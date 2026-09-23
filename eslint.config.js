@@ -118,6 +118,7 @@ export default tseslint.config(
         { selector: 'ExportDefaultDeclaration', message: 'Только именованные экспорты.' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/ban-ts-comment': [
         'error',
         { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true },
