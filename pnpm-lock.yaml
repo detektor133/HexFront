@@ -49,7 +49,11 @@ importers:
 
   apps/server: {}
 
-  packages/mapgen: {}
+  packages/mapgen:
+    dependencies:
+      '@hexfront/sim':
+        specifier: workspace:*
+        version: link:../sim
 
   packages/protocol: {}
 
