@@ -1,0 +1,32 @@
+{
+  "name": "hexfront",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.21.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "depcheck": "depcruise packages apps tools --config .dependency-cruiser.cjs",
+    "test": "vitest run --coverage",
+    "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm test",
+    "format": "prettier --write .",
+    "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.4",
+    "@vitest/coverage-v8": "^5.0.1",
+    "dependency-cruiser": "^18.4.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-import-x": "^4.17.1",
+    "fast-check": "^4.10.2",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  }
+}

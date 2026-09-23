@@ -6,7 +6,7 @@
 
 ## Задачи
 
-- [ ] **T1. Монорепо и инструменты.**
+- [x] **T1. Монорепо и инструменты.**
   pnpm workspaces (`packages/sim`, `packages/protocol`, `packages/mapgen`, `apps/client`, `apps/server`, `tools/balance`, `tools/replay`), общий `tsconfig.base.json` (strict + флаги из AGENTS.md), ESLint flat config, Prettier, dependency-cruiser с границами из `overview.md`, Vitest workspace, скрипт `pnpm check`, GitHub Actions CI.
   `.gitmessage` подключён (`git config commit.template .gitmessage`), шаблон PR в `.github/`, CI-проверка сообщений коммитов в PR свой скрипт `tools/commit-check` (формат `<тип>(<область>): <текст>`, кириллица в тексте заголовка, трейлер `Этап:` в ветках `stage-*`) — без сторонних зависимостей.
   *Приёмка:* `pnpm check` зелёный на пустом проекте; commit-check отклоняет 5 примеров неверных сообщений и принимает примеры из `CONVENTIONS.md`; в `packages/sim` фикстура с `Math.random()` и импортом из `apps/*` роняет lint и depcheck (фикстура-тест проверяет, что правило срабатывает, сама фикстура исключена из сборки).
