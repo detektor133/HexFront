@@ -11,9 +11,10 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "depcheck": "depcruise packages apps tools --config .dependency-cruiser.cjs",
     "test": "vitest run --coverage",
-    "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm test",
     "format": "prettier --write .",
-    "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts"
+    "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
+    "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

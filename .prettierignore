@@ -3,3 +3,6 @@ coverage/
 dist/
 docs/
 *.md
+
+# Генерируются tools/tokens; формат задаёт генератор, сверка — тестом.
+apps/client/src/theme/tokens.*
