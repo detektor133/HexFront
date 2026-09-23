@@ -1,0 +1,43 @@
+# Этап 01 — Фундамент
+
+**Цель:** репозиторий, в котором невозможно написать недетерминированную симуляцию незаметно, и клиент, рисующий карту в утверждённом стиле рельефа.
+
+**Читать:** `AGENTS.md`, `architecture/overview.md`, `architecture/sim-core.md`, `architecture/adr/*`, `gdd/01-map.md`, `art/tokens.json`, `art/style-guide.md` (слои 1–3), `testing.md`.
+
+## Задачи
+
+- [ ] **T1. Монорепо и инструменты.**
+  pnpm workspaces (`packages/sim`, `packages/protocol`, `packages/mapgen`, `apps/client`, `apps/server`, `tools/balance`, `tools/replay`), общий `tsconfig.base.json` (strict + флаги из AGENTS.md), ESLint flat config, Prettier, dependency-cruiser с границами из `overview.md`, Vitest workspace, скрипт `pnpm check`, GitHub Actions CI.
+  `.gitmessage` подключён (`git config commit.template .gitmessage`), шаблон PR в `.github/`, CI-проверка сообщений коммитов в PR свой скрипт `tools/commit-check` (формат `<тип>(<область>): <текст>`, кириллица в тексте заголовка, трейлер `Этап:` в ветках `stage-*`) — без сторонних зависимостей.
+  *Приёмка:* `pnpm check` зелёный на пустом проекте; commit-check отклоняет 5 примеров неверных сообщений и принимает примеры из `CONVENTIONS.md`; в `packages/sim` фикстура с `Math.random()` и импортом из `apps/*` роняет lint и depcheck (фикстура-тест проверяет, что правило срабатывает, сама фикстура исключена из сборки).
+
+- [ ] **T2. Fixed-point и hex-математика** (`packages/sim/src/math`).
+  `fp`, `fpMul`, `fpDiv`, `intDiv`, `clamp`; осевые координаты, `neighbors` в порядке `E, NE, NW, W, SW, SE`, `distance`, `ring`, `spiral`, `line`, конверсия axial↔offset (even-q), `hexId`.
+  *Приёмка:* юнит-тесты + fast-check свойства (`distance` симметрична и удовлетворяет неравенству треугольника; `ring(r)` содержит `6r` гексов; offset↔axial взаимно обратны; `fpMul` не теряет точность на граничных значениях из `sim-core.md`).
+
+- [ ] **T3. Seeded PRNG** (`rng.ts`, xoshiro128**).
+  *Приёмка:* эталонная последовательность для сида 42 зафиксирована тестом; `fork(seed, streamId)` даёт независимые потоки.
+
+- [ ] **T4. Формат карты v1.**
+  Типы, загрузчик JSON (base64 → typed arrays), валидатор (размеры, границы, города на суше, дистанция городов ≥ 4, spawn'ы проходимы). Две ручные тестовые карты: `tiny` (20×15, 2 игрока) и `small` (40×30, 6 игроков) в `packages/mapgen/maps/`.
+  *Приёмка:* валидатор отклоняет 6 заранее испорченных вариантов с понятными сообщениями.
+
+- [ ] **T5. Состояние матча и скелет `step`.**
+  `createMatch(map, players, seed)` по правилам старта (`gdd/08-match.md`: столица + 2 соседних гекса, население нейтральных гексов, золото, 2 армии — армии пока только как данные), `hashState`, `step` с пустыми системами в порядке из `sim-core.md`, команды-заглушки с валидацией `Rejected('notImplemented')`. Сценарный DSL из `testing.md` (ASCII → состояние).
+  *Приёмка:* стартовое состояние на `small` совпадает с golden-хэшем; 1000 тиков без команд → хэш стабилен между двумя прогонами; DSL разбирает пример из `testing.md`.
+
+- [ ] **T6. Токены.**
+  Скрипт `tools/tokens` генерирует `apps/client/src/theme/tokens.ts` и `tokens.css` из `docs/art/tokens.json`. Тест проверяет контраст всех `players.palette[].line` к белому ≥ 4,5.
+  *Приёмка:* сгенерированные файлы в git, CI падает, если они не совпадают с генерацией.
+
+- [ ] **T7. Клиент: рендер рельефа и камера.**
+  Vite + PixiJS v8 + React 19. Страница `/dev/map?map=small`: вода, рельеф с паттернами (лес — точки, холмы/горы — горизонтали, детерминированно от координат), реки по рёбрам, сетка гексов с z2. Камера: перетаскивание, колесо, щипок, инерция, границы карты, 3 уровня зума. Шрифты Unbounded и Golos Text локально (woff2, latin+cyrillic).
+  *Приёмка:* 60 fps на карте `small` в Chrome на ПК (замер в отчёте); скриншоты `/dev/map` на 390×844 и 1440×900 приложены; нет ни одного цвета вне токенов (grep по hex-литералам в `apps/client/src` вне `theme/`).
+
+## Вне объёма
+
+Население, экономика, армии, бой, UI кроме dev-страницы, сервер, генератор карт.
+
+## Готово, когда
+
+Все задачи отмечены, `pnpm check` зелёный, отчёт `docs/reports/stage-01.md` со скриншотами.

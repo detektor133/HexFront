@@ -1,0 +1,10 @@
+# <тип>(<область>): <что сделано — по-русски, с маленькой буквы, без точки>
+#
+# <зачем и как, если не очевидно>
+#
+# Этап: 02/T5
+# Решение: DECISIONS YYYY-MM-DD | CR-XXX
+#
+# Типы: feat fix test refactor perf balance change docs build ci chore
+# Области: sim protocol mapgen client server bots balance-tool infra docs
+# Подробно: docs/CONVENTIONS.md
