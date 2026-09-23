@@ -15,7 +15,7 @@
   `fp`, `fpMul`, `fpDiv`, `intDiv`, `clamp`; осевые координаты, `neighbors` в порядке `E, NE, NW, W, SW, SE`, `distance`, `ring`, `spiral`, `line`, конверсия axial↔offset (even-q), `hexId`.
   *Приёмка:* юнит-тесты + fast-check свойства (`distance` симметрична и удовлетворяет неравенству треугольника; `ring(r)` содержит `6r` гексов; offset↔axial взаимно обратны; `fpMul` не теряет точность на граничных значениях из `sim-core.md`).
 
-- [ ] **T3. Seeded PRNG** (`rng.ts`, xoshiro128**).
+- [x] **T3. Seeded PRNG** (`rng.ts`, xoshiro128**).
   *Приёмка:* эталонная последовательность для сида 42 зафиксирована тестом; `fork(seed, streamId)` даёт независимые потоки.
 
 - [ ] **T4. Формат карты v1.**
