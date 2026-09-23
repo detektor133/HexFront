@@ -157,6 +157,17 @@ export default tseslint.config(
     },
   },
   {
+    // Тесты сверяют результат с эталоном на BigInt; Math.random по-прежнему запрещён.
+    files: ['packages/sim/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ExportDefaultDeclaration', message: 'Только именованные экспорты.' },
+        ...simRestrictedSyntax.filter((r) => !r.selector.includes("'/'")),
+      ],
+    },
+  },
+  {
     // Единственное место, где разрешены усечение и оператор деления.
     files: ['packages/sim/src/math/int.ts'],
     rules: {

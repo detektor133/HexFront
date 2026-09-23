@@ -11,7 +11,7 @@
   `.gitmessage` подключён (`git config commit.template .gitmessage`), шаблон PR в `.github/`, CI-проверка сообщений коммитов в PR свой скрипт `tools/commit-check` (формат `<тип>(<область>): <текст>`, кириллица в тексте заголовка, трейлер `Этап:` в ветках `stage-*`) — без сторонних зависимостей.
   *Приёмка:* `pnpm check` зелёный на пустом проекте; commit-check отклоняет 5 примеров неверных сообщений и принимает примеры из `CONVENTIONS.md`; в `packages/sim` фикстура с `Math.random()` и импортом из `apps/*` роняет lint и depcheck (фикстура-тест проверяет, что правило срабатывает, сама фикстура исключена из сборки).
 
-- [ ] **T2. Fixed-point и hex-математика** (`packages/sim/src/math`).
+- [x] **T2. Fixed-point и hex-математика** (`packages/sim/src/math`).
   `fp`, `fpMul`, `fpDiv`, `intDiv`, `clamp`; осевые координаты, `neighbors` в порядке `E, NE, NW, W, SW, SE`, `distance`, `ring`, `spiral`, `line`, конверсия axial↔offset (even-q), `hexId`.
   *Приёмка:* юнит-тесты + fast-check свойства (`distance` симметрична и удовлетворяет неравенству треугольника; `ring(r)` содержит `6r` гексов; offset↔axial взаимно обратны; `fpMul` не теряет точность на граничных значениях из `sim-core.md`).
 
