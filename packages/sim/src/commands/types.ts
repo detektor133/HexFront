@@ -49,7 +49,10 @@ export type RejectReason =
   | 'maxLevel'
   | 'buildingExists'
   | 'fortInCity'
-  | 'depotNeedsRoad';
+  | 'depotNeedsRoad'
+  | 'notIsolated'
+  | 'noPath'
+  | 'alreadyBuilding';
 
 export type Validation =
   { readonly ok: true } | { readonly ok: false; readonly reason: RejectReason };

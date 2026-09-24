@@ -41,7 +41,7 @@ type ArmyRef = number | { readonly armyOf: string; readonly index: number };
 type DslCommand =
   | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
   | { readonly t: 'setTax'; readonly percent: number }
-  | { readonly t: 'foundCity' | 'improve' | 'upgradeCity'; readonly where: At }
+  | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' };
 
 export const at = (col: number, row: number): At => ({ col, row });
@@ -80,6 +80,8 @@ export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
 export const improve = (where: At): DslCommand => ({ t: 'improve', where });
 /** Улучшение города, стоящего в клетке where. */
 export const upgradeCity = (where: At): DslCommand => ({ t: 'upgradeCity', where });
+/** Перестройка снабжения города, стоящего в клетке where. */
+export const rebuildSupply = (where: At): DslCommand => ({ t: 'rebuildSupply', where });
 export const build = (where: At, kind: 'fort' | 'depot'): DslCommand => ({
   t: 'build',
   where,
@@ -254,6 +256,8 @@ function makeScenario(
         return { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
       case 'upgradeCity':
         return { t: 'upgradeCity', cityId: cityIdAt(c.where) };
+      case 'rebuildSupply':
+        return { t: 'rebuildSupply', cityId: cityIdAt(c.where) };
       case 'build':
         return { t: 'build', hex: hexOf(c.where), kind: c.kind };
       default:
