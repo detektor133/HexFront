@@ -16,3 +16,4 @@ export * from './step.ts';
 export * from './queries/city.ts';
 export * from './queries/road-path.ts';
 export * from './state/network.ts';
+export * from './queries/player-view.ts';
