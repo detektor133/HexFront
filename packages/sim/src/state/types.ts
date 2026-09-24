@@ -51,7 +51,7 @@ export interface Player {
   citiesFounded: number;
 }
 
-export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot';
+export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
 
 /** Стройка на гексе; одна на гекс. Прогресс — в тиках. */
 export interface Construction {
@@ -61,6 +61,8 @@ export interface Construction {
   readonly kind: ConstructionKind;
   progressTicks: number;
   readonly totalTicks: number;
+  /** Только для road: гексы без дороги в порядке прокладки, по одному за ROAD_BUILD_S_PER_HEX. */
+  readonly path?: readonly HexId[];
 }
 
 export type ArmyOrder = 'idle' | 'hold' | 'expand';

@@ -71,6 +71,9 @@ function hashEntities(s: Hasher, state: MatchState): void {
     str(s, a.order);
     int(s, a.supplyLevel);
   }
+}
+
+function hashConstructions(s: Hasher, state: MatchState): void {
   int(s, state.constructions.length);
   for (const c of state.constructions) {
     int(s, c.id);
@@ -79,6 +82,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     str(s, c.kind);
     int(s, c.progressTicks);
     int(s, c.totalTicks);
+    array(s, c.path ?? []);
   }
 }
 
@@ -101,5 +105,6 @@ export function hashState(state: MatchState): string {
   array(s, hexes.building);
   array(s, hexes.road);
   hashEntities(s, state);
+  hashConstructions(s, state);
   return s.h.toString(16).padStart(8, '0');
 }

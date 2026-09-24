@@ -2,7 +2,7 @@
 // Клетка сетки — гекс в offset-координатах (столбец, строка); at(col, row) адресует её так же.
 import { ORG_MAX, START_GOLD, TAX_DEFAULT, TICKS_PER_S, type UnitType } from '../../src/balance.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
-import { TERRAIN, type MapStatic } from '../../src/map/types.ts';
+import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import {
@@ -22,7 +22,7 @@ export interface At {
 }
 
 type Cell =
-  | { readonly kind: 'own'; readonly player: string }
+  | { readonly kind: 'own'; readonly player: string; readonly terrain: TerrainName }
   | {
       readonly kind: 'city';
       readonly player: string | null;
@@ -40,7 +40,12 @@ type DslCommand =
 
 export const at = (col: number, row: number): At => ({ col, row });
 
-export const own = (player: string): Cell => ({ kind: 'own', player });
+/** Свой гекс; местность по умолчанию — равнина. */
+export const own = (player: string, terrain: TerrainName = 'plains'): Cell => ({
+  kind: 'own',
+  player,
+  terrain,
+});
 
 export const city = (
   player: string | null,
@@ -96,12 +101,14 @@ function playerLetters(grid: string[][], legend: Readonly<Record<string, Cell>>)
   return [...letters].sort();
 }
 
-function buildMap(grid: string[][]): MapStatic {
+function buildMap(grid: string[][], legend: Readonly<Record<string, Cell>>): MapStatic {
   const width = grid[0]?.length ?? 0;
   const size = width * grid.length;
   const terrain = new Uint8Array(size).fill(TERRAIN.plains);
   grid.flat().forEach((token, id) => {
     if (token === WATER) terrain[id] = TERRAIN.water;
+    const cell = legend[token];
+    if (cell?.kind === 'own') terrain[id] = TERRAIN[cell.terrain];
   });
   return {
     version: 1,
@@ -180,7 +187,7 @@ export function scenario(
 ): Scenario {
   const grid = parseGrid(ascii);
   const letters = playerLetters(grid, opts.legend);
-  const map = buildMap(grid);
+  const map = buildMap(grid, opts.legend);
   const state = emptyState(map, letters);
   const idOf = (p: string): number => {
     const id = letters.indexOf(p);

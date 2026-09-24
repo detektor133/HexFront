@@ -116,7 +116,8 @@ describe('основание города', () => {
     expect(s.cityAt(hex)).toBeUndefined();
     s.runTicks(1);
     expect(s.cityAt(hex)).toMatchObject({ owner: 0, level: 1 });
-    expect(s.state.constructions).toHaveLength(0);
+    // Стройка основания закрыта; вместо неё идёт авто-дорога к столице (02/T6).
+    expect(s.state.constructions.map((c) => c.kind)).toEqual(['road']);
     expect(s.player('A').citiesFounded).toBe(1);
   });
 

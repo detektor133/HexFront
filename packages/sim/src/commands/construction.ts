@@ -40,8 +40,9 @@ const fail = (reason: RejectReason): PlanResult => ({ ok: false, reason });
 const plan = (p: Plan): PlanResult => ({ ok: true, plan: p });
 
 const cityAt = (state: MatchState, hex: HexId) => state.cities.find((c) => c.hex === hex);
+// Прокладка дороги не занимает гекс: пока она идёт, в городе можно строить.
 const busy = (state: MatchState, hex: HexId): boolean =>
-  state.constructions.some((c) => c.hex === hex);
+  state.constructions.some((c) => c.hex === hex && c.kind !== 'road');
 
 /**
  * Цена основания города: 120 × (1 + 0,5 × N), N — сколько городов игрок уже основал.
