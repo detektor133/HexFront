@@ -13,3 +13,6 @@ export * from './state/hash.ts';
 export * from './commands/types.ts';
 export { applyCommands, validate } from './commands/apply.ts';
 export * from './step.ts';
+export * from './queries/city.ts';
+export * from './queries/road-path.ts';
+export * from './state/network.ts';

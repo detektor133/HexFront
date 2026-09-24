@@ -11,7 +11,7 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { taxGrowthMult } from './tax.ts';
-import { hexId, inBounds, ring, hexFromId } from '../math/hex.ts';
+import { distance, hexFromId, hexId, inBounds, ring } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
@@ -28,27 +28,64 @@ export function cityLevelMult(level: number): Fp {
   return (FP + CITY_LEVEL_GROWTH_STEP * (level - 1)) as Fp;
 }
 
-// Для каждого гекса — лучшая «городская» часть роста: baseGrowth(ring) × cityLevelMult × networkMult.
+// «Городская» часть роста: baseGrowth(ring) × cityLevelMult × networkMult.
 // Остальные множители одинаковы для всех городов гекса, поэтому максимум берётся по этой части.
+function cityGrowthPart(
+  state: MatchState,
+  cityId: number,
+  level: number,
+  ringIndex: number,
+): number {
+  const networkMult = isCityIsolated(state, cityId) ? ISOLATED_GROWTH_MULT : (FP as Fp);
+  return fpMul(BASE_GROWTH[ringIndex] ?? (0 as Fp), fpMul(cityLevelMult(level), networkMult));
+}
+
 function bestCityGrowth(state: MatchState): Int32Array {
   const { map, hexes } = state;
   const best = new Int32Array(map.width * map.height);
   for (const c of state.cities) {
     if (c.owner === NEUTRAL) continue;
-    const networkMult = isCityIsolated(state, c.id) ? ISOLATED_GROWTH_MULT : (FP as Fp);
-    const cityPart = fpMul(cityLevelMult(c.level), networkMult);
     const center = hexFromId(c.hex, map.width);
-    BASE_GROWTH.forEach((base, k) => {
+    BASE_GROWTH.forEach((_, k) => {
+      const g = cityGrowthPart(state, c.id, c.level, k);
       for (const h of ring(center, k)) {
         if (!inBounds(h, map.width, map.height)) continue;
         const id = hexId(h, map.width);
-        if (hexes.owner[id] !== c.owner) continue;
-        const g = fpMul(base, cityPart);
-        if (g > (best[id] ?? 0)) best[id] = g;
+        if (hexes.owner[id] === c.owner && g > (best[id] ?? 0)) best[id] = g;
       }
     });
   }
   return best;
+}
+
+// Рост до деления на время: fullGrowth × (cap − pop) / cap даёт людей/с в fixed-point.
+function fullGrowth(state: MatchState, id: number, cityPart: number): number {
+  const player = state.players[state.hexes.owner[id] ?? NEUTRAL];
+  if (cityPart === 0 || !player) return 0;
+  const improvement = (FP + IMPROVEMENT_GROWTH_STEP * (state.hexes.improvement[id] ?? 0)) as Fp;
+  return fpMul(fpMul(cityPart as Fp, improvement), taxGrowthMult(player.taxEffective));
+}
+
+/**
+ * Скорость изменения населения гекса: рост по формуле GDD или убыль 1 %/с сверх лимита.
+ * @returns fixed-point людей в секунду (отрицательное — убыль)
+ */
+export function hexGrowthPerSecond(state: MatchState, hex: number): number {
+  const { width } = state.map;
+  const city = state.cities.find((c) => c.hex === hex);
+  const cap = city ? cityPopCap(city.level) : hexPopCap(state, hex);
+  const pop = state.hexes.pop[hex] ?? 0;
+  if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);
+  const here = hexFromId(hex, width);
+  let best = 0;
+  for (const c of state.cities) {
+    const d = distance(hexFromId(c.hex, width), here);
+    if (c.owner !== state.hexes.owner[hex] || c.owner === NEUTRAL || d >= BASE_GROWTH.length)
+      continue;
+    best = Math.max(best, cityGrowthPart(state, c.id, c.level, d));
+  }
+  if (pop === cap || cap === 0) return 0;
+  return intDiv(fullGrowth(state, hex, best) * (cap - pop), cap);
 }
 
 function cityLevels(state: MatchState): Uint8Array {
@@ -75,11 +112,8 @@ export function populationSystem(state: MatchState): void {
       hexes.pop[id] = Math.max(cap, pop - decay);
       continue;
     }
-    const cityPart = best[id] ?? 0;
-    const player = state.players[hexes.owner[id] ?? NEUTRAL];
-    if (cityPart === 0 || !player || pop === cap) continue;
-    const improvement = (FP + IMPROVEMENT_GROWTH_STEP * (hexes.improvement[id] ?? 0)) as Fp;
-    const full = fpMul(fpMul(cityPart as Fp, improvement), taxGrowthMult(player.taxEffective));
+    const full = fullGrowth(state, id, best[id] ?? 0);
+    if (full === 0 || pop === cap) continue;
     // Одно деление в конце: доля (1 − pop/cap) и перевод в тики без промежуточного округления.
     const growth = intDiv(full * (cap - pop), cap * TICKS_PER_S);
     hexes.pop[id] = Math.min(cap, pop + growth);

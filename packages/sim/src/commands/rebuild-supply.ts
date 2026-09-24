@@ -17,6 +17,8 @@ export type RebuildPlan =
       readonly path: readonly HexId[];
       readonly toBuild: readonly HexId[];
       readonly cost: Fp;
+      /** Хватает ли золота; предпросмотр показывает цену и без него (ui.md). */
+      readonly affordable: boolean;
     }
   | { readonly ok: false; readonly reason: RejectReason };
 
@@ -51,9 +53,8 @@ export function rebuildSupplyPlan(
   // Кэш сетей отстаёт до 1 с: путь уже замощён — значит, город вот-вот станет связанным.
   if (toBuild.length === 0) return fail('notIsolated');
   const cost = (SUPPLY_REBUILD_COST_PER_HEX * toBuild.length) as Fp;
-  const gold = state.players[playerId]?.gold ?? 0;
-  if (gold < cost) return fail('notEnoughGold');
-  return { ok: true, cityHex: city.hex, path, toBuild, cost };
+  const affordable = (state.players[playerId]?.gold ?? 0) >= cost;
+  return { ok: true, cityHex: city.hex, path, toBuild, cost, affordable };
 }
 
 /**
@@ -66,14 +67,15 @@ export function validateRebuildSupply(
   cityId: number,
 ): Validation {
   const plan = rebuildSupplyPlan(state, playerId, cityId);
-  return plan.ok ? OK : rejected(plan.reason);
+  if (!plan.ok) return rejected(plan.reason);
+  return plan.affordable ? OK : rejected('notEnoughGold');
 }
 
 /** Списывает золото и ставит прокладку пути в очередь. Вызывается после успешной проверки. */
 export function startRebuildSupply(state: MatchState, playerId: number, cityId: number): void {
   const plan = rebuildSupplyPlan(state, playerId, cityId);
   const player = state.players[playerId];
-  if (!plan.ok || !player) return;
+  if (!plan.ok || !plan.affordable || !player) return;
   player.gold = (player.gold - plan.cost) as Fp;
   queueRoad(state, playerId, plan.cityHex, plan.path);
 }

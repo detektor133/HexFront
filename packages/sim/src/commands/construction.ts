@@ -145,6 +145,25 @@ function withGold(state: MatchState, playerId: number, result: PlanResult): Plan
   return gold < result.plan.cost ? fail('notEnoughGold') : result;
 }
 
+/** Результат проверки стройки для UI: цена и время или причина отказа. */
+export type ConstructionCheck =
+  | { readonly ok: true; readonly cost: Fp; readonly timeS: Fp }
+  | { readonly ok: false; readonly reason: RejectReason };
+
+/**
+ * Проверка стройки с ценой — одна логика для команды и для кнопок интерфейса.
+ * @returns цена (золото) и время (с) в fixed-point или причина отказа
+ */
+export function checkConstruction(
+  state: MatchState,
+  playerId: number,
+  cmd: BuildCommand,
+): ConstructionCheck {
+  const result = withGold(state, playerId, planOf(state, playerId, cmd));
+  if (!result.ok) return result;
+  return { ok: true, cost: result.plan.cost, timeS: result.plan.timeS };
+}
+
 /**
  * Проверяет команду стройки без изменения состояния.
  * @returns OK или отказ с причиной
