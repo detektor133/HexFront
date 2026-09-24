@@ -19,6 +19,7 @@ import {
 } from './camera.ts';
 import { mapBounds, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
+import type { TerrainPalette } from '../theme/terrain-candidates.ts';
 import { tokens } from '../theme/tokens.ts';
 
 export interface MapViewState {
@@ -27,8 +28,24 @@ export interface MapViewState {
   readonly fps: number;
 }
 
+/** Слой между заливкой рельефа и его узорами (территории). */
+export interface MidLayer {
+  readonly container: Container;
+  update(scale: number, level: DetailLevel): void;
+  destroy(): void;
+}
+
+export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
+
+export interface MapViewOptions {
+  readonly radius: number;
+  readonly palette: TerrainPalette;
+  readonly midLayer: MidLayerFactory | null;
+}
+
 export interface MapView {
-  setRadius(radius: number): void;
+  /** Пересобирает слои; камера сохраняет точку карты в центре экрана и масштаб. */
+  configure(options: MapViewOptions): void;
   /** Масштаб с центром экрана; для скриншотов и отладки. */
   setScale(scale: number): void;
   destroy(): void;
@@ -49,9 +66,10 @@ const INERTIA_MAX_PAUSE_MS = 80;
 export async function createMapView(
   host: HTMLElement,
   map: MapStatic,
-  radius: number,
+  initial: MapViewOptions,
   onState: (s: MapViewState) => void,
 ): Promise<MapView> {
+  let opts = initial;
   const app = new Application();
   await app.init({
     background: tokens.map.background,
@@ -64,9 +82,15 @@ export async function createMapView(
   const world = new Container();
   app.stage.addChild(world);
 
-  let layer: TerrainLayer = createTerrainLayer(map, radius);
-  world.addChild(layer.container);
-  let bounds: Rect = mapBounds(map.width, map.height, radius);
+  let layer: TerrainLayer = createTerrainLayer(map, opts.radius, opts.palette);
+  let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
+  const mount = (): void => {
+    world.addChild(layer.base);
+    if (mid) world.addChild(mid.container);
+    world.addChild(layer.overlay);
+  };
+  mount();
+  let bounds: Rect = mapBounds(map.width, map.height, opts.radius);
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
   let cam: Camera = fitCamera(view(), bounds);
   let drawnScale = 0;
@@ -78,6 +102,7 @@ export async function createMapView(
     const level = detailLevel(cam.scale);
     if (cam.scale !== drawnScale) {
       layer.update(cam.scale, level);
+      mid?.update(cam.scale, level);
       drawnScale = cam.scale;
     }
     onState({ scale: cam.scale, level, fps: app.ticker.FPS });
@@ -105,22 +130,23 @@ export async function createMapView(
   });
 
   return {
-    setRadius(next) {
+    configure(next) {
       const centerWorld = {
-        x: (view().width / 2 - cam.x) / cam.scale / radius,
-        y: (view().height / 2 - cam.y) / cam.scale / radius,
+        x: (view().width / 2 - cam.x) / cam.scale / opts.radius,
+        y: (view().height / 2 - cam.y) / cam.scale / opts.radius,
       };
       layer.destroy();
-      radius = next;
-      layer = createTerrainLayer(map, radius);
-      world.addChild(layer.container);
-      bounds = mapBounds(map.width, map.height, radius);
-      // Сохраняем ту же точку карты в центре экрана и тот же масштаб.
+      mid?.destroy();
+      opts = next;
+      layer = createTerrainLayer(map, opts.radius, opts.palette);
+      mid = opts.midLayer?.(map, opts.radius) ?? null;
+      mount();
+      bounds = mapBounds(map.width, map.height, opts.radius);
       cam = clampCamera(
         {
           scale: cam.scale,
-          x: view().width / 2 - centerWorld.x * radius * cam.scale,
-          y: view().height / 2 - centerWorld.y * radius * cam.scale,
+          x: view().width / 2 - centerWorld.x * opts.radius * cam.scale,
+          y: view().height / 2 - centerWorld.y * opts.radius * cam.scale,
         },
         view(),
         bounds,

@@ -1,5 +1,6 @@
-// Слои карты 1–3 (вода, рельеф с паттернами, реки) и сетка гексов.
+// Слои карты 1–3 (вода, рельеф с узорами, реки) и сетка гексов.
 // Правила: docs/art/style-guide.md, «Слои карты»; цвета и толщины — tokens.json.
+// Заливки и узоры — отдельные контейнеры: между ними ложится территория, узоры остаются читаемыми.
 import { Container, Graphics } from 'pixi.js';
 
 import {
@@ -15,34 +16,25 @@ import {
 import type { DetailLevel } from './camera.ts';
 import { hexCenter, hexEdge, hexPolygon, type Point } from './hex-geometry.ts';
 import { chainSegments } from './river-paths.ts';
+import { PATTERN_WIDTH_CANDIDATE, type TerrainPalette } from '../theme/terrain-candidates.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const { map: M } = tokens;
 
-// Пропорции паттернов в долях радиуса гекса: геометрия знака, а не цвет или толщина.
-const DOT_SPREAD = 0.55;
-const DOT_RADIUS = 0.07;
-const FOREST_DOTS = 4;
-const DESERT_DOTS = 3;
-const CONTOUR_STEP = 0.22;
-const CONTOUR_HALF = 0.55;
-const CONTOUR_TAPER = 0.12;
-const CONTOUR_JITTER = 0.2;
+// Геометрия узоров в долях радиуса гекса.
+const CROWN_RADIUS = 0.17;
+const CROWN_SPREAD = 0.3;
+const HILL_HALF_WIDTH = 0.28;
+const HILL_HEIGHT = 0.3;
+const PEAK_HALF_WIDTH = 0.48;
+const PEAK_TOP = 0.42;
+const PEAK_BASE = 0.3;
 const HATCH_LINES = 3;
-const HATCH_START_X = 0.1;
-const HATCH_STEP_X = 0.12;
-const HATCH_TOP = 0.15;
-const HATCH_BOTTOM = 0.45;
-const HATCH_SLANT = 0.1;
-
-const TERRAIN_FILL: Readonly<Record<number, string>> = {
-  [TERRAIN.water]: M.water,
-  [TERRAIN.plains]: M.terrain.plains,
-  [TERRAIN.forest]: M.terrain.forest,
-  [TERRAIN.hills]: M.terrain.hills,
-  [TERRAIN.mountains]: M.terrain.mountains,
-  [TERRAIN.desert]: M.terrain.desert,
-};
+const HATCH_SLANT = 0.18;
+const RIPPLE_HALF = 0.3;
+const RIPPLE_AMPLITUDE = 0.08;
+const RIPPLE_STEP = 0.24;
+const JITTER = 0.12;
 
 /** Детерминированное «случайное» число 0..1 от координат гекса и номера признака. */
 export function hexNoise(q: number, r: number, salt: number): number {
@@ -67,38 +59,81 @@ function cellsOf(map: MapStatic, radius: number): HexCell[] {
   });
 }
 
-// Точки леса и пустыни — заливка, масштабируются с картой вместе с гексом.
-function drawDots(g: Graphics, cell: HexCell, radius: number, count: number, color: string): void {
-  for (let i = 0; i < count; i += 1) {
-    const angle = hexNoise(cell.q, cell.r, i * 2) * Math.PI * 2;
-    const dist = hexNoise(cell.q, cell.r, i * 2 + 1) * radius * DOT_SPREAD;
-    g.circle(
-      cell.center.x + Math.cos(angle) * dist,
-      cell.center.y + Math.sin(angle) * dist,
-      radius * DOT_RADIUS,
-    );
+function fillOf(p: TerrainPalette, terrain: number): string {
+  switch (terrain) {
+    case TERRAIN.water:
+      return p.water;
+    case TERRAIN.forest:
+      return p.forest;
+    case TERRAIN.hills:
+      return p.hills;
+    case TERRAIN.mountains:
+      return p.mountains;
+    case TERRAIN.desert:
+      return p.desert;
+    default:
+      return p.plains;
   }
-  g.fill(color);
 }
 
-// Горизонтали: холмы — 2, горы — 3–4 плюс штриховка склона. Толщина — экранная, задаётся в update().
-function addContours(g: Graphics, cell: HexCell, radius: number): void {
-  const { x, y } = cell.center;
-  const isMountain = cell.terrain === TERRAIN.mountains;
-  const lines = isMountain ? 3 + Math.floor(hexNoise(cell.q, cell.r, 7) * 2) : 2;
-  const shift = (hexNoise(cell.q, cell.r, 8) - 0.5) * radius * CONTOUR_JITTER;
-  for (let i = 0; i < lines; i += 1) {
-    const dy = (i - (lines - 1) / 2) * radius * CONTOUR_STEP + shift;
-    const half = radius * (CONTOUR_HALF - Math.abs(i - (lines - 1) / 2) * CONTOUR_TAPER);
-    g.moveTo(x - half, y + dy).lineTo(x + half, y + dy);
+// Сдвиг узора внутри гекса, чтобы соседние гексы не выглядели штампом.
+function jittered(cell: HexCell, radius: number): Point {
+  return {
+    x: cell.center.x + (hexNoise(cell.q, cell.r, 1) - 0.5) * radius * JITTER * 2,
+    y: cell.center.y + (hexNoise(cell.q, cell.r, 2) - 0.5) * radius * JITTER * 2,
+  };
+}
+
+// Лес — три кроны треугольником; заливка масштабируется вместе с картой.
+function drawCrowns(g: Graphics, c: Point, radius: number): void {
+  const s = radius * CROWN_SPREAD;
+  for (const [dx, dy] of [
+    [0, -0.6],
+    [-0.8, 0.45],
+    [0.8, 0.45],
+  ] as const) {
+    g.circle(c.x + dx * s, c.y + dy * s, radius * CROWN_RADIUS);
   }
-  if (!isMountain) return;
-  for (let i = 0; i < HATCH_LINES; i += 1) {
-    const sx = x + radius * (HATCH_START_X + i * HATCH_STEP_X);
-    g.moveTo(sx, y + radius * HATCH_TOP).lineTo(
-      sx + radius * HATCH_SLANT,
-      y + radius * HATCH_BOTTOM,
-    );
+}
+
+// Холмы — две дуги-«горба», правая чуть ниже.
+function addHills(g: Graphics, c: Point, radius: number): void {
+  const w = radius * HILL_HALF_WIDTH;
+  const h = radius * HILL_HEIGHT;
+  for (const [dx, dy] of [
+    [-0.55, -0.05],
+    [0.55, 0.2],
+  ] as const) {
+    const x = c.x + dx * w * 1.6;
+    const y = c.y + dy * radius;
+    g.moveTo(x - w, y).quadraticCurveTo(x, y - h * 2, x + w, y);
+  }
+}
+
+// Горы — пик и штриховка теневого (правого) склона.
+function addMountain(g: Graphics, c: Point, radius: number): void {
+  const w = radius * PEAK_HALF_WIDTH;
+  const top = c.y - radius * PEAK_TOP;
+  const base = c.y + radius * PEAK_BASE;
+  g.moveTo(c.x - w, base)
+    .lineTo(c.x, top)
+    .lineTo(c.x + w, base);
+  for (let i = 1; i <= HATCH_LINES; i += 1) {
+    const t = i / (HATCH_LINES + 1);
+    g.moveTo(c.x + w * t, top + (base - top) * t).lineTo(c.x + w * t - w * HATCH_SLANT, base);
+  }
+}
+
+// Пустыня — две строки ряби.
+function addRipple(g: Graphics, c: Point, radius: number): void {
+  const half = radius * RIPPLE_HALF;
+  const a = radius * RIPPLE_AMPLITUDE;
+  for (const dy of [-0.5, 0.5]) {
+    const y = c.y + dy * radius * RIPPLE_STEP * 2;
+    const x0 = c.x - half + dy * half * 0.4;
+    g.moveTo(x0, y)
+      .quadraticCurveTo(x0 + half * 0.5, y - a * 2, x0 + half, y)
+      .quadraticCurveTo(x0 + half * 1.5, y + a * 2, x0 + half * 2, y);
   }
 }
 
@@ -116,27 +151,6 @@ function drawSmooth(g: Graphics, points: readonly Point[]): void {
   g.lineTo(last.x, last.y);
 }
 
-export interface TerrainLayer {
-  readonly container: Container;
-  /** Перерисовка экранных толщин под текущий масштаб и уровень детализации. */
-  update(scale: number, level: DetailLevel): void;
-  destroy(): void;
-}
-
-function drawBase(cells: readonly HexCell[], radius: number): Graphics {
-  const g = new Graphics();
-  for (const cell of cells) {
-    g.poly(hexPolygon(cell.center, radius)).fill(TERRAIN_FILL[cell.terrain] ?? M.background);
-  }
-  for (const cell of cells) {
-    if (cell.terrain === TERRAIN.forest)
-      drawDots(g, cell, radius, FOREST_DOTS, M.terrain.forestDot);
-    if (cell.terrain === TERRAIN.desert)
-      drawDots(g, cell, radius, DESERT_DOTS, M.terrain.desertDot);
-  }
-  return g;
-}
-
 function neighborTerrain(map: MapStatic, cell: HexCell, d: Direction): number {
   const n = neighbor(cell, d);
   // За краем карты считаем море, чтобы край не рисовался берегом.
@@ -144,8 +158,13 @@ function neighborTerrain(map: MapStatic, cell: HexCell, d: Direction): number {
   return map.terrain[hexId(n, map.width)] ?? TERRAIN.water;
 }
 
-// Берег — линия 1 px по рёбрам вода/суша (style-guide, слой 1); рисуется поверх сетки,
-// иначе белая сетка его перекрывает.
+function drawFills(cells: readonly HexCell[], radius: number, p: TerrainPalette): Graphics {
+  const g = new Graphics();
+  for (const cell of cells) g.poly(hexPolygon(cell.center, radius)).fill(fillOf(p, cell.terrain));
+  return g;
+}
+
+// Берег — линия 1 px по рёбрам вода/суша (style-guide, слой 1).
 function drawCoast(map: MapStatic, cells: readonly HexCell[], radius: number): Graphics {
   const g = new Graphics();
   for (const cell of cells) {
@@ -167,19 +186,43 @@ function drawGrid(cells: readonly HexCell[], radius: number): Graphics {
   return g;
 }
 
-/** Строит слои рельефа для карты при заданном радиусе гекса. */
-export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer {
+function drawCrownLayer(cells: readonly HexCell[], radius: number, p: TerrainPalette): Graphics {
+  const g = new Graphics();
+  for (const cell of cells) {
+    if (cell.terrain === TERRAIN.forest) drawCrowns(g, jittered(cell, radius), radius);
+  }
+  return g.fill(p.forestInk);
+}
+
+export interface TerrainLayer {
+  /** Заливки, реки и сетка — под территорией. */
+  readonly base: Container;
+  /** Узоры и берег — над территорией. */
+  readonly overlay: Container;
+  /** Перерисовка экранных толщин под текущий масштаб и уровень детализации. */
+  update(scale: number, level: DetailLevel): void;
+  destroy(): void;
+}
+
+/** Строит слои рельефа для карты при заданном радиусе гекса и палитре. */
+export function createTerrainLayer(
+  map: MapStatic,
+  radius: number,
+  palette: TerrainPalette,
+): TerrainLayer {
   const cells = cellsOf(map, radius);
-  const container = new Container();
-  const base = drawBase(cells, radius);
-  const contours = new Graphics();
   const rivers = new Graphics();
   const grid = drawGrid(cells, radius);
-  container.addChild(base, contours, rivers, grid, drawCoast(map, cells, radius));
+  const base = new Container();
+  base.addChild(drawFills(cells, radius, palette), rivers, grid);
+  const lines = new Graphics();
+  const overlay = new Container();
+  overlay.addChild(drawCrownLayer(cells, radius, palette), lines, drawCoast(map, cells, radius));
 
-  const relief = cells.filter(
-    (c) => c.terrain === TERRAIN.hills || c.terrain === TERRAIN.mountains,
-  );
+  const byTerrain = (t: number): HexCell[] => cells.filter((c) => c.terrain === t);
+  const hills = byTerrain(TERRAIN.hills);
+  const mountains = byTerrain(TERRAIN.mountains);
+  const deserts = byTerrain(TERRAIN.desert);
   const riverChains = chainSegments(
     cells.flatMap((cell) =>
       [0, 1, 2]
@@ -189,17 +232,22 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
   );
 
   return {
-    container,
+    base,
+    overlay,
     update(scale, level) {
-      // Толщины в токенах — экранные px, поэтому в мировых единицах делим на масштаб.
-      contours.clear();
-      for (const cell of relief) addContours(contours, cell, radius);
-      contours.stroke({
-        color: M.contour,
-        alpha: M.contourAlpha,
-        width: M.contourWidth / scale,
+      // Толщины — экранные px, поэтому в мировых единицах делим на масштаб.
+      const style = {
+        width: PATTERN_WIDTH_CANDIDATE / scale,
         cap: 'round',
-      });
+        join: 'round',
+      } as const;
+      lines.clear();
+      for (const c of hills) addHills(lines, jittered(c, radius), radius);
+      lines.stroke({ ...style, color: palette.hillInk });
+      for (const c of mountains) addMountain(lines, jittered(c, radius), radius);
+      lines.stroke({ ...style, color: palette.mountainInk });
+      for (const c of deserts) addRipple(lines, jittered(c, radius), radius);
+      lines.stroke({ ...style, color: palette.desertInk });
       rivers.clear();
       for (const chain of riverChains) drawSmooth(rivers, chain);
       const riverWidth = M.riverWidth[level - 1] ?? M.riverWidth[1];
@@ -207,7 +255,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
       grid.visible = level >= M.hexGridVisibleFromZoom;
     },
     destroy() {
-      container.destroy({ children: true });
+      base.destroy({ children: true });
+      overlay.destroy({ children: true });
     },
   };
 }

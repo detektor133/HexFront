@@ -13,19 +13,33 @@ interface Shot {
   readonly query: string;
 }
 
+// Выбор палитры местности: 3 палитры × территории вкл/выкл × телефон/ПК, плюс прозрачность.
+const PALETTES = ['A', 'B', 'C'] as const;
+const VIEWS = [
+  { tag: '390x844', width: 390, height: 844, query: '&scale=1' },
+  { tag: '1440x900-fit', width: 1440, height: 900, query: '' },
+  { tag: '1440x900-zoom', width: 1440, height: 900, query: '&scale=1.6' },
+] as const;
+
 const SHOTS: readonly Shot[] = [
-  { name: 'dev-map-390x844-fit', width: 390, height: 844, query: '' },
-  { name: 'dev-map-390x844-scale1', width: 390, height: 844, query: '&scale=1' },
-  { name: 'dev-map-390x844-scale2', width: 390, height: 844, query: '&scale=2' },
-  { name: 'dev-map-1440x900-fit', width: 1440, height: 900, query: '' },
-  { name: 'dev-map-1440x900-scale1', width: 1440, height: 900, query: '&scale=1' },
-  { name: 'dev-map-1440x900-scale2', width: 1440, height: 900, query: '&scale=2' },
-  ...[16, 28, 36].map((r) => ({
-    name: `dev-map-1440x900-radius${r}`,
-    width: 1440,
-    height: 900,
-    query: `&radius=${r}&scale=1`,
-  })),
+  ...PALETTES.flatMap((p) =>
+    VIEWS.flatMap((v) =>
+      [false, true].map((terr) => ({
+        name: `terrain/${p}-${terr ? 'territories' : 'plain'}-${v.tag}`,
+        width: v.width,
+        height: v.height,
+        query: `&panel=0&palette=${p}${terr ? '&territories=1' : ''}${v.query}`,
+      })),
+    ),
+  ),
+  ...PALETTES.flatMap((p) =>
+    [65, 50].map((alpha) => ({
+      name: `terrain/${p}-territories-alpha${alpha}-1440x900-zoom`,
+      width: 1440,
+      height: 900,
+      query: `&panel=0&palette=${p}&territories=1&alpha=${alpha}&scale=1.6`,
+    })),
+  ),
 ];
 
 const browser = await chromium.launch();
