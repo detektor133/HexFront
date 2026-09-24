@@ -1,4 +1,4 @@
-// Только для /dev/map: фейковые государства и дорога-«метро», чтобы оценить палитру рельефа
+// Только для /dev/map: фейковые государства, чтобы оценить рельеф
 // под заливкой территорий. Настоящие слои 4–7 — этап 04; в игровой код модуль не идёт.
 import { Container, Graphics } from 'pixi.js';
 
@@ -7,8 +7,6 @@ import {
   hexFromId,
   hexId,
   inBounds,
-  distance,
-  line,
   neighbor,
   neighbors,
   type Hex,
@@ -16,7 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import type { DetailLevel } from '../render/camera.ts';
-import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
+import { hexCenter, hexEdge, hexPolygon } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const STATE_RADIUS = 6;
@@ -71,7 +69,7 @@ interface Owned {
   readonly p: number;
 }
 
-/** Строит слой из трёх государств и одной дороги по текущим токенам territory и road. */
+/** Строит слой из трёх государств по токенам territory. */
 export function createFakeTerritories(map: MapStatic, radius: number): FakeTerritories {
   const owner = claim(map);
   const cells: Owned[] = [];
@@ -86,17 +84,8 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
 
   const fill = new Graphics();
   const borders = new Graphics();
-  const road = new Graphics();
-  const stations = new Graphics();
   const container = new Container();
-  container.addChild(fill, borders, road, stations);
-
-  // Дорога-«метро» от столицы своего государства к ближайшему городу карты.
-  const capital = map.spawns[SPAWN_SLOTS[OWN]];
-  const city = capital
-    ? [...map.cities].sort((a, b) => distance(capital, a) - distance(capital, b))[0]
-    : undefined;
-  const roadPath = capital && city ? line(capital, city).map((h) => hexCenter(h, radius)) : [];
+  container.addChild(fill, borders);
 
   return {
     container,
@@ -125,35 +114,9 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
         }
         borders.stroke({ color: lineOf(p), width: bw, cap: 'round' });
       }
-      road.clear();
-      const [first, ...rest] = roadPath;
-      if (first) {
-        road.moveTo(first.x, first.y);
-        for (const pt of rest) road.lineTo(pt.x, pt.y);
-        const rw = tokens.road.width[level - 1] ?? tokens.road.width[1];
-        road.stroke({ color: lineOf(OWN), width: rw / scale, cap: 'round', join: 'round' });
-      }
-      drawStations(stations, [roadPath[0], roadPath.at(-1)], lineOf(OWN), scale);
     },
     destroy() {
       container.destroy({ children: true });
     },
   };
-}
-
-// Концы дороги — «станции» по токенам city (уровень 1), экранного размера.
-function drawStations(
-  g: Graphics,
-  points: readonly (Point | undefined)[],
-  color: string,
-  scale: number,
-): void {
-  const { city } = tokens;
-  g.clear();
-  for (const p of points) {
-    if (!p) continue;
-    g.circle(p.x, p.y, city.radiusByLevel[0] / scale)
-      .fill(city.fill)
-      .stroke({ color, width: city.strokeByLevel[0] / scale });
-  }
 }

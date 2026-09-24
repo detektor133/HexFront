@@ -13,8 +13,6 @@ import {
 } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
-/** Радиусы для выбора на глаз (DECISIONS 2026-09-24). */
-const RADIUS_OPTIONS = [16, 20, 28, 36] as const;
 /** Период обновления показаний панели: чаще — лишние перерисовки React. */
 const READOUT_MS = 250;
 
@@ -29,20 +27,18 @@ const LEGEND: readonly { color: string; label: MessageKey }[] = [
 ];
 
 interface Settings {
-  readonly radius: number;
   readonly territories: boolean;
 }
 
 function readSettings(params: URLSearchParams): Settings {
   return {
-    radius: Number(params.get('radius')) || tokens.map.hexRadius,
     territories: params.get('territories') === '1',
   };
 }
 
 function toOptions(s: Settings): MapViewOptions {
   return {
-    radius: s.radius,
+    radius: tokens.map.hexRadius,
     midLayer: s.territories ? (map, radius) => createFakeTerritories(map, radius) : null,
   };
 }
@@ -94,7 +90,7 @@ function Choice<T extends string | number | boolean>(props: {
   );
 }
 
-/** /dev/map?map=small[&radius&scale&territories=1&panel=0]. */
+/** /dev/map?map=small[&scale&territories=1&panel=0]. */
 export function DevMapPage(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search);
   const map = useMap(params.get('map') ?? 'small');
@@ -141,13 +137,6 @@ export function DevMapPage(): React.JSX.Element {
         <h1 className={styles.title}>{t('dev.map.title')}</h1>
         {map === 'loading' && <p>{t('dev.map.loading')}</p>}
         {map === 'error' && <p className={styles.error}>{t('dev.map.error')}</p>}
-        <Choice
-          label={t('dev.map.radius')}
-          options={RADIUS_OPTIONS}
-          value={settings.radius as (typeof RADIUS_OPTIONS)[number]}
-          format={String}
-          onPick={(radius) => update({ radius })}
-        />
         <Choice
           label={t('dev.map.territories')}
           options={[false, true]}

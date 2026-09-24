@@ -14,7 +14,7 @@ interface Shot {
 }
 
 // Эталоны /dev/map (палитра и прозрачность — DECISIONS 2026-09-24): телефон и ПК,
-// z1/z2/z3, без территорий и с примером территорий; плюс радиусы для выбора на глаз.
+// z1/z2/z3, без территорий и с примером территорий.
 const VIEWS = [
   { tag: '390x844-fit', width: 390, height: 844, query: '' },
   { tag: '390x844-scale1', width: 390, height: 844, query: '&scale=1' },
@@ -33,12 +33,6 @@ const SHOTS: readonly Shot[] = [
     })),
   ),
   { name: 'dev-map-1440x900-panel', width: 1440, height: 900, query: '&territories=1&scale=1' },
-  ...[16, 28, 36].map((r) => ({
-    name: `dev-map-1440x900-radius${r}`,
-    width: 1440,
-    height: 900,
-    query: `&panel=0&territories=1&radius=${r}&scale=1`,
-  })),
 ];
 
 const browser = await chromium.launch();

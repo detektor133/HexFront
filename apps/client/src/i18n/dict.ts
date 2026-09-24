@@ -2,7 +2,6 @@
 
 const ru = {
   'dev.map.title': 'Карта: отладка',
-  'dev.map.radius': 'Радиус гекса',
   'dev.map.scale': 'Масштаб',
   'dev.map.detail': 'Детализация',
   'dev.map.fps': 'Кадров/с',
@@ -24,7 +23,6 @@ export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
   'dev.map.title': 'Map: debug',
-  'dev.map.radius': 'Hex radius',
   'dev.map.scale': 'Scale',
   'dev.map.detail': 'Detail',
   'dev.map.fps': 'FPS',
