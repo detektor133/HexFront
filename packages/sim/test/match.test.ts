@@ -6,7 +6,6 @@ import { START_GOLD, START_POP_CAPITAL, START_POP_HEX, TAX_DEFAULT } from '../sr
 import { loadMap } from '../src/map/load.ts';
 import type { MapStatic } from '../src/map/types.ts';
 import { distance, hexFromId, hexId } from '../src/math/hex.ts';
-import type { Fp } from '../src/math/int.ts';
 import { createMatch, pickStartNeighbors } from '../src/state/create-match.ts';
 import { hashState } from '../src/state/hash.ts';
 import { hexPopCap } from '../src/state/pop-cap.ts';
@@ -155,10 +154,10 @@ describe('step', () => {
   it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'setTax', rate: 0 as Fp } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'upgradeCity', cityId: 1 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'setTax', reason: 'notImplemented' },
+      { t: 'commandRejected', playerId: 1, command: 'upgradeCity', reason: 'notImplemented' },
     ]);
     expect(hashState(a)).toBe(hashState(b));
   });

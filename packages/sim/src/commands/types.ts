@@ -32,7 +32,8 @@ export type Command =
   | { readonly t: 'rebuildSupply'; readonly cityId: number };
 
 /** Причина отклонения команды; уходит клиенту. */
-export type RejectReason = 'notImplemented' | 'unknownPlayer' | 'playerEliminated';
+export type RejectReason =
+  'notImplemented' | 'unknownPlayer' | 'playerEliminated' | 'invalidTaxRate';
 
 export type Validation =
   { readonly ok: true } | { readonly ok: false; readonly reason: RejectReason };

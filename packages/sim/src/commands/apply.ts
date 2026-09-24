@@ -1,4 +1,5 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
+import { validateSetTax } from './set-tax.ts';
 import { rejected, type Command, type PlayerCommand, type Validation } from './types.ts';
 import type { MatchState } from '../state/types.ts';
 
@@ -8,10 +9,11 @@ function assertNever(x: never): never {
   throw new Error(`неизвестная команда: ${JSON.stringify(x)}`);
 }
 
-// Каждая команда получит свою проверку в этапе, где появляется её механика.
+// Команды, чья механика появится в следующих этапах, пока отклоняются как notImplemented.
 function validateCommand(cmd: Command): Validation {
   switch (cmd.t) {
     case 'setTax':
+      return validateSetTax(cmd.rate);
     case 'move':
     case 'attack':
     case 'setOrder':
@@ -31,6 +33,11 @@ function validateCommand(cmd: Command): Validation {
     default:
       return assertNever(cmd);
   }
+}
+
+function execute(state: MatchState, playerId: number, cmd: Command): void {
+  const player = state.players[playerId];
+  if (cmd.t === 'setTax' && player) player.taxTarget = cmd.rate;
 }
 
 /**
@@ -53,8 +60,8 @@ export function applyCommands(state: MatchState, commands: readonly PlayerComman
   const ordered = [...commands].sort((a, b) => a.playerId - b.playerId);
   for (const { playerId, cmd } of ordered) {
     const result = validate(state, playerId, cmd);
-    if (!result.ok) {
+    if (result.ok) execute(state, playerId, cmd);
+    else
       state.events.push({ t: 'commandRejected', playerId, command: cmd.t, reason: result.reason });
-    }
   }
 }

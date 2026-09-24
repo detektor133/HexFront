@@ -5,7 +5,13 @@ import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic } from '../../src/map/types.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
-import { NEUTRAL, type Army, type GameEvent, type MatchState } from '../../src/state/types.ts';
+import {
+  NEUTRAL,
+  type Army,
+  type GameEvent,
+  type MatchState,
+  type Player,
+} from '../../src/state/types.ts';
 import { step } from '../../src/step.ts';
 
 /** Клетка сетки: столбец и строка. */
@@ -25,11 +31,9 @@ type Cell =
 
 type ArmyRef = number | { readonly armyOf: string; readonly index: number };
 
-type DslCommand = {
-  readonly t: 'attack';
-  readonly armies: readonly ArmyRef[];
-  readonly target: At;
-};
+type DslCommand =
+  | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
+  | { readonly t: 'setTax'; readonly percent: number };
 
 export const at = (col: number, row: number): At => ({ col, row });
 
@@ -49,6 +53,9 @@ export const attack = (armies: readonly ArmyRef[], target: At): DslCommand => ({
   armies,
   target,
 });
+
+/** Налог в процентах, как на ползунке HUD (может быть и невалидным — для тестов отказа). */
+export const setTax = (percent: number): DslCommand => ({ t: 'setTax', percent });
 
 const WATER = '~';
 const PLAINS = '.';
@@ -131,10 +138,17 @@ export interface Scenario {
   readonly state: MatchState;
   army(player: string, type: UnitType, soldiers: number, where: At): number;
   cmd(player: string, command: DslCommand): void;
+  /** Прогон целых секунд; дробные — через runTicks (float-умножение даёт лишний тик). */
   runSeconds(seconds: number): void;
+  runTicks(ticks: number): void;
   owner(where: At): string | null;
   armiesOf(player: string): Army[];
   lastEvent(t: GameEvent['t']): GameEvent | undefined;
+  /** Население гекса, fixed-point. */
+  pop(where: At): number;
+  /** Задать население гекса в людях. */
+  setPop(where: At, people: number): void;
+  player(p: string): Player;
 }
 
 /**
@@ -185,11 +199,15 @@ function makeScenario(
     if (!army) throw new Error(`сценарий: у ${ref.armyOf} нет армии #${ref.index}`);
     return army.id;
   };
-  const toCommand = (c: DslCommand): Command => ({
-    t: 'attack',
-    armyIds: c.armies.map(resolve),
-    target: hexOf(c.target),
-  });
+  const toCommand = (c: DslCommand): Command =>
+    c.t === 'setTax'
+      ? { t: 'setTax', rate: (c.percent * 10) as Fp }
+      : { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
+  const playerOf = (p: string): Player => {
+    const player = state.players[idOf(p)];
+    if (!player) throw new Error(`сценарий: нет игрока ${p}`);
+    return player;
+  };
   return {
     state,
     army(player, type, soldiers, where) {
@@ -211,7 +229,12 @@ function makeScenario(
       queue.push({ playerId: idOf(player), cmd: toCommand(command) });
     },
     runSeconds(seconds) {
-      for (let i = 0; i < seconds * TICKS_PER_S; i += 1) {
+      if (!Number.isInteger(seconds))
+        throw new Error('сценарий: runSeconds принимает целые секунды');
+      this.runTicks(seconds * TICKS_PER_S);
+    },
+    runTicks(ticks) {
+      for (let i = 0; i < ticks; i += 1) {
         step(state, queue.splice(0));
         log.push(...state.events);
       }
@@ -224,5 +247,12 @@ function makeScenario(
     lastEvent(t) {
       return [...log].reverse().find((e) => e.t === t);
     },
+    pop(where) {
+      return state.hexes.pop[hexOf(where)] ?? 0;
+    },
+    setPop(where, people) {
+      state.hexes.pop[hexOf(where)] = people * FP;
+    },
+    player: playerOf,
   };
 }
