@@ -136,7 +136,13 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
-    files: ['*.config.js', '*.config.ts'],
+    files: ['apps/client/test/**/*.ts', 'apps/client/scripts/**/*.ts'],
+    languageOptions: { globals: { ...globals.node } },
+  },
+  {
+    // Vite и Vitest читают конфиг только через default-экспорт.
+    files: ['**/*.config.js', '**/*.config.ts'],
+    languageOptions: { globals: { ...globals.node } },
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

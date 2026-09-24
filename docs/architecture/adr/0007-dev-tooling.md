@@ -15,6 +15,15 @@ Dev-зависимости корня монорепо (в `sim` runtime-зав�
 | `vitest`, `@vitest/coverage-v8`, `fast-check` | Тесты и покрытие `sim` ≥ 90 % (`testing.md`) |
 | `@types/node` 22 | Типы Node для сервера и инструментов |
 
+Клиент (`apps/client`), этап 01/T7:
+
+| Пакет | Зачем |
+| --- | --- |
+| `pixi.js` 8, `react` 19, `react-dom` 19 | Рендер карты и UI (ADR-0005), runtime |
+| `vite`, `@vitejs/plugin-react` | Dev-сервер и сборка клиента |
+| `@types/react`, `@types/react-dom` | Типы React |
+| `@playwright/test` | Скриншоты и замер fps dev-страниц; с этапа 04 — визуальные тесты (`testing.md`) |
+
 Vitest настроен через `test.projects` в `vitest.config.ts` (преемник workspace-файла).
 
 ## Отклонено
