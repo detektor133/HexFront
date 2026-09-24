@@ -4,6 +4,8 @@ import type { Command, ConstructionCheck, CityInfo, PlayerView, RejectReason } f
 /** Что можно сделать с выбранным гексом: цены и причины отказа для кнопок. */
 export interface Selection {
   readonly hex: number;
+  /** Лимит населения гекса, fixed-point людей. */
+  readonly popCap: number;
   readonly city: CityInfo | null;
   readonly foundCity: ConstructionCheck;
   readonly improve: ConstructionCheck;

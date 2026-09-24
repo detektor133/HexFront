@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { hexFromId, neighbors, offsetToAxial } from '@hexfront/sim';
 
-import { hexCenter, hexEdge, mapBounds } from '../src/render/hex-geometry.ts';
+import { hexCenter, hexEdge, mapBounds, pixelToHex } from '../src/render/hex-geometry.ts';
 
 const R = 20;
 
@@ -49,5 +49,15 @@ describe('геометрия flat-top гексов', () => {
       b.y,
       6,
     );
+  });
+
+  it('pixelToHex обратна hexCenter и попадает в гекс у края', () => {
+    for (let q = -4; q <= 4; q += 1) {
+      for (let r = -4; r <= 4; r += 1) {
+        const c = hexCenter({ q, r }, R);
+        expect(pixelToHex(c, R)).toEqual({ q, r });
+        expect(pixelToHex({ x: c.x + R * 0.8, y: c.y }, R)).toEqual({ q, r });
+      }
+    }
   });
 });

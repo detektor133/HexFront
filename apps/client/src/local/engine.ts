@@ -3,6 +3,8 @@
 import {
   canFoundCity,
   checkConstruction,
+  cityPopCap,
+  hexPopCap,
   cityInfo,
   createMatch,
   loadMap,
@@ -30,6 +32,7 @@ function selectionOf(state: MatchState, hex: number): Selection {
   const city = state.cities.find((c) => c.hex === hex);
   return {
     hex,
+    popCap: city ? cityPopCap(city.level) : hexPopCap(state, hex),
     city: city ? cityInfo(state, city.id) : null,
     foundCity: canFoundCity(state, HUMAN_ID, hex),
     improve: checkConstruction(state, HUMAN_ID, { t: 'improve', hex }),

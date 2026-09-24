@@ -31,28 +31,31 @@ export type Command =
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
   | { readonly t: 'rebuildSupply'; readonly cityId: number };
 
-/** Причина отклонения команды; уходит клиенту. */
-export type RejectReason =
-  | 'notImplemented'
-  | 'unknownPlayer'
-  | 'playerEliminated'
-  | 'invalidTaxRate'
-  | 'badHex'
-  | 'notOwnHex'
-  | 'hexBusy'
-  | 'isCity'
-  | 'cityTooClose'
-  | 'popTooLow'
-  | 'notEnoughGold'
-  | 'unknownCity'
-  | 'notOwnCity'
-  | 'maxLevel'
-  | 'buildingExists'
-  | 'fortInCity'
-  | 'depotNeedsRoad'
-  | 'notIsolated'
-  | 'noPath'
-  | 'alreadyBuilding';
+/** Причины отклонения команды; уходят клиенту, тексты — в i18n клиента. */
+export const REJECT_REASONS = [
+  'notImplemented',
+  'unknownPlayer',
+  'playerEliminated',
+  'invalidTaxRate',
+  'badHex',
+  'notOwnHex',
+  'hexBusy',
+  'isCity',
+  'cityTooClose',
+  'popTooLow',
+  'notEnoughGold',
+  'unknownCity',
+  'notOwnCity',
+  'maxLevel',
+  'buildingExists',
+  'fortInCity',
+  'depotNeedsRoad',
+  'notIsolated',
+  'noPath',
+  'alreadyBuilding',
+] as const;
+
+export type RejectReason = (typeof REJECT_REASONS)[number];
 
 export type Validation =
   { readonly ok: true } | { readonly ok: false; readonly reason: RejectReason };
