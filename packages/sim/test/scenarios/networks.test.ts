@@ -108,6 +108,37 @@ describe('сети снабжения', () => {
     expect(income(true)).toBeCloseTo(0.85, 1);
   });
 
+  describe('налог с гекса рядом с изолированным городом', () => {
+    // A3 изолирован и получает меньший id (идёт первым), A2 связан дорогой со столицей A1.
+    // Гекс (3, 0) — на дистанции 2 от обоих: правило «ближайший, при равенстве меньший id»
+    // отдало бы его изолированному A3. Гекс (0, 0) — только у A3.
+    const MIXED = `
+      a  A3 a  a  a  A2 r  r  A1 a
+    `;
+    const mixed = { ...legend, A3: city('A', 1) };
+
+    function taxFrom(where: At): number {
+      const s = scenario(MIXED, { legend: mixed });
+      s.runTicks(NETWORK_RECALC_TICKS);
+      s.state.hexes.pop.fill(0);
+      const before = s.player('A').gold;
+      s.runTicks(1);
+      const citiesOnly = s.player('A').gold - before;
+      s.setPop(where, 100);
+      const withHex = s.player('A').gold;
+      s.runTicks(1);
+      return ((s.player('A').gold - withHex - citiesOnly) * TICKS_PER_S) / 1000;
+    }
+
+    it('гекс между изолированным и связанным городом платит полный налог', () => {
+      expect(taxFrom(at(3, 0))).toBeCloseTo(0.2, 2);
+    });
+
+    it('гекс только у изолированного города платит ×0,5', () => {
+      expect(taxFrom(at(0, 0))).toBeCloseTo(0.1, 2);
+    });
+  });
+
   it('сети детерминированы: одинаковые прогоны дают одинаковый хэш', () => {
     const run = (): string => {
       const s = scenario(LINE, { legend });

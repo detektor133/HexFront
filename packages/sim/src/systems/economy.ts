@@ -16,28 +16,24 @@ import { NEUTRAL, type MatchState } from '../state/types.ts';
 /** Радиус, в котором гекс относится к городу (тот же, что у роста населения). */
 const COVERAGE_RADIUS = 2;
 
-// Гекс принадлежит сети ближайшего своего города в радиусе 2 (DECISIONS / QUESTIONS 02/T7):
-// изоляция города штрафует и доход его гексов. Вне радиуса — без штрафа.
+// Налог гекса ×0,5, только если все свои города в радиусе 2 от него изолированы; хоть один
+// город основной сети рядом — налог полный. Вне радиуса городов — без штрафа (02-economy.md, «Золото»).
 function isolatedHexes(state: MatchState): Uint8Array {
   const { width, height } = state.map;
-  const bestDist = new Int8Array(width * height).fill(COVERAGE_RADIUS + 1);
-  const isolated = new Uint8Array(width * height);
-  // Города отсортированы по id, поэтому при равной дистанции побеждает меньший id.
+  const covered = new Uint8Array(width * height);
+  const connected = new Uint8Array(width * height);
   for (const c of state.cities) {
     if (c.owner === NEUTRAL) continue;
-    const cut = isCityIsolated(state, c.id) ? 1 : 0;
-    const center = hexFromId(c.hex, width);
-    spiral(center, COVERAGE_RADIUS).forEach((h, i) => {
-      if (!inBounds(h, width, height)) return;
+    const isMain = !isCityIsolated(state, c.id);
+    for (const h of spiral(hexFromId(c.hex, width), COVERAGE_RADIUS)) {
+      if (!inBounds(h, width, height)) continue;
       const id = hexId(h, width);
-      if (state.hexes.owner[id] !== c.owner) return;
-      const d = i === 0 ? 0 : i <= 6 ? 1 : 2;
-      if (d >= (bestDist[id] ?? 0)) return;
-      bestDist[id] = d;
-      isolated[id] = cut;
-    });
+      if (state.hexes.owner[id] !== c.owner) continue;
+      covered[id] = 1;
+      if (isMain) connected[id] = 1;
+    }
   }
-  return isolated;
+  return covered.map((cov, id) => (cov === 1 && connected[id] === 0 ? 1 : 0));
 }
 
 interface Base {
