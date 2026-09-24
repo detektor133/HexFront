@@ -126,6 +126,22 @@ describe('перестройка снабжения', () => {
     expect(s.lastEvent('constructionCancelled')).toMatchObject({ kind: 'road' });
   });
 
+  it('после отмены прокладки (захват гекса пути) перестройку можно запустить снова', () => {
+    const s = scenario(MAP, { legend });
+    isolate(s);
+    s.cmd('A', rebuildSupply(A2));
+    s.runTicks(1);
+    const last = job(s)?.path?.at(-1) ?? -1;
+    s.state.hexes.owner[last] = -1;
+    s.runTicks(1);
+    expect(job(s)).toBeUndefined();
+    s.state.hexes.owner[last] = 0;
+    s.cmd('A', rebuildSupply(A2));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    expect(job(s)).toBeDefined();
+  });
+
   it('чужой или несуществующий город — отказ', () => {
     const s = scenario(MAP, { legend });
     s.cmd('A', rebuildSupply(at(0, 0)));
