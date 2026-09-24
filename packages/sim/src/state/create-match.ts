@@ -12,6 +12,7 @@ import {
   TAX_DEFAULT,
 } from '../balance.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
+import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
@@ -65,7 +66,7 @@ export function seedNeutralPopulation(state: MatchState): void {
 
 /**
  * Стартовые соседи столицы: проходимые, с наибольшим лимитом населения,
- * при равенстве — по порядку направлений E, NE, NW, W, SW, SE.
+ * при равенстве — по порядку направлений SE, NE, N, NW, SW, S.
  * @returns HexId соседей, START_HEXES − 1 штук (меньше, если проходимых соседей не хватает)
  */
 export function pickStartNeighbors(state: MatchState, capital: Hex): HexId[] {
@@ -123,7 +124,8 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
 }
 
 /**
- * Стартовое состояние матча: игрок i получает спавн i карты.
+ * Стартовое состояние матча: спавны перемешиваются потоком RNG_STREAM.spawns,
+ * игрок i получает i-й спавн после перемешивания (08-match.md, «Старт»).
  * @returns новое состояние на тике 0
  */
 export function createMatch(
@@ -136,8 +138,9 @@ export function createMatch(
   }
   const state = emptyState(map, seed);
   seedNeutralPopulation(state);
+  const spawns = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
   players.forEach((_, playerId) => {
-    const spawn = map.spawns[playerId];
+    const spawn = spawns[playerId];
     if (spawn) addPlayer(state, playerId, spawn);
   });
   state.cities.sort((a, b) => a.id - b.id);

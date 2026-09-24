@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { createRng, fork, nextInt, nextRange, nextU32, rngFromState, type Rng } from './rng.ts';
+import {
+  createRng,
+  fork,
+  nextInt,
+  nextRange,
+  nextU32,
+  rngFromState,
+  shuffle,
+  type Rng,
+} from './rng.ts';
 
 const take = (rng: Rng, n: number): number[] => Array.from({ length: n }, () => nextU32(rng));
 
@@ -77,5 +86,12 @@ describe('seeded PRNG xoshiro128**', () => {
     const seen = new Set<number>();
     for (let i = 0; i < 1000; i += 1) seen.add(nextRange(rng, -2, 2));
     expect([...seen].sort((x, y) => x - y)).toEqual([-2, -1, 0, 1, 2]);
+  });
+
+  it('shuffle переставляет элементы без потерь и детерминированно', () => {
+    const a = shuffle(createRng(3), [1, 2, 3, 4, 5, 6, 7, 8]);
+    expect([...a].sort((x, y) => x - y)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(a).toEqual(shuffle(createRng(3), [1, 2, 3, 4, 5, 6, 7, 8]));
+    expect(a).not.toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 });

@@ -22,7 +22,7 @@ const radius = fc.integer({ min: 0, max: 30 });
 const key = (h: Hex): string => `${h.q},${h.r}`;
 
 describe('гекс-математика', () => {
-  it('соседи идут в порядке E, NE, NW, W, SW, SE', () => {
+  it('соседи идут в порядке SE, NE, N, NW, SW, S', () => {
     expect(neighbors({ q: 0, r: 0 })).toEqual([
       { q: 1, r: 0 },
       { q: 1, r: -1 },

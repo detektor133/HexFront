@@ -7,6 +7,14 @@ export interface Rng {
 }
 
 const UINT32 = 0x1_0000_0000;
+
+/**
+ * Номера независимых потоков для fork (sim-core.md, «Случайность»).
+ * Существующие номера не меняются — иначе ломаются реплеи.
+ */
+export const RNG_STREAM = {
+  spawns: 1,
+} as const;
 const GOLDEN_GAMMA = 0x9e3779b9;
 
 // splitmix32 разворачивает один сид в 4 слова: xoshiro нельзя запускать из нулевого состояния,
@@ -87,4 +95,18 @@ export function nextInt(rng: Rng, bound: number): number {
  */
 export function nextRange(rng: Rng, min: number, max: number): number {
   return min + nextInt(rng, max - min + 1);
+}
+
+/**
+ * Перемешивание Фишера — Йетса; мутирует и возвращает массив.
+ * @returns тот же массив в случайном порядке
+ */
+export function shuffle<T>(rng: Rng, items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = nextInt(rng, i + 1);
+    const a = items[i] as T;
+    items[i] = items[j] as T;
+    items[j] = a;
+  }
+  return items;
 }

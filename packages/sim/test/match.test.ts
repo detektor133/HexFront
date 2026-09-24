@@ -30,14 +30,20 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('ea697523');
+    expect(hashState(state)).toBe('34a067fb');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
+    const spawnHexes = map.spawns.map((sp) => hexId(sp, map.width));
+    const capitals = state.players.map(
+      (p) => state.cities.find((c) => c.id === p.capitalCityId)?.hex,
+    );
+    expect([...capitals].sort((a = 0, b = 0) => a - b)).toEqual(
+      [...spawnHexes].sort((a, b) => a - b),
+    );
     for (const p of state.players) {
       const capital = state.cities.find((c) => c.id === p.capitalCityId);
       expect(capital).toMatchObject({ owner: p.id, level: 1 });
-      expect(capital?.hex).toBe(hexId(map.spawns[p.id] ?? { q: 0, r: 0 }, map.width));
       const owned = [...state.hexes.owner.entries()].filter(([, o]) => o === p.id);
       expect(owned).toHaveLength(3);
       for (const [id] of owned) {
@@ -96,6 +102,16 @@ describe('стартовое состояние', () => {
     expect(picked).toHaveLength(2);
     const caps = picked.map((id) => hexPopCap(s, id));
     expect(caps[0]).toBeGreaterThanOrEqual(caps[1] ?? 0);
+  });
+
+  it('спавны распределяются по сиду: разные сиды дают разные расстановки', () => {
+    const capitalsFor = (seed: number): number[] => {
+      const s = createMatch(map, players(6), seed);
+      return s.players.map((p) => s.cities.find((c) => c.id === p.capitalCityId)?.hex ?? -1);
+    };
+    expect(capitalsFor(SEED)).toEqual(capitalsFor(SEED));
+    const layouts = new Set([1, 2, 3, 4, 5].map((seed) => capitalsFor(seed).join(',')));
+    expect(layouts.size).toBeGreaterThan(1);
   });
 
   it('отклоняет больше игроков, чем спавнов', () => {

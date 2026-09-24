@@ -17,7 +17,7 @@ export interface OffsetCoord {
 /** Индекс гекса в плотном массиве карты: `col + row * width`. */
 export type HexId = number;
 
-/** Номер направления 0–5 в порядке GDD: E, NE, NW, W, SW, SE. */
+/** Номер направления 0–5 в порядке GDD: SE, NE, N, NW, SW, S. */
 export type Direction = 0 | 1 | 2 | 3 | 4 | 5;
 
 /** Векторы направлений; порядок фиксирован — от него зависит детерминизм обходов. */

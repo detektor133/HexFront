@@ -2,6 +2,14 @@
 
 export const tokens = {
   "map": {
+    "hexRadius": 20,
+    "zoom": {
+      "max": 2.5,
+      "detailThresholds": [
+        0.6,
+        1.5
+      ]
+    },
     "background": "#BFD8EA",
     "water": "#CFE3F2",
     "waterEdge": "#9CC3E0",

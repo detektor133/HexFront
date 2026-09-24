@@ -1,6 +1,10 @@
 /* Сгенерировано tools/tokens из docs/art/tokens.json — не редактировать вручную. */
 
 :root {
+  --map-hex-radius: 20;
+  --map-zoom-max: 2.5;
+  --map-zoom-detail-thresholds-1: 0.6;
+  --map-zoom-detail-thresholds-2: 1.5;
   --map-background: #BFD8EA;
   --map-water: #CFE3F2;
   --map-water-edge: #9CC3E0;
