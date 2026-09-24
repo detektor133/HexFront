@@ -11,61 +11,39 @@ import {
   type MapViewOptions,
   type MapViewState,
 } from '../render/map-view.ts';
-import { TERRAIN_CANDIDATES, type TerrainPalette } from '../theme/terrain-candidates.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Радиусы для выбора на глаз (DECISIONS 2026-09-24). */
 const RADIUS_OPTIONS = [16, 20, 28, 36] as const;
-/** Прозрачность территорий для выбора: текущая territory.alpha и два кандидата. */
-const ALPHA_OPTIONS = [85, 65, 50] as const;
 /** Период обновления показаний панели: чаще — лишние перерисовки React. */
 const READOUT_MS = 250;
 
-const LEGEND: readonly { key: keyof TerrainPalette; label: MessageKey }[] = [
-  { key: 'water', label: 'terrain.water' },
-  { key: 'plains', label: 'terrain.plains' },
-  { key: 'forest', label: 'terrain.forest' },
-  { key: 'hills', label: 'terrain.hills' },
-  { key: 'mountains', label: 'terrain.mountains' },
-  { key: 'desert', label: 'terrain.desert' },
+const { terrain: T } = tokens.map;
+const LEGEND: readonly { color: string; label: MessageKey }[] = [
+  { color: tokens.map.water, label: 'terrain.water' },
+  { color: T.plains, label: 'terrain.plains' },
+  { color: T.forest, label: 'terrain.forest' },
+  { color: T.hills, label: 'terrain.hills' },
+  { color: T.mountains, label: 'terrain.mountains' },
+  { color: T.desert, label: 'terrain.desert' },
 ];
 
 interface Settings {
   readonly radius: number;
-  readonly palette: TerrainPalette['id'];
   readonly territories: boolean;
-  readonly alpha: number;
 }
 
 function readSettings(params: URLSearchParams): Settings {
-  const palette = params.get('palette');
-  const alpha = Number(params.get('alpha'));
   return {
     radius: Number(params.get('radius')) || tokens.map.hexRadius,
-    palette: palette === 'B' || palette === 'C' ? palette : 'A',
     territories: params.get('territories') === '1',
-    alpha: (ALPHA_OPTIONS as readonly number[]).includes(alpha) ? alpha : ALPHA_OPTIONS[0],
   };
-}
-
-function paletteOf(id: TerrainPalette['id']): TerrainPalette {
-  return TERRAIN_CANDIDATES.find((p) => p.id === id) ?? (TERRAIN_CANDIDATES[0] as TerrainPalette);
 }
 
 function toOptions(s: Settings): MapViewOptions {
   return {
     radius: s.radius,
-    palette: paletteOf(s.palette),
-    midLayer: s.territories
-      ? (map, radius) => {
-          const layer = createFakeTerritories(map, radius);
-          return {
-            container: layer.container,
-            update: (scale, level) => layer.update(scale, level, s.alpha / 100),
-            destroy: () => layer.destroy(),
-          };
-        }
-      : null,
+    midLayer: s.territories ? (map, radius) => createFakeTerritories(map, radius) : null,
   };
 }
 
@@ -116,7 +94,7 @@ function Choice<T extends string | number | boolean>(props: {
   );
 }
 
-/** /dev/map?map=small[&radius&scale&palette=A|B|C&territories=1&alpha=85|65|50&panel=0]. */
+/** /dev/map?map=small[&radius&scale&territories=1&panel=0]. */
 export function DevMapPage(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search);
   const map = useMap(params.get('map') ?? 'small');
@@ -154,7 +132,6 @@ export function DevMapPage(): React.JSX.Element {
     setSettings(next);
     viewRef.current?.configure(toOptions(next));
   };
-  const palette = paletteOf(settings.palette);
 
   return (
     <div className={styles.page}>
@@ -172,30 +149,16 @@ export function DevMapPage(): React.JSX.Element {
           onPick={(radius) => update({ radius })}
         />
         <Choice
-          label={t('dev.map.palette')}
-          options={TERRAIN_CANDIDATES.map((p) => p.id)}
-          value={settings.palette}
-          format={String}
-          onPick={(id) => update({ palette: id })}
-        />
-        <Choice
           label={t('dev.map.territories')}
           options={[false, true]}
           value={settings.territories}
           format={(v) => t(v ? 'dev.map.on' : 'dev.map.off')}
           onPick={(territories) => update({ territories })}
         />
-        <Choice
-          label={t('dev.map.alpha')}
-          options={ALPHA_OPTIONS}
-          value={settings.alpha as (typeof ALPHA_OPTIONS)[number]}
-          format={(v) => `${v} %`}
-          onPick={(alpha) => update({ alpha })}
-        />
         <ul className={styles.legend} data-testid="legend">
           {LEGEND.map((l) => (
-            <li key={l.key}>
-              <span className={styles.swatch} style={{ background: palette[l.key] }} />
+            <li key={l.label}>
+              <span className={styles.swatch} style={{ background: l.color }} />
               {t(l.label)}
             </li>
           ))}

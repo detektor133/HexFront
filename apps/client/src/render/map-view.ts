@@ -19,7 +19,6 @@ import {
 } from './camera.ts';
 import { mapBounds, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
-import type { TerrainPalette } from '../theme/terrain-candidates.ts';
 import { tokens } from '../theme/tokens.ts';
 
 export interface MapViewState {
@@ -39,7 +38,6 @@ export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
 
 export interface MapViewOptions {
   readonly radius: number;
-  readonly palette: TerrainPalette;
   readonly midLayer: MidLayerFactory | null;
 }
 
@@ -82,7 +80,7 @@ export async function createMapView(
   const world = new Container();
   app.stage.addChild(world);
 
-  let layer: TerrainLayer = createTerrainLayer(map, opts.radius, opts.palette);
+  let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
   const mount = (): void => {
     world.addChild(layer.base);
@@ -138,7 +136,7 @@ export async function createMapView(
       layer.destroy();
       mid?.destroy();
       opts = next;
-      layer = createTerrainLayer(map, opts.radius, opts.palette);
+      layer = createTerrainLayer(map, opts.radius);
       mid = opts.midLayer?.(map, opts.radius) ?? null;
       mount();
       bounds = mapBounds(map.width, map.height, opts.radius);

@@ -16,10 +16,10 @@ import {
 import type { DetailLevel } from './camera.ts';
 import { hexCenter, hexEdge, hexPolygon, type Point } from './hex-geometry.ts';
 import { chainSegments } from './river-paths.ts';
-import { PATTERN_WIDTH_CANDIDATE, type TerrainPalette } from '../theme/terrain-candidates.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const { map: M } = tokens;
+const T = M.terrain;
 
 // Геометрия узоров в долях радиуса гекса.
 const CROWN_RADIUS = 0.17;
@@ -59,20 +59,20 @@ function cellsOf(map: MapStatic, radius: number): HexCell[] {
   });
 }
 
-function fillOf(p: TerrainPalette, terrain: number): string {
+function fillOf(terrain: number): string {
   switch (terrain) {
     case TERRAIN.water:
-      return p.water;
+      return M.water;
     case TERRAIN.forest:
-      return p.forest;
+      return T.forest;
     case TERRAIN.hills:
-      return p.hills;
+      return T.hills;
     case TERRAIN.mountains:
-      return p.mountains;
+      return T.mountains;
     case TERRAIN.desert:
-      return p.desert;
+      return T.desert;
     default:
-      return p.plains;
+      return T.plains;
   }
 }
 
@@ -158,9 +158,9 @@ function neighborTerrain(map: MapStatic, cell: HexCell, d: Direction): number {
   return map.terrain[hexId(n, map.width)] ?? TERRAIN.water;
 }
 
-function drawFills(cells: readonly HexCell[], radius: number, p: TerrainPalette): Graphics {
+function drawFills(cells: readonly HexCell[], radius: number): Graphics {
   const g = new Graphics();
-  for (const cell of cells) g.poly(hexPolygon(cell.center, radius)).fill(fillOf(p, cell.terrain));
+  for (const cell of cells) g.poly(hexPolygon(cell.center, radius)).fill(fillOf(cell.terrain));
   return g;
 }
 
@@ -186,12 +186,12 @@ function drawGrid(cells: readonly HexCell[], radius: number): Graphics {
   return g;
 }
 
-function drawCrownLayer(cells: readonly HexCell[], radius: number, p: TerrainPalette): Graphics {
+function drawCrownLayer(cells: readonly HexCell[], radius: number): Graphics {
   const g = new Graphics();
   for (const cell of cells) {
     if (cell.terrain === TERRAIN.forest) drawCrowns(g, jittered(cell, radius), radius);
   }
-  return g.fill(p.forestInk);
+  return g.fill(T.forestInk);
 }
 
 export interface TerrainLayer {
@@ -204,20 +204,16 @@ export interface TerrainLayer {
   destroy(): void;
 }
 
-/** Строит слои рельефа для карты при заданном радиусе гекса и палитре. */
-export function createTerrainLayer(
-  map: MapStatic,
-  radius: number,
-  palette: TerrainPalette,
-): TerrainLayer {
+/** Строит слои рельефа для карты при заданном радиусе гекса. */
+export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer {
   const cells = cellsOf(map, radius);
   const rivers = new Graphics();
   const grid = drawGrid(cells, radius);
   const base = new Container();
-  base.addChild(drawFills(cells, radius, palette), rivers, grid);
+  base.addChild(drawFills(cells, radius), rivers, grid);
   const lines = new Graphics();
   const overlay = new Container();
-  overlay.addChild(drawCrownLayer(cells, radius, palette), lines, drawCoast(map, cells, radius));
+  overlay.addChild(drawCrownLayer(cells, radius), lines, drawCoast(map, cells, radius));
 
   const byTerrain = (t: number): HexCell[] => cells.filter((c) => c.terrain === t);
   const hills = byTerrain(TERRAIN.hills);
@@ -237,17 +233,17 @@ export function createTerrainLayer(
     update(scale, level) {
       // Толщины — экранные px, поэтому в мировых единицах делим на масштаб.
       const style = {
-        width: PATTERN_WIDTH_CANDIDATE / scale,
+        width: M.patternWidth / scale,
         cap: 'round',
         join: 'round',
       } as const;
       lines.clear();
       for (const c of hills) addHills(lines, jittered(c, radius), radius);
-      lines.stroke({ ...style, color: palette.hillInk });
+      lines.stroke({ ...style, color: T.hillInk });
       for (const c of mountains) addMountain(lines, jittered(c, radius), radius);
-      lines.stroke({ ...style, color: palette.mountainInk });
+      lines.stroke({ ...style, color: T.mountainInk });
       for (const c of deserts) addRipple(lines, jittered(c, radius), radius);
-      lines.stroke({ ...style, color: palette.desertInk });
+      lines.stroke({ ...style, color: T.desertInk });
       rivers.clear();
       for (const chain of riverChains) drawSmooth(rivers, chain);
       const riverWidth = M.riverWidth[level - 1] ?? M.riverWidth[1];

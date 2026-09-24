@@ -11,7 +11,7 @@ export const tokens = {
       ]
     },
     "background": "#BFD8EA",
-    "water": "#CFE3F2",
+    "water": "#8BD0EF",
     "waterEdge": "#9CC3E0",
     "river": "#8FBCE0",
     "riverWidth": [
@@ -20,24 +20,25 @@ export const tokens = {
       3.5
     ],
     "terrain": {
-      "plains": "#F2F1EC",
-      "forest": "#E7ECE0",
-      "forestDot": "#C6D3BA",
-      "hills": "#EEECE5",
-      "mountains": "#E3E0D8",
-      "desert": "#F3EDDF",
-      "desertDot": "#E0D5BC"
+      "plains": "#F8F6EF",
+      "forest": "#B3E0B1",
+      "forestInk": "#6BA36B",
+      "hills": "#DFE3B5",
+      "hillInk": "#959A6B",
+      "mountains": "#C3CAD0",
+      "mountainInk": "#6B7983",
+      "desert": "#FFE49F",
+      "desertInk": "#D0A45C"
     },
-    "contour": "#A9A79F",
-    "contourAlpha": 0.5,
-    "contourWidth": 0.75,
+    "patternWidth": 1.25,
     "hexGrid": "#FFFFFF",
     "hexGridAlpha": 0.45,
     "hexGridVisibleFromZoom": 2
   },
   "territory": {
     "fillMix": 0.62,
-    "alpha": 0.85,
+    "alphaOwn": 0.5,
+    "alphaOther": 0.85,
     "borderWidth": [
       1.5,
       2.5,

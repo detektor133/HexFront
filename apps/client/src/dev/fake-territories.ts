@@ -7,6 +7,7 @@ import {
   hexFromId,
   hexId,
   inBounds,
+  distance,
   line,
   neighbor,
   neighbors,
@@ -15,10 +16,12 @@ import {
 } from '@hexfront/sim';
 
 import type { DetailLevel } from '../render/camera.ts';
-import { hexCenter, hexEdge, hexPolygon } from '../render/hex-geometry.ts';
+import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const STATE_RADIUS = 6;
+/** Государство «игрока» — остальные чужие (прозрачность alphaOwn/alphaOther). */
+const OWN = 0;
 /** Цвета палитры игроков для трёх государств: разные оттенки, как соседям при раскраске. */
 const PLAYER_SLOTS = [0, 1, 2] as const;
 /** Какие спавны карты занимают государства. */
@@ -59,7 +62,7 @@ function claim(map: MapStatic): Int16Array {
 
 export interface FakeTerritories {
   readonly container: Container;
-  update(scale: number, level: DetailLevel, alpha: number): void;
+  update(scale: number, level: DetailLevel): void;
   destroy(): void;
 }
 
@@ -84,22 +87,26 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
   const fill = new Graphics();
   const borders = new Graphics();
   const road = new Graphics();
+  const stations = new Graphics();
   const container = new Container();
-  container.addChild(fill, borders, road);
+  container.addChild(fill, borders, road, stations);
 
-  const spawn = map.spawns[SPAWN_SLOTS[0]];
-  const far = cells.filter((c) => c.p === 0).at(-1);
-  const roadPath = spawn && far ? line(spawn, far.h).map((h) => hexCenter(h, radius)) : [];
+  // Дорога-«метро» от столицы своего государства к ближайшему городу карты.
+  const capital = map.spawns[SPAWN_SLOTS[OWN]];
+  const city = capital
+    ? [...map.cities].sort((a, b) => distance(capital, a) - distance(capital, b))[0]
+    : undefined;
+  const roadPath = capital && city ? line(capital, city).map((h) => hexCenter(h, radius)) : [];
 
   return {
     container,
-    update(scale, level, alpha) {
+    update(scale, level) {
       fill.clear();
       for (const c of cells) {
         const center = hexCenter(c.h, radius);
         fill.poly(hexPolygon(center, radius)).fill({
           color: mixWithWhite(lineOf(c.p), tokens.territory.fillMix),
-          alpha,
+          alpha: c.p === OWN ? tokens.territory.alphaOwn : tokens.territory.alphaOther,
         });
       }
       // Граница — внутренняя кромка цвета владельца (style-guide, слой 5).
@@ -124,11 +131,29 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
         road.moveTo(first.x, first.y);
         for (const pt of rest) road.lineTo(pt.x, pt.y);
         const rw = tokens.road.width[level - 1] ?? tokens.road.width[1];
-        road.stroke({ color: lineOf(0), width: rw / scale, cap: 'round', join: 'round' });
+        road.stroke({ color: lineOf(OWN), width: rw / scale, cap: 'round', join: 'round' });
       }
+      drawStations(stations, [roadPath[0], roadPath.at(-1)], lineOf(OWN), scale);
     },
     destroy() {
       container.destroy({ children: true });
     },
   };
+}
+
+// Концы дороги — «станции» по токенам city (уровень 1), экранного размера.
+function drawStations(
+  g: Graphics,
+  points: readonly (Point | undefined)[],
+  color: string,
+  scale: number,
+): void {
+  const { city } = tokens;
+  g.clear();
+  for (const p of points) {
+    if (!p) continue;
+    g.circle(p.x, p.y, city.radiusByLevel[0] / scale)
+      .fill(city.fill)
+      .stroke({ color, width: city.strokeByLevel[0] / scale });
+  }
 }

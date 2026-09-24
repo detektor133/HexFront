@@ -13,33 +13,32 @@ interface Shot {
   readonly query: string;
 }
 
-// Выбор палитры местности: 3 палитры × территории вкл/выкл × телефон/ПК, плюс прозрачность.
-const PALETTES = ['A', 'B', 'C'] as const;
+// Эталоны /dev/map (палитра и прозрачность — DECISIONS 2026-09-24): телефон и ПК,
+// z1/z2/z3, без территорий и с примером территорий; плюс радиусы для выбора на глаз.
 const VIEWS = [
-  { tag: '390x844', width: 390, height: 844, query: '&scale=1' },
+  { tag: '390x844-fit', width: 390, height: 844, query: '' },
+  { tag: '390x844-scale1', width: 390, height: 844, query: '&scale=1' },
+  { tag: '390x844-scale2', width: 390, height: 844, query: '&scale=2' },
   { tag: '1440x900-fit', width: 1440, height: 900, query: '' },
-  { tag: '1440x900-zoom', width: 1440, height: 900, query: '&scale=1.6' },
+  { tag: '1440x900-scale2', width: 1440, height: 900, query: '&scale=2' },
 ] as const;
 
 const SHOTS: readonly Shot[] = [
-  ...PALETTES.flatMap((p) =>
-    VIEWS.flatMap((v) =>
-      [false, true].map((terr) => ({
-        name: `terrain/${p}-${terr ? 'territories' : 'plain'}-${v.tag}`,
-        width: v.width,
-        height: v.height,
-        query: `&panel=0&palette=${p}${terr ? '&territories=1' : ''}${v.query}`,
-      })),
-    ),
-  ),
-  ...PALETTES.flatMap((p) =>
-    [65, 50].map((alpha) => ({
-      name: `terrain/${p}-territories-alpha${alpha}-1440x900-zoom`,
-      width: 1440,
-      height: 900,
-      query: `&panel=0&palette=${p}&territories=1&alpha=${alpha}&scale=1.6`,
+  ...VIEWS.flatMap((v) =>
+    [false, true].map((terr) => ({
+      name: `dev-map-${v.tag}${terr ? '-territories' : ''}`,
+      width: v.width,
+      height: v.height,
+      query: `&panel=0${terr ? '&territories=1' : ''}${v.query}`,
     })),
   ),
+  { name: 'dev-map-1440x900-panel', width: 1440, height: 900, query: '&territories=1&scale=1' },
+  ...[16, 28, 36].map((r) => ({
+    name: `dev-map-1440x900-radius${r}`,
+    width: 1440,
+    height: 900,
+    query: `&panel=0&territories=1&radius=${r}&scale=1`,
+  })),
 ];
 
 const browser = await chromium.launch();
