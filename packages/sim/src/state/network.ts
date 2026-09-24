@@ -33,3 +33,70 @@ export function mainNetworkMask(state: MatchState, playerId: number): Uint8Array
   }
   return mask;
 }
+
+// Все узлы игрока раскладываются по компонентам; обход по возрастанию HexId, поэтому стартовый
+// гекс компоненты — её наименьший HexId, и id сети не зависит от истории.
+function components(state: MatchState, playerId: number): { id: number; hexes: HexId[] }[] {
+  const { width, height } = state.map;
+  const size = width * height;
+  const seen = new Uint8Array(size);
+  const result: { id: number; hexes: HexId[] }[] = [];
+  for (let start = 0; start < size; start += 1) {
+    if (seen[start] === 1 || !isNetworkNode(state, playerId, start)) continue;
+    const hexes: HexId[] = [];
+    const queue: HexId[] = [start];
+    seen[start] = 1;
+    while (queue.length > 0) {
+      const hex = queue.shift() as HexId;
+      hexes.push(hex);
+      for (const n of neighbors(hexFromId(hex, width))) {
+        if (!inBounds(n, width, height)) continue;
+        const id = hexId(n, width);
+        if (seen[id] === 1 || !isNetworkNode(state, playerId, id)) continue;
+        seen[id] = 1;
+        queue.push(id);
+      }
+    }
+    result.push({ id: playerId * size + start, hexes });
+  }
+  return result;
+}
+
+/** Пересчитывает сети одного игрока: компоненты узлов, основная — со столицей. */
+export function recomputeNetworks(state: MatchState, playerId: number): void {
+  const { network } = state.hexes;
+  const own = new Set(state.networks.filter((n) => n.owner === playerId).map((n) => n.id));
+  network.forEach((id, hex) => {
+    if (own.has(id)) network[hex] = -1;
+  });
+  const capitalId = state.players[playerId]?.capitalCityId;
+  const capitalHex = state.cities.find((c) => c.id === capitalId && c.owner === playerId)?.hex;
+  const fresh = components(state, playerId).map((c) => {
+    for (const hex of c.hexes) network[hex] = c.id;
+    return {
+      id: c.id,
+      owner: playerId,
+      isMain: capitalHex !== undefined && c.hexes.includes(capitalHex),
+    };
+  });
+  state.networks = [...state.networks.filter((n) => n.owner !== playerId), ...fresh].sort(
+    (a, b) => a.id - b.id,
+  );
+}
+
+/** Пересчитывает сети всех игроков (создание матча и сценарии). */
+export function recomputeAllNetworks(state: MatchState): void {
+  for (const p of state.players) recomputeNetworks(state, p.id);
+}
+
+/**
+ * Изолирован ли город: его сеть не основная. До первого пересчёта после основания города
+ * (≤ 1 с) сеть неизвестна — город считается связанным.
+ */
+export function isCityIsolated(state: MatchState, cityId: number): boolean {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return false;
+  const id = state.hexes.network[city.hex] ?? -1;
+  if (id < 0) return false;
+  return state.networks.find((n) => n.id === id)?.isMain !== true;
+}

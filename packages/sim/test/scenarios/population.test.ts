@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { TICKS_PER_S } from '../../src/balance.ts';
 import { hexFromId, distance } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
-import { at, city, own, scenario, setTax, type At } from '../scenario/dsl.ts';
+import { at, city, own, road, scenario, setTax, type At } from '../scenario/dsl.ts';
 
 // Равнина: лимит гекса 100 чел.; город уровня L — 300 × L.
 const people = (fpValue: number): number => fpValue / 1000;
@@ -60,11 +60,12 @@ describe('рост населения', () => {
   it('гекс в кольце 1 двух городов берёт максимум, а не сумму', () => {
     const TWO = `
       .  .  .  .  .
-      .  A1 a  A3 .
+      .  A1 r  A3 .
       .  .  .  .  .
     `;
+    // Дорога связывает A3 со столицей: иначе A3 изолирован и растит ×0,75 (02/T7).
     const s = scenario(TWO, {
-      legend: { A1: city('A', 1, { capital: true }), A3: city('A', 3), a: own('A') },
+      legend: { A1: city('A', 1, { capital: true }), A3: city('A', 3), r: road('A') },
     });
     s.setPop(at(2, 1), 0);
     s.runTicks(1);

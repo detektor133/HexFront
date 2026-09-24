@@ -11,6 +11,7 @@ import {
   START_POP_HEX,
   TAX_DEFAULT,
 } from '../balance.ts';
+import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
@@ -43,11 +44,13 @@ function emptyState(map: MapStatic, seed: number): MatchState {
       improvement: new Uint8Array(size),
       building: new Uint8Array(size),
       road: Uint8Array.from(map.roads),
+      network: new Int32Array(size).fill(-1),
     },
     cities,
     players: [],
     armies: [],
     constructions: [],
+    networks: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
   };
@@ -146,5 +149,6 @@ export function createMatch(
     if (spawn) addPlayer(state, playerId, spawn);
   });
   state.cities.sort((a, b) => a.id - b.id);
+  recomputeAllNetworks(state);
   return state;
 }

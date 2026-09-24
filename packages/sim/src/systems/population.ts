@@ -6,12 +6,14 @@ import {
   GROWTH_RING1,
   GROWTH_RING2,
   IMPROVEMENT_GROWTH_STEP,
+  ISOLATED_GROWTH_MULT,
   POP_OVERCAP_DECAY,
   TICKS_PER_S,
 } from '../balance.ts';
 import { taxGrowthMult } from './tax.ts';
 import { hexId, inBounds, ring, hexFromId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
 
@@ -33,8 +35,8 @@ function bestCityGrowth(state: MatchState): Int32Array {
   const best = new Int32Array(map.width * map.height);
   for (const c of state.cities) {
     if (c.owner === NEUTRAL) continue;
-    // TODO(stage-02/T7): networkMult 0,75 для городов изолированной сети.
-    const cityPart = cityLevelMult(c.level);
+    const networkMult = isCityIsolated(state, c.id) ? ISOLATED_GROWTH_MULT : (FP as Fp);
+    const cityPart = fpMul(cityLevelMult(c.level), networkMult);
     const center = hexFromId(c.hex, map.width);
     BASE_GROWTH.forEach((base, k) => {
       for (const h of ring(center, k)) {

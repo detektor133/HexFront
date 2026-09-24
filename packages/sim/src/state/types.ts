@@ -23,6 +23,17 @@ export interface HexState {
   readonly building: Uint8Array;
   /** 1 — на гексе дорога. */
   readonly road: Uint8Array;
+  /** Id сети снабжения узла (свой гекс с дорогой или городом) или -1; кэш networkSystem. */
+  readonly network: Int32Array;
+}
+
+/** Сеть снабжения — компонента связности узлов одного игрока. */
+export interface SupplyNetwork {
+  /** owner × размер карты + наименьший HexId компоненты: уникально и детерминированно. */
+  readonly id: number;
+  readonly owner: number;
+  /** Содержит столицу. */
+  readonly isMain: boolean;
 }
 
 export interface City {
@@ -109,6 +120,8 @@ export interface MatchState {
   readonly armies: Army[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
+  /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
+  networks: SupplyNetwork[];
   nextId: number;
   events: GameEvent[];
 }

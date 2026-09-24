@@ -104,7 +104,14 @@ export function hashState(state: MatchState): string {
   array(s, hexes.improvement);
   array(s, hexes.building);
   array(s, hexes.road);
+  array(s, hexes.network);
   hashEntities(s, state);
   hashConstructions(s, state);
+  int(s, state.networks.length);
+  for (const n of state.networks) {
+    int(s, n.id);
+    int(s, n.owner);
+    int(s, n.isMain ? 1 : 0);
+  }
   return s.h.toString(16).padStart(8, '0');
 }

@@ -5,6 +5,7 @@ import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
+import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   NEUTRAL,
   type Army,
@@ -22,7 +23,12 @@ export interface At {
 }
 
 type Cell =
-  | { readonly kind: 'own'; readonly player: string; readonly terrain: TerrainName }
+  | {
+      readonly kind: 'own';
+      readonly player: string;
+      readonly terrain: TerrainName;
+      readonly road?: boolean;
+    }
   | {
       readonly kind: 'city';
       readonly player: string | null;
@@ -39,6 +45,14 @@ type DslCommand =
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' };
 
 export const at = (col: number, row: number): At => ({ col, row });
+
+/** Свой гекс с дорогой (равнина). */
+export const road = (player: string): Cell => ({
+  kind: 'own',
+  player,
+  terrain: 'plains',
+  road: true,
+});
 
 /** Свой гекс; местность по умолчанию — равнина. */
 export const own = (player: string, terrain: TerrainName = 'plains'): Cell => ({
@@ -136,6 +150,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       improvement: new Uint8Array(size),
       building: new Uint8Array(size),
       road: new Uint8Array(size),
+      network: new Int32Array(size).fill(-1),
     },
     cities: [],
     players: players.map((_, id) => ({
@@ -149,6 +164,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     })),
     armies: [],
     constructions: [],
+    networks: [],
     nextId: 1,
     events: [],
   };
@@ -173,6 +189,8 @@ export interface Scenario {
   player(p: string): Player;
   /** Город в клетке или undefined. */
   cityAt(where: At): City | undefined;
+  /** Сменить владельца гекса в обход команд — для тестов разреза сетей; null — нейтральный. */
+  setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
   rejections(): string[];
 }
@@ -200,6 +218,7 @@ export function scenario(
     if (!cell) throw new Error(`сценарий: токен «${token}» нет в легенде`);
     const owner = cell.player === null ? NEUTRAL : idOf(cell.player);
     state.hexes.owner[hex] = owner;
+    if (cell.kind === 'own' && cell.road) state.hexes.road[hex] = 1;
     if (cell.kind !== 'city') return;
     const id = state.nextId;
     state.nextId += 1;
@@ -207,6 +226,7 @@ export function scenario(
     const player = state.players[owner];
     if (cell.capital && player) player.capitalCityId = id;
   });
+  recomputeAllNetworks(state);
   return makeScenario(state, idOf, letters);
 }
 
@@ -293,6 +313,9 @@ function makeScenario(
     player: playerOf,
     cityAt(where) {
       return state.cities.find((c) => c.hex === hexOf(where));
+    },
+    setOwner(where, player) {
+      state.hexes.owner[hexOf(where)] = player === null ? NEUTRAL : idOf(player);
     },
     rejections() {
       return log.flatMap((e) => (e.t === 'commandRejected' ? [e.reason] : []));
