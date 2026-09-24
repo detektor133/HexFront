@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "chart": "node --experimental-strip-types src/development-chart.ts"
   }
 }
