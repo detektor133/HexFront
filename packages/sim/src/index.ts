@@ -17,3 +17,9 @@ export * from './queries/city.ts';
 export * from './queries/road-path.ts';
 export * from './state/network.ts';
 export * from './queries/player-view.ts';
+export {
+  checkConstruction,
+  foundCityCost,
+  type ConstructionCheck,
+} from './commands/construction.ts';
+export { rebuildSupplyPlan, type RebuildPlan } from './commands/rebuild-supply.ts';
