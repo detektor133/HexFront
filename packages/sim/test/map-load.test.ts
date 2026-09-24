@@ -120,8 +120,8 @@ describe('загрузка карты v1', () => {
 
     it('ребро реки с направлением вне 0–2', () => {
       const json = base();
-      json.riverEdges.push([5, 5, 4]);
-      expect(errorsOf(json)).toContainEqual('riverEdges[3]: dir = 4, допустимо 0–2');
+      const index = json.riverEdges.push([5, 5, 4]) - 1;
+      expect(errorsOf(json)).toContainEqual(`riverEdges[${index}]: dir = 4, допустимо 0–2`);
     });
 
     it('неизвестный код местности', () => {

@@ -27,7 +27,8 @@ interface HandMap {
   readonly cities: readonly { at: At; name: string; level: number }[];
   /** Дороги — отрезки между точками по гекс-линии. */
   readonly roads: readonly (readonly [At, At])[];
-  readonly rivers: readonly (readonly [col: number, row: number, dir: number])[];
+  /** Реки — по правой стороне столбца `col` от строки `from` до `to` включительно. */
+  readonly rivers: readonly { col: number; from: number; to: number }[];
   readonly features: readonly { at: At; type: FeatureName }[];
 }
 
@@ -44,6 +45,18 @@ const GLYPHS: Readonly<Record<string, TerrainCode>> = {
 const GARRISON_BY_LEVEL = [150, 300, 600] as const;
 
 const axial = ([col, row]: At): Hex => offsetToAxial({ col, row });
+
+// Рёбра NE (1) и SE (0) гексов одного столбца стыкуются вершинами в непрерывную линию.
+const RIVER_DIRS = [1, 0] as const;
+
+function riverRun(run: { col: number; from: number; to: number }): [number, number, number][] {
+  const edges: [number, number, number][] = [];
+  for (let row = run.from; row <= run.to; row += 1) {
+    const h = axial([run.col, row]);
+    for (const dir of RIVER_DIRS) edges.push([h.q, h.r, dir]);
+  }
+  return edges;
+}
 
 function buildTerrain(m: HandMap, width: number): Uint8Array {
   const terrain = new Uint8Array(width * m.rows.length);
@@ -78,10 +91,7 @@ function toJson(m: HandMap): MapJson {
     height: m.rows.length,
     terrain: encodeBase64(buildTerrain(m, width)),
     features: m.features.map((f) => ({ ...axial(f.at), type: f.type })),
-    riverEdges: m.rivers.map(([col, row, dir]) => {
-      const h = axial([col, row]);
-      return [h.q, h.r, dir];
-    }),
+    riverEdges: m.rivers.flatMap(riverRun),
     roads: encodeBase64(packBits(roads)),
     cities,
     spawns: m.spawns.map(axial),
@@ -134,11 +144,7 @@ const TINY: HandMap = {
       [16, 11],
     ],
   ],
-  rivers: [
-    [11, 8, 0],
-    [12, 8, 1],
-    [12, 7, 2],
-  ],
+  rivers: [{ col: 10, from: 4, to: 8 }],
   features: [
     { at: [13, 2], type: 'mine' },
     { at: [2, 11], type: 'fertile' },
@@ -290,13 +296,8 @@ const SMALL: HandMap = {
     ],
   ],
   rivers: [
-    [24, 10, 0],
-    [25, 11, 1],
-    [26, 11, 2],
-    [26, 12, 0],
-    [27, 12, 1],
-    [10, 20, 0],
-    [11, 20, 1],
+    { col: 25, from: 4, to: 7 },
+    { col: 12, from: 16, to: 20 },
   ],
   features: [
     { at: [27, 4], type: 'pass' },
