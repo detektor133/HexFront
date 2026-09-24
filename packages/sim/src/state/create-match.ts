@@ -47,6 +47,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     cities,
     players: [],
     armies: [],
+    constructions: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
   };
@@ -107,6 +108,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     taxEffective: TAX_DEFAULT,
     capitalCityId: cityId,
     status: 'alive',
+    citiesFounded: 0,
   });
   for (let i = 0; i < START_ARMIES; i += 1) {
     state.armies.push({

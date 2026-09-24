@@ -33,7 +33,23 @@ export type Command =
 
 /** Причина отклонения команды; уходит клиенту. */
 export type RejectReason =
-  'notImplemented' | 'unknownPlayer' | 'playerEliminated' | 'invalidTaxRate';
+  | 'notImplemented'
+  | 'unknownPlayer'
+  | 'playerEliminated'
+  | 'invalidTaxRate'
+  | 'badHex'
+  | 'notOwnHex'
+  | 'hexBusy'
+  | 'isCity'
+  | 'cityTooClose'
+  | 'popTooLow'
+  | 'notEnoughGold'
+  | 'unknownCity'
+  | 'notOwnCity'
+  | 'maxLevel'
+  | 'buildingExists'
+  | 'fortInCity'
+  | 'depotNeedsRoad';
 
 export type Validation =
   { readonly ok: true } | { readonly ok: false; readonly reason: RejectReason };

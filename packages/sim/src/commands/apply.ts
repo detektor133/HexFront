@@ -1,4 +1,5 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
+import { startConstruction, validateConstruction } from './construction.ts';
 import { validateSetTax } from './set-tax.ts';
 import { rejected, type Command, type PlayerCommand, type Validation } from './types.ts';
 import type { MatchState } from '../state/types.ts';
@@ -10,10 +11,15 @@ function assertNever(x: never): never {
 }
 
 // Команды, чья механика появится в следующих этапах, пока отклоняются как notImplemented.
-function validateCommand(cmd: Command): Validation {
+function validateCommand(state: MatchState, playerId: number, cmd: Command): Validation {
   switch (cmd.t) {
     case 'setTax':
       return validateSetTax(cmd.rate);
+    case 'foundCity':
+    case 'upgradeCity':
+    case 'improve':
+    case 'build':
+      return validateConstruction(state, playerId, cmd);
     case 'move':
     case 'attack':
     case 'setOrder':
@@ -24,10 +30,6 @@ function validateCommand(cmd: Command): Validation {
     case 'merge':
     case 'bombard':
     case 'recruit':
-    case 'foundCity':
-    case 'upgradeCity':
-    case 'improve':
-    case 'build':
     case 'rebuildSupply':
       return rejected('notImplemented');
     default:
@@ -36,8 +38,21 @@ function validateCommand(cmd: Command): Validation {
 }
 
 function execute(state: MatchState, playerId: number, cmd: Command): void {
-  const player = state.players[playerId];
-  if (cmd.t === 'setTax' && player) player.taxTarget = cmd.rate;
+  switch (cmd.t) {
+    case 'setTax': {
+      const player = state.players[playerId];
+      if (player) player.taxTarget = cmd.rate;
+      return;
+    }
+    case 'foundCity':
+    case 'upgradeCity':
+    case 'improve':
+    case 'build':
+      startConstruction(state, playerId, cmd);
+      return;
+    default:
+      return;
+  }
 }
 
 /**
@@ -48,7 +63,7 @@ export function validate(state: MatchState, playerId: number, cmd: Command): Val
   const player = state.players[playerId];
   if (!player) return rejected('unknownPlayer');
   if (player.status !== 'alive') return rejected('playerEliminated');
-  return validateCommand(cmd);
+  return validateCommand(state, playerId, cmd);
 }
 
 /**

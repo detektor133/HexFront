@@ -29,7 +29,7 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('34a067fb');
+    expect(hashState(state)).toBe('3e62ed9b');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
@@ -154,10 +154,10 @@ describe('step', () => {
   it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'upgradeCity', cityId: 1 } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'recruit', cityId: 1, type: 'infantry', soldiers: 50 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'upgradeCity', reason: 'notImplemented' },
+      { t: 'commandRejected', playerId: 1, command: 'recruit', reason: 'notImplemented' },
     ]);
     expect(hashState(a)).toBe(hashState(b));
   });
@@ -175,7 +175,10 @@ describe('step', () => {
       { playerId: 0, cmd: { t: 'improve', hex: 3 } },
       { playerId: 1, cmd: { t: 'foundCity', hex: 4 } },
     ]);
-    expect(s.events.map((e) => [e.playerId, e.command])).toEqual([
+    const rejected = s.events.flatMap((e) =>
+      e.t === 'commandRejected' ? [[e.playerId, e.command]] : [],
+    );
+    expect(rejected).toEqual([
       [0, 'improve'],
       [1, 'upgradeCity'],
       [1, 'foundCity'],

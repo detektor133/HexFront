@@ -58,6 +58,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.taxEffective);
     int(s, p.capitalCityId);
     str(s, p.status);
+    int(s, p.citiesFounded);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {
@@ -69,6 +70,15 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.hex);
     str(s, a.order);
     int(s, a.supplyLevel);
+  }
+  int(s, state.constructions.length);
+  for (const c of state.constructions) {
+    int(s, c.id);
+    int(s, c.owner);
+    int(s, c.hex);
+    str(s, c.kind);
+    int(s, c.progressTicks);
+    int(s, c.totalTicks);
   }
 }
 

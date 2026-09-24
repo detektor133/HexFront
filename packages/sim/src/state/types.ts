@@ -8,6 +8,9 @@ import type { Fp } from '../math/int.ts';
 /** Владелец гекса или города: id игрока либо NEUTRAL. */
 export const NEUTRAL = -1;
 
+/** Коды постройки гекса в hexes.building; 0 — нет постройки. */
+export const BUILDING = { none: 0, fort: 1, depot: 2 } as const;
+
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
 export interface HexState {
   /** id игрока или NEUTRAL. */
@@ -44,6 +47,20 @@ export interface Player {
   taxEffective: Fp;
   capitalCityId: number;
   status: PlayerStatus;
+  /** Сколько городов игрок основал за матч (N в цене основания), включая начатые стройки. */
+  citiesFounded: number;
+}
+
+export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot';
+
+/** Стройка на гексе; одна на гекс. Прогресс — в тиках. */
+export interface Construction {
+  readonly id: number;
+  readonly owner: number;
+  readonly hex: HexId;
+  readonly kind: ConstructionKind;
+  progressTicks: number;
+  readonly totalTicks: number;
 }
 
 export type ArmyOrder = 'idle' | 'hold' | 'expand';
@@ -63,12 +80,19 @@ export interface Army {
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */
-export type GameEvent = {
-  readonly t: 'commandRejected';
-  readonly playerId: number;
-  readonly command: string;
-  readonly reason: string;
-};
+export type GameEvent =
+  | {
+      readonly t: 'commandRejected';
+      readonly playerId: number;
+      readonly command: string;
+      readonly reason: string;
+    }
+  | {
+      readonly t: 'constructionDone' | 'constructionCancelled';
+      readonly playerId: number;
+      readonly kind: ConstructionKind;
+      readonly hex: HexId;
+    };
 
 export interface MatchState {
   tick: number;
@@ -81,6 +105,8 @@ export interface MatchState {
   readonly players: Player[];
   /** Отсортированы по id. */
   readonly armies: Army[];
+  /** Отсортированы по id. */
+  readonly constructions: Construction[];
   nextId: number;
   events: GameEvent[];
 }

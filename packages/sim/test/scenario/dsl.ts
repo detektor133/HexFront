@@ -8,6 +8,7 @@ import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import {
   NEUTRAL,
   type Army,
+  type City,
   type GameEvent,
   type MatchState,
   type Player,
@@ -33,7 +34,9 @@ type ArmyRef = number | { readonly armyOf: string; readonly index: number };
 
 type DslCommand =
   | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
-  | { readonly t: 'setTax'; readonly percent: number };
+  | { readonly t: 'setTax'; readonly percent: number }
+  | { readonly t: 'foundCity' | 'improve' | 'upgradeCity'; readonly where: At }
+  | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' };
 
 export const at = (col: number, row: number): At => ({ col, row });
 
@@ -52,6 +55,16 @@ export const attack = (armies: readonly ArmyRef[], target: At): DslCommand => ({
   t: 'attack',
   armies,
   target,
+});
+
+export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
+export const improve = (where: At): DslCommand => ({ t: 'improve', where });
+/** Улучшение города, стоящего в клетке where. */
+export const upgradeCity = (where: At): DslCommand => ({ t: 'upgradeCity', where });
+export const build = (where: At, kind: 'fort' | 'depot'): DslCommand => ({
+  t: 'build',
+  where,
+  kind,
 });
 
 /** Налог в процентах, как на ползунке HUD (может быть и невалидным — для тестов отказа). */
@@ -125,8 +138,10 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       taxEffective: TAX_DEFAULT,
       capitalCityId: -1,
       status: 'alive' as const,
+      citiesFounded: 0,
     })),
     armies: [],
+    constructions: [],
     nextId: 1,
     events: [],
   };
@@ -149,6 +164,10 @@ export interface Scenario {
   /** Задать население гекса в людях. */
   setPop(where: At, people: number): void;
   player(p: string): Player;
+  /** Город в клетке или undefined. */
+  cityAt(where: At): City | undefined;
+  /** Отказы по порядку за всё время прогона. */
+  rejections(): string[];
 }
 
 /**
@@ -199,10 +218,21 @@ function makeScenario(
     if (!army) throw new Error(`сценарий: у ${ref.armyOf} нет армии #${ref.index}`);
     return army.id;
   };
-  const toCommand = (c: DslCommand): Command =>
-    c.t === 'setTax'
-      ? { t: 'setTax', rate: (c.percent * 10) as Fp }
-      : { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
+  const cityIdAt = (w: At): number => state.cities.find((c) => c.hex === hexOf(w))?.id ?? -1;
+  const toCommand = (c: DslCommand): Command => {
+    switch (c.t) {
+      case 'setTax':
+        return { t: 'setTax', rate: (c.percent * 10) as Fp };
+      case 'attack':
+        return { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
+      case 'upgradeCity':
+        return { t: 'upgradeCity', cityId: cityIdAt(c.where) };
+      case 'build':
+        return { t: 'build', hex: hexOf(c.where), kind: c.kind };
+      default:
+        return { t: c.t, hex: hexOf(c.where) };
+    }
+  };
   const playerOf = (p: string): Player => {
     const player = state.players[idOf(p)];
     if (!player) throw new Error(`сценарий: нет игрока ${p}`);
@@ -254,5 +284,11 @@ function makeScenario(
       state.hexes.pop[hexOf(where)] = people * FP;
     },
     player: playerOf,
+    cityAt(where) {
+      return state.cities.find((c) => c.hex === hexOf(where));
+    },
+    rejections() {
+      return log.flatMap((e) => (e.t === 'commandRejected' ? [e.reason] : []));
+    },
   };
 }
