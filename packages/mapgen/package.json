@@ -1,0 +1,16 @@
+{
+  "name": "@hexfront/mapgen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "maps": "node --experimental-strip-types scripts/hand-maps.ts"
+  },
+  "dependencies": {
+    "@hexfront/sim": "workspace:*"
+  }
+}

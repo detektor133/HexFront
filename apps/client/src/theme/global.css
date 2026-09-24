@@ -1,0 +1,13 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--map-background);
+  color: var(--ui-ink);
+  font-family: var(--font-ui-family);
+  font-size: var(--font-size-body);
+}
