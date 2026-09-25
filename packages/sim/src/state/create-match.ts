@@ -56,6 +56,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     constructions: [],
     recruits: [],
     armies: [],
+    plans: [],
     networks: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
@@ -156,6 +157,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       inBattle: false,
       focus: -1,
       fireTarget: -1,
+      slot: -1,
     });
     state.nextId += 1;
   }

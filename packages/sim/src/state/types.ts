@@ -144,7 +144,25 @@ export interface Unit {
   focus: number;
   /** Артиллерия: по кому бьёт в этом тике, или -1. */
   fireTarget: number;
+  /** Место, выданное распределителем плана армии, или -1 (нет плана или ручной приказ). */
+  slot: HexId;
 }
+
+/** План армии (CR-002): линия фронта против соседа (вся или участок) или линия обороны. */
+export type ArmyPlan =
+  | {
+      readonly armyId: number;
+      readonly kind: 'front';
+      readonly enemyId: number;
+      /** Концы участка на границе; null — вся граница с соседом. */
+      readonly section: readonly [HexId, HexId] | null;
+    }
+  | {
+      readonly armyId: number;
+      readonly kind: 'line';
+      /** Гексы линии обороны по порядку, достроенные между точками игрока. */
+      readonly hexes: readonly HexId[];
+    };
 
 /** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
 export interface Army {
@@ -205,6 +223,8 @@ export interface MatchState {
   readonly units: Unit[];
   /** Армии — группы отрядов, отсортированы по id. */
   readonly armies: Army[];
+  /** Планы армий, отсортированы по armyId; у армии не больше одного плана. */
+  readonly plans: ArmyPlan[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
   /** Отсортированы по id. */

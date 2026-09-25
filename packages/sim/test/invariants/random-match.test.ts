@@ -36,7 +36,7 @@ interface Raw {
 const rawArb = fc.record({
   at: fc.integer({ min: 0, max: TICKS - 1 }),
   player: fc.integer({ min: 0, max: 1 }),
-  kind: fc.integer({ min: 0, max: 13 }),
+  kind: fc.integer({ min: 0, max: 15 }),
   a: fc.nat(1000),
   b: fc.nat(1000),
   c: fc.nat(1000),
@@ -103,6 +103,30 @@ function build(state: MatchState, r: Raw): Command | null {
         r.a,
       );
       return army ? { t: 'armyOrder', armyId: army.id, order: ORDERS[r.b % 3] ?? 'idle' } : null;
+    }
+    case 14: {
+      const army = pickOf(
+        state.armies.filter((x) => x.owner === r.player),
+        r.a,
+      );
+      return army
+        ? { t: 'assignFront', armyId: army.id, enemyId: 1 - r.player, section: null }
+        : null;
+    }
+    case 15: {
+      const army = pickOf(
+        state.armies.filter((x) => x.owner === r.player),
+        r.a,
+      );
+      const mineHexes = state.hexes.owner.reduce<number[]>(
+        (acc, o, id) => (o === r.player ? [...acc, id] : acc),
+        [],
+      );
+      const a = pickOf(mineHexes, r.b);
+      const b = pickOf(mineHexes, r.c);
+      return army && a !== undefined && b !== undefined
+        ? { t: 'setDefenseLine', armyId: army.id, points: [a, b] }
+        : null;
     }
     default:
       // Заведомо сомнительная команда: случайные id и гексы — проверка отказов.

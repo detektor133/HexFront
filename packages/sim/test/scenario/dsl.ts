@@ -71,6 +71,14 @@ type DslCommand =
     }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   | {
+      readonly t: 'assignFront';
+      readonly armyId: number;
+      readonly enemy: string;
+      readonly section: readonly [At, At] | null;
+    }
+  | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'clearPlan'; readonly armyId: number }
+  | {
       readonly t: 'armyOrder';
       readonly armyId: number;
       readonly order: 'idle' | 'hold' | 'expand';
@@ -155,6 +163,19 @@ export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): Ds
   order,
 });
 
+/** Армия на фронт против игрока enemy (буква), вся граница или участок между двумя гексами. */
+export const assignFront = (
+  armyId: number,
+  enemy: string,
+  section: readonly [At, At] | null,
+): DslCommand => ({ t: 'assignFront', armyId, enemy, section });
+/** Линия обороны армии по точкам. */
+export const setDefenseLine = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'setDefenseLine',
+  armyId,
+  points,
+});
+export const clearPlan = (armyId: number): DslCommand => ({ t: 'clearPlan', armyId });
 export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
@@ -263,6 +284,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     constructions: [],
     recruits: [],
     armies: [],
+    plans: [],
     networks: [],
     nextId: 1,
     events: [],
@@ -401,6 +423,17 @@ function makeScenario(
       case 'armyOrder':
       case 'setAutoReinforce':
         return c;
+      case 'assignFront':
+        return {
+          t: 'assignFront',
+          armyId: c.armyId,
+          enemyId: idOf(c.enemy),
+          section: c.section ? [hexOf(c.section[0]), hexOf(c.section[1])] : null,
+        };
+      case 'setDefenseLine':
+        return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
+      case 'clearPlan':
+        return c;
       case 'assignUnits':
         return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':
@@ -449,6 +482,7 @@ function makeScenario(
         inBattle: false,
         focus: -1,
         fireTarget: -1,
+        slot: -1,
       });
       return id;
     },

@@ -13,7 +13,15 @@ export type Command =
       readonly unitIds: readonly number[];
       readonly order: 'idle' | 'hold' | 'expand';
     }
-  | { readonly t: 'assignFront'; readonly armyId: number; readonly enemyId: number }
+  | {
+      readonly t: 'assignFront';
+      readonly armyId: number;
+      readonly enemyId: number;
+      /** Участок фронта между двумя гексами границы; null — вся граница. */
+      readonly section: readonly [HexId, HexId] | null;
+    }
+  | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
+  | { readonly t: 'clearPlan'; readonly armyId: number }
   | { readonly t: 'arrow'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'arrowStop'; readonly arrowId: number }
   /** soldiers — fixed-point, целое число солдат. */

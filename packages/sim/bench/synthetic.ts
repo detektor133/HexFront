@@ -117,6 +117,7 @@ function unit(
     inBattle: false,
     focus: -1,
     fireTarget: -1,
+    slot: -1,
   };
   state.nextId += 1;
   state.units.push(u);

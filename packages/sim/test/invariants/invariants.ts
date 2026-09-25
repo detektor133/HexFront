@@ -66,6 +66,10 @@ function checkOwnership(state: MatchState, out: string[]): void {
     const capital = cities.filter((c) => c.id === p.capitalCityId);
     if (cities.length > 0 && capital.length !== 1) out.push(`игрок ${p.id}: столица не одна`);
   }
+  for (const p of state.plans) {
+    if (!state.armies.some((a) => a.id === p.armyId))
+      out.push(`план несуществующей армии ${p.armyId}`);
+  }
   for (const u of state.units) {
     if (u.armyId === null) continue;
     const army = state.armies.find((a) => a.id === u.armyId);

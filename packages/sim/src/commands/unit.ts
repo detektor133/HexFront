@@ -147,6 +147,7 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     inBattle: false,
     focus: -1,
     fireTarget: -1,
+    slot: -1,
   });
   state.nextId += 1;
 }
@@ -185,6 +186,8 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
         const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
         if (!sameStep) stop(a);
+        // Ручной приказ снимает отряд с места в плане армии; освободившись, он вернётся в план.
+        a.slot = -1;
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';
       }
@@ -192,6 +195,7 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'setOrder':
       for (const a of owned.units) {
         stop(a);
+        a.slot = -1;
         a.order = cmd.order;
       }
       return;

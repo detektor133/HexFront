@@ -54,6 +54,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     inBattle: false,
     focus: -1,
     fireTarget: -1,
+    slot: -1,
   });
   state.nextId += 1;
 }

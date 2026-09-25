@@ -1,5 +1,6 @@
 // Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits,
 // armyOrder. GDD: docs/gdd/05-armies.md — «Модель», «Разделение и слияние», «Приказы».
+import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 
@@ -104,6 +105,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       return;
     }
     case 'disbandArmy': {
+      removePlan(state, cmd.armyId);
       for (const u of state.units) if (u.armyId === cmd.armyId) u.armyId = null;
       const rest = state.armies.filter((a) => a.id !== cmd.armyId);
       state.armies.splice(0, state.armies.length, ...rest);
@@ -113,6 +115,8 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       for (const u of state.units) if (cmd.unitIds.includes(u.id)) u.armyId = cmd.armyId;
       return;
     case 'armyOrder':
+      // «Держать» и «Экспансия» снимают план армии (07-controls.md, «Распределение»).
+      removePlan(state, cmd.armyId);
       orderArmy(state, cmd.armyId, cmd.order);
       return;
     case 'setAutoReinforce': {

@@ -89,6 +89,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.inBattle ? 1 : 0);
     int(s, a.focus);
     int(s, a.fireTarget);
+    int(s, a.slot);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {
@@ -96,6 +97,15 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.owner);
     int(s, a.number);
     str(s, a.name);
+  }
+  int(s, state.plans.length);
+  for (const p of state.plans) {
+    int(s, p.armyId);
+    str(s, p.kind);
+    if (p.kind === 'front') {
+      int(s, p.enemyId);
+      array(s, p.section ?? []);
+    } else array(s, p.hexes);
   }
 }
 
