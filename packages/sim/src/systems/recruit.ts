@@ -1,18 +1,18 @@
-// Набор: очереди и появление армий.
-// GDD: docs/gdd/05-armies.md — «Набор»
-import { MAX_ARMIES_PER_HEX, ORG_MAX } from '../balance.ts';
+// Набор: очереди и появление отрядов.
+// GDD: docs/gdd/05-units.md — «Набор»
+import { MAX_UNITS_PER_HEX, ORG_MAX } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import type { MatchState, Recruitment } from '../state/types.ts';
 
-// Свой проходимый гекс без чужих армий и с местом: сначала город, иначе ближайший к нему,
+// Свой проходимый гекс без чужих отрядов и с местом: сначала город, иначе ближайший к нему,
 // при равной дистанции — наименьший HexId.
 function spawnHex(state: MatchState, owner: number, cityHex: HexId): HexId | null {
   const { width } = state.map;
   const count = new Map<HexId, number>();
   const foreign = new Set<HexId>();
-  for (const a of state.armies) {
+  for (const a of state.units) {
     if (a.owner === owner) count.set(a.hex, (count.get(a.hex) ?? 0) + 1);
     else foreign.add(a.hex);
   }
@@ -21,7 +21,7 @@ function spawnHex(state: MatchState, owner: number, cityHex: HexId): HexId | nul
   let bestDist = Infinity;
   state.hexes.owner.forEach((o, id) => {
     if (o !== owner || state.map.terrain[id] === TERRAIN.water || foreign.has(id)) return;
-    if ((count.get(id) ?? 0) >= MAX_ARMIES_PER_HEX) return;
+    if ((count.get(id) ?? 0) >= MAX_UNITS_PER_HEX) return;
     const d = distance(center, hexFromId(id, width));
     if (d < bestDist) {
       best = id;
@@ -32,8 +32,8 @@ function spawnHex(state: MatchState, owner: number, cityHex: HexId): HexId | nul
 }
 
 function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
-  // Id растут монотонно, поэтому push сохраняет сортировку армий по id.
-  state.armies.push({
+  // Id растут монотонно, поэтому push сохраняет сортировку отрядов по id.
+  state.units.push({
     id: state.nextId,
     owner: r.owner,
     type: r.type,
@@ -51,7 +51,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
 
 /**
  * Двигает наборы на тик. Потеря города отменяет набор без возврата людей и золота; если всем
- * своим гексам не хватает места, готовая армия ждёт в очереди.
+ * своим гексам не хватает места, готовый отряд ждёт в очереди.
  */
 export function recruitSystem(state: MatchState): void {
   const remaining: Recruitment[] = [];
@@ -69,7 +69,7 @@ export function recruitSystem(state: MatchState): void {
       continue;
     }
     spawn(state, r, hex);
-    state.events.push({ t: 'armyRecruited', ...event });
+    state.events.push({ t: 'unitRecruited', ...event });
   }
   state.recruits.splice(0, state.recruits.length, ...remaining);
 }

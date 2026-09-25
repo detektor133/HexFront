@@ -1,9 +1,9 @@
-// Путь и время перехода армий: A* по времени хода, стабильные ничьи по HexId.
-// GDD: docs/gdd/05-armies.md — «Движение», «Захват»; 01-map.md — «Местность».
+// Путь и время перехода отрядов: A* по времени хода, стабильные ничьи по HexId.
+// GDD: docs/gdd/05-units.md — «Движение», «Захват»; 01-map.md — «Местность».
 import {
   ATTRITION_THRESHOLD,
   LOW_SUPPLY_SPEED_MULT,
-  MAX_ARMIES_PER_HEX,
+  MAX_UNITS_PER_HEX,
   MOVE_TIME_S,
   RIVER_MOVE_PENALTY_S,
   ROAD_MOVE_MULT,
@@ -28,31 +28,31 @@ function moveTerrain(state: MatchState, hex: HexId): LandTerrain | null {
   return name === undefined || name === 'water' ? null : name;
 }
 
-/** Сколько армий игрока стоит в гексе. */
+/** Сколько отрядов игрока стоит в гексе. */
 export function ownArmiesAt(state: MatchState, owner: number, hex: HexId): number {
   let n = 0;
-  for (const a of state.armies) if (a.owner === owner && a.hex === hex) n += 1;
+  for (const a of state.units) if (a.owner === owner && a.hex === hex) n += 1;
   return n;
 }
 
 /**
- * Гекс занят врагом: вражеская армия, ополчение чужого города или гарнизон нейтрального.
+ * Гекс занят врагом: вражеский отряд, ополчение чужого города или гарнизон нейтрального.
  * Войти в такой гекс можно только через бой.
  */
 export function isHostileHex(state: MatchState, owner: number, hex: HexId): boolean {
-  if (state.armies.some((a) => a.hex === hex && a.owner !== owner)) return true;
+  if (state.units.some((a) => a.hex === hex && a.owner !== owner)) return true;
   const city = state.cities.find((c) => c.hex === hex);
   if (!city || city.owner === owner) return false;
   return city.owner !== NEUTRAL || city.garrison > 0;
 }
 
-/** Зона контроля: рядом с гексом стоит армия другого игрока. */
+/** Зона контроля: рядом с гексом стоит отряд другого игрока. */
 function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
   const { width, height } = state.map;
   for (const n of neighbors(hexFromId(hex, width))) {
     if (!inBounds(n, width, height)) continue;
     const id = hexId(n, width);
-    if (state.armies.some((a) => a.hex === id && a.owner !== owner)) return true;
+    if (state.units.some((a) => a.hex === id && a.owner !== owner)) return true;
   }
   return false;
 }
@@ -101,15 +101,15 @@ function minStepTicks(type: UnitType): number {
 }
 
 /**
- * Можно ли армии войти в гекс по пути. Артиллерия — только в свои гексы; промежуточные гексы
- * не должны быть заняты врагом или заполнены своими армиями; цель может быть вражеской (атака).
+ * Можно ли отряду войти в гекс по пути. Артиллерия — только в свои гексы; промежуточные гексы
+ * не должны быть заняты врагом или заполнены своими отрядами; цель может быть вражеской (атака).
  */
 function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boolean {
   if (moveTerrain(state, hex) === null) return false;
   if (m.type === 'artillery' && state.hexes.owner[hex] !== m.owner) return false;
   if (isGoal) return true;
   if (isHostileHex(state, m.owner, hex)) return false;
-  return ownArmiesAt(state, m.owner, hex) < MAX_ARMIES_PER_HEX;
+  return ownArmiesAt(state, m.owner, hex) < MAX_UNITS_PER_HEX;
 }
 
 const UNREACHED = 0x7fffffff;
@@ -154,7 +154,7 @@ function search(
 }
 
 /**
- * Путь армии (A* по времени хода, ничьи — по меньшему HexId). Снабжённость считается полной:
+ * Путь отряда (A* по времени хода, ничьи — по меньшему HexId). Снабжённость считается полной:
  * она меняет все шаги одинаково и на выбор пути не влияет.
  * @returns гексы после from до to включительно; [] при from === to; null — пути нет
  */

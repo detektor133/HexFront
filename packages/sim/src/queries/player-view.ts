@@ -51,7 +51,7 @@ export interface PlayerView {
     /** Золото в секунду при фактическом и при выбранном налоге. */
     readonly incomePerS: number;
     readonly incomeAtTargetPerS: number;
-    /** Содержание армий, fixed-point золота в секунду. */
+    /** Содержание отрядов, fixed-point золота в секунду. */
     readonly upkeepPerS: number;
     /** Казна пуста при отрицательном балансе (02-economy.md, «Банкротство»). */
     readonly bankrupt: boolean;

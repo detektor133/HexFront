@@ -1,10 +1,10 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
-import { executeArmyCommand, validateArmyCommand } from './army.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
 import { startRecruit, validateRecruit } from './recruit.ts';
 import { validateSetTax } from './set-tax.ts';
 import { rejected, type Command, type PlayerCommand, type Validation } from './types.ts';
+import { executeUnitCommand, validateUnitCommand } from './unit.ts';
 import type { MatchState } from '../state/types.ts';
 
 export type { PlayerCommand } from './types.ts';
@@ -31,7 +31,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'setOrder':
     case 'split':
     case 'merge':
-      return validateArmyCommand(state, playerId, cmd);
+      return validateUnitCommand(state, playerId, cmd);
     case 'attack':
     case 'assignFront':
     case 'arrow':
@@ -66,7 +66,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'setOrder':
     case 'split':
     case 'merge':
-      executeArmyCommand(state, playerId, cmd);
+      executeUnitCommand(state, playerId, cmd);
       return;
     default:
       return;

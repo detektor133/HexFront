@@ -1,8 +1,8 @@
 // Команда recruit: проверка, списание людей и золота, постановка в очередь города.
-// GDD: docs/gdd/05-armies.md — «Модель», «Набор»; 02-economy.md — «Банкротство».
+// GDD: docs/gdd/05-units.md — «Модель», «Набор»; 02-economy.md — «Банкротство».
 import {
-  ARMY_LIMIT_BASE,
-  ARMY_LIMIT_PER_CITY,
+  UNIT_LIMIT_BASE,
+  UNIT_LIMIT_PER_CITY,
   COST_GOLD_PER_SOLDIER,
   COST_POP_PER_SOLDIER,
   RECRUIT_BASE_S,
@@ -49,7 +49,7 @@ function donors(state: MatchState, city: City): Donor[] {
 }
 
 /**
- * Сколько людей город может отдать в армию: сумма излишков над 10 % лимита по своим гексам
+ * Сколько людей город может отдать в отряды: сумма излишков над 10 % лимита по своим гексам
  * в радиусе 2.
  * @returns fixed-point людей; 0 для неизвестного города
  */
@@ -60,12 +60,12 @@ export function recruitCapacity(state: MatchState, cityId: number): Fp {
 }
 
 /**
- * Командная ёмкость: ARMY_LIMIT_BASE + ARMY_LIMIT_PER_CITY × городов игрока.
- * @returns сколько армий (вместе с наборами в очереди) может быть у игрока
+ * Командная ёмкость: UNIT_LIMIT_BASE + UNIT_LIMIT_PER_CITY × городов игрока.
+ * @returns сколько отрядов (вместе с наборами в очереди) может быть у игрока
  */
-export function armyLimit(state: MatchState, playerId: number): number {
+export function unitLimit(state: MatchState, playerId: number): number {
   const cities = state.cities.filter((c) => c.owner === playerId).length;
-  return ARMY_LIMIT_BASE + ARMY_LIMIT_PER_CITY * cities;
+  return UNIT_LIMIT_BASE + UNIT_LIMIT_PER_CITY * cities;
 }
 
 /**
@@ -106,9 +106,9 @@ function checkRules(
   if (state.players[playerId]?.bankrupt) return 'bankrupt';
   if (state.recruits.some((r) => r.cityId === cityId)) return 'queueBusy';
   const used =
-    state.armies.filter((a) => a.owner === playerId).length +
+    state.units.filter((a) => a.owner === playerId).length +
     state.recruits.filter((r) => r.owner === playerId).length;
-  if (used >= armyLimit(state, playerId)) return 'armyLimit';
+  if (used >= unitLimit(state, playerId)) return 'unitLimit';
   if (recruitCapacity(state, cityId) < fpMul(soldiers, COST_POP_PER_SOLDIER[type])) {
     return 'notEnoughPeople';
   }

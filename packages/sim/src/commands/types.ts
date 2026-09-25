@@ -6,20 +6,20 @@ import type { Fp } from '../math/int.ts';
 
 export type Command =
   | { readonly t: 'setTax'; readonly rate: Fp }
-  | { readonly t: 'move'; readonly armyIds: readonly number[]; readonly to: HexId }
-  | { readonly t: 'attack'; readonly armyIds: readonly number[]; readonly target: HexId }
+  | { readonly t: 'move'; readonly unitIds: readonly number[]; readonly to: HexId }
+  | { readonly t: 'attack'; readonly unitIds: readonly number[]; readonly target: HexId }
   | {
       readonly t: 'setOrder';
-      readonly armyIds: readonly number[];
+      readonly unitIds: readonly number[];
       readonly order: 'idle' | 'hold' | 'expand';
     }
-  | { readonly t: 'assignFront'; readonly armyIds: readonly number[]; readonly enemyId: number }
+  | { readonly t: 'assignFront'; readonly unitIds: readonly number[]; readonly enemyId: number }
   | { readonly t: 'arrow'; readonly points: readonly HexId[] }
   | { readonly t: 'arrowStop'; readonly arrowId: number }
   /** soldiers — fixed-point, целое число солдат. */
-  | { readonly t: 'split'; readonly armyId: number; readonly soldiers: Fp }
-  | { readonly t: 'merge'; readonly armyIds: readonly number[] }
-  | { readonly t: 'bombard'; readonly armyId: number; readonly targetArmyId: number | null }
+  | { readonly t: 'split'; readonly unitId: number; readonly soldiers: Fp }
+  | { readonly t: 'merge'; readonly unitIds: readonly number[] }
+  | { readonly t: 'bombard'; readonly unitId: number; readonly targetUnitId: number | null }
   | {
       readonly t: 'recruit';
       readonly cityId: number;
@@ -59,10 +59,10 @@ export const REJECT_REASONS = [
   'badUnitType',
   'invalidAmount',
   'queueBusy',
-  'armyLimit',
+  'unitLimit',
   'notEnoughPeople',
-  'unknownArmy',
-  'notOwnArmy',
+  'unknownUnit',
+  'notOwnUnit',
   'hexFull',
   'notSameHex',
   'notSameType',

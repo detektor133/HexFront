@@ -2,9 +2,9 @@
 import {
   NEUTRAL_HEX_POP_RATIO,
   ORG_MAX,
-  START_ARMIES,
-  START_ARMY_SOLDIERS,
-  START_ARMY_TYPE,
+  START_UNITS,
+  START_UNIT_SOLDIERS,
+  START_UNIT_TYPE,
   START_GOLD,
   START_HEXES,
   START_POP_CAPITAL,
@@ -48,7 +48,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     },
     cities,
     players: [],
-    armies: [],
+    units: [],
     constructions: [],
     recruits: [],
     networks: [],
@@ -115,12 +115,12 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     citiesFounded: 0,
     bankrupt: false,
   });
-  for (let i = 0; i < START_ARMIES; i += 1) {
-    state.armies.push({
+  for (let i = 0; i < START_UNITS; i += 1) {
+    state.units.push({
       id: state.nextId,
       owner: playerId,
-      type: START_ARMY_TYPE,
-      soldiers: START_ARMY_SOLDIERS,
+      type: START_UNIT_TYPE,
+      soldiers: START_UNIT_SOLDIERS,
       org: ORG_MAX,
       hex: capital,
       order: 'expand',

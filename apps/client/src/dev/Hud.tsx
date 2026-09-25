@@ -41,7 +41,7 @@ export function Hud(props: {
   const me = view.players[view.playerId];
   if (!me) return null;
   const s = view.me;
-  // Прирост золота в HUD — баланс: доход минус содержание армий (02-economy.md, «Золото»).
+  // Прирост золота в HUD — баланс: доход минус содержание отрядов (02-economy.md, «Золото»).
   const net = s.incomePerS - s.upkeepPerS;
   return (
     <header className={styles.hud}>

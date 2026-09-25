@@ -21,10 +21,10 @@ describe('захват пустых гексов', () => {
     ~  ~  ~  ~  ~  ~
   `;
 
-  it('армия занимает нейтральный гекс по завершении перехода, население не теряется', () => {
+  it('отряд занимает нейтральный гекс по завершении перехода, население не теряется', () => {
     const s = scenario(MAP, { legend });
     s.setPop(at(2, 1), 20);
-    const id = s.army('A', 'infantry', 1, at(1, 1));
+    const id = s.unit('A', 'infantry', 1, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
     s.runTicks(19);
     expect(s.owner(at(2, 1))).toBeNull();
@@ -37,7 +37,7 @@ describe('захват пустых гексов', () => {
     const s = scenario(MAP, { legend });
     s.state.hexes.pop.fill(0);
     s.setPop(at(4, 1), 50);
-    const id = s.army('A', 'armor', 100, at(3, 1));
+    const id = s.unit('A', 'armor', 100, at(3, 1));
     s.cmd('A', move([id], at(4, 1)));
     s.runSeconds(3);
     expect(s.owner(at(4, 1))).toBe('A');
@@ -48,7 +48,7 @@ describe('захват пустых гексов', () => {
 
   it('промежуточные гексы пути тоже захватываются', () => {
     const s = scenario(MAP, { legend });
-    const id = s.army('A', 'infantry', 100, at(1, 1));
+    const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', move([id], at(3, 1)));
     s.runSeconds(5);
     expect(s.owner(at(2, 1))).toBe('A');
@@ -57,7 +57,7 @@ describe('захват пустых гексов', () => {
 
   it('артиллерия не захватывает: на чужой гекс её не пускает путь', () => {
     const s = scenario(MAP, { legend });
-    const id = s.army('A', 'artillery', 100, at(1, 1));
+    const id = s.unit('A', 'artillery', 100, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
     s.runSeconds(3);
     expect(s.owner(at(2, 1))).toBeNull();
@@ -66,7 +66,7 @@ describe('захват пустых гексов', () => {
 });
 
 describe('приказ expand', () => {
-  it('армия занимает ближайшие нейтральные гексы у границы, пока они есть, затем idle', () => {
+  it('отряд занимает ближайшие нейтральные гексы у границы, пока они есть, затем idle', () => {
     const s = scenario(
       `
       ~  ~  ~  ~  ~
@@ -75,7 +75,7 @@ describe('приказ expand', () => {
     `,
       { legend },
     );
-    const id = s.army('A', 'infantry', 100, at(1, 1));
+    const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', setOrder([id], 'expand'));
     s.runSeconds(3);
     expect(s.owner(at(2, 1))).toBe('A');
@@ -83,10 +83,10 @@ describe('приказ expand', () => {
     s.runSeconds(3);
     expect(s.owner(at(3, 1))).toBe('A');
     s.runTicks(1);
-    expect(s.armyById(id)?.order).toBe('idle');
+    expect(s.unitById(id)?.order).toBe('idle');
   });
 
-  it('две армии на экспансии не идут в один гекс', () => {
+  it('два отряда на экспансии не идут в один гекс', () => {
     const s = scenario(
       `
       ~  ~  ~  ~  ~
@@ -95,11 +95,11 @@ describe('приказ expand', () => {
     `,
       { legend },
     );
-    const x = s.army('A', 'infantry', 100, at(2, 1));
-    const y = s.army('A', 'infantry', 100, at(2, 1));
+    const x = s.unit('A', 'infantry', 100, at(2, 1));
+    const y = s.unit('A', 'infantry', 100, at(2, 1));
     s.cmd('A', setOrder([x, y], 'expand'));
     s.runTicks(1);
-    const targets = [x, y].map((id) => s.armyById(id)?.path.at(-1));
+    const targets = [x, y].map((id) => s.unitById(id)?.path.at(-1));
     expect(new Set(targets).size).toBe(2);
     s.runSeconds(10);
     expect(s.owner(at(0, 1))).toBe('A');
@@ -115,13 +115,13 @@ describe('приказ expand', () => {
     `,
       { legend },
     );
-    const id = s.army('A', 'infantry', 100, at(2, 1));
+    const id = s.unit('A', 'infantry', 100, at(2, 1));
     s.cmd('A', setOrder([id], 'expand'));
     s.runSeconds(5);
     expect(s.owner(at(3, 1))).toBe('B');
     expect(s.owner(at(0, 1))).toBeNull();
-    expect(s.armyById(id)?.order).toBe('idle');
-    expect(s.armyById(id)?.hex).toBe(hexOf(s, at(2, 1)));
+    expect(s.unitById(id)?.order).toBe('idle');
+    expect(s.unitById(id)?.hex).toBe(hexOf(s, at(2, 1)));
   });
 
   it('артиллерии приказ expand недоступен — отказ badOrder', () => {
@@ -131,7 +131,7 @@ describe('приказ expand', () => {
     `,
       { legend },
     );
-    const id = s.army('A', 'artillery', 100, at(1, 0));
+    const id = s.unit('A', 'artillery', 100, at(1, 0));
     s.cmd('A', setOrder([id], 'expand'));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['badOrder']);

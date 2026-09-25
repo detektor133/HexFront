@@ -58,7 +58,7 @@ describe('playerView', () => {
     expect(me.incomeAtTargetPerS).toBe(1400);
     expect(me.growthMultAtTarget).toBe(500);
     expect(me.popGrowthPerS).toBeGreaterThan(0);
-    // Очки (08-match.md): 2 города × 10 + 27 своих гексов, армий нет.
+    // Очки (08-match.md): 2 города × 10 + 27 своих гексов, отрядов нет.
     expect(me.score).toBe(2 * 10 + 27);
     expect(me.place).toBe(1);
     expect(me.players).toBe(1);
@@ -66,9 +66,9 @@ describe('playerView', () => {
     expect(me.bankrupt).toBe(false);
   });
 
-  it('содержание армий и свои наборы в очереди', () => {
+  it('содержание отрядов и свои наборы в очереди', () => {
     const s = scenario(MAP, { legend });
-    s.army('A', 'infantry', 100, at(0, 0));
+    s.unit('A', 'infantry', 100, at(0, 0));
     s.player('A').gold = (1000 * 1000) as Fp;
     s.setPop(at(1, 1), 250);
     s.setPop(at(6, 1), 250);

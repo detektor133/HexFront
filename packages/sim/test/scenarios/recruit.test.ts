@@ -36,22 +36,22 @@ function setup() {
   return s;
 }
 
-describe('набор армий', () => {
-  it('пехота 100: золото сразу, армия появляется через 9 с в городе с org 100', () => {
+describe('набор отрядов', () => {
+  it('пехота 100: золото сразу, отряд появляется через 9 с в городе с org 100', () => {
     const s = setup();
     const gold = s.player('A').gold;
     s.cmd('A', recruit(at(1, 1), 'infantry', 100));
     s.runTicks(1);
     expect(s.player('A').gold).toBeLessThanOrEqual(gold - 10 * FP + 2 * FP);
-    expect(s.armiesOf('A')).toHaveLength(0);
+    expect(s.unitsOf('A')).toHaveLength(0);
     s.runTicks(89);
-    expect(s.armiesOf('A')).toHaveLength(1);
-    const army = s.armiesOf('A')[0];
-    expect(army?.hex).toBe(1 + 1 * 6);
-    expect(army?.soldiers).toBe(100 * FP);
-    expect(army?.org).toBe(100 * FP);
-    expect(army?.order).toBe('idle');
-    expect(s.lastEvent('armyRecruited')).toBeDefined();
+    expect(s.unitsOf('A')).toHaveLength(1);
+    const unit = s.unitsOf('A')[0];
+    expect(unit?.hex).toBe(1 + 1 * 6);
+    expect(unit?.soldiers).toBe(100 * FP);
+    expect(unit?.org).toBe(100 * FP);
+    expect(unit?.order).toBe('idle');
+    expect(s.lastEvent('unitRecruited')).toBeDefined();
   });
 
   it('время: бронетехника 200 — 15 + 2 × 2 = 19 с', () => {
@@ -59,9 +59,9 @@ describe('набор армий', () => {
     s.player('A').gold = (1000 * FP) as Fp;
     s.cmd('A', recruit(at(1, 1), 'armor', 200));
     s.runTicks(189);
-    expect(s.armiesOf('A')).toHaveLength(0);
+    expect(s.unitsOf('A')).toHaveLength(0);
     s.runTicks(1);
-    expect(s.armiesOf('A')).toHaveLength(1);
+    expect(s.unitsOf('A')).toHaveLength(1);
   });
 
   it('люди списываются пропорционально излишку, ни один гекс не ниже 10 % лимита', () => {
@@ -120,16 +120,16 @@ describe('набор армий', () => {
     expect(s.rejections()).toEqual(['queueBusy']);
   });
 
-  it('лимит армий 4 + 2 × городов считает и очередь набора', () => {
+  it('лимит отрядов 4 + 2 × городов считает и очередь набора', () => {
     const s = setup();
-    for (let i = 0; i < 5; i += 1) s.army('A', 'infantry', 50, at(0, 0 + (i % 3)));
+    for (let i = 0; i < 5; i += 1) s.unit('A', 'infantry', 50, at(0, 0 + (i % 3)));
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
     s.runTicks(1);
     expect(s.rejections()).toEqual([]);
     s.runTicks(100);
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['armyLimit']);
+    expect(s.rejections()).toEqual(['unitLimit']);
   });
 
   it('не хватает золота — отказ notEnoughGold', () => {
@@ -140,12 +140,12 @@ describe('набор армий', () => {
     expect(s.rejections()).toEqual(['notEnoughGold']);
   });
 
-  it('в городе 3 армии — новая появляется в ближайшем своём свободном гексе', () => {
+  it('в городе 3 отряда — новый появляется в ближайшем своём свободном гексе', () => {
     const s = setup();
-    for (let i = 0; i < 3; i += 1) s.army('A', 'infantry', 50, at(1, 1));
+    for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(1, 1));
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
     s.runSeconds(9);
-    const fresh = s.armiesOf('A')[3];
+    const fresh = s.unitsOf('A')[3];
     expect(fresh).toBeDefined();
     // Соседи города — кольцо 1; при равенстве дистанции — наименьший HexId. Столбец 1 нечётный
     // и сдвинут вверх (even-q), поэтому (0,0) — сосед (1,1), его HexId 0.
@@ -160,7 +160,7 @@ describe('набор армий', () => {
     // setOwner переносит и город: город всегда принадлежит владельцу своего гекса.
     s.setOwner(at(1, 1), 'B');
     s.runSeconds(10);
-    expect(s.armiesOf('A')).toHaveLength(0);
+    expect(s.unitsOf('A')).toHaveLength(0);
     expect(s.lastEvent('recruitCancelled')).toBeDefined();
     expect(s.player('A').gold).toBeLessThan(gold + 20 * FP);
   });

@@ -64,7 +64,7 @@ export interface Player {
   bankrupt: boolean;
 }
 
-/** Набор в городе: люди и золото уже списаны, армия появится по завершении. Один на город. */
+/** Набор в городе: люди и золото уже списаны, отряд появится по завершении. Один на город. */
 export interface Recruitment {
   readonly id: number;
   readonly owner: number;
@@ -91,9 +91,9 @@ export interface Construction {
 }
 
 /** move — идёт по path; остальные — стоит (expand — этап 03/T3). */
-export type ArmyOrder = 'idle' | 'hold' | 'expand' | 'move';
+export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move';
 
-export interface Army {
+export interface Unit {
   readonly id: number;
   readonly owner: number;
   readonly type: UnitType;
@@ -102,10 +102,10 @@ export interface Army {
   /** Организованность 0..ORG_MAX, fixed-point. */
   org: Fp;
   hex: HexId;
-  order: ArmyOrder;
+  order: UnitOrder;
   /** Доля 0..1, fixed-point. */
   supplyLevel: Fp;
-  /** Оставшиеся гексы пути, следующий — первый; пусто, если армия не идёт. */
+  /** Оставшиеся гексы пути, следующий — первый; пусто, если отряд не идёт. */
   path: HexId[];
   /** Прогресс текущего перехода в path[0], тики. */
   moveTicks: number;
@@ -122,7 +122,7 @@ export type GameEvent =
       readonly reason: string;
     }
   | {
-      readonly t: 'armyRecruited' | 'recruitCancelled';
+      readonly t: 'unitRecruited' | 'recruitCancelled';
       readonly playerId: number;
       readonly cityId: number;
       readonly type: UnitType;
@@ -144,7 +144,7 @@ export interface MatchState {
   /** Индекс в массиве равен id игрока. */
   readonly players: Player[];
   /** Отсортированы по id. */
-  readonly armies: Army[];
+  readonly units: Unit[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
   /** Отсортированы по id. */

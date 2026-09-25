@@ -25,13 +25,13 @@ export {
 export { rebuildSupplyPlan, type RebuildPlan } from './commands/rebuild-supply.ts';
 export * from './queries/score.ts';
 export {
-  armyLimit,
+  unitLimit,
   checkRecruit,
   recruitCapacity,
   recruitTimeS,
   type RecruitCheck,
 } from './commands/recruit.ts';
 export { playerUpkeepPerSecond } from './systems/economy.ts';
-export { findPath, isHostileHex, stepTicks, type Mover } from './queries/army-path.ts';
-export { findNearestPath } from './queries/army-path.ts';
+export { findPath, isHostileHex, stepTicks, type Mover } from './queries/unit-path.ts';
+export { findNearestPath } from './queries/unit-path.ts';
 export { captureHex } from './state/capture.ts';

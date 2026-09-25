@@ -103,7 +103,7 @@ describe('доход', () => {
   });
 });
 
-describe('содержание армий и банкротство', () => {
+describe('содержание отрядов и банкротство', () => {
   const MAP = `
     .  a  a  .
     .  A1 a  .
@@ -119,9 +119,9 @@ describe('содержание армий и банкротство', () => {
 
   it('содержание: пехота 0,003, бронетехника 0,012, артиллерия 0,008 золота/с на солдата', () => {
     const s = empty();
-    s.army('A', 'infantry', 1000, at(1, 1));
-    s.army('A', 'armor', 100, at(1, 1));
-    s.army('A', 'artillery', 100, at(1, 1));
+    s.unit('A', 'infantry', 1000, at(1, 1));
+    s.unit('A', 'armor', 100, at(1, 1));
+    s.unit('A', 'artillery', 100, at(1, 1));
     expect(playerUpkeepPerSecond(s.state, 0)).toBe(3000 + 1200 + 800);
     const before = s.player('A').gold;
     s.runSeconds(1);
@@ -132,7 +132,7 @@ describe('содержание армий и банкротство', () => {
 
   it('казна пуста и баланс отрицательный → банкротство, золото не уходит в минус', () => {
     const s = empty();
-    s.army('A', 'infantry', 1000, at(1, 1));
+    s.unit('A', 'infantry', 1000, at(1, 1));
     s.player('A').gold = (1 * 1000) as Fp;
     s.runSeconds(2);
     expect(s.player('A').gold).toBe(0);
@@ -141,7 +141,7 @@ describe('содержание армий и банкротство', () => {
 
   it('банкротство блокирует набор и постройки с причиной bankrupt', () => {
     const s = empty();
-    s.army('A', 'infantry', 1000, at(1, 1));
+    s.unit('A', 'infantry', 1000, at(1, 1));
     s.player('A').gold = 0 as Fp;
     s.setPop(at(1, 1), 250);
     s.runTicks(1);
@@ -153,7 +153,7 @@ describe('содержание армий и банкротство', () => {
 
   it('баланс снова положительный → банкротство снимается', () => {
     const s = empty();
-    s.army('A', 'infantry', 100, at(1, 1));
+    s.unit('A', 'infantry', 100, at(1, 1));
     s.player('A').gold = 0 as Fp;
     s.runTicks(1);
     // Город 0,5 − содержание 0,3 > 0: банкротства нет, золото растёт.

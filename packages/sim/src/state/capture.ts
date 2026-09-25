@@ -1,5 +1,5 @@
 // Смена владельца гекса при захвате и её последствия для населения.
-// GDD: docs/gdd/02-economy.md — «Население»; 05-armies.md — «Захват».
+// GDD: docs/gdd/02-economy.md — «Население»; 05-units.md — «Захват».
 import { CAPTURE_POP_LOSS_CITY, CAPTURE_POP_LOSS_HEX } from '../balance.ts';
 import { NEUTRAL, type MatchState } from './types.ts';
 import type { HexId } from '../math/hex.ts';

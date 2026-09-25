@@ -1,4 +1,4 @@
-// Доход игроков: налог с населения, города, шахты; изолированные сети — ×0,5. Содержание армий
+// Доход игроков: налог с населения, города, шахты; изолированные сети — ×0,5. Содержание отрядов
 // и банкротство. GDD: docs/gdd/02-economy.md — «Золото», «Банкротство»; 04-roads-supply.md.
 import {
   CITY_GOLD_PER_LEVEL,
@@ -104,12 +104,12 @@ function incomeFromBase(b: Base, rate: Fp): number {
 }
 
 /**
- * Содержание армий игрока: expense/с = Σ soldiers × UPKEEP_GOLD_PER_SOLDIER_S(type).
+ * Содержание отрядов игрока: expense/с = Σ soldiers × UPKEEP_GOLD_PER_SOLDIER_S(type).
  * @returns fixed-point золота в секунду
  */
 export function playerUpkeepPerSecond(state: MatchState, playerId: number): number {
   let total = 0;
-  for (const a of state.armies) {
+  for (const a of state.units) {
     if (a.owner === playerId) total += fpMul(a.soldiers, UPKEEP_GOLD_PER_SOLDIER_S[a.type]);
   }
   return total;
@@ -118,7 +118,7 @@ export function playerUpkeepPerSecond(state: MatchState, playerId: number): numb
 /**
  * Начисляет баланс за тик:
  * income/с = Σpop × taxEffective × GOLD_PER_POP_TAX + Σ CITY_GOLD_PER_LEVEL × level + Σ MINE_GOLD_PER_S
- * (для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT) − содержание армий.
+ * (для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT) − содержание отрядов.
  * Золото не уходит в минус; казна пуста при отрицательном балансе — банкротство.
  */
 export function economySystem(state: MatchState): void {
