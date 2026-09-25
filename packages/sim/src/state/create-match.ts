@@ -36,6 +36,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     defenders: (c.garrison * FP) as Fp,
     defenseOrg: ORG_MAX,
     inBattle: false,
+    captureTicks: 0,
   }));
   return {
     tick: 0,
@@ -58,6 +59,9 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     networks: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
+    winner: -1,
+    holdPlayer: -1,
+    holdTicks: 0,
   };
 }
 
@@ -104,6 +108,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     defenders: MILITIA_PER_LEVEL,
     defenseOrg: ORG_MAX,
     inBattle: false,
+    captureTicks: 0,
   });
   state.hexes.owner[capital] = playerId;
   state.hexes.pop[capital] = START_POP_CAPITAL;
@@ -122,6 +127,9 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     bankrupt: false,
     armiesCreated: 1,
     autoReinforce: false,
+    chaosTicks: 0,
+    noCityTicks: 0,
+    eliminatedTick: -1,
   });
   // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
   const armyId = state.nextId;

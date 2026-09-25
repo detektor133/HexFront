@@ -51,6 +51,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, c.defenders);
     int(s, c.defenseOrg);
     int(s, c.inBattle ? 1 : 0);
+    int(s, c.captureTicks);
   }
   int(s, state.players.length);
   for (const p of state.players) {
@@ -64,6 +65,9 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.bankrupt ? 1 : 0);
     int(s, p.armiesCreated);
     int(s, p.autoReinforce ? 1 : 0);
+    int(s, p.chaosTicks);
+    int(s, p.noCityTicks);
+    int(s, p.eliminatedTick);
   }
   int(s, state.units.length);
   for (const a of state.units) {
@@ -145,5 +149,8 @@ export function hashState(state: MatchState): string {
     int(s, n.owner);
     int(s, n.isMain ? 1 : 0);
   }
+  int(s, state.winner);
+  int(s, state.holdPlayer);
+  int(s, state.holdTicks);
   return s.h.toString(16).padStart(8, '0');
 }

@@ -49,6 +49,8 @@ export interface City {
   defenseOrg: Fp;
   /** Гекс города атакован в этом тике — ополчение не восстанавливается. */
   inBattle: boolean;
+  /** Сколько тиков осталось до полной выработки после захвата; 0 — полная. */
+  captureTicks: number;
 }
 
 export type PlayerStatus = 'alive' | 'eliminated';
@@ -70,6 +72,12 @@ export interface Player {
   armiesCreated: number;
   /** «Автопополнение»: новый отряд сразу уходит в самую нуждающуюся армию (CR-001). */
   autoReinforce: boolean;
+  /** Тики «смуты» после переноса столицы: доход × CAPITAL_CHAOS_INCOME_MULT. */
+  chaosTicks: number;
+  /** Сколько тиков подряд у игрока нет городов. */
+  noCityTicks: number;
+  /** Тик выбывания или -1 — для мест выбывших. */
+  eliminatedTick: number;
 }
 
 /** Набор в городе: люди и золото уже списаны, отряд появится по завершении. Один на город. */
@@ -167,13 +175,22 @@ export type GameEvent =
       readonly playerId: number;
       readonly unitId: number;
     }
-  | { readonly t: 'cityCaptured'; readonly playerId: number; readonly cityId: number }
+  | {
+      readonly t: 'cityCaptured' | 'capitalMoved';
+      readonly playerId: number;
+      readonly cityId: number;
+    }
+  | { readonly t: 'playerEliminated'; readonly playerId: number }
+  | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;
       readonly kind: ConstructionKind;
       readonly hex: HexId;
     };
+
+/** Как выиграна партия (08-match.md, «Победа»). */
+export type WinReason = 'cities' | 'lastStanding' | 'score';
 
 export interface MatchState {
   tick: number;
@@ -196,4 +213,9 @@ export interface MatchState {
   networks: SupplyNetwork[];
   nextId: number;
   events: GameEvent[];
+  /** Победитель или -1; матч не замораживается — остановку делает сервер. */
+  winner: number;
+  /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и сколько тиков подряд; -1 — никто. */
+  holdPlayer: number;
+  holdTicks: number;
 }

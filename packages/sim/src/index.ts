@@ -40,3 +40,4 @@ export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/comba
 export { fireTargetOf } from './systems/artillery.ts';
 export * from './queries/unit-view.ts';
 export * from './queries/forecast.ts';
+export * from './state/city-output.ts';

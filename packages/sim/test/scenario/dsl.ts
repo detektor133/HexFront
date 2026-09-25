@@ -13,6 +13,7 @@ import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
+import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
@@ -254,6 +255,9 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       bankrupt: false,
       armiesCreated: 0,
       autoReinforce: false,
+      chaosTicks: 0,
+      noCityTicks: 0,
+      eliminatedTick: -1,
     })),
     units: [],
     constructions: [],
@@ -262,6 +266,9 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     networks: [],
     nextId: 1,
     events: [],
+    winner: -1,
+    holdPlayer: -1,
+    holdTicks: 0,
   };
   seedNeutralPopulation(state);
   return state;
@@ -295,6 +302,10 @@ export interface Scenario {
   river(where: At, dir: number): void;
   /** Задать организованность отряда (0–100). */
   setOrg(unitId: number, org: number): void;
+  /** Захват клетки игроком по правилам captureHex (население, ополчение, выработка). */
+  capture(where: At, player: string): void;
+  /** Перемотать счётчик тиков — для проверки таймера матча. */
+  setTick(tick: number): void;
   /** Поставить постройку в клетку в обход строек. */
   setBuilding(where: At, kind: 'fort' | 'depot'): void;
   /** Армии игрока по порядку создания. */
@@ -343,6 +354,7 @@ export function scenario(
       defenders: defenders as Fp,
       defenseOrg: ORG_MAX,
       inBattle: false,
+      captureTicks: 0,
     });
     const player = state.players[owner];
     if (cell.capital && player) player.capitalCityId = id;
@@ -495,6 +507,12 @@ function makeScenario(
       const unit = state.units.find((a) => a.id === unitId);
       if (!unit) throw new Error(`сценарий: нет отряда ${unitId}`);
       unit.org = (org * FP) as Fp;
+    },
+    capture(where, player) {
+      captureHex(state, hexOf(where), idOf(player));
+    },
+    setTick(tick) {
+      state.tick = tick;
     },
     setBuilding(where, kind) {
       state.hexes.building[hexOf(where)] = BUILDING[kind];

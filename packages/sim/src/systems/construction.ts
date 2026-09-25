@@ -19,6 +19,7 @@ function complete(state: MatchState, c: Construction): void {
         defenders: MILITIA_PER_LEVEL,
         defenseOrg: ORG_MAX,
         inBattle: false,
+        captureTicks: 0,
       });
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);

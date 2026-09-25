@@ -118,6 +118,8 @@ export const CITY_UPGRADE_TIME_S: readonly [Fp, Fp, Fp, Fp] = [fp(20), fp(30), f
 export const CAPTURED_OUTPUT_START: Fp = fp(0.25);
 export const CAPTURED_RAMP_S: Fp = fp(60);
 export const CAPITAL_MOVE_CHAOS_S: Fp = fp(30);
+/** Доход во время «смуты» после переноса столицы (03-cities-buildings.md, «Столица»). */
+export const CAPITAL_CHAOS_INCOME_MULT: Fp = fp(0.5);
 export const NO_CITY_GRACE_S: Fp = fp(60);
 /** Цена благоустройства уровней 1..3, золото. */
 export const IMPROVEMENT_COST: readonly [Fp, Fp, Fp] = [fp(20), fp(40), fp(80)];

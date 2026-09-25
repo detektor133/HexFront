@@ -10,6 +10,7 @@ import {
   OFFROAD_SUPPLY_LOSS,
   SUPPLY_PER_SOLDIER,
 } from '../balance.ts';
+import { cityOutputMult } from './city-output.ts';
 import { isCityIsolated } from './network.ts';
 import { BUILDING, type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
@@ -19,12 +20,13 @@ import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
 
 /**
  * Снабжение, которое производит город: CITY_SUPPLY_PER_LEVEL × level (+ CAPITAL_SUPPLY_BONUS
- * у столицы), в изолированной сети — × ISOLATED_SUPPLY_MULT.
+ * у столицы) × выработка после захвата, в изолированной сети — × ISOLATED_SUPPLY_MULT.
  * @returns fixed-point единиц снабжения (1 единица кормит 1 солдата пехоты)
  */
 export function citySupply(state: MatchState, city: City): Fp {
   const isCapital = state.players[city.owner]?.capitalCityId === city.id;
-  const raw = (CITY_SUPPLY_PER_LEVEL * city.level + (isCapital ? CAPITAL_SUPPLY_BONUS : 0)) as Fp;
+  const base = (CITY_SUPPLY_PER_LEVEL * city.level + (isCapital ? CAPITAL_SUPPLY_BONUS : 0)) as Fp;
+  const raw = fpMul(base, cityOutputMult(city));
   return isCityIsolated(state, city.id) ? fpMul(raw, ISOLATED_SUPPLY_MULT) : raw;
 }
 

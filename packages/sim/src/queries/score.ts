@@ -27,12 +27,22 @@ export function playerScore(state: MatchState, playerId: number): number {
 }
 
 /**
- * Место живого игрока по очкам: 1 + число живых игроков с большим счётом.
+ * Место игрока: живые — по очкам (1 + число живых с большим счётом); выбывшие — после всех
+ * живых, по порядку выбывания: выбывший позже стоит выше, в одном тике — меньший id выше.
  * @returns место (1 — лидер)
  */
 export function playerPlace(state: MatchState, playerId: number): number {
+  const me = state.players[playerId];
+  const alive = state.players.filter((p) => p.status === 'alive');
+  if (me?.status === 'eliminated') {
+    const above = state.players.filter(
+      (p) =>
+        p.status === 'eliminated' &&
+        (p.eliminatedTick > me.eliminatedTick ||
+          (p.eliminatedTick === me.eliminatedTick && p.id < me.id)),
+    ).length;
+    return alive.length + above + 1;
+  }
   const mine = playerScore(state, playerId);
-  return (
-    1 + state.players.filter((p) => p.status === 'alive' && playerScore(state, p.id) > mine).length
-  );
+  return 1 + alive.filter((p) => playerScore(state, p.id) > mine).length;
 }

@@ -1,7 +1,7 @@
 // Доход игроков: налог с населения, города, шахты; изолированные сети — ×0,5. Содержание отрядов
 // и банкротство. GDD: docs/gdd/02-economy.md — «Золото», «Банкротство»; 04-roads-supply.md.
 import {
-  CITY_GOLD_PER_LEVEL,
+  CAPITAL_CHAOS_INCOME_MULT,
   GOLD_PER_POP_TAX,
   ISOLATED_INCOME_MULT,
   MINE_GOLD_PER_S,
@@ -11,8 +11,9 @@ import {
 import { FEATURE } from '../map/types.ts';
 import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { fpMul, intDiv, type Fp } from '../math/int.ts';
+import { cityGold } from '../state/city-output.ts';
 import { isCityIsolated } from '../state/network.ts';
-import { NEUTRAL, type MatchState } from '../state/types.ts';
+import { NEUTRAL, type MatchState, type Player } from '../state/types.ts';
 
 /** Радиус, в котором гекс относится к городу (тот же, что у роста населения). */
 const COVERAGE_RADIUS = 2;
@@ -42,8 +43,8 @@ interface Base {
   isolatedPop: number;
   mines: number;
   isolatedMines: number;
-  cityLevels: number;
-  isolatedCityLevels: number;
+  /** Золото городов в секунду с изоляцией и выработкой, fixed-point. */
+  cityGold: number;
 }
 
 function incomeBases(state: MatchState): Base[] {
@@ -52,8 +53,7 @@ function incomeBases(state: MatchState): Base[] {
     isolatedPop: 0,
     mines: 0,
     isolatedMines: 0,
-    cityLevels: 0,
-    isolatedCityLevels: 0,
+    cityGold: 0,
   }));
   const cut = isolatedHexes(state);
   const { owner, pop } = state.hexes;
@@ -70,18 +70,13 @@ function incomeBases(state: MatchState): Base[] {
   for (const c of state.cities) {
     const base = bases[c.owner];
     if (!base) continue;
-    if (isCityIsolated(state, c.id)) base.isolatedCityLevels += c.level;
-    else base.cityLevels += c.level;
+    base.cityGold += cityGold(state, c);
   }
   return bases;
 }
 
-function incomePerSecond(pop: number, tax: Fp, cityLevels: number, mines: number): number {
-  return (
-    fpMul(fpMul(pop as Fp, tax), GOLD_PER_POP_TAX) +
-    CITY_GOLD_PER_LEVEL * cityLevels +
-    MINE_GOLD_PER_S * mines
-  );
+function incomePerSecond(pop: number, tax: Fp, mines: number): number {
+  return fpMul(fpMul(pop as Fp, tax), GOLD_PER_POP_TAX) + MINE_GOLD_PER_S * mines;
 }
 
 /**
@@ -93,14 +88,19 @@ export function playerIncomePerSecond(state: MatchState, playerId: number, tax?:
   const b = incomeBases(state)[playerId];
   const p = state.players[playerId];
   if (!b || !p) return 0;
-  return incomeFromBase(b, tax ?? p.taxEffective);
+  return withChaos(p, incomeFromBase(b, tax ?? p.taxEffective));
+}
+
+// «Смута» после переноса столицы: доход × CAPITAL_CHAOS_INCOME_MULT (03-cities-buildings.md).
+function withChaos(p: Player, income: number): number {
+  return p.chaosTicks > 0 ? fpMul(income as Fp, CAPITAL_CHAOS_INCOME_MULT) : income;
 }
 
 // Одна формула для начисления и для подсказок интерфейса.
 function incomeFromBase(b: Base, rate: Fp): number {
-  const connected = incomePerSecond(b.pop, rate, b.cityLevels, b.mines);
-  const isolated = incomePerSecond(b.isolatedPop, rate, b.isolatedCityLevels, b.isolatedMines);
-  return connected + fpMul(isolated as Fp, ISOLATED_INCOME_MULT);
+  const connected = incomePerSecond(b.pop, rate, b.mines);
+  const isolated = incomePerSecond(b.isolatedPop, rate, b.isolatedMines);
+  return connected + fpMul(isolated as Fp, ISOLATED_INCOME_MULT) + b.cityGold;
 }
 
 /**
@@ -126,7 +126,7 @@ export function economySystem(state: MatchState): void {
   state.players.forEach((p, i) => {
     const b = bases[i];
     if (p.status !== 'alive' || !b) return;
-    const net = incomeFromBase(b, p.taxEffective) - playerUpkeepPerSecond(state, i);
+    const net = withChaos(p, incomeFromBase(b, p.taxEffective)) - playerUpkeepPerSecond(state, i);
     p.gold = Math.max(0, p.gold + intDiv(net, TICKS_PER_S)) as Fp;
     p.bankrupt = p.gold === 0 && net < 0;
   });
