@@ -10,7 +10,7 @@
 | Свойства (инварианты) | fast-check | Случайные карты и команды → инварианты не нарушаются | `packages/sim/test/invariants/` |
 | Сценарии | Vitest + DSL | Мини-карты из ASCII, заданные команды, проверка исхода | `packages/sim/test/scenarios/` |
 | Golden-реплеи | Vitest | Лог команд → хэш состояния совпадает с эталоном | `packages/sim/test/golden/` |
-| Бенчмарк | Vitest bench | `step` на эталонном матче 30 игроков | `packages/sim/bench/` |
+| Бенчмарк | Node + `perf_hooks` (`pnpm --filter @hexfront/bench step`) | `step` на синтетическом матче 30 игроков, 4000 гексов, 200 отрядов, 20 боёв | матч — `packages/sim/bench/`, замер — `tools/bench/` (в `sim` таймеры запрещены) |
 | Интеграция | Vitest + реальный ws | Сервер: подключение, команды, туман, реконнект | `apps/server/test/` |
 | Визуальные | Playwright | Скриншоты страниц `/dev/*` и экрана матча на 3 разрешениях | `apps/client/tests/visual/` |
 | E2E | Playwright | Главное меню → локальный матч → первые действия | `apps/client/tests/e2e/` |

@@ -1,0 +1,10 @@
+{
+  "name": "@hexfront/bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "step": "node --experimental-strip-types src/step-bench.ts"
+  }
+}
