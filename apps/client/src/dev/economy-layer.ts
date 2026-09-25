@@ -56,8 +56,9 @@ function dashed(g: Graphics, a: Point, b: Point, dash: number, gap: number): voi
 }
 
 /**
- * Рёбра дорог — дерево обхода в ширину по узлам одного владельца (дорога или город).
- * Все пары соседей дали бы треугольники там, где три дорожных гекса стоят вплотную.
+ * Рёбра дорог — дерево обхода в ширину по узлам (дорога или город) любых владельцев: дорога —
+ * свойство гекса и на границах не рвётся (style-guide, «Дороги»). Все пары соседей дали бы
+ * треугольники там, где три дорожных гекса стоят вплотную.
  */
 export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
   const cityHexes = new Set(view.cities.map((c) => c.hex));
@@ -66,7 +67,6 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
   const edges: [number, number][] = [];
   for (let start = 0; start < seen.length; start += 1) {
     if (seen[start] === 1 || !isNode(start)) continue;
-    const owner = view.hexes.owner[start];
     const queue = [start];
     seen[start] = 1;
     while (queue.length > 0) {
@@ -74,7 +74,7 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
       for (const n of neighbors(hexFromId(id, map.width))) {
         if (!inBounds(n, map.width, map.height)) continue;
         const nid = hexId(n, map.width);
-        if (seen[nid] === 1 || !isNode(nid) || view.hexes.owner[nid] !== owner) continue;
+        if (seen[nid] === 1 || !isNode(nid)) continue;
         seen[nid] = 1;
         edges.push([id, nid]);
         queue.push(nid);
@@ -82,6 +82,17 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
     }
   }
   return edges;
+}
+
+/**
+ * Чей цвет у отрезка дороги: владельца — если оба гекса его и в основной сети (отрезок проводит
+ * снабжение); иначе null — серый пунктир (нейтральная дорога, граница, изоляция).
+ */
+export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | null {
+  const owner = view.hexes.owner[a] ?? -1;
+  if (owner < 0 || view.hexes.owner[b] !== owner) return null;
+  const main = view.hexes.link[a] === LINK.main && view.hexes.link[b] === LINK.main;
+  return main ? owner : null;
 }
 
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
@@ -117,12 +128,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     const width = (tokens.road.width[level - 1] ?? tokens.road.width[1]) / scale;
     const [dash, gap] = tokens.road.dash;
     for (const [a, b] of roadTree(map, v)) {
-      const owner = v.hexes.owner[a] ?? -1;
-      const isolated = v.hexes.link[a] === LINK.isolated || v.hexes.link[b] === LINK.isolated;
+      const owner = roadEdgeOwner(v, a, b);
       dashed(roads, center(a), center(b), dash / scale, gap / scale);
       roads.stroke({
-        color: owner < 0 || isolated ? tokens.neutral.road : playerLine(owner),
-        alpha: isolated ? tokens.road.isolatedAlpha : 1,
+        color: owner === null ? tokens.neutral.road : playerLine(owner),
+        alpha: owner === null ? tokens.road.isolatedAlpha : 1,
         width,
         cap: 'round',
       });

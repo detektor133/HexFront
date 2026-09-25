@@ -2,11 +2,20 @@
 // путь с бегущими штрихами, маркер боя, зона и линия огня артиллерии, призрак набора в городе.
 import { Container, Graphics } from 'pixi.js';
 
-import { distance, hexFromId, TICK_MS, type PlayerView, type UnitView } from '@hexfront/sim';
+import {
+  distance,
+  hexFromId,
+  hexId,
+  inBounds,
+  neighbors,
+  TICK_MS,
+  type PlayerView,
+  type UnitView,
+} from '@hexfront/sim';
 
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
-import type { Point } from '../render/hex-geometry.ts';
+import { hexEdge, type Point } from '../render/hex-geometry.ts';
 import { playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -19,7 +28,13 @@ const PATH_GAP = 5;
 /** Скорость бега штрихов, px/с экрана. */
 const PATH_SPEED = 24;
 const FIRE_PX = 1.5;
-const RANGE_ALPHA = 0.12;
+const RANGE_PX = 2;
+/** Масштаб фишки в мире: при масштабе карты 1 — эта доля размеров units.md (растёт с картой). */
+const CHIP_WORLD = 0.55;
+/** Постоянная сглаживания позиции фишки, мс: скачки снимка превращаются в плавный доезд. */
+const SMOOTH_MS = 90;
+/** Шаг разрешения текста — чтобы не перерисовывать текст на каждом шаге колеса. */
+const RES_STEP = 0.5;
 const ARTY_RANGE_HEXES = 2;
 /** Маркер боя (units.md): ⌀16, обводка 2, крест 7, пульс 1,0 → 1,15 за 800 мс. */
 const BATTLE_R = 8;
@@ -39,6 +54,8 @@ export interface UnitLayer {
 
 interface Entry {
   readonly key: string;
+  /** Отряды фишки — чтобы новая фишка начинала с прежнего места своих отрядов. */
+  readonly units: readonly number[];
   readonly state: ChipState;
   /** Точка фишки при доле текущего тика frac ∈ [0, 1]. */
   at(frac: number): Point;
@@ -84,6 +101,11 @@ export function createUnitLayer(
   let picked: Picked = { hex: null, units: [], target: null };
   let snapAt = 0;
   let k = 1;
+  let textRes = window.devicePixelRatio;
+  let lastFrame = 0;
+  /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
+  const drawnAt = new Map<string, Point>();
+  const shown = new Map<number, Point>();
   const cities = new Set<number>();
 
   const base = (hex: number): Point => {
@@ -131,7 +153,12 @@ export function createUnitLayer(
     const stacks = new Map<string, UnitView[]>();
     for (const u of v.units) {
       if (u.moveTotal > 0 && u.path.length > 0 && u.order !== 'retreat') {
-        out.push({ key: `u${u.id}`, state: stateOf([u], v), at: (f) => unitAt(u, f) });
+        out.push({
+          key: `u${u.id}`,
+          units: [u.id],
+          state: stateOf([u], v),
+          at: (f) => unitAt(u, f),
+        });
         continue;
       }
       const key = `h${u.owner}:${u.hex}`;
@@ -139,7 +166,12 @@ export function createUnitLayer(
     }
     for (const [key, units] of stacks) {
       const hex = (units[0] as UnitView).hex;
-      out.push({ key, state: stateOf(units, v), at: () => base(hex) });
+      out.push({
+        key,
+        units: units.map((u) => u.id),
+        state: stateOf(units, v),
+        at: () => base(hex),
+      });
     }
     for (const r of v.recruits) {
       const city = v.cities.find((c) => c.id === r.cityId);
@@ -147,6 +179,7 @@ export function createUnitLayer(
       const c = center(city.hex);
       out.push({
         key: `r${r.id}`,
+        units: [],
         state: {
           color: playerLine(v.playerId),
           type: r.type,
@@ -169,23 +202,30 @@ export function createUnitLayer(
   function drawGround(v: PlayerView, frac: number, nowMs: number): void {
     ground.clear();
     const mine = v.units.filter((u) => u.owner === v.playerId);
-    // Зона огня выбранной артиллерии: гексы в радиусе ARTY_RANGE.
+    // Зона огня выбранной артиллерии: контур области гексов в радиусе ARTY_RANGE.
     const arty = mine.filter((u) => u.type === 'artillery' && picked.units.includes(u.id));
     if (arty.length > 0) {
-      const hexes = new Set<number>();
+      const inside = new Set<number>();
       v.hexes.owner.forEach((_, id) => {
         const h = hexFromId(id, width);
         if (arty.some((a) => distance(hexFromId(a.hex, width), h) <= ARTY_RANGE_HEXES))
-          hexes.add(id);
+          inside.add(id);
       });
-      for (const id of hexes) ground.circle(center(id).x, center(id).y, radius * 0.9);
-      ground.fill({ color: playerLine(v.playerId), alpha: RANGE_ALPHA });
+      const height = v.hexes.owner.length / width;
+      for (const id of inside) {
+        neighbors(hexFromId(id, width)).forEach((n, d) => {
+          if (inBounds(n, width, height) && inside.has(hexId(n, width))) return;
+          const [p, q] = hexEdge(center(id), radius, d);
+          ground.moveTo(p.x, p.y).lineTo(q.x, q.y);
+        });
+      }
+      ground.stroke({ color: playerLine(v.playerId), width: RANGE_PX * k, cap: 'round' });
     }
     // Пути своих отрядов: пунктир от фишки до цели, штрихи бегут к цели.
     const phase = ((nowMs / 1000) * PATH_SPEED) % (PATH_DASH + PATH_GAP);
     for (const u of mine) {
       if (u.path.length === 0) continue;
-      const pts = [unitAt(u, frac), ...u.path.map(base)];
+      const pts = [shown.get(u.id) ?? unitAt(u, frac), ...u.path.map(base)];
       dashedPath(ground, pts, PATH_DASH * k, PATH_GAP * k, phase * k);
       ground.stroke({ color: playerLine(u.owner), width: PATH_PX * k, cap: 'round' });
       const end = pts[pts.length - 1] as Point;
@@ -210,18 +250,18 @@ export function createUnitLayer(
       const a = center(u.hex);
       const b = center(u.target);
       const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const r = BATTLE_R * k * pulse;
-      const c = BATTLE_CROSS * k * pulse;
+      const r = BATTLE_R * CHIP_WORLD * pulse;
+      const c = BATTLE_CROSS * CHIP_WORLD * pulse;
       ground
         .circle(m.x, m.y, r)
         .fill(tokens.ui.surface)
-        .stroke({ color: tokens.ui.ink, width: 2 * k });
+        .stroke({ color: tokens.ui.ink, width: 2 * CHIP_WORLD });
       ground
         .moveTo(m.x - c, m.y - c)
         .lineTo(m.x + c, m.y + c)
         .moveTo(m.x + c, m.y - c)
         .lineTo(m.x - c, m.y + c);
-      ground.stroke({ color: tokens.ui.ink, width: 2 * k, cap: 'round' });
+      ground.stroke({ color: tokens.ui.ink, width: 2 * CHIP_WORLD, cap: 'round' });
     }
   }
 
@@ -231,6 +271,7 @@ export function createUnitLayer(
       if (keep.has(key)) continue;
       chip.destroy();
       chips.delete(key);
+      drawnAt.delete(key);
     }
     for (const e of entries) {
       let chip = chips.get(e.key);
@@ -238,7 +279,11 @@ export function createUnitLayer(
         chip = createChip();
         chips.set(e.key, chip);
         chipsLayer.addChild(chip.root);
+        // Новая фишка (отряд встал или начал путь) стартует с прежнего места своих отрядов.
+        const from = e.units.map((id) => shown.get(id)).find((pt) => pt !== undefined);
+        if (from) drawnAt.set(e.key, from);
       }
+      chip.setResolution(textRes);
       chip.draw(e.state);
     }
   }
@@ -257,16 +302,28 @@ export function createUnitLayer(
     },
     setScale(scale) {
       k = 1 / scale;
+      const res = Math.ceil((window.devicePixelRatio * scale * CHIP_WORLD) / RES_STEP) * RES_STEP;
+      textRes = Math.max(1, res * 2);
+      for (const chip of chips.values()) chip.setResolution(textRes);
     },
     frame(nowMs) {
       if (!view) return;
       const frac = Math.min(1, Math.max(0, (nowMs - snapAt) / TICK_MS));
+      const blend = lastFrame === 0 ? 1 : 1 - Math.exp(-(nowMs - lastFrame) / SMOOTH_MS);
+      lastFrame = nowMs;
       for (const e of entries) {
         const chip = chips.get(e.key);
         if (!chip) continue;
-        const at = e.at(frac);
+        const target = e.at(frac);
+        const prev = drawnAt.get(e.key) ?? target;
+        const at = {
+          x: prev.x + (target.x - prev.x) * blend,
+          y: prev.y + (target.y - prev.y) * blend,
+        };
+        drawnAt.set(e.key, at);
+        for (const id of e.units) shown.set(id, at);
         chip.root.position.set(at.x, at.y);
-        chip.root.scale.set(k);
+        chip.root.scale.set(CHIP_WORLD);
       }
       drawGround(view, frac, nowMs);
     },

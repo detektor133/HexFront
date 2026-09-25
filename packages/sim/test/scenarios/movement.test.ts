@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { intDiv } from '../../src/math/int.ts';
 import { findPath } from '../../src/queries/unit-path.ts';
 import {
   at,
@@ -328,5 +329,38 @@ describe('приказы, разделение, слияние', () => {
     s.cmd('A', merge([a]));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['notSameHex', 'notSameType', 'invalidAmount']);
+  });
+});
+
+describe('новый приказ посреди перехода', () => {
+  const CROSS = `
+    a  a  a  a
+    A1 a  a  a
+    a  a  a  a
+  `;
+
+  it('путь в тот же соседний гекс — прогресс перехода сохраняется', () => {
+    const s = scenario(CROSS, { legend });
+    const id = s.unit('A', 'infantry', 100, at(1, 1));
+    s.cmd('A', move([id], at(3, 1)));
+    s.runTicks(10);
+    const ticks = s.unitById(id)?.moveTicks ?? 0;
+    expect(ticks).toBeGreaterThan(5);
+    // Новая цель — тот самый гекс, куда отряд уже идёт: первый шаг пути совпадает.
+    const next = s.unitById(id)?.path[0] ?? -1;
+    s.cmd('A', move([id], at(next % 4, intDiv(next, 4))));
+    s.runTicks(1);
+    expect(s.unitById(id)?.moveTicks).toBe(ticks + 1);
+  });
+
+  it('путь в другую сторону — отряд остаётся в своём гексе, переход начинается заново', () => {
+    const s = scenario(CROSS, { legend });
+    const id = s.unit('A', 'infantry', 100, at(1, 1));
+    s.cmd('A', move([id], at(3, 1)));
+    s.runTicks(10);
+    s.cmd('A', move([id], at(0, 1)));
+    s.runTicks(1);
+    expect(s.unitById(id)?.hex).toBe(1 + 1 * 4);
+    expect(s.unitById(id)?.moveTicks).toBe(1);
   });
 });

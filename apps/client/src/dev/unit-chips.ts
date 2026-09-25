@@ -1,5 +1,5 @@
-// Фишка отряда по docs/art/units.md, «Фишка отряда»: размеры в экранных px, контейнер
-// масштабируется на 1 / масштаб камеры. Песочница 03/T17; эталонные скриншоты — этап 04.
+// Фишка отряда по docs/art/units.md, «Фишка отряда»: размеры в px при масштабе карты 1, фишка
+// масштабируется вместе с картой. Песочница 03/T17; эталонные скриншоты — этап 04.
 import { Container, Graphics, Text } from 'pixi.js';
 
 import type { UnitType } from '@hexfront/sim';
@@ -48,6 +48,8 @@ export interface ChipState {
 export interface Chip {
   readonly root: Container;
   draw(s: ChipState): void;
+  /** Разрешение текста: при приближении его растеризуют заново, чтобы число было чётким. */
+  setResolution(r: number): void;
   destroy(): void;
 }
 
@@ -159,6 +161,11 @@ export function createChip(): Chip {
       index.position.set(w / 2 + 3, 0);
       body.alpha = s.retreating ? RETREAT_ALPHA : 1;
       body.scale.set(s.selected ? SELECT_SCALE : 1);
+    },
+    setResolution(r) {
+      if (label.resolution === r) return;
+      label.resolution = r;
+      index.resolution = r;
     },
     destroy() {
       root.destroy({ children: true });

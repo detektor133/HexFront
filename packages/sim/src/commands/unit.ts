@@ -182,7 +182,9 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
       for (const a of owned.units) {
         const path =
           findPath(state, a.hex, cmd.t === 'move' ? cmd.to : cmd.target, a.type, a.owner) ?? [];
-        stop(a);
+        // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
+        const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
+        if (!sameStep) stop(a);
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';
       }
