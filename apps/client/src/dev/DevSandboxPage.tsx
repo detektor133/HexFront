@@ -16,11 +16,11 @@ import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
-import { NOTHING_PICKED, tapHex, type Picked } from './sandbox-selection.ts';
+import { NOTHING_PICKED, orderHex, selectHex, type Picked } from './sandbox-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
-import { createMapView, type MapView } from '../render/map-view.ts';
+import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Сид и число игроков: игрок и соперник без ботов (боты — этап 05). */
@@ -101,10 +101,12 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const initialSelect = params.get('select');
     if (initialSelect !== null) pick({ hex: Number(initialSelect), units: [], target: null });
     const initialScale = Number(params.get('scale'));
-    const onTap = (h: { q: number; r: number }): void => {
+    const onTap = (h: { q: number; r: number }, kind: TapKind): void => {
       const current = viewRef.current;
       if (!current || !inBounds(h, map.width, map.height)) return pick(NOTHING_PICKED);
-      const next = tapHex(current, pickedRef.current, hexId(h, map.width));
+      const hex = hexId(h, map.width);
+      if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
+      const next = orderHex(current, pickedRef.current, hex);
       if (next.cmd) match.send(next.cmd);
       pick(next.picked);
     };

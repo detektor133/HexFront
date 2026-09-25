@@ -14,7 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
-import { drawUnits, groupUnits } from './unit-glyphs.ts';
+import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
@@ -39,6 +39,7 @@ export interface EconomyLayer {
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
+  frame(nowMs: number): void;
   destroy(): void;
 }
 
@@ -88,17 +89,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const fill = new Graphics();
   const roads = new Graphics();
   const marks = new Graphics();
-  const units = new Graphics();
-  const labels = new Container();
+
   const container = new Container();
   container.addChild(fill, roads);
   const top = new Container();
-  top.addChild(marks, units, labels);
+  const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
+  const unitLayer = createUnitLayer(map.width, radius, center);
+  top.addChild(marks, unitLayer.container);
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let scale = 1;
   let level: DetailLevel = 2;
-  const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
 
   function drawFill(v: PlayerView): void {
     fill.clear();
@@ -172,17 +173,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     }
   }
 
-  function drawUnitLayer(v: PlayerView): void {
-    units.clear();
-    drawUnits(units, labels, v, groupUnits(v, selected.units), center, radius, 1 / scale);
-  }
-
   const redraw = (): void => {
     if (!view) return;
     drawFill(view);
     drawRoads(view);
     drawMarks(view);
-    drawUnitLayer(view);
   };
 
   return {
@@ -191,12 +186,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     update(s, l) {
       scale = s;
       level = l;
+      unitLayer.setScale(s);
       redraw();
     },
     setView(v, sel) {
       view = v;
       selected = sel;
       redraw();
+      unitLayer.setView(v, sel, performance.now());
+    },
+    frame(nowMs) {
+      unitLayer.frame(nowMs);
     },
     destroy() {
       container.destroy({ children: true });

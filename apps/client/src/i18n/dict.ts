@@ -134,7 +134,8 @@ const ru = {
   'unit.army': 'Армия',
   'unit.encircled': 'котёл',
   'unit.selected': 'Выбрано отрядов',
-  'unit.hintOrder': 'Тап по гексу — идти, по врагу — прогноз атаки; Esc — снять выбор',
+  'unit.hintOrder':
+    'Приказ — ПКМ или долгий тап по гексу; по врагу — прогноз атаки. Тап — снять выбор',
   'unit.hold': 'Держать',
   'unit.expand': 'Экспансия',
   'unit.split': 'Разделить пополам',
@@ -305,7 +306,8 @@ const en: Record<MessageKey, string> = {
   'unit.army': 'Army',
   'unit.encircled': 'encircled',
   'unit.selected': 'Units selected',
-  'unit.hintOrder': 'Tap a hex to move, an enemy to see the forecast; Esc clears',
+  'unit.hintOrder':
+    'Order — right click or long press a hex; on an enemy — attack forecast. Tap — clear',
   'unit.hold': 'Hold',
   'unit.expand': 'Expand',
   'unit.split': 'Split in half',

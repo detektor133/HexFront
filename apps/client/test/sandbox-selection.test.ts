@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlayerView } from '@hexfront/sim';
 
-import { attackCommand, isHostile, NOTHING_PICKED, tapHex } from '../src/dev/sandbox-selection.ts';
+import {
+  attackCommand,
+  isHostile,
+  NOTHING_PICKED,
+  orderHex,
+  selectHex,
+} from '../src/dev/sandbox-selection.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 
@@ -20,50 +26,54 @@ function startView(): PlayerView {
   return msg.view;
 }
 
-describe('песочница: выбор и приказы кликом', () => {
+describe('песочница: выбор и приказы как в HoI4', () => {
   const view = startView();
   const mine = view.units.filter((u) => u.owner === view.playerId);
   const home = mine[0]?.hex ?? -1;
+  const free = view.hexes.owner.findIndex(
+    (o, id) => o === view.playerId && id !== home && !isHostile(view, id),
+  );
 
   it('тап по гексу со своими отрядами выбирает их', () => {
-    const next = tapHex(view, NOTHING_PICKED, home);
-    expect(next.cmd).toBeNull();
-    expect(next.picked.hex).toBe(home);
-    expect(next.picked.units).toEqual(mine.filter((u) => u.hex === home).map((u) => u.id));
+    const p = selectHex(view, NOTHING_PICKED, home);
+    expect(p.hex).toBe(home);
+    expect(p.units).toEqual(mine.filter((u) => u.hex === home).map((u) => u.id));
   });
 
-  it('следующий тап по свободному гексу — приказ «идти» выбранным', () => {
-    const picked = tapHex(view, NOTHING_PICKED, home).picked;
-    const free = view.hexes.owner.findIndex(
-      (o, id) => o === view.playerId && id !== home && !isHostile(view, id),
-    );
-    const next = tapHex(view, picked, free);
-    expect(next.cmd).toEqual({ t: 'move', unitIds: picked.units, to: free });
-    expect(next.picked.units).toEqual(picked.units);
+  it('тап по другому гексу снимает выбор, повторный тап по тем же отрядам — тоже', () => {
+    const p = selectHex(view, NOTHING_PICKED, home);
+    expect(selectHex(view, p, free)).toEqual({ hex: free, units: [], target: null });
+    expect(selectHex(view, p, home).units).toEqual([]);
   });
 
-  it('тап по вражескому гексу — прицел атаки без команды, подтверждение даёт attack', () => {
-    const picked = tapHex(view, NOTHING_PICKED, home).picked;
+  it('приказ (долгий тап / ПКМ) по свободному гексу — «идти» выбранным', () => {
+    const p = selectHex(view, NOTHING_PICKED, home);
+    const next = orderHex(view, p, free);
+    expect(next.cmd).toEqual({ t: 'move', unitIds: p.units, to: free });
+    expect(next.picked.units).toEqual(p.units);
+  });
+
+  it('приказ по врагу — прицел атаки, подтверждение даёт attack', () => {
+    const p = selectHex(view, NOTHING_PICKED, home);
     const enemy = view.units.find((u) => u.owner !== view.playerId);
     if (!enemy) throw new Error('нет врага');
-    const next = tapHex(view, picked, enemy.hex);
+    const next = orderHex(view, p, enemy.hex);
     expect(next.cmd).toBeNull();
     expect(next.picked.target).toBe(enemy.hex);
     expect(attackCommand(view, next.picked)).toEqual({
       t: 'attack',
-      unitIds: picked.units,
+      unitIds: p.units,
       target: enemy.hex,
     });
+  });
+
+  it('приказ без выбранных отрядов работает как выбор', () => {
+    expect(orderHex(view, NOTHING_PICKED, home).cmd).toBeNull();
   });
 
   it('нейтральный город с гарнизоном — враждебный гекс', () => {
     const neutral = view.cities.find((c) => c.owner < 0);
     expect(neutral && isHostile(view, neutral.hex)).toBe(true);
-  });
-
-  it('повторный тап по гексу выбранных отрядов снимает выбор отрядов', () => {
-    const picked = tapHex(view, NOTHING_PICKED, home).picked;
-    expect(tapHex(view, picked, home).picked.units).toEqual([]);
   });
 });
 

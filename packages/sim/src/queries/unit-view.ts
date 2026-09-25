@@ -24,6 +24,8 @@ export interface UnitView {
   readonly encircled: boolean | null;
   readonly armyId: number | null;
   readonly path: readonly HexId[];
+  /** Своя артиллерия: по кому бьёт сейчас, иначе -1. */
+  readonly fireTarget: number;
 }
 
 /** Своя армия в снимке. */
@@ -52,6 +54,7 @@ export function unitViews(state: MatchState, playerId: number): UnitView[] {
       encircled: mine ? u.encircled : null,
       armyId: mine ? u.armyId : null,
       path: mine ? [...u.path] : [],
+      fireTarget: mine ? u.fireTarget : -1,
     };
   });
 }

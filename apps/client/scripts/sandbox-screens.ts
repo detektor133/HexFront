@@ -60,7 +60,8 @@ await page.screenshot({ path: path('sandbox-1440x900-city') });
 await open(page, target.hex);
 // Выбрать «1-ю армию» и прицелиться в нейтральный город — прогноз в карточке отряда.
 await page.getByRole('button', { name: 'Выбрать' }).first().click();
-await page.mouse.click(W / 2, H / 2);
+// Приказ — правой кнопкой (07-controls.md): по врагу — прогноз и «Атаковать».
+await page.mouse.click(W / 2, H / 2, { button: 'right' });
 await page.getByText('Атаковать').waitFor();
 await page.screenshot({ path: path('sandbox-1440x900-forecast') });
 // Атака: отряды идут к городу и вступают в бой — маркер боя на карте.
