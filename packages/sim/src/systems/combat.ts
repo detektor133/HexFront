@@ -26,9 +26,14 @@ function direction(state: MatchState, from: HexId, to: HexId): number {
   return hexDirection(state.map, from, to);
 }
 
+// Отряд, выбитый обстрелом в этом же тике (солдат 0), в бою уже не участвует.
 function attackersOf(state: MatchState, hex: HexId): Unit[] {
   return state.units.filter(
-    (u) => u.order === 'attack' && u.target === hex && direction(state, u.hex, hex) >= 0,
+    (u) =>
+      u.order === 'attack' &&
+      u.target === hex &&
+      u.soldiers > 0 &&
+      direction(state, u.hex, hex) >= 0,
   );
 }
 
@@ -60,7 +65,9 @@ function battleAt(state: MatchState, hex: HexId): Battle | null {
   const attackers = attackersOf(state, hex);
   const first = attackers[0];
   if (!first) return null;
-  const defenders = state.units.filter((u) => u.hex === hex && u.owner !== first.owner);
+  const defenders = state.units.filter(
+    (u) => u.hex === hex && u.owner !== first.owner && u.soldiers > 0,
+  );
   const city = activeCity(state, hex, first.owner);
   if (defenders.length === 0 && !city) return null;
   return {

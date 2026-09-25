@@ -148,3 +148,16 @@ describe('поддержка и уязвимость', () => {
     expect(battlePowers(s.state, hexOf(s, at(3, 1))).defense).toBeGreaterThan(539 * FP);
   });
 });
+
+describe('регрессии', () => {
+  it('атакующий, убитый обстрелом в том же тике, не ломает бой (деление на ноль)', () => {
+    const s = scenario(LINE.replace('A1', 'A5'), { legend });
+    const att = s.unit('A', 'infantry', 1, at(3, 1));
+    s.unit('B', 'infantry', 100, at(4, 1));
+    // 3000 × 0,004 × снабжение / 10 ≈ 0,6–1,2 солдата за тик: одиночный солдат гибнет сразу.
+    s.unit('B', 'artillery', 3000, at(5, 1));
+    s.cmd('A', attack([att], at(4, 1)));
+    expect(() => s.runTicks(5)).not.toThrow();
+    expect(s.unitById(att)).toBeUndefined();
+  });
+});
