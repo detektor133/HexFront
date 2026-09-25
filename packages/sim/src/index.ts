@@ -38,3 +38,5 @@ export { captureHex } from './state/capture.ts';
 export { ARMY_NAME_MAX } from './commands/army.ts';
 export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';
 export { fireTargetOf } from './systems/artillery.ts';
+export * from './queries/unit-view.ts';
+export * from './queries/forecast.ts';

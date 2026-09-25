@@ -88,7 +88,7 @@ type Command =
 ## Запросы (чистые, без мутаций)
 
 - `playerView(state, playerId)` — видимое состояние для клиента и ботов (туман).
-- `forecastBattle(view, attackerIds, target)`.
+- `forecastBattle(map, view, unitIds, target)` — карта нужна для рельефа и рек: статическая карта не входит в снимок.
 - `findPath(state, from, to, unitType, ownerId)`, `rebuildSupplyPath(state, cityId)`.
 - `canFoundCity`, `recruitCapacity` и т. п. — для UI (кнопки с причинами).
 

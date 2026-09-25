@@ -72,7 +72,7 @@ terrainDef     — из 01-map.md;  fortMult = 1,4;  cityMult = 1,3
 
 ## Прогноз боя
 
-Чистая функция `forecastBattle(view, attackers, targetHex)` в `sim`, используется UI до подтверждения атаки.
+Чистая функция `forecastBattle(map, view, unitIds, targetHex)` в `sim`, используется UI до подтверждения атаки.
 
 ```
 tDef = средневзв. org защитников / потеря org защитника в секунду
