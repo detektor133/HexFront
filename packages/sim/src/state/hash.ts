@@ -83,6 +83,8 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.encircled ? 1 : 0);
     int(s, a.target);
     int(s, a.inBattle ? 1 : 0);
+    int(s, a.focus);
+    int(s, a.fireTarget);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {

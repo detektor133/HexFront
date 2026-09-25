@@ -59,6 +59,7 @@ type DslCommand =
     }
   | { readonly t: 'split'; readonly unit: UnitRef; readonly soldiers: number }
   | { readonly t: 'merge'; readonly units: readonly UnitRef[] }
+  | { readonly t: 'bombard'; readonly unit: UnitRef; readonly targetUnitId: number | null }
   | { readonly t: 'createArmy'; readonly name: string }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
@@ -128,6 +129,12 @@ export const split = (unit: UnitRef, soldiers: number): DslCommand => ({
 });
 export const merge = (units: readonly UnitRef[]): DslCommand => ({ t: 'merge', units });
 
+/** Фокус огня артиллерии; null — автоцель. */
+export const bombard = (unit: UnitRef, targetUnitId: number | null): DslCommand => ({
+  t: 'bombard',
+  unit,
+  targetUnitId,
+});
 export const createArmy = (name: string): DslCommand => ({ t: 'createArmy', name });
 export const renameArmy = (armyId: number, name: string): DslCommand => ({
   t: 'renameArmy',
@@ -374,6 +381,8 @@ function makeScenario(
         return { t: 'split', unitId: resolve(c.unit), soldiers: (c.soldiers * FP) as Fp };
       case 'merge':
         return { t: 'merge', unitIds: c.units.map(resolve) };
+      case 'bombard':
+        return { t: 'bombard', unitId: resolve(c.unit), targetUnitId: c.targetUnitId };
       case 'createArmy':
       case 'renameArmy':
       case 'disbandArmy':
@@ -426,6 +435,8 @@ function makeScenario(
         encircled: false,
         target: -1,
         inBattle: false,
+        focus: -1,
+        fireTarget: -1,
       });
       return id;
     },

@@ -41,7 +41,7 @@ function candidates(state: MatchState, unit: Unit, attackerHexes: readonly HexId
 }
 
 /**
- * Отступление сломленного отряда: −RETREAT_SOLDIER_LOSS солдат, сразу в гекс отступления,
+ * Отступление сломленного отряда: −loss солдат (по умолчанию RETREAT_SOLDIER_LOSS), сразу в гекс отступления,
  * состояние «отступает» на время хода × RETREAT_MOVE_MULT. Гекса нет — капитуляция.
  * @returns false, если отряд капитулировал и должен быть удалён
  */
@@ -49,6 +49,7 @@ export function retreatOrCapitulate(
   state: MatchState,
   unit: Unit,
   attackerHexes: readonly HexId[],
+  loss: Fp = RETREAT_SOLDIER_LOSS,
 ): boolean {
   const target = candidates(state, unit, attackerHexes)[0];
   if (!target) {
@@ -56,7 +57,7 @@ export function retreatOrCapitulate(
     return false;
   }
   const ticks = stepTicks(state, unit, unit.hex, target.hex) ?? 1;
-  unit.soldiers = (unit.soldiers - fpMul(unit.soldiers, RETREAT_SOLDIER_LOSS)) as Fp;
+  unit.soldiers = (unit.soldiers - fpMul(unit.soldiers, loss)) as Fp;
   unit.hex = target.hex;
   unit.order = 'retreat';
   unit.target = -1;

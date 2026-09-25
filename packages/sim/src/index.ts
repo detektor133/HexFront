@@ -37,3 +37,4 @@ export { findNearestPath } from './queries/unit-path.ts';
 export { captureHex } from './state/capture.ts';
 export { ARMY_NAME_MAX } from './commands/army.ts';
 export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';
+export { fireTargetOf } from './systems/artillery.ts';

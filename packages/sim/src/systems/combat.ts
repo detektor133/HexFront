@@ -1,6 +1,10 @@
 // Бой: сила сторон, потери, организованность, отступления, захват гекса.
 // GDD: docs/gdd/06-combat.md — «Сила сторон», «Потери и организованность», «Исход».
 import {
+  ARTY_FLEE_LOSS,
+  ARTY_RANGE,
+  ARTY_SUPPORT_BONUS,
+  ARTY_SUPPORT_MIN_SOLDIERS,
   ATK,
   CASUALTY_RATE,
   CITY_DEF_MULT,
@@ -18,7 +22,7 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
-import { hexFromId, neighbors, type HexId } from '../math/hex.ts';
+import { distance, hexFromId, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { captureHex } from '../state/capture.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
@@ -49,12 +53,31 @@ function activeCity(state: MatchState, hex: HexId, attacker: number): City | nul
   return city;
 }
 
-/** Вклад отряда в атаку до флангов: soldiers × ATK × supplyMult (× 0,7 через реку). */
+// Своя артиллерия (≥ ARTY_SUPPORT_MIN_SOLDIERS, не отступает) в радиусе ARTY_RANGE от цели.
+function supported(state: MatchState, owner: number, hex: HexId): boolean {
+  const { width } = state.map;
+  const target = hexFromId(hex, width);
+  return state.units.some(
+    (a) =>
+      a.owner === owner &&
+      a.type === 'artillery' &&
+      a.order !== 'retreat' &&
+      a.soldiers >= ARTY_SUPPORT_MIN_SOLDIERS &&
+      distance(hexFromId(a.hex, width), target) <= ARTY_RANGE,
+  );
+}
+
+/**
+ * Вклад отряда в атаку до флангов: soldiers × ATK × supplyMult (× 0,7 через реку,
+ * × ARTY_SUPPORT_BONUS при поддержке своей артиллерии — один раз, без сложения).
+ */
 function attackOf(state: MatchState, u: Unit, hex: HexId): number {
-  const base = fpMul(fpMul(u.soldiers, ATK[u.type]), supplyCombatMult(u.supplyLevel));
+  let base = fpMul(fpMul(u.soldiers, ATK[u.type]), supplyCombatMult(u.supplyLevel));
   const dir = direction(state, u.hex, hex);
-  const river = dir >= 0 && ((state.map.rivers[u.hex] ?? 0) >> dir) & 1;
-  return river ? fpMul(base as Fp, RIVER_ATTACK_MULT) : base;
+  if (dir >= 0 && ((state.map.rivers[u.hex] ?? 0) >> dir) & 1) {
+    base = fpMul(base as Fp, RIVER_ATTACK_MULT);
+  }
+  return supported(state, u.owner, hex) ? fpMul(base as Fp, ARTY_SUPPORT_BONUS) : base;
 }
 
 /**
@@ -223,14 +246,32 @@ function occupy(state: MatchState, hex: HexId): void {
   }
 }
 
-/** Все бои тика: потери и org одновременно для всех боёв, затем исходы и захваты. */
+// Артиллерия одна в атакованном гексе (без других отрядов и ополчения) сразу отступает
+// с потерей ARTY_FLEE_LOSS (06-combat.md, «Уязвимость»).
+function fleeLoneArtillery(state: MatchState, hex: HexId): void {
+  const attackers = attackersOf(state, hex);
+  const first = attackers[0];
+  if (!first || activeCity(state, hex, first.owner)) return;
+  const defenders = state.units.filter((u) => u.hex === hex && u.owner !== first.owner);
+  if (defenders.length === 0 || defenders.some((u) => u.type !== 'artillery')) return;
+  const hexes = attackers.map((a) => a.hex);
+  const lost = defenders.filter((u) => !retreatOrCapitulate(state, u, hexes, ARTY_FLEE_LOSS));
+  if (lost.length === 0) return;
+  const rest = state.units.filter((u) => !lost.includes(u));
+  state.units.splice(0, state.units.length, ...rest);
+}
+
+/**
+ * Все бои тика: одинокая артиллерия бежит, потери и org одновременно для всех боёв, затем
+ * исходы и захваты. Флаг боя отрядов сбрасывает artillerySystem.
+ */
 export function combatSystem(state: MatchState): void {
-  for (const u of state.units) u.inBattle = false;
   for (const c of state.cities) c.inBattle = false;
   const targets = [
     ...new Set(state.units.filter((u) => u.order === 'attack').map((u) => u.target)),
   ];
   targets.sort((a, b) => a - b);
+  for (const hex of targets) fleeLoneArtillery(state, hex);
   const battles: Battle[] = [];
   for (const hex of targets) {
     const b = battleAt(state, hex);

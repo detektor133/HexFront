@@ -10,7 +10,7 @@ import type { Unit, MatchState } from '../state/types.ts';
 
 export type UnitCommand = Extract<
   Command,
-  { t: 'move' | 'attack' | 'setOrder' | 'split' | 'merge' }
+  { t: 'move' | 'attack' | 'setOrder' | 'split' | 'merge' | 'bombard' }
 >;
 
 type Owned =
@@ -51,6 +51,19 @@ function validateAttack(state: MatchState, units: readonly Unit[], target: HexId
   return validateMove(state, units, target);
 }
 
+// Фокус огня: только артиллерия, цель — существующий чужой отряд (или null — автоцель).
+function validateBombard(
+  state: MatchState,
+  unit: Unit | undefined,
+  target: number | null,
+): Validation {
+  if (unit?.type !== 'artillery') return rejected('badOrder');
+  if (target === null) return OK;
+  const enemy = state.units.find((u) => u.id === target);
+  if (!enemy) return rejected('unknownUnit');
+  return enemy.owner === unit.owner ? rejected('notEnemy') : OK;
+}
+
 function validateSplit(state: MatchState, unit: Unit, soldiers: number): Validation {
   if (!Number.isInteger(soldiers) || soldiers % FP !== 0 || soldiers <= 0) {
     return rejected('invalidAmount');
@@ -80,7 +93,7 @@ export function validateUnitCommand(
   playerId: number,
   cmd: UnitCommand,
 ): Validation {
-  const ids = cmd.t === 'split' ? [cmd.unitId] : cmd.unitIds;
+  const ids = cmd.t === 'split' || cmd.t === 'bombard' ? [cmd.unitId] : cmd.unitIds;
   const owned = ownUnits(state, playerId, ids);
   if (!owned.ok) return rejected(owned.reason);
   // Отступающий отряд приказов не принимает (06-combat.md, «Отступление»).
@@ -90,6 +103,8 @@ export function validateUnitCommand(
       return validateMove(state, owned.units, cmd.to);
     case 'attack':
       return validateAttack(state, owned.units, cmd.target);
+    case 'bombard':
+      return validateBombard(state, owned.units[0], cmd.targetUnitId);
     case 'setOrder':
       // Артиллерия не захватывает гексы, поэтому экспансия ей недоступна.
       return cmd.order === 'expand' && owned.units.some((a) => a.type === 'artillery')
@@ -130,6 +145,8 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     encircled: unit.encircled,
     target: -1,
     inBattle: false,
+    focus: -1,
+    fireTarget: -1,
   });
   state.nextId += 1;
 }
@@ -156,7 +173,7 @@ function executeMerge(state: MatchState, units: readonly Unit[]): void {
 
 /** Применяет команду отряда. Вызывается только после успешной проверки. */
 export function executeUnitCommand(state: MatchState, playerId: number, cmd: UnitCommand): void {
-  const ids = cmd.t === 'split' ? [cmd.unitId] : cmd.unitIds;
+  const ids = cmd.t === 'split' || cmd.t === 'bombard' ? [cmd.unitId] : cmd.unitIds;
   const owned = ownUnits(state, playerId, ids);
   if (!owned.ok) return;
   switch (cmd.t) {
@@ -178,6 +195,9 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
       return;
     case 'split':
       if (owned.units[0]) executeSplit(state, owned.units[0], cmd.soldiers);
+      return;
+    case 'bombard':
+      if (owned.units[0]) owned.units[0].focus = cmd.targetUnitId ?? -1;
       return;
     case 'merge':
       executeMerge(state, owned.units);

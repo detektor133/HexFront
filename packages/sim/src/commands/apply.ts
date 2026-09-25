@@ -33,6 +33,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'setOrder':
     case 'split':
     case 'merge':
+    case 'bombard':
       return validateUnitCommand(state, playerId, cmd);
     case 'createArmy':
     case 'renameArmy':
@@ -44,7 +45,6 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'assignFront':
     case 'arrow':
     case 'arrowStop':
-    case 'bombard':
       return rejected('notImplemented');
     default:
       return assertNever(cmd);
@@ -75,6 +75,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'setOrder':
     case 'split':
     case 'merge':
+    case 'bombard':
       executeUnitCommand(state, playerId, cmd);
       return;
     case 'createArmy':

@@ -145,6 +145,8 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       encircled: false,
       target: -1,
       inBattle: false,
+      focus: -1,
+      fireTarget: -1,
     });
     state.nextId += 1;
   }
