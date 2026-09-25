@@ -33,3 +33,21 @@ export function formatClock(tick: number, ticksPerS: number): string {
   const s = Math.floor(tick / ticksPerS);
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
+
+const THOUSAND = 1000;
+const TEN_THOUSAND = 10_000;
+
+/**
+ * Солдаты на фишке (units.md, «Формат числа»): «850», «1,4к», «12к»; округление вниз —
+ * показываем не больше, чем есть.
+ */
+export function formatSoldiers(fp: number): string {
+  const n = Math.floor(fp / FP);
+  const k = t('unit.thousandSuffix');
+  if (n < THOUSAND) return String(n);
+  if (n < TEN_THOUSAND) {
+    const tenths = Math.floor(n / (THOUSAND / 10)) / 10;
+    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(tenths)}${k}`;
+  }
+  return `${Math.floor(n / THOUSAND)}${k}`;
+}

@@ -1,5 +1,21 @@
 // Сообщения между страницей и Web Worker локального режима (overview.md, «Локальный режим»).
-import type { Command, ConstructionCheck, CityInfo, PlayerView, RejectReason } from '@hexfront/sim';
+import type {
+  Command,
+  ConstructionCheck,
+  CityInfo,
+  Fp,
+  PlayerView,
+  RecruitCheck,
+  RejectReason,
+  UnitType,
+} from '@hexfront/sim';
+
+/** Вариант набора в своём городе для кнопки: тип, размер и цена или причина отказа. */
+export interface RecruitOption {
+  readonly type: UnitType;
+  readonly soldiers: Fp;
+  readonly check: RecruitCheck;
+}
 
 /** Что можно сделать с выбранным гексом: цены и причины отказа для кнопок. */
 export interface Selection {
@@ -11,6 +27,8 @@ export interface Selection {
   readonly improve: ConstructionCheck;
   readonly fort: ConstructionCheck;
   readonly depot: ConstructionCheck;
+  /** Набор — только в своём городе; иначе пусто. */
+  readonly recruit: readonly RecruitOption[];
 }
 
 export type ToWorker =

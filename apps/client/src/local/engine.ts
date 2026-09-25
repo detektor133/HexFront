@@ -3,6 +3,8 @@
 import {
   canFoundCity,
   checkConstruction,
+  checkRecruit,
+  FP,
   cityPopCap,
   hexPopCap,
   cityInfo,
@@ -11,11 +13,13 @@ import {
   playerView,
   step,
   type Command,
+  type Fp,
   type MatchState,
+  type UnitType,
   type RejectReason,
 } from '@hexfront/sim';
 
-import type { FromWorker, Selection } from './messages.ts';
+import type { FromWorker, RecruitOption, Selection } from './messages.ts';
 
 /** В локальном режиме игрок-человек — всегда id 0; остальные ждут ботов (этап 05). */
 export const HUMAN_ID = 0;
@@ -28,6 +32,19 @@ export interface LocalEngine {
   tick(): FromWorker;
 }
 
+/** Размер набора кнопкой песочницы, солдат (временный интерфейс до ползунка 04/T8). */
+const SANDBOX_RECRUIT = 100;
+const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
+
+function recruitOptions(state: MatchState, cityId: number): RecruitOption[] {
+  const soldiers = (SANDBOX_RECRUIT * FP) as Fp;
+  return RECRUIT_TYPES.map((type) => ({
+    type,
+    soldiers,
+    check: checkRecruit(state, HUMAN_ID, cityId, type, soldiers),
+  }));
+}
+
 function selectionOf(state: MatchState, hex: number): Selection {
   const city = state.cities.find((c) => c.hex === hex);
   return {
@@ -38,6 +55,7 @@ function selectionOf(state: MatchState, hex: number): Selection {
     improve: checkConstruction(state, HUMAN_ID, { t: 'improve', hex }),
     fort: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'fort' }),
     depot: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'depot' }),
+    recruit: city?.owner === HUMAN_ID ? recruitOptions(state, city.id) : [],
   };
 }
 

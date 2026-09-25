@@ -1,5 +1,6 @@
-// Слой экономики для /dev/economy (02/T10–T11): территории, дороги пунктиром, города, стройки,
-// выбранный гекс. Дороги лежат под узорами рельефа, города и стройки — над ними (style-guide, слои).
+// Слой песочницы /dev/sandbox (02/T10–T11, 03/T12): территории, дороги пунктиром, города, стройки,
+// отряды и бои, выбранный гекс. Дороги лежат под узорами рельефа, города, стройки и отряды — над ними
+// (style-guide, слои).
 import { Container, Graphics } from 'pixi.js';
 
 import {
@@ -13,6 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
+import { drawUnits, groupUnits } from './unit-glyphs.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
@@ -23,11 +25,20 @@ const MARK_WIDTH_PX = 2.5;
 /** Радиус дуги стройки — доля радиуса гекса. */
 const ARC_RADIUS = 0.78;
 
+/** Что выбрано на странице: гекс, свои отряды и цель атаки, ждущая подтверждения. */
+export interface SandboxSelection {
+  readonly hex: number | null;
+  readonly units: readonly number[];
+  readonly target: number | null;
+}
+
+const NOTHING: SandboxSelection = { hex: null, units: [], target: null };
+
 export interface EconomyLayer {
   readonly container: Container;
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
-  setView(view: PlayerView, selected: number | null): void;
+  setView(view: PlayerView, selected: SandboxSelection): void;
   destroy(): void;
 }
 
@@ -77,12 +88,14 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const fill = new Graphics();
   const roads = new Graphics();
   const marks = new Graphics();
+  const units = new Graphics();
+  const labels = new Container();
   const container = new Container();
   container.addChild(fill, roads);
   const top = new Container();
-  top.addChild(marks);
+  top.addChild(marks, units, labels);
   let view: PlayerView | null = null;
-  let selected: number | null = null;
+  let selected: SandboxSelection = NOTHING;
   let scale = 1;
   let level: DetailLevel = 2;
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
@@ -147,11 +160,21 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
-    if (selected !== null) {
+    if (selected.hex !== null) {
       marks
-        .poly(hexPolygon(center(selected), radius))
+        .poly(hexPolygon(center(selected.hex), radius))
         .stroke({ color: tokens.ui.ink, width: MARK_WIDTH_PX * k });
     }
+    if (selected.target !== null) {
+      marks
+        .poly(hexPolygon(center(selected.target), radius))
+        .stroke({ color: tokens.status.danger, width: MARK_WIDTH_PX * k });
+    }
+  }
+
+  function drawUnitLayer(v: PlayerView): void {
+    units.clear();
+    drawUnits(units, labels, v, groupUnits(v, selected.units), center, radius, 1 / scale);
   }
 
   const redraw = (): void => {
@@ -159,6 +182,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawFill(view);
     drawRoads(view);
     drawMarks(view);
+    drawUnitLayer(view);
   };
 
   return {
