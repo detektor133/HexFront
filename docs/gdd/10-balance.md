@@ -105,9 +105,9 @@
 | --- | --- |
 | `RECRUIT_MIN` / `RECRUIT_STEP` | 50 / 50 |
 | `RECRUIT_MIN_HEX_POP_RATIO` | 0,1 |
-| `MAX_ARMIES_PER_HEX` | 3 |
-| `ARMY_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
-| `START_ARMIES` | 2 × 100 пехоты |
+| `MAX_UNITS_PER_HEX` | 3 |
+| `UNIT_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
+| `START_UNITS` | 2 × 100 пехоты |
 | `START_GOLD` | 200 |
 | `START_POP_CAPITAL` / `START_POP_HEX` | 200 / 40 |
 | `START_HEXES` | 3 (столица + 2 соседних) |
@@ -146,7 +146,7 @@
 
 | Константа | Значение |
 | --- | --- |
-| `VISION_TERRITORY` / `_ARMY` / `_CITY` | 2 / 3 / 3 |
+| `VISION_TERRITORY` / `_UNIT` / `_CITY` | 2 / 3 / 3 |
 | `VICTORY_CITY_SHARE` | 0,70 |
 | `VICTORY_HOLD_S` | 60 |
 | `SCORE_CITY` / `SCORE_HEX` / `SCORE_PER_100_SOLDIERS` | 10 / 1 / 1 |
