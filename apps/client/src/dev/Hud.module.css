@@ -53,7 +53,9 @@
 }
 
 .taxButton {
-  min-height: var(--touch-target-min);
+  /* Подпись и значение — по центру кнопки, на одной линии с остальными слотами. */
+  align-items: center;
+  min-height: 36px;
   padding: 0 var(--space-sm);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-button);
@@ -99,6 +101,6 @@
   }
 
   .taxButton {
-    min-height: 32px;
+    min-height: 30px;
   }
 }

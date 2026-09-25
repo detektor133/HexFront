@@ -103,10 +103,6 @@ const ru = {
   'action.depot': 'Склад',
   'action.fortHint': 'оборона гекса ×1,4 в бою',
   'action.depotHint': 'армии рядом теряют снабжение вдвое медленнее',
-  'dev.economy.cityStyle': 'Знак города',
-  'dev.economy.style.circle': 'круг',
-  'dev.economy.style.houses': 'домики',
-  'dev.economy.style.shield': 'щит',
   'dev.notFound': 'Страница не найдена',
 } as const;
 
@@ -215,10 +211,6 @@ const en: Record<MessageKey, string> = {
   'action.depot': 'Depot',
   'action.fortHint': 'hex defence ×1.4 in battle',
   'action.depotHint': 'nearby armies lose supply half as fast',
-  'dev.economy.cityStyle': 'City mark',
-  'dev.economy.style.circle': 'circle',
-  'dev.economy.style.houses': 'houses',
-  'dev.economy.style.shield': 'shield',
   'dev.notFound': 'Page not found',
 };
 

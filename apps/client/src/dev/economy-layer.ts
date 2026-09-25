@@ -12,7 +12,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { drawCities, type CityStyle } from './city-glyphs.ts';
+import { drawCities } from './city-glyphs.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
@@ -28,7 +28,6 @@ export interface EconomyLayer {
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: number | null): void;
-  setCityStyle(style: CityStyle): void;
   destroy(): void;
 }
 
@@ -78,14 +77,12 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const fill = new Graphics();
   const roads = new Graphics();
   const marks = new Graphics();
-  const labels = new Container();
   const container = new Container();
   container.addChild(fill, roads);
   const top = new Container();
-  top.addChild(marks, labels);
+  top.addChild(marks);
   let view: PlayerView | null = null;
   let selected: number | null = null;
-  let cityStyle: CityStyle = 'circle';
   let scale = 1;
   let level: DetailLevel = 2;
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
@@ -120,7 +117,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
 
   function drawMarks(v: PlayerView): void {
     marks.clear();
-    for (const child of labels.removeChildren()) child.destroy();
     const k = 1 / scale;
     for (const c of v.constructions) {
       const p = center(c.hex);
@@ -150,7 +146,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isCapital: c.isCapital,
       isolated: c.isolated,
     }));
-    drawCities(marks, labels, glyphs, cityStyle, k, radius);
+    drawCities(marks, glyphs, k, radius);
     if (selected !== null) {
       marks
         .poly(hexPolygon(center(selected), radius))
@@ -176,10 +172,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     setView(v, sel) {
       view = v;
       selected = sel;
-      redraw();
-    },
-    setCityStyle(style) {
-      cityStyle = style;
       redraw();
     },
     destroy() {

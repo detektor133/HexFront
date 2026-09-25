@@ -5,9 +5,8 @@ import { hexFromId, hexId, inBounds, loadMap, type Command, type MapStatic } fro
 import styles from './DevEconomyPage.module.css';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
-import { CITY_STYLES, type CityStyle } from './city-glyphs.ts';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
-import { t, type MessageKey } from '../i18n/dict.ts';
+import { t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { createMapView, type MapView } from '../render/map-view.ts';
@@ -47,12 +46,10 @@ type ViewMessage = Extract<FromWorker, { t: 'view' }>;
 function useLocalEconomy(
   hostRef: React.RefObject<HTMLDivElement | null>,
   loaded: ReturnType<typeof useMapJson>,
-  styleRef: React.RefObject<CityStyle>,
 ): {
   msg: ViewMessage | null;
   error: string | null;
   send: (cmd: Command) => void;
-  setCityStyle: (style: CityStyle) => void;
 } {
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
@@ -89,7 +86,6 @@ function useLocalEconomy(
       radius: tokens.map.hexRadius,
       midLayer: (m: MapStatic, radius: number) => {
         const layer = createEconomyLayer(m, radius);
-        layer.setCityStyle(styleRef.current);
         layerRef.current = layer;
         return layer;
       },
@@ -107,53 +103,21 @@ function useLocalEconomy(
       matchRef.current = null;
       layerRef.current = null;
     };
-  }, [hostRef, loaded, styleRef]);
+  }, [hostRef, loaded]);
 
   return {
     msg,
     error,
     send: (cmd) => matchRef.current?.send(cmd),
-    setCityStyle: (style) => layerRef.current?.setCityStyle(style),
   };
 }
 
-/** Переключатель знака города — только для выбора владельцем (DECISIONS 2026-09-25). */
-function CityStylePicker(props: {
-  value: CityStyle;
-  onPick: (s: CityStyle) => void;
-}): React.JSX.Element {
-  return (
-    <div className={styles.picker} role="group" aria-label={t('dev.economy.cityStyle')}>
-      <span className={styles.pickerLabel}>{t('dev.economy.cityStyle')}</span>
-      {CITY_STYLES.map((style) => (
-        <button
-          key={style}
-          type="button"
-          className={style === props.value ? styles.chipActive : styles.chip}
-          aria-pressed={style === props.value}
-          onClick={() => props.onPick(style)}
-        >
-          {t(`dev.economy.style.${style}` as MessageKey)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** /dev/economy?map=small[&select=HexId&scale&city=circle|houses|shield] — локальный матч (02/T10–T11). */
+/** /dev/economy?map=small[&select=HexId&scale] — локальный матч (02/T10–T11). */
 export function DevEconomyPage(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search);
   const loaded = useMapJson(params.get('map') ?? 'small');
   const hostRef = useRef<HTMLDivElement>(null);
-  const fromUrl = params.get('city');
-  const [style, setStyle] = useState<CityStyle>(CITY_STYLES.find((s) => s === fromUrl) ?? 'circle');
-  const styleRef = useRef<CityStyle>(style);
-  const { msg, error, send, setCityStyle } = useLocalEconomy(hostRef, loaded, styleRef);
-  const pick = (next: CityStyle): void => {
-    styleRef.current = next;
-    setStyle(next);
-    setCityStyle(next);
-  };
+  const { msg, error, send } = useLocalEconomy(hostRef, loaded);
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
@@ -164,7 +128,6 @@ export function DevEconomyPage(): React.JSX.Element {
       {msg?.selection && typeof loaded !== 'string' && (
         <HexCard s={msg.selection} view={msg.view} map={loaded.map} send={send} />
       )}
-      <CityStylePicker value={style} onPick={pick} />
     </div>
   );
 }

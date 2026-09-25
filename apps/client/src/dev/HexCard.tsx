@@ -62,6 +62,8 @@ export function HexCard(props: {
         : t('dev.economy.rival');
   const terrain = TERRAIN_NAMES[map.terrain[s.hex] ?? 0] ?? 'plains';
   const c = s.city;
+  // Снабжение, золото и связь со столицей есть только у своего города.
+  const mine = c !== null && c.owner === view.playerId;
   const title = c
     ? `${c.isCapital ? t('card.capital') : t('card.city')} · ${t('card.level')} ${c.level}`
     : t(`terrain.${terrain}` as MessageKey);
@@ -80,10 +82,10 @@ export function HexCard(props: {
         />
         <Row label={t('card.growth')} value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
         {improvement > 0 && <Row label={t('card.improvementLevel')} value={String(improvement)} />}
-        {c && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
-        {c && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
+        {mine && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
+        {mine && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
       </dl>
-      {c && (
+      {mine && (
         <p className={c.link === 'isolated' ? styles.bad : styles.good}>
           {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
         </p>
