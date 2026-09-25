@@ -42,7 +42,13 @@ type DslCommand =
   | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
-  | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' };
+  | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
+  | {
+      readonly t: 'recruit';
+      readonly where: At;
+      readonly type: UnitType;
+      readonly soldiers: number;
+    };
 
 export const at = (col: number, row: number): At => ({ col, row });
 
@@ -86,6 +92,14 @@ export const build = (where: At, kind: 'fort' | 'depot'): DslCommand => ({
   t: 'build',
   where,
   kind,
+});
+
+/** Набор в городе, стоящем в клетке where; soldiers — целые солдаты. */
+export const recruit = (where: At, type: UnitType, soldiers: number): DslCommand => ({
+  t: 'recruit',
+  where,
+  type,
+  soldiers,
 });
 
 /** Налог в процентах, как на ползунке HUD (может быть и невалидным — для тестов отказа). */
@@ -163,9 +177,11 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       capitalCityId: -1,
       status: 'alive' as const,
       citiesFounded: 0,
+      bankrupt: false,
     })),
     armies: [],
     constructions: [],
+    recruits: [],
     networks: [],
     nextId: 1,
     events: [],
@@ -191,7 +207,10 @@ export interface Scenario {
   player(p: string): Player;
   /** Город в клетке или undefined. */
   cityAt(where: At): City | undefined;
-  /** Сменить владельца гекса в обход команд — для тестов разреза сетей; null — нейтральный. */
+  /**
+   * Сменить владельца гекса в обход команд — для тестов разреза сетей и потери городов;
+   * город на гексе переходит вместе с ним. null — нейтральный.
+   */
   setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
   rejections(): string[];
@@ -260,6 +279,13 @@ function makeScenario(
         return { t: 'rebuildSupply', cityId: cityIdAt(c.where) };
       case 'build':
         return { t: 'build', hex: hexOf(c.where), kind: c.kind };
+      case 'recruit':
+        return {
+          t: 'recruit',
+          cityId: cityIdAt(c.where),
+          type: c.type,
+          soldiers: (c.soldiers * FP) as Fp,
+        };
       default:
         return { t: c.t, hex: hexOf(c.where) };
     }
@@ -319,7 +345,10 @@ function makeScenario(
       return state.cities.find((c) => c.hex === hexOf(where));
     },
     setOwner(where, player) {
-      state.hexes.owner[hexOf(where)] = player === null ? NEUTRAL : idOf(player);
+      const owner = player === null ? NEUTRAL : idOf(player);
+      state.hexes.owner[hexOf(where)] = owner;
+      const c = state.cities.find((x) => x.hex === hexOf(where));
+      if (c) c.owner = owner;
     },
     rejections() {
       return log.flatMap((e) => (e.t === 'commandRejected' ? [e.reason] : []));

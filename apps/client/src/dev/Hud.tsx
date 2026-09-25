@@ -41,6 +41,8 @@ export function Hud(props: {
   const me = view.players[view.playerId];
   if (!me) return null;
   const s = view.me;
+  // Прирост золота в HUD — баланс: доход минус содержание армий (02-economy.md, «Золото»).
+  const net = s.incomePerS - s.upkeepPerS;
   return (
     <header className={styles.hud}>
       <Slot
@@ -51,8 +53,8 @@ export function Hud(props: {
       <Slot
         label={t('hud.gold')}
         value={formatFp(me.gold)}
-        rate={formatRate(s.incomePerS)}
-        negative={s.incomePerS < 0}
+        rate={formatRate(net)}
+        negative={net < 0}
       />
       <div className={styles.taxWrap}>
         <button
@@ -81,7 +83,7 @@ export function Hud(props: {
             </p>
             <p className={styles.hint}>
               {t('hud.taxGrowth')} {formatMult(s.growthMultAtTarget)} · {t('hud.taxIncome')}{' '}
-              {formatRate(s.incomeAtTargetPerS)}
+              {formatRate(s.incomeAtTargetPerS - s.upkeepPerS)}
             </p>
           </div>
         )}

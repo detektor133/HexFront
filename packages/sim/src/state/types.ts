@@ -60,6 +60,20 @@ export interface Player {
   status: PlayerStatus;
   /** Сколько городов игрок основал за матч (N в цене основания), включая начатые стройки. */
   citiesFounded: number;
+  /** Казна пуста и баланс отрицательный (02-economy.md, «Банкротство»); ставит economySystem. */
+  bankrupt: boolean;
+}
+
+/** Набор в городе: люди и золото уже списаны, армия появится по завершении. Один на город. */
+export interface Recruitment {
+  readonly id: number;
+  readonly owner: number;
+  readonly cityId: number;
+  readonly type: UnitType;
+  /** fixed-point солдат. */
+  readonly soldiers: Fp;
+  progressTicks: number;
+  readonly totalTicks: number;
 }
 
 export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
@@ -101,6 +115,12 @@ export type GameEvent =
       readonly reason: string;
     }
   | {
+      readonly t: 'armyRecruited' | 'recruitCancelled';
+      readonly playerId: number;
+      readonly cityId: number;
+      readonly type: UnitType;
+    }
+  | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;
       readonly kind: ConstructionKind;
@@ -120,6 +140,8 @@ export interface MatchState {
   readonly armies: Army[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
+  /** Отсортированы по id. */
+  readonly recruits: Recruitment[];
   /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
   networks: SupplyNetwork[];
   nextId: number;

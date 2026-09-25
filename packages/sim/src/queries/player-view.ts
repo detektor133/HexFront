@@ -1,11 +1,12 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
 import { playerPlace, playerScore } from './score.ts';
+import type { UnitType } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
-import { playerIncomePerSecond } from '../systems/economy.ts';
+import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
 import { hexGrowthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
 
@@ -50,6 +51,10 @@ export interface PlayerView {
     /** Золото в секунду при фактическом и при выбранном налоге. */
     readonly incomePerS: number;
     readonly incomeAtTargetPerS: number;
+    /** Содержание армий, fixed-point золота в секунду. */
+    readonly upkeepPerS: number;
+    /** Казна пуста при отрицательном балансе (02-economy.md, «Банкротство»). */
+    readonly bankrupt: boolean;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -65,6 +70,15 @@ export interface PlayerView {
     readonly progressTicks: number;
     readonly totalTicks: number;
     readonly path: readonly HexId[];
+  }[];
+  /** Свои наборы в очереди городов; чужие не видны (08-match.md, «Туман войны»). */
+  readonly recruits: readonly {
+    readonly id: number;
+    readonly cityId: number;
+    readonly type: UnitType;
+    readonly soldiers: Fp;
+    readonly progressTicks: number;
+    readonly totalTicks: number;
   }[];
 }
 
@@ -89,6 +103,8 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     popGrowthPerS,
     incomePerS: playerIncomePerSecond(state, playerId),
     incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target),
+    upkeepPerS: playerUpkeepPerSecond(state, playerId),
+    bankrupt: state.players[playerId]?.bankrupt ?? false,
     growthMultAtTarget: taxGrowthMult(target),
     score: playerScore(state, playerId),
     place: playerPlace(state, playerId),
@@ -141,5 +157,15 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
       totalTicks: c.totalTicks,
       path: [...(c.path ?? [])],
     })),
+    recruits: state.recruits
+      .filter((r) => r.owner === playerId)
+      .map((r) => ({
+        id: r.id,
+        cityId: r.cityId,
+        type: r.type,
+        soldiers: r.soldiers,
+        progressTicks: r.progressTicks,
+        totalTicks: r.totalTicks,
+      })),
   };
 }

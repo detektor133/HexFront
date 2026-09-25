@@ -68,6 +68,7 @@ export function validateRebuildSupply(
 ): Validation {
   const plan = rebuildSupplyPlan(state, playerId, cityId);
   if (!plan.ok) return rejected(plan.reason);
+  if (state.players[playerId]?.bankrupt) return rejected('bankrupt');
   return plan.affordable ? OK : rejected('notEnoughGold');
 }
 

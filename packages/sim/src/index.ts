@@ -24,3 +24,11 @@ export {
 } from './commands/construction.ts';
 export { rebuildSupplyPlan, type RebuildPlan } from './commands/rebuild-supply.ts';
 export * from './queries/score.ts';
+export {
+  armyLimit,
+  checkRecruit,
+  recruitCapacity,
+  recruitTimeS,
+  type RecruitCheck,
+} from './commands/recruit.ts';
+export { playerUpkeepPerSecond } from './systems/economy.ts';

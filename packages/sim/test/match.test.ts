@@ -29,7 +29,7 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('73da72f7');
+    expect(hashState(state)).toBe('45bcf297');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
@@ -154,10 +154,10 @@ describe('step', () => {
   it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'recruit', cityId: 1, type: 'infantry', soldiers: 50 } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'bombard', armyId: 1, targetArmyId: null } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'recruit', reason: 'notImplemented' },
+      { t: 'commandRejected', playerId: 1, command: 'bombard', reason: 'notImplemented' },
     ]);
     expect(hashState(a)).toBe(hashState(b));
   });

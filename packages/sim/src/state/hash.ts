@@ -59,6 +59,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.capitalCityId);
     str(s, p.status);
     int(s, p.citiesFounded);
+    int(s, p.bankrupt ? 1 : 0);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {
@@ -83,6 +84,16 @@ function hashConstructions(s: Hasher, state: MatchState): void {
     int(s, c.progressTicks);
     int(s, c.totalTicks);
     array(s, c.path ?? []);
+  }
+  int(s, state.recruits.length);
+  for (const r of state.recruits) {
+    int(s, r.id);
+    int(s, r.owner);
+    int(s, r.cityId);
+    str(s, r.type);
+    int(s, r.soldiers);
+    int(s, r.progressTicks);
+    int(s, r.totalTicks);
   }
 }
 

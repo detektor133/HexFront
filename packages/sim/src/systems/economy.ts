@@ -1,11 +1,12 @@
-// Доход игроков: налог с населения, города, шахты; изолированные сети — ×0,5.
-// GDD: docs/gdd/02-economy.md — «Золото»; 04-roads-supply.md — «Сети снабжения».
+// Доход игроков: налог с населения, города, шахты; изолированные сети — ×0,5. Содержание армий
+// и банкротство. GDD: docs/gdd/02-economy.md — «Золото», «Банкротство»; 04-roads-supply.md.
 import {
   CITY_GOLD_PER_LEVEL,
   GOLD_PER_POP_TAX,
   ISOLATED_INCOME_MULT,
   MINE_GOLD_PER_S,
   TICKS_PER_S,
+  UPKEEP_GOLD_PER_SOLDIER_S,
 } from '../balance.ts';
 import { FEATURE } from '../map/types.ts';
 import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
@@ -103,17 +104,30 @@ function incomeFromBase(b: Base, rate: Fp): number {
 }
 
 /**
- * Начисляет доход за тик:
- * income/с = Σpop × taxEffective × GOLD_PER_POP_TAX + Σ CITY_GOLD_PER_LEVEL × level + Σ MINE_GOLD_PER_S,
- * для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT.
- * Расходы (содержание армий) и банкротство — этап 03.
+ * Содержание армий игрока: expense/с = Σ soldiers × UPKEEP_GOLD_PER_SOLDIER_S(type).
+ * @returns fixed-point золота в секунду
+ */
+export function playerUpkeepPerSecond(state: MatchState, playerId: number): number {
+  let total = 0;
+  for (const a of state.armies) {
+    if (a.owner === playerId) total += fpMul(a.soldiers, UPKEEP_GOLD_PER_SOLDIER_S[a.type]);
+  }
+  return total;
+}
+
+/**
+ * Начисляет баланс за тик:
+ * income/с = Σpop × taxEffective × GOLD_PER_POP_TAX + Σ CITY_GOLD_PER_LEVEL × level + Σ MINE_GOLD_PER_S
+ * (для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT) − содержание армий.
+ * Золото не уходит в минус; казна пуста при отрицательном балансе — банкротство.
  */
 export function economySystem(state: MatchState): void {
   const bases = incomeBases(state);
   state.players.forEach((p, i) => {
     const b = bases[i];
     if (p.status !== 'alive' || !b) return;
-    const perSecond = incomeFromBase(b, p.taxEffective);
-    p.gold = (p.gold + intDiv(perSecond, TICKS_PER_S)) as Fp;
+    const net = incomeFromBase(b, p.taxEffective) - playerUpkeepPerSecond(state, i);
+    p.gold = Math.max(0, p.gold + intDiv(net, TICKS_PER_S)) as Fp;
+    p.bankrupt = p.gold === 0 && net < 0;
   });
 }

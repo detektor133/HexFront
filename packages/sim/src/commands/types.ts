@@ -23,7 +23,8 @@ export type Command =
       readonly t: 'recruit';
       readonly cityId: number;
       readonly type: UnitType;
-      readonly soldiers: number;
+      /** fixed-point солдат, кратно RECRUIT_STEP. */
+      readonly soldiers: Fp;
     }
   | { readonly t: 'foundCity'; readonly hex: HexId }
   | { readonly t: 'upgradeCity'; readonly cityId: number }
@@ -53,6 +54,12 @@ export const REJECT_REASONS = [
   'notIsolated',
   'noPath',
   'alreadyBuilding',
+  'bankrupt',
+  'badUnitType',
+  'invalidAmount',
+  'queueBusy',
+  'armyLimit',
+  'notEnoughPeople',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];
