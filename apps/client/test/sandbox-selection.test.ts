@@ -11,6 +11,7 @@ import {
   orderHex,
   selectHex,
 } from '../src/dev/sandbox-selection.ts';
+import { lang } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 
@@ -78,9 +79,11 @@ describe('песочница: выбор и приказы как в HoI4', () =
 });
 
 describe('число солдат на фишке (units.md)', () => {
-  it('850, 1,4к, 12к — с округлением вниз', () => {
+  // Язык берётся из navigator.language: локально — ru, в CI — en; проверяются оба варианта.
+  it('850, 1,4к / 1.4k, 12к / 12k — с округлением вниз', () => {
+    const [thousand, big] = lang === 'ru' ? ['1,4к', '12к'] : ['1.4k', '12k'];
     expect(formatSoldiers(850_000)).toBe('850');
-    expect(formatSoldiers(1_499_000)).toBe('1,4к');
-    expect(formatSoldiers(12_900_000)).toBe('12к');
+    expect(formatSoldiers(1_499_000)).toBe(thousand);
+    expect(formatSoldiers(12_900_000)).toBe(big);
   });
 });
