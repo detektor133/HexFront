@@ -1,5 +1,5 @@
 // Путь и время перехода отрядов: A* по времени хода, стабильные ничьи по HexId.
-// GDD: docs/gdd/05-units.md — «Движение», «Захват»; 01-map.md — «Местность».
+// GDD: docs/gdd/05-armies.md — «Движение», «Захват»; 01-map.md — «Местность».
 import {
   ATTRITION_THRESHOLD,
   LOW_SUPPLY_SPEED_MULT,
@@ -29,7 +29,7 @@ function moveTerrain(state: MatchState, hex: HexId): LandTerrain | null {
 }
 
 /** Сколько отрядов игрока стоит в гексе. */
-export function ownArmiesAt(state: MatchState, owner: number, hex: HexId): number {
+export function ownUnitsAt(state: MatchState, owner: number, hex: HexId): number {
   let n = 0;
   for (const a of state.units) if (a.owner === owner && a.hex === hex) n += 1;
   return n;
@@ -109,7 +109,7 @@ function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boo
   if (m.type === 'artillery' && state.hexes.owner[hex] !== m.owner) return false;
   if (isGoal) return true;
   if (isHostileHex(state, m.owner, hex)) return false;
-  return ownArmiesAt(state, m.owner, hex) < MAX_UNITS_PER_HEX;
+  return ownUnitsAt(state, m.owner, hex) < MAX_UNITS_PER_HEX;
 }
 
 const UNREACHED = 0x7fffffff;

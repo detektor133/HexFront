@@ -51,6 +51,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     units: [],
     constructions: [],
     recruits: [],
+    armies: [],
     networks: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
@@ -114,7 +115,12 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     status: 'alive',
     citiesFounded: 0,
     bankrupt: false,
+    armiesCreated: 1,
   });
+  // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
+  const armyId = state.nextId;
+  state.nextId += 1;
+  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '' });
   for (let i = 0; i < START_UNITS; i += 1) {
     state.units.push({
       id: state.nextId,
@@ -128,6 +134,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       path: [],
       moveTicks: 0,
       moveTotal: 0,
+      armyId,
     });
     state.nextId += 1;
   }

@@ -62,6 +62,8 @@ export interface Player {
   citiesFounded: number;
   /** Казна пуста и баланс отрицательный (02-economy.md, «Банкротство»); ставит economySystem. */
   bankrupt: boolean;
+  /** Сколько армий игрок создал за матч — следующий номер армии. */
+  armiesCreated: number;
 }
 
 /** Набор в городе: люди и золото уже списаны, отряд появится по завершении. Один на город. */
@@ -111,6 +113,18 @@ export interface Unit {
   moveTicks: number;
   /** Длительность текущего перехода, тики; 0 — переход не начат. */
   moveTotal: number;
+  /** Армия отряда или null — резерв (CR-001). */
+  armyId: number | null;
+}
+
+/** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
+export interface Army {
+  readonly id: number;
+  readonly owner: number;
+  /** Порядковый номер армии у игрока: 1, 2, …; интерфейс называет по нему армию без имени. */
+  readonly number: number;
+  /** Имя, заданное игроком; пустое — «N-я армия». */
+  name: string;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */
@@ -145,6 +159,8 @@ export interface MatchState {
   readonly players: Player[];
   /** Отсортированы по id. */
   readonly units: Unit[];
+  /** Армии — группы отрядов, отсортированы по id. */
+  readonly armies: Army[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
   /** Отсортированы по id. */

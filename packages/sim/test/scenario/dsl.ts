@@ -16,6 +16,7 @@ import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   NEUTRAL,
+  type Army,
   type Unit,
   type City,
   type GameEvent,
@@ -56,6 +57,19 @@ type DslCommand =
     }
   | { readonly t: 'split'; readonly unit: UnitRef; readonly soldiers: number }
   | { readonly t: 'merge'; readonly units: readonly UnitRef[] }
+  | { readonly t: 'createArmy'; readonly name: string }
+  | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
+  | { readonly t: 'disbandArmy'; readonly armyId: number }
+  | {
+      readonly t: 'assignUnits';
+      readonly units: readonly UnitRef[];
+      readonly armyId: number | null;
+    }
+  | {
+      readonly t: 'armyOrder';
+      readonly armyId: number;
+      readonly order: 'idle' | 'hold' | 'expand';
+    }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
@@ -110,6 +124,25 @@ export const split = (unit: UnitRef, soldiers: number): DslCommand => ({
   soldiers,
 });
 export const merge = (units: readonly UnitRef[]): DslCommand => ({ t: 'merge', units });
+
+export const createArmy = (name: string): DslCommand => ({ t: 'createArmy', name });
+export const renameArmy = (armyId: number, name: string): DslCommand => ({
+  t: 'renameArmy',
+  armyId,
+  name,
+});
+export const disbandArmy = (armyId: number): DslCommand => ({ t: 'disbandArmy', armyId });
+/** Назначить отряды в армию; null — вернуть в резерв. */
+export const assignUnits = (units: readonly UnitRef[], armyId: number | null): DslCommand => ({
+  t: 'assignUnits',
+  units,
+  armyId,
+});
+export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): DslCommand => ({
+  t: 'armyOrder',
+  armyId,
+  order,
+});
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
 export const improve = (where: At): DslCommand => ({ t: 'improve', where });
@@ -207,10 +240,12 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       status: 'alive' as const,
       citiesFounded: 0,
       bankrupt: false,
+      armiesCreated: 0,
     })),
     units: [],
     constructions: [],
     recruits: [],
+    armies: [],
     networks: [],
     nextId: 1,
     events: [],
@@ -249,6 +284,8 @@ export interface Scenario {
   setSupply(unitId: number, percent: number): void;
   /** Задать организованность отряда (0–100). */
   setOrg(unitId: number, org: number): void;
+  /** Армии игрока по порядку создания. */
+  armiesOf(player: string): Army[];
   /** Отряд по id или undefined. */
   unitById(id: number): Unit | undefined;
 }
@@ -320,6 +357,13 @@ function makeScenario(
         return { t: 'split', unitId: resolve(c.unit), soldiers: (c.soldiers * FP) as Fp };
       case 'merge':
         return { t: 'merge', unitIds: c.units.map(resolve) };
+      case 'createArmy':
+      case 'renameArmy':
+      case 'disbandArmy':
+      case 'armyOrder':
+        return c;
+      case 'assignUnits':
+        return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':
         return { t: 'upgradeCity', cityId: cityIdAt(c.where) };
       case 'rebuildSupply':
@@ -359,6 +403,7 @@ function makeScenario(
         path: [],
         moveTicks: 0,
         moveTotal: 0,
+        armyId: null,
       });
       return id;
     },
@@ -422,6 +467,9 @@ function makeScenario(
       const unit = state.units.find((a) => a.id === unitId);
       if (!unit) throw new Error(`сценарий: нет отряда ${unitId}`);
       unit.org = (org * FP) as Fp;
+    },
+    armiesOf(player) {
+      return state.armies.filter((a) => a.owner === idOf(player));
     },
     unitById(id) {
       return state.units.find((a) => a.id === id);

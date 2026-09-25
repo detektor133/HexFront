@@ -13,8 +13,8 @@ export type Command =
       readonly unitIds: readonly number[];
       readonly order: 'idle' | 'hold' | 'expand';
     }
-  | { readonly t: 'assignFront'; readonly unitIds: readonly number[]; readonly enemyId: number }
-  | { readonly t: 'arrow'; readonly points: readonly HexId[] }
+  | { readonly t: 'assignFront'; readonly armyId: number; readonly enemyId: number }
+  | { readonly t: 'arrow'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'arrowStop'; readonly arrowId: number }
   /** soldiers — fixed-point, целое число солдат. */
   | { readonly t: 'split'; readonly unitId: number; readonly soldiers: Fp }
@@ -31,7 +31,21 @@ export type Command =
   | { readonly t: 'upgradeCity'; readonly cityId: number }
   | { readonly t: 'improve'; readonly hex: HexId }
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
-  | { readonly t: 'rebuildSupply'; readonly cityId: number };
+  | { readonly t: 'rebuildSupply'; readonly cityId: number }
+  | {
+      readonly t: 'armyOrder';
+      readonly armyId: number;
+      readonly order: 'idle' | 'hold' | 'expand';
+    }
+  | { readonly t: 'createArmy'; readonly name: string }
+  | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
+  | { readonly t: 'disbandArmy'; readonly armyId: number }
+  | {
+      readonly t: 'assignUnits';
+      readonly unitIds: readonly number[];
+      /** null — вернуть в резерв. */
+      readonly armyId: number | null;
+    };
 
 /** Причины отклонения команды; уходят клиенту, тексты — в i18n клиента. */
 export const REJECT_REASONS = [
@@ -67,6 +81,9 @@ export const REJECT_REASONS = [
   'notSameHex',
   'notSameType',
   'badOrder',
+  'unknownArmy',
+  'notOwnArmy',
+  'badName',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

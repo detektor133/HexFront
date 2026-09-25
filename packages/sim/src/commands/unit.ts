@@ -1,11 +1,11 @@
 // Команды отрядов: move, setOrder, split, merge.
-// GDD: docs/gdd/05-units.md — «Движение», «Разделение и слияние», «Приказы».
+// GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { unitLimit } from './recruit.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
-import { findPath, ownArmiesAt } from '../queries/unit-path.ts';
+import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 
 export type UnitCommand = Extract<Command, { t: 'move' | 'setOrder' | 'split' | 'merge' }>;
@@ -15,7 +15,7 @@ type Owned =
   | { readonly ok: false; readonly reason: RejectReason };
 
 // Все id различны, существуют и принадлежат игроку; порядок — как в команде.
-function ownArmies(state: MatchState, playerId: number, ids: readonly number[]): Owned {
+function ownUnits(state: MatchState, playerId: number, ids: readonly number[]): Owned {
   if (ids.length === 0 || new Set(ids).size !== ids.length)
     return { ok: false, reason: 'unknownUnit' };
   const units: Unit[] = [];
@@ -32,7 +32,7 @@ function validateMove(state: MatchState, units: readonly Unit[], to: HexId): Val
   if (!Number.isInteger(to) || to < 0 || to >= state.hexes.owner.length) return rejected('badHex');
   for (const a of units) {
     if (a.hex === to) continue;
-    if (ownArmiesAt(state, a.owner, to) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
+    if (ownUnitsAt(state, a.owner, to) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
     if (!findPath(state, a.hex, to, a.type, a.owner)) return rejected('noPath');
   }
   return OK;
@@ -43,7 +43,7 @@ function validateSplit(state: MatchState, unit: Unit, soldiers: number): Validat
     return rejected('invalidAmount');
   }
   if (soldiers >= unit.soldiers) return rejected('invalidAmount');
-  if (ownArmiesAt(state, unit.owner, unit.hex) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
+  if (ownUnitsAt(state, unit.owner, unit.hex) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
   const used =
     state.units.filter((a) => a.owner === unit.owner).length +
     state.recruits.filter((r) => r.owner === unit.owner).length;
@@ -68,7 +68,7 @@ export function validateUnitCommand(
   cmd: UnitCommand,
 ): Validation {
   const ids = cmd.t === 'split' ? [cmd.unitId] : cmd.unitIds;
-  const owned = ownArmies(state, playerId, ids);
+  const owned = ownUnits(state, playerId, ids);
   if (!owned.ok) return rejected(owned.reason);
   switch (cmd.t) {
     case 'move':
@@ -108,6 +108,7 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     path: [],
     moveTicks: 0,
     moveTotal: 0,
+    armyId: unit.armyId,
   });
   state.nextId += 1;
 }
@@ -135,7 +136,7 @@ function executeMerge(state: MatchState, units: readonly Unit[]): void {
 /** Применяет команду отряда. Вызывается только после успешной проверки. */
 export function executeUnitCommand(state: MatchState, playerId: number, cmd: UnitCommand): void {
   const ids = cmd.t === 'split' ? [cmd.unitId] : cmd.unitIds;
-  const owned = ownArmies(state, playerId, ids);
+  const owned = ownUnits(state, playerId, ids);
   if (!owned.ok) return;
   switch (cmd.t) {
     case 'move':

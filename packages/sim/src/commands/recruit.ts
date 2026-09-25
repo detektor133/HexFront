@@ -1,5 +1,5 @@
 // Команда recruit: проверка, списание людей и золота, постановка в очередь города.
-// GDD: docs/gdd/05-units.md — «Модель», «Набор»; 02-economy.md — «Банкротство».
+// GDD: docs/gdd/05-armies.md — «Модель», «Набор»; 02-economy.md — «Банкротство».
 import {
   UNIT_LIMIT_BASE,
   UNIT_LIMIT_PER_CITY,

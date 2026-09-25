@@ -1,10 +1,10 @@
 // Переходы отрядов гекс за гексом, захват пустых гексов, приказ expand. Путь не пересчитывается
-// (05-units.md, «Движение»); атака при входе во врага — 03/T5.
-// GDD: docs/gdd/05-units.md — «Движение», «Захват», «Приказы»
+// (05-armies.md, «Движение»); атака при входе во врага — 03/T5.
+// GDD: docs/gdd/05-armies.md — «Движение», «Захват», «Приказы»
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import { findNearestPath, isHostileHex, ownArmiesAt, stepTicks } from '../queries/unit-path.ts';
+import { findNearestPath, isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
 import { NEUTRAL, type Unit, type MatchState } from '../state/types.ts';
 
@@ -24,7 +24,7 @@ function blocked(state: MatchState, unit: Unit, next: HexId): boolean {
 }
 
 const isFull = (state: MatchState, unit: Unit, hex: HexId): boolean =>
-  ownArmiesAt(state, unit.owner, hex) >= MAX_UNITS_PER_HEX;
+  ownUnitsAt(state, unit.owner, hex) >= MAX_UNITS_PER_HEX;
 
 function borders(state: MatchState, owner: number, hex: HexId): boolean {
   const { width, height } = state.map;

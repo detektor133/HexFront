@@ -1,5 +1,5 @@
 // Набор: очереди и появление отрядов.
-// GDD: docs/gdd/05-units.md — «Набор»
+// GDD: docs/gdd/05-armies.md — «Набор»
 import { MAX_UNITS_PER_HEX, ORG_MAX } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
@@ -45,6 +45,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     path: [],
     moveTicks: 0,
     moveTotal: 0,
+    armyId: null,
   });
   state.nextId += 1;
 }

@@ -60,6 +60,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     str(s, p.status);
     int(s, p.citiesFounded);
     int(s, p.bankrupt ? 1 : 0);
+    int(s, p.armiesCreated);
   }
   int(s, state.units.length);
   for (const a of state.units) {
@@ -74,6 +75,14 @@ function hashEntities(s: Hasher, state: MatchState): void {
     array(s, a.path);
     int(s, a.moveTicks);
     int(s, a.moveTotal);
+    int(s, a.armyId ?? -1);
+  }
+  int(s, state.armies.length);
+  for (const a of state.armies) {
+    int(s, a.id);
+    int(s, a.owner);
+    int(s, a.number);
+    str(s, a.name);
   }
 }
 
