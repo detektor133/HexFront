@@ -32,10 +32,15 @@ export interface MidLayer {
   readonly container: Container;
   readonly top?: Container;
   update(scale: number, level: DetailLevel): void;
+  /** Покадровая анимация (движение фишек, бегущие штрихи); время — performance.now(), мс. */
+  frame?(nowMs: number): void;
   destroy(): void;
 }
 
 export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
+
+/** Тап выбирает; долгий тап или правая кнопка мыши — приказ (07-controls.md, как в HoI4). */
+export type TapKind = 'select' | 'order';
 
 export interface MapViewOptions {
   readonly radius: number;
@@ -59,6 +64,9 @@ interface Pointers {
   multi: boolean;
   velocity: Velocity | null;
   lastMoveMs: number;
+  /** Время нажатия и кнопка — для долгого тапа и правой кнопки. */
+  downMs: number;
+  button: number;
 }
 
 // Скорость для инерции сглаживается по последним событиям перетаскивания.
@@ -74,7 +82,7 @@ export async function createMapView(
   map: MapStatic,
   initial: MapViewOptions,
   onState: (s: MapViewState) => void,
-  onTap?: (hex: Hex) => void,
+  onTap?: (hex: Hex, kind: TapKind) => void,
 ): Promise<MapView> {
   let opts = initial;
   const app = new Application();
@@ -108,6 +116,8 @@ export async function createMapView(
     lastMoveMs: 0,
     travel: 0,
     multi: false,
+    downMs: 0,
+    button: 0,
   };
 
   const apply = (): void => {
@@ -123,6 +133,7 @@ export async function createMapView(
   };
 
   app.ticker.add((ticker) => {
+    mid?.frame?.(performance.now());
     if (ptr.velocity && ptr.active.size === 0) {
       const v = ptr.velocity;
       cam = panBy(
@@ -141,9 +152,9 @@ export async function createMapView(
   const detach = attachInput(app.canvas, ptr, {
     pan: (dx, dy) => (cam = panBy(cam, dx, dy, view(), bounds)),
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, view(), bounds)),
-    tap: (at) => {
+    tap: (at, kind) => {
       const world = { x: (at.x - cam.x) / cam.scale, y: (at.y - cam.y) / cam.scale };
-      onTap?.(pixelToHex(world, opts.radius));
+      onTap?.(pixelToHex(world, opts.radius), kind);
     },
   });
 
@@ -193,8 +204,12 @@ export async function createMapView(
 interface InputHandlers {
   pan(dx: number, dy: number): void;
   zoom(factor: number, at: Point): void;
-  tap(at: Point): void;
+  tap(at: Point, kind: TapKind): void;
 }
+
+/** Удержание дольше этого без сдвига — долгий тап (приказ). */
+const LONG_PRESS_MS = 450;
+const RIGHT_BUTTON = 2;
 
 function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers): () => void {
   const local = (e: PointerEvent | WheelEvent): Point => {
@@ -221,6 +236,8 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
     }
     ptr.velocity = null;
     ptr.lastMoveMs = e.timeStamp;
+    ptr.downMs = e.timeStamp;
+    ptr.button = e.button;
   };
   const move = (e: PointerEvent): void => {
     const prev = ptr.active.get(e.pointerId);
@@ -248,7 +265,10 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
   const up = (e: PointerEvent): void => {
     const at = ptr.active.get(e.pointerId);
     ptr.active.delete(e.pointerId);
-    if (at && ptr.active.size === 0 && !ptr.multi && ptr.travel < TAP_SLOP_PX) h.tap(at);
+    if (at && ptr.active.size === 0 && !ptr.multi && ptr.travel < TAP_SLOP_PX) {
+      const long = e.timeStamp - ptr.downMs >= LONG_PRESS_MS;
+      h.tap(at, long || ptr.button === RIGHT_BUTTON ? 'order' : 'select');
+    }
     const paused = e.timeStamp - ptr.lastMoveMs > INERTIA_MAX_PAUSE_MS;
     if (ptr.active.size > 0 || paused) ptr.velocity = null;
   };
@@ -263,7 +283,11 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
   canvas.addEventListener('wheel', wheel, { passive: false });
+  // Правая кнопка — приказ, контекстное меню браузера над картой не нужно.
+  const noMenu = (e: MouseEvent): void => e.preventDefault();
+  canvas.addEventListener('contextmenu', noMenu);
   return () => {
+    canvas.removeEventListener('contextmenu', noMenu);
     canvas.removeEventListener('pointerdown', down);
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);

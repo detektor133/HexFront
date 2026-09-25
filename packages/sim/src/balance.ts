@@ -78,6 +78,8 @@ export const NEUTRAL_GARRISON: readonly [Fp, Fp, Fp] = [fp(150), fp(300), fp(600
 export const GROWTH_CITY_HEX: Fp = fp(3.0);
 export const GROWTH_RING1: Fp = fp(1.5);
 export const GROWTH_RING2: Fp = fp(0.5);
+/** Фоновый рост своих гексов вне радиуса 2 городов, людей/с. */
+export const GROWTH_BACKGROUND: Fp = fp(0.4);
 export const CITY_LEVEL_GROWTH_STEP: Fp = fp(0.25);
 export const POP_OVERCAP_DECAY: Fp = fp(0.01);
 export const CAPTURE_POP_LOSS_HEX: Fp = fp(0.2);
@@ -94,6 +96,8 @@ export const GOLD_PER_POP_TAX: Fp = fp(0.01);
 export const ISOLATED_INCOME_MULT: Fp = fp(0.5);
 export const ISOLATED_SUPPLY_MULT: Fp = fp(0.5);
 export const ISOLATED_GROWTH_MULT: Fp = fp(0.75);
+/** Снабжённость отрядов при банкротстве (02-economy.md, «Банкротство»). */
+export const BANKRUPT_SUPPLY_MULT: Fp = fp(0.5);
 
 // Города и постройки
 
@@ -102,6 +106,8 @@ export const CITY_SUPPLY_PER_LEVEL: Fp = fp(250);
 export const CAPITAL_SUPPLY_BONUS: Fp = fp(250);
 export const CITY_GOLD_PER_LEVEL: Fp = fp(0.5);
 export const MILITIA_PER_LEVEL: Fp = fp(100);
+/** Восстановление ополчения вне боя, солдат в секунду. */
+export const MILITIA_REGEN_PER_S: Fp = fp(4);
 export const CITY_DEF_MULT: Fp = fp(1.3);
 export const CITY_FOUND_BASE_COST: Fp = fp(120);
 export const CITY_FOUND_COST_STEP: Fp = fp(0.5);
@@ -114,6 +120,8 @@ export const CITY_UPGRADE_TIME_S: readonly [Fp, Fp, Fp, Fp] = [fp(20), fp(30), f
 export const CAPTURED_OUTPUT_START: Fp = fp(0.25);
 export const CAPTURED_RAMP_S: Fp = fp(60);
 export const CAPITAL_MOVE_CHAOS_S: Fp = fp(30);
+/** Доход во время «смуты» после переноса столицы (03-cities-buildings.md, «Столица»). */
+export const CAPITAL_CHAOS_INCOME_MULT: Fp = fp(0.5);
 export const NO_CITY_GRACE_S: Fp = fp(60);
 /** Цена благоустройства уровней 1..3, золото. */
 export const IMPROVEMENT_COST: readonly [Fp, Fp, Fp] = [fp(20), fp(40), fp(80)];
@@ -184,13 +192,13 @@ export const RECRUIT_PER_100_S: ByUnit<Fp> = {
 export const RECRUIT_MIN: Fp = fp(50);
 export const RECRUIT_STEP: Fp = fp(50);
 export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);
-export const MAX_ARMIES_PER_HEX = 3;
-export const ARMY_LIMIT_BASE = 4;
-export const ARMY_LIMIT_PER_CITY = 2;
-/** `START_ARMIES` = 2 × 100 пехоты: количество и размер отдельно. */
-export const START_ARMIES = 2;
-export const START_ARMY_SOLDIERS: Fp = fp(100);
-export const START_ARMY_TYPE: UnitType = 'infantry';
+export const MAX_UNITS_PER_HEX = 3;
+export const UNIT_LIMIT_BASE = 4;
+export const UNIT_LIMIT_PER_CITY = 2;
+/** `START_UNITS` = 2 × 100 пехоты: количество и размер отдельно. */
+export const START_UNITS = 2;
+export const START_UNIT_SOLDIERS: Fp = fp(100);
+export const START_UNIT_TYPE: UnitType = 'infantry';
 export const START_GOLD: Fp = fp(200);
 export const START_POP_CAPITAL: Fp = fp(200);
 export const START_POP_HEX: Fp = fp(40);
@@ -231,7 +239,7 @@ export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);
 // Обзор и победа
 
 export const VISION_TERRITORY = 2;
-export const VISION_ARMY = 3;
+export const VISION_UNIT = 3;
 export const VISION_CITY = 3;
 export const VICTORY_CITY_SHARE: Fp = fp(0.7);
 export const VICTORY_HOLD_S: Fp = fp(60);

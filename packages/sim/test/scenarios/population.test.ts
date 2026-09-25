@@ -42,8 +42,9 @@ describe('рост населения', () => {
     expect(growthPerSecond(at(5, 2), 0)).toBeCloseTo(0.5, 2);
   });
 
-  it('свой гекс вне радиуса 2 не растёт, но и не убывает', () => {
-    expect(growthPerSecond(at(6, 2), 10)).toBe(0);
+  it('свой гекс вне радиуса 2 растёт фоново: 0,4 чел./с × (1 − pop/cap)', () => {
+    expect(growthPerSecond(at(6, 2), 0)).toBeCloseTo(0.4, 2);
+    expect(growthPerSecond(at(6, 2), 50)).toBeCloseTo(0.2, 2);
   });
 
   it('нейтральный гекс в радиусе города не растёт', () => {
@@ -124,10 +125,11 @@ describe('инвариант: нет создания населения из н
     a  a  a  a  a  B1 b  b
     a  a  .  .  .  b  b  b
   `;
-  // Верхняя граница роста за тик: город L5, благоустройство 3, налог 0.
+  // Верхняя граница роста за тик: город L5, благоустройство 3, налог 0; вне радиуса — фоновый рост.
   const MAX_PER_TICK = (3.0 * 2.0 * 1.9 * 1.4 * 1000) / TICKS_PER_S;
+  const MAX_BACKGROUND_PER_TICK = (0.4 * 1.9 * 1.4 * 1000) / TICKS_PER_S;
 
-  it('за тик гекс прибавляет не больше максимума формулы, вне радиуса городов — ничего', () => {
+  it('за тик гекс прибавляет не больше максимума формулы, вне радиуса — не больше фонового', () => {
     fc.assert(
       fc.property(
         fc.array(fc.integer({ min: 0, max: 400 }), { minLength: 32, maxLength: 32 }),
@@ -159,7 +161,8 @@ describe('инвариант: нет создания населения из н
             const nearOwnCity = cities.some(
               (c) => c.owner === owner && distance(hexFromId(c.hex, s.state.map.width), h) <= 2,
             );
-            if (!nearOwnCity) expect(delta).toBeLessThanOrEqual(0);
+            if (owner === undefined || owner < 0) expect(delta).toBeLessThanOrEqual(0);
+            else if (!nearOwnCity) expect(delta).toBeLessThanOrEqual(MAX_BACKGROUND_PER_TICK);
           });
         },
       ),

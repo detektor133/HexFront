@@ -24,7 +24,8 @@ interface MatchState {
                                   //      building: Uint8Array, road: Uint8Array, buildProgress: Int32Array
   cities: City[];                 // отсортированы по id
   players: Player[];              // gold (FP), taxTarget, taxEffective, capitalCityId, status, ...
-  armies: Army[];                 // отсортированы по id
+  units: Unit[];                  // отряды, отсортированы по id
+  armies: Army[];                 // армии — группы отрядов (CR-001), отсортированы по id
   battles: Battle[];              // активные бои (по целевому гексу)
   networks: SupplyNetwork[];      // кэш, пересчитывается раз в секунду
   fronts: Front[];                // кэш
@@ -42,9 +43,9 @@ interface MatchState {
 1. `applyCommands` — валидация и применение команд игроков и ботов (порядок: по `playerId`, затем по порядку поступления).
 2. `taxSystem` — сдвиг `taxEffective` к `taxTarget`.
 3. `constructionSystem` — прогресс строек, завершение.
-4. `recruitSystem` — очереди набора, появление армий.
+4. `recruitSystem` — очереди набора, появление отрядов (резерв или автопополнение).
 5. `networkSystem` — (раз в 10 тиков) сети снабжения, изоляция.
-6. `supplySystem` — (раз в 10 тиков) `supplyLevel` армий; каждый тик — таймеры истощения.
+6. `supplySystem` — (раз в 10 тиков) `supplyLevel` отрядов; каждый тик — таймеры истощения.
 7. `frontSystem` — (раз в 10 тиков) фронты; (раз в 50) `frontAllocator` выдаёт приказы движения.
 8. `offensiveSystem` — (раз в 20 тиков) шаги наступления по стрелкам.
 9. `movementSystem` — прогресс переходов, захват пустых гексов, начало боёв при входе во врага.
@@ -63,14 +64,19 @@ interface MatchState {
 ```ts
 type Command =
   | { t: 'setTax'; rate: Fp }
-  | { t: 'move'; armyIds: number[]; to: HexId }
-  | { t: 'attack'; armyIds: number[]; target: HexId }
-  | { t: 'setOrder'; armyIds: number[]; order: 'idle' | 'hold' | 'expand' }
-  | { t: 'assignFront'; armyIds: number[]; enemyId: number }
-  | { t: 'arrow'; points: HexId[] } | { t: 'arrowStop'; arrowId: number }
-  | { t: 'split'; armyId: number; soldiers: number } | { t: 'merge'; armyIds: number[] }
-  | { t: 'bombard'; armyId: number; targetArmyId: number | null }
-  | { t: 'recruit'; cityId: number; type: UnitType; soldiers: number }
+  | { t: 'move'; unitIds: number[]; to: HexId }
+  | { t: 'attack'; unitIds: number[]; target: HexId }
+  | { t: 'setOrder'; unitIds: number[]; order: 'idle' | 'hold' | 'expand' }
+  | { t: 'armyOrder'; armyId: number; order: 'idle' | 'hold' | 'expand' }
+  | { t: 'createArmy'; name: string } | { t: 'renameArmy'; armyId: number; name: string }
+  | { t: 'disbandArmy'; armyId: number }
+  | { t: 'assignUnits'; unitIds: number[]; armyId: number | null }
+  | { t: 'setAutoReinforce'; on: boolean }
+  | { t: 'assignFront'; armyId: number; enemyId: number }
+  | { t: 'arrow'; armyId: number; points: HexId[] } | { t: 'arrowStop'; arrowId: number }
+  | { t: 'split'; unitId: number; soldiers: Fp } | { t: 'merge'; unitIds: number[] }
+  | { t: 'bombard'; unitId: number; targetUnitId: number | null }
+  | { t: 'recruit'; cityId: number; type: UnitType; soldiers: Fp }
   | { t: 'foundCity'; hex: HexId } | { t: 'upgradeCity'; cityId: number }
   | { t: 'improve'; hex: HexId } | { t: 'build'; hex: HexId; kind: 'fort' | 'depot' }
   | { t: 'rebuildSupply'; cityId: number };
@@ -82,7 +88,7 @@ type Command =
 ## Запросы (чистые, без мутаций)
 
 - `playerView(state, playerId)` — видимое состояние для клиента и ботов (туман).
-- `forecastBattle(view, attackerIds, target)`.
+- `forecastBattle(map, view, unitIds, target)` — карта нужна для рельефа и рек: статическая карта не входит в снимок.
 - `findPath(state, from, to, unitType, ownerId)`, `rebuildSupplyPath(state, cityId)`.
 - `canFoundCity`, `recruitCapacity` и т. п. — для UI (кнопки с причинами).
 
@@ -93,5 +99,5 @@ type Command =
 
 ## Производительность (цели)
 
-- Матч 30 игроков, 4000 гексов, 200 армий: `step` ≤ 3 мс в среднем, ≤ 10 мс p99 на одном ядре (Node 22).
+- Матч 30 игроков, 4000 гексов, 200 отрядов: `step` ≤ 3 мс в среднем, ≤ 10 мс p99 на одном ядре (Node 22).
 - Тяжёлые пересчёты (сети, обзор, фронты) — раз в секунду и **размазаны**: игрок `i` пересчитывается в тике `tick % 10 == i % 10`.

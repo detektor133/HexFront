@@ -1,10 +1,11 @@
 // Создание матча из карты по правилам старта. GDD: docs/gdd/08-match.md — «Старт».
 import {
+  MILITIA_PER_LEVEL,
   NEUTRAL_HEX_POP_RATIO,
   ORG_MAX,
-  START_ARMIES,
-  START_ARMY_SOLDIERS,
-  START_ARMY_TYPE,
+  START_UNITS,
+  START_UNIT_SOLDIERS,
+  START_UNIT_TYPE,
   START_GOLD,
   START_HEXES,
   START_POP_CAPITAL,
@@ -32,7 +33,10 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     owner: NEUTRAL,
     level: c.level,
     name: c.name,
-    garrison: (c.garrison * FP) as Fp,
+    defenders: (c.garrison * FP) as Fp,
+    defenseOrg: ORG_MAX,
+    inBattle: false,
+    captureTicks: 0,
   }));
   return {
     tick: 0,
@@ -48,11 +52,16 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     },
     cities,
     players: [],
-    armies: [],
+    units: [],
     constructions: [],
+    recruits: [],
+    armies: [],
     networks: [],
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
+    winner: -1,
+    holdPlayer: -1,
+    holdTicks: 0,
   };
 }
 
@@ -96,7 +105,10 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     owner: playerId,
     level: 1,
     name: '',
-    garrison: 0 as Fp,
+    defenders: MILITIA_PER_LEVEL,
+    defenseOrg: ORG_MAX,
+    inBattle: false,
+    captureTicks: 0,
   });
   state.hexes.owner[capital] = playerId;
   state.hexes.pop[capital] = START_POP_CAPITAL;
@@ -112,17 +124,38 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     capitalCityId: cityId,
     status: 'alive',
     citiesFounded: 0,
+    bankrupt: false,
+    armiesCreated: 1,
+    autoReinforce: false,
+    chaosTicks: 0,
+    noCityTicks: 0,
+    eliminatedTick: -1,
   });
-  for (let i = 0; i < START_ARMIES; i += 1) {
-    state.armies.push({
+  // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
+  const armyId = state.nextId;
+  state.nextId += 1;
+  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '' });
+  for (let i = 0; i < START_UNITS; i += 1) {
+    state.units.push({
       id: state.nextId,
       owner: playerId,
-      type: START_ARMY_TYPE,
-      soldiers: START_ARMY_SOLDIERS,
+      type: START_UNIT_TYPE,
+      soldiers: START_UNIT_SOLDIERS,
       org: ORG_MAX,
       hex: capital,
-      order: 'expand',
+      // Старт без приказа: экспансию игрок включает сам (08-match.md, «Старт»).
+      order: 'idle',
       supplyLevel: FP as Fp,
+      path: [],
+      moveTicks: 0,
+      moveTotal: 0,
+      armyId,
+      lowSupplyTicks: 0,
+      encircled: false,
+      target: -1,
+      inBattle: false,
+      focus: -1,
+      fireTarget: -1,
     });
     state.nextId += 1;
   }

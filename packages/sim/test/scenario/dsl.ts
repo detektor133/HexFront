@@ -1,14 +1,26 @@
 // Сценарный DSL из docs/testing.md: мини-карта в ASCII → состояние матча, команды, прогон по времени.
 // Клетка сетки — гекс в offset-координатах (столбец, строка); at(col, row) адресует её так же.
-import { ORG_MAX, START_GOLD, TAX_DEFAULT, TICKS_PER_S, type UnitType } from '../../src/balance.ts';
+import {
+  MILITIA_PER_LEVEL,
+  NEUTRAL_GARRISON,
+  ORG_MAX,
+  START_GOLD,
+  TAX_DEFAULT,
+  TICKS_PER_S,
+  type UnitType,
+} from '../../src/balance.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
+import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
+import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
+  BUILDING,
   NEUTRAL,
   type Army,
+  type Unit,
   type City,
   type GameEvent,
   type MatchState,
@@ -36,13 +48,42 @@ type Cell =
       readonly capital: boolean;
     };
 
-type ArmyRef = number | { readonly armyOf: string; readonly index: number };
+type UnitRef = number | { readonly unitOf: string; readonly index: number };
 
 type DslCommand =
-  | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
+  | { readonly t: 'attack'; readonly units: readonly UnitRef[]; readonly target: At }
+  | { readonly t: 'move'; readonly units: readonly UnitRef[]; readonly to: At }
+  | {
+      readonly t: 'setOrder';
+      readonly units: readonly UnitRef[];
+      readonly order: 'idle' | 'hold' | 'expand';
+    }
+  | { readonly t: 'split'; readonly unit: UnitRef; readonly soldiers: number }
+  | { readonly t: 'merge'; readonly units: readonly UnitRef[] }
+  | { readonly t: 'bombard'; readonly unit: UnitRef; readonly targetUnitId: number | null }
+  | { readonly t: 'createArmy'; readonly name: string }
+  | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
+  | { readonly t: 'disbandArmy'; readonly armyId: number }
+  | {
+      readonly t: 'assignUnits';
+      readonly units: readonly UnitRef[];
+      readonly armyId: number | null;
+    }
+  | { readonly t: 'setAutoReinforce'; readonly on: boolean }
+  | {
+      readonly t: 'armyOrder';
+      readonly armyId: number;
+      readonly order: 'idle' | 'hold' | 'expand';
+    }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
-  | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' };
+  | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
+  | {
+      readonly t: 'recruit';
+      readonly where: At;
+      readonly type: UnitType;
+      readonly soldiers: number;
+    };
 
 export const at = (col: number, row: number): At => ({ col, row });
 
@@ -67,14 +108,54 @@ export const city = (
   opts: { readonly capital?: boolean } = {},
 ): Cell => ({ kind: 'city', player, level, capital: opts.capital ?? false });
 
-/** Ссылка на армию игрока по порядку создания; разрешается в момент s.cmd. */
-export const armyOf = (player: string, index = 0): ArmyRef => ({ armyOf: player, index });
+/** Ссылка на отряд игрока по порядку создания; разрешается в момент s.cmd. */
+export const unitOf = (player: string, index = 0): UnitRef => ({ unitOf: player, index });
 
-export const attack = (armies: readonly ArmyRef[], target: At): DslCommand => ({
+export const attack = (units: readonly UnitRef[], target: At): DslCommand => ({
   t: 'attack',
-  armies,
+  units,
   target,
 });
+
+export const move = (units: readonly UnitRef[], to: At): DslCommand => ({ t: 'move', units, to });
+export const setOrder = (
+  units: readonly UnitRef[],
+  order: 'idle' | 'hold' | 'expand',
+): DslCommand => ({ t: 'setOrder', units, order });
+/** Отделить soldiers целых солдат в новый отряд. */
+export const split = (unit: UnitRef, soldiers: number): DslCommand => ({
+  t: 'split',
+  unit,
+  soldiers,
+});
+export const merge = (units: readonly UnitRef[]): DslCommand => ({ t: 'merge', units });
+
+/** Фокус огня артиллерии; null — автоцель. */
+export const bombard = (unit: UnitRef, targetUnitId: number | null): DslCommand => ({
+  t: 'bombard',
+  unit,
+  targetUnitId,
+});
+export const createArmy = (name: string): DslCommand => ({ t: 'createArmy', name });
+export const renameArmy = (armyId: number, name: string): DslCommand => ({
+  t: 'renameArmy',
+  armyId,
+  name,
+});
+export const disbandArmy = (armyId: number): DslCommand => ({ t: 'disbandArmy', armyId });
+/** Назначить отряды в армию; null — вернуть в резерв. */
+export const assignUnits = (units: readonly UnitRef[], armyId: number | null): DslCommand => ({
+  t: 'assignUnits',
+  units,
+  armyId,
+});
+export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): DslCommand => ({
+  t: 'armyOrder',
+  armyId,
+  order,
+});
+
+export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
 export const improve = (where: At): DslCommand => ({ t: 'improve', where });
@@ -86,6 +167,14 @@ export const build = (where: At, kind: 'fort' | 'depot'): DslCommand => ({
   t: 'build',
   where,
   kind,
+});
+
+/** Набор в городе, стоящем в клетке where; soldiers — целые солдаты. */
+export const recruit = (where: At, type: UnitType, soldiers: number): DslCommand => ({
+  t: 'recruit',
+  where,
+  type,
+  soldiers,
 });
 
 /** Налог в процентах, как на ползунке HUD (может быть и невалидным — для тестов отказа). */
@@ -163,12 +252,23 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       capitalCityId: -1,
       status: 'alive' as const,
       citiesFounded: 0,
+      bankrupt: false,
+      armiesCreated: 0,
+      autoReinforce: false,
+      chaosTicks: 0,
+      noCityTicks: 0,
+      eliminatedTick: -1,
     })),
-    armies: [],
+    units: [],
     constructions: [],
+    recruits: [],
+    armies: [],
     networks: [],
     nextId: 1,
     events: [],
+    winner: -1,
+    holdPlayer: -1,
+    holdTicks: 0,
   };
   seedNeutralPopulation(state);
   return state;
@@ -176,13 +276,13 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
 
 export interface Scenario {
   readonly state: MatchState;
-  army(player: string, type: UnitType, soldiers: number, where: At): number;
+  unit(player: string, type: UnitType, soldiers: number, where: At): number;
   cmd(player: string, command: DslCommand): void;
   /** Прогон целых секунд; дробные — через runTicks (float-умножение даёт лишний тик). */
   runSeconds(seconds: number): void;
   runTicks(ticks: number): void;
   owner(where: At): string | null;
-  armiesOf(player: string): Army[];
+  unitsOf(player: string): Unit[];
   lastEvent(t: GameEvent['t']): GameEvent | undefined;
   /** Население гекса, fixed-point. */
   pop(where: At): number;
@@ -191,10 +291,27 @@ export interface Scenario {
   player(p: string): Player;
   /** Город в клетке или undefined. */
   cityAt(where: At): City | undefined;
-  /** Сменить владельца гекса в обход команд — для тестов разреза сетей; null — нейтральный. */
+  /**
+   * Сменить владельца гекса в обход команд — для тестов разреза сетей и потери городов;
+   * город на гексе переходит вместе с ним. null — нейтральный.
+   */
   setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
   rejections(): string[];
+  /** Река на ребре между клеткой и её соседом по направлению dir (0–5), с обеих сторон. */
+  river(where: At, dir: number): void;
+  /** Задать организованность отряда (0–100). */
+  setOrg(unitId: number, org: number): void;
+  /** Захват клетки игроком по правилам captureHex (население, ополчение, выработка). */
+  capture(where: At, player: string): void;
+  /** Перемотать счётчик тиков — для проверки таймера матча. */
+  setTick(tick: number): void;
+  /** Поставить постройку в клетку в обход строек. */
+  setBuilding(where: At, kind: 'fort' | 'depot'): void;
+  /** Армии игрока по порядку создания. */
+  armiesOf(player: string): Army[];
+  /** Отряд по id или undefined. */
+  unitById(id: number): Unit | undefined;
 }
 
 /**
@@ -224,7 +341,21 @@ export function scenario(
     if (cell.kind !== 'city') return;
     const id = state.nextId;
     state.nextId += 1;
-    state.cities.push({ id, hex, owner, level: cell.level, name: token, garrison: 0 as Fp });
+    // Нейтральный город защищает гарнизон по уровню, как на сгенерированных картах.
+    // Город игрока защищает полное ополчение (03-cities-buildings.md).
+    const defenders =
+      owner === NEUTRAL ? (NEUTRAL_GARRISON[cell.level - 1] ?? 0) : MILITIA_PER_LEVEL * cell.level;
+    state.cities.push({
+      id,
+      hex,
+      owner,
+      level: cell.level,
+      name: token,
+      defenders: defenders as Fp,
+      defenseOrg: ORG_MAX,
+      inBattle: false,
+      captureTicks: 0,
+    });
     const player = state.players[owner];
     if (cell.capital && player) player.capitalCityId = id;
   });
@@ -240,12 +371,12 @@ function makeScenario(
   const queue: PlayerCommand[] = [];
   const log: GameEvent[] = [];
   const hexOf = (w: At): number => w.col + w.row * state.map.width;
-  const armiesOf = (p: string): Army[] => state.armies.filter((a) => a.owner === idOf(p));
-  const resolve = (ref: ArmyRef): number => {
+  const unitsOf = (p: string): Unit[] => state.units.filter((a) => a.owner === idOf(p));
+  const resolve = (ref: UnitRef): number => {
     if (typeof ref === 'number') return ref;
-    const army = armiesOf(ref.armyOf)[ref.index];
-    if (!army) throw new Error(`сценарий: у ${ref.armyOf} нет армии #${ref.index}`);
-    return army.id;
+    const unit = unitsOf(ref.unitOf)[ref.index];
+    if (!unit) throw new Error(`сценарий: у ${ref.unitOf} нет отряда #${ref.index}`);
+    return unit.id;
   };
   const cityIdAt = (w: At): number => state.cities.find((c) => c.hex === hexOf(w))?.id ?? -1;
   const toCommand = (c: DslCommand): Command => {
@@ -253,13 +384,38 @@ function makeScenario(
       case 'setTax':
         return { t: 'setTax', rate: (c.percent * 10) as Fp };
       case 'attack':
-        return { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
+        return { t: 'attack', unitIds: c.units.map(resolve), target: hexOf(c.target) };
+      case 'move':
+        return { t: 'move', unitIds: c.units.map(resolve), to: hexOf(c.to) };
+      case 'setOrder':
+        return { t: 'setOrder', unitIds: c.units.map(resolve), order: c.order };
+      case 'split':
+        return { t: 'split', unitId: resolve(c.unit), soldiers: (c.soldiers * FP) as Fp };
+      case 'merge':
+        return { t: 'merge', unitIds: c.units.map(resolve) };
+      case 'bombard':
+        return { t: 'bombard', unitId: resolve(c.unit), targetUnitId: c.targetUnitId };
+      case 'createArmy':
+      case 'renameArmy':
+      case 'disbandArmy':
+      case 'armyOrder':
+      case 'setAutoReinforce':
+        return c;
+      case 'assignUnits':
+        return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':
         return { t: 'upgradeCity', cityId: cityIdAt(c.where) };
       case 'rebuildSupply':
         return { t: 'rebuildSupply', cityId: cityIdAt(c.where) };
       case 'build':
         return { t: 'build', hex: hexOf(c.where), kind: c.kind };
+      case 'recruit':
+        return {
+          t: 'recruit',
+          cityId: cityIdAt(c.where),
+          type: c.type,
+          soldiers: (c.soldiers * FP) as Fp,
+        };
       default:
         return { t: c.t, hex: hexOf(c.where) };
     }
@@ -271,10 +427,10 @@ function makeScenario(
   };
   return {
     state,
-    army(player, type, soldiers, where) {
+    unit(player, type, soldiers, where) {
       const id = state.nextId;
       state.nextId += 1;
-      state.armies.push({
+      state.units.push({
         id,
         owner: idOf(player),
         type,
@@ -283,6 +439,16 @@ function makeScenario(
         hex: hexOf(where),
         order: 'idle',
         supplyLevel: FP as Fp,
+        path: [],
+        moveTicks: 0,
+        moveTotal: 0,
+        armyId: null,
+        lowSupplyTicks: 0,
+        encircled: false,
+        target: -1,
+        inBattle: false,
+        focus: -1,
+        fireTarget: -1,
       });
       return id;
     },
@@ -304,7 +470,7 @@ function makeScenario(
       const owner = state.hexes.owner[hexOf(where)] ?? NEUTRAL;
       return owner === NEUTRAL ? null : (letters[owner] ?? null);
     },
-    armiesOf,
+    unitsOf,
     lastEvent(t) {
       return [...log].reverse().find((e) => e.t === t);
     },
@@ -319,10 +485,43 @@ function makeScenario(
       return state.cities.find((c) => c.hex === hexOf(where));
     },
     setOwner(where, player) {
-      state.hexes.owner[hexOf(where)] = player === null ? NEUTRAL : idOf(player);
+      const owner = player === null ? NEUTRAL : idOf(player);
+      state.hexes.owner[hexOf(where)] = owner;
+      const c = state.cities.find((x) => x.hex === hexOf(where));
+      if (c) c.owner = owner;
     },
     rejections() {
       return log.flatMap((e) => (e.t === 'commandRejected' ? [e.reason] : []));
+    },
+    river(where, dir) {
+      const { width, height, rivers } = state.map;
+      const from = offsetToAxial({ col: where.col, row: where.row });
+      const to = neighbors(from)[dir];
+      if (!to || !inBounds(to, width, height)) throw new Error('сценарий: река за краем карты');
+      const a = hexId(from, width);
+      const b = hexId(to, width);
+      rivers[a] = (rivers[a] ?? 0) | (1 << dir);
+      rivers[b] = (rivers[b] ?? 0) | (1 << ((dir + 3) % 6));
+    },
+    setOrg(unitId, org) {
+      const unit = state.units.find((a) => a.id === unitId);
+      if (!unit) throw new Error(`сценарий: нет отряда ${unitId}`);
+      unit.org = (org * FP) as Fp;
+    },
+    capture(where, player) {
+      captureHex(state, hexOf(where), idOf(player));
+    },
+    setTick(tick) {
+      state.tick = tick;
+    },
+    setBuilding(where, kind) {
+      state.hexes.building[hexOf(where)] = BUILDING[kind];
+    },
+    armiesOf(player) {
+      return state.armies.filter((a) => a.owner === idOf(player));
+    },
+    unitById(id) {
+      return state.units.find((a) => a.id === id);
     },
   };
 }

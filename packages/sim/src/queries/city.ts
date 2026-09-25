@@ -1,19 +1,14 @@
 // Запросы для интерфейса: карточка города, «можно ли основать город», предпросмотр перестройки.
 // Чистые функции, состояние не меняют. GDD: docs/gdd/07-controls.md — «Карточка города»;
 // docs/art/ui.md — «Карточка города — статус снабжения».
-import {
-  CAPITAL_SUPPLY_BONUS,
-  CITY_GOLD_PER_LEVEL,
-  CITY_SUPPLY_PER_LEVEL,
-  ISOLATED_INCOME_MULT,
-  ISOLATED_SUPPLY_MULT,
-} from '../balance.ts';
 import { checkConstruction, type ConstructionCheck } from '../commands/construction.ts';
 import { rebuildSupplyPlan, type RebuildPlan } from '../commands/rebuild-supply.ts';
 import type { HexId } from '../math/hex.ts';
-import { fpMul, intDiv, type Fp } from '../math/int.ts';
+import { intDiv, type Fp } from '../math/int.ts';
+import { cityGold } from '../state/city-output.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap } from '../state/pop-cap.ts';
+import { citySupply } from '../state/supply.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { hexGrowthPerSecond } from '../systems/population.ts';
 import { ROAD_TICKS_PER_HEX } from '../systems/road-construction.ts';
@@ -79,9 +74,6 @@ export function cityInfo(state: MatchState, cityId: number): CityInfo | null {
   if (!city) return null;
   const isCapital = state.players[city.owner]?.capitalCityId === city.id;
   const isolated = isCityIsolated(state, city.id);
-  const supplyRaw = (CITY_SUPPLY_PER_LEVEL * city.level +
-    (isCapital ? CAPITAL_SUPPLY_BONUS : 0)) as Fp;
-  const goldRaw = (CITY_GOLD_PER_LEVEL * city.level) as Fp;
   const road = state.constructions.find((c) => c.kind === 'road' && c.hex === city.hex);
   const build = state.constructions.find((c) => c.kind !== 'road' && c.hex === city.hex);
   return {
@@ -94,8 +86,8 @@ export function cityInfo(state: MatchState, cityId: number): CityInfo | null {
     pop: state.hexes.pop[city.hex] ?? 0,
     popCap: cityPopCap(city.level),
     growthPerS: hexGrowthPerSecond(state, city.hex),
-    supply: isolated ? fpMul(supplyRaw, ISOLATED_SUPPLY_MULT) : supplyRaw,
-    goldPerS: isolated ? fpMul(goldRaw, ISOLATED_INCOME_MULT) : goldRaw,
+    supply: citySupply(state, city),
+    goldPerS: cityGold(state, city),
     link: isolated ? 'isolated' : 'connected',
     roadJob: road
       ? { built: intDiv(road.progressTicks, ROAD_TICKS_PER_HEX), total: road.path?.length ?? 0 }

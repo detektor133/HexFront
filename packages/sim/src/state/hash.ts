@@ -48,7 +48,10 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, c.owner);
     int(s, c.level);
     str(s, c.name);
-    int(s, c.garrison);
+    int(s, c.defenders);
+    int(s, c.defenseOrg);
+    int(s, c.inBattle ? 1 : 0);
+    int(s, c.captureTicks);
   }
   int(s, state.players.length);
   for (const p of state.players) {
@@ -59,9 +62,15 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.capitalCityId);
     str(s, p.status);
     int(s, p.citiesFounded);
+    int(s, p.bankrupt ? 1 : 0);
+    int(s, p.armiesCreated);
+    int(s, p.autoReinforce ? 1 : 0);
+    int(s, p.chaosTicks);
+    int(s, p.noCityTicks);
+    int(s, p.eliminatedTick);
   }
-  int(s, state.armies.length);
-  for (const a of state.armies) {
+  int(s, state.units.length);
+  for (const a of state.units) {
     int(s, a.id);
     int(s, a.owner);
     str(s, a.type);
@@ -70,6 +79,23 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.hex);
     str(s, a.order);
     int(s, a.supplyLevel);
+    array(s, a.path);
+    int(s, a.moveTicks);
+    int(s, a.moveTotal);
+    int(s, a.armyId ?? -1);
+    int(s, a.lowSupplyTicks);
+    int(s, a.encircled ? 1 : 0);
+    int(s, a.target);
+    int(s, a.inBattle ? 1 : 0);
+    int(s, a.focus);
+    int(s, a.fireTarget);
+  }
+  int(s, state.armies.length);
+  for (const a of state.armies) {
+    int(s, a.id);
+    int(s, a.owner);
+    int(s, a.number);
+    str(s, a.name);
   }
 }
 
@@ -83,6 +109,16 @@ function hashConstructions(s: Hasher, state: MatchState): void {
     int(s, c.progressTicks);
     int(s, c.totalTicks);
     array(s, c.path ?? []);
+  }
+  int(s, state.recruits.length);
+  for (const r of state.recruits) {
+    int(s, r.id);
+    int(s, r.owner);
+    int(s, r.cityId);
+    str(s, r.type);
+    int(s, r.soldiers);
+    int(s, r.progressTicks);
+    int(s, r.totalTicks);
   }
 }
 
@@ -113,5 +149,8 @@ export function hashState(state: MatchState): string {
     int(s, n.owner);
     int(s, n.isMain ? 1 : 0);
   }
+  int(s, state.winner);
+  int(s, state.holdPlayer);
+  int(s, state.holdTicks);
   return s.h.toString(16).padStart(8, '0');
 }

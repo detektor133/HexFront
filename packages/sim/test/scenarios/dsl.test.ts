@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { armyOf, at, attack, city, own, scenario } from '../scenario/dsl.ts';
+import { unitOf, at, attack, city, own, scenario } from '../scenario/dsl.ts';
 
 const EXAMPLE = `
   .  .  .  .  .
@@ -28,22 +28,17 @@ describe('сценарный DSL', () => {
     expect(s.state.players.map((p) => p.capitalCityId)).toEqual([1, 2]);
   });
 
-  it('выполняет пример целиком: армии, команда атаки, прогон по времени', () => {
+  it('выполняет пример целиком: отряды, команда атаки, прогон по времени', () => {
     const s = scenario(EXAMPLE, { legend });
-    s.army('A', 'infantry', 500, at(1, 2));
-    s.army('B', 'infantry', 200, at(2, 3));
-    s.cmd('A', attack([armyOf('A')], at(2, 3)));
+    s.unit('A', 'infantry', 500, at(1, 2));
+    s.unit('B', 'infantry', 200, at(2, 3));
+    s.cmd('A', attack([unitOf('A')], at(2, 3)));
     s.runSeconds(60);
 
     expect(s.state.tick).toBe(600);
-    expect(s.armiesOf('B')).toHaveLength(1);
-    // Бой появится в этапе 03; до тех пор атака честно отклоняется.
-    expect(s.owner(at(2, 3))).toBe('B');
-    expect(s.lastEvent('commandRejected')).toMatchObject({
-      playerId: 0,
-      command: 'attack',
-      reason: 'notImplemented',
-    });
+    expect(s.owner(at(2, 3))).toBe('A');
+    expect(s.unitsOf('B')).toHaveLength(1); // отступил, а не исчез
+    expect(s.lastEvent('unitRetreated')).toBeDefined();
   });
 
   it('сообщает о токене, которого нет в легенде', () => {

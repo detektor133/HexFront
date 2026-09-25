@@ -47,6 +47,7 @@
 | `GROWTH_CITY_HEX` | 3,0 чел./с |
 | `GROWTH_RING1` | 1,5 |
 | `GROWTH_RING2` | 0,5 |
+| `GROWTH_BACKGROUND` | 0,4 |
 | `CITY_LEVEL_GROWTH_STEP` | 0,25 |
 | `POP_OVERCAP_DECAY` | 0,01 /с |
 | `CAPTURE_POP_LOSS_HEX` | 0,20 |
@@ -58,6 +59,7 @@
 | `ISOLATED_INCOME_MULT` | 0,5 |
 | `ISOLATED_SUPPLY_MULT` | 0,5 |
 | `ISOLATED_GROWTH_MULT` | 0,75 |
+| `BANKRUPT_SUPPLY_MULT` | 0,5 |
 
 ## Города и постройки
 
@@ -68,6 +70,7 @@
 | `CAPITAL_SUPPLY_BONUS` | 250 |
 | `CITY_GOLD_PER_LEVEL` | 0,5 /с |
 | `MILITIA_PER_LEVEL` | 100 |
+| `MILITIA_REGEN_PER_S` | 4 |
 | `CITY_DEF_MULT` | 1,3 |
 | `CITY_FOUND_BASE_COST` | 120 |
 | `CITY_FOUND_COST_STEP` | 0,5 |
@@ -78,6 +81,7 @@
 | `CAPTURED_OUTPUT_START` | 0,25 |
 | `CAPTURED_RAMP_S` | 60 |
 | `CAPITAL_MOVE_CHAOS_S` | 30 |
+| `CAPITAL_CHAOS_INCOME_MULT` | 0,5 |
 | `NO_CITY_GRACE_S` | 60 |
 | `IMPROVEMENT_COST` L1..L3 | 20 / 40 / 80 |
 | `IMPROVEMENT_TIME_S` L1..L3 | 5 / 8 / 12 |
@@ -105,9 +109,9 @@
 | --- | --- |
 | `RECRUIT_MIN` / `RECRUIT_STEP` | 50 / 50 |
 | `RECRUIT_MIN_HEX_POP_RATIO` | 0,1 |
-| `MAX_ARMIES_PER_HEX` | 3 |
-| `ARMY_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
-| `START_ARMIES` | 2 × 100 пехоты |
+| `MAX_UNITS_PER_HEX` | 3 |
+| `UNIT_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
+| `START_UNITS` | 2 × 100 пехоты |
 | `START_GOLD` | 200 |
 | `START_POP_CAPITAL` / `START_POP_HEX` | 200 / 40 |
 | `START_HEXES` | 3 (столица + 2 соседних) |
@@ -146,7 +150,7 @@
 
 | Константа | Значение |
 | --- | --- |
-| `VISION_TERRITORY` / `_ARMY` / `_CITY` | 2 / 3 / 3 |
+| `VISION_TERRITORY` / `_UNIT` / `_CITY` | 2 / 3 / 3 |
 | `VICTORY_CITY_SHARE` | 0,70 |
 | `VICTORY_HOLD_S` | 60 |
 | `SCORE_CITY` / `SCORE_HEX` / `SCORE_PER_100_SOLDIERS` | 10 / 1 / 1 |

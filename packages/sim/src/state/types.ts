@@ -43,8 +43,14 @@ export interface City {
   level: number;
   /** Название с карты; у столиц пустое — имя выбирает интерфейс. */
   readonly name: string;
-  /** Гарнизон нейтрального города, fixed-point солдат. */
-  garrison: Fp;
+  /** Оборона города: гарнизон нейтрального или ополчение города игрока, fixed-point солдат. */
+  defenders: Fp;
+  /** Организованность обороны города, fixed-point. */
+  defenseOrg: Fp;
+  /** Гекс города атакован в этом тике — ополчение не восстанавливается. */
+  inBattle: boolean;
+  /** Сколько тиков осталось до полной выработки после захвата; 0 — полная. */
+  captureTicks: number;
 }
 
 export type PlayerStatus = 'alive' | 'eliminated';
@@ -60,6 +66,30 @@ export interface Player {
   status: PlayerStatus;
   /** Сколько городов игрок основал за матч (N в цене основания), включая начатые стройки. */
   citiesFounded: number;
+  /** Казна пуста и баланс отрицательный (02-economy.md, «Банкротство»); ставит economySystem. */
+  bankrupt: boolean;
+  /** Сколько армий игрок создал за матч — следующий номер армии. */
+  armiesCreated: number;
+  /** «Автопополнение»: новый отряд сразу уходит в самую нуждающуюся армию (CR-001). */
+  autoReinforce: boolean;
+  /** Тики «смуты» после переноса столицы: доход × CAPITAL_CHAOS_INCOME_MULT. */
+  chaosTicks: number;
+  /** Сколько тиков подряд у игрока нет городов. */
+  noCityTicks: number;
+  /** Тик выбывания или -1 — для мест выбывших. */
+  eliminatedTick: number;
+}
+
+/** Набор в городе: люди и золото уже списаны, отряд появится по завершении. Один на город. */
+export interface Recruitment {
+  readonly id: number;
+  readonly owner: number;
+  readonly cityId: number;
+  readonly type: UnitType;
+  /** fixed-point солдат. */
+  readonly soldiers: Fp;
+  progressTicks: number;
+  readonly totalTicks: number;
 }
 
 export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
@@ -76,9 +106,13 @@ export interface Construction {
   readonly path?: readonly HexId[];
 }
 
-export type ArmyOrder = 'idle' | 'hold' | 'expand';
+/**
+ * move — идёт по path; attack — атакует соседний гекс target; retreat — отступает (приказы не
+ * принимает); expand — экспансия; idle и hold — стоит.
+ */
+export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move' | 'attack' | 'retreat';
 
-export interface Army {
+export interface Unit {
   readonly id: number;
   readonly owner: number;
   readonly type: UnitType;
@@ -87,9 +121,39 @@ export interface Army {
   /** Организованность 0..ORG_MAX, fixed-point. */
   org: Fp;
   hex: HexId;
-  order: ArmyOrder;
+  order: UnitOrder;
   /** Доля 0..1, fixed-point. */
   supplyLevel: Fp;
+  /** Оставшиеся гексы пути, следующий — первый; пусто, если отряд не идёт. */
+  path: HexId[];
+  /** Прогресс текущего перехода в path[0], тики. */
+  moveTicks: number;
+  /** Длительность текущего перехода, тики; 0 — переход не начат. */
+  moveTotal: number;
+  /** Армия отряда или null — резерв (CR-001). */
+  armyId: number | null;
+  /** Сколько тиков подряд снабжённость ниже ATTRITION_THRESHOLD — таймер истощения. */
+  lowSupplyTicks: number;
+  /** Котёл: нет пути по своим гексам ни к одной сети снабжения. */
+  encircled: boolean;
+  /** Цель атаки (соседний гекс) при приказе attack, иначе -1. */
+  target: HexId;
+  /** Участвует в бою в этом тике (атакует, обороняется, под обстрелом) — org не восстанавливается. */
+  inBattle: boolean;
+  /** Артиллерия: фокус огня (id вражеского отряда) или -1 — автоцель. */
+  focus: number;
+  /** Артиллерия: по кому бьёт в этом тике, или -1. */
+  fireTarget: number;
+}
+
+/** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
+export interface Army {
+  readonly id: number;
+  readonly owner: number;
+  /** Порядковый номер армии у игрока: 1, 2, …; интерфейс называет по нему армию без имени. */
+  readonly number: number;
+  /** Имя, заданное игроком; пустое — «N-я армия». */
+  name: string;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */
@@ -101,11 +165,32 @@ export type GameEvent =
       readonly reason: string;
     }
   | {
+      readonly t: 'unitRecruited' | 'recruitCancelled';
+      readonly playerId: number;
+      readonly cityId: number;
+      readonly type: UnitType;
+    }
+  | {
+      readonly t: 'unitDestroyed' | 'unitRetreated' | 'unitCapitulated';
+      readonly playerId: number;
+      readonly unitId: number;
+    }
+  | {
+      readonly t: 'cityCaptured' | 'capitalMoved';
+      readonly playerId: number;
+      readonly cityId: number;
+    }
+  | { readonly t: 'playerEliminated'; readonly playerId: number }
+  | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
+  | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;
       readonly kind: ConstructionKind;
       readonly hex: HexId;
     };
+
+/** Как выиграна партия (08-match.md, «Победа»). */
+export type WinReason = 'cities' | 'lastStanding' | 'score';
 
 export interface MatchState {
   tick: number;
@@ -117,11 +202,20 @@ export interface MatchState {
   /** Индекс в массиве равен id игрока. */
   readonly players: Player[];
   /** Отсортированы по id. */
+  readonly units: Unit[];
+  /** Армии — группы отрядов, отсортированы по id. */
   readonly armies: Army[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
+  /** Отсортированы по id. */
+  readonly recruits: Recruitment[];
   /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
   networks: SupplyNetwork[];
   nextId: number;
   events: GameEvent[];
+  /** Победитель или -1; матч не замораживается — остановку делает сервер. */
+  winner: number;
+  /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и сколько тиков подряд; -1 — никто. */
+  holdPlayer: number;
+  holdTicks: number;
 }

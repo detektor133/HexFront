@@ -1,5 +1,6 @@
-// Слой экономики для /dev/economy (02/T10–T11): территории, дороги пунктиром, города, стройки,
-// выбранный гекс. Дороги лежат под узорами рельефа, города и стройки — над ними (style-guide, слои).
+// Слой песочницы /dev/sandbox (02/T10–T11, 03/T12): территории, дороги пунктиром, города, стройки,
+// отряды и бои, выбранный гекс. Дороги лежат под узорами рельефа, города, стройки и отряды — над ними
+// (style-guide, слои).
 import { Container, Graphics } from 'pixi.js';
 
 import {
@@ -13,6 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
+import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
@@ -23,11 +25,21 @@ const MARK_WIDTH_PX = 2.5;
 /** Радиус дуги стройки — доля радиуса гекса. */
 const ARC_RADIUS = 0.78;
 
+/** Что выбрано на странице: гекс, свои отряды и цель атаки, ждущая подтверждения. */
+export interface SandboxSelection {
+  readonly hex: number | null;
+  readonly units: readonly number[];
+  readonly target: number | null;
+}
+
+const NOTHING: SandboxSelection = { hex: null, units: [], target: null };
+
 export interface EconomyLayer {
   readonly container: Container;
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
-  setView(view: PlayerView, selected: number | null): void;
+  setView(view: PlayerView, selected: SandboxSelection): void;
+  frame(nowMs: number): void;
   destroy(): void;
 }
 
@@ -44,8 +56,9 @@ function dashed(g: Graphics, a: Point, b: Point, dash: number, gap: number): voi
 }
 
 /**
- * Рёбра дорог — дерево обхода в ширину по узлам одного владельца (дорога или город).
- * Все пары соседей дали бы треугольники там, где три дорожных гекса стоят вплотную.
+ * Рёбра дорог — дерево обхода в ширину по узлам (дорога или город) любых владельцев: дорога —
+ * свойство гекса и на границах не рвётся (style-guide, «Дороги»). Все пары соседей дали бы
+ * треугольники там, где три дорожных гекса стоят вплотную.
  */
 export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
   const cityHexes = new Set(view.cities.map((c) => c.hex));
@@ -54,7 +67,6 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
   const edges: [number, number][] = [];
   for (let start = 0; start < seen.length; start += 1) {
     if (seen[start] === 1 || !isNode(start)) continue;
-    const owner = view.hexes.owner[start];
     const queue = [start];
     seen[start] = 1;
     while (queue.length > 0) {
@@ -62,7 +74,7 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
       for (const n of neighbors(hexFromId(id, map.width))) {
         if (!inBounds(n, map.width, map.height)) continue;
         const nid = hexId(n, map.width);
-        if (seen[nid] === 1 || !isNode(nid) || view.hexes.owner[nid] !== owner) continue;
+        if (seen[nid] === 1 || !isNode(nid)) continue;
         seen[nid] = 1;
         edges.push([id, nid]);
         queue.push(nid);
@@ -72,20 +84,33 @@ export function roadTree(map: MapStatic, view: PlayerView): [number, number][] {
   return edges;
 }
 
+/**
+ * Чей цвет у отрезка дороги: владельца — если оба гекса его и в основной сети (отрезок проводит
+ * снабжение); иначе null — серый пунктир (нейтральная дорога, граница, изоляция).
+ */
+export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | null {
+  const owner = view.hexes.owner[a] ?? -1;
+  if (owner < 0 || view.hexes.owner[b] !== owner) return null;
+  const main = view.hexes.link[a] === LINK.main && view.hexes.link[b] === LINK.main;
+  return main ? owner : null;
+}
+
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const fill = new Graphics();
   const roads = new Graphics();
   const marks = new Graphics();
+
   const container = new Container();
   container.addChild(fill, roads);
   const top = new Container();
-  top.addChild(marks);
+  const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
+  const unitLayer = createUnitLayer(map.width, radius, center);
+  top.addChild(marks, unitLayer.container);
   let view: PlayerView | null = null;
-  let selected: number | null = null;
+  let selected: SandboxSelection = NOTHING;
   let scale = 1;
   let level: DetailLevel = 2;
-  const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
 
   function drawFill(v: PlayerView): void {
     fill.clear();
@@ -103,12 +128,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     const width = (tokens.road.width[level - 1] ?? tokens.road.width[1]) / scale;
     const [dash, gap] = tokens.road.dash;
     for (const [a, b] of roadTree(map, v)) {
-      const owner = v.hexes.owner[a] ?? -1;
-      const isolated = v.hexes.link[a] === LINK.isolated || v.hexes.link[b] === LINK.isolated;
+      const owner = roadEdgeOwner(v, a, b);
       dashed(roads, center(a), center(b), dash / scale, gap / scale);
       roads.stroke({
-        color: owner < 0 || isolated ? tokens.neutral.road : playerLine(owner),
-        alpha: isolated ? tokens.road.isolatedAlpha : 1,
+        color: owner === null ? tokens.neutral.road : playerLine(owner),
+        alpha: owner === null ? tokens.road.isolatedAlpha : 1,
         width,
         cap: 'round',
       });
@@ -147,10 +171,15 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
-    if (selected !== null) {
+    if (selected.hex !== null) {
       marks
-        .poly(hexPolygon(center(selected), radius))
+        .poly(hexPolygon(center(selected.hex), radius))
         .stroke({ color: tokens.ui.ink, width: MARK_WIDTH_PX * k });
+    }
+    if (selected.target !== null) {
+      marks
+        .poly(hexPolygon(center(selected.target), radius))
+        .stroke({ color: tokens.status.danger, width: MARK_WIDTH_PX * k });
     }
   }
 
@@ -167,12 +196,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     update(s, l) {
       scale = s;
       level = l;
+      unitLayer.setScale(s);
       redraw();
     },
     setView(v, sel) {
       view = v;
       selected = sel;
       redraw();
+      unitLayer.setView(v, sel, performance.now());
+    },
+    frame(nowMs) {
+      unitLayer.frame(nowMs);
     },
     destroy() {
       container.destroy({ children: true });

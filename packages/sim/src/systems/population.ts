@@ -2,6 +2,7 @@
 // GDD: docs/gdd/02-economy.md — «Население»
 import {
   CITY_LEVEL_GROWTH_STEP,
+  GROWTH_BACKGROUND,
   GROWTH_CITY_HEX,
   GROWTH_RING1,
   GROWTH_RING2,
@@ -55,6 +56,10 @@ function bestCityGrowth(state: MatchState): Int32Array {
       }
     });
   }
+  // Свои гексы вне радиуса городов обживаются фоново — иначе основать город негде (02-economy.md).
+  hexes.owner.forEach((o, id) => {
+    if (o !== NEUTRAL && (best[id] ?? 0) === 0) best[id] = GROWTH_BACKGROUND;
+  });
   return best;
 }
 
@@ -84,6 +89,7 @@ export function hexGrowthPerSecond(state: MatchState, hex: number): number {
       continue;
     best = Math.max(best, cityGrowthPart(state, c.id, c.level, d));
   }
+  if (best === 0 && (state.hexes.owner[hex] ?? NEUTRAL) !== NEUTRAL) best = GROWTH_BACKGROUND;
   if (pop === cap || cap === 0) return 0;
   return intDiv(fullGrowth(state, hex, best) * (cap - pop), cap);
 }
@@ -95,7 +101,8 @@ function cityLevels(state: MatchState): Uint8Array {
 }
 
 /**
- * Рост в радиусе 2 от своих городов (максимум по городам), убыль 1 %/с сверх лимита:
+ * Рост в радиусе 2 от своих городов (максимум по городам), фоновый GROWTH_BACKGROUND на остальных
+ * своих гексах, убыль 1 %/с сверх лимита:
  * growth/с = baseGrowth(ring) × cityLevelMult × improvementGrowthMult × taxGrowthMult
  *            × networkMult × (1 − pop / popCap)
  */

@@ -90,6 +90,8 @@ importers:
 
   tools/balance: {}
 
+  tools/bench: {}
+
   tools/commit-check: {}
 
   tools/replay: {}

@@ -1,0 +1,29 @@
+.page {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.error {
+  position: absolute;
+  top: 64px;
+  left: var(--space-lg);
+  z-index: 2;
+  color: var(--status-danger);
+}
+
+/* Последний отказ команды — строка внизу справа, без постоянной красной плашки (ui.md). */
+.reject {
+  position: absolute;
+  right: var(--space-lg);
+  bottom: var(--space-sm);
+  z-index: 2;
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}

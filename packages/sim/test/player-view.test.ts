@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { NETWORK_RECALC_TICKS } from '../src/balance.ts';
-import { at, city, own, road, scenario } from './scenario/dsl.ts';
+import { at, city, own, recruit, road, scenario } from './scenario/dsl.ts';
 import type { Fp } from '../src/math/int.ts';
 import { playerView } from '../src/queries/player-view.ts';
 import { hashState } from '../src/state/hash.ts';
@@ -58,9 +58,29 @@ describe('playerView', () => {
     expect(me.incomeAtTargetPerS).toBe(1400);
     expect(me.growthMultAtTarget).toBe(500);
     expect(me.popGrowthPerS).toBeGreaterThan(0);
-    // Очки (08-match.md): 2 города × 10 + 27 своих гексов, армий нет.
+    // Очки (08-match.md): 2 города × 10 + 27 своих гексов, отрядов нет.
     expect(me.score).toBe(2 * 10 + 27);
     expect(me.place).toBe(1);
     expect(me.players).toBe(1);
+    expect(me.upkeepPerS).toBe(0);
+    expect(me.bankrupt).toBe(false);
+  });
+
+  it('содержание отрядов и свои наборы в очереди', () => {
+    const s = scenario(MAP, { legend });
+    s.unit('A', 'infantry', 100, at(0, 0));
+    s.player('A').gold = (1000 * 1000) as Fp;
+    s.setPop(at(1, 1), 250);
+    s.setPop(at(6, 1), 250);
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.cmd('A', recruit(at(6, 1), 'artillery', 100));
+    s.runTicks(1);
+    const v = playerView(s.state, 0);
+    // 100 пехоты × 0,003 = 0,3 золота/с.
+    expect(v.me.upkeepPerS).toBe(300);
+    expect(v.recruits.map((r) => [r.cityId, r.type, r.soldiers, r.progressTicks])).toEqual([
+      [s.cityAt(at(1, 1))?.id, 'infantry', 50_000, 1],
+      [s.cityAt(at(6, 1))?.id, 'artillery', 100_000, 1],
+    ]);
   });
 });

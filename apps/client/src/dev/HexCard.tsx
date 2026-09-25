@@ -11,14 +11,29 @@ import {
 import styles from './HexCard.module.css';
 import { visibleActions, type HexAction } from './hex-actions.ts';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
-import { formatFp, formatRate } from '../i18n/format.ts';
-import type { Selection } from '../local/messages.ts';
+import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
+import type { RecruitOption, Selection } from '../local/messages.ts';
 
-function ActionButton(props: { a: HexAction; send: (cmd: Command) => void }): React.JSX.Element {
+function ActionButton(props: {
+  a: HexAction;
+  send: (cmd: Command) => void;
+  blockedText: string | null;
+}): React.JSX.Element {
   const [why, setWhy] = useState(false);
   const { a } = props;
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
+  // Недоступное по правилам «Основать город»: приглушённая кнопка и причина строкой (ui.md).
+  if (a.blocked) {
+    return (
+      <div className={styles.action}>
+        <button type="button" className={`${styles.button} ${styles.muted}`} disabled>
+          <span>{t(`action.${a.kind}` as MessageKey)}</span>
+        </button>
+        <span className={styles.hint}>{props.blockedText}</span>
+      </div>
+    );
+  }
   return (
     <div className={styles.action}>
       <button
@@ -36,6 +51,41 @@ function ActionButton(props: { a: HexAction; send: (cmd: Command) => void }): Re
   );
 }
 
+// Набор в своём городе (03/T12): доступный — с ценой; не хватает только золота — с ценой и
+// причиной по тапу; недоступный по правилам — скрыт (ui.md).
+function RecruitButton(props: {
+  o: RecruitOption;
+  send: (cmd: Command) => void;
+  cityId: number;
+}): React.JSX.Element | null {
+  const [why, setWhy] = useState(false);
+  const { o } = props;
+  const ok = o.check.ok;
+  const cost = o.check.cost;
+  if (!ok && o.check.reason !== 'notEnoughGold') return null;
+  return (
+    <div className={styles.action}>
+      <button
+        type="button"
+        className={styles.button}
+        onClick={() =>
+          ok
+            ? props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers: o.soldiers })
+            : setWhy(true)
+        }
+      >
+        <span>
+          {t(`recruit.${o.type}` as MessageKey)} {formatSoldiers(o.soldiers)}
+        </span>
+        <span className={ok ? styles.price : styles.priceBad}>
+          {cost === undefined ? '' : formatFp(cost)}
+        </span>
+      </button>
+      {why && !ok && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
+    </div>
+  );
+}
+
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
     <>
@@ -43,6 +93,14 @@ function Row(props: { label: string; value: string }): React.JSX.Element {
       <dd>{props.value}</dd>
     </>
   );
+}
+
+// Причина недоступности основания: для населения — с числами, иначе — общий текст отказа.
+function blockedText(a: HexAction, s: Selection, view: PlayerView): string | null {
+  if (!a.blocked) return null;
+  if (a.blocked !== 'popTooLow' || s.popCap <= 0) return reasonText(a.blocked);
+  const percent = Math.floor((100 * (view.hexes.pop[s.hex] ?? 0)) / s.popCap);
+  return t('found.popTooLow').replace('{pop}', String(percent));
 }
 
 /** Карточка выбранного гекса снизу слева (ui.md, «Карточка выбранного»). */
@@ -71,6 +129,7 @@ export function HexCard(props: {
   const road = view.constructions.find((x) => x.hex === s.hex && x.kind === 'road');
   const actions = visibleActions(s, owner, view.playerId, job !== undefined);
   const improvement = view.hexes.improvement[s.hex] ?? 0;
+  const recruiting = c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section className={styles.card} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
@@ -110,8 +169,19 @@ export function HexCard(props: {
         </p>
       )}
       {actions.map((a) => (
-        <ActionButton key={a.kind} a={a} send={send} />
+        <ActionButton key={a.kind} a={a} send={send} blockedText={blockedText(a, s, view)} />
       ))}
+      {recruiting && (
+        <p className={styles.progressText}>
+          {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}
+          {formatSoldiers(recruiting.soldiers)} · {t('card.left')}{' '}
+          {Math.ceil((recruiting.totalTicks - recruiting.progressTicks) / TICKS_PER_S)}{' '}
+          {t('card.seconds')}
+        </p>
+      )}
+      {c &&
+        !recruiting &&
+        s.recruit.map((o) => <RecruitButton key={o.type} o={o} send={send} cityId={c.id} />)}
     </section>
   );
 }

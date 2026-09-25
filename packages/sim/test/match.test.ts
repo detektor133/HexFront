@@ -29,7 +29,7 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('73da72f7');
+    expect(hashState(state)).toBe('b3c09053');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
@@ -70,24 +70,24 @@ describe('стартовое состояние', () => {
     expect(state.hexes.pop[id]).toBe((hexPopCap(state, id) * 200) / 1000);
   });
 
-  it('игрок начинает с 200 золота, налогом 20 % и двумя армиями пехоты по 100 с приказом expand', () => {
+  it('игрок начинает с 200 золота, налогом 20 % и двумя отрядами пехоты по 100 без приказа (idle)', () => {
     for (const p of state.players) {
       expect(p).toMatchObject({ gold: START_GOLD, taxTarget: TAX_DEFAULT, status: 'alive' });
-      const armies = state.armies.filter((a) => a.owner === p.id);
-      expect(armies).toHaveLength(2);
-      for (const a of armies) {
+      const units = state.units.filter((a) => a.owner === p.id);
+      expect(units).toHaveLength(2);
+      for (const a of units) {
         expect(a).toMatchObject({
           type: 'infantry',
           soldiers: 100_000,
           org: 100_000,
-          order: 'expand',
+          order: 'idle',
         });
       }
     }
   });
 
-  it('города и армии отсортированы по id без повторов', () => {
-    for (const list of [state.cities, state.armies]) {
+  it('города и отряды отсортированы по id без повторов', () => {
+    for (const list of [state.cities, state.units]) {
       const ids = list.map((x) => x.id);
       expect(ids).toEqual([...new Set(ids)].sort((a, b) => a - b));
     }
@@ -154,10 +154,10 @@ describe('step', () => {
   it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'recruit', cityId: 1, type: 'infantry', soldiers: 50 } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'arrowStop', arrowId: 1 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'recruit', reason: 'notImplemented' },
+      { t: 'commandRejected', playerId: 1, command: 'arrowStop', reason: 'notImplemented' },
     ]);
     expect(hashState(a)).toBe(hashState(b));
   });
@@ -202,7 +202,7 @@ describe('hashState', () => {
       (s) => (s.hexes.pop[0] = 1),
       (s) => (s.hexes.owner[0] = 1),
       (s) => ((s.players[0] as { gold: number }).gold += 1),
-      (s) => ((s.armies[0] as { org: number }).org -= 1),
+      (s) => ((s.units[0] as { org: number }).org -= 1),
       (s) => ((s.cities[0] as { level: number }).level += 1),
     ];
     for (const mutate of mutations) {

@@ -141,6 +141,7 @@ function planOf(state: MatchState, playerId: number, cmd: BuildCommand): PlanRes
 
 function withGold(state: MatchState, playerId: number, result: PlanResult): PlanResult {
   if (!result.ok) return result;
+  if (state.players[playerId]?.bankrupt) return fail('bankrupt');
   const gold = state.players[playerId]?.gold ?? 0;
   return gold < result.plan.cost ? fail('notEnoughGold') : result;
 }
@@ -169,9 +170,10 @@ export function checkConstruction(
   if (!planned.ok) return planned;
   const { cost, timeS } = planned.plan;
   const result = withGold(state, playerId, planned);
-  return result.ok
-    ? { ok: true, cost, timeS }
-    : { ok: false, reason: 'notEnoughGold', cost, timeS };
+  if (result.ok) return { ok: true, cost, timeS };
+  return result.reason === 'notEnoughGold'
+    ? { ok: false, reason: 'notEnoughGold', cost, timeS }
+    : { ok: false, reason: result.reason };
 }
 
 /**
