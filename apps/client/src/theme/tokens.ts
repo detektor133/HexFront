@@ -203,6 +203,14 @@ export const tokens = {
     ],
     "labelHalo": 3
   },
+  "armies": {
+    "source": "players.palette",
+    "ringWidth": 2,
+    "defenseTeeth": {
+      "length": 5,
+      "spacing": 12
+    }
+  },
   "front": {
     "width": [
       4,

@@ -91,6 +91,10 @@
   --city-label-size-2: 11;
   --city-label-size-3: 13;
   --city-label-halo: 3;
+  --armies-source: players.palette;
+  --armies-ring-width: 2;
+  --armies-defense-teeth-length: 5;
+  --armies-defense-teeth-spacing: 12;
   --front-width-1: 4;
   --front-width-2: 6;
   --front-width-3: 8;
