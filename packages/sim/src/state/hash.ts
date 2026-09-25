@@ -61,6 +61,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.citiesFounded);
     int(s, p.bankrupt ? 1 : 0);
     int(s, p.armiesCreated);
+    int(s, p.autoReinforce ? 1 : 0);
   }
   int(s, state.units.length);
   for (const a of state.units) {

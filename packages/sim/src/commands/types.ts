@@ -38,6 +38,7 @@ export type Command =
       readonly order: 'idle' | 'hold' | 'expand';
     }
   | { readonly t: 'createArmy'; readonly name: string }
+  | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {
@@ -84,6 +85,7 @@ export const REJECT_REASONS = [
   'unknownArmy',
   'notOwnArmy',
   'badName',
+  'badValue',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

@@ -38,6 +38,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'disbandArmy':
     case 'assignUnits':
     case 'armyOrder':
+    case 'setAutoReinforce':
       return validateArmyCommand(state, playerId, cmd);
     case 'attack':
     case 'assignFront':
@@ -80,6 +81,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'disbandArmy':
     case 'assignUnits':
     case 'armyOrder':
+    case 'setAutoReinforce':
       executeArmyCommand(state, playerId, cmd);
       return;
     default:

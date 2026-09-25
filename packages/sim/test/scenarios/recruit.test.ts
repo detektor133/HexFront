@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { recruitCapacity } from '../../src/commands/recruit.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
-import { at, city, own, recruit, scenario } from '../scenario/dsl.ts';
+import {
+  assignUnits,
+  at,
+  city,
+  createArmy,
+  own,
+  recruit,
+  scenario,
+  setAutoReinforce,
+} from '../scenario/dsl.ts';
 
 // Столица A в (1,1), вокруг — свои равнины; B — сосед справа.
 const MAP = `
@@ -163,5 +172,62 @@ describe('набор отрядов', () => {
     expect(s.unitsOf('A')).toHaveLength(0);
     expect(s.lastEvent('recruitCancelled')).toBeDefined();
     expect(s.player('A').gold).toBeLessThan(gold + 20 * FP);
+  });
+});
+
+describe('набор в резерв и «Автопополнение» (CR-001)', () => {
+  function withTwoArmies() {
+    const s = setup();
+    s.player('A').gold = (1000 * FP) as Fp;
+    s.cmd('A', createArmy('Первая'));
+    s.cmd('A', createArmy('Вторая'));
+    s.runTicks(1);
+    return s;
+  }
+
+  it('без переключателя новый отряд попадает в резерв', () => {
+    const s = withTwoArmies();
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.unitsOf('A')[0]?.armyId).toBeNull();
+  });
+
+  it('с переключателем — в армию с наименьшим числом солдат', () => {
+    const s = withTwoArmies();
+    const [first, second] = s.armiesOf('A');
+    const big = s.unit('A', 'infantry', 300, at(0, 0));
+    const small = s.unit('A', 'infantry', 100, at(2, 2));
+    s.cmd('A', assignUnits([big], first?.id ?? -1));
+    s.cmd('A', assignUnits([small], second?.id ?? -1));
+    s.cmd('A', setAutoReinforce(true));
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.player('A').autoReinforce).toBe(true);
+    expect(s.unitsOf('A').at(-1)?.armyId).toBe(second?.id);
+  });
+
+  it('при равенстве — армия с меньшим id; без армий — резерв', () => {
+    const s = withTwoArmies();
+    s.cmd('A', setAutoReinforce(true));
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.unitsOf('A').at(-1)?.armyId).toBe(s.armiesOf('A')[0]?.id);
+
+    const lone = setup();
+    lone.cmd('A', setAutoReinforce(true));
+    lone.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    lone.runSeconds(9);
+    expect(lone.unitsOf('A')[0]?.armyId).toBeNull();
+  });
+
+  it('выключение переключателя возвращает набор в резерв', () => {
+    const s = withTwoArmies();
+    s.cmd('A', setAutoReinforce(true));
+    s.runTicks(1);
+    s.cmd('A', setAutoReinforce(false));
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.player('A').autoReinforce).toBe(false);
+    expect(s.unitsOf('A')[0]?.armyId).toBeNull();
   });
 });

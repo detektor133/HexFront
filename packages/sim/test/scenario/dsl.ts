@@ -65,6 +65,7 @@ type DslCommand =
       readonly units: readonly UnitRef[];
       readonly armyId: number | null;
     }
+  | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   | {
       readonly t: 'armyOrder';
       readonly armyId: number;
@@ -143,6 +144,8 @@ export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): Ds
   armyId,
   order,
 });
+
+export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
 export const improve = (where: At): DslCommand => ({ t: 'improve', where });
@@ -241,6 +244,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       citiesFounded: 0,
       bankrupt: false,
       armiesCreated: 0,
+      autoReinforce: false,
     })),
     units: [],
     constructions: [],
@@ -361,6 +365,7 @@ function makeScenario(
       case 'renameArmy':
       case 'disbandArmy':
       case 'armyOrder':
+      case 'setAutoReinforce':
         return c;
       case 'assignUnits':
         return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };

@@ -116,6 +116,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     citiesFounded: 0,
     bankrupt: false,
     armiesCreated: 1,
+    autoReinforce: false,
   });
   // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
   const armyId = state.nextId;

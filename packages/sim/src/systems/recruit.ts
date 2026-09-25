@@ -4,6 +4,7 @@ import { MAX_UNITS_PER_HEX, ORG_MAX } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
+import { neediestArmy } from '../state/armies.ts';
 import type { MatchState, Recruitment } from '../state/types.ts';
 
 // Свой проходимый гекс без чужих отрядов и с местом: сначала город, иначе ближайший к нему,
@@ -45,7 +46,8 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     path: [],
     moveTicks: 0,
     moveTotal: 0,
-    armyId: null,
+    // Резерв; с «Автопополнением» — самая нуждающаяся армия (CR-001).
+    armyId: state.players[r.owner]?.autoReinforce ? neediestArmy(state, r.owner) : null,
   });
   state.nextId += 1;
 }

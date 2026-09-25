@@ -5,7 +5,15 @@ import type { Army, MatchState, Unit } from '../state/types.ts';
 
 export type ArmyCommand = Extract<
   Command,
-  { t: 'createArmy' | 'renameArmy' | 'disbandArmy' | 'assignUnits' | 'armyOrder' }
+  {
+    t:
+      | 'createArmy'
+      | 'renameArmy'
+      | 'disbandArmy'
+      | 'assignUnits'
+      | 'armyOrder'
+      | 'setAutoReinforce';
+  }
 >;
 
 /** Предел длины имени армии, символов: техническое ограничение протокола и интерфейса. */
@@ -48,6 +56,7 @@ export function validateArmyCommand(
   cmd: ArmyCommand,
 ): Validation {
   if (cmd.t === 'createArmy') return validName(cmd.name) ? OK : rejected('badName');
+  if (cmd.t === 'setAutoReinforce') return typeof cmd.on === 'boolean' ? OK : rejected('badValue');
   if (cmd.t === 'assignUnits') {
     const units = ownUnitList(state, playerId, cmd.unitIds);
     if (!units.ok) return rejected(units.reason);
@@ -106,5 +115,10 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
     case 'armyOrder':
       orderArmy(state, cmd.armyId, cmd.order);
       return;
+    case 'setAutoReinforce': {
+      const player = state.players[playerId];
+      if (player) player.autoReinforce = cmd.on;
+      return;
+    }
   }
 }
