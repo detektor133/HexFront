@@ -1,4 +1,5 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
+import { executeArmyCommand, validateArmyCommand } from './army.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
 import { startRecruit, validateRecruit } from './recruit.ts';
@@ -27,13 +28,14 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'recruit':
       return validateRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
     case 'move':
-    case 'attack':
     case 'setOrder':
+    case 'split':
+    case 'merge':
+      return validateArmyCommand(state, playerId, cmd);
+    case 'attack':
     case 'assignFront':
     case 'arrow':
     case 'arrowStop':
-    case 'split':
-    case 'merge':
     case 'bombard':
       return rejected('notImplemented');
     default:
@@ -59,6 +61,12 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'recruit':
       startRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
+      return;
+    case 'move':
+    case 'setOrder':
+    case 'split':
+    case 'merge':
+      executeArmyCommand(state, playerId, cmd);
       return;
     default:
       return;

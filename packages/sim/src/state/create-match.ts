@@ -125,6 +125,9 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       hex: capital,
       order: 'expand',
       supplyLevel: FP as Fp,
+      path: [],
+      moveTicks: 0,
+      moveTotal: 0,
     });
     state.nextId += 1;
   }

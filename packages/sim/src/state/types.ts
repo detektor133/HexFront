@@ -90,7 +90,8 @@ export interface Construction {
   readonly path?: readonly HexId[];
 }
 
-export type ArmyOrder = 'idle' | 'hold' | 'expand';
+/** move — идёт по path; остальные — стоит (expand — этап 03/T3). */
+export type ArmyOrder = 'idle' | 'hold' | 'expand' | 'move';
 
 export interface Army {
   readonly id: number;
@@ -104,6 +105,12 @@ export interface Army {
   order: ArmyOrder;
   /** Доля 0..1, fixed-point. */
   supplyLevel: Fp;
+  /** Оставшиеся гексы пути, следующий — первый; пусто, если армия не идёт. */
+  path: HexId[];
+  /** Прогресс текущего перехода в path[0], тики. */
+  moveTicks: number;
+  /** Длительность текущего перехода, тики; 0 — переход не начат. */
+  moveTotal: number;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */

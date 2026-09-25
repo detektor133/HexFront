@@ -16,7 +16,8 @@ export type Command =
   | { readonly t: 'assignFront'; readonly armyIds: readonly number[]; readonly enemyId: number }
   | { readonly t: 'arrow'; readonly points: readonly HexId[] }
   | { readonly t: 'arrowStop'; readonly arrowId: number }
-  | { readonly t: 'split'; readonly armyId: number; readonly soldiers: number }
+  /** soldiers — fixed-point, целое число солдат. */
+  | { readonly t: 'split'; readonly armyId: number; readonly soldiers: Fp }
   | { readonly t: 'merge'; readonly armyIds: readonly number[] }
   | { readonly t: 'bombard'; readonly armyId: number; readonly targetArmyId: number | null }
   | {
@@ -60,6 +61,11 @@ export const REJECT_REASONS = [
   'queueBusy',
   'armyLimit',
   'notEnoughPeople',
+  'unknownArmy',
+  'notOwnArmy',
+  'hexFull',
+  'notSameHex',
+  'notSameType',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

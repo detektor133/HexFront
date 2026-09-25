@@ -42,6 +42,9 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     hex,
     order: 'idle',
     supplyLevel: FP as Fp,
+    path: [],
+    moveTicks: 0,
+    moveTotal: 0,
   });
   state.nextId += 1;
 }

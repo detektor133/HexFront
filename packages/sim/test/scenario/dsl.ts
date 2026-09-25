@@ -3,6 +3,7 @@
 import { ORG_MAX, START_GOLD, TAX_DEFAULT, TICKS_PER_S, type UnitType } from '../../src/balance.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
+import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
@@ -40,6 +41,14 @@ type ArmyRef = number | { readonly armyOf: string; readonly index: number };
 
 type DslCommand =
   | { readonly t: 'attack'; readonly armies: readonly ArmyRef[]; readonly target: At }
+  | { readonly t: 'move'; readonly armies: readonly ArmyRef[]; readonly to: At }
+  | {
+      readonly t: 'setOrder';
+      readonly armies: readonly ArmyRef[];
+      readonly order: 'idle' | 'hold' | 'expand';
+    }
+  | { readonly t: 'split'; readonly army: ArmyRef; readonly soldiers: number }
+  | { readonly t: 'merge'; readonly armies: readonly ArmyRef[] }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
@@ -81,6 +90,19 @@ export const attack = (armies: readonly ArmyRef[], target: At): DslCommand => ({
   armies,
   target,
 });
+
+export const move = (armies: readonly ArmyRef[], to: At): DslCommand => ({ t: 'move', armies, to });
+export const setOrder = (
+  armies: readonly ArmyRef[],
+  order: 'idle' | 'hold' | 'expand',
+): DslCommand => ({ t: 'setOrder', armies, order });
+/** Отделить soldiers целых солдат в новую армию. */
+export const split = (army: ArmyRef, soldiers: number): DslCommand => ({
+  t: 'split',
+  army,
+  soldiers,
+});
+export const merge = (armies: readonly ArmyRef[]): DslCommand => ({ t: 'merge', armies });
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
 export const improve = (where: At): DslCommand => ({ t: 'improve', where });
@@ -214,6 +236,14 @@ export interface Scenario {
   setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
   rejections(): string[];
+  /** Река на ребре между клеткой и её соседом по направлению dir (0–5), с обеих сторон. */
+  river(where: At, dir: number): void;
+  /** Задать снабжённость армии в процентах — до появления supplySystem (03/T4). */
+  setSupply(armyId: number, percent: number): void;
+  /** Задать организованность армии (0–100). */
+  setOrg(armyId: number, org: number): void;
+  /** Армия по id или undefined. */
+  armyById(id: number): Army | undefined;
 }
 
 /**
@@ -273,6 +303,14 @@ function makeScenario(
         return { t: 'setTax', rate: (c.percent * 10) as Fp };
       case 'attack':
         return { t: 'attack', armyIds: c.armies.map(resolve), target: hexOf(c.target) };
+      case 'move':
+        return { t: 'move', armyIds: c.armies.map(resolve), to: hexOf(c.to) };
+      case 'setOrder':
+        return { t: 'setOrder', armyIds: c.armies.map(resolve), order: c.order };
+      case 'split':
+        return { t: 'split', armyId: resolve(c.army), soldiers: (c.soldiers * FP) as Fp };
+      case 'merge':
+        return { t: 'merge', armyIds: c.armies.map(resolve) };
       case 'upgradeCity':
         return { t: 'upgradeCity', cityId: cityIdAt(c.where) };
       case 'rebuildSupply':
@@ -309,6 +347,9 @@ function makeScenario(
         hex: hexOf(where),
         order: 'idle',
         supplyLevel: FP as Fp,
+        path: [],
+        moveTicks: 0,
+        moveTotal: 0,
       });
       return id;
     },
@@ -352,6 +393,29 @@ function makeScenario(
     },
     rejections() {
       return log.flatMap((e) => (e.t === 'commandRejected' ? [e.reason] : []));
+    },
+    river(where, dir) {
+      const { width, height, rivers } = state.map;
+      const from = offsetToAxial({ col: where.col, row: where.row });
+      const to = neighbors(from)[dir];
+      if (!to || !inBounds(to, width, height)) throw new Error('сценарий: река за краем карты');
+      const a = hexId(from, width);
+      const b = hexId(to, width);
+      rivers[a] = (rivers[a] ?? 0) | (1 << dir);
+      rivers[b] = (rivers[b] ?? 0) | (1 << ((dir + 3) % 6));
+    },
+    setSupply(armyId, percent) {
+      const army = state.armies.find((a) => a.id === armyId);
+      if (!army) throw new Error(`сценарий: нет армии ${armyId}`);
+      army.supplyLevel = (percent * 10) as Fp;
+    },
+    setOrg(armyId, org) {
+      const army = state.armies.find((a) => a.id === armyId);
+      if (!army) throw new Error(`сценарий: нет армии ${armyId}`);
+      army.org = (org * FP) as Fp;
+    },
+    armyById(id) {
+      return state.armies.find((a) => a.id === id);
     },
   };
 }

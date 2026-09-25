@@ -71,6 +71,9 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.hex);
     str(s, a.order);
     int(s, a.supplyLevel);
+    array(s, a.path);
+    int(s, a.moveTicks);
+    int(s, a.moveTotal);
   }
 }
 

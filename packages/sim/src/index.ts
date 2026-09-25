@@ -32,3 +32,4 @@ export {
   type RecruitCheck,
 } from './commands/recruit.ts';
 export { playerUpkeepPerSecond } from './systems/economy.ts';
+export { findPath, isHostileHex, stepTicks, type Mover } from './queries/army-path.ts';
