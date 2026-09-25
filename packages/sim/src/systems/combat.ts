@@ -1,43 +1,29 @@
-// Бой: сила сторон, потери, организованность, отступления, захват гекса.
+// Бой: потери, организованность, отступления, захват гекса. Формулы силы — queries/battle-math.
 // GDD: docs/gdd/06-combat.md — «Сила сторон», «Потери и организованность», «Исход».
 import {
   ARTY_FLEE_LOSS,
-  ARTY_RANGE,
-  ARTY_SUPPORT_BONUS,
-  ARTY_SUPPORT_MIN_SOLDIERS,
-  ATK,
   CASUALTY_RATE,
-  CITY_DEF_MULT,
-  DEF,
-  DEF_MULT,
-  FLANK_MAX,
-  FLANK_STEP,
-  FORT_DEF_MULT,
-  ORG_LOSS_K,
-  ORG_LOSS_MAX,
-  ORG_LOSS_MIN,
   RETREAT_DAMAGE_TAKEN_MULT,
-  RIVER_ATTACK_MULT,
-  SUPPLY_COMBAT_BASE,
   TICKS_PER_S,
 } from '../balance.ts';
-import { TERRAIN_NAMES } from '../map/types.ts';
-import { distance, hexFromId, neighbors, type HexId } from '../math/hex.ts';
-import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
+import type { HexId } from '../math/hex.ts';
+import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
+import {
+  attackContribution,
+  attackPower,
+  defensePower,
+  hexDirection,
+  orgLossPerS,
+  type Ground,
+} from '../queries/battle-math.ts';
 import { captureHex } from '../state/capture.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
-import { BUILDING, type City, type MatchState, type Unit } from '../state/types.ts';
+import type { City, MatchState, Unit } from '../state/types.ts';
 
-/** Множитель снабжения в бою: SUPPLY_COMBAT_BASE + (1 − SUPPLY_COMBAT_BASE) × s. */
-export function supplyCombatMult(supplyLevel: Fp): Fp {
-  return (SUPPLY_COMBAT_BASE + fpMul((FP - SUPPLY_COMBAT_BASE) as Fp, supplyLevel)) as Fp;
-}
+export { flankMultiplier, supplyCombatMult } from '../queries/battle-math.ts';
 
-// Направление ребра from→to или -1, если гексы не соседи.
 function direction(state: MatchState, from: HexId, to: HexId): number {
-  const { width } = state.map;
-  const t = hexFromId(to, width);
-  return neighbors(hexFromId(from, width)).findIndex((n) => n.q === t.q && n.r === t.r);
+  return hexDirection(state.map, from, to);
 }
 
 function attackersOf(state: MatchState, hex: HexId): Unit[] {
@@ -53,51 +39,12 @@ function activeCity(state: MatchState, hex: HexId, attacker: number): City | nul
   return city;
 }
 
-// Своя артиллерия (≥ ARTY_SUPPORT_MIN_SOLDIERS, не отступает) в радиусе ARTY_RANGE от цели.
-function supported(state: MatchState, owner: number, hex: HexId): boolean {
-  const { width } = state.map;
-  const target = hexFromId(hex, width);
-  return state.units.some(
-    (a) =>
-      a.owner === owner &&
-      a.type === 'artillery' &&
-      a.order !== 'retreat' &&
-      a.soldiers >= ARTY_SUPPORT_MIN_SOLDIERS &&
-      distance(hexFromId(a.hex, width), target) <= ARTY_RANGE,
-  );
-}
-
-/**
- * Вклад отряда в атаку до флангов: soldiers × ATK × supplyMult (× 0,7 через реку,
- * × ARTY_SUPPORT_BONUS при поддержке своей артиллерии — один раз, без сложения).
- */
-function attackOf(state: MatchState, u: Unit, hex: HexId): number {
-  let base = fpMul(fpMul(u.soldiers, ATK[u.type]), supplyCombatMult(u.supplyLevel));
-  const dir = direction(state, u.hex, hex);
-  if (dir >= 0 && ((state.map.rivers[u.hex] ?? 0) >> dir) & 1) {
-    base = fpMul(base as Fp, RIVER_ATTACK_MULT);
-  }
-  return supported(state, u.owner, hex) ? fpMul(base as Fp, ARTY_SUPPORT_BONUS) : base;
-}
-
-/**
- * Множитель флангов: 1 + FLANK_STEP × (направлений − 1), не больше FLANK_MAX.
- * @returns fixed-point множитель
- */
-export function flankMultiplier(directions: number): Fp {
-  return Math.min(FLANK_MAX, FP + FLANK_STEP * (directions - 1)) as Fp;
-}
-
-function flankMult(state: MatchState, attackers: readonly Unit[], hex: HexId): Fp {
-  return flankMultiplier(new Set(attackers.map((u) => direction(state, u.hex, hex))).size);
-}
-
-function defenseMult(state: MatchState, hex: HexId): Fp {
-  const name = TERRAIN_NAMES[state.map.terrain[hex] ?? 0];
-  let mult = (name === undefined || name === 'water' ? FP : DEF_MULT[name]) as Fp;
-  if (state.hexes.building[hex] === BUILDING.fort) mult = fpMul(mult, FORT_DEF_MULT);
-  if (state.cities.some((c) => c.hex === hex)) mult = fpMul(mult, CITY_DEF_MULT);
-  return mult;
+function groundOf(state: MatchState): Ground {
+  return {
+    map: state.map,
+    building: state.hexes.building,
+    hasCity: (hex) => state.cities.some((c) => c.hex === hex),
+  };
 }
 
 interface Battle {
@@ -116,18 +63,13 @@ function battleAt(state: MatchState, hex: HexId): Battle | null {
   const defenders = state.units.filter((u) => u.hex === hex && u.owner !== first.owner);
   const city = activeCity(state, hex, first.owner);
   if (defenders.length === 0 && !city) return null;
-  const rawAttack = attackers.reduce((sum, u) => sum + attackOf(state, u, hex), 0);
-  let rawDefense = city ? fpMul(city.defenders, DEF.infantry) : 0;
-  for (const u of defenders) {
-    rawDefense += fpMul(fpMul(u.soldiers, DEF[u.type]), supplyCombatMult(u.supplyLevel));
-  }
   return {
     hex,
     attackers,
     defenders,
     city,
-    attack: fpMul(rawAttack as Fp, flankMult(state, attackers, hex)),
-    defense: fpMul(rawDefense as Fp, defenseMult(state, hex)),
+    attack: attackPower(state.map, attackers, hex, state.units),
+    defense: defensePower(groundOf(state), defenders, city?.defenders ?? (0 as Fp), hex),
   };
 }
 
@@ -138,15 +80,6 @@ function battleAt(state: MatchState, hex: HexId): Battle | null {
 export function battlePowers(state: MatchState, hex: HexId): { attack: number; defense: number } {
   const b = battleAt(state, hex);
   return { attack: b?.attack ?? 0, defense: b?.defense ?? 0 };
-}
-
-/** Потеря org в секунду: clamp(ORG_LOSS_K × враг / свои, ORG_LOSS_MIN, ORG_LOSS_MAX). */
-function orgLossPerS(enemy: number, own: number): number {
-  if (own <= 0) return ORG_LOSS_MAX;
-  return Math.min(
-    ORG_LOSS_MAX,
-    Math.max(ORG_LOSS_MIN, fpMul(ORG_LOSS_K, fpDiv(enemy as Fp, own as Fp))),
-  );
 }
 
 interface Hit {
@@ -235,7 +168,8 @@ function occupy(state: MatchState, hex: HexId): void {
   if (state.units.some((u) => u.hex === hex && u.owner !== first.owner)) return;
   if (activeCity(state, hex, first.owner)) return;
   let winner = first;
-  for (const u of attackers) if (attackOf(state, u, hex) > attackOf(state, winner, hex)) winner = u;
+  const power = (u: Unit): number => attackContribution(state.map, u, hex, state.units);
+  for (const u of attackers) if (power(u) > power(winner)) winner = u;
   const city = state.cities.find((c) => c.hex === hex && c.owner !== winner.owner);
   winner.hex = hex;
   captureHex(state, hex, winner.owner);
