@@ -117,6 +117,10 @@ export interface Unit {
   moveTotal: number;
   /** Армия отряда или null — резерв (CR-001). */
   armyId: number | null;
+  /** Сколько тиков подряд снабжённость ниже ATTRITION_THRESHOLD — таймер истощения. */
+  lowSupplyTicks: number;
+  /** Котёл: нет пути по своим гексам ни к одной сети снабжения. */
+  encircled: boolean;
 }
 
 /** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
@@ -143,6 +147,7 @@ export type GameEvent =
       readonly cityId: number;
       readonly type: UnitType;
     }
+  | { readonly t: 'unitDestroyed'; readonly playerId: number; readonly unitId: number }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;

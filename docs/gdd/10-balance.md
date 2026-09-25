@@ -58,6 +58,7 @@
 | `ISOLATED_INCOME_MULT` | 0,5 |
 | `ISOLATED_SUPPLY_MULT` | 0,5 |
 | `ISOLATED_GROWTH_MULT` | 0,75 |
+| `BANKRUPT_SUPPLY_MULT` | 0,5 |
 
 ## Города и постройки
 

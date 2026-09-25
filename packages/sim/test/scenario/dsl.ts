@@ -15,6 +15,7 @@ import { FP, type Fp } from '../../src/math/int.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
+  BUILDING,
   NEUTRAL,
   type Army,
   type Unit,
@@ -284,10 +285,10 @@ export interface Scenario {
   rejections(): string[];
   /** Река на ребре между клеткой и её соседом по направлению dir (0–5), с обеих сторон. */
   river(where: At, dir: number): void;
-  /** Задать снабжённость отряда в процентах — до появления supplySystem (03/T4). */
-  setSupply(unitId: number, percent: number): void;
   /** Задать организованность отряда (0–100). */
   setOrg(unitId: number, org: number): void;
+  /** Поставить постройку в клетку в обход строек. */
+  setBuilding(where: At, kind: 'fort' | 'depot'): void;
   /** Армии игрока по порядку создания. */
   armiesOf(player: string): Army[];
   /** Отряд по id или undefined. */
@@ -409,6 +410,8 @@ function makeScenario(
         moveTicks: 0,
         moveTotal: 0,
         armyId: null,
+        lowSupplyTicks: 0,
+        encircled: false,
       });
       return id;
     },
@@ -463,15 +466,13 @@ function makeScenario(
       rivers[a] = (rivers[a] ?? 0) | (1 << dir);
       rivers[b] = (rivers[b] ?? 0) | (1 << ((dir + 3) % 6));
     },
-    setSupply(unitId, percent) {
-      const unit = state.units.find((a) => a.id === unitId);
-      if (!unit) throw new Error(`сценарий: нет отряда ${unitId}`);
-      unit.supplyLevel = (percent * 10) as Fp;
-    },
     setOrg(unitId, org) {
       const unit = state.units.find((a) => a.id === unitId);
       if (!unit) throw new Error(`сценарий: нет отряда ${unitId}`);
       unit.org = (org * FP) as Fp;
+    },
+    setBuilding(where, kind) {
+      state.hexes.building[hexOf(where)] = BUILDING[kind];
     },
     armiesOf(player) {
       return state.armies.filter((a) => a.owner === idOf(player));

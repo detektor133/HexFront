@@ -48,6 +48,8 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     moveTotal: 0,
     // Резерв; с «Автопополнением» — самая нуждающаяся армия (CR-001).
     armyId: state.players[r.owner]?.autoReinforce ? neediestArmy(state, r.owner) : null,
+    lowSupplyTicks: 0,
+    encircled: false,
   });
   state.nextId += 1;
 }

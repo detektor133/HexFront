@@ -109,6 +109,8 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     moveTicks: 0,
     moveTotal: 0,
     armyId: unit.armyId,
+    lowSupplyTicks: unit.lowSupplyTicks,
+    encircled: unit.encircled,
   });
   state.nextId += 1;
 }

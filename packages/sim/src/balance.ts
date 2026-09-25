@@ -94,6 +94,8 @@ export const GOLD_PER_POP_TAX: Fp = fp(0.01);
 export const ISOLATED_INCOME_MULT: Fp = fp(0.5);
 export const ISOLATED_SUPPLY_MULT: Fp = fp(0.5);
 export const ISOLATED_GROWTH_MULT: Fp = fp(0.75);
+/** Снабжённость отрядов при банкротстве (02-economy.md, «Банкротство»). */
+export const BANKRUPT_SUPPLY_MULT: Fp = fp(0.5);
 
 // Города и постройки
 

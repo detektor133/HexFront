@@ -136,6 +136,8 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       moveTicks: 0,
       moveTotal: 0,
       armyId,
+      lowSupplyTicks: 0,
+      encircled: false,
     });
     state.nextId += 1;
   }

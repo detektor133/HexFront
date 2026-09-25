@@ -64,29 +64,30 @@ describe('движение: время перехода', () => {
   it('пехота в лес — 3 / 0,7 ≈ 4,28 с (42 тика), в горы — 5 / 0,5 = 10 с', () => {
     const s = scenario(
       `
-      a  f  m
+      A1 a  f  m
     `,
       { legend },
     );
-    const id = s.unit('A', 'infantry', 100, at(0, 0));
-    s.cmd('A', move([id], at(1, 0)));
-    expect(ticksToArrive(s, id, at(1, 0))).toBe(42);
+    // Столица рядом — снабжение выше 50 %, скорость без штрафа.
+    const id = s.unit('A', 'infantry', 100, at(1, 0));
     s.cmd('A', move([id], at(2, 0)));
-    expect(ticksToArrive(s, id, at(2, 0))).toBe(100);
+    expect(ticksToArrive(s, id, at(2, 0))).toBe(42);
+    s.cmd('A', move([id], at(3, 0)));
+    expect(ticksToArrive(s, id, at(3, 0))).toBe(100);
   });
 
   it('дорога ×0,5, если оба гекса дорожные — по любым дорогам, и по чужим', () => {
     const s = scenario(
       `
-      r  r  b  b
+      A1 r  r  b  b
     `,
       { legend: { ...legend, b: { kind: 'own', player: 'B', terrain: 'plains', road: true } } },
     );
-    const id = s.unit('A', 'infantry', 100, at(0, 0));
-    s.cmd('A', move([id], at(1, 0)));
-    expect(ticksToArrive(s, id, at(1, 0))).toBe(10);
+    const id = s.unit('A', 'infantry', 100, at(1, 0));
     s.cmd('A', move([id], at(2, 0)));
     expect(ticksToArrive(s, id, at(2, 0))).toBe(10);
+    s.cmd('A', move([id], at(3, 0)));
+    expect(ticksToArrive(s, id, at(3, 0))).toBe(10);
   });
 
   it('переход через реку +1 с', () => {
@@ -108,8 +109,8 @@ describe('движение: время перехода', () => {
 
   it('снабжение ниже 50 % — скорость ×0,75 (2 / 0,75 ≈ 2,67 с)', () => {
     const s = scenario(LINE, { legend });
-    const id = s.unit('A', 'infantry', 100, at(1, 1));
-    s.setSupply(id, 40);
+    // Столица даёт 500 на 2000 пехоты: R = 25 %, × 0,88 за гекс от города ≈ 22 %.
+    const id = s.unit('A', 'infantry', 2000, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
     expect(ticksToArrive(s, id, at(2, 1))).toBe(26);
   });
