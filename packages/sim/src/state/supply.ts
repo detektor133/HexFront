@@ -172,3 +172,19 @@ export function recomputeSupply(state: MatchState, owner: number): void {
     u.supplyLevel = bankrupt ? fpMul(level as Fp, BANKRUPT_SUPPLY_MULT) : (level as Fp);
   }
 }
+
+/**
+ * Доля снабжения, которая дошла бы до своего гекса от лучшей сети игрока, без учёта нагрузки сети
+ * (для выбора гекса отступления, 06-combat.md, «Отступление»).
+ * @returns fixed-point доля 0..1
+ */
+export function hexSupplyEff(state: MatchState, owner: number, hex: number): Fp {
+  const loss = lossMap(state, owner);
+  let best = 0;
+  for (const net of state.networks) {
+    if (net.owner !== owner) continue;
+    const d = lossFrom(state, owner, net.id, loss)[hex] ?? UNREACHED;
+    if (d !== UNREACHED) best = Math.max(best, FP - d);
+  }
+  return best as Fp;
+}

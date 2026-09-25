@@ -86,6 +86,8 @@ export const REJECT_REASONS = [
   'notOwnArmy',
   'badName',
   'badValue',
+  'notEnemy',
+  'retreating',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

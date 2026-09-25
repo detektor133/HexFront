@@ -48,7 +48,9 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, c.owner);
     int(s, c.level);
     str(s, c.name);
-    int(s, c.garrison);
+    int(s, c.defenders);
+    int(s, c.defenseOrg);
+    int(s, c.inBattle ? 1 : 0);
   }
   int(s, state.players.length);
   for (const p of state.players) {
@@ -79,6 +81,8 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.armyId ?? -1);
     int(s, a.lowSupplyTicks);
     int(s, a.encircled ? 1 : 0);
+    int(s, a.target);
+    int(s, a.inBattle ? 1 : 0);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {

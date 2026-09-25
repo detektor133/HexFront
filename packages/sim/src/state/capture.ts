@@ -1,6 +1,6 @@
 // Смена владельца гекса при захвате и её последствия для населения.
 // GDD: docs/gdd/02-economy.md — «Население»; 05-armies.md — «Захват».
-import { CAPTURE_POP_LOSS_CITY, CAPTURE_POP_LOSS_HEX } from '../balance.ts';
+import { CAPTURE_POP_LOSS_CITY, CAPTURE_POP_LOSS_HEX, ORG_MAX } from '../balance.ts';
 import { NEUTRAL, type MatchState } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { fpMul, type Fp } from '../math/int.ts';
@@ -15,7 +15,12 @@ export function captureHex(state: MatchState, hex: HexId, owner: number): void {
   if (previous === owner) return;
   hexes.owner[hex] = owner;
   const city = state.cities.find((c) => c.hex === hex);
-  if (city) city.owner = owner;
+  if (city) {
+    city.owner = owner;
+    // Ополчение захваченного города собирается заново (03-cities-buildings.md).
+    city.defenders = 0 as Fp;
+    city.defenseOrg = ORG_MAX;
+  }
   if (previous === NEUTRAL) return;
   const pop = (hexes.pop[hex] ?? 0) as Fp;
   hexes.pop[hex] = pop - fpMul(pop, city ? CAPTURE_POP_LOSS_CITY : CAPTURE_POP_LOSS_HEX);

@@ -276,7 +276,9 @@ describe('приказы, разделение, слияние', () => {
     expect(mine[0]?.soldiers).toBe(180_000);
     expect(mine[1]?.soldiers).toBe(120_000);
     expect(mine[1]?.hex).toBe(mine[0]?.hex);
-    expect(mine[1]?.org).toBe(70_000);
+    // Копия org; затем в том же тике оба восстановили по 0,4 (4/с вне боя).
+    expect(mine[1]?.org).toBe(mine[0]?.org);
+    expect(mine[1]?.org).toBe(70_400);
   });
 
   it('разделение: 0, всё войско, нет места в гексе — отказ', () => {
@@ -312,8 +314,8 @@ describe('приказы, разделение, слияние', () => {
     expect(mine).toHaveLength(1);
     expect(mine[0]?.id).toBe(a);
     expect(mine[0]?.soldiers).toBe(400_000);
-    // (300 × 60 + 100 × 100) / 400 = 70.
-    expect(mine[0]?.org).toBe(70_000);
+    // (300 × 60 + 100 × 100) / 400 = 70, плюс 0,4 восстановления за тик.
+    expect(mine[0]?.org).toBe(70_400);
   });
 
   it('слияние: разные гексы или типы — отказ', () => {

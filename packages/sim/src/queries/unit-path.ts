@@ -17,7 +17,7 @@ import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
-import { NEUTRAL, type MatchState } from '../state/types.ts';
+import type { MatchState } from '../state/types.ts';
 
 /** Местность для времени хода: перевал — как холмы; null — вода. */
 function moveTerrain(state: MatchState, hex: HexId): LandTerrain | null {
@@ -43,7 +43,7 @@ export function isHostileHex(state: MatchState, owner: number, hex: HexId): bool
   if (state.units.some((a) => a.hex === hex && a.owner !== owner)) return true;
   const city = state.cities.find((c) => c.hex === hex);
   if (!city || city.owner === owner) return false;
-  return city.owner !== NEUTRAL || city.garrison > 0;
+  return city.defenders > 0;
 }
 
 /** Зона контроля: рядом с гексом стоит отряд другого игрока. */

@@ -1,5 +1,6 @@
 // Создание матча из карты по правилам старта. GDD: docs/gdd/08-match.md — «Старт».
 import {
+  MILITIA_PER_LEVEL,
   NEUTRAL_HEX_POP_RATIO,
   ORG_MAX,
   START_UNITS,
@@ -32,7 +33,9 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     owner: NEUTRAL,
     level: c.level,
     name: c.name,
-    garrison: (c.garrison * FP) as Fp,
+    defenders: (c.garrison * FP) as Fp,
+    defenseOrg: ORG_MAX,
+    inBattle: false,
   }));
   return {
     tick: 0,
@@ -98,7 +101,9 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     owner: playerId,
     level: 1,
     name: '',
-    garrison: 0 as Fp,
+    defenders: MILITIA_PER_LEVEL,
+    defenseOrg: ORG_MAX,
+    inBattle: false,
   });
   state.hexes.owner[capital] = playerId;
   state.hexes.pop[capital] = START_POP_CAPITAL;
@@ -138,6 +143,8 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       armyId,
       lowSupplyTicks: 0,
       encircled: false,
+      target: -1,
+      inBattle: false,
     });
     state.nextId += 1;
   }

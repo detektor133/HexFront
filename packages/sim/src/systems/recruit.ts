@@ -50,6 +50,8 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     armyId: state.players[r.owner]?.autoReinforce ? neediestArmy(state, r.owner) : null,
     lowSupplyTicks: 0,
     encircled: false,
+    target: -1,
+    inBattle: false,
   });
   state.nextId += 1;
 }

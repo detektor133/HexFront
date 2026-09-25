@@ -73,7 +73,7 @@ export function validateArmyCommand(
 // Приказ армии раздаётся её отрядам; экспансия недоступна артиллерии — та встаёт в idle.
 function orderArmy(state: MatchState, armyId: number, order: Unit['order']): void {
   for (const u of state.units) {
-    if (u.armyId !== armyId) continue;
+    if (u.armyId !== armyId || u.order === 'retreat') continue;
     u.path = [];
     u.moveTicks = 0;
     u.moveTotal = 0;

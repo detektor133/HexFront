@@ -1,6 +1,7 @@
 // Сценарный DSL из docs/testing.md: мини-карта в ASCII → состояние матча, команды, прогон по времени.
 // Клетка сетки — гекс в offset-координатах (столбец, строка); at(col, row) адресует её так же.
 import {
+  MILITIA_PER_LEVEL,
   NEUTRAL_GARRISON,
   ORG_MAX,
   START_GOLD,
@@ -323,8 +324,19 @@ export function scenario(
     const id = state.nextId;
     state.nextId += 1;
     // Нейтральный город защищает гарнизон по уровню, как на сгенерированных картах.
-    const garrison = owner === NEUTRAL ? (NEUTRAL_GARRISON[cell.level - 1] ?? 0) : 0;
-    state.cities.push({ id, hex, owner, level: cell.level, name: token, garrison: garrison as Fp });
+    // Город игрока защищает полное ополчение (03-cities-buildings.md).
+    const defenders =
+      owner === NEUTRAL ? (NEUTRAL_GARRISON[cell.level - 1] ?? 0) : MILITIA_PER_LEVEL * cell.level;
+    state.cities.push({
+      id,
+      hex,
+      owner,
+      level: cell.level,
+      name: token,
+      defenders: defenders as Fp,
+      defenseOrg: ORG_MAX,
+      inBattle: false,
+    });
     const player = state.players[owner];
     if (cell.capital && player) player.capitalCityId = id;
   });
@@ -412,6 +424,8 @@ function makeScenario(
         armyId: null,
         lowSupplyTicks: 0,
         encircled: false,
+        target: -1,
+        inBattle: false,
       });
       return id;
     },

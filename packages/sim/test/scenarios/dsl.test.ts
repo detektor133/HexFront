@@ -36,14 +36,9 @@ describe('сценарный DSL', () => {
     s.runSeconds(60);
 
     expect(s.state.tick).toBe(600);
-    expect(s.unitsOf('B')).toHaveLength(1);
-    // Бой появится в этапе 03; до тех пор атака честно отклоняется.
-    expect(s.owner(at(2, 3))).toBe('B');
-    expect(s.lastEvent('commandRejected')).toMatchObject({
-      playerId: 0,
-      command: 'attack',
-      reason: 'notImplemented',
-    });
+    expect(s.owner(at(2, 3))).toBe('A');
+    expect(s.unitsOf('B')).toHaveLength(1); // отступил, а не исчез
+    expect(s.lastEvent('unitRetreated')).toBeDefined();
   });
 
   it('сообщает о токене, которого нет в легенде', () => {

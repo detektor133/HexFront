@@ -5,10 +5,13 @@ import { unitLimit } from './recruit.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
-import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
+import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 
-export type UnitCommand = Extract<Command, { t: 'move' | 'setOrder' | 'split' | 'merge' }>;
+export type UnitCommand = Extract<
+  Command,
+  { t: 'move' | 'attack' | 'setOrder' | 'split' | 'merge' }
+>;
 
 type Owned =
   | { readonly ok: true; readonly units: Unit[] }
@@ -36,6 +39,16 @@ function validateMove(state: MatchState, units: readonly Unit[], to: HexId): Val
     if (!findPath(state, a.hex, to, a.type, a.owner)) return rejected('noPath');
   }
   return OK;
+}
+
+// Атака = путь до вражеского гекса; последний шаг движение превращает в атаку.
+function validateAttack(state: MatchState, units: readonly Unit[], target: HexId): Validation {
+  if (!Number.isInteger(target) || target < 0 || target >= state.hexes.owner.length) {
+    return rejected('badHex');
+  }
+  if (units.some((u) => u.type === 'artillery')) return rejected('badOrder');
+  if (units.some((u) => !isHostileHex(state, u.owner, target))) return rejected('notEnemy');
+  return validateMove(state, units, target);
 }
 
 function validateSplit(state: MatchState, unit: Unit, soldiers: number): Validation {
@@ -70,9 +83,13 @@ export function validateUnitCommand(
   const ids = cmd.t === 'split' ? [cmd.unitId] : cmd.unitIds;
   const owned = ownUnits(state, playerId, ids);
   if (!owned.ok) return rejected(owned.reason);
+  // Отступающий отряд приказов не принимает (06-combat.md, «Отступление»).
+  if (owned.units.some((u) => u.order === 'retreat')) return rejected('retreating');
   switch (cmd.t) {
     case 'move':
       return validateMove(state, owned.units, cmd.to);
+    case 'attack':
+      return validateAttack(state, owned.units, cmd.target);
     case 'setOrder':
       // Артиллерия не захватывает гексы, поэтому экспансия ей недоступна.
       return cmd.order === 'expand' && owned.units.some((a) => a.type === 'artillery')
@@ -111,6 +128,8 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     armyId: unit.armyId,
     lowSupplyTicks: unit.lowSupplyTicks,
     encircled: unit.encircled,
+    target: -1,
+    inBattle: false,
   });
   state.nextId += 1;
 }
@@ -142,8 +161,10 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
   if (!owned.ok) return;
   switch (cmd.t) {
     case 'move':
+    case 'attack':
       for (const a of owned.units) {
-        const path = findPath(state, a.hex, cmd.to, a.type, a.owner) ?? [];
+        const path =
+          findPath(state, a.hex, cmd.t === 'move' ? cmd.to : cmd.target, a.type, a.owner) ?? [];
         stop(a);
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';

@@ -1,7 +1,7 @@
 // Стройки: прогресс, завершение, отмена при потере гекса.
 // GDD: docs/gdd/03-cities-buildings.md
+import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
-import type { Fp } from '../math/int.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
 
 function complete(state: MatchState, c: Construction): void {
@@ -15,7 +15,10 @@ function complete(state: MatchState, c: Construction): void {
         owner: c.owner,
         level: 1,
         name: '',
-        garrison: 0 as Fp,
+        // Новый город получает полное ополчение (03-cities-buildings.md, «Захват города»).
+        defenders: MILITIA_PER_LEVEL,
+        defenseOrg: ORG_MAX,
+        inBattle: false,
       });
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);

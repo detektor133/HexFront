@@ -36,3 +36,4 @@ export { findPath, isHostileHex, stepTicks, type Mover } from './queries/unit-pa
 export { findNearestPath } from './queries/unit-path.ts';
 export { captureHex } from './state/capture.ts';
 export { ARMY_NAME_MAX } from './commands/army.ts';
+export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';

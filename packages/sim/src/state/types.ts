@@ -43,8 +43,12 @@ export interface City {
   level: number;
   /** Название с карты; у столиц пустое — имя выбирает интерфейс. */
   readonly name: string;
-  /** Гарнизон нейтрального города, fixed-point солдат. */
-  garrison: Fp;
+  /** Оборона города: гарнизон нейтрального или ополчение города игрока, fixed-point солдат. */
+  defenders: Fp;
+  /** Организованность обороны города, fixed-point. */
+  defenseOrg: Fp;
+  /** Гекс города атакован в этом тике — ополчение не восстанавливается. */
+  inBattle: boolean;
 }
 
 export type PlayerStatus = 'alive' | 'eliminated';
@@ -94,8 +98,11 @@ export interface Construction {
   readonly path?: readonly HexId[];
 }
 
-/** move — идёт по path; остальные — стоит (expand — этап 03/T3). */
-export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move';
+/**
+ * move — идёт по path; attack — атакует соседний гекс target; retreat — отступает (приказы не
+ * принимает); expand — экспансия; idle и hold — стоит.
+ */
+export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move' | 'attack' | 'retreat';
 
 export interface Unit {
   readonly id: number;
@@ -121,6 +128,10 @@ export interface Unit {
   lowSupplyTicks: number;
   /** Котёл: нет пути по своим гексам ни к одной сети снабжения. */
   encircled: boolean;
+  /** Цель атаки (соседний гекс) при приказе attack, иначе -1. */
+  target: HexId;
+  /** Участвует в бою в этом тике (атакует или обороняется) — org не восстанавливается. */
+  inBattle: boolean;
 }
 
 /** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
@@ -147,7 +158,12 @@ export type GameEvent =
       readonly cityId: number;
       readonly type: UnitType;
     }
-  | { readonly t: 'unitDestroyed'; readonly playerId: number; readonly unitId: number }
+  | {
+      readonly t: 'unitDestroyed' | 'unitRetreated' | 'unitCapitulated';
+      readonly playerId: number;
+      readonly unitId: number;
+    }
+  | { readonly t: 'cityCaptured'; readonly playerId: number; readonly cityId: number }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;

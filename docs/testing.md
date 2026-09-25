@@ -35,7 +35,7 @@ s.runSeconds(60);
 
 expect(s.owner(at(2, 3))).toBe('A');
 expect(s.unitsOf('B')).toHaveLength(1);            // отступил, а не исчез
-expect(s.lastEvent('retreat')).toBeDefined();
+expect(s.lastEvent('unitRetreated')).toBeDefined();
 ```
 
 ## Обязательные инварианты (fast-check, после каждого тика)

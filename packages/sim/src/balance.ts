@@ -104,6 +104,8 @@ export const CITY_SUPPLY_PER_LEVEL: Fp = fp(250);
 export const CAPITAL_SUPPLY_BONUS: Fp = fp(250);
 export const CITY_GOLD_PER_LEVEL: Fp = fp(0.5);
 export const MILITIA_PER_LEVEL: Fp = fp(100);
+/** Восстановление ополчения вне боя, солдат в секунду. */
+export const MILITIA_REGEN_PER_S: Fp = fp(4);
 export const CITY_DEF_MULT: Fp = fp(1.3);
 export const CITY_FOUND_BASE_COST: Fp = fp(120);
 export const CITY_FOUND_COST_STEP: Fp = fp(0.5);

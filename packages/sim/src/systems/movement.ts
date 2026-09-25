@@ -1,7 +1,7 @@
-// Переходы отрядов гекс за гексом, захват пустых гексов, приказ expand. Путь не пересчитывается
-// (05-armies.md, «Движение»); атака при входе во врага — 03/T5.
+// Переходы отрядов гекс за гексом, захват пустых гексов, приказ expand, атака врага на пути,
+// отсчёт отступления. Путь не пересчитывается (05-armies.md, «Движение»).
 // GDD: docs/gdd/05-armies.md — «Движение», «Захват», «Приказы»
-import { MAX_UNITS_PER_HEX } from '../balance.ts';
+import { MAX_UNITS_PER_HEX, ORG_AFTER_RETREAT } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { findNearestPath, isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
@@ -16,11 +16,22 @@ function stop(unit: Unit): void {
   if (unit.order === 'move') unit.order = 'idle';
 }
 
-// Гекс стал непроходимым или занят врагом: отряд встаёт. Атака врага на пути появится в 03/T5.
+// Гекс стал непроходимым: отряд встаёт.
 function blocked(state: MatchState, unit: Unit, next: HexId): boolean {
   if (state.map.terrain[next] === TERRAIN.water) return true;
-  if (unit.type === 'artillery' && state.hexes.owner[next] !== unit.owner) return true;
-  return isHostileHex(state, unit.owner, next);
+  return unit.type === 'artillery' && state.hexes.owner[next] !== unit.owner;
+}
+
+// Враг на следующем гексе: отряд с приказом move атакует его (06-combat.md), остальные встают.
+function meetEnemy(state: MatchState, unit: Unit, next: HexId): boolean {
+  if (!isHostileHex(state, unit.owner, next)) return false;
+  const attack = unit.order === 'move';
+  stop(unit);
+  if (attack) {
+    unit.order = 'attack';
+    unit.target = next;
+  }
+  return true;
 }
 
 const isFull = (state: MatchState, unit: Unit, hex: HexId): boolean =>
@@ -61,6 +72,7 @@ function startStep(state: MatchState, unit: Unit, next: HexId): boolean {
     stop(unit);
     return false;
   }
+  if (meetEnemy(state, unit, next)) return false;
   // Полный гекс впереди: ждём, пока освободится место.
   if (isFull(state, unit, next)) return false;
   const ticks = stepTicks(state, unit, unit.hex, next);
@@ -88,8 +100,19 @@ function advance(state: MatchState, unit: Unit): void {
   if (unit.moveTicks < unit.moveTotal) unit.moveTicks += 1;
   if (unit.moveTicks < unit.moveTotal) return;
   if (blocked(state, unit, next)) return stop(unit);
+  if (meetEnemy(state, unit, next)) return;
   if (isFull(state, unit, next)) return;
   arrive(state, unit, next);
+}
+
+// Отступление уже перенесло отряд; здесь идёт только его время, затем org = ORG_AFTER_RETREAT.
+function retreatTick(unit: Unit): void {
+  unit.moveTicks += 1;
+  if (unit.moveTicks < unit.moveTotal) return;
+  unit.moveTicks = 0;
+  unit.moveTotal = 0;
+  unit.order = 'idle';
+  unit.org = ORG_AFTER_RETREAT;
 }
 
 /** Двигает отряды с приказами move и expand на тик; отряды — по возрастанию id. */
@@ -97,5 +120,6 @@ export function movementSystem(state: MatchState): void {
   for (const unit of state.units) {
     if (unit.order === 'expand' && unit.path.length === 0) planExpand(state, unit);
     if (unit.order === 'move' || unit.order === 'expand') advance(state, unit);
+    else if (unit.order === 'retreat') retreatTick(unit);
   }
 }
