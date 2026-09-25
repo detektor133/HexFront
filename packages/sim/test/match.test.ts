@@ -29,7 +29,7 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('469351d3');
+    expect(hashState(state)).toBe('b3c09053');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
@@ -70,7 +70,7 @@ describe('стартовое состояние', () => {
     expect(state.hexes.pop[id]).toBe((hexPopCap(state, id) * 200) / 1000);
   });
 
-  it('игрок начинает с 200 золота, налогом 20 % и двумя отрядами пехоты по 100 с приказом expand', () => {
+  it('игрок начинает с 200 золота, налогом 20 % и двумя отрядами пехоты по 100 без приказа (idle)', () => {
     for (const p of state.players) {
       expect(p).toMatchObject({ gold: START_GOLD, taxTarget: TAX_DEFAULT, status: 'alive' });
       const units = state.units.filter((a) => a.owner === p.id);
@@ -80,7 +80,7 @@ describe('стартовое состояние', () => {
           type: 'infantry',
           soldiers: 100_000,
           org: 100_000,
-          order: 'expand',
+          order: 'idle',
         });
       }
     }

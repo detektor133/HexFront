@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { TICKS_PER_S } from '../../src/balance.ts';
 import { distance, offsetToAxial } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
+import { canFoundCity } from '../../src/queries/city.ts';
 import { hashState } from '../../src/state/hash.ts';
 import { BUILDING } from '../../src/state/types.ts';
 import {
@@ -244,5 +245,22 @@ describe('постройки', () => {
     s.cmd('A', improve(hex));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['buildingExists']);
+  });
+});
+
+describe('основание города на обжитой земле (фоновый рост)', () => {
+  it('гекс в 5 гексах от столицы с 20 % дорастает до 60 % за ≈ 3 мин, и город можно основать', () => {
+    const s = scenario(
+      `
+      A1 a  a  a  a  a
+    `,
+      { legend: { A1: city('A', 1, { capital: true }), a: own('A') } },
+    );
+    s.setPop(at(5, 0), 20);
+    const hex = 5;
+    expect(canFoundCity(s.state, 0, hex)).toMatchObject({ ok: false, reason: 'popTooLow' });
+    // 20 → 60 при 0,4 × (1 − p/100): 250 × ln 2 ≈ 173 с.
+    s.runSeconds(180);
+    expect(canFoundCity(s.state, 0, hex).ok).toBe(true);
   });
 });

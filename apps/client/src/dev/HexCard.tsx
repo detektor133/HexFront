@@ -14,11 +14,26 @@ import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
 import type { RecruitOption, Selection } from '../local/messages.ts';
 
-function ActionButton(props: { a: HexAction; send: (cmd: Command) => void }): React.JSX.Element {
+function ActionButton(props: {
+  a: HexAction;
+  send: (cmd: Command) => void;
+  blockedText: string | null;
+}): React.JSX.Element {
   const [why, setWhy] = useState(false);
   const { a } = props;
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
+  // Недоступное по правилам «Основать город»: приглушённая кнопка и причина строкой (ui.md).
+  if (a.blocked) {
+    return (
+      <div className={styles.action}>
+        <button type="button" className={`${styles.button} ${styles.muted}`} disabled>
+          <span>{t(`action.${a.kind}` as MessageKey)}</span>
+        </button>
+        <span className={styles.hint}>{props.blockedText}</span>
+      </div>
+    );
+  }
   return (
     <div className={styles.action}>
       <button
@@ -78,6 +93,14 @@ function Row(props: { label: string; value: string }): React.JSX.Element {
       <dd>{props.value}</dd>
     </>
   );
+}
+
+// Причина недоступности основания: для населения — с числами, иначе — общий текст отказа.
+function blockedText(a: HexAction, s: Selection, view: PlayerView): string | null {
+  if (!a.blocked) return null;
+  if (a.blocked !== 'popTooLow' || s.popCap <= 0) return reasonText(a.blocked);
+  const percent = Math.floor((100 * (view.hexes.pop[s.hex] ?? 0)) / s.popCap);
+  return t('found.popTooLow').replace('{pop}', String(percent));
 }
 
 /** Карточка выбранного гекса снизу слева (ui.md, «Карточка выбранного»). */
@@ -146,7 +169,7 @@ export function HexCard(props: {
         </p>
       )}
       {actions.map((a) => (
-        <ActionButton key={a.kind} a={a} send={send} />
+        <ActionButton key={a.kind} a={a} send={send} blockedText={blockedText(a, s, view)} />
       ))}
       {recruiting && (
         <p className={styles.progressText}>

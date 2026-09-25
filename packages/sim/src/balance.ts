@@ -78,6 +78,8 @@ export const NEUTRAL_GARRISON: readonly [Fp, Fp, Fp] = [fp(150), fp(300), fp(600
 export const GROWTH_CITY_HEX: Fp = fp(3.0);
 export const GROWTH_RING1: Fp = fp(1.5);
 export const GROWTH_RING2: Fp = fp(0.5);
+/** Фоновый рост своих гексов вне радиуса 2 городов, людей/с. */
+export const GROWTH_BACKGROUND: Fp = fp(0.4);
 export const CITY_LEVEL_GROWTH_STEP: Fp = fp(0.25);
 export const POP_OVERCAP_DECAY: Fp = fp(0.01);
 export const CAPTURE_POP_LOSS_HEX: Fp = fp(0.2);

@@ -1,6 +1,7 @@
 // Какие действия показать в карточке выбранного гекса (ui.md, «Карточка выбранного»):
-// только возможные; «не хватает золота» — с ценой; недоступные по правилам — скрыты.
-import type { Command, ConstructionCheck } from '@hexfront/sim';
+// только возможные; «не хватает золота» — с ценой; недоступные по правилам — скрыты,
+// кроме «Основать город»: она видна всегда, недоступная — с причиной.
+import type { Command, ConstructionCheck, RejectReason } from '@hexfront/sim';
 
 import type { Selection } from '../local/messages.ts';
 
@@ -12,6 +13,18 @@ export interface HexAction {
   readonly cost: number;
   readonly affordable: boolean;
   readonly cmd: Command;
+  /** Почему недоступно по правилам — только у «Основать город»; иначе такие действия скрыты. */
+  readonly blocked?: RejectReason;
+}
+
+// «Основать город» — путь к росту государства, поэтому причина недоступности видна всегда.
+function foundCityAction(check: ConstructionCheck, hex: number): HexAction {
+  const cmd: Command = { t: 'foundCity', hex };
+  if (check.ok) return { kind: 'foundCity', cost: check.cost, affordable: true, cmd };
+  if (check.reason === 'notEnoughGold' && check.cost !== undefined) {
+    return { kind: 'foundCity', cost: check.cost, affordable: false, cmd };
+  }
+  return { kind: 'foundCity', cost: 0, affordable: false, cmd, blocked: check.reason };
 }
 
 function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): HexAction | null {
@@ -48,7 +61,7 @@ export function visibleActions(
       });
     }
   } else {
-    out.push(fromCheck('foundCity', s.foundCity, { t: 'foundCity', hex }));
+    out.push(foundCityAction(s.foundCity, hex));
     out.push(fromCheck('improve', s.improve, { t: 'improve', hex }));
     out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
   }

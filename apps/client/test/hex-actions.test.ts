@@ -12,7 +12,9 @@ const noGold = (cost: number): ConstructionCheck => ({
   cost: cost as Fp,
   timeS: 1000 as Fp,
 });
-const rule = (reason: 'cityTooClose' | 'depotNeedsRoad' | 'notOwnHex'): ConstructionCheck => ({
+const rule = (
+  reason: 'cityTooClose' | 'depotNeedsRoad' | 'notOwnHex' | 'popTooLow',
+): ConstructionCheck => ({
   ok: false,
   reason,
 });
@@ -36,11 +38,21 @@ describe('действия карточки гекса', () => {
   });
 
   it('недоступные по правилам скрыты, «не хватает золота» — с ценой', () => {
-    const actions = visibleActions(plain(), 0, 0, false);
+    const actions = visibleActions(plain(), 0, 0, false).filter((a) => a.kind !== 'foundCity');
     expect(actions.map((a) => [a.kind, a.cost, a.affordable])).toEqual([
       ['improve', 20_000, true],
       ['fort', 60_000, false],
     ]);
+  });
+
+  it('«Основать город» видна всегда — недоступная с причиной (ui.md)', () => {
+    const [found] = visibleActions(plain(), 0, 0, false);
+    expect(found).toMatchObject({ kind: 'foundCity', affordable: false, blocked: 'cityTooClose' });
+    const low = visibleActions(plain({ foundCity: rule('popTooLow') }), 0, 0, false)[0];
+    expect(low).toMatchObject({ kind: 'foundCity', blocked: 'popTooLow' });
+    const ready = visibleActions(plain({ foundCity: ok(120_000) }), 0, 0, false)[0];
+    expect(ready).toMatchObject({ kind: 'foundCity', affordable: true });
+    expect(ready?.blocked).toBeUndefined();
   });
 
   it('пока на гексе идёт стройка — действий нет', () => {

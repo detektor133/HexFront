@@ -143,7 +143,8 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       soldiers: START_UNIT_SOLDIERS,
       org: ORG_MAX,
       hex: capital,
-      order: 'expand',
+      // Старт без приказа: экспансию игрок включает сам (08-match.md, «Старт»).
+      order: 'idle',
       supplyLevel: FP as Fp,
       path: [],
       moveTicks: 0,
