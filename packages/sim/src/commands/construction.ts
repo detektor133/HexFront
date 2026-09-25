@@ -148,7 +148,13 @@ function withGold(state: MatchState, playerId: number, result: PlanResult): Plan
 /** Результат проверки стройки для UI: цена и время или причина отказа. */
 export type ConstructionCheck =
   | { readonly ok: true; readonly cost: Fp; readonly timeS: Fp }
-  | { readonly ok: false; readonly reason: RejectReason };
+  | {
+      readonly ok: false;
+      readonly reason: RejectReason;
+      /** Есть, когда не хватает только золота: интерфейс показывает цену (ui.md). */
+      readonly cost?: Fp;
+      readonly timeS?: Fp;
+    };
 
 /**
  * Проверка стройки с ценой — одна логика для команды и для кнопок интерфейса.
@@ -159,9 +165,13 @@ export function checkConstruction(
   playerId: number,
   cmd: BuildCommand,
 ): ConstructionCheck {
-  const result = withGold(state, playerId, planOf(state, playerId, cmd));
-  if (!result.ok) return result;
-  return { ok: true, cost: result.plan.cost, timeS: result.plan.timeS };
+  const planned = planOf(state, playerId, cmd);
+  if (!planned.ok) return planned;
+  const { cost, timeS } = planned.plan;
+  const result = withGold(state, playerId, planned);
+  return result.ok
+    ? { ok: true, cost, timeS }
+    : { ok: false, reason: 'notEnoughGold', cost, timeS };
 }
 
 /**

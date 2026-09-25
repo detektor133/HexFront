@@ -27,9 +27,10 @@ export interface MapViewState {
   readonly fps: number;
 }
 
-/** Слой между заливкой рельефа и его узорами (территории). */
+/** Слой между заливкой рельефа и его узорами (территории, дороги); top — над узорами (города). */
 export interface MidLayer {
   readonly container: Container;
+  readonly top?: Container;
   update(scale: number, level: DetailLevel): void;
   destroy(): void;
 }
@@ -94,6 +95,7 @@ export async function createMapView(
     world.addChild(layer.base);
     if (mid) world.addChild(mid.container);
     world.addChild(layer.overlay);
+    if (mid?.top) world.addChild(mid.top);
   };
   mount();
   let bounds: Rect = mapBounds(map.width, map.height, opts.radius);

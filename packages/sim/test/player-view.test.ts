@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NETWORK_RECALC_TICKS } from '../src/balance.ts';
 import { at, city, own, road, scenario } from './scenario/dsl.ts';
+import type { Fp } from '../src/math/int.ts';
 import { playerView } from '../src/queries/player-view.ts';
 import { hashState } from '../src/state/hash.ts';
 
@@ -43,5 +44,23 @@ describe('playerView', () => {
     v.hexes.owner[0] = 5;
     v.hexes.pop[0] = 1;
     expect(hashState(s.state)).toBe(before);
+  });
+
+  it('сводка игрока для верхней полосы: население, прирост, доход, эффект выбранного налога, место', () => {
+    const s = scenario(MAP, { legend });
+    s.state.hexes.pop.fill(0);
+    s.setPop(at(0, 0), 100);
+    s.player('A').taxTarget = 400 as Fp;
+    const me = playerView(s.state, 0).me;
+    expect(me.popTotal).toBe(100_000);
+    // Доход: 100 чел. × 20 % × 0,01 = 0,2 + 2 города × 0,5 = 1,2; при 40 % — 1,4.
+    expect(me.incomePerS).toBe(1200);
+    expect(me.incomeAtTargetPerS).toBe(1400);
+    expect(me.growthMultAtTarget).toBe(500);
+    expect(me.popGrowthPerS).toBeGreaterThan(0);
+    // Очки (08-match.md): 2 города × 10 + 27 своих гексов, армий нет.
+    expect(me.score).toBe(2 * 10 + 27);
+    expect(me.place).toBe(1);
+    expect(me.players).toBe(1);
   });
 });

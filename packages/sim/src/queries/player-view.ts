@@ -1,10 +1,13 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
+import { playerPlace, playerScore } from './score.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
+import { playerIncomePerSecond } from '../systems/economy.ts';
 import { hexGrowthPerSecond } from '../systems/population.ts';
+import { taxGrowthMult } from '../systems/tax.ts';
 
 /** Связь узла сети: 0 — не узел, 1 — основная сеть, 2 — изолированная. */
 export const LINK = { none: 0, main: 1, isolated: 2 } as const;
@@ -39,6 +42,21 @@ export interface PlayerView {
     readonly taxEffective: Fp;
     readonly status: string;
   }[];
+  /** Сводка своего государства для верхней полосы (ui.md, «HUD»). */
+  readonly me: {
+    /** Людей всего и прирост, fixed-point (в секунду). */
+    readonly popTotal: number;
+    readonly popGrowthPerS: number;
+    /** Золото в секунду при фактическом и при выбранном налоге. */
+    readonly incomePerS: number;
+    readonly incomeAtTargetPerS: number;
+    /** Множитель роста населения при выбранном налоге, fixed-point. */
+    readonly growthMultAtTarget: Fp;
+    readonly score: number;
+    readonly place: number;
+    /** Живых игроков в матче. */
+    readonly players: number;
+  };
   readonly constructions: readonly {
     readonly id: number;
     readonly owner: number;
@@ -57,13 +75,36 @@ function links(state: MatchState): Uint8Array {
   );
 }
 
+function summary(state: MatchState, playerId: number, growth: Int32Array): PlayerView['me'] {
+  let popTotal = 0;
+  let popGrowthPerS = 0;
+  state.hexes.owner.forEach((o, id) => {
+    if (o !== playerId) return;
+    popTotal += state.hexes.pop[id] ?? 0;
+    popGrowthPerS += growth[id] ?? 0;
+  });
+  const target = state.players[playerId]?.taxTarget ?? (0 as Fp);
+  return {
+    popTotal,
+    popGrowthPerS,
+    incomePerS: playerIncomePerSecond(state, playerId),
+    incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target),
+    growthMultAtTarget: taxGrowthMult(target),
+    score: playerScore(state, playerId),
+    place: playerPlace(state, playerId),
+    players: state.players.filter((p) => p.status === 'alive').length,
+  };
+}
+
 /**
  * Снимок для игрока. Массивы — копии: клиент может их менять, состояние не пострадает.
  * @returns данные для отрисовки и интерфейса
  */
 export function playerView(state: MatchState, playerId: number): PlayerView {
   const { hexes } = state;
+  const growth = Int32Array.from(hexes.pop, (_, id) => hexGrowthPerSecond(state, id));
   return {
+    me: summary(state, playerId, growth),
     tick: state.tick,
     playerId,
     hexes: {
@@ -73,7 +114,7 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
       building: Uint8Array.from(hexes.building),
       road: Uint8Array.from(hexes.road),
       link: links(state),
-      growth: Int32Array.from(hexes.pop, (_, id) => hexGrowthPerSecond(state, id)),
+      growth,
     },
     cities: state.cities.map((c) => ({
       id: c.id,

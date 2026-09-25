@@ -23,3 +23,4 @@ export {
   type ConstructionCheck,
 } from './commands/construction.ts';
 export { rebuildSupplyPlan, type RebuildPlan } from './commands/rebuild-supply.ts';
+export * from './queries/score.ts';

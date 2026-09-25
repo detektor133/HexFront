@@ -135,9 +135,11 @@ describe('запросы для UI', () => {
         timeS: 30_000,
       });
       s.player('A').gold = 0 as Fp;
-      expect(cityInfo(s.state, cityId(s, A2))?.upgrade).toMatchObject({
+      expect(cityInfo(s.state, cityId(s, A2))?.upgrade).toEqual({
         ok: false,
         reason: 'notEnoughGold',
+        cost: 200_000,
+        timeS: 30_000,
       });
     });
 

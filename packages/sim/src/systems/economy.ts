@@ -84,6 +84,25 @@ function incomePerSecond(pop: number, tax: Fp, cityLevels: number, mines: number
 }
 
 /**
+ * Доход игрока в секунду по текущему состоянию; tax — ставка для расчёта (по умолчанию
+ * фактическая), чтобы интерфейс мог показать итог выбранной ставки.
+ * @returns fixed-point золота в секунду
+ */
+export function playerIncomePerSecond(state: MatchState, playerId: number, tax?: Fp): number {
+  const b = incomeBases(state)[playerId];
+  const p = state.players[playerId];
+  if (!b || !p) return 0;
+  return incomeFromBase(b, tax ?? p.taxEffective);
+}
+
+// Одна формула для начисления и для подсказок интерфейса.
+function incomeFromBase(b: Base, rate: Fp): number {
+  const connected = incomePerSecond(b.pop, rate, b.cityLevels, b.mines);
+  const isolated = incomePerSecond(b.isolatedPop, rate, b.isolatedCityLevels, b.isolatedMines);
+  return connected + fpMul(isolated as Fp, ISOLATED_INCOME_MULT);
+}
+
+/**
  * Начисляет доход за тик:
  * income/с = Σpop × taxEffective × GOLD_PER_POP_TAX + Σ CITY_GOLD_PER_LEVEL × level + Σ MINE_GOLD_PER_S,
  * для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT.
@@ -94,14 +113,7 @@ export function economySystem(state: MatchState): void {
   state.players.forEach((p, i) => {
     const b = bases[i];
     if (p.status !== 'alive' || !b) return;
-    const connected = incomePerSecond(b.pop, p.taxEffective, b.cityLevels, b.mines);
-    const isolated = incomePerSecond(
-      b.isolatedPop,
-      p.taxEffective,
-      b.isolatedCityLevels,
-      b.isolatedMines,
-    );
-    const perSecond = connected + fpMul(isolated as Fp, ISOLATED_INCOME_MULT);
+    const perSecond = incomeFromBase(b, p.taxEffective);
     p.gold = (p.gold + intDiv(perSecond, TICKS_PER_S)) as Fp;
   });
 }

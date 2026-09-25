@@ -158,9 +158,13 @@ export const tokens = {
   },
   "road": {
     "width": [
+      2,
       3,
+      4
+    ],
+    "dash": [
       6,
-      9
+      5
     ],
     "cornerRadius": 6,
     "flowColor": "#FFFFFF",
@@ -174,10 +178,6 @@ export const tokens = {
       14
     ],
     "flowSpeed": 18,
-    "isolatedDash": [
-      7,
-      7
-    ],
     "isolatedAlpha": 0.45,
     "offroadDotted": [
       1,

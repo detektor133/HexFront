@@ -1,0 +1,104 @@
+/* Верхняя полоса — ui.md «HUD»: белая, 48 px (ПК) / 44 px (телефон), жёсткая тень снизу. */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-xl);
+  min-height: 48px;
+  padding: 0 var(--space-lg);
+  box-sizing: border-box;
+  background: var(--ui-surface);
+  box-shadow: var(--shadow-hard);
+}
+
+.slot,
+.taxButton {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+
+.label {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.value {
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  font-size: var(--font-size-hud-value);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-ink);
+}
+
+.rate,
+.rateBad {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.rateBad {
+  color: var(--status-danger);
+}
+
+.taxWrap {
+  position: relative;
+}
+
+.taxButton {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  left: 0;
+  width: 260px;
+  padding: var(--space-md);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--ui-ink);
+}
+
+.hint {
+  margin: var(--space-xs) 0 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Телефон в портрете: две строки, вторая мельче (ui.md). */
+@media (max-width: 600px) {
+  .hud {
+    gap: 0 var(--space-md);
+    min-height: 44px;
+    padding: var(--space-xs) var(--space-md);
+  }
+
+  .value {
+    font-size: var(--font-size-body);
+  }
+
+  .taxButton {
+    min-height: 32px;
+  }
+}
