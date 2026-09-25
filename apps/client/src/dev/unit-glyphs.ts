@@ -13,8 +13,13 @@ import { tokens } from '../theme/tokens.ts';
 /** Радиус кружка отряда и сдвиг вниз от центра гекса — доли радиуса гекса (центр — у города). */
 const CIRCLE_SHARE = 0.42;
 const OFFSET_SHARE = 0.32;
-/** Размер числа — доля радиуса гекса. */
+/** Размер числа — доля радиуса гекса; длиннее FIT_CHARS знаков — шрифт уменьшается, чтобы влезть в кружок. */
 const LABEL_SHARE = 0.34;
+const FIT_CHARS = 3;
+/** Предел разрешения текста: выше — лишняя память без видимой разницы. */
+const MAX_TEXT_RESOLUTION = 8;
+/** Точка маркера боя — доля радиуса гекса. */
+const BATTLE_DOT_SHARE = 0.24;
 /** Толщины в экранных px (токенов нет — отладочный вид). */
 const OUTLINE_PX = 1.5;
 const RING_PX = 2;
@@ -81,13 +86,17 @@ export function drawUnits(
   for (const lbl of labels.removeChildren()) lbl.destroy();
   for (const u of view.units) {
     if (u.order !== 'attack' || u.target < 0) continue;
-    const a = center(u.hex);
+    // Линия боя — от кружка отряда (он ниже центра гекса) к центру цели.
+    const from = center(u.hex);
+    const a = { x: from.x, y: from.y + hexRadius * OFFSET_SHARE };
     const b = center(u.target);
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     g.moveTo(a.x, a.y)
       .lineTo(mid.x, mid.y)
       .stroke({ color: tokens.status.danger, width: BATTLE_PX * k });
-    g.circle(mid.x, mid.y, hexRadius * 0.16).fill(tokens.status.danger);
+    g.circle(mid.x, mid.y, hexRadius * BATTLE_DOT_SHARE)
+      .fill(tokens.status.danger)
+      .stroke({ color: tokens.ui.surface, width: OUTLINE_PX * k });
   }
   const r = hexRadius * CIRCLE_SHARE;
   for (const grp of groups) {
@@ -111,12 +120,15 @@ export function drawUnits(
     }
     const text =
       grp.count > 1 ? `${formatSoldiers(grp.soldiers)}·${grp.count}` : formatSoldiers(grp.soldiers);
+    const fit = Math.min(1, FIT_CHARS / text.length);
     const label = new Text({
       text,
+      // Текст растеризуется в разрешении масштаба камеры, иначе при приближении он размыт.
+      resolution: Math.min(MAX_TEXT_RESOLUTION, window.devicePixelRatio / k),
       style: {
         fontFamily: tokens.font.ui.family,
         fontWeight: '500',
-        fontSize: hexRadius * LABEL_SHARE,
+        fontSize: hexRadius * LABEL_SHARE * fit,
         fill: tokens.ui.surface,
       },
     });
