@@ -114,6 +114,45 @@ function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boo
 
 const UNREACHED = 0x7fffffff;
 
+// A* по времени хода; h — допустимая эвристика (0 — Дейкстра до ближайшей цели).
+function search(
+  state: MatchState,
+  from: HexId,
+  mover: Mover,
+  isGoal: (hex: HexId) => boolean,
+  h: (hex: HexId) => number,
+): HexId[] | null {
+  const { width, height } = state.map;
+  const g = new Int32Array(width * height).fill(UNREACHED);
+  const prev = new Int32Array(width * height).fill(-1);
+  const heap = createHeap();
+  g[from] = 0;
+  heapPush(heap, 0, from);
+  let found = -1;
+  for (let top = heapPop(heap); top; top = heapPop(heap)) {
+    const hex = top[1];
+    if (hex !== from && isGoal(hex)) {
+      found = hex;
+      break;
+    }
+    const gh = g[hex] ?? UNREACHED;
+    for (const n of neighbors(hexFromId(hex, width))) {
+      if (!inBounds(n, width, height)) continue;
+      const id = hexId(n, width);
+      if (!canEnter(state, mover, id, isGoal(id))) continue;
+      const cost = stepTicks(state, mover, hex, id);
+      if (cost === null || gh + cost >= (g[id] ?? UNREACHED)) continue;
+      g[id] = gh + cost;
+      prev[id] = hex;
+      heapPush(heap, gh + cost + h(id), id);
+    }
+  }
+  if (found < 0) return null;
+  const path: HexId[] = [];
+  for (let at = found; at !== from; at = prev[at] ?? from) path.push(at);
+  return path.reverse();
+}
+
 /**
  * Путь армии (A* по времени хода, ничьи — по меньшему HexId). Снабжённость считается полной:
  * она меняет все шаги одинаково и на выбор пути не влияет.
@@ -127,33 +166,31 @@ export function findPath(
   owner: number,
 ): HexId[] | null {
   if (from === to) return [];
-  const { width, height } = state.map;
   const mover: Mover = { type, owner, supplyLevel: FP as Fp };
   if (!canEnter(state, mover, to, true)) return null;
+  const { width } = state.map;
   const goal = hexFromId(to, width);
   const hMin = minStepTicks(type);
-  const g = new Int32Array(width * height).fill(UNREACHED);
-  const prev = new Int32Array(width * height).fill(-1);
-  const heap = createHeap();
-  g[from] = 0;
-  heapPush(heap, 0, from);
-  for (let top = heapPop(heap); top; top = heapPop(heap)) {
-    const hex = top[1];
-    if (hex === to) break;
-    const gh = g[hex] ?? UNREACHED;
-    for (const n of neighbors(hexFromId(hex, width))) {
-      if (!inBounds(n, width, height)) continue;
-      const id = hexId(n, width);
-      if (!canEnter(state, mover, id, id === to)) continue;
-      const cost = stepTicks(state, mover, hex, id);
-      if (cost === null || gh + cost >= (g[id] ?? UNREACHED)) continue;
-      g[id] = gh + cost;
-      prev[id] = hex;
-      heapPush(heap, gh + cost + distance(n, goal) * hMin, id);
-    }
-  }
-  if (prev[to] === -1) return null;
-  const path: HexId[] = [];
-  for (let at = to; at !== from; at = prev[at] ?? from) path.push(at);
-  return path.reverse();
+  return search(
+    state,
+    from,
+    mover,
+    (hex) => hex === to,
+    (hex) => distance(hexFromId(hex, width), goal) * hMin,
+  );
+}
+
+/**
+ * Путь до ближайшего по времени хода гекса, удовлетворяющего isGoal (Дейкстра).
+ * @returns гексы после from до цели включительно или null, если цели не достичь
+ */
+export function findNearestPath(
+  state: MatchState,
+  from: HexId,
+  type: UnitType,
+  owner: number,
+  isGoal: (hex: HexId) => boolean,
+): HexId[] | null {
+  const mover: Mover = { type, owner, supplyLevel: FP as Fp };
+  return search(state, from, mover, isGoal, () => 0);
 }

@@ -74,7 +74,10 @@ export function validateArmyCommand(
     case 'move':
       return validateMove(state, owned.armies, cmd.to);
     case 'setOrder':
-      return OK;
+      // Артиллерия не захватывает гексы, поэтому экспансия ей недоступна.
+      return cmd.order === 'expand' && owned.armies.some((a) => a.type === 'artillery')
+        ? rejected('badOrder')
+        : OK;
     case 'split':
       return owned.armies[0]
         ? validateSplit(state, owned.armies[0], cmd.soldiers)

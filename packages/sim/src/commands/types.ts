@@ -66,6 +66,7 @@ export const REJECT_REASONS = [
   'hexFull',
   'notSameHex',
   'notSameType',
+  'badOrder',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

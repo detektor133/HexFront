@@ -33,3 +33,5 @@ export {
 } from './commands/recruit.ts';
 export { playerUpkeepPerSecond } from './systems/economy.ts';
 export { findPath, isHostileHex, stepTicks, type Mover } from './queries/army-path.ts';
+export { findNearestPath } from './queries/army-path.ts';
+export { captureHex } from './state/capture.ts';

@@ -1,6 +1,13 @@
 // Сценарный DSL из docs/testing.md: мини-карта в ASCII → состояние матча, команды, прогон по времени.
 // Клетка сетки — гекс в offset-координатах (столбец, строка); at(col, row) адресует её так же.
-import { ORG_MAX, START_GOLD, TAX_DEFAULT, TICKS_PER_S, type UnitType } from '../../src/balance.ts';
+import {
+  NEUTRAL_GARRISON,
+  ORG_MAX,
+  START_GOLD,
+  TAX_DEFAULT,
+  TICKS_PER_S,
+  type UnitType,
+} from '../../src/balance.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
@@ -273,7 +280,9 @@ export function scenario(
     if (cell.kind !== 'city') return;
     const id = state.nextId;
     state.nextId += 1;
-    state.cities.push({ id, hex, owner, level: cell.level, name: token, garrison: 0 as Fp });
+    // Нейтральный город защищает гарнизон по уровню, как на сгенерированных картах.
+    const garrison = owner === NEUTRAL ? (NEUTRAL_GARRISON[cell.level - 1] ?? 0) : 0;
+    state.cities.push({ id, hex, owner, level: cell.level, name: token, garrison: garrison as Fp });
     const player = state.players[owner];
     if (cell.capital && player) player.capitalCityId = id;
   });
