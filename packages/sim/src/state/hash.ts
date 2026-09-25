@@ -58,6 +58,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.taxEffective);
     int(s, p.capitalCityId);
     str(s, p.status);
+    int(s, p.citiesFounded);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {
@@ -69,6 +70,19 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.hex);
     str(s, a.order);
     int(s, a.supplyLevel);
+  }
+}
+
+function hashConstructions(s: Hasher, state: MatchState): void {
+  int(s, state.constructions.length);
+  for (const c of state.constructions) {
+    int(s, c.id);
+    int(s, c.owner);
+    int(s, c.hex);
+    str(s, c.kind);
+    int(s, c.progressTicks);
+    int(s, c.totalTicks);
+    array(s, c.path ?? []);
   }
 }
 
@@ -90,6 +104,14 @@ export function hashState(state: MatchState): string {
   array(s, hexes.improvement);
   array(s, hexes.building);
   array(s, hexes.road);
+  array(s, hexes.network);
   hashEntities(s, state);
+  hashConstructions(s, state);
+  int(s, state.networks.length);
+  for (const n of state.networks) {
+    int(s, n.id);
+    int(s, n.owner);
+    int(s, n.isMain ? 1 : 0);
+  }
   return s.h.toString(16).padStart(8, '0');
 }

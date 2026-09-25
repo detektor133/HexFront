@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { deltaE2000, toLab } from './color-math.ts';
-import { mixWithWhite } from '../src/dev/fake-territories.ts';
+import { mixWithWhite } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 const LAND = ['plains', 'forest', 'hills', 'mountains', 'desert'] as const;

@@ -1,4 +1,7 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
+import { startConstruction, validateConstruction } from './construction.ts';
+import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
+import { validateSetTax } from './set-tax.ts';
 import { rejected, type Command, type PlayerCommand, type Validation } from './types.ts';
 import type { MatchState } from '../state/types.ts';
 
@@ -8,10 +11,18 @@ function assertNever(x: never): never {
   throw new Error(`неизвестная команда: ${JSON.stringify(x)}`);
 }
 
-// Каждая команда получит свою проверку в этапе, где появляется её механика.
-function validateCommand(cmd: Command): Validation {
+// Команды, чья механика появится в следующих этапах, пока отклоняются как notImplemented.
+function validateCommand(state: MatchState, playerId: number, cmd: Command): Validation {
   switch (cmd.t) {
     case 'setTax':
+      return validateSetTax(cmd.rate);
+    case 'foundCity':
+    case 'upgradeCity':
+    case 'improve':
+    case 'build':
+      return validateConstruction(state, playerId, cmd);
+    case 'rebuildSupply':
+      return validateRebuildSupply(state, playerId, cmd.cityId);
     case 'move':
     case 'attack':
     case 'setOrder':
@@ -22,14 +33,30 @@ function validateCommand(cmd: Command): Validation {
     case 'merge':
     case 'bombard':
     case 'recruit':
+      return rejected('notImplemented');
+    default:
+      return assertNever(cmd);
+  }
+}
+
+function execute(state: MatchState, playerId: number, cmd: Command): void {
+  switch (cmd.t) {
+    case 'setTax': {
+      const player = state.players[playerId];
+      if (player) player.taxTarget = cmd.rate;
+      return;
+    }
     case 'foundCity':
     case 'upgradeCity':
     case 'improve':
     case 'build':
+      startConstruction(state, playerId, cmd);
+      return;
     case 'rebuildSupply':
-      return rejected('notImplemented');
+      startRebuildSupply(state, playerId, cmd.cityId);
+      return;
     default:
-      return assertNever(cmd);
+      return;
   }
 }
 
@@ -41,7 +68,7 @@ export function validate(state: MatchState, playerId: number, cmd: Command): Val
   const player = state.players[playerId];
   if (!player) return rejected('unknownPlayer');
   if (player.status !== 'alive') return rejected('playerEliminated');
-  return validateCommand(cmd);
+  return validateCommand(state, playerId, cmd);
 }
 
 /**
@@ -53,8 +80,8 @@ export function applyCommands(state: MatchState, commands: readonly PlayerComman
   const ordered = [...commands].sort((a, b) => a.playerId - b.playerId);
   for (const { playerId, cmd } of ordered) {
     const result = validate(state, playerId, cmd);
-    if (!result.ok) {
+    if (result.ok) execute(state, playerId, cmd);
+    else
       state.events.push({ t: 'commandRejected', playerId, command: cmd.t, reason: result.reason });
-    }
   }
 }

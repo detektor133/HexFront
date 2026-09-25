@@ -15,6 +15,7 @@ import {
 
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexEdge, hexPolygon } from '../render/hex-geometry.ts';
+import { mixWithWhite } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const STATE_RADIUS = 6;
@@ -24,18 +25,6 @@ const OWN = 0;
 const PLAYER_SLOTS = [0, 1, 2] as const;
 /** Какие спавны карты занимают государства. */
 const SPAWN_SLOTS = [0, 2, 4] as const;
-
-/** Смешивает цвет с белым: f — доля белого (territory.fillMix). */
-export function mixWithWhite(hex: string, f: number): string {
-  const ch = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
-  return `#${ch
-    .map((c) =>
-      Math.round(c * (1 - f) + 255 * f)
-        .toString(16)
-        .padStart(2, '0'),
-    )
-    .join('')}`;
-}
 
 function claim(map: MapStatic): Int16Array {
   const owner = new Int16Array(map.width * map.height).fill(-1);

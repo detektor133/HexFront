@@ -1,0 +1,18 @@
+.page {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.error {
+  position: absolute;
+  top: 64px;
+  left: var(--space-lg);
+  z-index: 2;
+  color: var(--status-danger);
+}

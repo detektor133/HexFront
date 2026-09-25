@@ -8,6 +8,9 @@ import type { Fp } from '../math/int.ts';
 /** Владелец гекса или города: id игрока либо NEUTRAL. */
 export const NEUTRAL = -1;
 
+/** Коды постройки гекса в hexes.building; 0 — нет постройки. */
+export const BUILDING = { none: 0, fort: 1, depot: 2 } as const;
+
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
 export interface HexState {
   /** id игрока или NEUTRAL. */
@@ -20,6 +23,17 @@ export interface HexState {
   readonly building: Uint8Array;
   /** 1 — на гексе дорога. */
   readonly road: Uint8Array;
+  /** Id сети снабжения узла (свой гекс с дорогой или городом) или -1; кэш networkSystem. */
+  readonly network: Int32Array;
+}
+
+/** Сеть снабжения — компонента связности узлов одного игрока. */
+export interface SupplyNetwork {
+  /** owner × размер карты + наименьший HexId компоненты: уникально и детерминированно. */
+  readonly id: number;
+  readonly owner: number;
+  /** Содержит столицу. */
+  readonly isMain: boolean;
 }
 
 export interface City {
@@ -44,6 +58,22 @@ export interface Player {
   taxEffective: Fp;
   capitalCityId: number;
   status: PlayerStatus;
+  /** Сколько городов игрок основал за матч (N в цене основания), включая начатые стройки. */
+  citiesFounded: number;
+}
+
+export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
+
+/** Стройка на гексе; одна на гекс. Прогресс — в тиках. */
+export interface Construction {
+  readonly id: number;
+  readonly owner: number;
+  readonly hex: HexId;
+  readonly kind: ConstructionKind;
+  progressTicks: number;
+  readonly totalTicks: number;
+  /** Только для road: гексы без дороги в порядке прокладки, по одному за ROAD_BUILD_S_PER_HEX. */
+  readonly path?: readonly HexId[];
 }
 
 export type ArmyOrder = 'idle' | 'hold' | 'expand';
@@ -63,12 +93,19 @@ export interface Army {
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */
-export type GameEvent = {
-  readonly t: 'commandRejected';
-  readonly playerId: number;
-  readonly command: string;
-  readonly reason: string;
-};
+export type GameEvent =
+  | {
+      readonly t: 'commandRejected';
+      readonly playerId: number;
+      readonly command: string;
+      readonly reason: string;
+    }
+  | {
+      readonly t: 'constructionDone' | 'constructionCancelled';
+      readonly playerId: number;
+      readonly kind: ConstructionKind;
+      readonly hex: HexId;
+    };
 
 export interface MatchState {
   tick: number;
@@ -81,6 +118,10 @@ export interface MatchState {
   readonly players: Player[];
   /** Отсортированы по id. */
   readonly armies: Army[];
+  /** Отсортированы по id. */
+  readonly constructions: Construction[];
+  /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
+  networks: SupplyNetwork[];
   nextId: number;
   events: GameEvent[];
 }

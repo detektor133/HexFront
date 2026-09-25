@@ -158,9 +158,13 @@ export const tokens = {
   },
   "road": {
     "width": [
+      2,
       3,
+      4
+    ],
+    "dash": [
       6,
-      9
+      5
     ],
     "cornerRadius": 6,
     "flowColor": "#FFFFFF",
@@ -174,10 +178,6 @@ export const tokens = {
       14
     ],
     "flowSpeed": 18,
-    "isolatedDash": [
-      7,
-      7
-    ],
     "isolatedAlpha": 0.45,
     "offroadDotted": [
       1,
@@ -185,24 +185,17 @@ export const tokens = {
     ]
   },
   "city": {
-    "radiusByLevel": [
-      6,
-      7.5,
-      9,
-      10.5,
-      12
+    "sizeByLevel": [
+      0.36,
+      0.44,
+      0.52,
+      0.6,
+      0.68
     ],
-    "strokeByLevel": [
-      3,
-      3.5,
-      4,
-      4.5,
-      5
-    ],
+    "outline": 1.5,
+    "capitalStarOuter": 0.62,
+    "capitalStarInner": 0.27,
     "fill": "#FFFFFF",
-    "capitalDotRadius": 3,
-    "capitalOuterRingGap": 3,
-    "capitalOuterRingWidth": 1.25,
     "labelSize": [
       11,
       11,
