@@ -18,8 +18,9 @@ import {
 } from '@hexfront/sim';
 
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
-import { edgeRuns } from './plan-edges.ts';
+import { edgeRuns, smooth } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
+import type { SplitOverlay } from './split-drag.ts';
 import { dashedPath } from './unit-layer.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import type { DetailLevel } from '../render/camera.ts';
@@ -40,6 +41,7 @@ export interface PlanLayer {
     view: PlayerView,
     draft: Draft | null,
     selectedArmy: number | null,
+    split: SplitOverlay | null,
     scale: number,
     level: DetailLevel,
   ): void;
@@ -185,43 +187,47 @@ export function createPlanLayer(
     arrows.poly(shape).fill({ color: tokens.arrow.color, alpha });
   }
 
-  // Линия наступления: пунктир по граням + 1–3 стрелки от ближайших точек фронта.
+  // Линия наступления как в HoI4: сглаженная линия по граням (пунктир — только нарисована, сплошная —
+  // идёт) и 1–3 полупрозрачные стрелки, разнесённые вдоль фронта и линии в одном порядке, чтобы
+  // стрелки не пересекались и не сходились в одну точку.
   function drawOffensiveLine(
     front: readonly EdgeId[],
     line: readonly EdgeId[],
-    alpha: number,
+    active: boolean,
+    alpha = 1,
   ): Point[] {
-    const runs = runsOf(line);
+    const runs = runsOf(line).map((r) => smooth(r));
     const [dash = 8, gap = 5] = tokens.arrow.dash;
-    for (const r of runs) dashedPath(g, r, dash * k, gap * k, 0);
+    for (const r of runs) {
+      if (active) polyline(r);
+      else dashedPath(g, r, dash * k, gap * k, 0);
+    }
     g.stroke({
       color: tokens.arrow.color,
       width: width(tokens.arrow.width),
       cap: 'round',
-      alpha: Math.min(1, alpha * 3),
+      join: 'round',
+      alpha,
     });
-    const frontPts = runsOf(front).flat();
-    const all = runs.flat();
-    const total = runs.reduce((s, r) => s + pathLength(r), 0);
-    if (frontPts.length === 0 || total === 0) return all;
-    const n = total < radius * 4 ? 1 : total < radius * 10 ? 2 : 3;
+    const frontLine = runsOf(front).flat();
+    const lineAll = runs.flat();
+    const fl = pathLength(frontLine);
+    const ll = pathLength(lineAll);
+    const fa = frontLine[0];
+    const fb = frontLine.at(-1);
+    const la = lineAll[0];
+    const lb = lineAll.at(-1);
+    if (!fa || !fb || !la || !lb || ll === 0) return lineAll;
+    const d = (p: Point, q: Point): number => Math.hypot(p.x - q.x, p.y - q.y);
+    const target =
+      d(fa, la) + d(fb, lb) <= d(fa, lb) + d(fb, la) ? lineAll : [...lineAll].reverse();
+    const n = Math.max(1, Math.min(3, Math.round(fl / (radius * 3)) + 1));
+    const arrowAlpha = (active ? tokens.arrow.alpha : tokens.arrow.plannedAlpha) * alpha;
     for (let i = 0; i < n; i += 1) {
-      // Точка на линии — равномерно по суммарной длине ломаных; начало — ближайшая точка фронта.
-      let s = (total * (2 * i + 1)) / (2 * n);
-      let to = all[0] as Point;
-      for (const r of runs) {
-        const l = pathLength(r);
-        if (s <= l) {
-          to = pointAlong(r, s);
-          break;
-        }
-        s -= l;
-      }
-      const dist = (p: Point): number => Math.hypot(p.x - to.x, p.y - to.y);
-      const from = frontPts.reduce((best, p) => (dist(p) < dist(best) ? p : best));
-      drawArrow(from, to, alpha);
+      const share = (2 * i + 1) / (2 * n);
+      drawArrow(pointAlong(frontLine, fl * share), pointAlong(target, ll * share), arrowAlpha);
     }
-    return all;
+    return lineAll;
   }
 
   // Самый трудный из ближайших боёв: отряды армии рядом с занятыми врагом гексами зоны.
@@ -261,7 +267,7 @@ export function createPlanLayer(
 
   function drawOffensive(v: PlayerView, p: FrontPlan): void {
     if (!p.offensive) return;
-    const pts = drawOffensiveLine(p.edges, p.offensive.edges, tokens.arrow.alpha);
+    const pts = drawOffensiveLine(p.edges, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
     const mid = pts[Math.floor(pts.length / 2)];
     if (!worst || !mid) return;
@@ -274,6 +280,33 @@ export function createPlanLayer(
     label(t(`forecast.${worst}` as MessageKey), tone, mid);
   }
 
+  // Кольцо деления: подложка, дуга «сколько взять» от верха по часовой, ручка, число; путь в гекс.
+  function drawSplit(o: SplitOverlay): void {
+    const { center: c, ring } = o;
+    if (o.target !== null) {
+      const t = center(o.target);
+      dashedPath(g, [c, t], 6 * k, 5 * k, 0);
+      g.stroke({ color: tokens.relation.own, width: 2.5 * k, cap: 'round' });
+      g.circle(t.x, t.y, 6 * k)
+        .fill(tokens.ui.surface)
+        .stroke({ color: tokens.relation.own, width: 2.5 * k });
+    }
+    g.circle(c.x, c.y, ring).stroke({ color: tokens.ui.surface, width: 8 * k, alpha: 0.95 });
+    const start = -Math.PI / 2;
+    const end = start + Math.PI * 2 * o.share;
+    g.arc(c.x, c.y, ring, start, end).stroke({
+      color: tokens.relation.own,
+      width: 5 * k,
+      cap: 'round',
+    });
+    const kx = c.x + Math.cos(end) * ring;
+    const ky = c.y + Math.sin(end) * ring;
+    g.circle(kx, ky, 6 * k)
+      .fill(tokens.ui.surface)
+      .stroke({ color: tokens.relation.own, width: 2.5 * k });
+    label(String(o.amount), tokens.ui.ink, { x: c.x, y: c.y - ring - 4 * k });
+  }
+
   function drawDraft(v: PlayerView, d: Draft, color: string): void {
     const path = draftPath({ map, view: v, radius }, d);
     const plan = v.plans.find((p) => p.armyId === d.armyId);
@@ -281,13 +314,13 @@ export function createPlanLayer(
     else if (d.tool === 'line') drawDefense(v, path.hexes, color, DRAFT_ALPHA);
     else if (d.tool === 'offensive') {
       const front = plan?.kind === 'front' ? plan.edges : [];
-      drawOffensiveLine(front, path.edges, tokens.arrow.alpha * DRAFT_ALPHA);
+      drawOffensiveLine(front, path.edges, false, DRAFT_ALPHA);
     }
   }
 
   return {
     container,
-    setView(v, draft, selectedArmy, scale, lvl) {
+    setView(v, draft, selectedArmy, split, scale, lvl) {
       k = 1 / scale;
       level = lvl;
       g.clear();
@@ -312,6 +345,7 @@ export function createPlanLayer(
       }
       const dc = draft ? colorOf(draft.armyId) : null;
       if (draft && dc) drawDraft(v, draft, dc);
+      if (split) drawSplit(split);
     },
     destroy() {
       container.destroy({ children: true });

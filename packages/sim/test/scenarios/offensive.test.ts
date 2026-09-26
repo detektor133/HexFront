@@ -11,7 +11,9 @@ import {
   scenario,
   setDefenseLine,
   setOffensiveLine,
+  startOffensive,
   stopOffensive,
+  clearOffensive,
   type At,
 } from '../scenario/dsl.ts';
 
@@ -57,6 +59,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const s = scenario(FIELD, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runSeconds(80);
     for (const c of [3, 4, 5]) {
       for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
@@ -68,6 +71,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const s = scenario(FIELD, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runSeconds(80);
     const plan = s.state.plans.find((p) => p.armyId === army);
     expect(plan?.kind).toBe('front');
@@ -86,6 +90,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const s = scenario(bulge, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runSeconds(80);
     for (const c of [3, 4, 5]) {
       for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
@@ -97,6 +102,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const s = scenario(FIELD, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runTicks(1);
     const plan = playerView(s.state, 0).plans.find((p) => p.armyId === army);
     const zone = plan?.kind === 'front' ? plan.zone : [];
@@ -114,6 +120,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     s.unit('B', 'infantry', 3000, at(3, 2));
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runSeconds(30);
     expect(ownerOf(s, 3, 2)).toBe('B');
     expect(s.state.units.some((u) => u.owner === 0 && u.inBattle)).toBe(false);
@@ -124,17 +131,35 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const { army, ids } = frontArmy(s, 5);
     for (const id of ids) s.setOrg(id, 20);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
     s.runTicks(25);
     for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 3, r)).toBe('B');
   });
 
-  it('«Стоп» прекращает наступление', () => {
+  it('нарисованная линия ждёт «Начать наступление»; «Стоп» — пауза, линия остаётся', () => {
     const s = scenario(FIELD, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
+    s.runSeconds(10);
+    for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 3, r)).toBe('B');
+    s.cmd('A', startOffensive(army));
     s.cmd('A', stopOffensive(army));
     s.runSeconds(30);
     for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 4, r)).toBe('B');
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(false);
+    s.cmd('A', clearOffensive(army));
+    s.runTicks(1);
+    const after = s.state.plans.find((p) => p.armyId === army);
+    expect(after?.kind === 'front' && after.offensive).toBeNull();
+  });
+
+  it('«Начать» без нарисованной линии — noOffensive', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 1);
+    s.cmd('A', startOffensive(army));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['noOffensive']);
   });
 
   it('линия наступления только у армии с линией фронта — иначе noFront', () => {
@@ -158,6 +183,9 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     });
     s.runTicks(1);
     for (const a of armies) s.cmd('A', setOffensiveLine(a, LINE));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    for (const a of armies) s.cmd('A', startOffensive(a));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['tooManyOffensives']);
   });

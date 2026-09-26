@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { intDiv } from '../../src/math/int.ts';
 import {
   borderSegmentEdges,
+  cornerKey,
+  cornerPath,
+  edgeCorners,
   edgeHex,
   edgeNeighbors,
   edgeOf,
@@ -12,6 +15,7 @@ import {
   followEdges,
   frontEdgePath,
   isBorderEdge,
+  isLandEdge,
   landEdgePath,
 } from '../../src/state/edges.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
@@ -90,9 +94,56 @@ describe('грани гексов (CR-004)', () => {
     expect(seg.every((x) => t.state.hexes.owner[edgeOther(t.state, x)] === 1)).toBe(true);
   });
 
+  it('угол один у трёх гексов; путь по углам — цепочка граней без ответвлений', () => {
+    const e = edgeOf(hex(2, 2), 0);
+    const [, end] = edgeCorners(e);
+    const f = flipEdge(g, e);
+    const keys = edgeCorners(f).map((c) => cornerKey(g, c));
+    expect(keys).toContain(cornerKey(g, end));
+    const from = edgeCorners(edgeOf(hex(2, 0), 3))[0];
+    const to = edgeCorners(edgeOf(hex(2, 4), 3))[1];
+    const path = cornerPath(g, from, to, (x) => isLandEdge(g, x)) ?? [];
+    expect(path.length).toBeGreaterThan(3);
+    // Каждая следующая грань начинается в углу, где закончилась предыдущая; углы не повторяются.
+    let at = cornerKey(g, from);
+    const seen = new Set([at]);
+    for (const x of path) {
+      const [a, b] = edgeCorners(x).map((c) => cornerKey(g, c));
+      expect([a, b]).toContain(at);
+      at = a === at ? (b as number) : (a as number);
+      expect(seen.has(at)).toBe(false);
+      seen.add(at);
+    }
+    expect(at).toBe(cornerKey(g, to));
+  });
+
   it('линия наступления по граням суши соединяет точки', () => {
     const path = landEdgePath(g, [edgeOf(hex(2, 0), 0), edgeOf(hex(2, 3), 0)]) ?? [];
     expect(path.length).toBeGreaterThan(1);
+  });
+
+  it('земля выросла во все стороны — фронт остаётся с той же стороны, не обходит страну кругом', () => {
+    const blob = `
+      .  .  .  .  .  .  .
+      .  .  .  .  .  .  .
+      .  .  a  a  a  .  .
+      .  .  a  A1 a  .  .
+      .  .  a  a  a  .  .
+      .  .  .  .  .  .  .
+      .  .  .  .  .  .  B1
+    `;
+    const t = scenario(blob, { legend });
+    const w = t.state.map.width;
+    const hx = (c: number, r: number): number => c + r * w;
+    // Фронт — западные грани столбца 2 (направление 3 — к столбцу 1).
+    const front = frontEdgePath(t.state, 0, [edgeOf(hx(2, 2), 3), edgeOf(hx(2, 4), 3)]) ?? [];
+    expect(front.length).toBeGreaterThan(1);
+    for (let r = 1; r <= 5; r += 1) for (let c = 1; c <= 5; c += 1) t.setOwner(at(c, r), 'A');
+    const moved = followEdges(t.state, 0, front);
+    expect(moved.every((e) => isBorderEdge(t.state, 0, e))).toBe(true);
+    // Все грани — на западной стороне (столбец 1), без обхода по северу, востоку и югу.
+    expect(moved.every((e) => edgeHex(e) % w === 1)).toBe(true);
+    expect(moved.length).toBeLessThanOrEqual(front.length + 4);
   });
 
   it('фронт едет за границей: после захвата столбца 2 грани встают на новую границу', () => {

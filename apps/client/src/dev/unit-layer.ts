@@ -15,7 +15,7 @@ import {
 } from '@hexfront/sim';
 
 import type { Picked } from './sandbox-selection.ts';
-import { createChip, type Chip, type ChipState, type ChipStyle } from './unit-chips.ts';
+import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -48,8 +48,8 @@ export interface UnitLayer {
   readonly container: Container;
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
-  /** Вариант фишки (переключатель песочницы, CR-003). */
-  setChipStyle(style: ChipStyle): void;
+  /** Где стоит фишка гекса (под городом — сдвинута вниз). */
+  chipAt(hex: number): Point;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -106,7 +106,6 @@ export function createUnitLayer(
   let k = 1;
   let textRes = window.devicePixelRatio;
   let lastFrame = 0;
-  let chipStyle: ChipStyle = 'hoi';
   /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
   const drawnAt = new Map<string, Point>();
   const shown = new Map<number, Point>();
@@ -142,7 +141,6 @@ export function createUnitLayer(
     const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
     const mine = first.owner === v.playerId;
     return {
-      style: chipStyle,
       color: relationColor(first.owner, v.playerId),
       army: oneArmy ? armyColor(army.number) : null,
       type,
@@ -192,7 +190,6 @@ export function createUnitLayer(
         key: `r${r.id}`,
         units: [],
         state: {
-          style: chipStyle,
           color: tokens.relation.own,
           army: null,
           type: r.type,
@@ -314,11 +311,8 @@ export function createUnitLayer(
       syncChips();
       layer.frame(nowMs);
     },
-    setChipStyle(style) {
-      chipStyle = style;
-      if (!view) return;
-      entries = build(view);
-      syncChips();
+    chipAt(hex) {
+      return base(hex);
     },
     setScale(scale) {
       k = 1 / scale;

@@ -143,6 +143,7 @@
 | `FORECAST_MARGIN` | 0,9 |
 | `OFFENSIVE_STOP_ORG` | 30 |
 | `MAX_ACTIVE_ARROWS` | 3 |
+| `FRONT_SPLIT_MIN` | 50 |
 | `FRONT_REALLOC_GAIN_MIN` | 0,15 |
 
 ## Обзор и победа

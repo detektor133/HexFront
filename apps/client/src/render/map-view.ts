@@ -185,7 +185,9 @@ export async function createMapView(
     drawing: () => grabbed !== null || stroke !== null,
     press: (at) => {
       grabbed = grab?.(toWorld(at)) ?? null;
-      return grabbed !== null;
+    },
+    release: () => {
+      grabbed = null;
     },
     stroke: (at, phase) => {
       (grabbed ?? stroke)?.(toWorld(at), phase);
@@ -249,8 +251,10 @@ interface InputHandlers {
   zoom(factor: number, at: Point): void;
   tap(at: Point, kind: TapKind): void;
   drawing(): boolean;
-  /** Нажатие одним указателем: true — жест захвачен (тянем объект сразу, без порога). */
-  press(at: Point): boolean;
+  /** Нажатие одним указателем: запоминает, что под ним можно тянуть (ручку, фишку). */
+  press(at: Point): void;
+  /** Отпустили без сдвига — захват не начался. */
+  release(): void;
   stroke(at: Point, phase: StrokePhase): void;
 }
 
@@ -283,15 +287,14 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
       // Второй палец — это жест карты: начатый росчерк отменяется.
       if (ptr.stroking) h.stroke({ x: 0, y: 0 }, 'cancel');
       ptr.stroking = false;
+      h.release();
     }
     ptr.velocity = null;
     ptr.lastMoveMs = e.timeStamp;
     ptr.downMs = e.timeStamp;
     ptr.button = e.button;
-    if (ptr.active.size === 1 && e.button === 0 && h.press(local(e))) {
-      ptr.stroking = true;
-      h.stroke(local(e), 'start');
-    }
+    // Захват (ручка фронта, фишка) начнётся, только если палец сдвинется: тап остаётся тапом.
+    if (ptr.active.size === 1 && e.button === 0) h.press(local(e));
   };
   const move = (e: PointerEvent): void => {
     const prev = ptr.active.get(e.pointerId);
@@ -334,6 +337,7 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
       if (at) h.stroke(at, 'end');
       return;
     }
+    h.release();
     if (at && ptr.active.size === 0 && !ptr.multi && ptr.travel < TAP_SLOP_PX) {
       const long = e.timeStamp - ptr.downMs >= LONG_PRESS_MS;
       h.tap(at, long || ptr.button === RIGHT_BUTTON ? 'order' : 'select');

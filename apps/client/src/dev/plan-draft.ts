@@ -4,6 +4,9 @@
 // из одной грани. «Удалить» — тап по линии убирает её. Ручки на концах фронта тянут участок.
 import {
   borderSegmentEdges,
+  cornerKey,
+  cornerPath,
+  edgeCorners,
   defenseLinePath,
   edgeOther,
   flipEdge,
@@ -16,13 +19,14 @@ import {
   landEdgePath,
   TERRAIN,
   type Command,
+  type Corner,
   type EdgeId,
   type MapStatic,
   type PlanView,
   type PlayerView,
 } from '@hexfront/sim';
 
-import { edgeMid, edgeRuns, nearestEdge } from './plan-edges.ts';
+import { cornerPoint, edgeMid, nearestCorner, nearestEdge } from './plan-edges.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 
 export type Tool = 'front' | 'offensive' | 'line' | 'erase';
@@ -33,6 +37,8 @@ export interface Draft {
   readonly armyId: number;
   readonly edges: readonly EdgeId[];
   readonly hexes: readonly number[];
+  /** Наступление: последний угол, до которого довели линию (путь идёт по углам гексов). */
+  readonly corner: Corner | null;
 }
 
 export interface DraftContext {
@@ -46,6 +52,7 @@ export const startDraft = (tool: Tool, armyId: number): Draft => ({
   armyId,
   edges: [],
   hexes: [],
+  corner: null,
 });
 
 const ground = (c: DraftContext): { map: MapStatic; hexes: { owner: Int16Array } } => ({
@@ -77,12 +84,18 @@ export function strokeAdd(c: DraftContext, d: Draft, world: Point): Draft {
   }
   if (d.tool === 'erase') return d;
   const g = ground(c);
-  const e =
-    d.tool === 'front'
-      ? nearestEdge(c.map, c.radius, world, (x) => ownBorder(c, x) !== null)
-      : nearestEdge(c.map, c.radius, world, (x) => isLandEdge(g, x));
+  if (d.tool === 'offensive') {
+    // Наступление — по углам гексов: цепочка граней без ответвлений и обрывков.
+    const corner = nearestCorner(c.map, c.radius, world);
+    if (!corner) return d;
+    if (!d.corner) return { ...d, corner };
+    if (cornerKey(g, corner) === cornerKey(g, d.corner)) return d;
+    const path = cornerPath(g, d.corner, corner, (x) => isLandEdge(g, x));
+    return path ? { ...d, corner, edges: [...d.edges, ...path] } : d;
+  }
+  const e = nearestEdge(c.map, c.radius, world, (x) => ownBorder(c, x) !== null);
   if (e === null) return d;
-  const x = d.tool === 'front' ? (ownBorder(c, e) as EdgeId) : e;
+  const x = ownBorder(c, e) as EdgeId;
   return d.edges.at(-1) === x ? d : { ...d, edges: [...d.edges, x] };
 }
 
@@ -120,7 +133,7 @@ function hitPlan(c: DraftContext, world: Point): Command | null {
       continue;
     }
     near(p.edges.map(mid), { t: 'clearPlan', armyId: p.armyId });
-    if (p.offensive) near(p.offensive.edges.map(mid), { t: 'stopOffensive', armyId: p.armyId });
+    if (p.offensive) near(p.offensive.edges.map(mid), { t: 'clearOffensive', armyId: p.armyId });
   }
   return (best as { cmd: Command } | null)?.cmd ?? null;
 }
@@ -155,12 +168,27 @@ export function draftPath(c: DraftContext, d: Draft): { edges: EdgeId[]; hexes: 
   return { edges: [], hexes: [] };
 }
 
-/** Точки ручек на концах фронта (в мировых координатах): начало и конец ломаной граней. */
+/**
+ * Точки ручек на концах фронта: внешние углы первой и последней грани (угол, не общий с
+ * соседней гранью участка).
+ */
 export function frontHandles(c: DraftContext, plan: PlanView & { kind: 'front' }): Point[] {
-  const runs = edgeRuns(c.map, c.radius, plan.edges);
-  const a = runs[0]?.[0];
-  const b = runs.at(-1)?.at(-1);
-  return a && b ? [a, b] : [];
+  const g = ground(c);
+  const outer = (e: EdgeId | undefined, next: EdgeId | undefined): Point | null => {
+    if (e === undefined) return null;
+    const corners = edgeCorners(e);
+    const shared = next === undefined ? [] : edgeCorners(next).map((x) => cornerKey(g, x));
+    const free = corners.find((x) => !shared.includes(cornerKey(g, x))) ?? corners[0];
+    return cornerPoint(c.map, c.radius, free);
+  };
+  const { edges } = plan;
+  if (edges.length === 1) {
+    const [a, b] = edgeCorners(edges[0] as EdgeId);
+    return [cornerPoint(c.map, c.radius, a), cornerPoint(c.map, c.radius, b)];
+  }
+  const first = outer(edges[0], edges[1]);
+  const last = outer(edges.at(-1), edges.at(-2));
+  return first && last ? [first, last] : [];
 }
 
 /**

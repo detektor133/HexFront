@@ -83,6 +83,8 @@ type DslCommand =
   | { readonly t: 'raw'; readonly cmd: Command }
   | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
+  | { readonly t: 'startOffensive'; readonly armyId: number }
+  | { readonly t: 'clearOffensive'; readonly armyId: number }
   | {
       readonly t: 'armyOrder';
       readonly armyId: number;
@@ -195,6 +197,9 @@ export const setOffensiveLine = (armyId: number, points: readonly At[]): DslComm
   points,
 });
 export const stopOffensive = (armyId: number): DslCommand => ({ t: 'stopOffensive', armyId });
+/** «Начать наступление» (CR-005): нарисованная линия ждёт этой команды. */
+export const startOffensive = (armyId: number): DslCommand => ({ t: 'startOffensive', armyId });
+export const clearOffensive = (armyId: number): DslCommand => ({ t: 'clearOffensive', armyId });
 export const clearPlan = (armyId: number): DslCommand => ({ t: 'clearPlan', armyId });
 export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
@@ -476,6 +481,8 @@ function makeScenario(
         return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'clearPlan':
       case 'stopOffensive':
+      case 'startOffensive':
+      case 'clearOffensive':
         return c;
       case 'setOffensiveLine':
         // Точка линии — восточная грань гекса (к столбцу справа).

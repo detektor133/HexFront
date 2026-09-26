@@ -69,10 +69,23 @@ describe('линия фронта (CR-002)', () => {
 
   it('отрядов меньше гексов, угрозы нет — встают равномерно вдоль линии', () => {
     const s = scenario(BORDER, { legend });
-    const ids = infantry(s, 2);
+    // 60 солдат не делятся (половина меньше FRONT_SPLIT_MIN) — отрядов остаётся меньше гексов.
+    const ids = Array.from({ length: 2 }, () => s.unit('A', 'infantry', 60, at(0, 2)));
     s.cmd('A', assignFront(armyOf(s, ids), 'B', null));
     s.runSeconds(25);
     expect(hexesOf(s, ids)).toEqual([hexOf(at(2, 1)), hexOf(at(2, 3))]);
+  });
+
+  it('армия сама делится, чтобы закрыть все гексы фронта (половины не меньше 50)', () => {
+    const s = scenario(BORDER, { legend });
+    const army = armyOf(s, [s.unit('A', 'infantry', 400, at(0, 2))]);
+    s.cmd('A', assignFront(army, 'B', null));
+    s.runSeconds(30);
+    const units = s.state.units.filter((u) => u.armyId === army);
+    expect(units.length).toBe(5);
+    expect(units.every((u) => u.soldiers >= 50_000)).toBe(true);
+    expect(units.reduce((n, u) => n + u.soldiers, 0)).toBe(400_000);
+    expect(new Set(units.map((u) => u.hex)).size).toBe(5);
   });
 
   it('угроза стягивает отряд к гексу рядом с врагом', () => {
@@ -96,8 +109,8 @@ describe('линия фронта (CR-002)', () => {
     `,
       { legend },
     );
-    const armor = s.unit('A', 'armor', 100, at(0, 2));
-    const inf = s.unit('A', 'infantry', 100, at(0, 2));
+    const armor = s.unit('A', 'armor', 60, at(0, 2));
+    const inf = s.unit('A', 'infantry', 60, at(0, 2));
     s.cmd('A', assignFront(armyOf(s, [inf, armor]), 'B', null));
     s.runSeconds(25);
     // Два отряда на 5 гексах — места в строках 1 и 3; равнина — только строка 1.

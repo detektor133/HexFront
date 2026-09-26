@@ -233,6 +233,8 @@ export const ARTY_FLEE_LOSS: Fp = fp(0.1);
 export const FORECAST_MARGIN: Fp = fp(0.9);
 export const OFFENSIVE_STOP_ORG: Fp = fp(30);
 export const MAX_ACTIVE_ARROWS = 3;
+/** Автоделение на линии плана: часть не меньше шага набора (05-armies.md, CR-005). */
+export const FRONT_SPLIT_MIN: Fp = fp(50);
 export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);
 
 // Обзор и победа

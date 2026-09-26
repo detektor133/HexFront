@@ -82,7 +82,12 @@ describe('инструменты планов по граням (CR-004)', () =>
   });
 
   it('линия наступления — грани под пальцем; «Удалить» — тап по линии даёт приказ', () => {
-    const d = strokeAdd(c, startDraft('offensive', 3), edgeMid(map, R, e0));
+    // Палец ведёт от угла к углу: грани между ними — цепочка без ответвлений.
+    const far = border.find((e) => edgeHex(e) !== edgeHex(e0)) ?? e0;
+    let d = strokeAdd(c, startDraft('offensive', 3), edgeMid(map, R, e0));
+    expect(finishCommand(d)).toBeNull();
+    d = strokeAdd(c, d, edgeMid(map, R, far));
+    expect(d.edges.length).toBeGreaterThan(0);
     expect(finishCommand(d)).toMatchObject({ t: 'setOffensiveLine', armyId: 3 });
     const plan = { armyId: 3, kind: 'front' as const, edges: [e0], hexes: [], offensive: null };
     const withPlan = { ...view, plans: [{ ...plan, zone: [] }] };

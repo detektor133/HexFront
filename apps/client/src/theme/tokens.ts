@@ -244,10 +244,15 @@ export const tokens = {
       8,
       5
     ],
-    "alpha": 0.3,
-    "bodyWidth": 0.7,
-    "headLength": 0.9,
-    "headWidth": 1.5
+    "alpha": 0.32,
+    "plannedAlpha": 0.14,
+    "bodyWidth": 0.42,
+    "headLength": 0.7,
+    "headWidth": 1
+  },
+  "selection": {
+    "color": "#C99A2E",
+    "width": 2.5
   },
   "chip": {
     "org": "#2E7D4F",

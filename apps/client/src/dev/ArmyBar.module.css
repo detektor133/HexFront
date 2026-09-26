@@ -1,5 +1,5 @@
-/* Панель армий как в HoI4 (ui.md, «Панель армий», CR-003): ряд карточек армий внизу экрана с
-   горизонтальной прокруткой, над ним — приказы выбранной армии. Стиль — как у карточек. */
+/* Панель армий как в HoI4 (ui.md, «Панель армий», CR-005): ряд карточек армий внизу экрана,
+   над ним — приказы выбранной армии иконками. Текста минимум: подписи — в подсказках. */
 .dock {
   position: absolute;
   right: 0;
@@ -17,16 +17,20 @@
 .strip {
   display: flex;
   gap: var(--space-sm);
-  overflow-x: auto;
   pointer-events: auto;
 }
 
+.strip {
+  align-items: flex-end;
+  overflow-x: auto;
+}
+
+/* Приказы — прямо над карточками армий, слева. */
 .tools {
   flex-wrap: wrap;
-  /* Приказы — прямо над карточками армий, слева, как в HoI4. */
   align-self: flex-start;
+  gap: 2px;
   max-width: 100%;
-  overflow-x: visible;
   padding: var(--space-xs);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
@@ -34,39 +38,32 @@
   box-shadow: var(--shadow-hard);
 }
 
-.tool {
+.tool,
+.iconButton {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 64px;
-  min-height: 48px;
-  padding: var(--space-xs);
-  border: 1px solid transparent;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  border: 1.5px solid transparent;
   border-radius: var(--radius-button);
   background: var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
-  font-size: var(--font-size-caption);
-  white-space: nowrap;
   cursor: pointer;
 }
 
-.tool:hover:not(:disabled) {
+.tool:hover:not(:disabled),
+.iconButton:hover {
   border-color: var(--ui-border-strong);
 }
 
-.tool[aria-pressed='true'] {
-  border-color: var(--ui-ink);
+.tool[aria-pressed='true'],
+.iconButton[aria-pressed='true'] {
+  border-color: var(--selection-color);
   background: var(--ui-surface2);
-}
-
-/* Подсказка включённого инструмента — одной строкой, без кнопок (как в HoI4). */
-.hint {
-  flex-basis: 100%;
-  padding: 0 var(--space-xs);
-  color: var(--ui-ink2);
-  font-size: var(--font-size-caption);
 }
 
 .tool:disabled {
@@ -75,8 +72,8 @@
 }
 
 .icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentcolor;
   stroke-width: 2;
@@ -86,7 +83,7 @@
 
 .card {
   display: flex;
-  flex: 0 0 176px;
+  flex: 0 0 150px;
   overflow: hidden;
   padding: 0;
   background: var(--ui-surface);
@@ -99,12 +96,15 @@
   cursor: pointer;
 }
 
+/* Выбранная армия (или армия выбранных отрядов) — золотая рамка, как у фишки. */
 .selected {
-  border-color: var(--ui-ink);
-  outline: 2px solid var(--ui-ink);
+  border-color: var(--selection-color);
+  box-shadow:
+    inset 0 0 0 1.5px var(--selection-color),
+    var(--shadow-hard);
 }
 
-/* Полоса цвета армии во всю высоту карточки. */
+/* Закладка цвета армии во всю высоту карточки. */
 .band {
   flex: 0 0 8px;
 }
@@ -113,16 +113,16 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
   padding: var(--space-sm);
-  font-size: var(--font-size-caption);
 }
 
 .head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .name {
@@ -134,26 +134,33 @@
 }
 
 .num {
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
-.key {
-  flex: 0 0 44px;
-  color: var(--ui-ink2);
+.meterIcon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--ui-ink2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .meter {
   flex: 1;
   height: 6px;
   overflow: hidden;
-  background: var(--ui-surface2);
-  border-radius: 2px;
+  background: var(--chip-track);
+  border-radius: 3px;
 }
 
 .meter > span {
@@ -161,16 +168,14 @@
   height: 100%;
 }
 
-.meta {
-  overflow: hidden;
-  color: var(--ui-ink2);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.alarm {
-  color: var(--status-danger);
-  font-weight: 500;
+.alarmIcon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--status-danger);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .reserve {
@@ -178,58 +183,12 @@
   flex: 0 0 auto;
   flex-direction: column;
   justify-content: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hard);
-  font-size: var(--font-size-caption);
-}
-
-.small {
-  min-height: 32px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  background: var(--ui-surface);
-  font: inherit;
-  cursor: pointer;
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-}
-
-/* Переключатель вида фишки и легенда (CR-004) — пока владелец не выберет вариант. */
-.chipSwitch {
-  position: absolute;
-  top: 72px;
-  left: var(--space-lg);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-xs);
+  gap: 2px;
   padding: var(--space-xs);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
-  font-size: var(--font-size-caption);
-}
-
-.chipSwitch button[aria-pressed='true'] {
-  border-color: var(--ui-ink);
-  background: var(--ui-surface2);
 }
 
 @media (max-width: 600px) {
@@ -238,45 +197,6 @@
   }
 
   .card {
-    flex-basis: 150px;
+    flex-basis: 132px;
   }
-
-  .chipSwitch {
-    top: 104px;
-    left: var(--space-sm);
-  }
-}
-
-.legend {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px var(--space-md);
-  color: var(--ui-ink2);
-}
-
-.key {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.keyBar {
-  width: 16px;
-  height: 4px;
-  border-radius: 2px;
-}
-
-.keyBox {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-/* Треугольник снабжения — рамками, без картинок. */
-.keyWarn {
-  width: 0;
-  height: 0;
-  border-right: 6px solid transparent;
-  border-bottom: 10px solid;
-  border-left: 6px solid transparent;
 }

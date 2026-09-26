@@ -74,8 +74,10 @@ type Command =
   | { t: 'setAutoReinforce'; on: boolean }
   | { t: 'assignFront'; armyId: number; edges: EdgeId[] }   // грани своей границы (CR-004)
   | { t: 'setDefenseLine'; armyId: number; points: HexId[] } | { t: 'clearPlan'; armyId: number }
-  | { t: 'setOffensiveLine'; armyId: number; edges: EdgeId[] } | { t: 'stopOffensive'; armyId: number }
-  | { t: 'split'; unitId: number; soldiers: Fp } | { t: 'merge'; unitIds: number[] }
+  | { t: 'setOffensiveLine'; armyId: number; edges: EdgeId[] }   // нарисовать (active: false)
+  | { t: 'startOffensive'; armyId: number } | { t: 'stopOffensive'; armyId: number }   // начать / пауза
+  | { t: 'clearOffensive'; armyId: number }
+  | { t: 'split'; unitId: number; soldiers: Fp; to?: HexId } | { t: 'merge'; unitIds: number[] }
   | { t: 'bombard'; unitId: number; targetUnitId: number | null }
   | { t: 'recruit'; cityId: number; type: UnitType; soldiers: Fp }
   | { t: 'foundCity'; hex: HexId } | { t: 'upgradeCity'; cityId: number }

@@ -111,6 +111,12 @@ export function validateUnitCommand(
         ? rejected('badOrder')
         : OK;
     case 'split':
+      if (
+        cmd.to !== undefined &&
+        !(Number.isInteger(cmd.to) && cmd.to >= 0 && cmd.to < state.hexes.owner.length)
+      ) {
+        return rejected('badHex');
+      }
       return owned.units[0]
         ? validateSplit(state, owned.units[0], cmd.soldiers)
         : rejected('unknownUnit');
@@ -125,10 +131,14 @@ function stop(unit: Unit): void {
   unit.moveTotal = 0;
 }
 
-function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
+/**
+ * Отделяет от отряда soldiers солдат в новый отряд в том же гексе и армии (05-armies.md).
+ * @returns новый отряд
+ */
+export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
   unit.soldiers = (unit.soldiers - soldiers) as Fp;
   // Id растут монотонно, поэтому push сохраняет сортировку отрядов по id.
-  state.units.push({
+  const part: Unit = {
     id: state.nextId,
     owner: unit.owner,
     type: unit.type,
@@ -148,8 +158,10 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     focus: -1,
     fireTarget: -1,
     slot: -1,
-  });
+  };
+  state.units.push(part);
   state.nextId += 1;
+  return part;
 }
 
 // Остаётся отряд с наименьшим id; org — средневзвешенная по солдатам.
@@ -200,7 +212,18 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
       }
       return;
     case 'split':
-      if (owned.units[0]) executeSplit(state, owned.units[0], cmd.soldiers);
+      if (owned.units[0]) {
+        const part = splitUnit(state, owned.units[0], cmd.soldiers);
+        // Вытянули из фишки в другой гекс — отделённая часть сразу идёт туда.
+        const path =
+          cmd.to === undefined || cmd.to === part.hex
+            ? null
+            : findPath(state, part.hex, cmd.to, part.type, part.owner);
+        if (path && path.length > 0) {
+          part.path = path;
+          part.order = 'move';
+        }
+      }
       return;
     case 'bombard':
       if (owned.units[0]) owned.units[0].focus = cmd.targetUnitId ?? -1;

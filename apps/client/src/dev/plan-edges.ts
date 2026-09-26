@@ -8,6 +8,7 @@ import {
   hexId,
   inBounds,
   neighbors,
+  type Corner,
   type EdgeId,
   type MapStatic,
 } from '@hexfront/sim';
@@ -76,4 +77,51 @@ export function edgeRuns(map: MapStatic, radius: number, edges: readonly EdgeId[
     } else runs.push([a, b]);
   }
   return runs;
+}
+
+/** Точка угла гекса (между направлениями a и a+1) в мировых координатах. */
+export function cornerPoint(map: MapStatic, radius: number, c: Corner): Point {
+  const [a, b] = edgeEnds(map, radius, edgeOf(c.hex, c.a));
+  const [p, q] = edgeEnds(map, radius, edgeOf(c.hex, c.a + 1));
+  const same = (x: Point, y: Point): boolean => Math.hypot(x.x - y.x, x.y - y.y) < radius * 0.05;
+  return same(a, p) || same(a, q) ? a : b;
+}
+
+/** Ближайший к точке угол гекса под ней (или null за картой). */
+export function nearestCorner(map: MapStatic, radius: number, world: Point): Corner | null {
+  const h = pixelToHex(world, radius);
+  if (!inBounds(h, map.width, map.height)) return null;
+  const hex = hexId(h, map.width);
+  let best: Corner | null = null;
+  let bestD = Infinity;
+  for (let a = 0; a < 6; a += 1) {
+    const p = cornerPoint(map, radius, { hex, a });
+    const d = Math.hypot(p.x - world.x, p.y - world.y);
+    if (d < bestD) {
+      best = { hex, a };
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * Сглаживание ломаной (Чайкин): углы срезаются, концы остаются на месте — линия наступления
+ * выглядит проведённой рукой, как в HoI4, но идёт по граням.
+ * @returns новая ломаная
+ */
+export function smooth(pts: readonly Point[], rounds = 2): Point[] {
+  let cur = [...pts];
+  for (let k = 0; k < rounds && cur.length > 2; k += 1) {
+    const next: Point[] = [cur[0] as Point];
+    for (let i = 0; i < cur.length - 1; i += 1) {
+      const a = cur[i] as Point;
+      const b = cur[i + 1] as Point;
+      next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      next.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    next.push(cur[cur.length - 1] as Point);
+    cur = next;
+  }
+  return cur;
 }

@@ -1,11 +1,19 @@
 // Распределение отрядов армий по планам (CR-002): раз в FRONT_ALLOC_TICKS для каждой армии,
-// размазано по армиям; перестановка — только при выигрыше покрытия больше порога.
+// размазано по армиям; перестановка — только при выигрыше покрытия больше порога. Если отрядов
+// меньше гексов линии, армия сама делится (CR-005).
 // GDD: docs/gdd/07-controls.md — «Планы армий», «Распределение».
-import { FRONT_ALLOC_TICKS, FRONT_REALLOC_GAIN_MIN } from '../balance.ts';
-import { fpMul, type Fp } from '../math/int.ts';
-import { findPath } from '../queries/unit-path.ts';
+import {
+  FRONT_ALLOC_TICKS,
+  FRONT_REALLOC_GAIN_MIN,
+  FRONT_SPLIT_MIN,
+  MAX_UNITS_PER_HEX,
+} from '../balance.ts';
+import { unitLimit } from '../commands/recruit.ts';
+import { splitUnit } from '../commands/unit.ts';
+import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
-import { followBorder } from '../state/front.ts';
+import { followBorder, planHexes } from '../state/front.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 
 // Отряд идёт на своё место или встаёт на нём в оборону.
@@ -32,12 +40,39 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
   u.order = 'move';
 }
 
+/**
+ * Автоделение (05-armies.md, CR-005): пока пехоты и брони армии меньше, чем гексов линии,
+ * самый большой отряд (при равенстве — меньший id) делится пополам, если обе половины не меньше
+ * FRONT_SPLIT_MIN, в его гексе есть место и не превышен лимит отрядов.
+ */
+function coverLine(state: MatchState, armyId: number, owner: number): void {
+  const plan = state.plans.find((p) => p.armyId === armyId);
+  if (!plan) return;
+  const need = planHexes(state, plan).length;
+  for (;;) {
+    const units = state.units.filter((u) => planControls(u, armyId) && u.type !== 'artillery');
+    const used =
+      state.units.filter((u) => u.owner === owner).length +
+      state.recruits.filter((r) => r.owner === owner).length;
+    if (units.length >= need || used >= unitLimit(state, owner)) return;
+    let best: Unit | null = null;
+    for (const u of units) {
+      if (u.soldiers < 2 * FRONT_SPLIT_MIN || ownUnitsAt(state, owner, u.hex) >= MAX_UNITS_PER_HEX)
+        continue;
+      if (!best || u.soldiers > best.soldiers) best = u;
+    }
+    if (!best) return;
+    splitUnit(state, best, (intDiv(intDiv(best.soldiers, FP), 2) * FP) as Fp);
+  }
+}
+
 function runPlan(state: MatchState, armyId: number): void {
   followBorder(state, armyId);
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
+  coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = state.units.filter((u) => planControls(u, plan.armyId));
   const lineSet = new Set(next.line);

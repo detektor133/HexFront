@@ -115,10 +115,13 @@
   --arrow-width-3: 3.5;
   --arrow-dash-1: 8;
   --arrow-dash-2: 5;
-  --arrow-alpha: 0.3;
-  --arrow-body-width: 0.7;
-  --arrow-head-length: 0.9;
-  --arrow-head-width: 1.5;
+  --arrow-alpha: 0.32;
+  --arrow-planned-alpha: 0.14;
+  --arrow-body-width: 0.42;
+  --arrow-head-length: 0.7;
+  --arrow-head-width: 1;
+  --selection-color: #C99A2E;
+  --selection-width: 2.5;
   --chip-org: #2E7D4F;
   --chip-supply: #3A6EA5;
   --chip-track: #E4E2DA;

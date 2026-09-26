@@ -16,7 +16,7 @@ import {
 import { drawCities } from './city-glyphs.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
-import type { ChipStyle } from './unit-chips.ts';
+import type { SplitOverlay } from './split-drag.ts';
 import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
@@ -44,9 +44,11 @@ export interface EconomyLayer {
   setView(view: PlayerView, selected: SandboxSelection): void;
   /** Рисуемый план армии (режим рисования) или null. */
   setDraft(draft: Draft | null): void;
-  setChipStyle(style: ChipStyle): void;
   /** Выбранная армия: у её фронта — ручки на концах. */
   setSelectedArmy(id: number | null): void;
+  /** Кольцо «сколько взять» при вытягивании части из фишки. */
+  setSplit(o: SplitOverlay | null): void;
+  chipAt(hex: number): Point;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -120,6 +122,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
   let selectedArmy: number | null = null;
+  let split: SplitOverlay | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
 
@@ -199,7 +202,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawFill(view);
     drawRoads(view);
     drawMarks(view);
-    planLayer.setView(view, draft, selectedArmy, scale, level);
+    planLayer.setView(view, draft, selectedArmy, split, scale, level);
   };
 
   return {
@@ -217,12 +220,16 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
       unitLayer.setView(v, sel, performance.now());
     },
+    setSplit(o) {
+      split = o;
+      redraw();
+    },
+    chipAt(hex) {
+      return unitLayer.chipAt(hex);
+    },
     setSelectedArmy(id) {
       selectedArmy = id;
       redraw();
-    },
-    setChipStyle(style) {
-      unitLayer.setChipStyle(style);
     },
     setDraft(d) {
       draft = d;

@@ -154,6 +154,8 @@ export interface OffensiveLine {
   readonly edges: readonly number[];
   /** Гексы линии — у каждой грани тот, что ближе к фронту армии в момент приказа. */
   readonly hexes: readonly HexId[];
+  /** Наступление идёт (кнопка «Начать наступление», CR-005); false — линия только нарисована. */
+  readonly active: boolean;
 }
 
 /**

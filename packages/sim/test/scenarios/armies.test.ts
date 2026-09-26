@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import small from '../../../mapgen/maps/small.json' with { type: 'json' };
 import { loadMap } from '../../src/map/load.ts';
+import type { Fp } from '../../src/math/int.ts';
 import { createMatch } from '../../src/state/create-match.ts';
 import {
   armyOrder,
@@ -12,6 +13,7 @@ import {
   disbandArmy,
   merge,
   own,
+  raw,
   renameArmy,
   scenario,
   split,
@@ -122,6 +124,19 @@ describe('армии — группы отрядов', () => {
     s.runTicks(1);
     expect(s.unitById(inf)?.order).toBe('expand');
     expect(s.unitById(art)?.order).toBe('idle');
+  });
+
+  it('вытянули часть из фишки в соседний гекс — отделённый отряд сразу идёт туда', () => {
+    const s = scenario(MAP, { legend });
+    const a = s.unit('A', 'infantry', 300, at(1, 1));
+    const to = at(1, 0).col + at(1, 0).row * s.state.map.width;
+    s.cmd('A', raw({ t: 'split', unitId: a, soldiers: 100_000 as Fp, to }));
+    s.runTicks(1);
+    const fresh = s.unitsOf('A').at(-1);
+    expect(s.unitById(a)?.soldiers).toBe(200_000);
+    expect(fresh?.soldiers).toBe(100_000);
+    expect(fresh?.order).toBe('move');
+    expect(fresh?.path.at(-1)).toBe(to);
   });
 
   it('разделение оставляет новый отряд в армии, слияние — в армии отряда с меньшим id', () => {

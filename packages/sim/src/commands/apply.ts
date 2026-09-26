@@ -47,7 +47,9 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'setDefenseLine':
     case 'clearPlan':
     case 'setOffensiveLine':
+    case 'startOffensive':
     case 'stopOffensive':
+    case 'clearOffensive':
       return validatePlanCommand(state, playerId, cmd);
     default:
       return assertNever(cmd);
@@ -93,7 +95,9 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'setDefenseLine':
     case 'clearPlan':
     case 'setOffensiveLine':
+    case 'startOffensive':
     case 'stopOffensive':
+    case 'clearOffensive':
       executePlanCommand(state, playerId, cmd);
       return;
     default:

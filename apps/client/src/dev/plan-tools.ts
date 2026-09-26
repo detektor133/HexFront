@@ -37,6 +37,8 @@ export interface PlanInput {
   /** Тап при включённом инструменте; true — тап обработан (выбор на карте не меняется). */
   tap(world: Point, kind: TapKind): boolean;
   grab(world: Point): StrokeHandler | null;
+  /** Под пальцем ручка фронта выбранной армии — тап по ней ничего не выбирает. */
+  onHandle(world: Point): boolean;
 }
 
 /** Доля радиуса гекса: насколько близко к ручке надо нажать, чтобы её взять. */
@@ -82,6 +84,15 @@ export function createPlanInput(deps: PlanInputDeps): PlanInput {
       }
       return true;
     },
+    onHandle(world) {
+      const c = deps.context();
+      const armyId = deps.selected();
+      const plan = c?.view.plans.find((p) => p.armyId === armyId);
+      if (!c || plan?.kind !== 'front') return false;
+      return frontHandles(c, plan).some(
+        (p) => Math.hypot(p.x - world.x, p.y - world.y) <= c.radius * HANDLE_HIT,
+      );
+    },
     grab(world) {
       const c = deps.context();
       const armyId = deps.selected();
@@ -96,8 +107,10 @@ export function createPlanInput(deps: PlanInputDeps): PlanInput {
       return (w, phase) => {
         if (phase === 'cancel') return show(null);
         const edges = dragFrontEnd(c, base, which === 0 ? 0 : 1, w);
-        if (phase !== 'end') return show({ tool: 'front', armyId, edges, hexes: [] });
-        deps.send({ t: 'assignFront', armyId, edges });
+        if (phase !== 'end') return show({ tool: 'front', armyId, edges, hexes: [], corner: null });
+        // Участок не изменился (отпустили на месте) — приказ не нужен.
+        const same = edges.length === base.length && edges.every((e, i) => e === base[i]);
+        if (!same) deps.send({ t: 'assignFront', armyId, edges });
         show(null);
       };
     },

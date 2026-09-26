@@ -22,9 +22,17 @@ export type Command =
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }
   | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly edges: readonly number[] }
+  | { readonly t: 'startOffensive'; readonly armyId: number }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
+  | { readonly t: 'clearOffensive'; readonly armyId: number }
   /** soldiers — fixed-point, целое число солдат. */
-  | { readonly t: 'split'; readonly unitId: number; readonly soldiers: Fp }
+  | {
+      readonly t: 'split';
+      readonly unitId: number;
+      readonly soldiers: Fp;
+      /** Куда сразу отправить отделённую часть (вытянули из фишки, CR-005). */
+      readonly to?: HexId;
+    }
   | { readonly t: 'merge'; readonly unitIds: readonly number[] }
   | { readonly t: 'bombard'; readonly unitId: number; readonly targetUnitId: number | null }
   | {
@@ -95,6 +103,7 @@ export const REJECT_REASONS = [
   'badValue',
   'noFront',
   'tooManyOffensives',
+  'noOffensive',
   'notEnemy',
   'retreating',
 ] as const;

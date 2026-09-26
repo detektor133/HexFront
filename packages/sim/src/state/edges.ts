@@ -221,34 +221,39 @@ export function borderEdges(g: LineGround, owner: number): EdgeId[] {
 }
 
 /**
- * Фронт едет за границей: грань, переставшая быть своей границей, переносится на ближайшую
- * грань границы (по гексу, при равенстве — то же направление, затем меньший EdgeId), соседние —
- * соединяются по границе. Нет границы — грани не меняются.
+ * Фронт едет за границей: если какая-то грань участка перестала быть своей границей, концы
+ * участка переносятся на ближайшие грани границы (по гексу, при равенстве — то же направление,
+ * затем меньший EdgeId), а середина заново идёт кратчайшим путём по граням границы между ними.
+ * Переносятся только концы — иначе участок при каждом сдвиге копил бы грани и обрастал страну.
+ * Нет границы — грани не меняются.
  * @returns новые грани по порядку
  */
 export function followEdges(g: LineGround, owner: number, edges: readonly EdgeId[]): EdgeId[] {
   if (edges.every((e) => isBorderEdge(g, owner, e))) return [...edges];
   const border = borderEdges(g, owner);
-  if (border.length === 0) return [...edges];
+  const first = edges[0];
+  const last = edges.at(-1);
+  if (border.length === 0 || first === undefined || last === undefined) return [...edges];
   const { width } = g.map;
-  const points: EdgeId[] = [];
-  for (const e of edges) {
+  const snap = (e: EdgeId): EdgeId => {
+    if (isBorderEdge(g, owner, e)) return e;
+    const at = hexFromId(edgeHex(e), width);
     let best = e;
-    if (!isBorderEdge(g, owner, e)) {
-      const at = hexFromId(edgeHex(e), width);
-      let bestKey = Number.MAX_SAFE_INTEGER;
-      for (const b of border) {
-        const key =
-          distance(at, hexFromId(edgeHex(b), width)) * 16 + (edgeDir(b) === edgeDir(e) ? 0 : 8);
-        if (key < bestKey || (key === bestKey && b < best)) {
-          best = b;
-          bestKey = key;
-        }
+    let bestKey = Number.MAX_SAFE_INTEGER;
+    for (const b of border) {
+      const key =
+        distance(at, hexFromId(edgeHex(b), width)) * 16 + (edgeDir(b) === edgeDir(e) ? 0 : 8);
+      if (key < bestKey || (key === bestKey && b < best)) {
+        best = b;
+        bestKey = key;
       }
     }
-    if (points.at(-1) !== best) points.push(best);
-  }
-  return chain(points, (x) => borderNeighbors(g, owner, x), limitOf(g), false) ?? points;
+    return best;
+  };
+  const a = snap(first);
+  const b = snap(last);
+  if (a === b) return [a];
+  return chain([a, b], (x) => borderNeighbors(g, owner, x), limitOf(g), false) ?? [a, b];
 }
 
 /** Гексы граней по порядку, без повторов (со своей стороны грани). */
@@ -256,4 +261,87 @@ export function edgeHexes(edges: readonly EdgeId[]): HexId[] {
   const out: HexId[] = [];
   for (const e of edges) if (!out.includes(edgeHex(e))) out.push(edgeHex(e));
   return out;
+}
+
+/**
+ * Угол гекса: между направлениями a и a+1 гекса hex. Один и тот же угол принадлежит трём
+ * гексам; cornerKey у всех трёх представлений одинаковый.
+ */
+export interface Corner {
+  readonly hex: HexId;
+  readonly a: number;
+}
+
+/** Сдвиг и основание ключа угла: сумма осевых координат трёх гексов угла — целая пара. */
+const KEY_OFFSET = 1 << 12;
+const KEY_SPAN = 1 << 14;
+
+/** Ключ угла: сумма осевых координат трёх сходящихся в нём гексов (включая гексы за краем). */
+export function cornerKey(g: LineGround, c: Corner): number {
+  const h = hexFromId(c.hex, g.map.width);
+  const na = neighbor(h, (((c.a % SIDES) + SIDES) % SIDES) as Direction);
+  const nb = neighbor(h, ((((c.a + 1) % SIDES) + SIDES) % SIDES) as Direction);
+  const q = h.q + na.q + nb.q;
+  const r = h.r + na.r + nb.r;
+  return (q + KEY_OFFSET) * KEY_SPAN + (r + KEY_OFFSET);
+}
+
+/** Углы грани: начало (между d−1 и d) и конец (между d и d+1). */
+export function edgeCorners(e: EdgeId): [Corner, Corner] {
+  const h = edgeHex(e);
+  const d = edgeDir(e);
+  return [
+    { hex: h, a: (d + SIDES - 1) % SIDES },
+    { hex: h, a: d },
+  ];
+}
+
+/** Грани, сходящиеся в углу: (h, a), (h, a+1) и грань между соседями n_a → n_{a+1}. */
+function cornerEdges(g: LineGround, c: Corner): EdgeId[] {
+  const out = [edgeOf(c.hex, c.a), edgeOf(c.hex, c.a + 1)];
+  const na = edgeOther(g, edgeOf(c.hex, c.a));
+  if (na >= 0) out.push(edgeOf(na, c.a + 2));
+  return out;
+}
+
+/**
+ * Путь по углам гексов: цепочка граней без ответвлений от угла from до угла to, только по
+ * граням, прошедшим фильтр (ничьи — по меньшему EdgeId).
+ * @returns грани по порядку или null, если не дойти
+ */
+export function cornerPath(
+  g: LineGround,
+  from: Corner,
+  to: Corner,
+  accept: (e: EdgeId) => boolean,
+): EdgeId[] | null {
+  const target = cornerKey(g, to);
+  const start = cornerKey(g, from);
+  if (start === target) return [];
+  const prev = new Map<number, { key: number; edge: EdgeId }>();
+  const seen = new Set<number>([start]);
+  const queue: Corner[] = [from];
+  const limit = limitOf(g);
+  for (let i = 0; i < queue.length && i < limit && !seen.has(target); i += 1) {
+    const c = queue[i] as Corner;
+    const ck = cornerKey(g, c);
+    for (const e of cornerEdges(g, c).sort((x, y) => x - y)) {
+      if (!accept(e)) continue;
+      const [a, b] = edgeCorners(e);
+      const next = cornerKey(g, a) === ck ? b : a;
+      const nk = cornerKey(g, next);
+      if (seen.has(nk)) continue;
+      seen.add(nk);
+      prev.set(nk, { key: ck, edge: e });
+      queue.push(next);
+    }
+  }
+  if (!seen.has(target)) return null;
+  const out: EdgeId[] = [];
+  for (let k = target; k !== start;) {
+    const step = prev.get(k) as { key: number; edge: EdgeId };
+    out.push(step.edge);
+    k = step.key;
+  }
+  return out.reverse();
 }

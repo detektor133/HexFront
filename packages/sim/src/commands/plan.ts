@@ -1,5 +1,6 @@
-// Команды планов армий (CR-002…CR-004): assignFront, setDefenseLine, clearPlan, setOffensiveLine,
-// stopOffensive. Фронт и линия наступления задаются гранями.
+// Команды планов армий (CR-002…CR-005): assignFront, setDefenseLine, clearPlan, setOffensiveLine,
+// startOffensive, stopOffensive, clearOffensive. Фронт и линия наступления задаются гранями;
+// нарисованная линия наступления ждёт кнопки «Начать наступление».
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { MAX_ACTIVE_ARROWS } from '../balance.ts';
@@ -19,7 +20,16 @@ import type { ArmyPlan, MatchState, OffensiveLine } from '../state/types.ts';
 
 export type PlanCommand = Extract<
   Command,
-  { t: 'assignFront' | 'setDefenseLine' | 'clearPlan' | 'setOffensiveLine' | 'stopOffensive' }
+  {
+    t:
+      | 'assignFront'
+      | 'setDefenseLine'
+      | 'clearPlan'
+      | 'setOffensiveLine'
+      | 'startOffensive'
+      | 'stopOffensive'
+      | 'clearOffensive';
+  }
 >;
 
 const inMap = (state: MatchState, e: EdgeId): boolean =>
@@ -55,11 +65,9 @@ function validateLine(state: MatchState, playerId: number, points: readonly numb
   return defenseLinePath(state, playerId, points) ? OK : rejected('noPath');
 }
 
-// Наступление — только у армии с линией фронта; активных наступлений у игрока не больше
-// MAX_ACTIVE_ARROWS (07-controls.md, «Линия наступления»).
+// Линия наступления — только у армии с линией фронта (07-controls.md, «Линия наступления»).
 function validateOffensive(
   state: MatchState,
-  playerId: number,
   cmd: Extract<PlanCommand, { t: 'setOffensiveLine' }>,
 ): Validation {
   const plan = state.plans.find((p) => p.armyId === cmd.armyId);
@@ -67,10 +75,17 @@ function validateOffensive(
   if (cmd.edges.length === 0 || cmd.edges.some((e) => !inMap(state, e) || !isLandEdge(state, e))) {
     return rejected('badHex');
   }
-  if (!landEdgePath(state, cmd.edges)) return rejected('noPath');
+  return landEdgePath(state, cmd.edges) ? OK : rejected('noPath');
+}
+
+// «Начать наступление»: есть нарисованная линия; идущих наступлений у игрока не больше
+// MAX_ACTIVE_ARROWS.
+function validateStart(state: MatchState, playerId: number, armyId: number): Validation {
+  const plan = state.plans.find((p) => p.armyId === armyId);
+  if (plan?.kind !== 'front' || !plan.offensive) return rejected('noOffensive');
   const mine = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.id));
   const active = state.plans.filter(
-    (p) => p.kind === 'front' && p.offensive && p.armyId !== cmd.armyId && mine.has(p.armyId),
+    (p) => p.kind === 'front' && p.offensive?.active && p.armyId !== armyId && mine.has(p.armyId),
   ).length;
   return active < MAX_ACTIVE_ARROWS ? OK : rejected('tooManyOffensives');
 }
@@ -88,7 +103,8 @@ export function validatePlanCommand(
   if (!army.ok) return army;
   if (cmd.t === 'assignFront') return validateFront(state, playerId, cmd);
   if (cmd.t === 'setDefenseLine') return validateLine(state, playerId, cmd.points);
-  if (cmd.t === 'setOffensiveLine') return validateOffensive(state, playerId, cmd);
+  if (cmd.t === 'setOffensiveLine') return validateOffensive(state, cmd);
+  if (cmd.t === 'startOffensive') return validateStart(state, playerId, cmd.armyId);
   return OK;
 }
 
@@ -113,7 +129,7 @@ function offensiveLine(state: MatchState, plan: ArmyPlan, edges: readonly EdgeId
     const h = b >= 0 && dist(b) < dist(a) ? b : a;
     if (!hexes.includes(h)) hexes.push(h);
   }
-  return { edges, hexes };
+  return { edges, hexes, active: false };
 }
 
 /** Ставит или снимает линию наступления армии с фронтом; места отрядов не трогает. */
@@ -132,7 +148,15 @@ function setPlan(state: MatchState, plan: ArmyPlan): void {
 /** Применяет команду плана. Вызывается только после успешной проверки. */
 export function executePlanCommand(state: MatchState, playerId: number, cmd: PlanCommand): void {
   if (cmd.t === 'clearPlan') return removePlan(state, cmd.armyId);
-  if (cmd.t === 'stopOffensive') return setOffensive(state, cmd.armyId, null);
+  if (cmd.t === 'clearOffensive') return setOffensive(state, cmd.armyId, null);
+  if (cmd.t === 'startOffensive' || cmd.t === 'stopOffensive') {
+    const plan = state.plans.find((p) => p.armyId === cmd.armyId);
+    if (plan?.kind !== 'front' || !plan.offensive) return;
+    return setOffensive(state, cmd.armyId, {
+      ...plan.offensive,
+      active: cmd.t === 'startOffensive',
+    });
+  }
   if (cmd.t === 'setOffensiveLine') {
     const plan = state.plans.find((p) => p.armyId === cmd.armyId);
     const edges = landEdgePath(state, cmd.edges);

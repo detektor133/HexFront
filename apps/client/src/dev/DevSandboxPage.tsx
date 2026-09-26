@@ -11,7 +11,6 @@ import {
 } from '@hexfront/sim';
 
 import { ArmyBar } from './ArmyBar.tsx';
-import { ChipSwitch } from './ChipSwitch.tsx';
 import styles from './DevSandboxPage.module.css';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
@@ -20,7 +19,7 @@ import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
 import { NOTHING_PICKED, orderHex, selectHex, type Picked } from './sandbox-selection.ts';
-import { CHIP_STYLES, type ChipStyle } from './unit-chips.ts';
+import { createSplitGrab } from './split-drag.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -65,25 +64,10 @@ interface Sandbox {
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   readonly army: number | null;
-  readonly chipStyle: ChipStyle;
   send(cmd: Command): void;
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
-  setChipStyle(s: ChipStyle): void;
-}
-
-/** Ключ localStorage выбранного вида фишки — удобство одного зрителя (CR-003). */
-const CHIP_KEY = 'hexfront.chipStyle';
-
-function savedChipStyle(): ChipStyle {
-  try {
-    const v = window.localStorage.getItem(CHIP_KEY);
-    return CHIP_STYLES.find((s) => s === v) ?? 'hoi';
-  } catch (error) {
-    console.warn('chip_style_read_failed', error);
-    return 'hoi';
-  }
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -101,18 +85,6 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
-  const [chipStyle, setChipStyleState] = useState<ChipStyle>(savedChipStyle);
-  const chipRef = useRef(chipStyle);
-  const setChipStyle = useCallback((s: ChipStyle) => {
-    chipRef.current = s;
-    setChipStyleState(s);
-    layerRef.current?.setChipStyle(s);
-    try {
-      window.localStorage.setItem(CHIP_KEY, s);
-    } catch (error) {
-      console.warn('chip_style_write_failed', error);
-    }
-  }, []);
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -127,6 +99,20 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     layerRef.current?.setSelectedArmy(id);
   }, []);
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
+  const splitGrab = useMemo(
+    () =>
+      createSplitGrab({
+        context: (): DraftContext | null => {
+          const v = viewRef.current;
+          if (!v || typeof loaded === 'string') return null;
+          return { map: loaded.map, view: v, radius: tokens.map.hexRadius };
+        },
+        chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
+        send: (cmd) => matchRef.current?.send(cmd),
+        setOverlay: (o) => layerRef.current?.setSplit(o),
+      }),
+    [loaded],
+  );
   const setToolRef = useRef<(t: ToolState | null) => void>(() => undefined);
   // Инструменты планов: рисование пальцем по граням, тапы, ручки фронта (CR-004).
   const input = useMemo(
@@ -183,7 +169,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
         return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
-      if (input.tap(world, kind)) return;
+      if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
       const next = orderHex(current, pickedRef.current, hex);
       if (next.cmd) match.send(next.cmd);
@@ -193,7 +179,6 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       radius: tokens.map.hexRadius,
       midLayer: (m: MapStatic, radius: number) => {
         const layer = createEconomyLayer(m, radius);
-        layer.setChipStyle(chipRef.current);
         layer.setSelectedArmy(armyRef.current);
         layerRef.current = layer;
         return layer;
@@ -203,7 +188,8 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
-      v.setGrab(input.grab);
+      // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
+      v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
@@ -223,7 +209,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       layerRef.current = null;
       mapViewRef.current = null;
     };
-  }, [hostRef, loaded, pick, input, setTool]);
+  }, [hostRef, loaded, pick, input, setTool, splitGrab]);
 
   return {
     msg,
@@ -232,12 +218,10 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     lastReject,
     tool,
     army,
-    chipStyle,
     send,
     pick,
     setTool,
     setArmy,
-    setChipStyle,
   };
 }
 
@@ -256,15 +240,23 @@ export function DevSandboxPage(): React.JSX.Element {
     armyUnits.length === sb.picked.units.length &&
     armyUnits.every((u) => sb.picked.units.includes(u.id));
   const map = typeof loaded === 'string' ? null : loaded.map;
+  // Армии выбранных на карте отрядов — их карточки в золотой рамке (можно выбрать отряды разных армий).
+  const pickedArmies = [
+    ...new Set(
+      (view?.units ?? [])
+        .filter((u) => sb.picked.units.includes(u.id) && u.armyId !== null)
+        .map((u) => u.armyId as number),
+    ),
+  ];
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
       {view && <Hud view={view} send={sb.send} />}
-      {view && <ChipSwitch value={sb.chipStyle} onChange={sb.setChipStyle} />}
       {view && (
         <ArmyBar
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
+          pickedArmies={pickedArmies}
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}
