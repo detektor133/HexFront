@@ -78,6 +78,8 @@ type DslCommand =
     }
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }
+  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'stopOffensive'; readonly armyId: number }
   | {
       readonly t: 'armyOrder';
       readonly armyId: number;
@@ -175,6 +177,13 @@ export const setDefenseLine = (armyId: number, points: readonly At[]): DslComman
   armyId,
   points,
 });
+/** Линия наступления армии с фронтом — граница «до куда наступать». */
+export const setOffensiveLine = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'setOffensiveLine',
+  armyId,
+  points,
+});
+export const stopOffensive = (armyId: number): DslCommand => ({ t: 'stopOffensive', armyId });
 export const clearPlan = (armyId: number): DslCommand => ({ t: 'clearPlan', armyId });
 export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
@@ -433,7 +442,10 @@ function makeScenario(
       case 'setDefenseLine':
         return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'clearPlan':
+      case 'stopOffensive':
         return c;
+      case 'setOffensiveLine':
+        return { t: 'setOffensiveLine', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'assignUnits':
         return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':

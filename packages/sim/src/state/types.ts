@@ -156,6 +156,8 @@ export type ArmyPlan =
       readonly enemyId: number;
       /** Концы участка на границе; null — вся граница с соседом. */
       readonly section: readonly [HexId, HexId] | null;
+      /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
+      readonly offensive: readonly HexId[] | null;
     }
   | {
       readonly armyId: number;
@@ -199,6 +201,7 @@ export type GameEvent =
       readonly cityId: number;
     }
   | { readonly t: 'playerEliminated'; readonly playerId: number }
+  | { readonly t: 'offensiveDone'; readonly playerId: number; readonly armyId: number }
   | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';

@@ -13,6 +13,7 @@ import type { UnitView } from './unit-view.ts';
 import type { MapStatic } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
+import type { MatchState, Unit } from '../state/types.ts';
 
 export type ForecastOutcome = 'victory' | 'defeat' | 'stalemate';
 
@@ -30,7 +31,7 @@ export interface Forecast {
 }
 
 // Неизвестная снабжённость чужого отряда считается полной.
-const fighter = (u: UnitView): Fighter => ({ ...u, supplyLevel: u.supplyLevel ?? (FP as Fp) });
+const fighter = (u: UnitView): Combatant => ({ ...u, supplyLevel: u.supplyLevel ?? (FP as Fp) });
 
 interface Side {
   readonly soldiers: number;
@@ -38,7 +39,11 @@ interface Side {
 }
 
 // Солдаты стороны и средневзвешенная по солдатам организованность (с ополчением города).
-function side(units: readonly UnitView[], militia = 0, militiaOrg = 0): Side {
+function side(
+  units: readonly { soldiers: number; org: number }[],
+  militia = 0,
+  militiaOrg = 0,
+): Side {
   let soldiers = militia;
   let orgWeighted = militia * militiaOrg;
   for (const u of units) {
@@ -63,41 +68,26 @@ function lossShare(enemyPower: number, timeS: Fp, soldiers: number): Fp {
   return Math.min(FP, fpDiv(lost, soldiers as Fp)) as Fp;
 }
 
-/**
- * Прогноз боя за гекс target отрядами unitIds по видимым данным игрока:
- * tDef = org защитников / потеря org защитников в секунду, tAtt — так же для атакующих;
- * tDef < tAtt × FORECAST_MARGIN → «победа», tAtt < tDef × FORECAST_MARGIN → «поражение»,
- * иначе «упорный бой». Невидимые отряды не учитываются, чужое снабжение = 100 %.
- */
-export function forecastBattle(
-  map: MapStatic,
-  view: PlayerView,
-  unitIds: readonly number[],
-  target: HexId,
-): Forecast {
-  const me = view.playerId;
-  const attackers = view.units.filter((u) => unitIds.includes(u.id) && u.owner === me);
-  const defenders = view.units.filter((u) => u.hex === target && u.owner !== me);
-  const city = view.cities.find(
-    (c) => c.hex === target && c.owner !== me && c.defenders > 0 && c.defenseOrg > 0,
-  );
-  const all = view.units.map(fighter);
-  const attack = attackPower(map, attackers.map(fighter), target, all);
+type Combatant = Fighter & { readonly org: number };
+
+/** Входные данные прогноза: бойцы сторон, оборона города, все отряды (для поддержки артиллерии). */
+interface ForecastInput {
+  readonly ground: Ground;
+  readonly attackers: readonly Combatant[];
+  readonly defenders: readonly Combatant[];
+  readonly city: { readonly defenders: Fp; readonly defenseOrg: Fp } | null;
+  readonly all: readonly Fighter[];
+  readonly target: HexId;
+}
+
+// Общая формула прогноза для снимка игрока и для состояния матча (06-combat.md, «Прогноз боя»).
+function forecastCore(f: ForecastInput): Forecast {
+  const attack = attackPower(f.ground.map, f.attackers, f.target, f.all);
   // Пустой гекс или одинокая артиллерия без ополчения — гекс берётся сразу.
-  if (!city && defenders.every((u) => u.type === 'artillery')) return { ...INSTANT, attack };
-  const ground: Ground = {
-    map,
-    building: view.hexes.building,
-    hasCity: (hex) => view.cities.some((c) => c.hex === hex),
-  };
-  const defense = defensePower(
-    ground,
-    defenders.map(fighter),
-    city?.defenders ?? (0 as Fp),
-    target,
-  );
-  const att = side(attackers);
-  const def = side(defenders, city?.defenders ?? 0, city?.defenseOrg ?? 0);
+  if (!f.city && f.defenders.every((u) => u.type === 'artillery')) return { ...INSTANT, attack };
+  const defense = defensePower(f.ground, f.defenders, f.city?.defenders ?? (0 as Fp), f.target);
+  const att = side(f.attackers);
+  const def = side(f.defenders, f.city?.defenders ?? 0, f.city?.defenseOrg ?? 0);
   const tDef = fpDiv(def.avgOrg, orgLossPerS(attack, defense) as Fp);
   const tAtt = fpDiv(att.avgOrg, orgLossPerS(defense, attack) as Fp);
   let outcome: ForecastOutcome = 'stalemate';
@@ -112,4 +102,61 @@ export function forecastBattle(
     attack,
     defense,
   };
+}
+
+/**
+ * Прогноз боя за гекс target отрядами unitIds по видимым данным игрока:
+ * tDef = org защитников / потеря org защитников в секунду, tAtt — так же для атакующих;
+ * tDef < tAtt × FORECAST_MARGIN → «победа», tAtt < tDef × FORECAST_MARGIN → «поражение»,
+ * иначе «упорный бой». Невидимые отряды не учитываются, чужое снабжение = 100 %.
+ */
+export function forecastBattle(
+  map: MapStatic,
+  view: PlayerView,
+  unitIds: readonly number[],
+  target: HexId,
+): Forecast {
+  const me = view.playerId;
+  const city = view.cities.find(
+    (c) => c.hex === target && c.owner !== me && c.defenders > 0 && c.defenseOrg > 0,
+  );
+  return forecastCore({
+    ground: {
+      map,
+      building: view.hexes.building,
+      hasCity: (hex) => view.cities.some((c) => c.hex === hex),
+    },
+    attackers: view.units.filter((u) => unitIds.includes(u.id) && u.owner === me).map(fighter),
+    defenders: view.units.filter((u) => u.hex === target && u.owner !== me).map(fighter),
+    city: city ?? null,
+    all: view.units.map(fighter),
+    target,
+  });
+}
+
+/**
+ * Прогноз боя по полному состоянию матча — для шагов наступления армий (07-controls.md).
+ * @returns тот же прогноз, что показывает интерфейс, но по настоящим данным
+ */
+export function forecastInState(
+  state: MatchState,
+  attackers: readonly Unit[],
+  target: HexId,
+): Forecast {
+  const owner = attackers[0]?.owner ?? -1;
+  const city = state.cities.find(
+    (c) => c.hex === target && c.owner !== owner && c.defenders > 0 && c.defenseOrg > 0,
+  );
+  return forecastCore({
+    ground: {
+      map: state.map,
+      building: state.hexes.building,
+      hasCity: (hex) => state.cities.some((c) => c.hex === hex),
+    },
+    attackers,
+    defenders: state.units.filter((u) => u.hex === target && u.owner !== owner),
+    city: city ?? null,
+    all: state.units,
+    target,
+  });
 }

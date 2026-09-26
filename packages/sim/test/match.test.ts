@@ -149,15 +149,16 @@ describe('step', () => {
       return hashState(s);
     };
     expect(run()).toBe(run());
-  });
+    // 2000 тиков на 6 игроков: в параллельном прогоне всех тестов дольше 5 с по умолчанию.
+  }, 30_000);
 
-  it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
+  it('отклонённая команда не меняет состояние и даёт событие с причиной', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'arrowStop', arrowId: 1 } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'stopOffensive', armyId: 999 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'arrowStop', reason: 'notImplemented' },
+      { t: 'commandRejected', playerId: 1, command: 'stopOffensive', reason: 'unknownArmy' },
     ]);
     expect(hashState(a)).toBe(hashState(b));
   });

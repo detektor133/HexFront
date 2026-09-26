@@ -163,8 +163,27 @@ export function defenseLinePath(
   owner: number,
   points: readonly HexId[],
 ): HexId[] | null {
-  const passable = (h: HexId): boolean =>
-    state.hexes.owner[h] === owner && state.map.terrain[h] !== TERRAIN.water;
+  return linePath(
+    state,
+    points,
+    (h) => state.hexes.owner[h] === owner && state.map.terrain[h] !== TERRAIN.water,
+  );
+}
+
+/**
+ * Линия наступления по точкам: кратчайший путь по любым проходимым гексам (свои, чужие, ничьи).
+ * @returns гексы линии по порядку или null, если точки не соединить
+ */
+export function offensiveLinePath(state: MatchState, points: readonly HexId[]): HexId[] | null {
+  return linePath(state, points, (h) => state.map.terrain[h] !== TERRAIN.water);
+}
+
+// Точки соединяются кратчайшими по числу гексов путями, ничьи — по меньшему HexId.
+function linePath(
+  state: MatchState,
+  points: readonly HexId[],
+  passable: (h: HexId) => boolean,
+): HexId[] | null {
   const [start] = points;
   if (start === undefined || !passable(start)) return null;
   const out: HexId[] = [start];

@@ -36,7 +36,7 @@ interface Raw {
 const rawArb = fc.record({
   at: fc.integer({ min: 0, max: TICKS - 1 }),
   player: fc.integer({ min: 0, max: 1 }),
-  kind: fc.integer({ min: 0, max: 15 }),
+  kind: fc.integer({ min: 0, max: 16 }),
   a: fc.nat(1000),
   b: fc.nat(1000),
   c: fc.nat(1000),
@@ -127,6 +127,15 @@ function build(state: MatchState, r: Raw): Command | null {
       return army && a !== undefined && b !== undefined
         ? { t: 'setDefenseLine', armyId: army.id, points: [a, b] }
         : null;
+    }
+    case 16: {
+      const plan = pickOf(
+        state.plans.filter((p) =>
+          state.armies.some((x) => x.id === p.armyId && x.owner === r.player),
+        ),
+        r.a,
+      );
+      return plan ? { t: 'setOffensiveLine', armyId: plan.armyId, points: [r.b] } : null;
     }
     default:
       // Заведомо сомнительная команда: случайные id и гексы — проверка отказов.
