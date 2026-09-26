@@ -72,7 +72,7 @@ type Command =
   | { t: 'disbandArmy'; armyId: number }
   | { t: 'assignUnits'; unitIds: number[]; armyId: number | null }
   | { t: 'setAutoReinforce'; on: boolean }
-  | { t: 'assignFront'; armyId: number; enemyId: number; section: [HexId, HexId] | null }
+  | { t: 'assignFront'; armyId: number; points: HexId[] }   // точки на своей границе (CR-003)
   | { t: 'setDefenseLine'; armyId: number; points: HexId[] } | { t: 'clearPlan'; armyId: number }
   | { t: 'setOffensiveLine'; armyId: number; points: HexId[] } | { t: 'stopOffensive'; armyId: number }
   | { t: 'split'; unitId: number; soldiers: Fp } | { t: 'merge'; unitIds: number[] }

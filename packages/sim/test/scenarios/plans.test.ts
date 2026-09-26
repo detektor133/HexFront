@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { intDiv } from '../../src/math/int.ts';
 import { neediestArmy } from '../../src/state/armies.ts';
 import {
   armyOrder,
@@ -10,6 +9,7 @@ import {
   city,
   clearPlan,
   createArmy,
+  drawFront,
   move,
   own,
   scenario,
@@ -35,7 +35,6 @@ const legend = {
 const W = 5;
 const hexOf = (w: At): number => w.col + w.row * W;
 const col = (hex: number): number => hex % W;
-const row = (hex: number): number => intDiv(hex, W);
 
 type S = ReturnType<typeof scenario>;
 
@@ -120,19 +119,43 @@ describe('линия фронта (CR-002)', () => {
     expect(hexesOf(s, ids)).toEqual([0, 1, 2].map((r) => hexOf(at(2, r))));
   });
 
-  it('две армии на одном фронте делят его на смежные участки по солдатам', () => {
-    const s = scenario(BORDER, { legend });
-    const big = infantry(s, 3);
-    const small = infantry(s, 2, at(0, 3));
-    const x = armyOf(s, big);
-    const y = armyOf(s, small);
-    s.cmd('A', assignFront(x, 'B', null));
-    s.cmd('A', assignFront(y, 'B', null));
-    s.runSeconds(30);
-    const rowsX = hexesOf(s, big).map(row);
-    const rowsY = hexesOf(s, small).map(row);
-    expect(rowsX).toEqual([0, 1, 2]);
-    expect(rowsY).toEqual([3, 4]);
+  it('участок по ничейной земле: армия встаёт на нарисованные гексы своей границы', () => {
+    const s = scenario(
+      `
+      a  a  .  .  .
+      a  a  .  .  .
+      A1 a  .  .  B1
+      a  a  .  .  .
+      a  a  .  .  .
+    `,
+      { legend },
+    );
+    const ids = infantry(s, 3);
+    s.cmd('A', drawFront(armyOf(s, ids), [at(1, 1), at(1, 3)]));
+    s.runSeconds(20);
+    expect(hexesOf(s, ids)).toEqual([1, 2, 3].map((r) => hexOf(at(1, r))));
+  });
+
+  it('фронт едет за границей: захваченный впереди участок переносит фронт на новую границу', () => {
+    const s = scenario(
+      `
+      a  a  .  .  .
+      a  a  .  .  .
+      A1 a  .  .  B1
+      a  a  .  .  .
+      a  a  .  .  .
+    `,
+      { legend },
+    );
+    const army = armyOf(s, infantry(s, 1));
+    s.cmd('A', drawFront(army, [at(1, 1), at(1, 3)]));
+    s.runTicks(1);
+    for (let r = 0; r < 5; r += 1) s.setOwner(at(2, r), 'A');
+    s.runSeconds(6);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    const cols = (plan?.kind === 'front' ? plan.hexes : []).map(col);
+    expect(cols.length).toBeGreaterThan(0);
+    expect(cols.every((c) => c === 2)).toBe(true);
   });
 
   it('ручной приказ снимает отряд с места; выполнив его, отряд возвращается на фронт', () => {
@@ -213,7 +236,7 @@ describe('линия обороны (CR-002)', () => {
 });
 
 describe('команды планов: отказы', () => {
-  it('фронт против себя — notEnemy; линия через чужой гекс — notOwnHex; нет пути — noPath', () => {
+  it('фронт не по своей границе — badHex; линия через чужой гекс — notOwnHex; нет пути — noPath', () => {
     const s = scenario(
       `
       a  ~  a  b
@@ -222,11 +245,11 @@ describe('команды планов: отказы', () => {
       { legend },
     );
     const army = armyOf(s, infantry(s, 1, at(0, 0)));
-    s.cmd('A', assignFront(army, 'A', null));
+    s.cmd('A', drawFront(army, [at(3, 0)]));
     s.cmd('A', setDefenseLine(army, [at(0, 0), at(3, 0)]));
     s.cmd('A', setDefenseLine(army, [at(0, 0), at(2, 0)]));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['notEnemy', 'notOwnHex', 'noPath']);
+    expect(s.rejections()).toEqual(['badHex', 'notOwnHex', 'noPath']);
   });
 });
 

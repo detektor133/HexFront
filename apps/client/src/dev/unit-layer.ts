@@ -8,13 +8,14 @@ import {
   hexId,
   inBounds,
   neighbors,
+  ORG_MAX,
   TICK_MS,
   type PlayerView,
   type UnitView,
 } from '@hexfront/sim';
 
 import type { Picked } from './sandbox-selection.ts';
-import { createChip, type Chip, type ChipState } from './unit-chips.ts';
+import { createChip, type Chip, type ChipState, type ChipStyle } from './unit-chips.ts';
 import { hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -41,13 +42,14 @@ const BATTLE_R = 8;
 const BATTLE_CROSS = 3.5;
 const BATTLE_PULSE_MS = 800;
 const BATTLE_PULSE = 0.15;
-const LOW_SUPPLY = 500;
 const FULL = 1000;
 
 export interface UnitLayer {
   readonly container: Container;
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
+  /** Вариант фишки (переключатель песочницы, CR-003). */
+  setChipStyle(style: ChipStyle): void;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -104,6 +106,7 @@ export function createUnitLayer(
   let k = 1;
   let textRes = window.devicePixelRatio;
   let lastFrame = 0;
+  let chipStyle: ChipStyle = 'hoi';
   /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
   const drawnAt = new Map<string, Point>();
   const shown = new Map<number, Point>();
@@ -133,20 +136,24 @@ export function createUnitLayer(
     const first = units[0] as UnitView;
     let type = first.type;
     for (const u of units) if ((byType.get(u.type) ?? 0) > (byType.get(type) ?? 0)) type = u.type;
-    const org = units.reduce((s, u) => s + u.org * u.soldiers, 0) / Math.max(1, soldiers);
+    const weighted = (f: (u: UnitView) => number): number =>
+      units.reduce((s, u) => s + f(u) * u.soldiers, 0) / Math.max(1, soldiers);
     const army = v.armies.find((a) => a.id === first.armyId);
     const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
+    const mine = first.owner === v.playerId;
     return {
+      style: chipStyle,
       color: playerLine(first.owner),
-      ring: oneArmy ? armyColor(v.playerId, army.number) : null,
+      army: oneArmy ? armyColor(v.playerId, army.number) : null,
       type,
       soldiers,
-      bar: org / FULL / 100,
+      org: weighted((u) => u.org) / ORG_MAX,
+      supply: mine ? weighted((u) => u.supplyLevel ?? FULL) / FULL : null,
+      starving: units.some((u) => u.starving === true),
       count: units.length,
       selected: units.some((u) => picked.units.includes(u.id)),
       retreating: units.some((u) => u.order === 'retreat'),
-      encircled: first.owner === v.playerId && units.some((u) => u.encircled === true),
-      lowSupply: units.some((u) => u.supplyLevel !== null && u.supplyLevel < LOW_SUPPLY),
+      encircled: mine && units.some((u) => u.encircled === true),
       hold: units.every((u) => u.order === 'hold'),
       ghost: false,
     };
@@ -185,16 +192,18 @@ export function createUnitLayer(
         key: `r${r.id}`,
         units: [],
         state: {
+          style: chipStyle,
           color: playerLine(v.playerId),
-          ring: null,
+          army: null,
           type: r.type,
           soldiers: r.soldiers,
-          bar: r.progressTicks / Math.max(1, r.totalTicks),
+          org: r.progressTicks / Math.max(1, r.totalTicks),
+          supply: null,
+          starving: false,
           count: 1,
           selected: false,
           retreating: false,
           encircled: false,
-          lowSupply: false,
           hold: false,
           ghost: true,
         },
@@ -304,6 +313,12 @@ export function createUnitLayer(
       entries = build(v);
       syncChips();
       layer.frame(nowMs);
+    },
+    setChipStyle(style) {
+      chipStyle = style;
+      if (!view) return;
+      entries = build(view);
+      syncChips();
     },
     setScale(scale) {
       k = 1 / scale;

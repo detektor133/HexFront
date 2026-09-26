@@ -148,14 +148,16 @@ export interface Unit {
   slot: HexId;
 }
 
-/** План армии (CR-002): линия фронта против соседа (вся или участок) или линия обороны. */
+/**
+ * План армии (CR-002, CR-003): участок фронта на своей границе (с врагом или ничьей землёй) или
+ * линия обороны.
+ */
 export type ArmyPlan =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      readonly enemyId: number;
-      /** Концы участка на границе; null — вся граница с соседом. */
-      readonly section: readonly [HexId, HexId] | null;
+      /** Цепочка своих пограничных гексов по порядку; едет за границей (followBorder). */
+      readonly hexes: readonly HexId[];
       /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
       readonly offensive: readonly HexId[] | null;
     }

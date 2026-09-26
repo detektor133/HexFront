@@ -4,7 +4,7 @@
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { MAX_ACTIVE_ARROWS } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
-import { defenseLinePath, frontHexes, offensiveLinePath } from '../state/front.ts';
+import { defenseLinePath, frontLinePath, isBorderHex, offensiveLinePath } from '../state/front.ts';
 import type { ArmyPlan, MatchState } from '../state/types.ts';
 
 export type PlanCommand = Extract<
@@ -23,12 +23,10 @@ function validateFront(
   playerId: number,
   cmd: Extract<PlanCommand, { t: 'assignFront' }>,
 ): Validation {
-  const enemy = state.players[cmd.enemyId];
-  if (!enemy || cmd.enemyId === playerId || enemy.status !== 'alive') return rejected('notEnemy');
-  if (cmd.section === null) return OK;
-  // Концы участка — гексы нынешней границы с этим соседом.
-  const front = frontHexes(state, playerId, cmd.enemyId);
-  return cmd.section.every((h) => front.includes(h)) ? OK : rejected('badHex');
+  // Точки участка — гексы своей нынешней границы (с врагом или ничьей землёй).
+  if (cmd.points.length === 0) return rejected('badHex');
+  if (cmd.points.some((h) => !isBorderHex(state, playerId, h))) return rejected('badHex');
+  return frontLinePath(state, playerId, cmd.points) ? OK : rejected('noPath');
 }
 
 function validateLine(state: MatchState, playerId: number, points: readonly number[]): Validation {
@@ -107,14 +105,9 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
     return setOffensive(state, cmd.armyId, offensiveLinePath(state, cmd.points));
   }
   if (cmd.t === 'assignFront') {
-    const section = cmd.section ? ([cmd.section[0], cmd.section[1]] as const) : null;
-    return setPlan(state, {
-      armyId: cmd.armyId,
-      kind: 'front',
-      enemyId: cmd.enemyId,
-      section,
-      offensive: null,
-    });
+    const hexes = frontLinePath(state, playerId, cmd.points);
+    if (!hexes) return;
+    return setPlan(state, { armyId: cmd.armyId, kind: 'front', hexes, offensive: null });
   }
   const hexes = defenseLinePath(state, playerId, cmd.points);
   if (hexes) setPlan(state, { armyId: cmd.armyId, kind: 'line', hexes });

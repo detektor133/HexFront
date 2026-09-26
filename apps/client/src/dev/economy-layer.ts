@@ -16,6 +16,7 @@ import {
 import { drawCities } from './city-glyphs.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
+import type { ChipStyle } from './unit-chips.ts';
 import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
@@ -43,6 +44,7 @@ export interface EconomyLayer {
   setView(view: PlayerView, selected: SandboxSelection): void;
   /** Рисуемый план армии (режим рисования) или null. */
   setDraft(draft: Draft | null): void;
+  setChipStyle(style: ChipStyle): void;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -211,6 +213,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       selected = sel;
       redraw();
       unitLayer.setView(v, sel, performance.now());
+    },
+    setChipStyle(style) {
+      unitLayer.setChipStyle(style);
     },
     setDraft(d) {
       draft = d;

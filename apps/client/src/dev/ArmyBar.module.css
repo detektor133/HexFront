@@ -1,0 +1,257 @@
+/* Панель армий как в HoI4 (ui.md, «Панель армий», CR-003): ряд карточек армий внизу экрана с
+   горизонтальной прокруткой, над ним — приказы выбранной армии. Стиль — как у карточек. */
+.dock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0 var(--space-lg) var(--space-sm);
+  pointer-events: none;
+}
+
+.tools,
+.strip {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  pointer-events: auto;
+}
+
+.tools {
+  flex-wrap: wrap;
+  align-self: flex-end;
+  max-width: 100%;
+  overflow-x: visible;
+  padding: var(--space-xs);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+  min-height: 48px;
+  padding: var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+}
+
+.tool:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.card {
+  display: flex;
+  flex: 0 0 176px;
+  overflow: hidden;
+  padding: 0;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selected {
+  border-color: var(--ui-ink);
+  outline: 2px solid var(--ui-ink);
+}
+
+/* Полоса цвета армии во всю высоту карточки. */
+.band {
+  flex: 0 0 8px;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--space-sm);
+  font-size: var(--font-size-caption);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.name {
+  overflow: hidden;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.key {
+  flex: 0 0 44px;
+  color: var(--ui-ink2);
+}
+
+.meter {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  background: var(--ui-surface2);
+  border-radius: 2px;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--ui-ink2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.alarm {
+  color: var(--status-danger);
+  font-weight: 500;
+}
+
+.reserve {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  font-size: var(--font-size-caption);
+}
+
+.small {
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* Плашка режима рисования плана — сверху по центру под HUD. */
+.draft {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: min(460px, calc(100% - 2 * var(--space-lg)));
+  box-sizing: border-box;
+  padding: var(--space-md);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  font-size: var(--font-size-caption);
+  transform: translateX(-50%);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Переключатель вида фишки (CR-003) — пока владелец не выберет вариант. */
+.chipSwitch {
+  position: absolute;
+  top: 72px;
+  left: var(--space-lg);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  font-size: var(--font-size-caption);
+}
+
+.chipSwitch button[aria-pressed='true'] {
+  border-color: var(--ui-ink);
+  background: var(--ui-surface2);
+}
+
+@media (max-width: 600px) {
+  .dock {
+    padding: 0 var(--space-sm) var(--space-sm);
+  }
+
+  .card {
+    flex-basis: 150px;
+  }
+
+  .draft {
+    top: 104px;
+  }
+
+  .chipSwitch {
+    top: 104px;
+    left: var(--space-sm);
+  }
+}

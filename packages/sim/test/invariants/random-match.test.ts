@@ -109,9 +109,7 @@ function build(state: MatchState, r: Raw): Command | null {
         state.armies.filter((x) => x.owner === r.player),
         r.a,
       );
-      return army
-        ? { t: 'assignFront', armyId: army.id, enemyId: 1 - r.player, section: null }
-        : null;
+      return army ? { t: 'assignFront', armyId: army.id, points: [r.b, r.b + 1] } : null;
     }
     case 15: {
       const army = pickOf(

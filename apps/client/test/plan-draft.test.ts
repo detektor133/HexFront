@@ -5,20 +5,34 @@ import { describe, expect, it } from 'vitest';
 import {
   distance,
   hexFromId,
+  hexId,
+  inBounds,
+  isBorderHex,
   loadMap,
+  neighbors,
   TERRAIN,
   type MapStatic,
   type PlayerView,
 } from '@hexfront/sim';
 
-import { draftCommand, draftPath, draftTap, type Draft } from '../src/dev/plan-draft.ts';
+import {
+  addPoints,
+  draftCommand,
+  draftPath,
+  pointAt,
+  type Draft,
+  type DraftContext,
+} from '../src/dev/plan-draft.ts';
+import { frontEdges, offensiveEdges } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
+import { hexCenter, hexEdge, type Point } from '../src/render/hex-geometry.ts';
 import { armyColor, playerLine } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 const small: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
 );
+const R = tokens.map.hexRadius;
 
 function start(): { map: MapStatic; view: PlayerView } {
   const loaded = loadMap(small);
@@ -30,70 +44,96 @@ function start(): { map: MapStatic; view: PlayerView } {
   return { map: loaded.map, view: msg.view };
 }
 
-describe('режимы рисования планов армии (CR-002)', () => {
+const around = (map: MapStatic, h: number): number[] =>
+  neighbors(hexFromId(h, map.width)).flatMap((n) =>
+    inBounds(n, map.width, map.height) ? [hexId(n, map.width)] : [],
+  );
+
+// Середина грани между гексом и соседом — точка «пальца».
+function edgeMid(map: MapStatic, h: number, other: number): Point {
+  const dir = neighbors(hexFromId(h, map.width)).findIndex(
+    (n) => inBounds(n, map.width, map.height) && hexId(n, map.width) === other,
+  );
+  const [a, b] = hexEdge(hexCenter(hexFromId(h, map.width), R), R, dir);
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+const land = (map: MapStatic, h: number): boolean => map.terrain[h] !== TERRAIN.water;
+
+describe('рисование планов по граням (CR-003)', () => {
   const { map, view } = start();
-  const own = view.hexes.owner.reduce<number[]>(
-    (acc, o, id) => (o === view.playerId ? [...acc, id] : acc),
+  const me = view.playerId;
+  const ctx: DraftContext = { map, view, radius: R, front: [] };
+  const ownBorder = view.hexes.owner.reduce<number[]>(
+    (acc, _, id) => (isBorderHex({ map, hexes: view.hexes }, me, id) ? [...acc, id] : acc),
     [],
   );
-  const enemyHex = view.hexes.owner.findIndex((o) => o >= 0 && o !== view.playerId);
-  const a = own[0] ?? -1;
-  const b = own.at(-1) ?? -1;
+  const b0 = ownBorder[0] ?? -1;
+  const out0 = around(map, b0).find((n) => land(map, n) && view.hexes.owner[n] !== me) ?? -1;
 
-  it('фронт: тап по земле соседа — вся граница с ним', () => {
-    const d: Draft = { mode: 'front', armyId: 7, points: [] };
-    const next = draftTap(map, view, d, enemyHex);
-    expect(next.draft).toBeNull();
-    expect(next.cmd).toEqual({
-      t: 'assignFront',
-      armyId: 7,
-      enemyId: view.hexes.owner[enemyHex],
-      section: null,
-    });
+  it('фронт: палец у грани своей границы с ничьей землёй даёт свой гекс этой грани', () => {
+    expect(pointAt(ctx, 'front', edgeMid(map, b0, out0), false)).toEqual([b0]);
   });
 
-  it('фронт: два тапа по своей земле — участок', () => {
-    const d: Draft = { mode: 'front', armyId: 7, points: [] };
-    const first = draftTap(map, view, d, a);
-    expect(first.cmd).toBeNull();
-    expect(first.draft?.points).toEqual([a]);
-    const second = draftTap(map, view, first.draft as Draft, b);
-    expect(second.draft).toBeNull();
-    expect(second.cmd).toMatchObject({ t: 'assignFront', armyId: 7, section: [a, b] });
+  it('фронт: тап по границе с врагом — весь непрерывный кусок этой границы', () => {
+    // Вся чужая суша вокруг — враг: граница с ним одна и непрерывная.
+    const owner = Int16Array.from(view.hexes.owner, (o, id) =>
+      o === me || !land(map, id) ? o : 1,
+    );
+    const enemyView = { ...view, hexes: { ...view.hexes, owner } };
+    const c = { ...ctx, view: enemyView };
+    const seg = pointAt(c, 'front', edgeMid(map, b0, out0), true);
+    expect([...seg].sort((x, y) => x - y)).toEqual(ownBorder);
+    expect(pointAt(c, 'front', edgeMid(map, b0, out0), false)).toEqual([b0]);
   });
 
-  it('линия: тапы добавляют точки, повтор той же точки не добавляет', () => {
-    let d: Draft = { mode: 'line', armyId: 3, points: [] };
+  it('наступление: из двух гексов грани берётся тот, что ближе к фронту армии', () => {
+    const c = { ...ctx, front: [b0] };
+    expect(pointAt(c, 'offensive', edgeMid(map, b0, out0), false)).toEqual([b0]);
+    const far =
+      around(map, out0).find(
+        (n) =>
+          n !== b0 &&
+          land(map, n) &&
+          distance(hexFromId(n, map.width), hexFromId(b0, map.width)) === 2,
+      ) ?? -1;
+    expect(pointAt(c, 'offensive', edgeMid(map, out0, far), false)).toEqual([out0]);
+  });
+
+  it('линия обороны: только свои гексы суши', () => {
+    const c = hexCenter(hexFromId(b0, map.width), R);
+    expect(pointAt(ctx, 'line', c, true)).toEqual([b0]);
+    expect(pointAt(ctx, 'line', hexCenter(hexFromId(out0, map.width), R), true)).toEqual([]);
+  });
+
+  it('точки без повторов подряд; «Готово» даёт команду своего режима', () => {
+    let d: Draft = { mode: 'front', armyId: 3, points: [] };
     expect(draftCommand(d)).toBeNull();
-    for (const h of [a, a, b]) d = draftTap(map, view, d, h).draft as Draft;
-    expect(d.points).toEqual([a, b]);
-    expect(draftCommand(d)).toEqual({ t: 'setDefenseLine', armyId: 3, points: [a, b] });
-    expect(draftCommand({ ...d, mode: 'offensive' })).toEqual({
-      t: 'setOffensiveLine',
-      armyId: 3,
-      points: [a, b],
-    });
+    d = addPoints(addPoints(d, [b0, b0]), [b0]);
+    expect(d.points).toEqual([b0]);
+    expect(draftCommand(d)).toEqual({ t: 'assignFront', armyId: 3, points: [b0] });
+    expect(draftCommand({ ...d, mode: 'line' })).toMatchObject({ t: 'setDefenseLine' });
+    expect(draftCommand({ ...d, mode: 'offensive' })).toMatchObject({ t: 'setOffensiveLine' });
   });
 
-  it('вода и (для линии обороны) чужие гексы точками не становятся', () => {
-    const water = map.terrain.findIndex((t) => t === TERRAIN.water);
-    const line: Draft = { mode: 'line', armyId: 3, points: [] };
-    expect(draftTap(map, view, line, water).draft).toBe(line);
-    expect(draftTap(map, view, line, enemyHex).draft).toBe(line);
-    const off: Draft = { mode: 'offensive', armyId: 3, points: [] };
-    expect(draftTap(map, view, off, water).draft).toBe(off);
-    expect(draftTap(map, view, off, enemyHex).draft?.points).toEqual([enemyHex]);
-  });
-
-  it('подсветка линии обороны — цепочка соседних своих гексов от точки до точки', () => {
-    const path = draftPath(map, view, { mode: 'line', armyId: 3, points: [a, b] });
-    expect(path[0]).toBe(a);
-    expect(path.at(-1)).toBe(b);
+  it('подсветка фронта — цепочка соседних гексов своей границы; грани смотрят наружу', () => {
+    const a = ownBorder[0] ?? -1;
+    const b = ownBorder.at(-1) ?? -1;
+    const path = draftPath(ctx, { mode: 'front', armyId: 1, points: [a, b] });
     for (let i = 1; i < path.length; i += 1) {
       const p = hexFromId(path[i - 1] as number, map.width);
       expect(distance(p, hexFromId(path[i] as number, map.width))).toBe(1);
-      expect(view.hexes.owner[path[i] as number]).toBe(view.playerId);
     }
+    const edges = frontEdges({ map, owner: view.hexes.owner, me }, path);
+    expect(edges.length).toBeGreaterThan(0);
+    for (const e of edges) expect(view.hexes.owner[e.other]).not.toBe(me);
+  });
+
+  it('кромка наступления — грани к соседям дальше от фронта', () => {
+    const line = [out0];
+    const edges = offensiveEdges(map, [b0], line);
+    expect(edges.length).toBeGreaterThan(0);
+    for (const e of edges) expect(e.other).not.toBe(b0);
   });
 });
 

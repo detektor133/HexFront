@@ -1,4 +1,7 @@
+/* Высота нижней панели армий: ряд карточек (+ приказы на телефоне) — карточки встают над ней. */
 .page {
+  --dock-h: 124px;
+
   position: relative;
   height: 100%;
   overflow: hidden;
@@ -20,10 +23,16 @@
 /* Последний отказ команды — строка внизу справа, без постоянной красной плашки (ui.md). */
 .reject {
   position: absolute;
+  top: 72px;
   right: var(--space-lg);
-  bottom: var(--space-sm);
   z-index: 2;
   margin: 0;
   color: var(--ui-ink2);
   font-size: var(--font-size-caption);
+}
+
+@media (max-width: 600px) {
+  .page {
+    --dock-h: 196px;
+  }
 }

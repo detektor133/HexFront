@@ -42,6 +42,12 @@ export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
 /** Тап выбирает; долгий тап или правая кнопка мыши — приказ (07-controls.md, как в HoI4). */
 export type TapKind = 'select' | 'order';
 
+/** Фаза росчерка в режиме рисования: палец/ЛКМ ведёт линию (07-controls.md, CR-003). */
+export type StrokePhase = 'start' | 'move' | 'end' | 'cancel';
+
+/** Росчерк: точка в мировых координатах карты. */
+export type StrokeHandler = (world: Point, phase: StrokePhase) => void;
+
 export interface MapViewOptions {
   readonly radius: number;
   readonly midLayer: MidLayerFactory | null;
@@ -54,6 +60,11 @@ export interface MapView {
   setScale(scale: number): void;
   /** Ставит гекс в центр экрана (в пределах границ карты). */
   centerOn(hex: Hex): void;
+  /**
+   * Режим рисования: один палец или ЛКМ с зажатием ведут линию, два пальца, колесо и
+   * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
+   */
+  setStroke(handler: StrokeHandler | null): void;
   destroy(): void;
 }
 
@@ -67,6 +78,8 @@ interface Pointers {
   /** Время нажатия и кнопка — для долгого тапа и правой кнопки. */
   downMs: number;
   button: number;
+  /** Идёт росчерк (режим рисования, один указатель, сдвиг больше TAP_SLOP_PX). */
+  stroking: boolean;
 }
 
 // Скорость для инерции сглаживается по последним событиям перетаскивания.
@@ -82,7 +95,7 @@ export async function createMapView(
   map: MapStatic,
   initial: MapViewOptions,
   onState: (s: MapViewState) => void,
-  onTap?: (hex: Hex, kind: TapKind) => void,
+  onTap?: (hex: Hex, kind: TapKind, world: Point) => void,
 ): Promise<MapView> {
   let opts = initial;
   const app = new Application();
@@ -118,7 +131,13 @@ export async function createMapView(
     multi: false,
     downMs: 0,
     button: 0,
+    stroking: false,
   };
+  let stroke: StrokeHandler | null = null;
+  const toWorld = (at: Point): Point => ({
+    x: (at.x - cam.x) / cam.scale,
+    y: (at.y - cam.y) / cam.scale,
+  });
 
   const apply = (): void => {
     world.position.set(Math.round(cam.x), Math.round(cam.y));
@@ -153,9 +172,11 @@ export async function createMapView(
     pan: (dx, dy) => (cam = panBy(cam, dx, dy, view(), bounds)),
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, view(), bounds)),
     tap: (at, kind) => {
-      const world = { x: (at.x - cam.x) / cam.scale, y: (at.y - cam.y) / cam.scale };
-      onTap?.(pixelToHex(world, opts.radius), kind);
+      const world = toWorld(at);
+      onTap?.(pixelToHex(world, opts.radius), kind, world);
     },
+    drawing: () => stroke !== null,
+    stroke: (at, phase) => stroke?.(toWorld(at), phase),
   });
 
   return {
@@ -191,6 +212,11 @@ export async function createMapView(
         bounds,
       );
     },
+    setStroke(handler) {
+      if (ptr.stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
+      ptr.stroking = false;
+      stroke = handler;
+    },
     setScale(scale) {
       cam = zoomAt(cam, scale / cam.scale, view().width / 2, view().height / 2, view(), bounds);
     },
@@ -205,6 +231,8 @@ interface InputHandlers {
   pan(dx: number, dy: number): void;
   zoom(factor: number, at: Point): void;
   tap(at: Point, kind: TapKind): void;
+  drawing(): boolean;
+  stroke(at: Point, phase: StrokePhase): void;
 }
 
 /** Удержание дольше этого без сдвига — долгий тап (приказ). */
@@ -233,6 +261,9 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
       ptr.multi = false;
     } else {
       ptr.multi = true;
+      // Второй палец — это жест карты: начатый росчерк отменяется.
+      if (ptr.stroking) h.stroke({ x: 0, y: 0 }, 'cancel');
+      ptr.stroking = false;
     }
     ptr.velocity = null;
     ptr.lastMoveMs = e.timeStamp;
@@ -254,6 +285,15 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
     const dx = p.x - prev.x;
     const dy = p.y - prev.y;
     ptr.travel += Math.hypot(dx, dy);
+    if (h.drawing() && !ptr.multi && ptr.button === 0) {
+      if (ptr.travel < TAP_SLOP_PX) return;
+      if (!ptr.stroking) {
+        ptr.stroking = true;
+        h.stroke({ x: p.x - dx, y: p.y - dy }, 'start');
+      }
+      h.stroke(p, 'move');
+      return;
+    }
     h.pan(dx, dy);
     const dt = Math.max(1, e.timeStamp - ptr.lastMoveMs);
     const inst = { vx: (dx / dt) * 1000, vy: (dy / dt) * 1000 };
@@ -265,6 +305,12 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
   const up = (e: PointerEvent): void => {
     const at = ptr.active.get(e.pointerId);
     ptr.active.delete(e.pointerId);
+    if (ptr.stroking) {
+      ptr.stroking = false;
+      ptr.velocity = null;
+      if (at) h.stroke(at, 'end');
+      return;
+    }
     if (at && ptr.active.size === 0 && !ptr.multi && ptr.travel < TAP_SLOP_PX) {
       const long = e.timeStamp - ptr.downMs >= LONG_PRESS_MS;
       h.tap(at, long || ptr.button === RIGHT_BUTTON ? 'order' : 'select');

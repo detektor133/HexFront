@@ -2,10 +2,11 @@
 .card {
   position: absolute;
   left: var(--space-lg);
-  bottom: var(--space-lg);
+  /* Над нижней панелью армий (--dock-h задаёт страница). */
+  bottom: calc(var(--dock-h, 0px) + var(--space-sm));
   z-index: 2;
   width: 320px;
-  max-height: calc(100% - 96px);
+  max-height: calc(100% - 96px - var(--dock-h, 0px));
   overflow-y: auto;
   box-sizing: border-box;
   padding: var(--space-md);

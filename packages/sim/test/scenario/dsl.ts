@@ -15,6 +15,7 @@ import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts
 import { FP, type Fp } from '../../src/math/int.ts';
 import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
+import { borderSegment } from '../../src/state/front.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   BUILDING,
@@ -78,6 +79,7 @@ type DslCommand =
     }
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }
+  | { readonly t: 'drawFront'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
   | {
@@ -165,6 +167,12 @@ export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): Ds
   order,
 });
 
+/** Участок фронта по точкам своей границы (с врагом или ничьей землёй), CR-003. */
+export const drawFront = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'drawFront',
+  armyId,
+  points,
+});
 /** Армия на фронт против игрока enemy (буква), вся граница или участок между двумя гексами. */
 export const assignFront = (
   armyId: number,
@@ -432,13 +440,20 @@ function makeScenario(
       case 'armyOrder':
       case 'setAutoReinforce':
         return c;
-      case 'assignFront':
-        return {
-          t: 'assignFront',
-          armyId: c.armyId,
-          enemyId: idOf(c.enemy),
-          section: c.section ? [hexOf(c.section[0]), hexOf(c.section[1])] : null,
-        };
+      case 'assignFront': {
+        if (c.section) {
+          return { t: 'assignFront', armyId: c.armyId, points: c.section.map(hexOf) };
+        }
+        // Вся граница с соседом — все её непрерывные куски подряд.
+        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
+        const points: number[] = [];
+        state.hexes.owner.forEach((_, h) => {
+          if (!points.includes(h)) points.push(...borderSegment(state, owner, idOf(c.enemy), h));
+        });
+        return { t: 'assignFront', armyId: c.armyId, points };
+      }
+      case 'drawFront':
+        return { t: 'assignFront', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'setDefenseLine':
         return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'clearPlan':

@@ -16,9 +16,8 @@ export type Command =
   | {
       readonly t: 'assignFront';
       readonly armyId: number;
-      readonly enemyId: number;
-      /** Участок фронта между двумя гексами границы; null — вся граница. */
-      readonly section: readonly [HexId, HexId] | null;
+      /** Точки на своей границе; между ними фронт достраивается по гексам границы (CR-003). */
+      readonly points: readonly HexId[];
     }
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }

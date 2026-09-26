@@ -1,11 +1,13 @@
-// Режимы рисования планов армии в песочнице (07-controls.md, «Панель армий»): участок фронта,
-// линия обороны, линия наступления. Тапы задают точки, путь подсвечивается, «Готово» — команда.
+// Режимы рисования планов армии (07-controls.md, «Планы армий», CR-003): участок фронта и линия
+// наступления — по граням гексов, линия обороны — по своим гексам. Палец или ЛКМ ведут линию,
+// тап добавляет точку, между точками линия достраивается сама; тап по границе с врагом берёт
+// весь её непрерывный кусок.
 import {
+  borderSegment,
   defenseLinePath,
-  hexFromId,
+  frontLinePath,
   hexId,
   inBounds,
-  neighbors,
   offensiveLinePath,
   TERRAIN,
   type Command,
@@ -13,75 +15,94 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { distanceTo, isBorderEdge, nearestEdge, type Ground } from './plan-edges.ts';
+import { pixelToHex, type Point } from '../render/hex-geometry.ts';
+
 export type DraftMode = 'front' | 'line' | 'offensive';
 
-/** Рисуемый план: режим, армия и точки-гексы по порядку тапов. */
+/** Рисуемый план: режим, армия и точки-гексы по порядку. */
 export interface Draft {
   readonly mode: DraftMode;
   readonly armyId: number;
   readonly points: readonly number[];
 }
 
-/** Итог тапа: новый черновик (null — режим закончен) и команда, если план уже готов. */
-export interface DraftStep {
-  readonly draft: Draft | null;
-  readonly cmd: Command | null;
+/** Что нужно для перевода точки экрана в гексы плана. */
+export interface DraftContext {
+  readonly map: MapStatic;
+  readonly view: PlayerView;
+  readonly radius: number;
+  /** Текущий фронт армии — с какой стороны грани наступления «свой» гекс. */
+  readonly front: readonly number[];
 }
 
-// Соседний враг у гекса границы — против него участок фронта.
-function enemyNear(map: MapStatic, view: PlayerView, hex: number): number {
-  for (const n of neighbors(hexFromId(hex, map.width))) {
-    if (!inBounds(n, map.width, map.height)) continue;
-    const o = view.hexes.owner[hexId(n, map.width)] ?? -1;
-    if (o >= 0 && o !== view.playerId) return o;
-  }
-  return -1;
+const ground = (c: DraftContext): Ground => ({
+  map: c.map,
+  owner: c.view.hexes.owner,
+  me: c.view.playerId,
+});
+
+const isLand = (map: MapStatic, h: number): boolean =>
+  h >= 0 && map.terrain[h] !== undefined && map.terrain[h] !== TERRAIN.water;
+
+function hexUnder(c: DraftContext, world: Point): number {
+  const h = pixelToHex(world, c.radius);
+  return inBounds(h, c.map.width, c.map.height) ? hexId(h, c.map.width) : -1;
 }
 
 /**
- * Тап в режиме рисования. Фронт: тап по земле соседа — вся граница с ним, два тапа по своей
- * границе — участок. Линии: тап добавляет точку.
+ * Гексы, которые добавляет точка world. Фронт — свой гекс ближайшей грани границы (тап по
+ * границе с врагом — весь её непрерывный кусок); наступление — гекс ближайшей грани со стороны
+ * фронта армии; линия обороны — свой гекс под точкой.
+ * @returns гексы по порядку или пусто, если рядом нет подходящей грани
  */
-export function draftTap(map: MapStatic, view: PlayerView, d: Draft, hex: number): DraftStep {
-  // Вода и чужие гексы для линии обороны точками не становятся — sim их всё равно отклонит.
-  if (map.terrain[hex] === TERRAIN.water) return { draft: d, cmd: null };
-  if (d.mode === 'line' && view.hexes.owner[hex] !== view.playerId) return { draft: d, cmd: null };
-  if (d.mode !== 'front') {
-    return d.points.at(-1) === hex
-      ? { draft: d, cmd: null }
-      : { draft: { ...d, points: [...d.points, hex] }, cmd: null };
+export function pointAt(c: DraftContext, mode: DraftMode, world: Point, tap: boolean): number[] {
+  const g = ground(c);
+  if (mode === 'line') {
+    const h = hexUnder(c, world);
+    return isLand(c.map, h) && g.owner[h] === g.me ? [h] : [];
   }
-  const owner = view.hexes.owner[hex] ?? -1;
-  if (owner >= 0 && owner !== view.playerId) {
-    return {
-      draft: null,
-      cmd: { t: 'assignFront', armyId: d.armyId, enemyId: owner, section: null },
-    };
+  if (mode === 'front') {
+    const e = nearestEdge(c.map, c.radius, world, (x) => isBorderEdge(g, x));
+    if (!e) return [];
+    const enemy = g.owner[e.other] ?? -1;
+    if (tap && enemy >= 0) {
+      return borderSegment({ map: c.map, hexes: c.view.hexes }, g.me, enemy, e.hex);
+    }
+    return [e.hex];
   }
-  if (owner !== view.playerId) return { draft: d, cmd: null };
-  const [first] = d.points;
-  if (first === undefined) return { draft: { ...d, points: [hex] }, cmd: null };
-  const enemyId = enemyNear(map, view, first);
-  return {
-    draft: null,
-    cmd: { t: 'assignFront', armyId: d.armyId, enemyId, section: [first, hex] },
-  };
+  const e = nearestEdge(
+    c.map,
+    c.radius,
+    world,
+    (x) => isLand(c.map, x.hex) && isLand(c.map, x.other),
+  );
+  if (!e) return [];
+  if (c.front.length === 0) return [e.hex];
+  const near = distanceTo(c.map, e.other, c.front) < distanceTo(c.map, e.hex, c.front);
+  return [near ? e.other : e.hex];
 }
 
-/** «Готово»: команда линии по точкам черновика; фронт завершается тапами, а не кнопкой. */
+/** Добавляет точки, пропуская повтор последней. */
+export function addPoints(d: Draft, pts: readonly number[]): Draft {
+  const points = [...d.points];
+  for (const p of pts) if (points.at(-1) !== p) points.push(p);
+  return points.length === d.points.length ? d : { ...d, points };
+}
+
+/** «Готово»: команда плана по точкам черновика. */
 export function draftCommand(d: Draft): Command | null {
   if (d.points.length === 0) return null;
+  if (d.mode === 'front') return { t: 'assignFront', armyId: d.armyId, points: d.points };
   if (d.mode === 'line') return { t: 'setDefenseLine', armyId: d.armyId, points: d.points };
-  if (d.mode === 'offensive') {
-    return { t: 'setOffensiveLine', armyId: d.armyId, points: d.points };
-  }
-  return null;
+  return { t: 'setOffensiveLine', armyId: d.armyId, points: d.points };
 }
 
-/** Гексы подсветки: путь линии между точками (как его достроит sim) или сами точки. */
-export function draftPath(map: MapStatic, view: PlayerView, d: Draft): readonly number[] {
-  const ground = { map, hexes: view.hexes };
-  if (d.mode === 'line') return defenseLinePath(ground, view.playerId, d.points) ?? d.points;
-  if (d.mode === 'offensive') return offensiveLinePath(ground, d.points) ?? d.points;
-  return d.points;
+/** Гексы подсветки: линия между точками так, как её достроит sim, или сами точки. */
+export function draftPath(c: DraftContext, d: Draft): readonly number[] {
+  const gr = { map: c.map, hexes: c.view.hexes };
+  const me = c.view.playerId;
+  if (d.mode === 'front') return frontLinePath(gr, me, d.points) ?? d.points;
+  if (d.mode === 'line') return defenseLinePath(gr, me, d.points) ?? d.points;
+  return offensiveLinePath(gr, d.points) ?? d.points;
 }

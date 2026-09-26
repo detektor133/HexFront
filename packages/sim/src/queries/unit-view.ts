@@ -4,6 +4,7 @@ import type { UnitType } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import type { MatchState, UnitOrder } from '../state/types.ts';
+import { isStarving } from '../systems/attrition.ts';
 
 /** Отряд в снимке; поля null/пусто у чужих отрядов. */
 export interface UnitView {
@@ -22,6 +23,8 @@ export interface UnitView {
   /** Снабжённость — только своих отрядов; у чужих неизвестна. */
   readonly supplyLevel: Fp | null;
   readonly encircled: boolean | null;
+  /** Свой отряд прямо сейчас теряет солдат от истощения; у чужих неизвестно. */
+  readonly starving: boolean | null;
   readonly armyId: number | null;
   readonly path: readonly HexId[];
   /** Своя артиллерия: по кому бьёт сейчас, иначе -1. */
@@ -52,6 +55,7 @@ export function unitViews(state: MatchState, playerId: number): UnitView[] {
       moveTotal: u.moveTotal,
       supplyLevel: mine ? u.supplyLevel : null,
       encircled: mine ? u.encircled : null,
+      starving: mine ? isStarving(u) : null,
       armyId: mine ? u.armyId : null,
       path: mine ? [...u.path] : [],
       fireTarget: mine ? u.fireTarget : -1,

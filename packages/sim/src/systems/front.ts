@@ -5,7 +5,8 @@ import { FRONT_ALLOC_TICKS, FRONT_REALLOC_GAIN_MIN } from '../balance.ts';
 import { fpMul, type Fp } from '../math/int.ts';
 import { findPath } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
-import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
+import { followBorder } from '../state/front.ts';
+import type { MatchState, Unit } from '../state/types.ts';
 
 // Отряд идёт на своё место или встаёт на нём в оборону.
 function goTo(state: MatchState, u: Unit, slot: number): void {
@@ -31,7 +32,10 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
   u.order = 'move';
 }
 
-function runPlan(state: MatchState, plan: ArmyPlan): void {
+function runPlan(state: MatchState, armyId: number): void {
+  followBorder(state, armyId);
+  const plan = state.plans.find((p) => p.armyId === armyId);
+  if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
   const next = allocate(state, plan, owner);
@@ -53,6 +57,6 @@ function runPlan(state: MatchState, plan: ArmyPlan): void {
 /** Раз в FRONT_ALLOC_TICKS раздаёт места отрядам армии с планом; армии — в разные тики. */
 export function frontSystem(state: MatchState): void {
   for (const plan of state.plans) {
-    if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan);
+    if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan.armyId);
   }
 }

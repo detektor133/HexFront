@@ -10,9 +10,7 @@ export type PlanView =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      readonly enemyId: number;
-      readonly section: readonly [HexId, HexId] | null;
-      /** Текущие гексы фронта армии (её доля границы или участок). */
+      /** Текущие гексы участка фронта на своей границе. */
       readonly hexes: readonly HexId[];
       readonly offensive: readonly HexId[] | null;
       /** Гексы зоны наступления по возрастанию HexId; пусто без наступления. */
@@ -34,8 +32,6 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
       return {
         armyId: p.armyId,
         kind: 'front',
-        enemyId: p.enemyId,
-        section: p.section,
         hexes,
         offensive: p.offensive,
         zone: zone.sort((a, b) => a - b),
