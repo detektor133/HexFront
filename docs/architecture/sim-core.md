@@ -29,8 +29,7 @@ interface MatchState {
   battles: Battle[];              // активные бои (по целевому гексу)
   networks: SupplyNetwork[];      // кэш, пересчитывается раз в секунду
   fronts: Front[];                // кэш
-  plans: ArmyPlan[];              // планы армий: фронт (сосед, участок), линия обороны (CR-002)
-  arrows: OffensiveArrow[];       // стрелки наступления армий
+  plans: ArmyPlan[];              // планы армий: фронт (сосед, участок, линия наступления), линия обороны (CR-002)
   constructions: Construction[];  // стройки: город, улучшение, постройка, дорога
   nextId: number;
   events: GameEvent[];            // события этого тика (для UI и логов), очищаются каждый тик
@@ -75,7 +74,7 @@ type Command =
   | { t: 'setAutoReinforce'; on: boolean }
   | { t: 'assignFront'; armyId: number; enemyId: number; section: [HexId, HexId] | null }
   | { t: 'setDefenseLine'; armyId: number; points: HexId[] } | { t: 'clearPlan'; armyId: number }
-  | { t: 'arrow'; armyId: number; points: HexId[] } | { t: 'arrowStop'; arrowId: number }
+  | { t: 'setOffensiveLine'; armyId: number; points: HexId[] } | { t: 'stopOffensive'; armyId: number }
   | { t: 'split'; unitId: number; soldiers: Fp } | { t: 'merge'; unitIds: number[] }
   | { t: 'bombard'; unitId: number; targetUnitId: number | null }
   | { t: 'recruit'; cityId: number; type: UnitType; soldiers: Fp }
