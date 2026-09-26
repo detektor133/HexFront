@@ -26,7 +26,7 @@ import {
 import { frontEdges, offensiveEdges } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { hexCenter, hexEdge, type Point } from '../src/render/hex-geometry.ts';
-import { armyColor, playerLine } from '../src/theme/colors.ts';
+import { armyColor, relationColor } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 const small: unknown = JSON.parse(
@@ -138,11 +138,17 @@ describe('рисование планов по граням (CR-003)', () => {
 });
 
 describe('цвет армии', () => {
-  it('из палитры игроков без своего цвета, по номеру армии, по кругу', () => {
-    const pool = tokens.players.palette.length - 1;
-    const colors = Array.from({ length: pool }, (_, i) => armyColor(0, i + 1));
-    expect(colors).not.toContain(playerLine(0));
+  it('из своей палитры армий, по номеру, по кругу; не совпадает с цветами отношений', () => {
+    const pool = tokens.armies.palette.length;
+    const colors = Array.from({ length: pool }, (_, i) => armyColor(i + 1));
     expect(new Set(colors).size).toBe(pool);
-    expect(armyColor(0, pool + 1)).toBe(colors[0]);
+    expect(armyColor(pool + 1)).toBe(colors[0]);
+    const { own, ally, enemy } = tokens.relation;
+    for (const c of [own, ally, enemy]) expect(colors).not.toContain(c);
+  });
+
+  it('фишки: свои — зелёные, чужие — красные', () => {
+    expect(relationColor(0, 0)).toBe(tokens.relation.own);
+    expect(relationColor(1, 0)).toBe(tokens.relation.enemy);
   });
 });

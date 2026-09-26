@@ -182,10 +182,12 @@ function drawHoi(p: Parts, s: ChipState): number {
   const barH = H - 2 * BAR_PAD;
   let x = left + w - BAR_PAD - BAR_W;
   if (s.supply !== null) {
-    vbar(g, x, barTop, barH, s.supply, supplyColor(s.supply, s.starving));
+    // Снабжение в норме — белое, как организация: зелёное на зелёной фишке не видно.
+    const bad = s.starving || s.supply < MID_SUPPLY;
+    vbar(g, x, barTop, barH, s.supply, bad ? supplyColor(s.supply, s.starving) : tokens.ui.surface);
     x -= BAR_W + BAR_GAP;
   }
-  vbar(g, x, barTop, barH, s.org, tokens.status.success);
+  vbar(g, x, barTop, barH, s.org, tokens.ui.surface);
   return w;
 }
 

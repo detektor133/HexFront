@@ -17,7 +17,7 @@ import {
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState, type ChipStyle } from './unit-chips.ts';
 import { hexEdge, type Point } from '../render/hex-geometry.ts';
-import { armyColor, playerLine } from '../theme/colors.ts';
+import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Сдвиг фишки вниз, если в гексе город (знак города — в центре), и призрака набора вверх. */
@@ -143,8 +143,8 @@ export function createUnitLayer(
     const mine = first.owner === v.playerId;
     return {
       style: chipStyle,
-      color: playerLine(first.owner),
-      army: oneArmy ? armyColor(v.playerId, army.number) : null,
+      color: relationColor(first.owner, v.playerId),
+      army: oneArmy ? armyColor(army.number) : null,
       type,
       soldiers,
       org: weighted((u) => u.org) / ORG_MAX,
@@ -193,7 +193,7 @@ export function createUnitLayer(
         units: [],
         state: {
           style: chipStyle,
-          color: playerLine(v.playerId),
+          color: tokens.relation.own,
           army: null,
           type: r.type,
           soldiers: r.soldiers,

@@ -245,7 +245,7 @@ export function createPlanLayer(
       active = [];
       const colorOf = (armyId: number): string | null => {
         const army = v.armies.find((a) => a.id === armyId);
-        return army ? armyColor(v.playerId, army.number) : null;
+        return army ? armyColor(army.number) : null;
       };
       for (const p of v.plans) {
         const color = colorOf(p.armyId);

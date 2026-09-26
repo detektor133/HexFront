@@ -240,7 +240,7 @@ export function ArmyBar(props: {
             <ArmyCard
               key={a.id}
               name={armyName(a)}
-              color={armyColor(view.playerId, a.number)}
+              color={armyColor(a.number)}
               stats={armyStats(units)}
               plan={planText(view.plans.find((p) => p.armyId === a.id))}
               selected={a.id === selected}

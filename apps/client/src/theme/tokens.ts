@@ -203,9 +203,21 @@ export const tokens = {
     ],
     "labelHalo": 3
   },
+  "relation": {
+    "own": "#2E7D32",
+    "ally": "#1F5FB8",
+    "enemy": "#C62828"
+  },
   "armies": {
-    "source": "players.palette",
-    "ringWidth": 2,
+    "palette": [
+      "#946A08",
+      "#7B3F8C",
+      "#4F6475",
+      "#9E2C8C",
+      "#94561B",
+      "#636A1C",
+      "#0B7F8E"
+    ],
     "defenseTeeth": {
       "length": 5,
       "spacing": 12

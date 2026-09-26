@@ -91,8 +91,16 @@
   --city-label-size-2: 11;
   --city-label-size-3: 13;
   --city-label-halo: 3;
-  --armies-source: players.palette;
-  --armies-ring-width: 2;
+  --relation-own: #2E7D32;
+  --relation-ally: #1F5FB8;
+  --relation-enemy: #C62828;
+  --armies-palette-1: #946A08;
+  --armies-palette-2: #7B3F8C;
+  --armies-palette-3: #4F6475;
+  --armies-palette-4: #9E2C8C;
+  --armies-palette-5: #94561B;
+  --armies-palette-6: #636A1C;
+  --armies-palette-7: #0B7F8E;
   --armies-defense-teeth-length: 5;
   --armies-defense-teeth-spacing: 12;
   --front-width-1: 4;

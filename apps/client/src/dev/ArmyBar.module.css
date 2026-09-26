@@ -23,7 +23,8 @@
 
 .tools {
   flex-wrap: wrap;
-  align-self: flex-end;
+  /* Приказы — прямо над карточками армий, слева, как в HoI4. */
+  align-self: flex-start;
   max-width: 100%;
   overflow-x: visible;
   padding: var(--space-xs);
