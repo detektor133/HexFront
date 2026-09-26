@@ -22,3 +22,14 @@ export function playerLine(playerId: number): string {
 export function playerFill(playerId: number): string {
   return mixWithWhite(playerLine(playerId), tokens.territory.fillMix);
 }
+
+/**
+ * Цвет армии (style-guide, «Армии»): палитра игроков без цвета самого игрока, по порядку
+ * создания армий (номер армии), по кругу.
+ */
+export function armyColor(playerId: number, armyNumber: number): string {
+  const own = tokens.players.palette[playerId]?.line;
+  const pool = tokens.players.palette.map((p) => p.line).filter((c) => c !== own);
+  const index = (((armyNumber - 1) % pool.length) + pool.length) % pool.length;
+  return pool[index] ?? tokens.neutral.line;
+}

@@ -1,5 +1,6 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
+import { planViews, type PlanView } from './plan-view.ts';
 import { playerPlace, playerScore } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
 import type { UnitType } from '../balance.ts';
@@ -43,6 +44,8 @@ export interface PlayerView {
   readonly units: readonly UnitView[];
   /** Свои армии — группы отрядов (CR-001). */
   readonly armies: readonly ArmyView[];
+  /** Планы своих армий (CR-002). */
+  readonly plans: readonly PlanView[];
   readonly players: readonly {
     readonly id: number;
     readonly gold: Fp;
@@ -155,6 +158,7 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
     })),
     units: unitViews(state, playerId),
     armies: armyViews(state, playerId),
+    plans: planViews(state, playerId),
     players: state.players.map((p) => ({
       id: p.id,
       gold: p.gold,

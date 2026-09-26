@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { playerView } from '../../src/queries/player-view.ts';
 import {
   assignFront,
   assignUnits,
@@ -72,6 +73,40 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     expect(plan?.kind).toBe('front');
     expect(plan?.kind === 'front' && plan.offensive).toBeNull();
     expect(s.lastEvent('offensiveDone')).toBeDefined();
+  });
+
+  it('выступ фронта, уже дошедший до линии, не сужает зону: армия берёт всё до линии', () => {
+    const bulge = `
+      a  a  a  a  a  a  b  b
+      a  a  a  b  b  b  b  b
+      A1 a  a  b  b  b  b  B1
+      a  a  a  b  b  b  b  b
+      a  a  a  b  b  b  b  b
+    `;
+    const s = scenario(bulge, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.runSeconds(80);
+    for (const c of [3, 4, 5]) {
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+    }
+    for (let r = 1; r < 5; r += 1) expect(ownerOf(s, 6, r)).toBe('B');
+  });
+
+  it('снимок владельца показывает линию и зону наступления, чужой — нет', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.runTicks(1);
+    const plan = playerView(s.state, 0).plans.find((p) => p.armyId === army);
+    const zone = plan?.kind === 'front' ? plan.zone : [];
+    const hexOf = (c: number, r: number): number => c + r * s.state.map.width;
+    for (let r = 0; r < 5; r += 1) {
+      expect(zone).toContain(hexOf(3, r));
+      expect(zone).toContain(hexOf(5, r));
+      expect(zone).not.toContain(hexOf(6, r));
+    }
+    expect(playerView(s.state, 1).plans).toEqual([]);
   });
 
   it('в гекс с прогнозом «Поражение» отряды не атакуют', () => {

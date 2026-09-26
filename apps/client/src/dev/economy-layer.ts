@@ -14,6 +14,8 @@ import {
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
+import type { Draft } from './plan-draft.ts';
+import { createPlanLayer } from './plan-layer.ts';
 import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
@@ -39,6 +41,8 @@ export interface EconomyLayer {
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
+  /** Рисуемый план армии (режим рисования) или null. */
+  setDraft(draft: Draft | null): void;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -106,9 +110,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
-  top.addChild(marks, unitLayer.container);
+  const planLayer = createPlanLayer(map, radius, center);
+  top.addChild(planLayer.container, marks, unitLayer.container);
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
+  let draft: Draft | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
 
@@ -188,6 +194,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawFill(view);
     drawRoads(view);
     drawMarks(view);
+    planLayer.setView(view, draft, scale, level);
   };
 
   return {
@@ -205,7 +212,12 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
       unitLayer.setView(v, sel, performance.now());
     },
+    setDraft(d) {
+      draft = d;
+      redraw();
+    },
     frame(nowMs) {
+      planLayer.frame(nowMs);
       unitLayer.frame(nowMs);
     },
     destroy() {

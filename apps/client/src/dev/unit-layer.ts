@@ -16,7 +16,7 @@ import {
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { hexEdge, type Point } from '../render/hex-geometry.ts';
-import { playerLine } from '../theme/colors.ts';
+import { armyColor, playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Сдвиг фишки вниз, если в гексе город (знак города — в центре), и призрака набора вверх. */
@@ -61,7 +61,8 @@ interface Entry {
   at(frac: number): Point;
 }
 
-function dashedPath(
+/** Пунктир по ломаной со сдвигом phase — для бегущих штрихов. */
+export function dashedPath(
   g: Graphics,
   pts: readonly Point[],
   dash: number,
@@ -133,8 +134,11 @@ export function createUnitLayer(
     let type = first.type;
     for (const u of units) if ((byType.get(u.type) ?? 0) > (byType.get(type) ?? 0)) type = u.type;
     const org = units.reduce((s, u) => s + u.org * u.soldiers, 0) / Math.max(1, soldiers);
+    const army = v.armies.find((a) => a.id === first.armyId);
+    const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
     return {
       color: playerLine(first.owner),
+      ring: oneArmy ? armyColor(v.playerId, army.number) : null,
       type,
       soldiers,
       bar: org / FULL / 100,
@@ -182,6 +186,7 @@ export function createUnitLayer(
         units: [],
         state: {
           color: playerLine(v.playerId),
+          ring: null,
           type: r.type,
           soldiers: r.soldiers,
           bar: r.progressTicks / Math.max(1, r.totalTicks),

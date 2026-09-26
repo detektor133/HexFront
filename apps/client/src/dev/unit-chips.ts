@@ -27,10 +27,13 @@ const RETREAT_ALPHA = 0.6;
 const ORG_BG_ALPHA = 0.3;
 /** Пунктир фишки-призрака набора, px. */
 const GHOST_DASH = 3;
+const RING = tokens.armies.ringWidth;
 
 /** Что показывает фишка: владелец, тип, солдаты и состояния из units.md. */
 export interface ChipState {
   readonly color: string;
+  /** Цвет армии для кольца вокруг фишки; null — резерв или чужой отряд (CR-002). */
+  readonly ring: string | null;
   readonly type: UnitType;
   readonly soldiers: number;
   /** Доля 0..1 для полоски: организованность (или прогресс набора у призрака). */
@@ -153,6 +156,17 @@ export function createChip(): Chip {
         g.roundRect(left, top, w, H, tokens.radius.chip)
           .fill(s.color)
           .stroke({ color: tokens.ui.surface, width: OUTLINE });
+        // Кольцо армии — снаружи белой обводки (units.md, CR-002).
+        if (s.ring !== null) {
+          const off = OUTLINE / 2 + RING / 2;
+          g.roundRect(
+            left - off,
+            top - off,
+            w + 2 * off,
+            H + 2 * off,
+            tokens.radius.chip + off,
+          ).stroke({ color: s.ring, width: RING });
+        }
       }
       glyph(g, s.type, left + PAD_L, top + GLYPH_TOP, s.ghost ? s.color : tokens.ui.surface);
       marks(g, s, w);

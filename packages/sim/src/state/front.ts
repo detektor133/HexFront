@@ -2,11 +2,17 @@
 // участки, деление фронта между армиями, путь линии обороны.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import type { ArmyPlan, MatchState } from './types.ts';
-import { TERRAIN } from '../map/types.ts';
+import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
 
-function adjacent(state: MatchState, hex: HexId): HexId[] {
+/** Карта и владельцы гексов — общее у состояния матча и снимка игрока (для превью линий). */
+export interface LineGround {
+  readonly map: MapStatic;
+  readonly hexes: { readonly owner: Int16Array };
+}
+
+function adjacent(state: LineGround, hex: HexId): HexId[] {
   const { width, height } = state.map;
   const out: HexId[] = [];
   for (const n of neighbors(hexFromId(hex, width))) {
@@ -159,7 +165,7 @@ export function planHexes(state: MatchState, plan: ArmyPlan): HexId[] {
  * @returns гексы линии по порядку или null, если какие-то точки не соединить
  */
 export function defenseLinePath(
-  state: MatchState,
+  state: LineGround,
   owner: number,
   points: readonly HexId[],
 ): HexId[] | null {
@@ -174,13 +180,13 @@ export function defenseLinePath(
  * Линия наступления по точкам: кратчайший путь по любым проходимым гексам (свои, чужие, ничьи).
  * @returns гексы линии по порядку или null, если точки не соединить
  */
-export function offensiveLinePath(state: MatchState, points: readonly HexId[]): HexId[] | null {
+export function offensiveLinePath(state: LineGround, points: readonly HexId[]): HexId[] | null {
   return linePath(state, points, (h) => state.map.terrain[h] !== TERRAIN.water);
 }
 
 // Точки соединяются кратчайшими по числу гексов путями, ничьи — по меньшему HexId.
 function linePath(
-  state: MatchState,
+  state: LineGround,
   points: readonly HexId[],
   passable: (h: HexId) => boolean,
 ): HexId[] | null {

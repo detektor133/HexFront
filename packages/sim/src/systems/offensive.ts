@@ -2,51 +2,14 @@
 // GDD: docs/gdd/07-controls.md — «Линия наступления».
 import { MAX_UNITS_PER_HEX, OFFENSIVE_STEP_TICKS, OFFENSIVE_STOP_ORG } from '../balance.ts';
 import { setOffensive } from '../commands/plan.ts';
-import { TERRAIN } from '../map/types.ts';
-import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import { planHexes } from '../state/front.ts';
+import { offensiveZone } from '../state/offensive-zone.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 
-/** Запас ширины зоны: гексы в пределах 2 от кратчайшего пути фронт → линия (07-controls.md). */
-const ZONE_SLACK = 2;
-
 type FrontPlan = Extract<ArmyPlan, { kind: 'front' }>;
-
-function nearest(state: MatchState, hex: HexId, to: readonly HexId[]): number {
-  const { width } = state.map;
-  const h = hexFromId(hex, width);
-  let best = Number.MAX_SAFE_INTEGER;
-  for (const t of to) best = Math.min(best, distance(h, hexFromId(t, width)));
-  return best;
-}
-
-/**
- * Зона наступления: чужие и ничьи проходимые гексы между участком фронта и линией
- * (d_s + d_t ≤ L + 2) и не дальше от фронта, чем самая дальняя точка линии.
- * @returns расстояние до линии наступления для каждого гекса зоны
- */
-function offensiveZone(
-  state: MatchState,
-  owner: number,
-  front: readonly HexId[],
-  line: readonly HexId[],
-): Map<HexId, number> {
-  const zone = new Map<HexId, number>();
-  if (front.length === 0) return zone;
-  const toFront = line.map((h) => nearest(state, h, front));
-  const shortest = Math.min(...toFront);
-  const farthest = Math.max(...toFront);
-  state.hexes.owner.forEach((o, id) => {
-    if (o === owner || state.map.terrain[id] === TERRAIN.water) return;
-    const ds = nearest(state, id, front);
-    if (ds > farthest) return;
-    const dt = nearest(state, id, line);
-    if (ds + dt <= shortest + ZONE_SLACK) zone.set(id, dt);
-  });
-  return zone;
-}
 
 function around(state: MatchState, hex: HexId): HexId[] {
   const { width, height } = state.map;

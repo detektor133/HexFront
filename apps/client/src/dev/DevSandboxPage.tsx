@@ -14,8 +14,10 @@ import { ArmiesPanel } from './ArmiesPanel.tsx';
 import styles from './DevSandboxPage.module.css';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
+import { PlanDraftBar } from './PlanDraftBar.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
+import { draftTap, type Draft } from './plan-draft.ts';
 import { NOTHING_PICKED, orderHex, selectHex, type Picked } from './sandbox-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
@@ -58,8 +60,10 @@ interface Sandbox {
   readonly error: string | null;
   readonly picked: Picked;
   readonly lastReject: string | null;
+  readonly draft: Draft | null;
   send(cmd: Command): void;
   pick(p: Picked): void;
+  setDraft(d: Draft | null): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -68,6 +72,8 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const layerRef = useRef<EconomyLayer | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
   const pickedRef = useRef<Picked>(NOTHING_PICKED);
+  const draftRef = useRef<Draft | null>(null);
+  const [draft, setDraftState] = useState<Draft | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
@@ -80,6 +86,11 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     if (viewRef.current) layerRef.current?.setView(viewRef.current, p);
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
+  const setDraft = useCallback((d: Draft | null) => {
+    draftRef.current = d;
+    setDraftState(d);
+    layerRef.current?.setDraft(d);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -105,6 +116,14 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       const current = viewRef.current;
       if (!current || !inBounds(h, map.width, map.height)) return pick(NOTHING_PICKED);
       const hex = hexId(h, map.width);
+      // Режим рисования плана: тап ставит точку, ПКМ/долгий тап убирает последнюю.
+      const d = draftRef.current;
+      if (d) {
+        if (kind === 'order') return setDraft({ ...d, points: d.points.slice(0, -1) });
+        const next = draftTap(map, current, d, hex);
+        if (next.cmd) match.send(next.cmd);
+        return setDraft(next.draft);
+      }
       if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
       const next = orderHex(current, pickedRef.current, hex);
       if (next.cmd) match.send(next.cmd);
@@ -126,7 +145,9 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
     });
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') pick(NOTHING_PICKED);
+      if (e.key !== 'Escape') return;
+      if (draftRef.current) setDraft(null);
+      else pick(NOTHING_PICKED);
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -137,9 +158,9 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       matchRef.current = null;
       layerRef.current = null;
     };
-  }, [hostRef, loaded, pick]);
+  }, [hostRef, loaded, pick, setDraft]);
 
-  return { msg, error, picked, lastReject, send, pick };
+  return { msg, error, picked, lastReject, draft, send, pick, setDraft };
 }
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
@@ -154,7 +175,8 @@ export function DevSandboxPage(): React.JSX.Element {
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
       {view && <Hud view={view} send={sb.send} />}
-      {view && <ArmiesPanel view={view} send={sb.send} onPick={sb.pick} />}
+      {view && <ArmiesPanel view={view} send={sb.send} onPick={sb.pick} onDraft={sb.setDraft} />}
+      {sb.draft && <PlanDraftBar draft={sb.draft} send={sb.send} setDraft={sb.setDraft} />}
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
