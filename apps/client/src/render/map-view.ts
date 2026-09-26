@@ -65,6 +65,11 @@ export interface MapView {
    * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
    */
   setStroke(handler: StrokeHandler | null): void;
+  /**
+   * Захват: при нажатии grab(world) может вернуть обработчик росчерка — тогда этот жест тянет
+   * объект (ручку конца фронта), а не карту.
+   */
+  setGrab(grab: ((world: Point) => StrokeHandler | null) | null): void;
   destroy(): void;
 }
 
@@ -134,6 +139,8 @@ export async function createMapView(
     stroking: false,
   };
   let stroke: StrokeHandler | null = null;
+  let grab: ((world: Point) => StrokeHandler | null) | null = null;
+  let grabbed: StrokeHandler | null = null;
   const toWorld = (at: Point): Point => ({
     x: (at.x - cam.x) / cam.scale,
     y: (at.y - cam.y) / cam.scale,
@@ -175,8 +182,15 @@ export async function createMapView(
       const world = toWorld(at);
       onTap?.(pixelToHex(world, opts.radius), kind, world);
     },
-    drawing: () => stroke !== null,
-    stroke: (at, phase) => stroke?.(toWorld(at), phase),
+    drawing: () => grabbed !== null || stroke !== null,
+    press: (at) => {
+      grabbed = grab?.(toWorld(at)) ?? null;
+      return grabbed !== null;
+    },
+    stroke: (at, phase) => {
+      (grabbed ?? stroke)?.(toWorld(at), phase);
+      if (phase === 'end' || phase === 'cancel') grabbed = null;
+    },
   });
 
   return {
@@ -212,6 +226,9 @@ export async function createMapView(
         bounds,
       );
     },
+    setGrab(fn) {
+      grab = fn;
+    },
     setStroke(handler) {
       if (ptr.stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
       ptr.stroking = false;
@@ -232,6 +249,8 @@ interface InputHandlers {
   zoom(factor: number, at: Point): void;
   tap(at: Point, kind: TapKind): void;
   drawing(): boolean;
+  /** Нажатие одним указателем: true — жест захвачен (тянем объект сразу, без порога). */
+  press(at: Point): boolean;
   stroke(at: Point, phase: StrokePhase): void;
 }
 
@@ -269,6 +288,10 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
     ptr.lastMoveMs = e.timeStamp;
     ptr.downMs = e.timeStamp;
     ptr.button = e.button;
+    if (ptr.active.size === 1 && e.button === 0 && h.press(local(e))) {
+      ptr.stroking = true;
+      h.stroke(local(e), 'start');
+    }
   };
   const move = (e: PointerEvent): void => {
     const prev = ptr.active.get(e.pointerId);
@@ -286,7 +309,7 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
     const dy = p.y - prev.y;
     ptr.travel += Math.hypot(dx, dy);
     if (h.drawing() && !ptr.multi && ptr.button === 0) {
-      if (ptr.travel < TAP_SLOP_PX) return;
+      if (!ptr.stroking && ptr.travel < TAP_SLOP_PX) return;
       if (!ptr.stroking) {
         ptr.stroking = true;
         h.stroke({ x: p.x - dx, y: p.y - dy }, 'start');

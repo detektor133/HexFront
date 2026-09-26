@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { planViews } from '../../src/queries/plan-view.ts';
 import { neediestArmy } from '../../src/state/armies.ts';
+import { edgeHex, edgeOf } from '../../src/state/edges.ts';
 import {
   armyOrder,
   assignFront,
@@ -12,6 +14,7 @@ import {
   drawFront,
   move,
   own,
+  raw,
   scenario,
   setDefenseLine,
   type At,
@@ -153,9 +156,42 @@ describe('линия фронта (CR-002)', () => {
     for (let r = 0; r < 5; r += 1) s.setOwner(at(2, r), 'A');
     s.runSeconds(6);
     const plan = s.state.plans.find((p) => p.armyId === army);
-    const cols = (plan?.kind === 'front' ? plan.hexes : []).map(col);
+    const cols = (plan?.kind === 'front' ? plan.edges : []).map((e) => col(edgeHex(e)));
     expect(cols.length).toBeGreaterThan(0);
     expect(cols.every((c) => c === 2)).toBe(true);
+  });
+
+  it('фронт из одной грани: армия держит гекс этой грани, в плане — только эта грань', () => {
+    const s = scenario(BORDER, { legend });
+    const ids = infantry(s, 1);
+    const army = armyOf(s, ids);
+    const e = edgeOf(hexOf(at(2, 1)), 0);
+    s.cmd('A', raw({ t: 'assignFront', armyId: army, edges: [e] }));
+    s.runSeconds(20);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.edges).toEqual([e]);
+    expect(hexesOf(s, ids)).toEqual([hexOf(at(2, 1))]);
+  });
+
+  it('снимок сразу показывает фронт на новой границе, без пропаданий между шагами', () => {
+    const s = scenario(
+      `
+      a  a  .  .  .
+      a  a  .  .  .
+      A1 a  .  .  B1
+      a  a  .  .  .
+      a  a  .  .  .
+    `,
+      { legend },
+    );
+    const army = armyOf(s, infantry(s, 1));
+    s.cmd('A', drawFront(army, [at(1, 1), at(1, 3)]));
+    s.runTicks(1);
+    for (let r = 0; r < 5; r += 1) s.setOwner(at(2, r), 'A');
+    const view = planViews(s.state, 0).find((p) => p.armyId === army);
+    const hexes = view?.kind === 'front' ? view.hexes : [];
+    expect(hexes.length).toBeGreaterThan(0);
+    expect(hexes.every((h) => col(h) === 2)).toBe(true);
   });
 
   it('ручной приказ снимает отряд с места; выполнив его, отряд возвращается на фронт', () => {

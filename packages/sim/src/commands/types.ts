@@ -16,12 +16,12 @@ export type Command =
   | {
       readonly t: 'assignFront';
       readonly armyId: number;
-      /** Точки на своей границе; между ними фронт достраивается по гексам границы (CR-003). */
-      readonly points: readonly HexId[];
+      /** Грани своей границы (EdgeId); между ними фронт достраивается по граням (CR-004). */
+      readonly edges: readonly number[];
     }
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }
-  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly HexId[] }
+  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly edges: readonly number[] }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
   /** soldiers — fixed-point, целое число солдат. */
   | { readonly t: 'split'; readonly unitId: number; readonly soldiers: Fp }

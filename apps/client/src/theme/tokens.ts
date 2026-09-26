@@ -210,13 +210,13 @@ export const tokens = {
   },
   "armies": {
     "palette": [
-      "#946A08",
       "#7B3F8C",
-      "#4F6475",
+      "#0B7F8E",
       "#9E2C8C",
-      "#94561B",
+      "#4F6475",
+      "#946A08",
       "#636A1C",
-      "#0B7F8E"
+      "#94561B"
     ],
     "defenseTeeth": {
       "length": 5,
@@ -225,22 +225,34 @@ export const tokens = {
   },
   "front": {
     "width": [
-      4,
-      6,
-      8
+      2.5,
+      3,
+      3.5
     ],
     "casing": "#FFFFFF",
-    "casingWidth": 2
+    "casingWidth": 1.5,
+    "handleRadius": 7
   },
   "arrow": {
+    "color": "#E8590C",
     "width": [
-      8,
-      11,
-      14
+      2.5,
+      3,
+      3.5
     ],
-    "alpha": 0.85,
-    "headLength": 16,
-    "headWidth": 22
+    "dash": [
+      8,
+      5
+    ],
+    "alpha": 0.3,
+    "bodyWidth": 0.7,
+    "headLength": 0.9,
+    "headWidth": 1.5
+  },
+  "chip": {
+    "org": "#2E7D4F",
+    "supply": "#3A6EA5",
+    "track": "#E4E2DA"
   },
   "fog": {
     "hatch": "#22211E",

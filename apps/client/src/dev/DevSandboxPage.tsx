@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   hexFromId,
@@ -15,10 +15,10 @@ import { ChipSwitch } from './ChipSwitch.tsx';
 import styles from './DevSandboxPage.module.css';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
-import { PlanDraftBar } from './PlanDraftBar.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
-import { addPoints, pointAt, type Draft, type DraftContext } from './plan-draft.ts';
+import type { Draft, DraftContext } from './plan-draft.ts';
+import { createPlanInput, type ToolState } from './plan-tools.ts';
 import { NOTHING_PICKED, orderHex, selectHex, type Picked } from './sandbox-selection.ts';
 import { CHIP_STYLES, type ChipStyle } from './unit-chips.ts';
 import { reasonText, t } from '../i18n/dict.ts';
@@ -63,11 +63,13 @@ interface Sandbox {
   readonly error: string | null;
   readonly picked: Picked;
   readonly lastReject: string | null;
-  readonly draft: Draft | null;
+  readonly tool: ToolState | null;
+  readonly army: number | null;
   readonly chipStyle: ChipStyle;
   send(cmd: Command): void;
   pick(p: Picked): void;
-  setDraft(d: Draft | null): void;
+  setTool(t: ToolState | null): void;
+  setArmy(id: number | null): void;
   setChipStyle(s: ChipStyle): void;
 }
 
@@ -90,10 +92,11 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const layerRef = useRef<EconomyLayer | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
   const pickedRef = useRef<Picked>(NOTHING_PICKED);
-  const draftRef = useRef<Draft | null>(null);
   const mapViewRef = useRef<MapView | null>(null);
-  const strokeFrom = useRef(0);
-  const [draft, setDraftState] = useState<Draft | null>(null);
+  const toolRef = useRef<ToolState | null>(null);
+  const armyRef = useRef<number | null>(null);
+  const [tool, setToolState] = useState<ToolState | null>(null);
+  const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
@@ -118,44 +121,41 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     if (viewRef.current) layerRef.current?.setView(viewRef.current, p);
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
-  const setDraft = useCallback((d: Draft | null) => {
-    draftRef.current = d;
-    setDraftState(d);
-    layerRef.current?.setDraft(d);
+  const setArmy = useCallback((id: number | null) => {
+    armyRef.current = id;
+    setArmyState(id);
+    layerRef.current?.setSelectedArmy(id);
   }, []);
-  // Контекст черновика: карта, снимок и текущий фронт армии (сторона граней наступления).
-  const draftContext = useCallback(
-    (d: Draft): DraftContext | null => {
-      const v = viewRef.current;
-      if (!v || typeof loaded === 'string') return null;
-      const plan = v.plans.find((p) => p.armyId === d.armyId);
-      const front = plan?.kind === 'front' ? plan.hexes : [];
-      return { map: loaded.map, view: v, radius: tokens.map.hexRadius, front };
-    },
+  // setTool зависит от input, а input вызывает setTool — связь через ссылку.
+  const setToolRef = useRef<(t: ToolState | null) => void>(() => undefined);
+  // Инструменты планов: рисование пальцем по граням, тапы, ручки фронта (CR-004).
+  const input = useMemo(
+    () =>
+      createPlanInput({
+        context: (): DraftContext | null => {
+          const v = viewRef.current;
+          if (!v || typeof loaded === 'string') return null;
+          return { map: loaded.map, view: v, radius: tokens.map.hexRadius };
+        },
+        tool: () => toolRef.current,
+        selected: () => armyRef.current,
+        setTool: (t) => setToolRef.current(t),
+        setDraft: (d: Draft | null) => layerRef.current?.setDraft(d),
+        send: (cmd) => matchRef.current?.send(cmd),
+      }),
     [loaded],
   );
-  // Режим рисования включает росчерки на карте: палец/ЛКМ ведёт линию по граням.
-  const draw = useCallback(
-    (d: Draft | null) => {
-      setDraft(d);
-      mapViewRef.current?.setStroke(
-        d
-          ? (world, phase) => {
-              const cur = draftRef.current;
-              const c = cur ? draftContext(cur) : null;
-              if (!cur || !c) return;
-              if (phase === 'start') strokeFrom.current = cur.points.length;
-              if (phase === 'cancel') {
-                setDraft({ ...cur, points: cur.points.slice(0, strokeFrom.current) });
-                return;
-              }
-              setDraft(addPoints(cur, pointAt(c, cur.mode, world, false)));
-            }
-          : null,
-      );
+  const setTool = useCallback(
+    (t: ToolState | null) => {
+      toolRef.current = t;
+      setToolState(t);
+      layerRef.current?.setDraft(null);
+      // «Удалить» работает тапом, карту при нём можно двигать; остальные — рисуют пальцем.
+      mapViewRef.current?.setStroke(t && t.tool !== 'erase' ? input.stroke : null);
     },
-    [setDraft, draftContext],
+    [input],
   );
+  setToolRef.current = setTool;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -180,16 +180,10 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const onTap = (h: { q: number; r: number }, kind: TapKind, world: Point): void => {
       const current = viewRef.current;
       if (!current || !inBounds(h, map.width, map.height)) {
-        return draftRef.current ? undefined : pick(NOTHING_PICKED);
+        return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
-      // Режим рисования плана: тап ставит точку, ПКМ/долгий тап убирает последнюю.
-      const d = draftRef.current;
-      if (d) {
-        if (kind === 'order') return setDraft({ ...d, points: d.points.slice(0, -1) });
-        const c = draftContext(d);
-        return c ? setDraft(addPoints(d, pointAt(c, d.mode, world, true))) : undefined;
-      }
+      if (input.tap(world, kind)) return;
       if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
       const next = orderHex(current, pickedRef.current, hex);
       if (next.cmd) match.send(next.cmd);
@@ -200,6 +194,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       midLayer: (m: MapStatic, radius: number) => {
         const layer = createEconomyLayer(m, radius);
         layer.setChipStyle(chipRef.current);
+        layer.setSelectedArmy(armyRef.current);
         layerRef.current = layer;
         return layer;
       },
@@ -208,13 +203,14 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      v.setGrab(input.grab);
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
     });
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
-      if (draftRef.current) draw(null);
+      if (toolRef.current) setTool(null);
       else pick(NOTHING_PICKED);
     };
     window.addEventListener('keydown', onKey);
@@ -227,18 +223,20 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       layerRef.current = null;
       mapViewRef.current = null;
     };
-  }, [hostRef, loaded, pick, setDraft, draw, draftContext]);
+  }, [hostRef, loaded, pick, input, setTool]);
 
   return {
     msg,
     error,
     picked,
     lastReject,
-    draft,
+    tool,
+    army,
     chipStyle,
     send,
     pick,
-    setDraft: draw,
+    setTool,
+    setArmy,
     setChipStyle,
   };
 }
@@ -249,7 +247,7 @@ export function DevSandboxPage(): React.JSX.Element {
   const loaded = useMapJson(params.get('map') ?? 'small');
   const hostRef = useRef<HTMLDivElement>(null);
   const sb = useSandbox(hostRef, loaded);
-  const [army, setArmy] = useState<number | null>(null);
+  const { army } = sb;
   const view = sb.msg?.view;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
@@ -263,24 +261,24 @@ export function DevSandboxPage(): React.JSX.Element {
       <div ref={hostRef} className={styles.map} />
       {view && <Hud view={view} send={sb.send} />}
       {view && <ChipSwitch value={sb.chipStyle} onChange={sb.setChipStyle} />}
-      {view && !sb.draft && (
+      {view && (
         <ArmyBar
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
-          onSelect={setArmy}
+          onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}
-          onDraft={sb.setDraft}
+          tool={sb.tool}
+          onTool={sb.setTool}
         />
       )}
-      {sb.draft && <PlanDraftBar draft={sb.draft} send={sb.send} setDraft={sb.setDraft} />}
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view && map && sb.picked.units.length > 0 && !sb.draft && !armyPicked && (
+      {view && map && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
         <UnitCard view={view} map={map} picked={sb.picked} send={sb.send} onPick={sb.pick} />
       )}
-      {view && map && sb.picked.units.length === 0 && !sb.draft && sb.msg?.selection && (
+      {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
         <HexCard s={sb.msg.selection} view={view} map={map} send={sb.send} />
       )}
       {sb.lastReject && (

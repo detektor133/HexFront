@@ -1,49 +1,28 @@
-// Грани гексов для планов армий (CR-003): линии фронта и наступления рисуются и вводятся по граням.
-// GDD: docs/gdd/07-controls.md — «Планы армий»; вид — art/units.md, «Линии планов».
+// Грани гексов на экране (CR-004): середина грани, ближайшая к пальцу грань.
+// Логика граней (смежность, пути) — в sim, `state/edges.ts`.
 import {
-  TERRAIN,
-  distance,
+  edgeDir,
+  edgeHex,
+  edgeOf,
   hexFromId,
   hexId,
   inBounds,
   neighbors,
+  type EdgeId,
   type MapStatic,
 } from '@hexfront/sim';
 
 import { hexCenter, hexEdge, pixelToHex, type Point } from '../render/hex-geometry.ts';
 
-/** Грань: гекс и направление (индекс в neighbors); other — сосед за гранью или -1 (край карты). */
-export interface Edge {
-  readonly hex: number;
-  readonly d: number;
-  readonly other: number;
+/** Концы грани в мировых координатах. */
+export function edgeEnds(map: MapStatic, radius: number, e: EdgeId): [Point, Point] {
+  return hexEdge(hexCenter(hexFromId(edgeHex(e), map.width), radius), radius, edgeDir(e));
 }
 
-export interface Ground {
-  readonly map: MapStatic;
-  readonly owner: ArrayLike<number>;
-  readonly me: number;
-}
-
-const isLand = (map: MapStatic, h: number): boolean =>
-  h >= 0 && map.terrain[h] !== undefined && map.terrain[h] !== TERRAIN.water;
-
-function edgesOf(map: MapStatic, hex: number): Edge[] {
-  return neighbors(hexFromId(hex, map.width)).map((n, d) => ({
-    hex,
-    d,
-    other: inBounds(n, map.width, map.height) ? hexId(n, map.width) : -1,
-  }));
-}
-
-/** Грань своей границы: свой гекс суши | чужая или ничья суша. */
-export function isBorderEdge(g: Ground, e: Edge): boolean {
-  return (
-    g.owner[e.hex] === g.me &&
-    isLand(g.map, e.hex) &&
-    isLand(g.map, e.other) &&
-    g.owner[e.other] !== g.me
-  );
+/** Середина грани в мировых координатах. */
+export function edgeMid(map: MapStatic, radius: number, e: EdgeId): Point {
+  const [a, b] = edgeEnds(map, radius, e);
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 /**
@@ -54,58 +33,47 @@ export function nearestEdge(
   map: MapStatic,
   radius: number,
   world: Point,
-  accept: (e: Edge) => boolean,
-): Edge | null {
+  accept: (e: EdgeId) => boolean,
+): EdgeId | null {
   const h = pixelToHex(world, radius);
   if (!inBounds(h, map.width, map.height)) return null;
   const around = [h, ...neighbors(h)].filter((x) => inBounds(x, map.width, map.height));
-  let best: Edge | null = null;
+  let best: EdgeId | null = null;
   let bestD = Infinity;
   for (const x of around) {
-    const id = hexId(x, map.width);
-    for (const e of edgesOf(map, id)) {
+    for (let d = 0; d < 6; d += 1) {
+      const e = edgeOf(hexId(x, map.width), d);
       if (!accept(e)) continue;
-      const [a, b] = hexEdge(hexCenter(x, radius), radius, e.d);
-      const d = Math.hypot((a.x + b.x) / 2 - world.x, (a.y + b.y) / 2 - world.y);
-      if (d < bestD) {
+      const m = edgeMid(map, radius, e);
+      const dist = Math.hypot(m.x - world.x, m.y - world.y);
+      if (dist < bestD) {
         best = e;
-        bestD = d;
+        bestD = dist;
       }
     }
   }
   return best;
 }
 
-/** Грани цепочки гексов фронта, смотрящие на чужую или ничью сушу. */
-export function frontEdges(g: Ground, hexes: readonly number[]): Edge[] {
-  return hexes.flatMap((h) => edgesOf(g.map, h).filter((e) => isBorderEdge(g, e)));
-}
-
-/** Расстояние в гексах до ближайшего гекса набора (для «ближе к фронту / дальше от фронта»). */
-export function distanceTo(map: MapStatic, hex: number, set: readonly number[]): number {
-  const at = hexFromId(hex, map.width);
-  let best = Infinity;
-  for (const s of set) best = Math.min(best, distance(at, hexFromId(s, map.width)));
-  return best;
-}
-
 /**
- * Грани линии наступления — внешняя кромка её гексов: грани к соседям не из линии, которые
- * дальше от фронта армии. Это и есть «граница, до которой наступать».
+ * Ломаные по цепочке граней: соседние грани с общим углом идут одной ломаной, разрыв (грани не
+ * сходятся) начинает новую — чтобы не рисовать отрезок через разрыв.
+ * @returns ломаные в мировых координатах
  */
-export function offensiveEdges(
-  map: MapStatic,
-  front: readonly number[],
-  line: readonly number[],
-): Edge[] {
-  const inLine = new Set(line);
-  const out: Edge[] = [];
-  for (const h of line) {
-    const dh = front.length > 0 ? distanceTo(map, h, front) : 0;
-    for (const e of edgesOf(map, h)) {
-      if (e.other < 0 || inLine.has(e.other) || !isLand(map, e.other)) continue;
-      if (front.length === 0 || distanceTo(map, e.other, front) > dh) out.push(e);
-    }
+export function edgeRuns(map: MapStatic, radius: number, edges: readonly EdgeId[]): Point[][] {
+  const runs: Point[][] = [];
+  const same = (a: Point, b: Point): boolean => Math.hypot(a.x - b.x, a.y - b.y) < radius * 0.05;
+  for (let i = 0; i < edges.length; i += 1) {
+    const [a, b] = edgeEnds(map, radius, edges[i] as EdgeId);
+    const run = runs.at(-1);
+    const last = run?.at(-1);
+    if (run && last && same(last, a)) run.push(b);
+    else if (run && last && same(last, b)) run.push(a);
+    else if (run && run.length === 2 && run[0] && (same(run[0], a) || same(run[0], b))) {
+      // Вторая грань сходится с началом первой — разворачиваем первую.
+      run.reverse();
+      run.push(same(run.at(-1) as Point, a) ? b : a);
+    } else runs.push([a, b]);
   }
-  return out;
+  return runs;
 }

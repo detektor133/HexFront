@@ -56,6 +56,19 @@
   border-color: var(--ui-border-strong);
 }
 
+.tool[aria-pressed='true'] {
+  border-color: var(--ui-ink);
+  background: var(--ui-surface2);
+}
+
+/* Подсказка включённого инструмента — одной строкой, без кнопок (как в HoI4). */
+.hint {
+  flex-basis: 100%;
+  padding: 0 var(--space-xs);
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
 .tool:disabled {
   color: var(--ui-ink3);
   cursor: not-allowed;
@@ -190,40 +203,21 @@
   gap: var(--space-xs);
 }
 
-/* Плашка режима рисования плана — сверху по центру под HUD. */
-.draft {
-  position: absolute;
-  top: 72px;
-  left: 50%;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  width: min(460px, calc(100% - 2 * var(--space-lg)));
-  box-sizing: border-box;
-  padding: var(--space-md);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hard);
-  font-size: var(--font-size-caption);
-  transform: translateX(-50%);
-}
-
 .buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
 }
 
-/* Переключатель вида фишки (CR-003) — пока владелец не выберет вариант. */
+/* Переключатель вида фишки и легенда (CR-004) — пока владелец не выберет вариант. */
 .chipSwitch {
   position: absolute;
   top: 72px;
   left: var(--space-lg);
   z-index: 2;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-xs);
   padding: var(--space-xs);
   background: var(--ui-surface);
@@ -247,12 +241,42 @@
     flex-basis: 150px;
   }
 
-  .draft {
-    top: 104px;
-  }
-
   .chipSwitch {
     top: 104px;
     left: var(--space-sm);
   }
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-md);
+  color: var(--ui-ink2);
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.keyBar {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.keyBox {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* Треугольник снабжения — рамками, без картинок. */
+.keyWarn {
+  width: 0;
+  height: 0;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid;
+  border-left: 6px solid transparent;
 }

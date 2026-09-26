@@ -45,6 +45,8 @@ export interface EconomyLayer {
   /** Рисуемый план армии (режим рисования) или null. */
   setDraft(draft: Draft | null): void;
   setChipStyle(style: ChipStyle): void;
+  /** Выбранная армия: у её фронта — ручки на концах. */
+  setSelectedArmy(id: number | null): void;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -117,6 +119,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
+  let selectedArmy: number | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
 
@@ -196,7 +199,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawFill(view);
     drawRoads(view);
     drawMarks(view);
-    planLayer.setView(view, draft, scale, level);
+    planLayer.setView(view, draft, selectedArmy, scale, level);
   };
 
   return {
@@ -214,6 +217,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
       unitLayer.setView(v, sel, performance.now());
     },
+    setSelectedArmy(id) {
+      selectedArmy = id;
+      redraw();
+    },
     setChipStyle(style) {
       unitLayer.setChipStyle(style);
     },
@@ -222,7 +229,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
     },
     frame(nowMs) {
-      planLayer.frame(nowMs);
       unitLayer.frame(nowMs);
     },
     destroy() {

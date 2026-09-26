@@ -42,5 +42,6 @@ export * from './queries/unit-view.ts';
 export * from './queries/forecast.ts';
 export * from './state/city-output.ts';
 export * from './state/front.ts';
+export * from './state/edges.ts';
 export * from './state/offensive-zone.ts';
 export * from './queries/plan-view.ts';

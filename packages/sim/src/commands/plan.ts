@@ -1,16 +1,29 @@
-// Команды планов армий (CR-002): assignFront, setDefenseLine, clearPlan, setOffensiveLine,
-// stopOffensive.
+// Команды планов армий (CR-002…CR-004): assignFront, setDefenseLine, clearPlan, setOffensiveLine,
+// stopOffensive. Фронт и линия наступления задаются гранями.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { MAX_ACTIVE_ARROWS } from '../balance.ts';
-import type { HexId } from '../math/hex.ts';
-import { defenseLinePath, frontLinePath, isBorderHex, offensiveLinePath } from '../state/front.ts';
-import type { ArmyPlan, MatchState } from '../state/types.ts';
+import { distance, hexFromId, type HexId } from '../math/hex.ts';
+import {
+  edgeHex,
+  edgeOther,
+  flipEdge,
+  frontEdgePath,
+  isBorderEdge,
+  isLandEdge,
+  landEdgePath,
+  type EdgeId,
+} from '../state/edges.ts';
+import { defenseLinePath, planHexes } from '../state/front.ts';
+import type { ArmyPlan, MatchState, OffensiveLine } from '../state/types.ts';
 
 export type PlanCommand = Extract<
   Command,
   { t: 'assignFront' | 'setDefenseLine' | 'clearPlan' | 'setOffensiveLine' | 'stopOffensive' }
 >;
+
+const inMap = (state: MatchState, e: EdgeId): boolean =>
+  Number.isInteger(e) && e >= 0 && e < state.map.width * state.map.height * 6;
 
 function ownArmy(state: MatchState, playerId: number, armyId: number): Validation {
   const army = state.armies.find((a) => a.id === armyId);
@@ -23,10 +36,17 @@ function validateFront(
   playerId: number,
   cmd: Extract<PlanCommand, { t: 'assignFront' }>,
 ): Validation {
-  // Точки участка — гексы своей нынешней границы (с врагом или ничьей землёй).
-  if (cmd.points.length === 0) return rejected('badHex');
-  if (cmd.points.some((h) => !isBorderHex(state, playerId, h))) return rejected('badHex');
-  return frontLinePath(state, playerId, cmd.points) ? OK : rejected('noPath');
+  // Точки участка — грани своей нынешней границы (с врагом или ничьей землёй).
+  if (cmd.edges.length === 0 || cmd.edges.some((e) => !inMap(state, e))) return rejected('badHex');
+  if (
+    cmd.edges.some(
+      (e) =>
+        !isBorderEdge(state, playerId, e) && !isBorderEdge(state, playerId, flipEdge(state, e)),
+    )
+  ) {
+    return rejected('badHex');
+  }
+  return frontEdgePath(state, playerId, cmd.edges) ? OK : rejected('noPath');
 }
 
 function validateLine(state: MatchState, playerId: number, points: readonly number[]): Validation {
@@ -44,11 +64,10 @@ function validateOffensive(
 ): Validation {
   const plan = state.plans.find((p) => p.armyId === cmd.armyId);
   if (plan?.kind !== 'front') return rejected('noFront');
-  const size = state.map.width * state.map.height;
-  if (cmd.points.length === 0 || cmd.points.some((h) => h < 0 || h >= size)) {
+  if (cmd.edges.length === 0 || cmd.edges.some((e) => !inMap(state, e) || !isLandEdge(state, e))) {
     return rejected('badHex');
   }
-  if (!offensiveLinePath(state, cmd.points)) return rejected('noPath');
+  if (!landEdgePath(state, cmd.edges)) return rejected('noPath');
   const mine = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.id));
   const active = state.plans.filter(
     (p) => p.kind === 'front' && p.offensive && p.armyId !== cmd.armyId && mine.has(p.armyId),
@@ -80,12 +99,25 @@ export function removePlan(state: MatchState, armyId: number): void {
   for (const u of state.units) if (u.armyId === armyId) u.slot = -1;
 }
 
+// Гексы линии наступления: у каждой грани — гекс, ближе к фронту армии (при равенстве — свой).
+function offensiveLine(state: MatchState, plan: ArmyPlan, edges: readonly EdgeId[]): OffensiveLine {
+  const front = planHexes(state, plan).map((h) => hexFromId(h, state.map.width));
+  const dist = (h: HexId): number => {
+    const at = hexFromId(h, state.map.width);
+    return front.reduce((m, f) => Math.min(m, distance(at, f)), Number.MAX_SAFE_INTEGER);
+  };
+  const hexes: HexId[] = [];
+  for (const e of edges) {
+    const a = edgeHex(e);
+    const b = edgeOther(state, e);
+    const h = b >= 0 && dist(b) < dist(a) ? b : a;
+    if (!hexes.includes(h)) hexes.push(h);
+  }
+  return { edges, hexes };
+}
+
 /** Ставит или снимает линию наступления армии с фронтом; места отрядов не трогает. */
-export function setOffensive(
-  state: MatchState,
-  armyId: number,
-  line: readonly HexId[] | null,
-): void {
+export function setOffensive(state: MatchState, armyId: number, line: OffensiveLine | null): void {
   const i = state.plans.findIndex((p) => p.armyId === armyId);
   const plan = state.plans[i];
   if (plan?.kind === 'front') state.plans[i] = { ...plan, offensive: line };
@@ -102,12 +134,15 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
   if (cmd.t === 'clearPlan') return removePlan(state, cmd.armyId);
   if (cmd.t === 'stopOffensive') return setOffensive(state, cmd.armyId, null);
   if (cmd.t === 'setOffensiveLine') {
-    return setOffensive(state, cmd.armyId, offensiveLinePath(state, cmd.points));
+    const plan = state.plans.find((p) => p.armyId === cmd.armyId);
+    const edges = landEdgePath(state, cmd.edges);
+    if (!plan || !edges) return;
+    return setOffensive(state, cmd.armyId, offensiveLine(state, plan, edges));
   }
   if (cmd.t === 'assignFront') {
-    const hexes = frontLinePath(state, playerId, cmd.points);
-    if (!hexes) return;
-    return setPlan(state, { armyId: cmd.armyId, kind: 'front', hexes, offensive: null });
+    const edges = frontEdgePath(state, playerId, cmd.edges);
+    if (!edges) return;
+    return setPlan(state, { armyId: cmd.armyId, kind: 'front', edges, offensive: null });
   }
   const hexes = defenseLinePath(state, playerId, cmd.points);
   if (hexes) setPlan(state, { armyId: cmd.armyId, kind: 'line', hexes });

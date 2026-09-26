@@ -103,9 +103,10 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.armyId);
     str(s, p.kind);
     if (p.kind === 'front') {
-      array(s, p.hexes);
+      array(s, p.edges);
       int(s, p.offensive ? 1 : 0);
-      array(s, p.offensive ?? []);
+      array(s, p.offensive?.edges ?? []);
+      array(s, p.offensive?.hexes ?? []);
     } else array(s, p.hexes);
   }
 }

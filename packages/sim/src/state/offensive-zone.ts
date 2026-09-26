@@ -1,7 +1,7 @@
 // Зона наступления армии (CR-002, как в HoI4): гексы между участком фронта и линией наступления.
 // Общая для offensiveSystem и снимка игрока (отрисовка зоны).
 // GDD: docs/gdd/07-controls.md — «Линия наступления».
-import type { LineGround } from './front.ts';
+import type { LineGround } from './ground.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 

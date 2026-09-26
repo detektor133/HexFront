@@ -148,18 +148,26 @@ export interface Unit {
   slot: HexId;
 }
 
+/** Линия наступления (CR-004): грани, как нарисовал игрок, и гексы линии со стороны фронта. */
+export interface OffensiveLine {
+  /** Грани линии по порядку (EdgeId = hex × 6 + d). */
+  readonly edges: readonly number[];
+  /** Гексы линии — у каждой грани тот, что ближе к фронту армии в момент приказа. */
+  readonly hexes: readonly HexId[];
+}
+
 /**
- * План армии (CR-002, CR-003): участок фронта на своей границе (с врагом или ничьей землёй) или
- * линия обороны.
+ * План армии (CR-002…CR-004): участок фронта — грани своей границы (с врагом или ничьей землёй)
+ * или линия обороны.
  */
 export type ArmyPlan =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      /** Цепочка своих пограничных гексов по порядку; едет за границей (followBorder). */
-      readonly hexes: readonly HexId[];
+      /** Грани своей границы по порядку (со своей стороны); едут за границей (followBorder). */
+      readonly edges: readonly number[];
       /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
-      readonly offensive: readonly HexId[] | null;
+      readonly offensive: OffensiveLine | null;
     }
   | {
       readonly armyId: number;

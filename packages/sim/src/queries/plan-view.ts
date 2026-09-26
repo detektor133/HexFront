@@ -1,19 +1,23 @@
-// Планы своих армий в снимке игрока (CR-002): гексы линий и зона наступления для отрисовки.
+// Планы своих армий в снимке игрока (CR-002…CR-004): грани фронта (уже перенесённые на текущую
+// границу), линия наступления, гексы линии обороны.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import type { HexId } from '../math/hex.ts';
-import { planHexes } from '../state/front.ts';
+import { edgeHexes } from '../state/edges.ts';
+import { frontEdgesNow, planHexes } from '../state/front.ts';
 import { offensiveZone } from '../state/offensive-zone.ts';
-import type { MatchState } from '../state/types.ts';
+import type { MatchState, OffensiveLine } from '../state/types.ts';
 
-/** План армии: текущие гексы фронта или линии обороны, линия и зона наступления. */
+/** План армии для отрисовки. */
 export type PlanView =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      /** Текущие гексы участка фронта на своей границе. */
+      /** Грани фронта на текущей границе (EdgeId), по порядку. */
+      readonly edges: readonly number[];
+      /** Гексы участка фронта. */
       readonly hexes: readonly HexId[];
-      readonly offensive: readonly HexId[] | null;
-      /** Гексы зоны наступления по возрастанию HexId; пусто без наступления. */
+      readonly offensive: OffensiveLine | null;
+      /** Гексы зоны наступления по возрастанию HexId (для прогноза); пусто без наступления. */
       readonly zone: readonly HexId[];
     }
   | { readonly armyId: number; readonly kind: 'line'; readonly hexes: readonly HexId[] };
@@ -24,14 +28,16 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
   return state.plans
     .filter((p) => mine.has(p.armyId))
     .map((p): PlanView => {
-      const hexes = planHexes(state, p);
-      if (p.kind === 'line') return { armyId: p.armyId, kind: 'line', hexes };
+      if (p.kind === 'line') return { armyId: p.armyId, kind: 'line', hexes: planHexes(state, p) };
+      const edges = frontEdgesNow(state, p);
+      const hexes = edgeHexes(edges);
       const zone = p.offensive
-        ? [...offensiveZone(state, playerId, hexes, p.offensive).keys()]
+        ? [...offensiveZone(state, playerId, hexes, p.offensive.hexes).keys()]
         : [];
       return {
         armyId: p.armyId,
         kind: 'front',
+        edges,
         hexes,
         offensive: p.offensive,
         zone: zone.sort((a, b) => a - b),

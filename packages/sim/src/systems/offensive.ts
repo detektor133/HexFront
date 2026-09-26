@@ -75,6 +75,6 @@ export function offensiveSystem(state: MatchState): void {
     if ((state.tick + plan.armyId) % OFFENSIVE_STEP_TICKS !== 0) continue;
     followBorder(state, plan.armyId);
     const now = state.plans.find((p) => p.armyId === plan.armyId);
-    if (now?.kind === 'front' && now.offensive) advance(state, now, now.offensive);
+    if (now?.kind === 'front' && now.offensive) advance(state, now, now.offensive.hexes);
   }
 }

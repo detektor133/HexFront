@@ -15,7 +15,7 @@ import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts
 import { FP, type Fp } from '../../src/math/int.ts';
 import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
-import { borderSegment } from '../../src/state/front.ts';
+import { borderEdges, borderSegmentEdges, edgeOf, isBorderEdge } from '../../src/state/edges.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   BUILDING,
@@ -80,6 +80,7 @@ type DslCommand =
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'clearPlan'; readonly armyId: number }
   | { readonly t: 'drawFront'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'raw'; readonly cmd: Command }
   | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly At[] }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
   | {
@@ -167,6 +168,8 @@ export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): Ds
   order,
 });
 
+/** Команда sim как есть — когда удобнее задать грани напрямую. */
+export const raw = (cmd: Command): DslCommand => ({ t: 'raw', cmd });
 /** Участок фронта по точкам своей границы (с врагом или ничьей землёй), CR-003. */
 export const drawFront = (armyId: number, points: readonly At[]): DslCommand => ({
   t: 'drawFront',
@@ -417,6 +420,9 @@ function makeScenario(
     if (!unit) throw new Error(`сценарий: у ${ref.unitOf} нет отряда #${ref.index}`);
     return unit.id;
   };
+  // Грани своей границы у гекса точки — так тест задаёт участок фронта гексами.
+  const borderOf = (owner: number, w: At): number[] =>
+    [0, 1, 2, 3, 4, 5].map((d) => edgeOf(hexOf(w), d)).filter((e) => isBorderEdge(state, owner, e));
   const cityIdAt = (w: At): number => state.cities.find((c) => c.hex === hexOf(w))?.id ?? -1;
   const toCommand = (c: DslCommand): Command => {
     switch (c.t) {
@@ -441,26 +447,43 @@ function makeScenario(
       case 'setAutoReinforce':
         return c;
       case 'assignFront': {
+        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
         if (c.section) {
-          return { t: 'assignFront', armyId: c.armyId, points: c.section.map(hexOf) };
+          return {
+            t: 'assignFront',
+            armyId: c.armyId,
+            edges: c.section.flatMap((w) => borderOf(owner, w)),
+          };
         }
         // Вся граница с соседом — все её непрерывные куски подряд.
-        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
-        const points: number[] = [];
-        state.hexes.owner.forEach((_, h) => {
-          if (!points.includes(h)) points.push(...borderSegment(state, owner, idOf(c.enemy), h));
-        });
-        return { t: 'assignFront', armyId: c.armyId, points };
+        const edges: number[] = [];
+        for (const e of borderEdges(state, owner)) {
+          if (!edges.includes(e)) edges.push(...borderSegmentEdges(state, owner, idOf(c.enemy), e));
+        }
+        return { t: 'assignFront', armyId: c.armyId, edges };
       }
-      case 'drawFront':
-        return { t: 'assignFront', armyId: c.armyId, points: c.points.map(hexOf) };
+      case 'raw':
+        return c.cmd;
+      case 'drawFront': {
+        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
+        return {
+          t: 'assignFront',
+          armyId: c.armyId,
+          edges: c.points.flatMap((w) => borderOf(owner, w)),
+        };
+      }
       case 'setDefenseLine':
         return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
       case 'clearPlan':
       case 'stopOffensive':
         return c;
       case 'setOffensiveLine':
-        return { t: 'setOffensiveLine', armyId: c.armyId, points: c.points.map(hexOf) };
+        // Точка линии — восточная грань гекса (к столбцу справа).
+        return {
+          t: 'setOffensiveLine',
+          armyId: c.armyId,
+          edges: c.points.map((w) => edgeOf(hexOf(w), 0)),
+        };
       case 'assignUnits':
         return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':

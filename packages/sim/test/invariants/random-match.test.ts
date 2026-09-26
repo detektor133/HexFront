@@ -109,7 +109,7 @@ function build(state: MatchState, r: Raw): Command | null {
         state.armies.filter((x) => x.owner === r.player),
         r.a,
       );
-      return army ? { t: 'assignFront', armyId: army.id, points: [r.b, r.b + 1] } : null;
+      return army ? { t: 'assignFront', armyId: army.id, edges: [r.b * 6, r.b * 6 + 1] } : null;
     }
     case 15: {
       const army = pickOf(
@@ -133,7 +133,7 @@ function build(state: MatchState, r: Raw): Command | null {
         ),
         r.a,
       );
-      return plan ? { t: 'setOffensiveLine', armyId: plan.armyId, points: [r.b] } : null;
+      return plan ? { t: 'setOffensiveLine', armyId: plan.armyId, edges: [r.b * 6] } : null;
     }
     default:
       // Заведомо сомнительная команда: случайные id и гексы — проверка отказов.

@@ -2,7 +2,8 @@ import type { Command, PlanView, PlayerView, UnitView } from '@hexfront/sim';
 
 import styles from './ArmyBar.module.css';
 import { armyName } from './army-name.ts';
-import type { Draft, DraftMode } from './plan-draft.ts';
+import type { Tool as PlanTool } from './plan-draft.ts';
+import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
@@ -61,7 +62,11 @@ const ICONS: Record<string, React.JSX.Element> = {
       <line x1="15" y1="12" x2="15" y2="7" />
     </>
   ),
-  stop: <rect x="5" y="5" width="10" height="10" />,
+  erase: (
+    <>
+      <path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 17 H13 L14 6" />
+    </>
+  ),
   hold: <path d="M10 2 L17 5 V10 C17 14 14 17 10 18 C6 17 3 14 3 10 V5 Z" />,
   expand: (
     <>
@@ -70,12 +75,6 @@ const ICONS: Record<string, React.JSX.Element> = {
       <line x1="10" y1="15" x2="10" y2="19" />
       <line x1="1" y1="10" x2="5" y2="10" />
       <line x1="15" y1="10" x2="19" y2="10" />
-    </>
-  ),
-  clear: (
-    <>
-      <line x1="5" y1="5" x2="15" y2="15" />
-      <line x1="15" y1="5" x2="5" y2="15" />
     </>
   ),
   disband: (
@@ -91,11 +90,13 @@ function Tool(props: {
   label: MessageKey;
   onClick: () => void;
   disabled?: string | null;
+  active?: boolean;
 }): React.JSX.Element {
   return (
     <button
       type="button"
       className={styles.tool}
+      aria-pressed={props.active ?? false}
       disabled={Boolean(props.disabled)}
       title={props.disabled ?? t(props.label)}
       onClick={props.onClick}
@@ -144,7 +145,7 @@ function ArmyCard(props: {
         </span>
         <span className={styles.row}>
           <span className={styles.key}>{t('army.org')}</span>
-          <Bar share={stats.org} color={tokens.status.success} />
+          <Bar share={stats.org} color={tokens.chip.org} />
         </span>
         <span className={styles.row}>
           <span className={styles.key}>{t('army.supply')}</span>
@@ -170,14 +171,18 @@ export function ArmyBar(props: {
   onSelect: (armyId: number | null) => void;
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
-  onDraft: (d: Draft | null) => void;
+  tool: ToolState | null;
+  onTool: (t: ToolState | null) => void;
 }): React.JSX.Element {
   const { view, send, selected } = props;
   const mine = view.units.filter((u) => u.owner === view.playerId);
   const army = view.armies.find((a) => a.id === selected);
   const plan = army ? view.plans.find((p) => p.armyId === army.id) : undefined;
-  const draw = (mode: DraftMode): void =>
-    army ? props.onDraft({ mode, armyId: army.id, points: [] }) : undefined;
+  const active = (tool: PlanTool): boolean =>
+    props.tool?.tool === tool && props.tool.armyId === army?.id;
+  // Повторное нажатие на включённый инструмент — выключить (как в HoI4).
+  const use = (tool: PlanTool): void =>
+    army ? props.onTool(active(tool) ? null : { tool, armyId: army.id }) : undefined;
   const select = (armyId: number | null, units: readonly UnitView[]): void => {
     props.onSelect(armyId === selected ? null : armyId);
     props.onPick({
@@ -191,28 +196,27 @@ export function ArmyBar(props: {
     <div className={styles.dock}>
       {army && (
         <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
-          <Tool icon="front" label="plan.front" onClick={() => draw('front')} />
+          <Tool
+            icon="front"
+            label="plan.front"
+            onClick={() => use('front')}
+            active={active('front')}
+          />
           <Tool
             icon="offensive"
             label="plan.offensive"
-            onClick={() => draw('offensive')}
+            onClick={() => use('offensive')}
+            active={active('offensive')}
             disabled={plan?.kind === 'front' ? null : t('plan.needFront')}
           />
-          <Tool icon="line" label="plan.line" onClick={() => draw('line')} />
-          {plan?.kind === 'front' && plan.offensive && (
-            <Tool
-              icon="stop"
-              label="plan.stop"
-              onClick={() => send({ t: 'stopOffensive', armyId: army.id })}
-            />
-          )}
-          {plan && (
-            <Tool
-              icon="clear"
-              label="plan.clear"
-              onClick={() => send({ t: 'clearPlan', armyId: army.id })}
-            />
-          )}
+          <Tool icon="line" label="plan.line" onClick={() => use('line')} active={active('line')} />
+          <Tool
+            icon="erase"
+            label="plan.erase"
+            onClick={() => use('erase')}
+            active={active('erase')}
+            disabled={view.plans.length > 0 ? null : t('plan.nothingToErase')}
+          />
           <Tool
             icon="hold"
             label="army.hold"
@@ -231,6 +235,9 @@ export function ArmyBar(props: {
               props.onSelect(null);
             }}
           />
+          {props.tool && props.tool.armyId === army.id && (
+            <span className={styles.hint}>{t(`plan.hint.${props.tool.tool}` as MessageKey)}</span>
+          )}
         </div>
       )}
       <div className={styles.strip}>
