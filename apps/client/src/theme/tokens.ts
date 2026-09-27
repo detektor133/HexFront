@@ -167,17 +167,6 @@ export const tokens = {
       5
     ],
     "cornerRadius": 6,
-    "flowColor": "#FFFFFF",
-    "flowWidth": [
-      1.5,
-      2.5,
-      3.5
-    ],
-    "flowDash": [
-      2,
-      14
-    ],
-    "flowSpeed": 18,
     "isolatedAlpha": 0.45,
     "offroadDotted": [
       1,

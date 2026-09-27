@@ -29,7 +29,7 @@ interface MatchState {
   battles: Battle[];              // активные бои (по целевому гексу)
   networks: SupplyNetwork[];      // кэш, пересчитывается раз в секунду
   fronts: Front[];                // кэш
-  plans: ArmyPlan[];              // планы армий: фронт (сосед, участок, линия наступления), линия обороны (CR-002)
+  plans: ArmyPlan[];              // планы армий: фронт (грани своей границы, линия наступления), линия обороны (CR-002)
   constructions: Construction[];  // стройки: город, улучшение, постройка, дорога
   nextId: number;
   events: GameEvent[];            // события этого тика (для UI и логов), очищаются каждый тик
@@ -47,7 +47,7 @@ interface MatchState {
 5. `networkSystem` — (раз в 10 тиков) сети снабжения, изоляция.
 6. `supplySystem` — (раз в 10 тиков) `supplyLevel` отрядов; каждый тик — таймеры истощения.
 7. `frontSystem` — (раз в 10 тиков) фронты; (раз в 50) `frontAllocator` выдаёт приказы движения.
-8. `offensiveSystem` — (раз в 20 тиков) шаги наступления по стрелкам.
+8. `offensiveSystem` — (раз в 20 тиков) шаги наступления к линиям наступления.
 9. `movementSystem` — прогресс переходов, захват пустых гексов, начало боёв при входе во врага.
 10. `artillerySystem` — обстрел.
 11. `combatSystem` — потери, org, исходы, отступления, капитуляции, захваты.
@@ -75,7 +75,7 @@ type Command =
   | { t: 'assignFront'; armyId: number; edges: EdgeId[] }   // грани своей границы (CR-004)
   | { t: 'setDefenseLine'; armyId: number; points: HexId[] } | { t: 'clearPlan'; armyId: number }
   | { t: 'setOffensiveLine'; armyId: number; edges: EdgeId[] }   // нарисовать (active: false)
-  | { t: 'startOffensive'; armyId: number } | { t: 'stopOffensive'; armyId: number }   // начать / пауза
+  | { t: 'startOffensive'; armyId: number } | { t: 'stopOffensive'; armyId: number }   // «Начать» / «Стоп» (линия остаётся)
   | { t: 'clearOffensive'; armyId: number }
   | { t: 'split'; unitId: number; soldiers: Fp; to?: HexId } | { t: 'merge'; unitIds: number[] }
   | { t: 'bombard'; unitId: number; targetUnitId: number | null }
