@@ -237,6 +237,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     frame(nowMs) {
       unitLayer.frame(nowMs);
+      planLayer.frame(nowMs);
     },
     destroy() {
       container.destroy({ children: true });

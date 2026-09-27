@@ -17,6 +17,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { createFrontTweens } from './front-tween.ts';
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
 import { edgeRuns, smooth } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
@@ -45,6 +46,8 @@ export interface PlanLayer {
     scale: number,
     level: DetailLevel,
   ): void;
+  /** Кадр: пока линия фронта перетекает в новое положение, слой перерисовывается. */
+  frame(nowMs: number): void;
   destroy(): void;
 }
 
@@ -99,8 +102,7 @@ export function createPlanLayer(
     for (const p of rest) g.lineTo(p.x, p.y);
   }
 
-  function drawFront(edges: readonly EdgeId[], color: string, alpha = 1): void {
-    const runs = runsOf(edges);
+  function drawFront(runs: readonly Point[][], color: string, alpha = 1): void {
     const w = width(tokens.front.width);
     const style = { cap: 'round', join: 'round', alpha } as const;
     for (const r of runs) polyline(r);
@@ -191,7 +193,7 @@ export function createPlanLayer(
   // идёт) и 1–3 полупрозрачные стрелки, разнесённые вдоль фронта и линии в одном порядке, чтобы
   // стрелки не пересекались и не сходились в одну точку.
   function drawOffensiveLine(
-    front: readonly EdgeId[],
+    front: readonly Point[][],
     line: readonly EdgeId[],
     active: boolean,
     alpha = 1,
@@ -209,7 +211,7 @@ export function createPlanLayer(
       join: 'round',
       alpha,
     });
-    const frontLine = runsOf(front).flat();
+    const frontLine = front.flat();
     const lineAll = runs.flat();
     const fl = pathLength(frontLine);
     const ll = pathLength(lineAll);
@@ -265,9 +267,9 @@ export function createPlanLayer(
     labels.addChild(tx);
   }
 
-  function drawOffensive(v: PlayerView, p: FrontPlan): void {
+  function drawOffensive(v: PlayerView, p: FrontPlan, front: readonly Point[][]): void {
     if (!p.offensive) return;
-    const pts = drawOffensiveLine(p.edges, p.offensive.edges, p.offensive.active);
+    const pts = drawOffensiveLine(front, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
     const mid = pts[Math.floor(pts.length / 2)];
     if (!worst || !mid) return;
@@ -310,17 +312,24 @@ export function createPlanLayer(
   function drawDraft(v: PlayerView, d: Draft, color: string): void {
     const path = draftPath({ map, view: v, radius }, d);
     const plan = v.plans.find((p) => p.armyId === d.armyId);
-    if (d.tool === 'front') drawFront(path.edges, color, DRAFT_ALPHA);
+    if (d.tool === 'front') drawFront(runsOf(path.edges), color, DRAFT_ALPHA);
     else if (d.tool === 'line') drawDefense(v, path.hexes, color, DRAFT_ALPHA);
     else if (d.tool === 'offensive') {
-      const front = plan?.kind === 'front' ? plan.edges : [];
+      const front = plan?.kind === 'front' ? runsOf(plan.edges) : [];
       drawOffensiveLine(front, path.edges, false, DRAFT_ALPHA);
     }
   }
 
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tweens = createFrontTweens(reduced);
+  let last: Parameters<PlanLayer['setView']> | null = null;
+  let animating = false;
+
   return {
     container,
     setView(v, draft, selectedArmy, split, scale, lvl) {
+      last = [v, draft, selectedArmy, split, scale, lvl];
+      const now = performance.now();
       k = 1 / scale;
       level = lvl;
       g.clear();
@@ -337,15 +346,24 @@ export function createPlanLayer(
           drawDefense(v, p.hexes, color);
           continue;
         }
-        drawOffensive(v, p);
-        drawFront(p.edges, color);
+        const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
+        drawOffensive(v, p, front);
+        drawFront(front, color);
         if (p.armyId === selectedArmy && !draft) {
           drawHandles(frontHandles({ map, view: v, radius }, p), color);
         }
       }
+      tweens.keep(new Set(v.plans.filter((p) => p.kind === 'front').map((p) => p.armyId)));
+      animating = tweens.active(now);
       const dc = draft ? colorOf(draft.armyId) : null;
       if (draft && dc) drawDraft(v, draft, dc);
       if (split) drawSplit(split);
+    },
+    frame(nowMs) {
+      // Ещё один кадр после конца перехода — линия встаёт точно в новое положение.
+      if (!animating || !last) return;
+      animating = tweens.active(nowMs);
+      this.setView(...last);
     },
     destroy() {
       container.destroy({ children: true });
