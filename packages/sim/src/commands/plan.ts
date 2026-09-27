@@ -16,6 +16,7 @@ import {
   type EdgeId,
 } from '../state/edges.ts';
 import { defenseLinePath, planHexes } from '../state/front.ts';
+import { frontSideDistance } from '../state/offensive-steps.ts';
 import type { ArmyPlan, MatchState, OffensiveLine } from '../state/types.ts';
 
 export type PlanCommand = Extract<
@@ -115,21 +116,30 @@ export function removePlan(state: MatchState, armyId: number): void {
   for (const u of state.units) if (u.armyId === armyId) u.slot = -1;
 }
 
-// Гексы линии наступления: у каждой грани — гекс, ближе к фронту армии (при равенстве — свой).
+// Гексы линии наступления: у каждой грани — гекс ближе к фронту армии по пути, не пересекающему
+// линию (сторона линии, обращённая к фронту); не дойти ни до одного или поровну — ближе по прямой,
+// затем со стороны EdgeId.
 function offensiveLine(state: MatchState, plan: ArmyPlan, edges: readonly EdgeId[]): OffensiveLine {
-  const front = planHexes(state, plan).map((h) => hexFromId(h, state.map.width));
-  const dist = (h: HexId): number => {
+  const own = planHexes(state, plan);
+  const front = own.map((h) => hexFromId(h, state.map.width));
+  const walk = frontSideDistance(state, own, edges);
+  const straight = (h: HexId): number => {
     const at = hexFromId(h, state.map.width);
     return front.reduce((m, f) => Math.min(m, distance(at, f)), Number.MAX_SAFE_INTEGER);
+  };
+  const far = (h: HexId): number => {
+    const w = walk[h] ?? -1;
+    return w < 0 ? Number.MAX_SAFE_INTEGER : w;
   };
   const hexes: HexId[] = [];
   for (const e of edges) {
     const a = edgeHex(e);
     const b = edgeOther(state, e);
-    const h = b >= 0 && dist(b) < dist(a) ? b : a;
+    const closer = b >= 0 && (far(b) < far(a) || (far(b) === far(a) && straight(b) < straight(a)));
+    const h = closer ? b : a;
     if (!hexes.includes(h)) hexes.push(h);
   }
-  return { edges, hexes, active: false };
+  return { edges, hexes, active: false, progressTick: state.tick };
 }
 
 /** Ставит или снимает линию наступления армии с фронтом; места отрядов не трогает. */
@@ -155,6 +165,7 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
     return setOffensive(state, cmd.armyId, {
       ...plan.offensive,
       active: cmd.t === 'startOffensive',
+      progressTick: state.tick,
     });
   }
   if (cmd.t === 'setOffensiveLine') {

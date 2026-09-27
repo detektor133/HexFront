@@ -1,10 +1,11 @@
 // Планы своих армий в снимке игрока (CR-002…CR-004): грани фронта как есть в плане (план сам едет
 // за границей при каждой смене владельца гекса), линия наступления, гексы линии обороны.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
+import { OFFENSIVE_STUCK_TICKS } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import { edgeHexes } from '../state/edges.ts';
 import { planHexes } from '../state/front.ts';
-import { offensiveZone } from '../state/offensive-zone.ts';
+import { offensiveTargets } from '../state/offensive-steps.ts';
 import type { MatchState, OffensiveLine } from '../state/types.ts';
 
 /** План армии для отрисовки. */
@@ -17,8 +18,13 @@ export type PlanView =
       /** Гексы участка фронта. */
       readonly hexes: readonly HexId[];
       readonly offensive: OffensiveLine | null;
-      /** Гексы зоны наступления по возрастанию HexId (для прогноза); пусто без наступления. */
+      /**
+       * Гексы, куда могут шагнуть наступающие отряды, по возрастанию HexId (для прогноза у
+       * линии); пусто без линии наступления.
+       */
       readonly zone: readonly HexId[];
+      /** Идущее наступление дольше OFFENSIVE_STUCK_TICKS без продвижения — «упёрлись». */
+      readonly stuck: boolean;
     }
   | { readonly armyId: number; readonly kind: 'line'; readonly hexes: readonly HexId[] };
 
@@ -31,16 +37,18 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
       if (p.kind === 'line') return { armyId: p.armyId, kind: 'line', hexes: planHexes(state, p) };
       const { edges } = p;
       const hexes = edgeHexes(edges);
-      const zone = p.offensive
-        ? [...offensiveZone(state, playerId, hexes, p.offensive.hexes).keys()]
-        : [];
+      const zone = p.offensive ? offensiveTargets(state, playerId, edges, p.offensive.hexes) : [];
+      const stuck =
+        p.offensive?.active === true &&
+        state.tick - p.offensive.progressTick > OFFENSIVE_STUCK_TICKS;
       return {
         armyId: p.armyId,
         kind: 'front',
         edges,
         hexes,
         offensive: p.offensive,
-        zone: zone.sort((a, b) => a - b),
+        zone,
+        stuck,
       };
     });
 }

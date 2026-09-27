@@ -29,7 +29,8 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
     return;
   }
   if (u.order === 'move' && u.path.at(-1) === slot) return;
-  const path = findPath(state, u.hex, slot, u.type, u.owner);
+  // К месту — только по своей земле: иначе отряд берёт чужие гексы по дороге (04/T14b).
+  const path = findPath(state, u.hex, slot, u.type, u.owner, true);
   if (!path || path.length === 0) {
     u.slot = -1;
     return;

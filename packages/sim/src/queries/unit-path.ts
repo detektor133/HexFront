@@ -121,6 +121,7 @@ function search(
   mover: Mover,
   isGoal: (hex: HexId) => boolean,
   h: (hex: HexId) => number,
+  ownLand = false,
 ): HexId[] | null {
   const { width, height } = state.map;
   const g = new Int32Array(width * height).fill(UNREACHED);
@@ -140,6 +141,7 @@ function search(
       if (!inBounds(n, width, height)) continue;
       const id = hexId(n, width);
       if (!canEnter(state, mover, id, isGoal(id))) continue;
+      if (ownLand && state.hexes.owner[id] !== mover.owner) continue;
       const cost = stepTicks(state, mover, hex, id);
       if (cost === null || gh + cost >= (g[id] ?? UNREACHED)) continue;
       g[id] = gh + cost;
@@ -155,7 +157,8 @@ function search(
 
 /**
  * Путь отряда (A* по времени хода, ничьи — по меньшему HexId). Снабжённость считается полной:
- * она меняет все шаги одинаково и на выбор пути не влияет.
+ * она меняет все шаги одинаково и на выбор пути не влияет. ownLand — только по своей земле (путь
+ * к месту на линии плана).
  * @returns гексы после from до to включительно; [] при from === to; null — пути нет
  */
 export function findPath(
@@ -164,6 +167,7 @@ export function findPath(
   to: HexId,
   type: UnitType,
   owner: number,
+  ownLand = false,
 ): HexId[] | null {
   if (from === to) return [];
   const mover: Mover = { type, owner, supplyLevel: FP as Fp };
@@ -177,6 +181,7 @@ export function findPath(
     mover,
     (hex) => hex === to,
     (hex) => distance(hexFromId(hex, width), goal) * hMin,
+    ownLand,
   );
 }
 

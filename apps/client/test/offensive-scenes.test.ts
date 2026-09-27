@@ -1,0 +1,136 @@
+import { readFileSync } from 'node:fs';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  borderEdges,
+  canonicalEdge,
+  frontSideDistance,
+  hexFromId,
+  lineDistance,
+  planHexes,
+  playerView,
+} from '@hexfront/sim';
+
+import { finishCommand, startDraft, strokeAdd } from '../src/dev/plan-draft.ts';
+import { createLocalEngine } from '../src/local/engine.ts';
+import { hexCenter, type Point } from '../src/render/hex-geometry.ts';
+
+const small: unknown = JSON.parse(
+  readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
+);
+/** Столица игрока 0 на карте small при сиде 42 и камера песочницы при 1440×900 (как в скриптах). */
+const CAPITAL = 765;
+const R = 20;
+const SCALE = 2.5;
+const CAM_X = 50;
+
+// Три сцены приёмки 04/T14b — экранные точки линии, как в scripts/offensive-line-screens.ts.
+const SCENES: readonly { name: string; line: Point[] }[] = [
+  {
+    name: 'прямая',
+    line: [
+      { x: 760, y: 230 },
+      { x: 760, y: 560 },
+    ],
+  },
+  {
+    name: 'диагональная',
+    line: [
+      { x: 640, y: 120 },
+      { x: 860, y: 560 },
+    ],
+  },
+  {
+    name: 'изогнутая',
+    line: [
+      { x: 690, y: 170 },
+      { x: 790, y: 260 },
+      { x: 830, y: 380 },
+      { x: 800, y: 490 },
+      { x: 740, y: 560 },
+    ],
+  },
+];
+
+// Точки росчерка между экранными точками (палец ведёт линию), в мировых координатах.
+function strokePoints(pts: readonly Point[], capY: number): Point[] {
+  const camY = 450 - capY * SCALE;
+  const out: Point[] = [];
+  for (let i = 1; i < pts.length; i += 1) {
+    const a = pts[i - 1] as Point;
+    const b = pts[i] as Point;
+    for (let k = i === 1 ? 0 : 1; k <= 20; k += 1) {
+      const x = a.x + ((b.x - a.x) * k) / 20;
+      const y = a.y + ((b.y - a.y) * k) / 20;
+      out.push({ x: (x - CAM_X) / SCALE, y: (y - camY) / SCALE });
+    }
+  }
+  return out;
+}
+
+describe('наступление в песочнице без сопротивления (04/T14b)', () => {
+  it.each(SCENES)(
+    '$name линия: вся линия взята, за линию и назад — ни шага, фронт = линия',
+    (sc) => {
+      const e = createLocalEngine(small, 42, 2);
+      if ('errors' in e) throw new Error(e.errors.join('\n'));
+      const s = e.state;
+      const run = (seconds: number): void => {
+        for (let i = 0; i < seconds * 10; i += 1) e.tick();
+      };
+      run(3);
+      const army = s.armies.find((a) => a.owner === 0)?.id ?? -1;
+      e.queue({ t: 'assignFront', armyId: army, edges: borderEdges(s, 0) });
+      run(6);
+      const capY = hexCenter(hexFromId(CAPITAL, s.map.width), R).y;
+      const c = { map: s.map, view: playerView(s, 0), radius: R };
+      let d = startDraft('offensive', army);
+      for (const p of strokePoints(sc.line, capY)) d = strokeAdd(c, d, p);
+      const cmd = finishCommand(d);
+      if (!cmd) throw new Error('линия не нарисована');
+      e.queue(cmd);
+      run(0.1);
+      const plan = s.plans.find((p) => p.armyId === army);
+      if (plan?.kind !== 'front' || !plan.offensive) throw new Error('нет линии');
+      const { hexes, edges } = plan.offensive;
+      const dt = lineDistance(s, hexes);
+      const side = frontSideDistance(s, planHexes(s, plan), edges);
+      e.queue({ t: 'startOffensive', armyId: army });
+      // Захваты: откуда (последний свой гекс отряда) и куда.
+      const origin = new Map<number, number>();
+      const caps: { from: number; to: number }[] = [];
+      for (
+        let t = 0;
+        t < 3000 && s.plans.find((p) => p.armyId === army)?.kind === 'front';
+        t += 1
+      ) {
+        const owners = s.hexes.owner.slice();
+        for (const u of s.units) if (owners[u.hex] === 0) origin.set(u.id, u.hex);
+        e.tick();
+        for (const u of s.units) {
+          const from = origin.get(u.id);
+          if (u.owner !== 0 || from === undefined || owners[u.hex] === 0) continue;
+          if (s.hexes.owner[u.hex] === 0) caps.push({ from, to: u.hex });
+        }
+        const now = s.plans.find((p) => p.armyId === army);
+        if (now?.kind === 'front' && !now.offensive) break;
+      }
+      expect(hexes.every((h) => s.hexes.owner[h] === 0)).toBe(true);
+      for (const x of caps) {
+        const from = dt[x.from] as number;
+        const to = dt[x.to] as number;
+        // Ни одного шага назад: dt не растёт, не меняется — только вдоль линии.
+        expect(to < from || (to === 0 && from === 0)).toBe(true);
+        // Ни одного гекса за линией.
+        expect(side[x.to]).toBeGreaterThanOrEqual(0);
+      }
+      const after = s.plans.find((p) => p.armyId === army);
+      expect(after?.kind === 'front' && after.offensive).toBeNull();
+      const line = new Set(edges.map((x) => canonicalEdge(s, x)));
+      const front = after?.kind === 'front' ? after.edges : [];
+      expect(front.length).toBeGreaterThan(0);
+      expect(front.every((x) => line.has(canonicalEdge(s, x)))).toBe(true);
+    },
+  );
+});

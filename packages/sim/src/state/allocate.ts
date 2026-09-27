@@ -1,8 +1,9 @@
 // Расчёт мест отрядов армии на линии плана (CR-002): вес угрозы, равномерность при равной
 // угрозе, броня на равнину, артиллерия позади линии. Состояние не меняет.
 // GDD: docs/gdd/07-controls.md — «Распределение».
-import { ARTY_RANGE, MAX_UNITS_PER_HEX } from '../balance.ts';
+import { ARTY_RANGE, MAX_UNITS_PER_HEX, OFFENSIVE_FACING_WEIGHT } from '../balance.ts';
 import { planHexes } from './front.ts';
+import { facingHexes, lineDistance } from './offensive-steps.ts';
 import type { ArmyPlan, MatchState, Unit } from './types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -169,6 +170,13 @@ function assignArtillery(
 export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allocation {
   const line = planHexes(state, plan);
   const w = weights(state, owner, line);
+  // Идёт наступление — гексы с гранями, смотрящими на линию, весят больше: армия стягивает силы.
+  if (plan.kind === 'front' && plan.offensive?.active) {
+    const dist = lineDistance(state, plan.offensive.hexes);
+    for (const h of facingHexes(state, plan.edges, dist)) {
+      w.set(h, (w.get(h) ?? 0) * OFFENSIVE_FACING_WEIGHT);
+    }
+  }
   const units = state.units.filter((u) => planControls(u, plan.armyId));
   const lineUnits = units.filter((u) => u.type !== 'artillery');
   const arty = units.filter((u) => u.type === 'artillery');

@@ -156,6 +156,11 @@ export interface OffensiveLine {
   readonly hexes: readonly HexId[];
   /** Наступление идёт (кнопка «Начать наступление», CR-005); false — линия только нарисована. */
   readonly active: boolean;
+  /**
+   * Тик последнего продвижения: приказ, «Начать», шаг к линии или бой отряда армии. Дольше
+   * OFFENSIVE_STUCK_TICKS без продвижения — армия «упёрлась» (04/T14b).
+   */
+  readonly progressTick: number;
 }
 
 /**

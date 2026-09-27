@@ -98,7 +98,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     for (let r = 1; r < 5; r += 1) expect(ownerOf(s, 6, r)).toBe('B');
   });
 
-  it('снимок владельца показывает линию и зону наступления, чужой — нет', () => {
+  it('снимок владельца показывает линию и гексы, куда наступающие могут шагнуть; чужой — нет', () => {
     const s = scenario(FIELD, { legend });
     const { army } = frontArmy(s, 5);
     s.cmd('A', setOffensiveLine(army, LINE));
@@ -107,9 +107,10 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     const plan = playerView(s.state, 0).plans.find((p) => p.armyId === army);
     const zone = plan?.kind === 'front' ? plan.zone : [];
     const hexOf = (c: number, r: number): number => c + r * s.state.map.width;
+    // Шаг — только в соседний гекс, строго ближе к линии: столбец 3, не глубже.
     for (let r = 0; r < 5; r += 1) {
       expect(zone).toContain(hexOf(3, r));
-      expect(zone).toContain(hexOf(5, r));
+      expect(zone).not.toContain(hexOf(5, r));
       expect(zone).not.toContain(hexOf(6, r));
     }
     expect(playerView(s.state, 1).plans).toEqual([]);

@@ -178,6 +178,16 @@
   stroke-linejoin: round;
 }
 
+.stuckIcon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--status-warning);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .reserve {
   display: flex;
   flex: 0 0 auto;

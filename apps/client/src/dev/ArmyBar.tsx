@@ -42,6 +42,14 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   start: <polygon points="6,4 16,10 6,16" />,
+  // «Упёрлись»: стрелка упирается в черту (07-controls.md, «Линия наступления»).
+  stuck: (
+    <>
+      <line x1="3" y1="10" x2="12" y2="10" />
+      <polyline points="9,7 12,10 9,13" />
+      <line x1="16" y1="4" x2="16" y2="16" />
+    </>
+  ),
   pause: (
     <>
       <line x1="7" y1="4" x2="7" y2="16" />
@@ -149,6 +157,8 @@ function ArmyCard(props: {
   name: string;
   color: string;
   stats: ArmyStats;
+  /** Наступление армии стоит без продвижения — значок «упёрлись». */
+  stuck: boolean;
   selected: boolean;
   onClick: () => void;
 }): React.JSX.Element {
@@ -167,6 +177,11 @@ function ArmyCard(props: {
           {stats.starving > 0 && (
             <span title={t('army.starving').replace('{n}', String(stats.starving))}>
               <Icon name="warn" className={styles.alarmIcon} />
+            </span>
+          )}
+          {props.stuck && (
+            <span title={t('army.stuck')}>
+              <Icon name="stuck" className={styles.stuckIcon} />
             </span>
           )}
         </span>
@@ -281,6 +296,7 @@ export function ArmyBar(props: {
               name={armyName(a)}
               color={armyColor(a.number)}
               stats={armyStats(units)}
+              stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
               selected={a.id === selected || props.pickedArmies.includes(a.id)}
               onClick={() => select(a.id, units)}
             />
