@@ -12,6 +12,7 @@ import {
   START_POP_HEX,
   TAX_DEFAULT,
 } from '../balance.ts';
+import { setHexOwner } from './hex-owner.ts';
 import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
@@ -111,10 +112,10 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     inBattle: false,
     captureTicks: 0,
   });
-  state.hexes.owner[capital] = playerId;
+  setHexOwner(state, capital, playerId);
   state.hexes.pop[capital] = START_POP_CAPITAL;
   for (const id of pickStartNeighbors(state, spawn)) {
-    state.hexes.owner[id] = playerId;
+    setHexOwner(state, id, playerId);
     state.hexes.pop[id] = START_POP_HEX;
   }
   state.players.push({

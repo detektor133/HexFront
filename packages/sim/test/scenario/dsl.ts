@@ -16,6 +16,7 @@ import { FP, type Fp } from '../../src/math/int.ts';
 import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { borderEdges, borderSegmentEdges, edgeOf, isBorderEdge } from '../../src/state/edges.ts';
+import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   BUILDING,
@@ -340,7 +341,8 @@ export interface Scenario {
   cityAt(where: At): City | undefined;
   /**
    * Сменить владельца гекса в обход команд — для тестов разреза сетей и потери городов;
-   * город на гексе переходит вместе с ним. null — нейтральный.
+   * через setHexOwner, как любая смена владельца (фронты рядом переносятся); город на гексе
+   * переходит вместе с ним. null — нейтральный.
    */
   setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
@@ -383,7 +385,7 @@ export function scenario(
     const cell = opts.legend[token];
     if (!cell) throw new Error(`сценарий: токен «${token}» нет в легенде`);
     const owner = cell.player === null ? NEUTRAL : idOf(cell.player);
-    state.hexes.owner[hex] = owner;
+    setHexOwner(state, hex, owner);
     if (cell.kind === 'own' && cell.road) state.hexes.road[hex] = 1;
     if (cell.kind !== 'city') return;
     const id = state.nextId;
@@ -577,7 +579,7 @@ function makeScenario(
     },
     setOwner(where, player) {
       const owner = player === null ? NEUTRAL : idOf(player);
-      state.hexes.owner[hexOf(where)] = owner;
+      setHexOwner(state, hexOf(where), owner);
       const c = state.cities.find((x) => x.hex === hexOf(where));
       if (c) c.owner = owner;
     },

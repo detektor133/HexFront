@@ -166,7 +166,7 @@ export type ArmyPlan =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      /** Грани своей границы по порядку (со своей стороны); едут за границей (followBorder). */
+      /** Грани своей границы по порядку (со своей стороны); едут за границей (setHexOwner). */
       readonly edges: readonly number[];
       /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
       readonly offensive: OffensiveLine | null;

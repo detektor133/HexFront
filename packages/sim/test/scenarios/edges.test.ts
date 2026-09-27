@@ -12,12 +12,12 @@ import {
   edgeOf,
   edgeOther,
   flipEdge,
-  followEdges,
   frontEdgePath,
   isBorderEdge,
   isLandEdge,
   landEdgePath,
 } from '../../src/state/edges.ts';
+import { followEdges } from '../../src/state/front-follow.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
 // A — столбцы 0–1, B — столбец 3 (два куска: строки 0–1 и 3–4), ничья земля — столбец 2.

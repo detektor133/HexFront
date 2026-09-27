@@ -1,7 +1,8 @@
 // Геометрия планов армий (CR-002…CR-004): участок фронта — цепочка граней своей границы (с врагом
 // или ничьей землёй), которая едет за границей; линия обороны — по своим гексам.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
-import { edgeHexes, followEdges } from './edges.ts';
+import { edgeHex, edgeHexes, edgeOther } from './edges.ts';
+import { followEdges } from './front-follow.ts';
 import type { LineGround } from './ground.ts';
 import type { ArmyPlan, MatchState } from './types.ts';
 import { TERRAIN } from '../map/types.ts';
@@ -83,28 +84,25 @@ export function defenseLinePath(
   return linePath(state, points, (h) => state.hexes.owner[h] === owner && isLand(state, h));
 }
 
-/** Грани участка фронта армии сейчас: сохранённые, перенесённые на текущую границу. */
-export function frontEdgesNow(state: MatchState, plan: ArmyPlan & { kind: 'front' }): number[] {
-  const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
-  return owner === undefined ? [] : followEdges(state, owner, plan.edges);
-}
-
 /**
- * Фронт едет за границей: сохраняет в план грани, перенесённые на текущую границу
- * (раз в шаг распределения и наступления; снимок игрока считает то же самое каждый тик).
+ * Фронт едет за границей: переносит участки фронта, у которых есть грань гекса hex (с любой
+ * стороны), — после каждой смены владельца этого гекса (setHexOwner). Остальные не трогает.
  */
-export function followBorder(state: MatchState, armyId: number): void {
-  const i = state.plans.findIndex((p) => p.armyId === armyId);
-  const plan = state.plans[i];
-  if (plan?.kind !== 'front') return;
-  const edges = frontEdgesNow(state, plan);
-  if (edges.length !== plan.edges.length || edges.some((e, k) => e !== plan.edges[k])) {
-    state.plans[i] = { ...plan, edges };
-  }
+export function followFrontsNear(state: MatchState, hex: HexId): void {
+  state.plans.forEach((plan, i) => {
+    if (plan.kind !== 'front') return;
+    if (!plan.edges.some((e) => edgeHex(e) === hex || edgeOther(state, e) === hex)) return;
+    const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
+    if (owner === undefined) return;
+    const edges = followEdges(state, owner, plan.edges);
+    if (edges.length !== plan.edges.length || edges.some((e, k) => e !== plan.edges[k])) {
+      state.plans[i] = { ...plan, edges };
+    }
+  });
 }
 
 /**
- * Текущие гексы плана армии по порядку: для фронта — гексы его граней на текущей границе;
+ * Текущие гексы плана армии по порядку: для фронта — гексы его граней (план уже на границе);
  * для линии обороны — свои проходимые гексы линии (потерянные пропускаются).
  */
 export function planHexes(state: MatchState, plan: ArmyPlan): HexId[] {
@@ -113,5 +111,5 @@ export function planHexes(state: MatchState, plan: ArmyPlan): HexId[] {
   if (plan.kind === 'line') {
     return plan.hexes.filter((h) => state.hexes.owner[h] === owner && isLand(state, h));
   }
-  return edgeHexes(frontEdgesNow(state, plan)).filter((h) => isBorderHex(state, owner, h));
+  return edgeHexes(plan.edges).filter((h) => isBorderHex(state, owner, h));
 }

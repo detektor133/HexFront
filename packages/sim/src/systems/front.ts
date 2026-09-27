@@ -13,7 +13,7 @@ import { splitUnit } from '../commands/unit.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
-import { followBorder, planHexes } from '../state/front.ts';
+import { planHexes } from '../state/front.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 
 // Отряд идёт на своё место или встаёт на нём в оборону.
@@ -67,7 +67,6 @@ function coverLine(state: MatchState, armyId: number, owner: number): void {
 }
 
 function runPlan(state: MatchState, armyId: number): void {
-  followBorder(state, armyId);
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;

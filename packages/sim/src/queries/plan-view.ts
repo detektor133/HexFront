@@ -1,9 +1,9 @@
-// Планы своих армий в снимке игрока (CR-002…CR-004): грани фронта (уже перенесённые на текущую
-// границу), линия наступления, гексы линии обороны.
+// Планы своих армий в снимке игрока (CR-002…CR-004): грани фронта как есть в плане (план сам едет
+// за границей при каждой смене владельца гекса), линия наступления, гексы линии обороны.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import type { HexId } from '../math/hex.ts';
 import { edgeHexes } from '../state/edges.ts';
-import { frontEdgesNow, planHexes } from '../state/front.ts';
+import { planHexes } from '../state/front.ts';
 import { offensiveZone } from '../state/offensive-zone.ts';
 import type { MatchState, OffensiveLine } from '../state/types.ts';
 
@@ -12,7 +12,7 @@ export type PlanView =
   | {
       readonly armyId: number;
       readonly kind: 'front';
-      /** Грани фронта на текущей границе (EdgeId), по порядку. */
+      /** Грани фронта из плана (EdgeId), по порядку. */
       readonly edges: readonly number[];
       /** Гексы участка фронта. */
       readonly hexes: readonly HexId[];
@@ -29,7 +29,7 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
     .filter((p) => mine.has(p.armyId))
     .map((p): PlanView => {
       if (p.kind === 'line') return { armyId: p.armyId, kind: 'line', hexes: planHexes(state, p) };
-      const edges = frontEdgesNow(state, p);
+      const { edges } = p;
       const hexes = edgeHexes(edges);
       const zone = p.offensive
         ? [...offensiveZone(state, playerId, hexes, p.offensive.hexes).keys()]

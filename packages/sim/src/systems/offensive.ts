@@ -5,7 +5,7 @@ import { setOffensive } from '../commands/plan.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
-import { followBorder, planHexes } from '../state/front.ts';
+import { planHexes } from '../state/front.ts';
 import { offensiveZone } from '../state/offensive-zone.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 
@@ -73,8 +73,6 @@ export function offensiveSystem(state: MatchState): void {
   for (const plan of state.plans) {
     if (plan.kind !== 'front' || !plan.offensive?.active) continue;
     if ((state.tick + plan.armyId) % OFFENSIVE_STEP_TICKS !== 0) continue;
-    followBorder(state, plan.armyId);
-    const now = state.plans.find((p) => p.armyId === plan.armyId);
-    if (now?.kind === 'front' && now.offensive) advance(state, now, now.offensive.hexes);
+    advance(state, plan, plan.offensive.hexes);
   }
 }

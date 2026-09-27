@@ -4,15 +4,7 @@
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import type { LineGround } from './ground.ts';
 import { TERRAIN } from '../map/types.ts';
-import {
-  distance,
-  hexFromId,
-  hexId,
-  inBounds,
-  neighbor,
-  type Direction,
-  type HexId,
-} from '../math/hex.ts';
+import { hexFromId, hexId, inBounds, neighbor, type Direction, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
 
 /** Грань: hex × 6 + d (d — направление к соседу). */
@@ -220,42 +212,6 @@ export function borderEdges(g: LineGround, owner: number): EdgeId[] {
   return out;
 }
 
-/**
- * Фронт едет за границей: если какая-то грань участка перестала быть своей границей, концы
- * участка переносятся на ближайшие грани границы (по гексу, при равенстве — то же направление,
- * затем меньший EdgeId), а середина заново идёт кратчайшим путём по граням границы между ними.
- * Переносятся только концы — иначе участок при каждом сдвиге копил бы грани и обрастал страну.
- * Нет границы — грани не меняются.
- * @returns новые грани по порядку
- */
-export function followEdges(g: LineGround, owner: number, edges: readonly EdgeId[]): EdgeId[] {
-  if (edges.every((e) => isBorderEdge(g, owner, e))) return [...edges];
-  const border = borderEdges(g, owner);
-  const first = edges[0];
-  const last = edges.at(-1);
-  if (border.length === 0 || first === undefined || last === undefined) return [...edges];
-  const { width } = g.map;
-  const snap = (e: EdgeId): EdgeId => {
-    if (isBorderEdge(g, owner, e)) return e;
-    const at = hexFromId(edgeHex(e), width);
-    let best = e;
-    let bestKey = Number.MAX_SAFE_INTEGER;
-    for (const b of border) {
-      const key =
-        distance(at, hexFromId(edgeHex(b), width)) * 16 + (edgeDir(b) === edgeDir(e) ? 0 : 8);
-      if (key < bestKey || (key === bestKey && b < best)) {
-        best = b;
-        bestKey = key;
-      }
-    }
-    return best;
-  };
-  const a = snap(first);
-  const b = snap(last);
-  if (a === b) return [a];
-  return chain([a, b], (x) => borderNeighbors(g, owner, x), limitOf(g), false) ?? [a, b];
-}
-
 /** Гексы граней по порядку, без повторов (со своей стороны грани). */
 export function edgeHexes(edges: readonly EdgeId[]): HexId[] {
   const out: HexId[] = [];
@@ -297,7 +253,7 @@ export function edgeCorners(e: EdgeId): [Corner, Corner] {
 }
 
 /** Грани, сходящиеся в углу: (h, a), (h, a+1) и грань между соседями n_a → n_{a+1}. */
-function cornerEdges(g: LineGround, c: Corner): EdgeId[] {
+export function cornerEdges(g: LineGround, c: Corner): EdgeId[] {
   const out = [edgeOf(c.hex, c.a), edgeOf(c.hex, c.a + 1)];
   const na = edgeOther(g, edgeOf(c.hex, c.a));
   if (na >= 0) out.push(edgeOf(na, c.a + 2));

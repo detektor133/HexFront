@@ -2,6 +2,7 @@
 // GDD: docs/gdd/03-cities-buildings.md — «Столица»; 08-match.md — «Выбывание».
 import { CAPITAL_MOVE_CHAOS_S, NO_CITY_GRACE_S, TICKS_PER_S } from '../balance.ts';
 import { FP, intDiv } from '../math/int.ts';
+import { setHexOwner } from '../state/hex-owner.ts';
 import { recomputeNetworks } from '../state/network.ts';
 import { NEUTRAL, type City, type MatchState, type Player } from '../state/types.ts';
 
@@ -37,7 +38,7 @@ function eliminate(state: MatchState, p: Player): void {
   const { owner, network } = state.hexes;
   owner.forEach((o, hex) => {
     if (o !== p.id) return;
-    owner[hex] = NEUTRAL;
+    setHexOwner(state, hex, NEUTRAL);
     network[hex] = -1;
   });
   const keep = <T extends { owner: number }>(list: T[]): void => {
