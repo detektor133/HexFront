@@ -19,7 +19,12 @@ for (const entry of log.split('\0')) {
   const trimmed = entry.trim();
   if (trimmed === '') continue;
   const [sha = '', ...rest] = trimmed.split('\n');
-  const errors = checkCommitMessage(rest.join('\n'), { branch });
+  const files = execFileSync('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', sha], {
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter((f) => f !== '');
+  const errors = checkCommitMessage(rest.join('\n'), { branch, files, sha });
   if (errors.length > 0) {
     failed += 1;
     console.error(`${sha.slice(0, 8)}: ${rest[0] ?? ''}`);
