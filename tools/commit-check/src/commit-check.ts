@@ -56,10 +56,21 @@ export interface CheckContext {
   readonly sha?: string;
 }
 
-// Коммит документов этапа без задачи: тип docs или change(docs), все файлы — в docs/.
+/**
+ * Файлы, сгенерированные из `docs/art/tokens.json` (`pnpm tokens`): CI требует коммитить их вместе
+ * с токенами, поэтому они — часть коммита документов.
+ */
+const GENERATED_FROM_DOCS = new Set([
+  'apps/client/src/theme/tokens.css',
+  'apps/client/src/theme/tokens.ts',
+]);
+
+// Коммит документов этапа без задачи: тип docs или change(docs), все файлы — в docs/ или
+// сгенерированы из них.
 function isDocsOnly(type: string, scope: string, files: readonly string[] | undefined): boolean {
   const docsType = type === 'docs' || (type === 'change' && scope === 'docs');
-  return docsType && !!files && files.length > 0 && files.every((f) => f.startsWith('docs/'));
+  const docsFile = (f: string): boolean => f.startsWith('docs/') || GENERATED_FROM_DOCS.has(f);
+  return docsType && !!files && files.length > 0 && files.every(docsFile);
 }
 
 /** Возвращает список нарушений; пустой список — сообщение корректно. */

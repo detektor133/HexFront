@@ -64,6 +64,21 @@ describe('проверка сообщений коммитов', () => {
     });
   });
 
+  it('сгенерированные токены клиента — часть коммита документов', () => {
+    const files = [
+      'docs/art/tokens.json',
+      'apps/client/src/theme/tokens.css',
+      'apps/client/src/theme/tokens.ts',
+    ];
+    const message =
+      'change(docs): токены потока снабжения удалены\n\nЭтап: 04\nРешение: DECISIONS 2026-09-27';
+    expect(checkCommitMessage(message, { branch: 'stage-04', files })).toEqual([]);
+    const other = [...files, 'apps/client/src/theme/colors.ts'];
+    expect(checkCommitMessage(message, { branch: 'stage-04', files: other })).toContain(
+      'в ветке этапа нужен трейлер «Этап: NN/Tn»',
+    );
+  });
+
   describe('исключения по хэшу', () => {
     const MESSAGE = 'docs(docs): CR-006 «Автокомандование»\n\nЭтап: 04';
     const FILES = ['docs/changes/CR-006-auto-command.md'];
