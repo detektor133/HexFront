@@ -106,6 +106,17 @@ function coverAll(marksInOrder: readonly EdgeId[], way: Way, limit: number): Edg
 }
 
 /**
+ * Дуга контура своей границы, покрывающая отмеченные грани: на каждой цепочке контура — наименьшая
+ * дуга через все её отметки (фронт после завершённого наступления, 04/T14b).
+ * @returns грани по порядку обхода (со своей стороны); разрыв — только где обрывается контур
+ */
+export function borderArc(g: LineGround, owner: number, marks: readonly EdgeId[]): EdgeId[] {
+  const own = marks.filter((e) => isBorderEdge(g, owner, e));
+  if (own.length === 0) return [];
+  return coverAll([...new Set(own)], wayOf(g, owner, own), g.hexes.owner.length * 6);
+}
+
+/**
  * Фронт едет за границей от последнего положения (07-controls.md, «Линия фронта»): уцелевшие
  * грани сохраняются; пропавший конец — по внешнему углу, иначе на ближайшую грань границы (не
  * дальше 2 граней, если есть) в той же связной части: из равных — участок длиннее, затем меньший

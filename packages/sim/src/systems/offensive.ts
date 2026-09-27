@@ -7,8 +7,23 @@ import { setOffensive } from '../commands/plan.ts';
 import type { HexId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
-import { flipEdge, isBorderEdge, type EdgeId } from '../state/edges.ts';
-import { facingHexes, lineDistance, stepsToward } from '../state/offensive-steps.ts';
+import { edgeAt } from '../state/contour.ts';
+import {
+  cornerKey,
+  edgeCorners,
+  flipEdge,
+  isBorderEdge,
+  type Corner,
+  type EdgeId,
+} from '../state/edges.ts';
+import { borderArc } from '../state/front-follow.ts';
+import {
+  enclaveHexes,
+  facingHexes,
+  lineDistance,
+  neighborsIn,
+  stepsToward,
+} from '../state/offensive-steps.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 
 type FrontPlan = Extract<ArmyPlan, { kind: 'front' }>;
@@ -31,34 +46,56 @@ function pickStep(
   return null;
 }
 
-// Наступающий отряд: свободный, не артиллерия, org не ниже порога, на гексе смотрящей грани.
-const advancing = (u: Unit, armyId: number, facing: ReadonlySet<HexId>): boolean =>
+// Свободный отряд армии: стоит, не в бою, не артиллерия, org не ниже порога.
+const free = (u: Unit, armyId: number): boolean =>
   u.armyId === armyId &&
   u.order === 'idle' &&
   !u.inBattle &&
   u.type !== 'artillery' &&
-  u.org >= OFFENSIVE_STOP_ORG &&
-  facing.has(u.hex);
+  u.org >= OFFENSIVE_STOP_ORG;
 
-// Вся линия своя — как в HoI4: линия наступления становится фронтом армии (её грани, ставшие своей
-// границей, со своей стороны), линия и стрелки исчезают. Граней границы нет — фронт прежний.
+// Наступающий отряд: свободный, на гексе смотрящей грани.
+const advancing = (u: Unit, armyId: number, facing: ReadonlySet<HexId>): boolean =>
+  free(u, armyId) && facing.has(u.hex);
+
+// Вся линия своя и анклавов нет — как в HoI4: фронт армии — дуга своей границы от угла начала
+// линии до угла конца (контур, как в «Линии фронта»), линия и стрелки исчезают. Дуги нет — фронт
+// прежний.
 function finish(state: MatchState, plan: FrontPlan, owner: number, line: readonly EdgeId[]): void {
-  const own = line
-    .map((e) => (isBorderEdge(state, owner, e) ? e : flipEdge(state, e)))
-    .filter((e) => e >= 0 && isBorderEdge(state, owner, e));
-  // Грани линии по порядку, без достройки обходом по границе: фронт — ровно линия (кусками, если
-  // часть граней линии не стала границей).
-  const edges = own.length > 0 ? own : [...plan.edges];
+  const first = line[0];
+  const last = line.at(-1);
+  const marks = line.map((e) => (isBorderEdge(state, owner, e) ? e : flipEdge(state, e)));
+  // Грани границы у внешних углов концов линии: дуга идёт от угла до угла.
+  for (const [e, next] of [
+    [first, line[1]],
+    [last, line.at(-2)],
+  ] as const) {
+    if (e === undefined) continue;
+    for (const c of edgeCorners(e)) {
+      if (next !== undefined && touchesCorner(state, next, c)) continue;
+      marks.push(edgeAt(state, owner, c, 0), edgeAt(state, owner, c, 1));
+    }
+  }
+  const arc = borderArc(state, owner, marks);
+  const edges = arc.length > 0 ? arc : [...plan.edges];
   const i = state.plans.findIndex((p) => p.armyId === plan.armyId);
   state.plans[i] = { ...plan, edges, offensive: null };
   state.events.push({ t: 'offensiveDone', playerId: owner, armyId: plan.armyId });
+}
+
+// Угол c — один из углов грани e.
+function touchesCorner(state: MatchState, e: EdgeId, c: Corner): boolean {
+  const key = cornerKey(state, c);
+  return edgeCorners(e).some((x) => cornerKey(state, x) === key);
 }
 
 function advance(state: MatchState, plan: FrontPlan): void {
   const off = plan.offensive;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (!off || owner === undefined) return;
-  if (off.hexes.every((h) => state.hexes.owner[h] === owner)) {
+  // Анклавы у взятой земли — тоже цель наступления, независимо от dt.
+  const enclaves = new Set(enclaveHexes(state, owner, off.taken));
+  if (enclaves.size === 0 && off.hexes.every((h) => state.hexes.owner[h] === owner)) {
     finish(state, plan, owner, off.edges);
     return;
   }
@@ -67,8 +104,10 @@ function advance(state: MatchState, plan: FrontPlan): void {
   const taken = new Set<HexId>();
   let progress = state.units.some((u) => u.armyId === plan.armyId && u.inBattle);
   for (const u of state.units) {
-    if (!advancing(u, plan.armyId, facing)) continue;
-    const steps = stepsToward(state, owner, u.hex, dist);
+    const near = neighborsIn(state, u.hex, enclaves);
+    if (!advancing(u, plan.armyId, facing) && !(near.length > 0 && free(u, plan.armyId))) continue;
+    const toward = facing.has(u.hex) ? stepsToward(state, owner, u.hex, dist) : [];
+    const steps = [...toward, ...near.filter((h) => !toward.includes(h))];
     const step = pickStep(state, u, steps, taken);
     if (step === null) continue;
     taken.add(step);
@@ -79,7 +118,9 @@ function advance(state: MatchState, plan: FrontPlan): void {
     u.moveTotal = 0;
     u.order = 'move';
   }
-  if (progress) setOffensive(state, plan.armyId, { ...off, progressTick: state.tick });
+  if (!progress) return;
+  const all = [...new Set([...off.taken, ...taken])].sort((a, b) => a - b);
+  setOffensive(state, plan.armyId, { ...off, progressTick: state.tick, taken: all });
 }
 
 /**

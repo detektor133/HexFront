@@ -109,6 +109,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
       array(s, p.offensive?.hexes ?? []);
       int(s, p.offensive?.active ? 1 : 0);
       int(s, p.offensive?.progressTick ?? 0);
+      array(s, p.offensive?.taken ?? []);
     } else array(s, p.hexes);
   }
 }

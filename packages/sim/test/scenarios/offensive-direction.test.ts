@@ -1,10 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import { TERRAIN } from '../../src/map/types.ts';
+import { hexFromId, hexId, inBounds, neighbors } from '../../src/math/hex.ts';
 import { intDiv } from '../../src/math/int.ts';
 import { playerView } from '../../src/queries/player-view.ts';
 import { allocate } from '../../src/state/allocate.ts';
+import { contourNext, contourPrev } from '../../src/state/contour.ts';
 import { canonicalEdge } from '../../src/state/edge-line.ts';
+import { flipEdge, isBorderEdge } from '../../src/state/edges.ts';
 import { planHexes } from '../../src/state/front.ts';
 import { facingHexes, frontSideDistance, lineDistance } from '../../src/state/offensive-steps.ts';
 import {
@@ -73,6 +77,8 @@ function lineOf(s: S, army: number): number[] {
 interface Capture {
   readonly from: number;
   readonly to: number;
+  /** Гекс был анклавом (чужой внутри своей земли) до захвата — шаг туда не зависит от dt. */
+  readonly enclave: boolean;
 }
 
 // Прогон на ticks тиков с записью захватов: откуда (последний свой гекс отряда) и куда.
@@ -81,12 +87,15 @@ function run(s: S, ticks: number): Capture[] {
   const origin = new Map<number, number>();
   for (let t = 0; t < ticks; t += 1) {
     const owners = s.state.hexes.owner.slice();
+    const holes = new Set(enclosed(s.state, 0));
     for (const u of s.state.units) if (owners[u.hex] === 0) origin.set(u.id, u.hex);
     s.runTicks(1);
     for (const u of s.state.units) {
       const from = origin.get(u.id);
       if (u.owner !== 0 || from === undefined || owners[u.hex] === 0) continue;
-      if (s.state.hexes.owner[u.hex] === 0) out.push({ from, to: u.hex });
+      if (s.state.hexes.owner[u.hex] === 0) {
+        out.push({ from, to: u.hex, enclave: holes.has(u.hex) });
+      }
     }
   }
   return out;
@@ -94,11 +103,57 @@ function run(s: S, ticks: number): Capture[] {
 
 const col = (h: number): number => h % W;
 
+// Чужие проходимые гексы в «дырах» своей земли: связные куски не своих гексов (вода — тоже),
+// не касающиеся края карты.
+function enclosed(st: S['state'], owner: number): number[] {
+  const { width, height } = st.map;
+  const seen = new Uint8Array(width * height);
+  const out: number[] = [];
+  for (let h0 = 0; h0 < width * height; h0 += 1) {
+    if (seen[h0] || st.hexes.owner[h0] === owner) continue;
+    const comp = [h0];
+    seen[h0] = 1;
+    let edge = false;
+    for (let i = 0; i < comp.length; i += 1) {
+      const h = comp[i] as number;
+      const c = h % width;
+      const r = intDiv(h, width);
+      if (c === 0 || r === 0 || c === width - 1 || r === height - 1) edge = true;
+      for (const n of neighbors(hexFromId(h, width))) {
+        if (!inBounds(n, width, height)) continue;
+        const id = hexId(n, width);
+        if (seen[id] || st.hexes.owner[id] === owner) continue;
+        seen[id] = 1;
+        comp.push(id);
+      }
+    }
+    if (!edge) out.push(...comp.filter((h) => st.map.terrain[h] !== TERRAIN.water));
+  }
+  return out.sort((a, b) => a - b);
+}
+
+// Фронт — сплошная дуга контура своей границы: соседние грани фронта — соседние по обходу
+// контура (в ту или другую сторону); иначе — разрыв, допустимый только там, где контур обрывается.
+// Возвращает пары граней с дырой между ними.
+function arcGaps(st: S['state'], owner: number, front: readonly number[]): string[] {
+  const gaps: string[] = [];
+  for (let i = 1; i < front.length; i += 1) {
+    const a = front[i - 1] as number;
+    const b = front[i] as number;
+    const next = contourNext(st, owner, a);
+    const prev = contourPrev(st, owner, a);
+    if (next === b || prev === b) continue;
+    if (next < 0 || prev < 0) continue;
+    gaps.push(`${a}→${b}`);
+  }
+  return gaps;
+}
+
 // Захват ведёт к линии: dt строго меньше или шаг вдоль линии (dt 0 → 0).
 function toward(dt: Int32Array, c: Capture): boolean {
   const from = dt[c.from] as number;
   const to = dt[c.to] as number;
-  return to >= 0 && (to < from || (to === 0 && from === 0));
+  return c.enclave || (to >= 0 && (to < from || (to === 0 && from === 0)));
 }
 
 describe('наступление только к линии (04/T14b)', () => {
@@ -148,7 +203,22 @@ describe('наступление только к линии (04/T14b)', () => {
     for (const c of caps) expect(side[c.to]).toBeGreaterThanOrEqual(0);
   });
 
-  it('вся линия своя — линия становится фронтом армии, наступление завершено', () => {
+  it('завершено — ни одного чужого гекса внутри своей земли, фронт — сплошная дуга, «упёрлись» снят', () => {
+    for (const line of [LINE, [at(10, 1), at(10, 9)]]) {
+      const { s, army } = start(MAP, line);
+      s.cmd('A', startOffensive(army));
+      s.runSeconds(300);
+      const after = s.state.plans.find((p) => p.armyId === army);
+      expect(after?.kind === 'front' && after.offensive).toBeNull();
+      expect(enclosed(s.state, 0)).toEqual([]);
+      const front = after?.kind === 'front' ? after.edges : [];
+      expect(arcGaps(s.state, 0, front)).toEqual([]);
+      const view = playerView(s.state, 0).plans.find((p) => p.armyId === army);
+      expect(view?.kind === 'front' && view.stuck).toBe(false);
+    }
+  });
+
+  it('вся линия своя — наступление завершено, грани линии, ставшие границей, — во фронте', () => {
     const { s, army } = start();
     const plan = s.state.plans.find((p) => p.armyId === army);
     if (plan?.kind !== 'front' || !plan.offensive) throw new Error('нет линии');
@@ -158,12 +228,14 @@ describe('наступление только к линии (04/T14b)', () => {
     expect(hexes.every((h) => s.state.hexes.owner[h] === 0)).toBe(true);
     const after = s.state.plans.find((p) => p.armyId === army);
     expect(after?.kind === 'front' && after.offensive).toBeNull();
-    // Грани фронта — грани линии со своей стороны.
-    const own = new Set(edges.map((e) => canonicalEdge(s.state, e)));
-    const front = after?.kind === 'front' ? after.edges : [];
-    expect(front.length).toBeGreaterThan(0);
-    const onLine = front.filter((e) => own.has(canonicalEdge(s.state, e)));
-    expect(onLine.length).toBe(front.length);
+    const front = new Set(
+      (after?.kind === 'front' ? after.edges : []).map((e) => canonicalEdge(s.state, e)),
+    );
+    const border = edges.filter(
+      (e) => isBorderEdge(s.state, 0, e) || isBorderEdge(s.state, 0, flipEdge(s.state, e)),
+    );
+    expect(border.length).toBeGreaterThan(0);
+    expect(border.filter((e) => !front.has(canonicalEdge(s.state, e)))).toEqual([]);
   });
 
   it('идёт наступление — на гексах смотрящих граней отрядов больше, чем без него', () => {
@@ -242,6 +314,8 @@ describe('наступление только к линии: случайные 
         for (const c of run(s, 300)) {
           expect(toward(dt, c)).toBe(true);
         }
+        const done = s.state.plans.find((p) => p.armyId === army);
+        if (done?.kind === 'front' && !done.offensive) expect(enclosed(s.state, 0)).toEqual([]);
       }),
       { numRuns: 25, seed: 7 },
     );

@@ -139,7 +139,7 @@ function offensiveLine(state: MatchState, plan: ArmyPlan, edges: readonly EdgeId
     const h = closer ? b : a;
     if (!hexes.includes(h)) hexes.push(h);
   }
-  return { edges, hexes, active: false, progressTick: state.tick };
+  return { edges, hexes, active: false, progressTick: state.tick, taken: [] };
 }
 
 /** Ставит или снимает линию наступления армии с фронтом; места отрядов не трогает. */

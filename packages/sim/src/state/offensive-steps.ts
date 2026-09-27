@@ -160,3 +160,44 @@ export function offensiveTargets(
   }
   return [...out].sort((a, b) => a - b);
 }
+
+/**
+ * Анклавы у земли, взятой наступлением: чужие проходимые гексы в «дырах» своей земли — связных
+ * кусках не своих гексов (вода входит в кусок), не касающихся края карты, — рядом с гексами taken,
+ * ставшими своими.
+ * @returns HexId по возрастанию
+ */
+export function enclaveHexes(g: LineGround, owner: number, taken: readonly HexId[]): HexId[] {
+  const table = neighborTable(g);
+  const seen = new Uint8Array(g.hexes.owner.length);
+  const out: HexId[] = [];
+  for (const t of taken) {
+    if (g.hexes.owner[t] !== owner) continue;
+    for (let d = 0; d < SIDES; d += 1) {
+      const start = table[t * SIDES + d] as number;
+      if (start < 0 || seen[start] || g.hexes.owner[start] === owner) continue;
+      const comp: HexId[] = [start];
+      seen[start] = 1;
+      let open = false;
+      for (let i = 0; i < comp.length; i += 1) {
+        const h = comp[i] as HexId;
+        for (let k = 0; k < SIDES; k += 1) {
+          const n = table[h * SIDES + k] as number;
+          if (n < 0) open = true;
+          if (n < 0 || seen[n] || g.hexes.owner[n] === owner) continue;
+          seen[n] = 1;
+          comp.push(n);
+        }
+      }
+      if (!open) out.push(...comp.filter((h) => passable(g, h)));
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Соседние гексы из набора, по возрастанию HexId. */
+export function neighborsIn(g: LineGround, hex: HexId, set: ReadonlySet<HexId>): HexId[] {
+  return adjacent(g, hex)
+    .filter((n) => set.has(n))
+    .sort((a, b) => a - b);
+}

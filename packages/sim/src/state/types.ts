@@ -161,6 +161,8 @@ export interface OffensiveLine {
    * OFFENSIVE_STUCK_TICKS без продвижения — армия «упёрлась» (04/T14b).
    */
   readonly progressTick: number;
+  /** Гексы, куда этим наступлением сделаны шаги, по возрастанию HexId (для анклавов, 04/T14b). */
+  readonly taken: readonly HexId[];
 }
 
 /**
