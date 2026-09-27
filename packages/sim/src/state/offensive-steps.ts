@@ -119,6 +119,17 @@ function advances(dist: Int32Array, a: HexId, b: HexId): boolean {
 }
 
 /**
+ * Грани фронта, смотрящие на линию: гекс за гранью ближе к линии, чем свой, или оба на линии.
+ * @returns грани в порядке фронта
+ */
+export function facingEdges(g: LineGround, edges: readonly EdgeId[], dist: Int32Array): EdgeId[] {
+  return edges.filter((e) => {
+    const other = edgeOther(g, e);
+    return other >= 0 && advances(dist, edgeHex(e), other);
+  });
+}
+
+/**
  * Свои гексы фронта с гранью, смотрящей на линию: гекс за гранью ближе к линии, чем свой, или
  * оба на линии (грань вдоль линии).
  * @returns HexId по возрастанию, без повторов

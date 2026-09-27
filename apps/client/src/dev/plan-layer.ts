@@ -5,7 +5,12 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
 import {
+  edgeHex,
+  edgeHexes,
+  edgeOther,
+  facingEdges,
   forecastBattle,
+  lineDistance,
   hexFromId,
   hexId,
   inBounds,
@@ -18,7 +23,7 @@ import {
 } from '@hexfront/sim';
 
 import { createFrontTweens } from './front-tween.ts';
-import { arrowPairs, offensiveCurve, pathLength } from './plan-arrows.ts';
+import { arrowCount, offensiveArrows, offensiveCurve, pathLength } from './plan-arrows.ts';
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
 import { edgeRuns } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
@@ -166,10 +171,10 @@ export function createPlanLayer(
   }
 
   // Линия наступления как в HoI4: гладкая кривая по серединам граней (пунктир — только нарисована,
-  // сплошная — идёт) и 1–3 полупрозрачные стрелки, разнесённые вдоль фронта и линии в одном
-  // порядке, чтобы стрелки не пересекались и не сходились в одну точку.
+  // сплошная — идёт) и 1–3 стрелки от смотрящего на линию участка фронта: хвосты и концы
+  // равномерно, попарно по порядку, без пересечений (art/units.md, «Линия наступления»).
   function drawOffensiveLine(
-    front: readonly Point[][],
+    facing: readonly EdgeId[],
     line: readonly EdgeId[],
     active: boolean,
     alpha = 1,
@@ -187,12 +192,13 @@ export function createPlanLayer(
       join: 'round',
       alpha,
     });
-    // Стрелки — по кускам фронта и линии, без перескоков через разрывы.
-    const fl = front.reduce((s, r) => s + pathLength(r), 0);
-    const n = Math.max(1, Math.min(3, Math.round(fl / (radius * 3)) + 1));
+    // Хвосты — только на смотрящем участке текущего фронта; число — по его ширине в гексах.
+    const tails = runsOf(facing);
+    const n = arrowCount(edgeHexes(facing).length);
     const arrowAlpha = (active ? tokens.arrow.alpha : tokens.arrow.plannedAlpha) * alpha;
-    if (fl > 0 && runs.some((r) => pathLength(r) > 0)) {
-      for (const [from, to] of arrowPairs(front, runs, n)) drawArrow(from, to, arrowAlpha);
+    const long = (rs: readonly Point[][]): boolean => rs.some((r) => pathLength(r) > 0);
+    if (long(tails) && long(runs)) {
+      for (const [from, to] of offensiveArrows(tails, runs, n)) drawArrow(from, to, arrowAlpha);
     }
     return runs.flat();
   }
@@ -232,9 +238,9 @@ export function createPlanLayer(
     labels.addChild(tx);
   }
 
-  function drawOffensive(v: PlayerView, p: FrontPlan, front: readonly Point[][]): void {
+  function drawOffensive(v: PlayerView, p: FrontPlan): void {
     if (!p.offensive) return;
-    const pts = drawOffensiveLine(front, p.offensive.edges, p.offensive.active);
+    const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
     const mid = pts[Math.floor(pts.length / 2)];
     if (!worst || !mid) return;
@@ -280,8 +286,12 @@ export function createPlanLayer(
     if (d.tool === 'front') drawFront(runsOf(path.edges), color, DRAFT_ALPHA);
     else if (d.tool === 'line') drawDefense(v, path.hexes, color, DRAFT_ALPHA);
     else if (d.tool === 'offensive') {
-      const front = plan?.kind === 'front' ? runsOf(plan.edges) : [];
-      drawOffensiveLine(front, path.edges, false, DRAFT_ALPHA);
+      // Черновик: гексы линии ещё не выбраны sim — считаем от обеих сторон её граней.
+      const g0 = { map, hexes: v.hexes };
+      const both = path.edges.flatMap((e) => [edgeHex(e), edgeOther(g0, e)]).filter((h) => h >= 0);
+      const facing =
+        plan?.kind === 'front' ? facingEdges(g0, plan.edges, lineDistance(g0, both)) : [];
+      drawOffensiveLine(facing, path.edges, false, DRAFT_ALPHA);
     }
   }
 
@@ -312,7 +322,7 @@ export function createPlanLayer(
           continue;
         }
         const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
-        drawOffensive(v, p, front);
+        drawOffensive(v, p);
         drawFront(front, color);
         if (p.armyId === selectedArmy && !draft) {
           drawHandles(frontHandles({ map, view: v, radius }, p), color);

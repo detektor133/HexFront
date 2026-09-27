@@ -6,6 +6,9 @@ import { chromium, type Page } from '@playwright/test';
 
 const PORT = process.argv[2] ?? '5173';
 const SUFFIX = process.argv[3] ?? 'after';
+/** Третий аргумент `arrows` — только стрелки: кадр в момент «Начать» и через 20 с наступления. */
+const ARROWS_ONLY = process.argv[4] === 'arrows';
+const ARROWS_WAIT_MS = 20_000;
 const OUT = new URL('../../../docs/reports/stage-04/', import.meta.url);
 /** Столица игрока 0 на карте small при сиде 42 (гекс 765, у левого края). */
 const CAPITAL = 765;
@@ -106,6 +109,11 @@ const page = await browser.newPage({ viewport: VIEW });
 for (const s of SCENES) {
   await scene(page, s.line);
   await page.screenshot({ path: path(`offensive-line-${s.name}-start-1440x900`) });
+  if (ARROWS_ONLY) {
+    await page.waitForTimeout(ARROWS_WAIT_MS);
+    await page.screenshot({ path: path(`offensive-line-${s.name}-20s-1440x900`) });
+    continue;
+  }
   await page.waitForTimeout(OFFENSIVE_WAIT_MS);
   await page.screenshot({ path: path(`offensive-line-${s.name}-1440x900`) });
 }

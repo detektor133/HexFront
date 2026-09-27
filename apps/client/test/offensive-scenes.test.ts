@@ -6,6 +6,7 @@ import {
   borderEdges,
   contourNext,
   contourPrev,
+  edgeOther,
   flipEdge,
   hexId,
   inBounds,
@@ -151,6 +152,17 @@ describe('наступление в песочнице без сопротивл
       const dt = lineDistance(s, hexes);
       const side = frontSideDistance(s, planHexes(s, plan), edges);
       e.queue({ t: 'startOffensive', armyId: army });
+      run(0.1);
+      // Хвосты стрелок — на гранях фронта, смотрящих на линию: гекс за гранью ближе к линии.
+      const pv = playerView(s, 0).plans.find((p) => p.armyId === army);
+      const facing = pv?.kind === 'front' ? pv.facing : [];
+      expect(facing.length).toBeGreaterThan(0);
+      for (const f of facing) {
+        const other = edgeOther(s, f);
+        const self = dt[Math.floor(f / 6)] as number;
+        const beyond = dt[other] as number;
+        expect(beyond < self || (beyond === 0 && self === 0)).toBe(true);
+      }
       // Захваты: откуда (последний свой гекс отряда) и куда.
       const origin = new Map<number, number>();
       const caps: { from: number; to: number; enclave: boolean }[] = [];

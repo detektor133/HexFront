@@ -5,7 +5,7 @@ import { OFFENSIVE_STUCK_TICKS } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import { edgeHexes } from '../state/edges.ts';
 import { planHexes } from '../state/front.ts';
-import { offensiveTargets } from '../state/offensive-steps.ts';
+import { facingEdges, lineDistance, offensiveTargets } from '../state/offensive-steps.ts';
 import type { MatchState, OffensiveLine } from '../state/types.ts';
 
 /** План армии для отрисовки. */
@@ -25,6 +25,8 @@ export type PlanView =
       readonly zone: readonly HexId[];
       /** Идущее наступление дольше OFFENSIVE_STUCK_TICKS без продвижения — «упёрлись». */
       readonly stuck: boolean;
+      /** Грани фронта, смотрящие на линию наступления, в порядке фронта (хвосты стрелок). */
+      readonly facing: readonly number[];
     }
   | { readonly armyId: number; readonly kind: 'line'; readonly hexes: readonly HexId[] };
 
@@ -38,6 +40,9 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
       const { edges } = p;
       const hexes = edgeHexes(edges);
       const zone = p.offensive ? offensiveTargets(state, playerId, edges, p.offensive.hexes) : [];
+      const facing = p.offensive
+        ? facingEdges(state, edges, lineDistance(state, p.offensive.hexes))
+        : [];
       const stuck =
         p.offensive?.active === true &&
         state.tick - p.offensive.progressTick > OFFENSIVE_STUCK_TICKS;
@@ -49,6 +54,7 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
         offensive: p.offensive,
         zone,
         stuck,
+        facing,
       };
     });
 }

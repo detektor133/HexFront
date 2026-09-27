@@ -90,7 +90,7 @@ describe('инструменты планов по граням (CR-004)', () =>
     expect(d.edges.length).toBeGreaterThan(0);
     expect(finishCommand(d)).toMatchObject({ t: 'setOffensiveLine', armyId: 3 });
     const plan = { armyId: 3, kind: 'front' as const, edges: [e0], hexes: [], offensive: null };
-    const withPlan = { ...view, plans: [{ ...plan, zone: [], stuck: false }] };
+    const withPlan = { ...view, plans: [{ ...plan, zone: [], stuck: false, facing: [] }] };
     const erase = startDraft('erase', 3);
     expect(tapCommand({ ...c, view: withPlan }, erase, edgeMid(map, R, e0))).toEqual({
       t: 'clearPlan',

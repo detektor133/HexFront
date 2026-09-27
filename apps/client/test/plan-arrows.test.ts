@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { edgeHex, edgeOf, edgeOther, loadMap, type EdgeId } from '@hexfront/sim';
 
-import { arrowPairs, offensiveCurve } from '../src/dev/plan-arrows.ts';
+import { arrowCount, arrowPairs, offensiveArrows, offensiveCurve } from '../src/dev/plan-arrows.ts';
 import { edgeMid, edgeRuns } from '../src/dev/plan-edges.ts';
 import type { Point } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
@@ -51,10 +52,8 @@ function onRuns(p: Point, runs: readonly Point[][]): boolean {
       const a = r[i] as Point;
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const t = Math.max(
-        0,
-        Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)),
-      );
+      const l2 = dx * dx + dy * dy;
+      const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
       return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy) < 1e-6;
     }),
   );
@@ -153,5 +152,39 @@ describe('стрелки наступления по кускам (04/T14)', () 
     ];
     const pairs = arrowPairs(split, line, 3);
     for (const [from] of pairs) expect(onRuns(from, split)).toBe(true);
+  });
+});
+
+describe('стрелки наступления по смотрящему участку (04/T14b)', () => {
+  it('число стрелок = clamp(округл(ширина смотрящего участка в гексах / 4), 1, 3)', () => {
+    expect([0, 1, 2, 5, 6, 9, 10, 14, 40].map(arrowCount)).toEqual([1, 1, 1, 1, 2, 2, 3, 3, 3]);
+  });
+
+  const pt = fc.record({
+    x: fc.integer({ min: -300, max: 300 }),
+    y: fc.integer({ min: -300, max: 300 }),
+  });
+  const run = fc.array(pt, { minLength: 2, maxLength: 6 });
+  const runs = fc.array(run, { minLength: 1, maxLength: 3 });
+
+  it('для любых фронта и линии стрелки попарно не пересекаются, хвост — на смотрящем участке', () => {
+    fc.assert(
+      fc.property(runs, runs, fc.integer({ min: 1, max: 3 }), (front, line, n) => {
+        const pairs = offensiveArrows(front, line, n);
+        expect(pairs).toHaveLength(n);
+        for (const [from, to] of pairs) {
+          expect(onRuns(from, front)).toBe(true);
+          expect(onRuns(to, line)).toBe(true);
+        }
+        for (let i = 0; i < pairs.length; i += 1) {
+          for (let j = i + 1; j < pairs.length; j += 1) {
+            const [a, b] = pairs[i] as [Point, Point];
+            const [c, d] = pairs[j] as [Point, Point];
+            expect(cross(a, b, c, d)).toBe(false);
+          }
+        }
+      }),
+      { numRuns: 500, seed: 11 },
+    );
   });
 });
