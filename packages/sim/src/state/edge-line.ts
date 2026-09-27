@@ -2,7 +2,16 @@
 // Палец, вернувшийся назад, стирает линию до этого места — то же правило вырезает петли в
 // команде, поэтому клиент и sim получают одну и ту же линию.
 // GDD: docs/gdd/07-controls.md — «Линия наступления».
-import { cornerKey, edgeCorners, flipEdge, landEdgePath, type EdgeId } from './edges.ts';
+import {
+  cornerKey,
+  edgeChain,
+  edgeCorners,
+  edgeNeighbors,
+  flipEdge,
+  isLandEdge,
+  limitOf,
+  type EdgeId,
+} from './edges.ts';
 import type { LineGround } from './ground.ts';
 
 /** Одна грань — один EdgeId: меньший из двух сторон (у края карты — единственный). */
@@ -52,14 +61,25 @@ export function normalizeLine(g: LineGround, edges: readonly EdgeId[]): EdgeId[]
 }
 
 /**
- * Линия наступления по точкам-граням: точки приводятся к одному EdgeId, между ними — путь по
- * граням суши (`landEdgePath`), затем повторы и петли убираются (`normalizeLine`).
+ * Линия наступления по точкам-граням: точки приводятся к одному EdgeId, между ними — кратчайший
+ * путь по граням суши (в одном EdgeId), затем повторы и петли убираются (`normalizeLine`).
  * @returns грани по порядку или null, если точки не на суше, их не соединить или линия пуста
  */
 export function offensiveEdgePath(g: LineGround, points: readonly EdgeId[]): EdgeId[] | null {
-  const path = landEdgePath(
-    g,
+  if (points.length === 0 || points.some((e) => !isLandEdge(g, e))) return null;
+  // Граф граней суши в одном EdgeId: соседи грани — с обеих её сторон, иначе путь к грани,
+  // записанной со стороны соседа, шёл бы в обход.
+  const next = (e: EdgeId): EdgeId[] => {
+    const f = flipEdge(g, e);
+    const around = [...edgeNeighbors(g, e), ...(f >= 0 ? edgeNeighbors(g, f) : [])];
+    const out = around.filter((x) => isLandEdge(g, x)).map((x) => canonicalEdge(g, x));
+    return [...new Set(out)].sort((a, b) => a - b);
+  };
+  const path = edgeChain(
     points.map((e) => canonicalEdge(g, e)),
+    next,
+    limitOf(g),
+    true,
   );
   const line = path ? normalizeLine(g, path) : [];
   return line.length > 0 ? line : null;

@@ -135,4 +135,19 @@ describe('нормализация линии по граням (04/T14)', () =>
     const corners = cornersOf(t.state, line);
     expect(new Set(corners).size).toBe(corners?.length);
   });
+
+  it('цепочка граней по углам, записанная любыми сторонами, даёт ту же цепочку без дыр', () => {
+    const t = scenario(FIELD, { legend });
+    const land = (x: EdgeId): boolean => isLandEdge(t.state, x);
+    const path =
+      cornerPath(t.state, { hex: hex(4, 1), a: 0 }, { hex: hex(6, 3), a: 3 }, land) ?? [];
+    expect(path.length).toBeGreaterThan(4);
+    // Каждая вторая грань — со стороны соседа.
+    const mixed = path.map((e, i) =>
+      i % 2 === 1 && flipEdge(t.state, e) >= 0 ? flipEdge(t.state, e) : e,
+    );
+    const line = offensiveEdgePath(t.state, mixed) ?? [];
+    expect(line).toEqual(normalizeLine(t.state, path));
+    expect(cornersOf(t.state, line)).not.toBeNull();
+  });
 });

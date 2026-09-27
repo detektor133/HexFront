@@ -105,8 +105,12 @@ function bfs(
   return out.reverse();
 }
 
-// Цепочка граней через точки: между соседними точками — кратчайший путь по next.
-function chain(
+/**
+ * Цепочка граней через точки: между соседними точками — кратчайший путь по next (ничьи — меньший
+ * EdgeId); strict — точки, которые не соединить, дают null.
+ * @returns грани по порядку, без повторов
+ */
+export function edgeChain(
   points: readonly EdgeId[],
   next: (e: EdgeId) => EdgeId[],
   limit: number,
@@ -131,7 +135,7 @@ function chain(
 }
 
 /** Предел обхода при поиске пути по граням — вся карта, 6 граней на гекс. */
-const limitOf = (g: LineGround): number => g.hexes.owner.length * SIDES;
+export const limitOf = (g: LineGround): number => g.hexes.owner.length * SIDES;
 
 /**
  * Участок фронта по точкам-граням своей границы: между точками — кратчайший путь по граням
@@ -145,7 +149,7 @@ export function frontEdgePath(
 ): EdgeId[] | null {
   const own = points.map((e) => ownSide(g, owner, e));
   if (own.length === 0 || own.some((e) => e < 0)) return null;
-  return chain(own, (e) => borderNeighbors(g, owner, e), limitOf(g), true);
+  return edgeChain(own, (e) => borderNeighbors(g, owner, e), limitOf(g), true);
 }
 
 /**
@@ -158,7 +162,7 @@ export function landEdgePath(g: LineGround, points: readonly EdgeId[]): EdgeId[]
     edgeNeighbors(g, e)
       .filter((n) => isLandEdge(g, n))
       .sort((a, b) => a - b);
-  return chain(points, next, limitOf(g), true);
+  return edgeChain(points, next, limitOf(g), true);
 }
 
 /**
