@@ -1,7 +1,7 @@
 // Планы армий на карте как в HoI4 (CR-004; art/units.md, «Линии планов»): фронт — тонкая линия
 // цвета армии по граням на белой подложке, у выбранной армии — ручки на концах; линия
-// наступления — пунктир `arrow.color` по граням и широкие полупрозрачные стрелки от фронта к ней;
-// линия обороны — через центры гексов с зубцами к врагу; прогноз у линии; черновик инструмента.
+// наступления — пунктир `arrow.color` гладкой кривой по граням и широкие полупрозрачные стрелки
+// к ней; линия обороны — через центры гексов с зубцами к врагу; прогноз у линии; черновик.
 import { Container, Graphics, Text } from 'pixi.js';
 
 import {
@@ -18,8 +18,9 @@ import {
 } from '@hexfront/sim';
 
 import { createFrontTweens } from './front-tween.ts';
+import { arrowPairs, offensiveCurve, pathLength } from './plan-arrows.ts';
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
-import { edgeRuns, smooth } from './plan-edges.ts';
+import { edgeRuns } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
 import type { SplitOverlay } from './split-drag.ts';
 import { dashedPath } from './unit-layer.ts';
@@ -52,31 +53,6 @@ export interface PlanLayer {
 }
 
 type FrontPlan = PlanView & { kind: 'front' };
-
-const pathLength = (pts: readonly Point[]): number => {
-  let l = 0;
-  for (let i = 1; i < pts.length; i += 1) {
-    const a = pts[i - 1] as Point;
-    const b = pts[i] as Point;
-    l += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return l;
-};
-
-// Точка на ломаной на расстоянии s от начала.
-function pointAlong(pts: readonly Point[], s: number): Point {
-  let left = s;
-  for (let i = 1; i < pts.length; i += 1) {
-    const a = pts[i - 1] as Point;
-    const b = pts[i] as Point;
-    const l = Math.hypot(b.x - a.x, b.y - a.y);
-    if (left <= l && l > 0) {
-      return { x: a.x + ((b.x - a.x) * left) / l, y: a.y + ((b.y - a.y) * left) / l };
-    }
-    left -= l;
-  }
-  return pts.at(-1) ?? { x: 0, y: 0 };
-}
 
 /** Создаёт слой; center — центр гекса в мировых координатах. */
 export function createPlanLayer(
@@ -189,16 +165,16 @@ export function createPlanLayer(
     arrows.poly(shape).fill({ color: tokens.arrow.color, alpha });
   }
 
-  // Линия наступления как в HoI4: сглаженная линия по граням (пунктир — только нарисована, сплошная —
-  // идёт) и 1–3 полупрозрачные стрелки, разнесённые вдоль фронта и линии в одном порядке, чтобы
-  // стрелки не пересекались и не сходились в одну точку.
+  // Линия наступления как в HoI4: гладкая кривая по серединам граней (пунктир — только нарисована,
+  // сплошная — идёт) и 1–3 полупрозрачные стрелки, разнесённые вдоль фронта и линии в одном
+  // порядке, чтобы стрелки не пересекались и не сходились в одну точку.
   function drawOffensiveLine(
     front: readonly Point[][],
     line: readonly EdgeId[],
     active: boolean,
     alpha = 1,
   ): Point[] {
-    const runs = runsOf(line).map((r) => smooth(r));
+    const runs = runsOf(line).map(offensiveCurve);
     const [dash = 8, gap = 5] = tokens.arrow.dash;
     for (const r of runs) {
       if (active) polyline(r);
@@ -211,25 +187,14 @@ export function createPlanLayer(
       join: 'round',
       alpha,
     });
-    const frontLine = front.flat();
-    const lineAll = runs.flat();
-    const fl = pathLength(frontLine);
-    const ll = pathLength(lineAll);
-    const fa = frontLine[0];
-    const fb = frontLine.at(-1);
-    const la = lineAll[0];
-    const lb = lineAll.at(-1);
-    if (!fa || !fb || !la || !lb || ll === 0) return lineAll;
-    const d = (p: Point, q: Point): number => Math.hypot(p.x - q.x, p.y - q.y);
-    const target =
-      d(fa, la) + d(fb, lb) <= d(fa, lb) + d(fb, la) ? lineAll : [...lineAll].reverse();
+    // Стрелки — по кускам фронта и линии, без перескоков через разрывы.
+    const fl = front.reduce((s, r) => s + pathLength(r), 0);
     const n = Math.max(1, Math.min(3, Math.round(fl / (radius * 3)) + 1));
     const arrowAlpha = (active ? tokens.arrow.alpha : tokens.arrow.plannedAlpha) * alpha;
-    for (let i = 0; i < n; i += 1) {
-      const share = (2 * i + 1) / (2 * n);
-      drawArrow(pointAlong(frontLine, fl * share), pointAlong(target, ll * share), arrowAlpha);
+    if (fl > 0 && runs.some((r) => pathLength(r) > 0)) {
+      for (const [from, to] of arrowPairs(front, runs, n)) drawArrow(from, to, arrowAlpha);
     }
-    return lineAll;
+    return runs.flat();
   }
 
   // Самый трудный из ближайших боёв: отряды армии рядом с занятыми врагом гексами зоны.

@@ -5,7 +5,6 @@
 import {
   borderSegmentEdges,
   cornerKey,
-  cornerPath,
   edgeCorners,
   defenseLinePath,
   edgeOther,
@@ -16,7 +15,8 @@ import {
   inBounds,
   isBorderEdge,
   isLandEdge,
-  landEdgePath,
+  normalizeLine,
+  offensiveEdgePath,
   TERRAIN,
   type Command,
   type Corner,
@@ -27,6 +27,7 @@ import {
 } from '@hexfront/sim';
 
 import { cornerPoint, edgeMid, nearestCorner, nearestEdge } from './plan-edges.ts';
+import { trajectoryPath } from './stroke-path.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 
 export type Tool = 'front' | 'offensive' | 'line' | 'erase';
@@ -39,6 +40,8 @@ export interface Draft {
   readonly hexes: readonly number[];
   /** Наступление: последний угол, до которого довели линию (путь идёт по углам гексов). */
   readonly corner: Corner | null;
+  /** Наступление: последняя точка пальца (мир) — начало отрезка траектории. */
+  readonly last?: Point;
 }
 
 export interface DraftContext {
@@ -86,12 +89,16 @@ export function strokeAdd(c: DraftContext, d: Draft, world: Point): Draft {
   const g = ground(c);
   if (d.tool === 'offensive') {
     // Наступление — по углам гексов: цепочка граней без ответвлений и обрывков.
+    // Между углами — путь, ближайший к траектории пальца; возврат в пройденный угол стирает
+    // линию до него (normalizeLine).
     const corner = nearestCorner(c.map, c.radius, world);
     if (!corner) return d;
-    if (!d.corner) return { ...d, corner };
-    if (cornerKey(g, corner) === cornerKey(g, d.corner)) return d;
-    const path = cornerPath(g, d.corner, corner, (x) => isLandEdge(g, x));
-    return path ? { ...d, corner, edges: [...d.edges, ...path] } : d;
+    if (!d.corner) return { ...d, corner, last: world };
+    if (cornerKey(g, corner) === cornerKey(g, d.corner)) return { ...d, last: world };
+    const seg = [d.last ?? world, world] as const;
+    const path = trajectoryPath(g, c.radius, d.corner, corner, seg, (x) => isLandEdge(g, x));
+    if (!path) return d;
+    return { ...d, corner, last: world, edges: normalizeLine(g, [...d.edges, ...path]) };
   }
   const e = nearestEdge(c.map, c.radius, world, (x) => ownBorder(c, x) !== null);
   if (e === null) return d;
@@ -161,7 +168,9 @@ export function draftPath(c: DraftContext, d: Draft): { edges: EdgeId[]; hexes: 
   if (d.tool === 'front') {
     return { edges: frontEdgePath(g, c.view.playerId, d.edges) ?? [...d.edges], hexes: [] };
   }
-  if (d.tool === 'offensive') return { edges: landEdgePath(g, d.edges) ?? [...d.edges], hexes: [] };
+  if (d.tool === 'offensive') {
+    return { edges: offensiveEdgePath(g, d.edges) ?? [...d.edges], hexes: [] };
+  }
   if (d.tool === 'line') {
     return { edges: [], hexes: defenseLinePath(g, c.view.playerId, d.hexes) ?? [...d.hexes] };
   }
