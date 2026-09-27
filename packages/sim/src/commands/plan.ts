@@ -5,6 +5,7 @@
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { MAX_ACTIVE_ARROWS } from '../balance.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
+import { offensiveEdgePath } from '../state/edge-line.ts';
 import {
   edgeHex,
   edgeOther,
@@ -12,7 +13,6 @@ import {
   frontEdgePath,
   isBorderEdge,
   isLandEdge,
-  landEdgePath,
   type EdgeId,
 } from '../state/edges.ts';
 import { defenseLinePath, planHexes } from '../state/front.ts';
@@ -75,7 +75,7 @@ function validateOffensive(
   if (cmd.edges.length === 0 || cmd.edges.some((e) => !inMap(state, e) || !isLandEdge(state, e))) {
     return rejected('badHex');
   }
-  return landEdgePath(state, cmd.edges) ? OK : rejected('noPath');
+  return offensiveEdgePath(state, cmd.edges) ? OK : rejected('noPath');
 }
 
 // «Начать наступление»: есть нарисованная линия; идущих наступлений у игрока не больше
@@ -159,7 +159,8 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
   }
   if (cmd.t === 'setOffensiveLine') {
     const plan = state.plans.find((p) => p.armyId === cmd.armyId);
-    const edges = landEdgePath(state, cmd.edges);
+    // Одна грань — один EdgeId, петли вырезаются молча (07-controls.md, «Линия наступления»).
+    const edges = offensiveEdgePath(state, cmd.edges);
     if (!plan || !edges) return;
     return setOffensive(state, cmd.armyId, offensiveLine(state, plan, edges));
   }
