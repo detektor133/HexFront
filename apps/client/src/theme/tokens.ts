@@ -233,8 +233,8 @@ export const tokens = {
       8,
       5
     ],
-    "alpha": 0.32,
-    "plannedAlpha": 0.14,
+    "alpha": 0.6,
+    "plannedAlpha": 0.25,
     "bodyWidth": 0.42,
     "headLength": 0.7,
     "headWidth": 1
