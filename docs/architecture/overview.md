@@ -31,7 +31,7 @@ packages/
     src/systems/ системы (по одной механике на файл)
     src/commands/ валидация и применение команд
     src/queries/ чистые запросы: forecastBattle, pathfind, playerView
-    src/bots/   decide() ботов
+    src/bots/   decide() ботов, commander.decide() — автокомандование армий (CR-006)
     src/balance.ts
   protocol/     типы сообщений, кодек, версия протокола
   mapgen/       генератор процедурных карт, импорт реальных (использует sim/math, rng)

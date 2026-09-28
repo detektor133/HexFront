@@ -16,6 +16,8 @@ type C2S =
   | { t: 'ping'; at: number };
 ```
 
+Команды — `Command` из `sim` (`architecture/sim-core.md`), в том числе `setArmyAuto` и `setAutoCommand` (CR-006); `source: 'auto'` клиент не отправляет — его ставит только сервер для команд commander.
+
 Rate limit: ≤ 20 команд/с на игрока; превышение — команды отбрасываются с `rejected: rateLimit`.
 
 ## Сервер → клиент

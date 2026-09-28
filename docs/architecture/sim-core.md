@@ -23,9 +23,9 @@ interface MatchState {
   hexes: HexState;                // SoA: owner: Int16Array, pop: Int32Array (FP), improvement: Uint8Array,
                                   //      building: Uint8Array, road: Uint8Array, buildProgress: Int32Array
   cities: City[];                 // отсортированы по id
-  players: Player[];              // gold (FP), taxTarget, taxEffective, capitalCityId, status, ...
+  players: Player[];              // gold (FP), taxTarget, taxEffective, capitalCityId, status, autoCommand, ...
   units: Unit[];                  // отряды, отсортированы по id
-  armies: Army[];                 // армии — группы отрядов (CR-001), отсортированы по id
+  armies: Army[];                 // армии — группы отрядов (CR-001), отсортированы по id; auto — автокомандование (CR-006)
   battles: Battle[];              // активные бои (по целевому гексу)
   networks: SupplyNetwork[];      // кэш, пересчитывается раз в секунду
   fronts: Front[];                // кэш
@@ -67,8 +67,7 @@ type Command =
   | { t: 'setTax'; rate: Fp }
   | { t: 'move'; unitIds: number[]; to: HexId }
   | { t: 'attack'; unitIds: number[]; target: HexId }
-  | { t: 'setOrder'; unitIds: number[]; order: 'idle' | 'hold' | 'expand' }
-  | { t: 'armyOrder'; armyId: number; order: 'idle' | 'hold' | 'expand' }
+  | { t: 'setArmyAuto'; armyId: number; on: boolean } | { t: 'setAutoCommand'; on: boolean }   // CR-006
   | { t: 'createArmy'; name: string } | { t: 'renameArmy'; armyId: number; name: string }
   | { t: 'disbandArmy'; armyId: number }
   | { t: 'assignUnits'; unitIds: number[]; armyId: number | null }
@@ -88,6 +87,12 @@ type Command =
 
 - Каждая команда проходит `validate(state, playerId, cmd) → Ok | Rejected(reason)`. Отклонённые команды не меняют состояние; причина уходит клиенту.
 - Команды — единственный способ изменить состояние (и для людей, и для ботов).
+- Конверт команды `{ playerId, cmd, source? }`: `source: 'auto'` — команду отдал commander; такие команды не выключают auto у армии (`gdd/07-controls.md`, «Автокомандование»).
+
+## Commander (CR-006)
+
+- `packages/sim/src/bots/commander.ts`: `commander.decide(view: PlayerView, armyId) → Command[]` — чистая функция снимка игрока, без случайности и мутаций, стабильный порядок.
+- Вне `step`: движок (локальный — в воркере, сервер — в комнате) раз в `COMMANDER_TICKS` для каждой армии с auto (со смещением по id армии) вызывает `decide` и кладёт команды в очередь следующего тика с `source: 'auto'`.
 
 ## Запросы (чистые, без мутаций)
 
