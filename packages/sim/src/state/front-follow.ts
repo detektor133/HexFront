@@ -26,7 +26,7 @@ import {
 } from './edges.ts';
 import type { LineGround } from './ground.ts';
 import { TERRAIN } from '../map/types.ts';
-import { hexFromId, hexId, inBounds, neighbors } from '../math/hex.ts';
+import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 
 export { contourNext, contourPrev } from './contour.ts';
 
@@ -50,11 +50,12 @@ function connected(g: LineGround, edges: readonly EdgeId[]): boolean {
 }
 
 /**
- * Уцелевшие грани, чьи гексы — в одном связном куске своей земли, где таких граней больше всего
- * (при равенстве — где раньше первая): окружённый свой гекс выпадает из участка, а карман чужой
- * земли у края карты остаётся.
+ * Уцелевшие грани в одном связном куске своей земли: в куске со столицей, если там есть хоть одна
+ * (оторванный от страны карман выпадает, даже если граней на нём больше, — иначе фронт уходил на
+ * карман и замыкался вокруг него, 04/T18); нет — в куске, где таких граней больше всего (при
+ * равенстве — где раньше первая): фронт на своём острове за водой остаётся там.
  */
-function mainPart(g: LineGround, owner: number, kept: readonly EdgeId[]): EdgeId[] {
+function mainPart(g: LineGround, owner: number, kept: readonly EdgeId[], capital: HexId): EdgeId[] {
   const { width, height } = g.map;
   const own = (h: number): boolean =>
     g.hexes.owner[h] === owner && g.map.terrain[h] !== TERRAIN.water;
@@ -74,6 +75,7 @@ function mainPart(g: LineGround, owner: number, kept: readonly EdgeId[]): EdgeId
       }
     }
     const mine = kept.filter((x) => land.has(edgeHex(x)));
+    if (capital >= 0 && land.has(capital)) return mine;
     for (const x of mine) done.add(x);
     if (mine.length > best.length) best = mine;
   }
@@ -112,6 +114,37 @@ function coverAll(marksInOrder: readonly EdgeId[], way: Way, limit: number): Edg
   return out;
 }
 
+// Обход от from в сторону step до обрыва контура (край карты, вода): грани по порядку; null — не
+// оборвался (замкнутый контур) или дошёл до stop.
+function toBreak(from: EdgeId, step: Way['next'], stop: EdgeId, limit: number): EdgeId[] | null {
+  const out = [from];
+  for (let e = step(from); out.length < limit; e = step(e)) {
+    if (e < 0) return out;
+    if (e === stop || e === from) return null;
+    out.push(e);
+  }
+  return null;
+}
+
+/**
+ * Контур открылся между концами участка (выступ дошёл до края карты): вместо дуги через всю страну
+ * — два куска, от конца a вперёд до обрыва и от обрыва до конца b, если в них все уцелевшие грани
+ * (04/T18). Иначе null.
+ */
+function splitAtBreak(
+  a: EdgeId,
+  b: EdgeId,
+  kept: readonly EdgeId[],
+  way: Way,
+  limit: number,
+): EdgeId[] | null {
+  const head = toBreak(a, way.next, b, limit);
+  const tail = toBreak(b, way.back, a, limit);
+  if (!head || !tail) return null;
+  const path = [...head, ...tail.reverse()];
+  return kept.every((e) => path.includes(e)) ? path : null;
+}
+
 /**
  * Дуга контура своей границы, покрывающая отмеченные грани: на каждой цепочке контура — наименьшая
  * дуга через все её отметки (фронт после завершённого наступления, 04/T14b).
@@ -146,9 +179,15 @@ export function frontLinePath(
  * дальше 2 граней, если есть) в той же связной части: из равных — участок длиннее, затем меньший
  * EdgeId; середина — по контуру в прежнем направлении обхода; участок из нескольких граней не
  * схлопывается в одну. Нет границы рядом — грани не меняются.
+ * @param capital гекс столицы владельца (-1 — нет): страна — кусок своей земли с ней
  * @returns новые грани по порядку (со своей стороны)
  */
-export function followEdges(g: LineGround, owner: number, edges: readonly EdgeId[]): EdgeId[] {
+export function followEdges(
+  g: LineGround,
+  owner: number,
+  edges: readonly EdgeId[],
+  capital: HexId = -1,
+): EdgeId[] {
   const border = (e: EdgeId): boolean => isBorderEdge(g, owner, e);
   if (edges.every(border) && connected(g, edges)) return [...edges];
   const first = edges[0];
@@ -157,7 +196,7 @@ export function followEdges(g: LineGround, owner: number, edges: readonly EdgeId
   const way = wayOf(g, owner, edges);
   const exit = way.entry === 0 ? 1 : 0;
   const limit = g.hexes.owner.length * 6;
-  const kept = mainPart(g, owner, edges.filter(border));
+  const kept = mainPart(g, owner, edges.filter(border), capital);
   const keptSet = new Set(kept);
   const end = (e: EdgeId, c: Corner, side: 0 | 1, ref: EdgeId | undefined, toRef: Way['next']) => {
     if (keptSet.has(e)) return e;
@@ -186,7 +225,8 @@ export function followEdges(g: LineGround, owner: number, edges: readonly EdgeId
   const path =
     walked && kept.every((e) => walked.includes(e))
       ? walked
-      : coverAll([...new Set([a, ...kept, b])], way, limit);
+      : (splitAtBreak(a, b, kept, way, limit) ??
+        coverAll([...new Set([a, ...kept, b])], way, limit));
   if (path.length > 1 || edges.length === 1) return path;
   const ahead = way.next(a);
   if (ahead >= 0) return [a, ahead];

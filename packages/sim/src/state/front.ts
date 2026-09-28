@@ -94,7 +94,9 @@ export function followFrontsNear(state: MatchState, hex: HexId): void {
     if (!plan.edges.some((e) => edgeHex(e) === hex || edgeOther(state, e) === hex)) return;
     const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
     if (owner === undefined) return;
-    const edges = followEdges(state, owner, plan.edges);
+    const capitalId = state.players[owner]?.capitalCityId;
+    const capital = state.cities.find((c) => c.id === capitalId && c.owner === owner)?.hex ?? -1;
+    const edges = followEdges(state, owner, plan.edges, capital);
     if (edges.length !== plan.edges.length || edges.some((e, k) => e !== plan.edges[k])) {
       state.plans[i] = { ...plan, edges };
     }
