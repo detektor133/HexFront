@@ -97,6 +97,10 @@
 }
 
 /* Выбранная армия (или армия выбранных отрядов) — золотая рамка, как у фишки. */
+.partial {
+  border-color: var(--selection-color);
+}
+
 .selected {
   border-color: var(--selection-color);
   box-shadow:

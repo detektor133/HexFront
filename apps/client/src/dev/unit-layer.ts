@@ -16,6 +16,7 @@ import {
 
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
+import { chipGroups } from './unit-groups.ts';
 import { hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -159,27 +160,14 @@ export function createUnitLayer(
 
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
-    const stacks = new Map<string, UnitView[]>();
-    for (const u of v.units) {
-      if (u.moveTotal > 0 && u.path.length > 0 && u.order !== 'retreat') {
-        out.push({
-          key: `u${u.id}`,
-          units: [u.id],
-          state: stateOf([u], v),
-          at: (f) => unitAt(u, f),
-        });
-        continue;
-      }
-      const key = `h${u.owner}:${u.hex}`;
-      stacks.set(key, [...(stacks.get(key) ?? []), u]);
-    }
-    for (const [key, units] of stacks) {
-      const hex = (units[0] as UnitView).hex;
+    // Одна фишка — отряды в одном гексе или идущие одним переходом (art/units.md, «Группа отрядов»).
+    for (const g of chipGroups(v)) {
+      const first = g.units[0] as UnitView;
       out.push({
-        key,
-        units: units.map((u) => u.id),
-        state: stateOf(units, v),
-        at: () => base(hex),
+        key: g.key,
+        units: g.units.map((u) => u.id),
+        state: stateOf(g.units, v),
+        at: g.moving ? (f) => unitAt(first, f) : () => base(first.hex),
       });
     }
     for (const r of v.recruits) {

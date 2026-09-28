@@ -32,13 +32,40 @@ function pickedUnits(view: PlayerView, picked: Picked): UnitView[] {
 }
 
 /**
- * Тап (выбор): гекс со своими отрядами выбирает их; повторный тап по тому же гексу или тап по
- * любому другому гексу снимает выбор отрядов и показывает карточку гекса.
+ * Тап (выбор), подсвечивается что-то одно (07-controls.md, «Что выбрано»): гекс со своими
+ * отрядами выбирает отряды — гекс не подсвечен; повторный тап по тем же отрядам или тап по
+ * другому гексу — выбран гекс, отряды не выбраны.
  */
 export function selectHex(view: PlayerView, picked: Picked, hex: number): Picked {
   const units = ownUnitsAt(view, hex).map((u) => u.id);
-  const same = picked.hex === hex && picked.units.length > 0;
-  return { hex, units: same ? [] : units, target: null };
+  const same = units.length > 0 && units.every((id) => picked.units.includes(id));
+  if (units.length > 0 && !same) return { hex: null, units, target: null };
+  return { hex, units: [], target: null };
+}
+
+/** Армии выбранных отрядов: выбранная целиком и затронутые частично. */
+export interface ArmySelection {
+  readonly whole: number | null;
+  readonly partial: readonly number[];
+}
+
+/**
+ * Выбраны вручную все отряды одной армии — армия выбрана целиком; часть отрядов армии — армия
+ * затронута частично (тонкая рамка карточки, инструменты планов недоступны).
+ */
+export function armySelection(view: PlayerView, picked: readonly number[]): ArmySelection {
+  const mine = view.units.filter((u) => u.owner === view.playerId && u.armyId !== null);
+  const touched = [
+    ...new Set(mine.filter((u) => picked.includes(u.id)).map((u) => u.armyId as number)),
+  ].sort((a, b) => a - b);
+  const whole = touched.filter((a) =>
+    mine.filter((u) => u.armyId === a).every((u) => picked.includes(u.id)),
+  );
+  // Армия выбирается сама, только если выбрана ровно она — целиком и без чужих отрядов.
+  const only = whole.length === 1 && touched.length === 1 ? (whole[0] as number) : null;
+  const outside = picked.some((id) => !mine.some((u) => u.id === id && u.armyId === only));
+  const full = only !== null && !outside ? only : null;
+  return { whole: full, partial: touched.filter((a) => a !== full) };
 }
 
 /**

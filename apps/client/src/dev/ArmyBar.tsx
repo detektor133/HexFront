@@ -160,13 +160,15 @@ function ArmyCard(props: {
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
+  /** Выбрана часть отрядов армии — тонкая рамка (07-controls.md, «Что выбрано»). */
+  partial: boolean;
   onClick: () => void;
 }): React.JSX.Element {
   const { stats } = props;
   return (
     <button
       type="button"
-      className={`${styles.card} ${props.selected ? styles.selected : ''}`}
+      className={`${styles.card} ${props.selected ? styles.selected : props.partial ? styles.partial : ''}`}
       aria-pressed={props.selected}
       onClick={props.onClick}
     >
@@ -204,8 +206,8 @@ function ArmyCard(props: {
 export function ArmyBar(props: {
   view: PlayerView;
   selected: number | null;
-  /** Армии, отряды которых сейчас выбраны на карте, — их карточки в золотой рамке. */
-  pickedArmies: readonly number[];
+  /** Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке. */
+  partial: readonly number[];
   onSelect: (armyId: number | null) => void;
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
@@ -214,7 +216,12 @@ export function ArmyBar(props: {
 }): React.JSX.Element {
   const { view, send, selected } = props;
   const mine = view.units.filter((u) => u.owner === view.playerId);
-  const army = view.armies.find((a) => a.id === selected);
+  // Тулбар — у выбранной армии; у единственной частично выбранной — тоже, но без инструментов
+  // планов (07-controls.md, «Что выбрано»).
+  const only = props.partial.length === 1 ? props.partial[0] : undefined;
+  const army = view.armies.find((a) => a.id === (selected ?? only));
+  const whole = army !== undefined && army.id === selected;
+  const needWhole = whole ? null : t('plan.needWholeArmy');
   const plan = army ? view.plans.find((p) => p.armyId === army.id) : undefined;
   const offensive = plan?.kind === 'front' ? plan.offensive : null;
   const active = (tool: PlanTool): boolean =>
@@ -237,13 +244,14 @@ export function ArmyBar(props: {
             label="plan.front"
             onClick={() => use('front')}
             active={active('front')}
+            disabled={needWhole}
           />
           <Tool
             icon="offensive"
             label="plan.offensive"
             onClick={() => use('offensive')}
             active={active('offensive')}
-            disabled={plan?.kind === 'front' ? null : t('plan.needFront')}
+            disabled={needWhole ?? (plan?.kind === 'front' ? null : t('plan.needFront'))}
           />
           {offensive && !offensive.active && (
             <Tool
@@ -259,13 +267,19 @@ export function ArmyBar(props: {
               onClick={() => send({ t: 'stopOffensive', armyId: army.id })}
             />
           )}
-          <Tool icon="line" label="plan.line" onClick={() => use('line')} active={active('line')} />
+          <Tool
+            icon="line"
+            label="plan.line"
+            onClick={() => use('line')}
+            active={active('line')}
+            disabled={needWhole}
+          />
           <Tool
             icon="erase"
             label="plan.erase"
             onClick={() => use('erase')}
             active={active('erase')}
-            disabled={view.plans.length > 0 ? null : t('plan.nothingToErase')}
+            disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
           />
           <Tool
             icon="hold"
@@ -297,7 +311,8 @@ export function ArmyBar(props: {
               color={armyColor(a.number)}
               stats={armyStats(units)}
               stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
-              selected={a.id === selected || props.pickedArmies.includes(a.id)}
+              selected={a.id === selected}
+              partial={props.partial.includes(a.id)}
               onClick={() => select(a.id, units)}
             />
           );

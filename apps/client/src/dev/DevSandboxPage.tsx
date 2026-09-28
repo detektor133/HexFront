@@ -18,7 +18,13 @@ import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
-import { NOTHING_PICKED, orderHex, selectHex, type Picked } from './sandbox-selection.ts';
+import {
+  armySelection,
+  NOTHING_PICKED,
+  orderHex,
+  selectHex,
+  type Picked,
+} from './sandbox-selection.ts';
 import { createSplitGrab } from './split-drag.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
@@ -90,7 +96,12 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
     pickedRef.current = p;
     setPicked(p);
-    if (viewRef.current) layerRef.current?.setView(viewRef.current, p);
+    // Подсвечивается что-то одно: выбраны все отряды армии — армия выбрана сама; выбран гекс —
+    // армия не выбрана (07-controls.md, «Что выбрано»).
+    const v = viewRef.current;
+    if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
+    else if (p.hex !== null) setArmyRef.current(null);
+    if (v) layerRef.current?.setView(v, p);
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
   const setArmy = useCallback((id: number | null) => {
@@ -98,6 +109,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     setArmyState(id);
     layerRef.current?.setSelectedArmy(id);
   }, []);
+  const setArmyRef = useRef(setArmy);
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
     () =>
@@ -240,14 +252,8 @@ export function DevSandboxPage(): React.JSX.Element {
     armyUnits.length === sb.picked.units.length &&
     armyUnits.every((u) => sb.picked.units.includes(u.id));
   const map = typeof loaded === 'string' ? null : loaded.map;
-  // Армии выбранных на карте отрядов — их карточки в золотой рамке (можно выбрать отряды разных армий).
-  const pickedArmies = [
-    ...new Set(
-      (view?.units ?? [])
-        .filter((u) => sb.picked.units.includes(u.id) && u.armyId !== null)
-        .map((u) => u.armyId as number),
-    ),
-  ];
+  // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
+  const partial = view ? armySelection(view, sb.picked.units).partial : [];
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
@@ -256,7 +262,7 @@ export function DevSandboxPage(): React.JSX.Element {
         <ArmyBar
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
-          pickedArmies={pickedArmies}
+          partial={partial.filter((a) => a !== army)}
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}

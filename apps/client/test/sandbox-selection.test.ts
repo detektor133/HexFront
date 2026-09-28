@@ -35,9 +35,9 @@ describe('песочница: выбор и приказы как в HoI4', () =
     (o, id) => o === view.playerId && id !== home && !isHostile(view, id),
   );
 
-  it('тап по гексу со своими отрядами выбирает их', () => {
+  it('тап по гексу со своими отрядами выбирает их, гекс не подсвечен (04/T15)', () => {
     const p = selectHex(view, NOTHING_PICKED, home);
-    expect(p.hex).toBe(home);
+    expect(p.hex).toBeNull();
     expect(p.units).toEqual(mine.filter((u) => u.hex === home).map((u) => u.id));
   });
 
