@@ -55,11 +55,11 @@ export const DEF_MULT: ByTerrain<Fp> = {
 };
 /** Потеря снабжения на гекс вне дорог, доля. */
 export const OFFROAD_SUPPLY_LOSS: ByTerrain<Fp> = {
-  plains: fp(0.12),
-  forest: fp(0.15),
-  hills: fp(0.15),
-  mountains: fp(0.25),
-  desert: fp(0.15),
+  plains: fp(0.08),
+  forest: fp(0.1),
+  hills: fp(0.1),
+  mountains: fp(0.17),
+  desert: fp(0.1),
 };
 
 export const RIVER_MOVE_PENALTY_S: Fp = fp(1.0);
