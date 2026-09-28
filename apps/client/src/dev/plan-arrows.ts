@@ -154,3 +154,36 @@ export function offensiveArrows(
   }
   return pairs;
 }
+
+/** Размеры стрелки в долях радиуса гекса (токены arrow.bodyWidth, headWidth, headLength). */
+export interface ArrowSize {
+  readonly bodyWidth: number;
+  readonly headWidth: number;
+  readonly headLength: number;
+}
+
+/**
+ * Контур широкой стрелки от хвоста к концу: тело шириной bodyWidth, один наконечник
+ * headLength × headWidth (доли радиуса); короткая стрелка — только наконечник.
+ * @returns 7 вершин по обходу, мировые координаты; пусто при нулевой длине
+ */
+export function arrowShape(from: Point, to: Point, size: ArrowSize, radius: number): Point[] {
+  const l = Math.hypot(to.x - from.x, to.y - from.y);
+  if (l === 0) return [];
+  const ux = (to.x - from.x) / l;
+  const uy = (to.y - from.y) / l;
+  const bw = (size.bodyWidth * radius) / 2;
+  const hw = (size.headWidth * radius) / 2;
+  const hl = Math.min(l, size.headLength * radius);
+  const b = { x: to.x - ux * hl, y: to.y - uy * hl };
+  const side = (p: Point, w: number): Point => ({ x: p.x - uy * w, y: p.y + ux * w });
+  return [
+    side(from, bw),
+    side(b, bw),
+    side(b, hw),
+    to,
+    side(b, -hw),
+    side(b, -bw),
+    side(from, -bw),
+  ];
+}

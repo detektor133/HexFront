@@ -23,7 +23,13 @@ import {
 } from '@hexfront/sim';
 
 import { createFrontTweens } from './front-tween.ts';
-import { arrowCount, offensiveArrows, offensiveCurve, pathLength } from './plan-arrows.ts';
+import {
+  arrowCount,
+  arrowShape,
+  offensiveArrows,
+  offensiveCurve,
+  pathLength,
+} from './plan-arrows.ts';
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
 import { edgeRuns } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
@@ -69,7 +75,8 @@ export function createPlanLayer(
   const arrows = new Graphics();
   const g = new Graphics();
   const labels = new Container();
-  container.addChild(arrows, g, labels);
+  // Стрелки — поверх линий планов: белая подложка фронта не режет наконечник на части.
+  container.addChild(g, arrows, labels);
   let k = 1;
   let level: DetailLevel = 2;
 
@@ -147,27 +154,9 @@ export function createPlanLayer(
 
   // Широкая полупрозрачная стрелка от фронта к линии наступления, как в HoI4 (мировые размеры).
   function drawArrow(from: Point, to: Point, alpha: number): void {
-    const l = Math.hypot(to.x - from.x, to.y - from.y);
-    if (l === 0) return;
-    const ux = (to.x - from.x) / l;
-    const uy = (to.y - from.y) / l;
-    const bw = (tokens.arrow.bodyWidth * radius) / 2;
-    const hw = (tokens.arrow.headWidth * radius) / 2;
-    const hl = Math.min(l, tokens.arrow.headLength * radius);
-    const bx = to.x - ux * hl;
-    const by = to.y - uy * hl;
-    const px = -uy;
-    const py = ux;
-    const shape = [
-      [from.x + px * bw, from.y + py * bw],
-      [bx + px * bw, by + py * bw],
-      [bx + px * hw, by + py * hw],
-      [to.x, to.y],
-      [bx - px * hw, by - py * hw],
-      [bx - px * bw, by - py * bw],
-      [from.x - px * bw, from.y - py * bw],
-    ].flat();
-    arrows.poly(shape).fill({ color: tokens.arrow.color, alpha });
+    const shape = arrowShape(from, to, tokens.arrow, radius);
+    if (shape.length === 0) return;
+    arrows.poly(shape.flatMap((p) => [p.x, p.y])).fill({ color: tokens.arrow.color, alpha });
   }
 
   // Линия наступления как в HoI4: гладкая кривая по серединам граней (пунктир — только нарисована,

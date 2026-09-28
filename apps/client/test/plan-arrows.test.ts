@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import { edgeHex, edgeOf, edgeOther, loadMap, type EdgeId } from '@hexfront/sim';
 
-import { arrowCount, arrowPairs, offensiveArrows, offensiveCurve } from '../src/dev/plan-arrows.ts';
+import {
+  arrowCount,
+  arrowPairs,
+  arrowShape,
+  offensiveArrows,
+  offensiveCurve,
+} from '../src/dev/plan-arrows.ts';
 import { edgeMid, edgeRuns } from '../src/dev/plan-edges.ts';
 import type { Point } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
@@ -185,6 +191,45 @@ describe('стрелки наступления по смотрящему уча
         }
       }),
       { numRuns: 500, seed: 11 },
+    );
+  });
+});
+
+describe('контур стрелки (04/T14b)', () => {
+  const size = tokens.arrow;
+  const pt = fc.record({
+    x: fc.integer({ min: -400, max: 400 }),
+    y: fc.integer({ min: -400, max: 400 }),
+  });
+
+  it('контур не самопересекается, наконечник один — вершина в конце стрелки', () => {
+    fc.assert(
+      fc.property(pt, pt, (from, to) => {
+        const shape = arrowShape(from, to, size, R);
+        if (from.x === to.x && from.y === to.y) {
+          expect(shape).toEqual([]);
+          return;
+        }
+        expect(shape).toHaveLength(7);
+        // Несоседние стороны многоугольника не пересекаются.
+        const n = shape.length;
+        for (let i = 0; i < n; i += 1) {
+          for (let j = i + 2; j < n; j += 1) {
+            if (i === 0 && j === n - 1) continue;
+            const a = shape[i] as Point;
+            const b = shape[(i + 1) % n] as Point;
+            const c = shape[j] as Point;
+            const d = shape[(j + 1) % n] as Point;
+            expect(cross(a, b, c, d)).toBe(false);
+          }
+        }
+        // Острая вершина одна — конец стрелки: дальше всех вдоль направления стрелки.
+        const along = (p: Point): number =>
+          (p.x - from.x) * (to.x - from.x) + (p.y - from.y) * (to.y - from.y);
+        const tips = shape.filter((p) => along(p) >= along(to) - 1e-9);
+        expect(tips).toEqual([to]);
+      }),
+      { numRuns: 500, seed: 5 },
     );
   });
 });
