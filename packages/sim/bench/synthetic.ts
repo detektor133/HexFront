@@ -171,7 +171,7 @@ function planFronts(state: MatchState): void {
     const enemy = state.hexes.owner[edgeOther(state, edge)] ?? -1;
     const id = state.nextId;
     state.nextId += 1;
-    state.armies.push({ id, owner: p.id, number: 1, name: '' });
+    state.armies.push({ id, owner: p.id, number: 1, name: '', auto: false });
     const edges = borderSegmentEdges(state, p.id, enemy, edge);
     state.plans.push({ armyId: id, kind: 'front', edges, offensive: null });
   }

@@ -54,6 +54,10 @@ export type Command =
     }
   | { readonly t: 'createArmy'; readonly name: string }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
+  /** Значок «А» на карточке армии (CR-006). */
+  | { readonly t: 'setArmyAuto'; readonly armyId: number; readonly on: boolean }
+  /** Настройка «Автокомандование» для новых армий (CR-006). */
+  | { readonly t: 'setAutoCommand'; readonly on: boolean }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {
@@ -117,6 +121,8 @@ export type Validation =
 export interface PlayerCommand {
   readonly playerId: number;
   readonly cmd: Command;
+  /** 'auto' — команду отдал commander: не выключает auto у армии (CR-006). */
+  readonly source?: 'auto';
 }
 
 export const OK: Validation = { ok: true };

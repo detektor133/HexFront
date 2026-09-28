@@ -23,6 +23,8 @@ export const FRONT_ALLOC_TICKS = 50;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;
+/** Период вызова commander для армии с автокомандованием, тиков (07-controls.md, CR-006). */
+export const COMMANDER_TICKS = 10;
 export const BOT_THINK_TICKS = 10;
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
@@ -237,6 +239,8 @@ export const OFFENSIVE_STOP_ORG: Fp = fp(30);
 export const MAX_ACTIVE_ARROWS = 3;
 /** Вес гексов фронта с гранями, смотрящими на линию наступления, во время наступления. */
 export const OFFENSIVE_FACING_WEIGHT = 3;
+/** Глубина линии наступления, которую строит commander по ▶, гексов (CR-006). */
+export const COMMANDER_LINE_DEPTH = 3;
 /** Автоделение на линии плана: часть не меньше шага набора (05-armies.md, CR-005). */
 export const FRONT_SPLIT_MIN: Fp = fp(50);
 export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);

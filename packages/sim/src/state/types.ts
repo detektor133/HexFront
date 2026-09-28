@@ -72,6 +72,8 @@ export interface Player {
   armiesCreated: number;
   /** «Автопополнение»: новый отряд сразу уходит в самую нуждающуюся армию (CR-001). */
   autoReinforce: boolean;
+  /** Настройка «Автокомандование»: новые армии получают auto (CR-006). */
+  autoCommand: boolean;
   /** Тики «смуты» после переноса столицы: доход × CAPITAL_CHAOS_INCOME_MULT. */
   chaosTicks: number;
   /** Сколько тиков подряд у игрока нет городов. */
@@ -193,6 +195,8 @@ export interface Army {
   readonly number: number;
   /** Имя, заданное игроком; пустое — «N-я армия». */
   name: string;
+  /** Автокомандование: армией командует commander (CR-006). */
+  auto: boolean;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */

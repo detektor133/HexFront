@@ -65,6 +65,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.bankrupt ? 1 : 0);
     int(s, p.armiesCreated);
     int(s, p.autoReinforce ? 1 : 0);
+    int(s, p.autoCommand ? 1 : 0);
     int(s, p.chaosTicks);
     int(s, p.noCityTicks);
     int(s, p.eliminatedTick);
@@ -97,6 +98,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.owner);
     int(s, a.number);
     str(s, a.name);
+    int(s, a.auto ? 1 : 0);
   }
   int(s, state.plans.length);
   for (const p of state.plans) {

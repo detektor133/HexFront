@@ -36,6 +36,8 @@ export interface ArmyView {
   readonly id: number;
   readonly number: number;
   readonly name: string;
+  /** Автокомандование (CR-006). */
+  readonly auto: boolean;
 }
 
 /** Отряды для снимка игрока playerId. */
@@ -67,5 +69,5 @@ export function unitViews(state: MatchState, playerId: number): UnitView[] {
 export function armyViews(state: MatchState, playerId: number): ArmyView[] {
   return state.armies
     .filter((a) => a.owner === playerId)
-    .map((a) => ({ id: a.id, number: a.number, name: a.name }));
+    .map((a) => ({ id: a.id, number: a.number, name: a.name, auto: a.auto }));
 }

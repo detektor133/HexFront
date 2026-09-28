@@ -302,6 +302,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       bankrupt: false,
       armiesCreated: 0,
       autoReinforce: false,
+      autoCommand: true,
       chaosTicks: 0,
       noCityTicks: 0,
       eliminatedTick: -1,
@@ -325,7 +326,8 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
 export interface Scenario {
   readonly state: MatchState;
   unit(player: string, type: UnitType, soldiers: number, where: At): number;
-  cmd(player: string, command: DslCommand): void;
+  /** Команда игрока; source 'auto' — от commander (не выключает auto у армии, CR-006). */
+  cmd(player: string, command: DslCommand, source?: 'auto'): void;
   /** Прогон целых секунд; дробные — через runTicks (float-умножение даёт лишний тик). */
   runSeconds(seconds: number): void;
   runTicks(ticks: number): void;
@@ -545,8 +547,9 @@ function makeScenario(
       });
       return id;
     },
-    cmd(player, command) {
-      queue.push({ playerId: idOf(player), cmd: toCommand(command) });
+    cmd(player, command, source) {
+      const pc = { playerId: idOf(player), cmd: toCommand(command) };
+      queue.push(source ? { ...pc, source } : pc);
     },
     runSeconds(seconds) {
       if (!Number.isInteger(seconds))

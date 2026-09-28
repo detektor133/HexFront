@@ -129,6 +129,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     bankrupt: false,
     armiesCreated: 1,
     autoReinforce: false,
+    autoCommand: true,
     chaosTicks: 0,
     noCityTicks: 0,
     eliminatedTick: -1,
@@ -136,7 +137,9 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
   // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
   const armyId = state.nextId;
   state.nextId += 1;
-  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '' });
+  // Стартовая армия — с автокомандованием по настройке игрока (08-match.md, «Старт»).
+  const auto = state.players[playerId]?.autoCommand ?? true;
+  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '', auto });
   for (let i = 0; i < START_UNITS; i += 1) {
     state.units.push({
       id: state.nextId,

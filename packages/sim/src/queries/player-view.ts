@@ -67,6 +67,8 @@ export interface PlayerView {
     readonly bankrupt: boolean;
     /** Переключатель «Автопополнение». */
     readonly autoReinforce: boolean;
+    /** Настройка «Автокомандование» (CR-006). */
+    readonly autoCommand: boolean;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -118,6 +120,7 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     upkeepPerS: playerUpkeepPerSecond(state, playerId),
     bankrupt: state.players[playerId]?.bankrupt ?? false,
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
+    autoCommand: state.players[playerId]?.autoCommand ?? true,
     growthMultAtTarget: taxGrowthMult(target),
     score: playerScore(state, playerId),
     place: playerPlace(state, playerId),
