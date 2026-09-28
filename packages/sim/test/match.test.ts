@@ -158,9 +158,21 @@ describe('step', () => {
     step(a, [{ playerId: 1, cmd: { t: 'stopOffensive', armyId: 999 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'stopOffensive', reason: 'unknownArmy' },
+      {
+        t: 'commandRejected',
+        playerId: 1,
+        command: 'stopOffensive',
+        reason: 'unknownArmy',
+        auto: false,
+      },
     ]);
     expect(hashState(a)).toBe(hashState(b));
+  });
+
+  it('отказ команды commander помечен auto — интерфейс его не показывает (CR-006)', () => {
+    const s = createMatch(mapOf(tiny), players(2), SEED);
+    step(s, [{ playerId: 1, cmd: { t: 'stopOffensive', armyId: 999 }, source: 'auto' }]);
+    expect(s.events[0]).toMatchObject({ t: 'commandRejected', auto: true });
   });
 
   it('команда несуществующего игрока отклоняется', () => {

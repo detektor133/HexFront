@@ -133,7 +133,15 @@ export function applyCommands(state: MatchState, commands: readonly PlayerComman
     // Ручное действие игрока с армией выключает её автокомандование (CR-006).
     if (result.ok && source !== 'auto') takeOver(state, cmd);
     if (result.ok) execute(state, playerId, cmd);
-    else
-      state.events.push({ t: 'commandRejected', playerId, command: cmd.t, reason: result.reason });
+    else {
+      const auto = source === 'auto';
+      state.events.push({
+        t: 'commandRejected',
+        playerId,
+        command: cmd.t,
+        reason: result.reason,
+        auto,
+      });
+    }
   }
 }

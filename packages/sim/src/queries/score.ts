@@ -27,6 +27,31 @@ export function playerScore(state: MatchState, playerId: number): number {
 }
 
 /**
+ * Очки всех игроков одним проходом по гексам и отрядам — то же, что playerScore по каждому.
+ * @returns целые очки по id игрока
+ */
+export function playerScores(state: MatchState): Int32Array {
+  const n = state.players.length;
+  const cities = new Int32Array(n);
+  const hexes = new Int32Array(n);
+  const soldiers = new Array<number>(n).fill(0);
+  for (const c of state.cities) {
+    if (c.owner >= 0 && c.owner < n) cities[c.owner] = (cities[c.owner] ?? 0) + 1;
+  }
+  for (const o of state.hexes.owner) if (o >= 0 && o < n) hexes[o] = (hexes[o] ?? 0) + 1;
+  for (const u of state.units) {
+    if (u.owner >= 0 && u.owner < n) soldiers[u.owner] = (soldiers[u.owner] ?? 0) + u.soldiers;
+  }
+  return Int32Array.from(
+    { length: n },
+    (_, p) =>
+      SCORE_CITY * (cities[p] ?? 0) +
+      SCORE_HEX * (hexes[p] ?? 0) +
+      SCORE_PER_100_SOLDIERS * intDiv(soldiers[p] ?? 0, SOLDIERS_PER_SCORE * FP),
+  );
+}
+
+/**
  * Место игрока: живые — по очкам (1 + число живых с большим счётом); выбывшие — после всех
  * живых, по порядку выбывания: выбывший позже стоит выше, в одном тике — меньший id выше.
  * @returns место (1 — лидер)
@@ -43,6 +68,7 @@ export function playerPlace(state: MatchState, playerId: number): number {
     ).length;
     return alive.length + above + 1;
   }
-  const mine = playerScore(state, playerId);
-  return 1 + alive.filter((p) => playerScore(state, p.id) > mine).length;
+  const scores = playerScores(state);
+  const mine = scores[playerId] ?? 0;
+  return 1 + alive.filter((p) => (scores[p.id] ?? 0) > mine).length;
 }

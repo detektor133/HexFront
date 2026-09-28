@@ -9,6 +9,7 @@ import {
   TICKS_PER_S,
   type UnitType,
 } from '../../src/balance.ts';
+import { commanderCommands } from '../../src/bots/run.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
@@ -331,6 +332,8 @@ export interface Scenario {
   /** Прогон целых секунд; дробные — через runTicks (float-умножение даёт лишний тик). */
   runSeconds(seconds: number): void;
   runTicks(ticks: number): void;
+  /** Прогон с автокомандованием: перед каждым тиком — команды commander (CR-006). */
+  runAuto(ticks: number): void;
   owner(where: At): string | null;
   unitsOf(player: string): Unit[];
   lastEvent(t: GameEvent['t']): GameEvent | undefined;
@@ -555,6 +558,12 @@ function makeScenario(
       if (!Number.isInteger(seconds))
         throw new Error('сценарий: runSeconds принимает целые секунды');
       this.runTicks(seconds * TICKS_PER_S);
+    },
+    runAuto(ticks) {
+      for (let i = 0; i < ticks; i += 1) {
+        queue.push(...commanderCommands(state));
+        this.runTicks(1);
+      }
     },
     runTicks(ticks) {
       for (let i = 0; i < ticks; i += 1) {

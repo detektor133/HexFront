@@ -8,6 +8,7 @@ import {
   cityPopCap,
   hexPopCap,
   cityInfo,
+  commanderCommands,
   createMatch,
   loadMap,
   playerView,
@@ -21,7 +22,7 @@ import {
 
 import type { FromWorker, RecruitOption, Selection } from './messages.ts';
 
-/** В локальном режиме игрок-человек — всегда id 0; остальные ждут ботов (этап 05). */
+/** В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander. */
 export const HUMAN_ID = 0;
 
 export interface LocalEngine {
@@ -83,14 +84,16 @@ export function createLocalEngine(
       selected = hex;
     },
     tick() {
-      step(
-        state,
-        pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-      );
+      // Сначала commander (армии с auto всех игроков), затем ручные команды игрока: ручная
+      // выключает auto армии и в том же тике перекрывает решение commander.
+      step(state, [
+        ...commanderCommands(state),
+        ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+      ]);
       pending = [];
       const rejected: { command: string; reason: RejectReason }[] = [];
       for (const e of state.events) {
-        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID) {
+        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
           rejected.push({ command: e.command, reason: e.reason as RejectReason });
         }
       }

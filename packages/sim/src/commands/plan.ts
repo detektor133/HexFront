@@ -83,7 +83,9 @@ function validateOffensive(
 // MAX_ACTIVE_ARROWS.
 function validateStart(state: MatchState, playerId: number, armyId: number): Validation {
   const plan = state.plans.find((p) => p.armyId === armyId);
-  if (plan?.kind !== 'front' || !plan.offensive) return rejected('noOffensive');
+  const auto = state.armies.find((a) => a.id === armyId)?.auto === true;
+  // У армии с автокомандованием ▶ без линии допустима: линию строит commander (CR-006).
+  if (plan?.kind !== 'front' || (!plan.offensive && !auto)) return rejected('noOffensive');
   const mine = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.id));
   const active = state.plans.filter(
     (p) => p.kind === 'front' && p.offensive?.active && p.armyId !== armyId && mine.has(p.armyId),
@@ -160,8 +162,14 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
   if (cmd.t === 'clearPlan') return removePlan(state, cmd.armyId);
   if (cmd.t === 'clearOffensive') return setOffensive(state, cmd.armyId, null);
   if (cmd.t === 'startOffensive' || cmd.t === 'stopOffensive') {
-    const plan = state.plans.find((p) => p.armyId === cmd.armyId);
-    if (plan?.kind !== 'front' || !plan.offensive) return;
+    const i = state.plans.findIndex((p) => p.armyId === cmd.armyId);
+    const plan = state.plans[i];
+    if (plan?.kind !== 'front') return;
+    if (!plan.offensive) {
+      state.plans[i] = { ...plan, startWanted: cmd.t === 'startOffensive' };
+      return;
+    }
+    if (plan.startWanted) state.plans[i] = { ...plan, startWanted: false };
     return setOffensive(state, cmd.armyId, {
       ...plan.offensive,
       active: cmd.t === 'startOffensive',

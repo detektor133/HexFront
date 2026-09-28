@@ -48,6 +48,20 @@ describe('локальный режим', () => {
     expect(msg.selection?.foundCity).toMatchObject({ ok: false, reason: 'isCity' });
   });
 
+  it('армии с auto всех игроков ведёт commander; ручная команда игрока выключает auto (CR-006)', () => {
+    const e = engine();
+    const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;
+    const before = [owned(0), owned(1)];
+    for (let i = 0; i < 300; i += 1) e.tick();
+    expect(owned(0)).toBeGreaterThan(before[0] ?? 0);
+    expect(owned(1)).toBeGreaterThan(before[1] ?? 0);
+    const army = e.state.armies.find((a) => a.owner === HUMAN_ID);
+    const unit = e.state.units.find((u) => u.armyId === army?.id);
+    e.queue({ t: 'move', unitIds: [unit?.id ?? -1], to: unit?.hex ?? 0 });
+    e.tick();
+    expect(e.state.armies.find((a) => a.id === army?.id)?.auto).toBe(false);
+  });
+
   it('ошибка карты возвращается, а не бросается', () => {
     expect(createLocalEngine({ version: 2 }, 1, 2)).toMatchObject({ errors: expect.any(Array) });
   });

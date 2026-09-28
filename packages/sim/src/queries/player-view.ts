@@ -9,7 +9,7 @@ import type { Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
-import { hexGrowthPerSecond } from '../systems/population.ts';
+import { growthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
 
 /** Связь узла сети: 0 — не узел, 1 — основная сеть, 2 — изолированная. */
@@ -134,7 +134,7 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
  */
 export function playerView(state: MatchState, playerId: number): PlayerView {
   const { hexes } = state;
-  const growth = Int32Array.from(hexes.pop, (_, id) => hexGrowthPerSecond(state, id));
+  const growth = growthPerSecond(state);
   return {
     me: summary(state, playerId, growth),
     tick: state.tick,

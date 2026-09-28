@@ -87,11 +87,11 @@ type Command =
 
 - Каждая команда проходит `validate(state, playerId, cmd) → Ok | Rejected(reason)`. Отклонённые команды не меняют состояние; причина уходит клиенту.
 - Команды — единственный способ изменить состояние (и для людей, и для ботов).
-- Конверт команды `{ playerId, cmd, source? }`: `source: 'auto'` — команду отдал commander; такие команды не выключают auto у армии (`gdd/07-controls.md`, «Автокомандование»).
+- Конверт команды `{ playerId, cmd, source? }`: `source: 'auto'` — команду отдал commander; такие команды не выключают auto у армии (`gdd/07-controls.md`, «Автокомандование»). Отказ такой команды приходит событием `commandRejected` с `auto: true` — интерфейс игроку его не показывает.
 
 ## Commander (CR-006)
 
-- `packages/sim/src/bots/commander.ts`: `commander.decide(view: PlayerView, armyId) → Command[]` — чистая функция снимка игрока, без случайности и мутаций, стабильный порядок.
+- `packages/sim/src/bots/commander.ts`: `decide(map: MapStatic, view: PlayerView, armyId) → Command[]` — чистая функция снимка игрока (карта — статичная и общая, в снимок не входит), без случайности и мутаций, стабильный порядок. Линию наступления для ▶ строит `bots/commander-line.ts`; запуск по тикам — `bots/run.ts` `commanderCommands(state)`.
 - Вне `step`: движок (локальный — в воркере, сервер — в комнате) раз в `COMMANDER_TICKS` для каждой армии с auto (со смещением по id армии) вызывает `decide` и кладёт команды в очередь следующего тика с `source: 'auto'`.
 
 ## Запросы (чистые, без мутаций)

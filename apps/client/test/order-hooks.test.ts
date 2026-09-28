@@ -119,6 +119,8 @@ describe('«Удалить» (04/T16)', () => {
     zone: [],
     stuck: false,
     facing: [],
+    lost: [],
+    startWanted: false,
   };
   const withPlan = { ...v, plans: [plan] };
   const erase = startDraft('erase', 3);

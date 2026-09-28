@@ -27,6 +27,10 @@ export type PlanView =
       readonly stuck: boolean;
       /** Грани фронта, смотрящие на линию наступления, в порядке фронта (хвосты стрелок). */
       readonly facing: readonly number[];
+      /** Свои гексы у фронта, взятые врагом (отбивает commander, CR-006). */
+      readonly lost: readonly HexId[];
+      /** Нажата ▶ у армии с auto без линии — линию строит commander (CR-006). */
+      readonly startWanted: boolean;
     }
   | { readonly armyId: number; readonly kind: 'line'; readonly hexes: readonly HexId[] };
 
@@ -55,6 +59,8 @@ export function planViews(state: MatchState, playerId: number): PlanView[] {
         zone,
         stuck,
         facing,
+        lost: [...(p.lost ?? [])],
+        startWanted: p.startWanted === true,
       };
     });
 }

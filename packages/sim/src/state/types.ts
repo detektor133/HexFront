@@ -179,6 +179,13 @@ export type ArmyPlan =
       readonly edges: readonly number[];
       /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
       readonly offensive: OffensiveLine | null;
+      /**
+       * Свои гексы у фронта, взятые врагом (07-controls.md, «Автокомандование»): commander их
+       * отбивает; гекс выбывает, когда снова свой или больше не у фронта.
+       */
+      readonly lost?: readonly HexId[];
+      /** Нажата ▶ у армии с auto без линии наступления: линию строит commander (CR-006). */
+      readonly startWanted?: boolean;
     }
   | {
       readonly armyId: number;
@@ -206,6 +213,8 @@ export type GameEvent =
       readonly playerId: number;
       readonly command: string;
       readonly reason: string;
+      /** Команда commander (CR-006): интерфейс игроку её отказ не показывает. */
+      readonly auto: boolean;
     }
   | {
       readonly t: 'unitRecruited' | 'recruitCancelled';
