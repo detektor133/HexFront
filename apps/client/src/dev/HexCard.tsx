@@ -44,7 +44,7 @@ function ActionButton(props: {
         onClick={() => (a.affordable ? props.send(a.cmd) : setWhy(true))}
       >
         <span>{t(`action.${a.kind}` as MessageKey)}</span>
-        <span className={a.affordable ? styles.price : styles.priceBad}>{formatFp(a.cost)}</span>
+        <Price value={formatFp(a.cost)} ok={a.affordable} />
       </button>
       {/* Причина — только по тапу (ui.md). */}
       {why && !a.affordable && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
@@ -68,6 +68,19 @@ function UnitGlyph(props: { type: RecruitOption['type'] }): React.JSX.Element {
         </>
       )}
     </svg>
+  );
+}
+
+// Цена со значком золота — монета по сетке иконок (линия, round), цвет — как у числа.
+function Price(props: { value: string; ok: boolean }): React.JSX.Element {
+  return (
+    <span className={props.ok ? styles.price : styles.priceBad}>
+      <svg viewBox="0 0 14 14" className={styles.coin} aria-hidden="true">
+        <circle cx="7" cy="7" r="5" />
+        <line x1="7" y1="4.5" x2="7" y2="9.5" />
+      </svg>
+      {props.value}
+    </span>
   );
 }
 
@@ -98,9 +111,7 @@ function RecruitButton(props: {
           <UnitGlyph type={o.type} />
           {formatSoldiers(o.soldiers)}
         </span>
-        <span className={ok ? styles.price : styles.priceBad}>
-          {cost === undefined ? '' : formatFp(cost)}
-        </span>
+        {cost !== undefined && <Price value={formatFp(cost)} ok={ok} />}
       </button>
       {why && !ok && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
     </div>
@@ -165,7 +176,8 @@ export function HexCard(props: {
         {mine && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
         {mine && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
       </dl>
-      {mine && (
+      {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
+      {mine && !c.isCapital && (
         <p className={c.link === 'isolated' ? styles.bad : styles.good}>
           {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
         </p>

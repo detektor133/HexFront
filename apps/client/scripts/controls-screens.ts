@@ -2,7 +2,7 @@
 // 1440×900): ▶/■ на карточке армии, прогноз без слов при наведении и при удержании, карточки
 // отряда и города без подсказок-инструкций, набор — иконкой рода войск и числом.
 // Запуск при работающем dev-сервере:
-//   node --experimental-strip-types apps/client/scripts/controls-screens.ts 5174
+//   node --experimental-strip-types apps/client/scripts/controls-screens.ts 5174 [after|t17]
 import { chromium, type Page } from '@playwright/test';
 
 import type { ForecastOutcome } from '../../../packages/sim/src/index.ts';
@@ -18,8 +18,10 @@ const SCENE_SETTLE_MS = 2500;
 
 type Point = { readonly x: number; readonly y: number };
 
+/** Суффикс имени кадров — вторым аргументом (по умолчанию after). */
+const SUFFIX = process.argv[3] ?? 'after';
 const path = (name: string): string =>
-  new URL(`${name}-after.png`, OUT).pathname.replace(/^\/([A-Z]:)/, '$1');
+  new URL(`${name}-${SUFFIX}.png`, OUT).pathname.replace(/^\/([A-Z]:)/, '$1');
 
 // Экранные точки при 1440×900: столица — (425, 450); ничейный город с гарнизоном — (1025, 622).
 const CAPITAL_AT = { x: 425, y: 450 };

@@ -12,6 +12,7 @@ import { armyName } from './army-name.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
+import { armyColor } from '../theme/colors.ts';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -63,12 +64,41 @@ function IconButton(props: {
   );
 }
 
+// «В армию» — плашки армий с закладкой цвета и «Резерв»; плашка армии, где сейчас все выбранные
+// отряды, в золотой рамке. Тап — перевести отряды (assignUnits).
+function ArmyPlates(props: {
+  units: readonly UnitView[];
+  view: PlayerView;
+  send: (cmd: Command) => void;
+}): React.JSX.Element {
+  const { units, view, send } = props;
+  const ids = units.map((u) => u.id);
+  const current = units.every((u) => u.armyId === units[0]?.armyId) ? units[0]?.armyId : undefined;
+  const plate = (armyId: number | null, label: string, color: string | null): React.JSX.Element => (
+    <button
+      key={armyId ?? 'reserve'}
+      type="button"
+      className={`${styles.plate} ${current === armyId ? styles.plateOn : ''}`}
+      aria-pressed={current === armyId}
+      onClick={() => send({ t: 'assignUnits', unitIds: ids, armyId })}
+    >
+      {color && <span className={styles.plateBand} style={{ background: color }} />}
+      <span>{label}</span>
+    </button>
+  );
+  return (
+    <div className={styles.plates} role="group" aria-label={t('unit.toArmy')}>
+      {view.armies.map((a) => plate(a.id, armyName(a), armyColor(a.number)))}
+      {plate(null, t('army.reserve'), null)}
+    </div>
+  );
+}
+
 function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   const { u, view } = props;
   const army = view.armies.find((a) => a.id === u.armyId);
   return (
     <dl className={styles.stats}>
-      <Row label={t('unit.soldiers')} value={formatSoldiers(u.soldiers)} />
       <Row label={t('unit.org')} value={formatFp(u.org)} />
       <Row
         label={t('unit.supply')}
@@ -118,24 +148,7 @@ function Orders(props: {
           onClick={() => send({ t: 'bombard', unitId: first.id, targetUnitId: null })}
         />
       )}
-      <label className={styles.hint}>
-        {t('unit.toArmy')}{' '}
-        <select
-          value=""
-          onChange={(e) => {
-            const v = e.target.value;
-            send({ t: 'assignUnits', unitIds: ids, armyId: v === 'reserve' ? null : Number(v) });
-          }}
-        >
-          <option value="">—</option>
-          <option value="reserve">{t('army.reserve')}</option>
-          {view.armies.map((a) => (
-            <option key={a.id} value={a.id}>
-              {armyName(a)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <ArmyPlates units={units} view={view} send={send} />
     </>
   );
 }
@@ -164,10 +177,6 @@ export function UnitCard(props: {
       <h2 className={styles.title}>{title}</h2>
       {units.length === 1 && <UnitRows u={first} view={view} />}
       <Orders units={units} view={view} send={props.send} />
-      <Button
-        label={t('unit.clear')}
-        onClick={() => props.onPick({ ...picked, units: [], target: null })}
-      />
     </section>
   );
 }

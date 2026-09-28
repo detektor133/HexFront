@@ -14,6 +14,7 @@ import {
   type UnitView,
 } from '@hexfront/sim';
 
+import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
@@ -21,8 +22,6 @@ import { hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
-/** Сдвиг фишки вниз, если в гексе город (знак города — в центре), и призрака набора вверх. */
-const CITY_SHIFT = 0.62;
 /** Пути и линии огня — экранные px. */
 const PATH_PX = 2;
 const PATH_DASH = 6;
@@ -31,8 +30,6 @@ const PATH_GAP = 5;
 const PATH_SPEED = 24;
 const FIRE_PX = 1.5;
 const RANGE_PX = 2;
-/** Масштаб фишки в мире: при масштабе карты 1 — эта доля размеров units.md (растёт с картой). */
-const CHIP_WORLD = 0.55;
 /** Постоянная сглаживания позиции фишки, мс: скачки снимка превращаются в плавный доезд. */
 const SMOOTH_MS = 90;
 /** Шаг разрешения текста — чтобы не перерисовывать текст на каждом шаге колеса. */
@@ -110,11 +107,13 @@ export function createUnitLayer(
   /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
   const drawnAt = new Map<string, Point>();
   const shown = new Map<number, Point>();
-  const cities = new Set<number>();
+  /** Гексы с городами и их уровень — фишка стоит ниже знака города. */
+  const cities = new Map<number, number>();
 
   const base = (hex: number): Point => {
     const c = center(hex);
-    return cities.has(hex) ? { x: c.x, y: c.y + radius * CITY_SHIFT } : c;
+    const level = cities.get(hex);
+    return level === undefined ? c : { x: c.x, y: c.y + cityChipShift(level, radius) };
   };
   // Идущий отряд — между центрами гексов по прогрессу перехода (+ доля текущего тика).
   const unitAt = (u: UnitView, frac: number): Point => {
@@ -192,7 +191,8 @@ export function createUnitLayer(
           hold: false,
           ghost: true,
         },
-        at: () => ({ x: c.x, y: c.y - radius * CITY_SHIFT }),
+        // Призрак набора — над знаком города, симметрично фишке под ним.
+        at: () => ({ x: c.x, y: c.y - cityChipShift(city.level, radius) }),
       });
     }
     return out;
@@ -294,7 +294,7 @@ export function createUnitLayer(
       picked = p;
       snapAt = nowMs;
       cities.clear();
-      for (const c of v.cities) cities.add(c.hex);
+      for (const c of v.cities) cities.set(c.hex, c.level);
       entries = build(v);
       syncChips();
       layer.frame(nowMs);

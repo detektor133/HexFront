@@ -93,11 +93,26 @@
 }
 
 .price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--ui-ink3);
   font-variant-numeric: tabular-nums;
 }
 
+.coin {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
 .priceBad {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--status-danger);
   font-variant-numeric: tabular-nums;
 }
@@ -175,4 +190,41 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* «В армию» — плашки армий (закладка цвета + название) и «Резерв». */
+.plates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.plate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-sm) 0 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plate > span:only-child {
+  padding-left: var(--space-sm);
+}
+
+.plateOn {
+  border-color: var(--selection-color);
+  box-shadow: inset 0 0 0 1px var(--selection-color);
+}
+
+.plateBand {
+  align-self: stretch;
+  width: 6px;
 }

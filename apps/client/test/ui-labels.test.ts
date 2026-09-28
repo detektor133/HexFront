@@ -34,7 +34,6 @@ const ACTIONS: readonly MessageKey[] = [
   'unit.merge',
   'unit.autoTarget',
   'unit.toArmy',
-  'unit.clear',
 ];
 
 // Слово — кусок без пробелов, в котором есть буква, цифра или подстановка ({pop}).
@@ -68,6 +67,7 @@ describe('подписи и причины отказа (04/T16, art/ui.md)', ()
     for (const k of [
       'unit.hintOrder',
       'unit.split',
+      'unit.clear',
       'forecast.attack',
       'forecast.cancel',
       'plan.pause',

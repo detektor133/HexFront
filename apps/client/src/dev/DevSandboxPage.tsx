@@ -261,6 +261,8 @@ export function DevSandboxPage(): React.JSX.Element {
   const loaded = useMapJson(params.get('map') ?? 'small');
   const hostRef = useRef<HTMLDivElement>(null);
   const sb = useSandbox(hostRef, loaded);
+  // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
+  const [dockH, setDockH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
@@ -273,7 +275,7 @@ export function DevSandboxPage(): React.JSX.Element {
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
       {view && <Hud view={view} send={sb.send} />}
       {view && (
@@ -281,6 +283,7 @@ export function DevSandboxPage(): React.JSX.Element {
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
           partial={partial.filter((a) => a !== army)}
+          onHeight={setDockH}
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}

@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react';
+
 import { ORG_MAX, type Command, type PlayerView, type UnitView } from '@hexfront/sim';
 
 import styles from './ArmyBar.module.css';
@@ -193,7 +195,7 @@ function ArmyCard(props: {
   const { stats, run } = props;
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   return (
-    <div className={`${styles.card} ${frame} ${run ? styles.withRun : ''}`}>
+    <div className={`${styles.card} ${frame}`}>
       <button
         type="button"
         className={styles.pick}
@@ -224,22 +226,25 @@ function ArmyCard(props: {
           />
         </span>
       </button>
-      {run && (
-        <span className={styles.runs}>
-          <RunButton
-            icon="start"
-            label="plan.start"
-            enabled={run.start}
-            onClick={() => props.onRun(true)}
-          />
-          <RunButton
-            icon="stop"
-            label="plan.stop"
-            enabled={run.stop}
-            onClick={() => props.onRun(false)}
-          />
-        </span>
-      )}
+      {/* Место под ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
+      <span className={styles.runs}>
+        {run && (
+          <>
+            <RunButton
+              icon="start"
+              label="plan.start"
+              enabled={run.start}
+              onClick={() => props.onRun(true)}
+            />
+            <RunButton
+              icon="stop"
+              label="plan.stop"
+              enabled={run.stop}
+              onClick={() => props.onRun(false)}
+            />
+          </>
+        )}
+      </span>
     </div>
   );
 }
@@ -258,7 +263,20 @@ export function ArmyBar(props: {
   onPick: (p: Picked) => void;
   tool: ToolState | null;
   onTool: (t: ToolState | null) => void;
+  /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
+  onHeight?: (px: number) => void;
 }): React.JSX.Element {
+  const dockRef = useRef<HTMLDivElement>(null);
+  const { onHeight } = props;
+  useLayoutEffect(() => {
+    const el = dockRef.current;
+    if (!el || !onHeight) return;
+    const report = (): void => onHeight(el.getBoundingClientRect().height);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [onHeight]);
   const { view, send, selected } = props;
   const mine = view.units.filter((u) => u.owner === view.playerId);
   // Тулбар — у выбранной армии; у единственной частично выбранной — тоже, но без инструментов
@@ -284,7 +302,7 @@ export function ArmyBar(props: {
     return p?.kind === 'front' ? p.offensive : null;
   };
   return (
-    <div className={styles.dock}>
+    <div className={styles.dock} ref={dockRef}>
       {army && (
         <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
           <Tool

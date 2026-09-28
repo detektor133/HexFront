@@ -83,18 +83,13 @@
 
 .card {
   display: flex;
-  flex: 0 0 150px;
+  flex: 0 0 238px;
   overflow: hidden;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   color: var(--ui-ink);
-}
-
-/* Карточка с линией наступления — шире на две кнопки ▶/■ по 44 px. */
-.withRun {
-  flex-basis: 238px;
 }
 
 /* Вся карточка, кроме ▶/■, — кнопка выбора армии. */
@@ -113,6 +108,7 @@
 
 .runs {
   display: flex;
+  flex: 0 0 88px;
   align-items: center;
 }
 
@@ -258,6 +254,6 @@
   }
 
   .card {
-    flex-basis: 132px;
+    flex-basis: 220px;
   }
 }
