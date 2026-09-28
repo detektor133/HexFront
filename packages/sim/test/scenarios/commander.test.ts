@@ -52,6 +52,19 @@ const OPEN = `
   .  .  .  .  .  .  .  .  B1
 `;
 
+// A в середине большого поля ничьей земли; B в углу.
+const WIDE = `
+  .  .  .  .  .  .  .  .  .  .  .
+  .  .  .  .  .  .  .  .  .  .  .
+  .  .  .  .  .  .  .  .  .  .  .
+  .  .  .  .  a  a  .  .  .  .  .
+  .  .  .  .  a  A1 a  .  .  .  .
+  .  .  .  .  a  a  .  .  .  .  .
+  .  .  .  .  .  .  .  .  .  .  .
+  .  .  .  .  .  .  .  .  .  .  .
+  .  .  .  .  .  .  .  .  .  .  B1
+`;
+
 // A и B граничат по столбцам 2 и 3.
 const FIELD = `
   a  a  a  b  b  b  b  b
@@ -69,6 +82,21 @@ describe('commander: ничья земля (04/T21, CR-006)', () => {
     s.runAuto(300);
     expect(ownedBy(s, 0)).toBeGreaterThan(before + 2);
     expect(planOf(s, army)).toBeUndefined();
+  });
+
+  it('ничья земля растёт кольцом вокруг столицы, а не коридором от отрядов', () => {
+    const s = scenario(WIDE, { legend });
+    autoArmy(s, 2, at(5, 4));
+    s.runAuto(600);
+    const w = s.state.map.width;
+    const capital = hexFromId(5 + 4 * w, w);
+    const dist = (h: number): number => distance(hexFromId(h, w), capital);
+    const mine = [...s.state.hexes.owner.keys()].filter((h) => s.state.hexes.owner[h] === 0);
+    expect(mine.length).toBeGreaterThan(9);
+    const far = Math.max(...mine.map(dist));
+    // Все гексы ближе внешнего кольца уже свои: земля без дыр и «змей».
+    const inner = [...s.state.hexes.owner.keys()].filter((h) => dist(h) < far - 1);
+    for (const h of inner) expect(s.state.hexes.owner[h]).toBe(0);
   });
 
   it('нейтральный город при прогнозе «успех» — цель раньше пустых гексов', () => {

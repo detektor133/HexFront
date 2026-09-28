@@ -21,6 +21,9 @@ import {
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
+/** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
+const LAND_KEY = 1 << 16;
+
 /** Непрерывный кусок своей границы с врагом. */
 interface Piece {
   readonly enemy: number;
@@ -144,35 +147,44 @@ function emptyNeutral(map: MapStatic, view: PlayerView): HexId[] {
   return out;
 }
 
-// Ничья земля без плана: нейтральный город при прогнозе «успех» — в приоритете, иначе ближайший
-// пустой ничий гекс у своей границы; цели, куда уже идут свои отряды, не повторяются.
+// Ничья земля без плана: нейтральный город при прогнозе «успех» — в приоритете (ближайший к
+// отряду), иначе пустой ничий гекс у своей границы, ближайший к столице, затем к отряду: земля
+// растёт кольцом у ядра, а не коридором за отрядом, уходящим из снабжения. Цели, куда уже идут
+// свои отряды, не повторяются.
 function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] {
   const claimed = new Set(
     view.units
       .filter((u) => u.owner === view.playerId && u.path.length > 0)
       .map((u) => u.path.at(-1) as HexId),
   );
+  const capital = view.cities.find((c) => c.owner === view.playerId && c.isCapital)?.hex;
+  const core = (h: HexId): number =>
+    capital === undefined ? 0 : distance(hexOf(map, capital), hexOf(map, h));
   const empty = emptyNeutral(map, view);
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   const out: Command[] = [];
   for (const u of units.filter(idle)) {
     const at = hexOf(map, u.hex);
-    const nearest = (hexes: readonly HexId[]): HexId | null => {
+    // Лучшая цель по ключу (меньше — лучше), при равенстве — меньший HexId.
+    const nearest = (hexes: readonly HexId[], key: (h: HexId) => number): HexId | null => {
       let best: HexId | null = null;
-      let bestD = Number.MAX_SAFE_INTEGER;
+      let bestK = Number.MAX_SAFE_INTEGER;
       for (const h of hexes) {
-        const d = distance(at, hexOf(map, h));
-        if (!claimed.has(h) && (d < bestD || (d === bestD && best !== null && h < best))) {
+        const k = key(h);
+        if (!claimed.has(h) && (k < bestK || (k === bestK && best !== null && h < best))) {
           best = h;
-          bestD = d;
+          bestK = k;
         }
       }
       return best;
     };
+    const fromUnit = (h: HexId): number => distance(at, hexOf(map, h));
+    // Расстояния на карте меньше LAND_KEY, поэтому ключ — «сначала к столице, потом к отряду».
+    const fromCore = (h: HexId): number => core(h) * LAND_KEY + fromUnit(h);
     const winnable = cities.filter(
       (h) => forecastBattle(map, view, [u.id], h).outcome === 'victory',
     );
-    const target = nearest(winnable) ?? nearest(empty);
+    const target = nearest(winnable, fromUnit) ?? nearest(empty, fromCore);
     if (target === null) continue;
     claimed.add(target);
     out.push({ t: 'move', unitIds: [u.id], to: target });
