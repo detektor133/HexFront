@@ -152,7 +152,6 @@ export function createUnitLayer(
       selected: units.some((u) => picked.units.includes(u.id)),
       retreating: units.some((u) => u.order === 'retreat'),
       encircled: mine && units.some((u) => u.encircled === true),
-      hold: units.every((u) => u.order === 'hold'),
       ghost: false,
     };
   }
@@ -188,7 +187,6 @@ export function createUnitLayer(
           selected: false,
           retreating: false,
           encircled: false,
-          hold: false,
           ghost: true,
         },
         // Призрак набора — над знаком города, симметрично фишке под ним.

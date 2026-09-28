@@ -32,7 +32,6 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
       return validateRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
     case 'move':
     case 'attack':
-    case 'setOrder':
     case 'split':
     case 'merge':
     case 'bombard':
@@ -41,7 +40,6 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'renameArmy':
     case 'disbandArmy':
     case 'assignUnits':
-    case 'armyOrder':
     case 'setAutoReinforce':
     case 'setArmyAuto':
     case 'setAutoCommand':
@@ -80,7 +78,6 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'move':
     case 'attack':
-    case 'setOrder':
     case 'split':
     case 'merge':
     case 'bombard':
@@ -90,7 +87,6 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'renameArmy':
     case 'disbandArmy':
     case 'assignUnits':
-    case 'armyOrder':
     case 'setAutoReinforce':
     case 'setArmyAuto':
     case 'setAutoCommand':

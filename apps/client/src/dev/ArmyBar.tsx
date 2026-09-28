@@ -69,16 +69,6 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   erase: <path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 17 H13 L14 6" />,
-  hold: <path d="M10 2 L17 5 V10 C17 14 14 17 10 18 C6 17 3 14 3 10 V5 Z" />,
-  expand: (
-    <>
-      <circle cx="10" cy="10" r="3" />
-      <line x1="10" y1="1" x2="10" y2="5" />
-      <line x1="10" y1="15" x2="10" y2="19" />
-      <line x1="1" y1="10" x2="5" y2="10" />
-      <line x1="15" y1="10" x2="19" y2="10" />
-    </>
-  ),
   disband: (
     <>
       <circle cx="10" cy="10" r="7" />
@@ -332,16 +322,6 @@ export function ArmyBar(props: {
             onClick={() => use('erase')}
             active={active('erase')}
             disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
-          />
-          <Tool
-            icon="hold"
-            label="army.hold"
-            onClick={() => send({ t: 'armyOrder', armyId: army.id, order: 'hold' })}
-          />
-          <Tool
-            icon="expand"
-            label="army.expand"
-            onClick={() => send({ t: 'armyOrder', armyId: army.id, order: 'expand' })}
           />
           <Tool
             icon="disband"

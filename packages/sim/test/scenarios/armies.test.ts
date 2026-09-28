@@ -5,7 +5,6 @@ import { loadMap } from '../../src/map/load.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { createMatch } from '../../src/state/create-match.ts';
 import {
-  armyOrder,
   assignUnits,
   at,
   city,
@@ -102,28 +101,6 @@ describe('армии — группы отрядов', () => {
     s.runTicks(1);
     expect(s.armiesOf('A')).toEqual([]);
     expect(s.unitById(u)?.armyId).toBeNull();
-  });
-
-  it('приказ армии получают все её отряды, резерв — нет; артиллерия на экспансии — idle', () => {
-    const s = scenario(MAP, { legend });
-    const inf = s.unit('A', 'infantry', 100, at(1, 1));
-    const art = s.unit('A', 'artillery', 100, at(1, 0));
-    const reserve = s.unit('A', 'infantry', 100, at(2, 2));
-    s.cmd('A', createArmy(''));
-    s.runTicks(1);
-    const army = s.armiesOf('A')[0]?.id ?? -1;
-    s.cmd('A', assignUnits([inf, art], army));
-    s.cmd('A', armyOrder(army, 'hold'));
-    s.runTicks(1);
-    expect([inf, art, reserve].map((id) => s.unitById(id)?.order)).toEqual([
-      'hold',
-      'hold',
-      'idle',
-    ]);
-    s.cmd('A', armyOrder(army, 'expand'));
-    s.runTicks(1);
-    expect(s.unitById(inf)?.order).toBe('expand');
-    expect(s.unitById(art)?.order).toBe('idle');
   });
 
   it('вытянули часть из фишки в соседний гекс — отделённый отряд сразу идёт туда', () => {

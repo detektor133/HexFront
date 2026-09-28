@@ -110,7 +110,7 @@ function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   );
 }
 
-// Приказы выбранным отрядам: держать, экспансия, слить, в армию, фокус огня. Деление — только
+// Приказы выбранным отрядам: слить, в армию, фокус огня. Деление — только
 // вытягиванием из фишки (05-armies.md), кнопки «Разделить» нет.
 function Orders(props: {
   units: readonly UnitView[];
@@ -120,21 +120,10 @@ function Orders(props: {
   const { units, view, send } = props;
   const ids = units.map((u) => u.id);
   const [first] = units;
-  const noArtillery = units.every((u) => u.type !== 'artillery');
   const sameStack =
     units.length > 1 && units.every((u) => u.hex === first?.hex && u.type === first?.type);
   return (
     <>
-      <Button
-        label={t('unit.hold')}
-        onClick={() => send({ t: 'setOrder', unitIds: ids, order: 'hold' })}
-      />
-      {noArtillery && (
-        <Button
-          label={t('unit.expand')}
-          onClick={() => send({ t: 'setOrder', unitIds: ids, order: 'expand' })}
-        />
-      )}
       {sameStack && (
         <IconButton
           label={t('unit.merge')}

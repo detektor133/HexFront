@@ -56,11 +56,6 @@ type UnitRef = number | { readonly unitOf: string; readonly index: number };
 type DslCommand =
   | { readonly t: 'attack'; readonly units: readonly UnitRef[]; readonly target: At }
   | { readonly t: 'move'; readonly units: readonly UnitRef[]; readonly to: At }
-  | {
-      readonly t: 'setOrder';
-      readonly units: readonly UnitRef[];
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
   | { readonly t: 'split'; readonly unit: UnitRef; readonly soldiers: number }
   | { readonly t: 'merge'; readonly units: readonly UnitRef[] }
   | { readonly t: 'bombard'; readonly unit: UnitRef; readonly targetUnitId: number | null }
@@ -87,11 +82,6 @@ type DslCommand =
   | { readonly t: 'stopOffensive'; readonly armyId: number }
   | { readonly t: 'startOffensive'; readonly armyId: number }
   | { readonly t: 'clearOffensive'; readonly armyId: number }
-  | {
-      readonly t: 'armyOrder';
-      readonly armyId: number;
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
@@ -135,10 +125,6 @@ export const attack = (units: readonly UnitRef[], target: At): DslCommand => ({
 });
 
 export const move = (units: readonly UnitRef[], to: At): DslCommand => ({ t: 'move', units, to });
-export const setOrder = (
-  units: readonly UnitRef[],
-  order: 'idle' | 'hold' | 'expand',
-): DslCommand => ({ t: 'setOrder', units, order });
 /** Отделить soldiers целых солдат в новый отряд. */
 export const split = (unit: UnitRef, soldiers: number): DslCommand => ({
   t: 'split',
@@ -165,11 +151,6 @@ export const assignUnits = (units: readonly UnitRef[], armyId: number | null): D
   t: 'assignUnits',
   units,
   armyId,
-});
-export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): DslCommand => ({
-  t: 'armyOrder',
-  armyId,
-  order,
 });
 
 /** Команда sim как есть — когда удобнее задать грани напрямую. */
@@ -444,8 +425,6 @@ function makeScenario(
         return { t: 'attack', unitIds: c.units.map(resolve), target: hexOf(c.target) };
       case 'move':
         return { t: 'move', unitIds: c.units.map(resolve), to: hexOf(c.to) };
-      case 'setOrder':
-        return { t: 'setOrder', unitIds: c.units.map(resolve), order: c.order };
       case 'split':
         return { t: 'split', unitId: resolve(c.unit), soldiers: (c.soldiers * FP) as Fp };
       case 'merge':
@@ -455,7 +434,6 @@ function makeScenario(
       case 'createArmy':
       case 'renameArmy':
       case 'disbandArmy':
-      case 'armyOrder':
       case 'setAutoReinforce':
         return c;
       case 'assignFront': {

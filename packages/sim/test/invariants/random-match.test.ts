@@ -5,6 +5,7 @@ import { cloneState } from './clone.ts';
 import { invariantViolations } from './invariants.ts';
 import tiny from '../../../mapgen/maps/tiny.json' with { type: 'json' };
 import type { UnitType } from '../../src/balance.ts';
+import { commanderCommands } from '../../src/bots/run.ts';
 import { validate } from '../../src/commands/apply.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { loadMap } from '../../src/map/load.ts';
@@ -21,7 +22,6 @@ const MAP = loaded.map;
 /** Длина одного случайного матча: 40 с — отряды успевают сойтись на карте tiny. */
 const TICKS = 400;
 const TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
-const ORDERS = ['idle', 'hold', 'expand'] as const;
 
 /** Сырая команда: вид и числа, из которых по состоянию собирается настоящая команда. */
 interface Raw {
@@ -72,8 +72,13 @@ function build(state: MatchState, r: Raw): Command | null {
         ? { t: 'recruit', cityId: city.id, type: TYPES[r.b % 3] ?? 'infantry', soldiers }
         : null;
     }
-    case 3:
-      return unit ? { t: 'setOrder', unitIds: [unit.id], order: ORDERS[r.b % 3] ?? 'idle' } : null;
+    case 3: {
+      const army = pickOf(
+        state.armies.filter((x) => x.owner === r.player),
+        r.a,
+      );
+      return army ? { t: 'setArmyAuto', armyId: army.id, on: r.b % 2 === 0 } : null;
+    }
     case 4:
       return unit
         ? { t: 'split', unitId: unit.id, soldiers: ((1 + (r.b % 200)) * FP) as Fp }
@@ -102,7 +107,7 @@ function build(state: MatchState, r: Raw): Command | null {
         state.armies.filter((x) => x.owner === r.player),
         r.a,
       );
-      return army ? { t: 'armyOrder', armyId: army.id, order: ORDERS[r.b % 3] ?? 'idle' } : null;
+      return army ? { t: 'startOffensive', armyId: army.id } : null;
     }
     case 14: {
       const army = pickOf(
@@ -150,7 +155,8 @@ function play(seed: number, raws: readonly Raw[]): MatchState {
   const byTick = new Map<number, Raw[]>();
   for (const r of raws) byTick.set(r.at, [...(byTick.get(r.at) ?? []), r]);
   for (let t = 0; t < TICKS; t += 1) {
-    const cmds: PlayerCommand[] = [];
+    // Армии с auto ведёт commander (CR-006), случайные команды игроков — поверх.
+    const cmds: PlayerCommand[] = commanderCommands(state);
     for (const r of byTick.get(t) ?? []) {
       const cmd = build(state, r);
       if (cmd) cmds.push({ playerId: r.player, cmd });

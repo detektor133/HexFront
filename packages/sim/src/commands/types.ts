@@ -9,11 +9,6 @@ export type Command =
   | { readonly t: 'move'; readonly unitIds: readonly number[]; readonly to: HexId }
   | { readonly t: 'attack'; readonly unitIds: readonly number[]; readonly target: HexId }
   | {
-      readonly t: 'setOrder';
-      readonly unitIds: readonly number[];
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
-  | {
       readonly t: 'assignFront';
       readonly armyId: number;
       /** Грани своей границы (EdgeId); между ними фронт достраивается по граням (CR-004). */
@@ -47,11 +42,6 @@ export type Command =
   | { readonly t: 'improve'; readonly hex: HexId }
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
-  | {
-      readonly t: 'armyOrder';
-      readonly armyId: number;
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
   | { readonly t: 'createArmy'; readonly name: string }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   /** Значок «А» на карточке армии (CR-006). */

@@ -110,9 +110,9 @@ export interface Construction {
 
 /**
  * move — идёт по path; attack — атакует соседний гекс target; retreat — отступает (приказы не
- * принимает); expand — экспансия; idle и hold — стоит.
+ * принимает); idle — стоит.
  */
-export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move' | 'attack' | 'retreat';
+export type UnitOrder = 'idle' | 'move' | 'attack' | 'retreat';
 
 export interface Unit {
   readonly id: number;

@@ -29,7 +29,6 @@ const COUNT_R = 5;
 const COUNT_PX = 8;
 /** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
 const WARN = 8;
-const HOLD_W = 9;
 const LABEL_PX = 12;
 const RETREAT_ALPHA = 0.6;
 /** Пунктир фишки-призрака набора, px. */
@@ -56,7 +55,6 @@ export interface ChipState {
   readonly selected: boolean;
   readonly retreating: boolean;
   readonly encircled: boolean;
-  readonly hold: boolean;
   readonly ghost: boolean;
 }
 
@@ -161,7 +159,6 @@ function marks(p: Parts, s: ChipState, sq: number): void {
       .fill(s.starving ? tokens.status.danger : tokens.status.lowSupply)
       .stroke({ color: tokens.ui.surface, width: 1 });
   }
-  if (s.hold) g.rect(sq + 3, top + H - 4, HOLD_W, 2).fill(tokens.ui.surface);
 }
 
 function drawChip(p: Parts, s: ChipState): void {

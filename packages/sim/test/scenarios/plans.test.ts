@@ -4,7 +4,6 @@ import { planViews } from '../../src/queries/plan-view.ts';
 import { neediestArmy } from '../../src/state/armies.ts';
 import { edgeHex, edgeOf } from '../../src/state/edges.ts';
 import {
-  armyOrder,
   assignFront,
   assignUnits,
   at,
@@ -235,17 +234,6 @@ describe('линия фронта (CR-002)', () => {
     s.unit('B', 'infantry', 10, at(3, 0));
     s.runSeconds(10);
     expect(hexesOf(s, ids)).toEqual(before);
-  });
-
-  it('«Держать» армии снимает план', () => {
-    const s = scenario(BORDER, { legend });
-    const army = armyOf(s, infantry(s, 1));
-    s.cmd('A', assignFront(army, 'B', null));
-    s.runTicks(1);
-    expect(s.state.plans).toHaveLength(1);
-    s.cmd('A', armyOrder(army, 'hold'));
-    s.runTicks(1);
-    expect(s.state.plans).toHaveLength(0);
   });
 
   it('clearPlan снимает план, отряды остаются на местах', () => {

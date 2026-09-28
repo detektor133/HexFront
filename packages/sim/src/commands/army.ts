@@ -1,5 +1,5 @@
-// Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits,
-// armyOrder; автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель», «Разделение и слияние», «Приказы».
+// Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits;
+// автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель».
 import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
@@ -12,7 +12,6 @@ export type ArmyCommand = Extract<
       | 'renameArmy'
       | 'disbandArmy'
       | 'assignUnits'
-      | 'armyOrder'
       | 'setAutoReinforce'
       | 'setArmyAuto'
       | 'setAutoCommand';
@@ -76,17 +75,6 @@ export function validateArmyCommand(
   return OK;
 }
 
-// Приказ армии раздаётся её отрядам; экспансия недоступна артиллерии — та встаёт в idle.
-function orderArmy(state: MatchState, armyId: number, order: Unit['order']): void {
-  for (const u of state.units) {
-    if (u.armyId !== armyId || u.order === 'retreat') continue;
-    u.path = [];
-    u.moveTicks = 0;
-    u.moveTotal = 0;
-    u.order = order === 'expand' && u.type === 'artillery' ? 'idle' : order;
-  }
-}
-
 /** Применяет команду армии. Вызывается только после успешной проверки. */
 export function executeArmyCommand(state: MatchState, playerId: number, cmd: ArmyCommand): void {
   switch (cmd.t) {
@@ -119,11 +107,6 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
     }
     case 'assignUnits':
       for (const u of state.units) if (cmd.unitIds.includes(u.id)) u.armyId = cmd.armyId;
-      return;
-    case 'armyOrder':
-      // «Держать» и «Экспансия» снимают план армии (07-controls.md, «Распределение»).
-      removePlan(state, cmd.armyId);
-      orderArmy(state, cmd.armyId, cmd.order);
       return;
     case 'setAutoReinforce': {
       const player = state.players[playerId];

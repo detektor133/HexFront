@@ -1,4 +1,4 @@
-// Команды отрядов: move, setOrder, split, merge.
+// Команды отрядов: move, attack, split, merge, bombard.
 // GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { unitLimit } from './recruit.ts';
@@ -10,7 +10,7 @@ import type { Unit, MatchState } from '../state/types.ts';
 
 export type UnitCommand = Extract<
   Command,
-  { t: 'move' | 'attack' | 'setOrder' | 'split' | 'merge' | 'bombard' }
+  { t: 'move' | 'attack' | 'split' | 'merge' | 'bombard' }
 >;
 
 type Owned =
@@ -105,11 +105,6 @@ export function validateUnitCommand(
       return validateAttack(state, owned.units, cmd.target);
     case 'bombard':
       return validateBombard(state, owned.units[0], cmd.targetUnitId);
-    case 'setOrder':
-      // Артиллерия не захватывает гексы, поэтому экспансия ей недоступна.
-      return cmd.order === 'expand' && owned.units.some((a) => a.type === 'artillery')
-        ? rejected('badOrder')
-        : OK;
     case 'split':
       if (
         cmd.to !== undefined &&
@@ -202,13 +197,6 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         a.slot = -1;
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';
-      }
-      return;
-    case 'setOrder':
-      for (const a of owned.units) {
-        stop(a);
-        a.slot = -1;
-        a.order = cmd.order;
       }
       return;
     case 'split':
