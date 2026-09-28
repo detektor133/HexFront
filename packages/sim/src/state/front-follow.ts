@@ -16,7 +16,14 @@ import {
   wayOf,
   type Way,
 } from './contour.ts';
-import { edgeCorners, edgeHex, isBorderEdge, type Corner, type EdgeId } from './edges.ts';
+import {
+  edgeCorners,
+  edgeHex,
+  frontEdgePath,
+  isBorderEdge,
+  type Corner,
+  type EdgeId,
+} from './edges.ts';
 import type { LineGround } from './ground.ts';
 import { TERRAIN } from '../map/types.ts';
 import { hexFromId, hexId, inBounds, neighbors } from '../math/hex.ts';
@@ -114,6 +121,23 @@ export function borderArc(g: LineGround, owner: number, marks: readonly EdgeId[]
   const own = marks.filter((e) => isBorderEdge(g, owner, e));
   if (own.length === 0) return [];
   return coverAll([...new Set(own)], wayOf(g, owner, own), g.hexes.owner.length * 6);
+}
+
+/**
+ * Участок фронта по точкам-граням своей границы (04/T14a): грани между точками — по границе
+ * (`frontEdgePath`), затем укладываются в дугу контура в порядке обхода — одна грань один раз,
+ * соседние грани сходятся в углу, без «зигзага» от росчерка туда-обратно.
+ * @returns грани по порядку (со своей стороны) или null, если точки не на границе или не соединить
+ */
+export function frontLinePath(
+  g: LineGround,
+  owner: number,
+  points: readonly EdgeId[],
+): EdgeId[] | null {
+  const path = frontEdgePath(g, owner, points);
+  if (!path) return null;
+  const arc = borderArc(g, owner, path);
+  return arc.length > 0 ? arc : path;
 }
 
 /**

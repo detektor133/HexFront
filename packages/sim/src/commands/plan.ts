@@ -10,11 +10,11 @@ import {
   edgeHex,
   edgeOther,
   flipEdge,
-  frontEdgePath,
   isBorderEdge,
   isLandEdge,
   type EdgeId,
 } from '../state/edges.ts';
+import { frontLinePath } from '../state/front-follow.ts';
 import { defenseLinePath, planHexes } from '../state/front.ts';
 import { frontSideDistance } from '../state/offensive-steps.ts';
 import type { ArmyPlan, MatchState, OffensiveLine } from '../state/types.ts';
@@ -57,7 +57,7 @@ function validateFront(
   ) {
     return rejected('badHex');
   }
-  return frontEdgePath(state, playerId, cmd.edges) ? OK : rejected('noPath');
+  return frontLinePath(state, playerId, cmd.edges) ? OK : rejected('noPath');
 }
 
 function validateLine(state: MatchState, playerId: number, points: readonly number[]): Validation {
@@ -176,7 +176,7 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
     return setOffensive(state, cmd.armyId, offensiveLine(state, plan, edges));
   }
   if (cmd.t === 'assignFront') {
-    const edges = frontEdgePath(state, playerId, cmd.edges);
+    const edges = frontLinePath(state, playerId, cmd.edges);
     if (!edges) return;
     return setPlan(state, { armyId: cmd.armyId, kind: 'front', edges, offensive: null });
   }

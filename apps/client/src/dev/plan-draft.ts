@@ -10,6 +10,7 @@ import {
   edgeOther,
   flipEdge,
   frontEdgePath,
+  frontLinePath,
   hexFromId,
   hexId,
   inBounds,
@@ -166,7 +167,7 @@ export function tapCommand(c: DraftContext, d: Draft, world: Point): Command | n
 export function draftPath(c: DraftContext, d: Draft): { edges: EdgeId[]; hexes: number[] } {
   const g = ground(c);
   if (d.tool === 'front') {
-    return { edges: frontEdgePath(g, c.view.playerId, d.edges) ?? [...d.edges], hexes: [] };
+    return { edges: frontLinePath(g, c.view.playerId, d.edges) ?? [...d.edges], hexes: [] };
   }
   if (d.tool === 'offensive') {
     return { edges: offensiveEdgePath(g, d.edges) ?? [...d.edges], hexes: [] };
@@ -219,6 +220,7 @@ export function dragFrontEnd(
   let next: EdgeId[];
   if (at >= 0) next = chain.slice(0, Math.max(1, at + 1));
   else {
+    // Удлинение — путь от конца участка; порядок и дуга — при показе и в sim (frontLinePath).
     const ext = frontEdgePath(ground(c), c.view.playerId, [chain.at(-1) as EdgeId, own]);
     next = ext ? [...chain, ...ext.slice(1).filter((x) => !chain.includes(x))] : chain;
   }

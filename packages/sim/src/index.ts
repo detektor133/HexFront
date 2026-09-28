@@ -45,5 +45,6 @@ export * from './state/front.ts';
 export * from './state/edges.ts';
 export * from './state/edge-line.ts';
 export { contourNext, contourPrev } from './state/contour.ts';
+export { frontLinePath } from './state/front-follow.ts';
 export * from './state/offensive-steps.ts';
 export * from './queries/plan-view.ts';
