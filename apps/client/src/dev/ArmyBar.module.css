@@ -106,10 +106,55 @@
   cursor: pointer;
 }
 
-.runs {
+/* Правая колонка 88 px: сверху «А», снизу ▶ ■ (art/ui.md). */
+.side {
   display: flex;
   flex: 0 0 88px;
+  flex-direction: column;
   align-items: center;
+}
+
+.runs {
+  display: flex;
+  height: 44px;
+  align-items: center;
+}
+
+.autoBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.autoOn,
+.autoOff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-family: var(--font-ui-family);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.autoOn {
+  background: var(--ui-ink);
+  color: var(--ui-surface);
+}
+
+.autoOff {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-ink3);
 }
 
 .run {

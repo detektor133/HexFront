@@ -88,6 +88,96 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Настройки — справа в конце полосы. */
+.settingsWrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.settingsButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.settingsIcon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settingsMenu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  width: 260px;
+  padding: var(--space-md);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Переключатель: дорожка 40 × 24, ручка 18 × 18; скругления — из токенов. */
+.switchOn,
+.switchOff {
+  display: flex;
+  flex: 0 0 40px;
+  align-items: center;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 2px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-input);
+}
+
+.switchOn {
+  justify-content: flex-end;
+  background: var(--ui-ink);
+  border-color: var(--ui-ink);
+}
+
+.switchOff {
+  justify-content: flex-start;
+  background: var(--ui-surface);
+}
+
+.knob {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: var(--radius-chip);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+}
+
 /* Телефон в портрете: две строки, вторая мельче (ui.md). */
 @media (max-width: 600px) {
   .hud {

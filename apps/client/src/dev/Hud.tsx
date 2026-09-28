@@ -31,7 +31,53 @@ function Slot(props: {
   );
 }
 
-/** Верхняя полоса по ui.md «HUD»: люди, золото, налог с ползунком, снабжение, время, место. */
+// Шестерёнка Tabler Icons «settings» (art/ui.md: кнопки меню и настроек — Tabler, outline 1,75).
+function SettingsIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
+      <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+      <path d="M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+    </svg>
+  );
+}
+
+// Меню настроек: пока одна настройка — «Автокомандование» для новых армий (art/ui.md, CR-006).
+function Settings(props: { view: PlayerView; send: (cmd: Command) => void }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const on = props.view.me.autoCommand;
+  return (
+    <div className={styles.settingsWrap}>
+      <button
+        type="button"
+        className={styles.settingsButton}
+        aria-expanded={open}
+        aria-label={t('settings.title')}
+        title={t('settings.title')}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <SettingsIcon />
+      </button>
+      {open && (
+        <div className={styles.settingsMenu} role="dialog" aria-label={t('settings.title')}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            className={styles.switchRow}
+            onClick={() => props.send({ t: 'setAutoCommand', on: !on })}
+          >
+            <span>{t('settings.autoCommand')}</span>
+            <span className={on ? styles.switchOn : styles.switchOff}>
+              <span className={styles.knob} />
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Верхняя полоса по ui.md «HUD»: люди, золото, налог с ползунком, снабжение, время, место, настройки. */
 export function Hud(props: {
   view: PlayerView;
   send: (cmd: Command) => void;
@@ -91,6 +137,7 @@ export function Hud(props: {
       <Slot label={t('hud.supply')} value="—" title={t('hud.supplyLater')} />
       <Slot label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
       <Slot label={t('hud.place')} value={`#${s.place}/${s.players}`} />
+      <Settings view={view} send={props.send} />
     </header>
   );
 }

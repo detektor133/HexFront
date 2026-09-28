@@ -99,4 +99,19 @@ describe('кнопки наступления на карточке армии (
     expect(offensiveButtons({ active: false })).toEqual({ start: true, stop: false });
     expect(offensiveButtons({ active: true })).toEqual({ start: false, stop: true });
   });
+
+  it('армия с auto: ▶ есть и без линии — при фронте активна, ▶ нажата — активна ■ (CR-006)', () => {
+    const noFront = { front: false, wanted: false };
+    expect(offensiveButtons(null, noFront)).toEqual({ start: false, stop: false });
+    expect(offensiveButtons(null, { front: true, wanted: false })).toEqual({
+      start: true,
+      stop: false,
+    });
+    expect(offensiveButtons(null, { front: true, wanted: true })).toEqual({
+      start: false,
+      stop: true,
+    });
+    // Линия есть — кнопки как у любой армии.
+    expect(offensiveButtons({ active: true }, noFront)).toEqual({ start: false, stop: true });
+  });
 });

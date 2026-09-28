@@ -1,6 +1,12 @@
 import { useLayoutEffect, useRef } from 'react';
 
-import { ORG_MAX, type Command, type PlayerView, type UnitView } from '@hexfront/sim';
+import {
+  ORG_MAX,
+  type ArmyView,
+  type Command,
+  type PlayerView,
+  type UnitView,
+} from '@hexfront/sim';
 
 import styles from './ArmyBar.module.css';
 import { armyName } from './army-name.ts';
@@ -151,6 +157,8 @@ function Meter(props: {
 function RunButton(props: {
   icon: 'start' | 'stop';
   label: MessageKey;
+  /** Почему кнопка приглушена; null — без пояснения. */
+  hint: string | null;
   enabled: boolean;
   onClick: () => void;
 }): React.JSX.Element {
@@ -159,11 +167,28 @@ function RunButton(props: {
       type="button"
       className={styles.run}
       aria-label={t(props.label)}
-      title={t(props.label)}
+      title={props.hint ?? t(props.label)}
       disabled={!props.enabled}
       onClick={props.onClick}
     >
       <Icon name={props.icon} className={styles.runIcon} />
+    </button>
+  );
+}
+
+// Значок «А» — автокомандование армии (art/ui.md, «Панель армий»): вкл. — залитый круг.
+function AutoBadge(props: { on: boolean; onClick: () => void }): React.JSX.Element {
+  const label = t(props.on ? 'army.autoCommandOn' : 'army.autoCommandOff');
+  return (
+    <button
+      type="button"
+      className={styles.autoBadge}
+      aria-pressed={props.on}
+      aria-label={label}
+      title={label}
+      onClick={props.onClick}
+    >
+      <span className={props.on ? styles.autoOn : styles.autoOff}>{t('army.autoLetter')}</span>
     </button>
   );
 }
@@ -179,7 +204,12 @@ function ArmyCard(props: {
   partial: boolean;
   /** Линия наступления армии: ▶/■ на карточке; null — кнопок нет. */
   run: { readonly start: boolean; readonly stop: boolean } | null;
+  /** Подсказка приглушённой ▶ (у армии с auto без фронта). */
+  runHint: string | null;
   onRun: (start: boolean) => void;
+  /** Автокомандование армии — значок «А» (CR-006). */
+  auto: boolean;
+  onAuto: () => void;
   onClick: () => void;
 }): React.JSX.Element {
   const { stats, run } = props;
@@ -216,24 +246,29 @@ function ArmyCard(props: {
           />
         </span>
       </button>
-      {/* Место под ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
-      <span className={styles.runs}>
-        {run && (
-          <>
-            <RunButton
-              icon="start"
-              label="plan.start"
-              enabled={run.start}
-              onClick={() => props.onRun(true)}
-            />
-            <RunButton
-              icon="stop"
-              label="plan.stop"
-              enabled={run.stop}
-              onClick={() => props.onRun(false)}
-            />
-          </>
-        )}
+      {/* Колонка «А» и ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
+      <span className={styles.side}>
+        <AutoBadge on={props.auto} onClick={props.onAuto} />
+        <span className={styles.runs}>
+          {run && (
+            <>
+              <RunButton
+                icon="start"
+                label="plan.start"
+                hint={run.start ? null : props.runHint}
+                enabled={run.start}
+                onClick={() => props.onRun(true)}
+              />
+              <RunButton
+                icon="stop"
+                label="plan.stop"
+                hint={null}
+                enabled={run.stop}
+                onClick={() => props.onRun(false)}
+              />
+            </>
+          )}
+        </span>
       </span>
     </div>
   );
@@ -287,9 +322,11 @@ export function ArmyBar(props: {
     props.onPick({ hex: null, units: off ? [] : units.map((u) => u.id), target: null });
   };
   const reserve = mine.filter((u) => u.armyId === null);
-  const offensiveOf = (armyId: number): { readonly active: boolean } | null => {
-    const p = view.plans.find((x) => x.armyId === armyId);
-    return p?.kind === 'front' ? p.offensive : null;
+  const runOf = (a: ArmyView) => {
+    const p = view.plans.find((x) => x.armyId === a.id);
+    const front = p?.kind === 'front';
+    const auto = a.auto ? { front, wanted: front && p.startWanted } : undefined;
+    return offensiveButtons(front ? p.offensive : null, auto);
   };
   return (
     <div className={styles.dock} ref={dockRef}>
@@ -345,8 +382,11 @@ export function ArmyBar(props: {
               stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
               selected={a.id === selected}
               partial={props.partial.includes(a.id)}
-              run={offensiveButtons(offensiveOf(a.id))}
+              run={runOf(a)}
+              runHint={t('plan.needFront')}
               onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
+              auto={a.auto}
+              onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
               onClick={() => select(a.id, units)}
             />
           );
