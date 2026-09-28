@@ -17,6 +17,7 @@ import {
   type Velocity,
   type Viewport,
 } from './camera.ts';
+import { createGesture, type Gesture, type StrokePhase, type TapKind } from './gesture.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -39,11 +40,19 @@ export interface MidLayer {
 
 export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
 
-/** Тап выбирает; долгий тап или правая кнопка мыши — приказ (07-controls.md, как в HoI4). */
-export type TapKind = 'select' | 'order';
+export type { StrokePhase, TapKind } from './gesture.ts';
 
-/** Фаза росчерка в режиме рисования: палец/ЛКМ ведёт линию (07-controls.md, CR-003). */
-export type StrokePhase = 'start' | 'move' | 'end' | 'cancel';
+/** Приказ удержанием (07-controls.md, «Приказ удержанием»): фаза. */
+export type HoldPhase = 'start' | 'move' | 'end' | 'cancel';
+
+/** Когда удержание — приказ, где его отмена (фишка выбранных отрядов), наведение мыши. */
+export interface OrderHooks {
+  canHold(): boolean;
+  cancelZone(world: Point): boolean;
+  hold(world: Point, phase: HoldPhase): void;
+  /** Мышь над картой без нажатия (ПК: прогноз при наведении); null — ушла с карты. */
+  hover(world: Point | null): void;
+}
 
 /** Росчерк: точка в мировых координатах карты. */
 export type StrokeHandler = (world: Point, phase: StrokePhase) => void;
@@ -70,29 +79,15 @@ export interface MapView {
    * объект (ручку конца фронта), а не карту.
    */
   setGrab(grab: ((world: Point) => StrokeHandler | null) | null): void;
+  /** Приказ удержанием и наведение мыши. */
+  setOrderHooks(hooks: OrderHooks | null): void;
   destroy(): void;
-}
-
-interface Pointers {
-  readonly active: Map<number, Point>;
-  /** Путь указателя с нажатия: короче TAP_SLOP_PX — это тап, а не перетаскивание. */
-  travel: number;
-  multi: boolean;
-  velocity: Velocity | null;
-  lastMoveMs: number;
-  /** Время нажатия и кнопка — для долгого тапа и правой кнопки. */
-  downMs: number;
-  button: number;
-  /** Идёт росчерк (режим рисования, один указатель, сдвиг больше TAP_SLOP_PX). */
-  stroking: boolean;
 }
 
 // Скорость для инерции сглаживается по последним событиям перетаскивания.
 const VELOCITY_SMOOTHING = 0.8;
 /** Если палец замер дольше этого перед отпусканием, инерции нет. */
 const INERTIA_MAX_PAUSE_MS = 80;
-/** Сдвиг указателя, после которого нажатие считается перетаскиванием, px. */
-const TAP_SLOP_PX = 6;
 
 /** Создаёт карту в host и сообщает масштаб, детализацию и fps через onState. */
 export async function createMapView(
@@ -128,16 +123,10 @@ export async function createMapView(
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
   let cam: Camera = fitCamera(view(), bounds);
   let drawnScale = 0;
-  const ptr: Pointers = {
-    active: new Map(),
-    velocity: null,
-    lastMoveMs: 0,
-    travel: 0,
-    multi: false,
-    downMs: 0,
-    button: 0,
-    stroking: false,
-  };
+  let velocity: Velocity | null = null;
+  let pressed = 0;
+  let stroking = false;
+  let hooks: OrderHooks | null = null;
   let stroke: StrokeHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
   let grabbed: StrokeHandler | null = null;
@@ -160,8 +149,8 @@ export async function createMapView(
 
   app.ticker.add((ticker) => {
     mid?.frame?.(performance.now());
-    if (ptr.velocity && ptr.active.size === 0) {
-      const v = ptr.velocity;
+    if (velocity && pressed === 0) {
+      const v = velocity;
       cam = panBy(
         cam,
         (v.vx * ticker.deltaMS) / 1000,
@@ -169,31 +158,65 @@ export async function createMapView(
         view(),
         bounds,
       );
-      ptr.velocity = decayVelocity(v, ticker.deltaMS);
+      velocity = decayVelocity(v, ticker.deltaMS);
     }
     cam = clampCamera(cam, view(), bounds);
     apply();
   });
 
-  const detach = attachInput(app.canvas, ptr, {
-    pan: (dx, dy) => (cam = panBy(cam, dx, dy, view(), bounds)),
+  let lastPanMs = 0;
+  const gesture = createGesture(
+    {
+      drawing: () => grabbed !== null || stroke !== null,
+      press: (at) => {
+        grabbed = grab?.(toWorld(at)) ?? null;
+      },
+      release: () => {
+        grabbed = null;
+      },
+      canHold: () => stroke === null && (hooks?.canHold() ?? false),
+      cancelZone: (at) => hooks?.cancelZone(toWorld(at)) ?? false,
+      inside: (at) => at.x >= 0 && at.y >= 0 && at.x <= view().width && at.y <= view().height,
+    },
+    (e) => {
+      if (e.t === 'pan') {
+        cam = panBy(cam, e.dx, e.dy, view(), bounds);
+        const now = performance.now();
+        const dt = Math.max(1, now - lastPanMs);
+        const inst = { vx: (e.dx / dt) * 1000, vy: (e.dy / dt) * 1000 };
+        const v = velocity ?? inst;
+        const k = VELOCITY_SMOOTHING;
+        velocity = { vx: v.vx * (1 - k) + inst.vx * k, vy: v.vy * (1 - k) + inst.vy * k };
+        lastPanMs = now;
+      } else if (e.t === 'zoom') {
+        cam = zoomAt(cam, e.factor, e.at.x, e.at.y, view(), bounds);
+      } else if (e.t === 'tap') {
+        const world = toWorld(e.at);
+        onTap?.(pixelToHex(world, opts.radius), e.kind, world);
+      } else if (e.t === 'stroke') {
+        stroking = e.phase === 'start' || e.phase === 'move';
+        (grabbed ?? stroke)?.(toWorld(e.at), e.phase);
+        if (e.phase === 'end' || e.phase === 'cancel') grabbed = null;
+      } else if (e.t === 'hold') {
+        velocity = null;
+        hooks?.hold(toWorld(e.at), e.phase);
+      } else {
+        hooks?.hover(e.at ? toWorld(e.at) : null);
+      }
+    },
+  );
+  const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, view(), bounds)),
-    tap: (at, kind) => {
-      const world = toWorld(at);
-      onTap?.(pixelToHex(world, opts.radius), kind, world);
+    pressed: (n) => {
+      pressed = n;
+      if (n > 0) velocity = null;
     },
-    drawing: () => grabbed !== null || stroke !== null,
-    press: (at) => {
-      grabbed = grab?.(toWorld(at)) ?? null;
-    },
-    release: () => {
-      grabbed = null;
-    },
-    stroke: (at, phase) => {
-      (grabbed ?? stroke)?.(toWorld(at), phase);
-      if (phase === 'end' || phase === 'cancel') grabbed = null;
+    idle: (ms) => {
+      if (performance.now() - lastPanMs > ms) velocity = null;
     },
   });
+  // Удержание засчитывается и без движения пальца — проверка каждый кадр.
+  app.ticker.add(() => gesture.tick(performance.now()));
 
   return {
     configure(next) {
@@ -231,9 +254,12 @@ export async function createMapView(
     setGrab(fn) {
       grab = fn;
     },
+    setOrderHooks(h) {
+      hooks = h;
+    },
     setStroke(handler) {
-      if (ptr.stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
-      ptr.stroking = false;
+      if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
+      stroking = false;
       stroke = handler;
     },
     setScale(scale) {
@@ -247,103 +273,38 @@ export async function createMapView(
 }
 
 interface InputHandlers {
-  pan(dx: number, dy: number): void;
   zoom(factor: number, at: Point): void;
-  tap(at: Point, kind: TapKind): void;
-  drawing(): boolean;
-  /** Нажатие одним указателем: запоминает, что под ним можно тянуть (ручку, фишку). */
-  press(at: Point): void;
-  /** Отпустили без сдвига — захват не начался. */
-  release(): void;
-  stroke(at: Point, phase: StrokePhase): void;
+  /** Сколько указателей нажато (инерция — только когда ни одного). */
+  pressed(n: number): void;
+  /** Палец отпущен после паузы дольше ms — инерции нет. */
+  idle(ms: number): void;
 }
 
-/** Удержание дольше этого без сдвига — долгий тап (приказ). */
-const LONG_PRESS_MS = 450;
-const RIGHT_BUTTON = 2;
-
-function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers): () => void {
+// DOM-события указателя → машина жестов (render/gesture.ts); колесо — зум.
+function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandlers): () => void {
   const local = (e: PointerEvent | WheelEvent): Point => {
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
-  const pinch = (): { mid: Point; dist: number } | null => {
-    const [a, b] = [...ptr.active.values()];
-    if (!a || !b) return null;
-    return {
-      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-      dist: Math.hypot(a.x - b.x, a.y - b.y),
-    };
-  };
-
+  let count = 0;
   const down = (e: PointerEvent): void => {
     canvas.setPointerCapture(e.pointerId);
-    ptr.active.set(e.pointerId, local(e));
-    if (ptr.active.size === 1) {
-      ptr.travel = 0;
-      ptr.multi = false;
-    } else {
-      ptr.multi = true;
-      // Второй палец — это жест карты: начатый росчерк отменяется.
-      if (ptr.stroking) h.stroke({ x: 0, y: 0 }, 'cancel');
-      ptr.stroking = false;
-      h.release();
-    }
-    ptr.velocity = null;
-    ptr.lastMoveMs = e.timeStamp;
-    ptr.downMs = e.timeStamp;
-    ptr.button = e.button;
-    // Захват (ручка фронта, фишка) начнётся, только если палец сдвинется: тап остаётся тапом.
-    if (ptr.active.size === 1 && e.button === 0) h.press(local(e));
+    count += 1;
+    h.pressed(count);
+    g.down(e.pointerId, local(e), e.button, performance.now());
   };
   const move = (e: PointerEvent): void => {
-    const prev = ptr.active.get(e.pointerId);
-    if (!prev) return;
-    const before = pinch();
-    const p = local(e);
-    ptr.active.set(e.pointerId, p);
-    const after = pinch();
-    if (before && after) {
-      h.zoom(after.dist / before.dist, after.mid);
-      h.pan(after.mid.x - before.mid.x, after.mid.y - before.mid.y);
-      return;
-    }
-    const dx = p.x - prev.x;
-    const dy = p.y - prev.y;
-    ptr.travel += Math.hypot(dx, dy);
-    if (h.drawing() && !ptr.multi && ptr.button === 0) {
-      if (!ptr.stroking && ptr.travel < TAP_SLOP_PX) return;
-      if (!ptr.stroking) {
-        ptr.stroking = true;
-        h.stroke({ x: p.x - dx, y: p.y - dy }, 'start');
-      }
-      h.stroke(p, 'move');
-      return;
-    }
-    h.pan(dx, dy);
-    const dt = Math.max(1, e.timeStamp - ptr.lastMoveMs);
-    const inst = { vx: (dx / dt) * 1000, vy: (dy / dt) * 1000 };
-    const v = ptr.velocity ?? inst;
-    const k = VELOCITY_SMOOTHING;
-    ptr.velocity = { vx: v.vx * (1 - k) + inst.vx * k, vy: v.vy * (1 - k) + inst.vy * k };
-    ptr.lastMoveMs = e.timeStamp;
+    if (count === 0) return g.hover(local(e));
+    g.move(e.pointerId, local(e), performance.now());
   };
   const up = (e: PointerEvent): void => {
-    const at = ptr.active.get(e.pointerId);
-    ptr.active.delete(e.pointerId);
-    if (ptr.stroking) {
-      ptr.stroking = false;
-      ptr.velocity = null;
-      if (at) h.stroke(at, 'end');
-      return;
-    }
-    h.release();
-    if (at && ptr.active.size === 0 && !ptr.multi && ptr.travel < TAP_SLOP_PX) {
-      const long = e.timeStamp - ptr.downMs >= LONG_PRESS_MS;
-      h.tap(at, long || ptr.button === RIGHT_BUTTON ? 'order' : 'select');
-    }
-    const paused = e.timeStamp - ptr.lastMoveMs > INERTIA_MAX_PAUSE_MS;
-    if (ptr.active.size > 0 || paused) ptr.velocity = null;
+    count = Math.max(0, count - 1);
+    g.up(e.pointerId, local(e), performance.now());
+    h.pressed(count);
+    if (count === 0) h.idle(INERTIA_MAX_PAUSE_MS);
+  };
+  const leave = (): void => {
+    if (count === 0) g.hover(null);
   };
   const wheel = (e: WheelEvent): void => {
     e.preventDefault();
@@ -355,6 +316,7 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('pointerleave', leave);
   canvas.addEventListener('wheel', wheel, { passive: false });
   // Правая кнопка — приказ, контекстное меню браузера над картой не нужно.
   const noMenu = (e: MouseEvent): void => e.preventDefault();
@@ -365,6 +327,7 @@ function attachInput(canvas: HTMLCanvasElement, ptr: Pointers, h: InputHandlers)
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);
     canvas.removeEventListener('pointercancel', up);
+    canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('wheel', wheel);
   };
 }

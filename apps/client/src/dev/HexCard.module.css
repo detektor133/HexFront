@@ -128,3 +128,51 @@
   color: var(--ui-ink3);
   cursor: default;
 }
+
+/* Набор: глиф рода войск + число (art/ui.md, «Одна иконка — подпись до двух слов»). */
+.recruit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.glyph {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.glyphDot {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Действие одной иконкой: 44×44, иконка 22×22, линия 2, round. */
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

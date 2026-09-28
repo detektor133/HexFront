@@ -16,6 +16,7 @@ import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
+import { createOrderHooks } from './order-hooks.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
 import {
@@ -183,10 +184,26 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       const hex = hexId(h, map.width);
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
+      order(hex);
+    };
+    // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
+    const order = (hex: number): void => {
+      const current = viewRef.current;
+      if (!current) return;
       const next = orderHex(current, pickedRef.current, hex);
       if (next.cmd) match.send(next.cmd);
       pick(next.picked);
     };
+    const hooks = createOrderHooks({
+      map,
+      radius: tokens.map.hexRadius,
+      view: () => viewRef.current,
+      picked: () => pickedRef.current,
+      tool: () => toolRef.current !== null,
+      chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
+      setTarget: (t) => layerRef.current?.setOrderTarget(t),
+      order,
+    });
     const options = {
       radius: tokens.map.hexRadius,
       midLayer: (m: MapStatic, radius: number) => {
@@ -202,6 +219,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       mapViewRef.current = v;
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
+      v.setOrderHooks(hooks);
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));

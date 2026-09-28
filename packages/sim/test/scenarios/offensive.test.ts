@@ -14,6 +14,7 @@ import {
   startOffensive,
   stopOffensive,
   clearOffensive,
+  clearPlan,
   type At,
 } from '../scenario/dsl.ts';
 
@@ -153,6 +154,37 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     s.runTicks(1);
     const after = s.state.plans.find((p) => p.armyId === army);
     expect(after?.kind === 'front' && after.offensive).toBeNull();
+  });
+
+  it('«Стоп» — армия стоит, линия остаётся; «Начать» продолжает до линии (04/T16)', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(4);
+    s.cmd('A', stopOffensive(army));
+    s.runSeconds(2);
+    const owned = (): number => s.state.hexes.owner.filter((o) => o === 0).length;
+    const paused = owned();
+    s.runSeconds(20);
+    expect(owned()).toBe(paused);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(false);
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(80);
+    for (const c of [3, 4, 5]) {
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+    }
+  });
+
+  it('«Удалить» по фронту убирает и линию наступления (04/T16)', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 2);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.runTicks(1);
+    s.cmd('A', clearPlan(army));
+    s.runTicks(1);
+    expect(s.state.plans.find((p) => p.armyId === army)).toBeUndefined();
   });
 
   it('«Начать» без нарисованной линии — noOffensive', () => {

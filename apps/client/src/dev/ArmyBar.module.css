@@ -85,15 +85,62 @@
   display: flex;
   flex: 0 0 150px;
   overflow: hidden;
-  padding: 0;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   color: var(--ui-ink);
+}
+
+/* Карточка с линией наступления — шире на две кнопки ▶/■ по 44 px. */
+.withRun {
+  flex-basis: 238px;
+}
+
+/* Вся карточка, кроме ▶/■, — кнопка выбора армии. */
+.pick {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.runs {
+  display: flex;
+  align-items: center;
+}
+
+.run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.run:disabled {
+  color: var(--ui-ink3);
+  cursor: default;
+}
+
+.runIcon {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
 }
 
 /* Выбранная армия (или армия выбранных отрядов) — золотая рамка, как у фишки. */

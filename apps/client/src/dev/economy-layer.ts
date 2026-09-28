@@ -14,6 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
+import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
 import type { SplitOverlay } from './split-drag.ts';
@@ -25,6 +26,8 @@ import { tokens } from '../theme/tokens.ts';
 
 /** Толщина выделения гекса и дуги стройки, экранные px (токена нет — отладочный вид). */
 const MARK_WIDTH_PX = 2.5;
+/** Плашка прогноза над центром целевого гекса — выше его фишки, px экрана. */
+const PLATE_LIFT_PX = 30;
 /** Радиус дуги стройки — доля радиуса гекса. */
 const ARC_RADIUS = 0.78;
 
@@ -48,9 +51,20 @@ export interface EconomyLayer {
   setSelectedArmy(id: number | null): void;
   /** Кольцо «сколько взять» при вытягивании части из фишки. */
   setSplit(o: SplitOverlay | null): void;
+  /**
+   * Цель приказа, пока палец держит (или мышь наводит): подсветка гекса и плашка прогноза над
+   * ним, если там враг; null — убрать.
+   */
+  setOrderTarget(t: OrderTarget | null): void;
   chipAt(hex: number): Point;
   frame(nowMs: number): void;
   destroy(): void;
+}
+
+/** Цель приказа удержанием или наведением: гекс и плашка прогноза (null — не враг). */
+export interface OrderTarget {
+  readonly hex: number;
+  readonly badge: ForecastBadge | null;
 }
 
 /** Пунктир отрезка: штрих и промежуток — в мировых единицах. */
@@ -117,12 +131,15 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
   const planLayer = createPlanLayer(map, radius, center);
-  top.addChild(planLayer.container, marks, unitLayer.container);
+  // Плашка прогноза — поверх фишек.
+  const plates = new Container();
+  top.addChild(planLayer.container, marks, unitLayer.container, plates);
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
   let selectedArmy: number | null = null;
   let split: SplitOverlay | null = null;
+  let orderTarget: OrderTarget | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
 
@@ -195,6 +212,16 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         .poly(hexPolygon(center(selected.target), radius))
         .stroke({ color: tokens.status.danger, width: MARK_WIDTH_PX * k });
     }
+    for (const p of plates.removeChildren()) p.destroy({ children: true });
+    if (orderTarget) {
+      const at = center(orderTarget.hex);
+      marks.poly(hexPolygon(at, radius)).stroke({
+        color: orderTarget.badge ? tokens.status.danger : tokens.ui.ink,
+        width: MARK_WIDTH_PX * k,
+      });
+      // Над целевым гексом, выше фишек (art/units.md, «Плашка прогноза»).
+      if (orderTarget.badge) drawForecastPlate(plates, orderTarget.badge, at, k, PLATE_LIFT_PX);
+    }
   }
 
   const redraw = (): void => {
@@ -222,6 +249,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     setSplit(o) {
       split = o;
+      redraw();
+    },
+    setOrderTarget(t) {
+      orderTarget = t;
       redraw();
     },
     chipAt(hex) {

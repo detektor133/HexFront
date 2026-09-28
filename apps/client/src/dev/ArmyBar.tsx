@@ -2,6 +2,7 @@ import { ORG_MAX, type Command, type PlayerView, type UnitView } from '@hexfront
 
 import styles from './ArmyBar.module.css';
 import { armyName } from './army-name.ts';
+import { offensiveButtons } from './offensive-buttons.ts';
 import type { Tool as PlanTool } from './plan-draft.ts';
 import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
@@ -42,6 +43,7 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   start: <polygon points="6,4 16,10 6,16" />,
+  stop: <polygon points="5,5 15,5 15,15 5,15" />,
   // «Упёрлись»: стрелка упирается в черту (07-controls.md, «Линия наступления»).
   stuck: (
     <>
@@ -153,6 +155,27 @@ function Meter(props: {
   );
 }
 
+// ▶ «Начать» и ■ «Стоп» справа на карточке армии (art/ui.md); неактивная — приглушена.
+function RunButton(props: {
+  icon: 'start' | 'stop';
+  label: MessageKey;
+  enabled: boolean;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={styles.run}
+      aria-label={t(props.label)}
+      title={t(props.label)}
+      disabled={!props.enabled}
+      onClick={props.onClick}
+    >
+      <Icon name={props.icon} className={styles.runIcon} />
+    </button>
+  );
+}
+
 function ArmyCard(props: {
   name: string;
   color: string;
@@ -162,40 +185,62 @@ function ArmyCard(props: {
   selected: boolean;
   /** Выбрана часть отрядов армии — тонкая рамка (07-controls.md, «Что выбрано»). */
   partial: boolean;
+  /** Линия наступления армии: ▶/■ на карточке; null — кнопок нет. */
+  run: { readonly start: boolean; readonly stop: boolean } | null;
+  onRun: (start: boolean) => void;
   onClick: () => void;
 }): React.JSX.Element {
-  const { stats } = props;
+  const { stats, run } = props;
+  const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   return (
-    <button
-      type="button"
-      className={`${styles.card} ${props.selected ? styles.selected : props.partial ? styles.partial : ''}`}
-      aria-pressed={props.selected}
-      onClick={props.onClick}
-    >
-      <span className={styles.band} style={{ background: props.color }} />
-      <span className={styles.body}>
-        <span className={styles.head}>
-          <span className={styles.name}>{props.name}</span>
-          {stats.starving > 0 && (
-            <span title={t('army.starving').replace('{n}', String(stats.starving))}>
-              <Icon name="warn" className={styles.alarmIcon} />
-            </span>
-          )}
-          {props.stuck && (
-            <span title={t('army.stuck')}>
-              <Icon name="stuck" className={styles.stuckIcon} />
-            </span>
-          )}
+    <div className={`${styles.card} ${frame} ${run ? styles.withRun : ''}`}>
+      <button
+        type="button"
+        className={styles.pick}
+        aria-pressed={props.selected}
+        onClick={props.onClick}
+      >
+        <span className={styles.band} style={{ background: props.color }} />
+        <span className={styles.body}>
+          <span className={styles.head}>
+            <span className={styles.name}>{props.name}</span>
+            {stats.starving > 0 && (
+              <span title={t('army.starving').replace('{n}', String(stats.starving))}>
+                <Icon name="warn" className={styles.alarmIcon} />
+              </span>
+            )}
+            {props.stuck && (
+              <span title={t('army.stuck')}>
+                <Icon name="stuck" className={styles.stuckIcon} />
+              </span>
+            )}
+          </span>
+          <Meter icon="org" label="army.org" share={stats.org} color={tokens.chip.org} />
+          <Meter
+            icon="supply"
+            label="army.supply"
+            share={stats.supply}
+            color={supplyColor(stats.supply, stats.starving > 0)}
+          />
         </span>
-        <Meter icon="org" label="army.org" share={stats.org} color={tokens.chip.org} />
-        <Meter
-          icon="supply"
-          label="army.supply"
-          share={stats.supply}
-          color={supplyColor(stats.supply, stats.starving > 0)}
-        />
-      </span>
-    </button>
+      </button>
+      {run && (
+        <span className={styles.runs}>
+          <RunButton
+            icon="start"
+            label="plan.start"
+            enabled={run.start}
+            onClick={() => props.onRun(true)}
+          />
+          <RunButton
+            icon="stop"
+            label="plan.stop"
+            enabled={run.stop}
+            onClick={() => props.onRun(false)}
+          />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -223,7 +268,6 @@ export function ArmyBar(props: {
   const whole = army !== undefined && army.id === selected;
   const needWhole = whole ? null : t('plan.needWholeArmy');
   const plan = army ? view.plans.find((p) => p.armyId === army.id) : undefined;
-  const offensive = plan?.kind === 'front' ? plan.offensive : null;
   const active = (tool: PlanTool): boolean =>
     props.tool?.tool === tool && props.tool.armyId === army?.id;
   // Повторное нажатие на включённый инструмент — выключить (как в HoI4).
@@ -235,6 +279,10 @@ export function ArmyBar(props: {
     props.onPick({ hex: null, units: off ? [] : units.map((u) => u.id), target: null });
   };
   const reserve = mine.filter((u) => u.armyId === null);
+  const offensiveOf = (armyId: number): { readonly active: boolean } | null => {
+    const p = view.plans.find((x) => x.armyId === armyId);
+    return p?.kind === 'front' ? p.offensive : null;
+  };
   return (
     <div className={styles.dock}>
       {army && (
@@ -253,20 +301,6 @@ export function ArmyBar(props: {
             active={active('offensive')}
             disabled={needWhole ?? (plan?.kind === 'front' ? null : t('plan.needFront'))}
           />
-          {offensive && !offensive.active && (
-            <Tool
-              icon="start"
-              label="plan.start"
-              onClick={() => send({ t: 'startOffensive', armyId: army.id })}
-            />
-          )}
-          {offensive?.active && (
-            <Tool
-              icon="pause"
-              label="plan.pause"
-              onClick={() => send({ t: 'stopOffensive', armyId: army.id })}
-            />
-          )}
           <Tool
             icon="line"
             label="plan.line"
@@ -313,6 +347,8 @@ export function ArmyBar(props: {
               stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
               selected={a.id === selected}
               partial={props.partial.includes(a.id)}
+              run={offensiveButtons(offensiveOf(a.id))}
+              onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
               onClick={() => select(a.id, units)}
             />
           );

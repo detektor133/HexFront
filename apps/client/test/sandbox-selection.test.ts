@@ -4,13 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlayerView } from '@hexfront/sim';
 
-import {
-  attackCommand,
-  isHostile,
-  NOTHING_PICKED,
-  orderHex,
-  selectHex,
-} from '../src/dev/sandbox-selection.ts';
+import { isHostile, NOTHING_PICKED, orderHex, selectHex } from '../src/dev/sandbox-selection.ts';
 import { lang } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -54,18 +48,13 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(next.picked.units).toEqual(p.units);
   });
 
-  it('приказ по врагу — прицел атаки, подтверждение даёт attack', () => {
+  it('приказ по врагу — атака сразу, без подтверждения (04/T16)', () => {
     const p = selectHex(view, NOTHING_PICKED, home);
     const enemy = view.units.find((u) => u.owner !== view.playerId);
     if (!enemy) throw new Error('нет врага');
     const next = orderHex(view, p, enemy.hex);
-    expect(next.cmd).toBeNull();
-    expect(next.picked.target).toBe(enemy.hex);
-    expect(attackCommand(view, next.picked)).toEqual({
-      t: 'attack',
-      unitIds: p.units,
-      target: enemy.hex,
-    });
+    expect(next.cmd).toEqual({ t: 'attack', unitIds: p.units, target: enemy.hex });
+    expect(next.picked.target).toBeNull();
   });
 
   it('приказ без выбранных отрядов работает как выбор', () => {

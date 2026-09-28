@@ -16,12 +16,14 @@ import {
   inBounds,
   neighbors,
   type EdgeId,
+  type Forecast,
   type ForecastOutcome,
   type MapStatic,
   type PlanView,
   type PlayerView,
 } from '@hexfront/sim';
 
+import { drawForecastPlate, forecastBadge } from './forecast-plate.ts';
 import { createFrontTweens } from './front-tween.ts';
 import {
   arrowCount,
@@ -35,7 +37,6 @@ import { edgeRuns } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
 import type { SplitOverlay } from './split-drag.ts';
 import { dashedPath } from './unit-layer.ts';
-import { t, type MessageKey } from '../i18n/dict.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import type { Point } from '../render/hex-geometry.ts';
 import { armyColor } from '../theme/colors.ts';
@@ -193,17 +194,22 @@ export function createPlanLayer(
   }
 
   // Самый трудный из ближайших боёв: отряды армии рядом с занятыми врагом гексами зоны.
-  function worstForecast(v: PlayerView, p: FrontPlan): ForecastOutcome | null {
+  // Самый трудный бой — худший исход, при равенстве — больше свои потери.
+  function worstForecast(v: PlayerView, p: FrontPlan): Forecast | null {
     const zone = new Set(p.zone);
-    let worst: ForecastOutcome | null = null;
+    let worst: Forecast | null = null;
     for (const u of v.units) {
       if (u.armyId !== p.armyId || u.type === 'artillery') continue;
       for (const n of neighbors(hexFromId(u.hex, map.width))) {
         if (!inBounds(n, map.width, map.height)) continue;
         const id = hexId(n, map.width);
         if (!zone.has(id) || !isHostile(v, id)) continue;
-        const f = forecastBattle(map, v, [u.id], id).outcome;
-        if (worst === null || RANK[f] < RANK[worst]) worst = f;
+        const f = forecastBattle(map, v, [u.id], id);
+        const harder =
+          worst === null ||
+          RANK[f.outcome] < RANK[worst.outcome] ||
+          (RANK[f.outcome] === RANK[worst.outcome] && f.attackerLoss > worst.attackerLoss);
+        if (harder) worst = f;
       }
     }
     return worst;
@@ -232,14 +238,8 @@ export function createPlanLayer(
     const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
     const mid = pts[Math.floor(pts.length / 2)];
-    if (!worst || !mid) return;
-    const tone =
-      worst === 'victory'
-        ? tokens.status.success
-        : worst === 'defeat'
-          ? tokens.status.danger
-          : tokens.ui.ink;
-    label(t(`forecast.${worst}` as MessageKey), tone, mid);
+    // У линии — плашка прогноза без слов: иконка и цвет исхода + свои потери (art/units.md).
+    if (worst && mid) drawForecastPlate(labels, forecastBadge(worst), mid, k);
   }
 
   // Кольцо деления: подложка, дуга «сколько взять» от верха по часовой, ручка, число; путь в гекс.

@@ -1,8 +1,9 @@
 // Выбор и приказы в песочнице как в HoI4 (07-controls.md): тап/ЛКМ только выбирает и снимает
-// выбор, приказ — долгим тапом или ПКМ: «идти» на свободный гекс, прицел атаки на вражеский.
+// выбор, приказ — удержанием или ПКМ: «идти» на свободный гекс, «атаковать» вражеский — сразу, без
+// подтверждения (прогноз — только подсказка).
 import type { Command, PlayerView, UnitView } from '@hexfront/sim';
 
-/** Выбранный гекс, свои отряды и цель атаки, ждущая подтверждения. */
+/** Выбранный гекс, свои отряды и цель приказа, пока палец держит (удержание). */
 export interface Picked {
   readonly hex: number | null;
   readonly units: readonly number[];
@@ -69,8 +70,9 @@ export function armySelection(view: PlayerView, picked: readonly number[]): Army
 }
 
 /**
- * Долгий тап или ПКМ (приказ) выбранным отрядам.
- * @returns новый выбор и команда «идти»; по врагу — прицел атаки без команды
+ * Приказ (отпустили удержание, ПКМ) выбранным отрядам: свободный гекс — «идти», вражеский —
+ * «атаковать» сразу (артиллерия в атаку не идёт).
+ * @returns новый выбор и команда (или null)
  */
 export function orderHex(
   view: PlayerView,
@@ -79,15 +81,17 @@ export function orderHex(
 ): { readonly picked: Picked; readonly cmd: Command | null } {
   const mine = pickedUnits(view, picked);
   if (mine.length === 0) return { picked: selectHex(view, picked, hex), cmd: null };
-  if (isHostile(view, hex)) return { picked: { ...picked, target: hex }, cmd: null };
-  if (mine.every((u) => u.hex === hex)) return { picked, cmd: null };
-  const cmd: Command = { t: 'move', unitIds: mine.map((u) => u.id), to: hex };
-  return { picked: { ...picked, target: null }, cmd };
+  const done = { ...picked, target: null };
+  if (isHostile(view, hex)) {
+    const attackers = mine.filter((u) => u.type !== 'artillery');
+    if (attackers.length === 0) return { picked: done, cmd: null };
+    return { picked: done, cmd: { t: 'attack', unitIds: attackers.map((u) => u.id), target: hex } };
+  }
+  if (mine.every((u) => u.hex === hex)) return { picked: done, cmd: null };
+  return { picked: done, cmd: { t: 'move', unitIds: mine.map((u) => u.id), to: hex } };
 }
 
-/** Подтверждение атаки выбранными отрядами. */
-export function attackCommand(view: PlayerView, picked: Picked): Command | null {
-  const mine = pickedUnits(view, picked).filter((u) => u.type !== 'artillery');
-  if (picked.target === null || mine.length === 0) return null;
-  return { t: 'attack', unitIds: mine.map((u) => u.id), target: picked.target };
+/** Свои выбранные отряды (есть в снимке), для прогноза и отмены приказа удержанием. */
+export function pickedOwn(view: PlayerView, picked: Picked): UnitView[] {
+  return pickedUnits(view, picked);
 }

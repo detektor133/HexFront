@@ -21,6 +21,7 @@ function ActionButton(props: {
 }): React.JSX.Element {
   const [why, setWhy] = useState(false);
   const { a } = props;
+  // Что даёт постройка — во всплывающей подсказке, не текстом в карточке (04/T16).
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
   // Недоступное по правилам «Основать город»: приглушённая кнопка и причина строкой (ui.md).
@@ -39,12 +40,12 @@ function ActionButton(props: {
       <button
         type="button"
         className={styles.button}
+        title={hint ?? undefined}
         onClick={() => (a.affordable ? props.send(a.cmd) : setWhy(true))}
       >
         <span>{t(`action.${a.kind}` as MessageKey)}</span>
         <span className={a.affordable ? styles.price : styles.priceBad}>{formatFp(a.cost)}</span>
       </button>
-      {hint && <span className={styles.hint}>{hint}</span>}
       {/* Причина — только по тапу (ui.md). */}
       {why && !a.affordable && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
     </div>
@@ -53,6 +54,23 @@ function ActionButton(props: {
 
 // Набор в своём городе (03/T12): доступный — с ценой; не хватает только золота — с ценой и
 // причиной по тапу; недоступный по правилам — скрыт (ui.md).
+
+// Глиф рода войск в сетке 14×14 — как на фишке (art/units.md, «Глифы»).
+function UnitGlyph(props: { type: RecruitOption['type'] }): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 14 14" className={styles.glyph} aria-hidden="true">
+      {props.type === 'infantry' && <polyline points="2,10 7,5 12,10" />}
+      {props.type === 'armor' && <polygon points="7,2 12,7 7,12 2,7" />}
+      {props.type === 'artillery' && (
+        <>
+          <path d="M2 10 A5 5 0 0 1 12 10" />
+          <circle cx="7" cy="10" r="1.75" className={styles.glyphDot} />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function RecruitButton(props: {
   o: RecruitOption;
   send: (cmd: Command) => void;
@@ -68,14 +86,17 @@ function RecruitButton(props: {
       <button
         type="button"
         className={styles.button}
+        aria-label={`${t(`unit.${o.type}` as MessageKey)} ${formatSoldiers(o.soldiers)}`}
+        title={t(`unit.${o.type}` as MessageKey)}
         onClick={() =>
           ok
             ? props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers: o.soldiers })
             : setWhy(true)
         }
       >
-        <span>
-          {t(`recruit.${o.type}` as MessageKey)} {formatSoldiers(o.soldiers)}
+        <span className={styles.recruit}>
+          <UnitGlyph type={o.type} />
+          {formatSoldiers(o.soldiers)}
         </span>
         <span className={ok ? styles.price : styles.priceBad}>
           {cost === undefined ? '' : formatFp(cost)}
