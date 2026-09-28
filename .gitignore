@@ -8,3 +8,5 @@ playwright-report/
 .env
 .env.*
 !.env.example
+# Видео прогонов для отчётов — большие файлы, в репозиторий не кладутся (путь — в отчёте).
+docs/reports/**/*.webm
