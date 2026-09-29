@@ -14,7 +14,8 @@
     "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm test",
     "format": "prettier --write .",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
-    "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts"
+    "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
