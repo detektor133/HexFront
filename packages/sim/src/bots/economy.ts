@@ -1,24 +1,27 @@
 // Экономический мозг бота (04/T23, CR-006; gdd/09-bots.md, «Utility AI»): только по снимку игрока,
 // те же команды, что у игрока. Военная часть — commander; здесь — налог, стройки, набор, дорога и
 // когда нажать ▶ «Начать» у армии с auto. За одно решение — не больше одной траты: сначала дорога
-// к изолированному городу, затем набор (если у границы слабее врага), город, благоустройство.
+// к изолированному городу, затем набор (если у границы слабее врага), город, благоустройство,
+// улучшение города.
 import {
   BOT_GOLD_RESERVE,
   BOT_IMPROVE_POP_RATIO,
   BOT_RECRUIT_RATIO,
-  BOT_RECRUIT_SOLDIERS,
   BOT_TAX_PEACE,
   BOT_TAX_WAR,
   CITY_FOUND_MIN_POP_RATIO,
   CITY_MIN_DISTANCE,
+  CITY_UPGRADE_COST,
   COST_GOLD_PER_SOLDIER,
   IMPROVEMENT_COST,
+  RECRUIT_MIN,
+  RECRUIT_STEP,
   TAX_MAX,
 } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import { fpMul, type Fp } from '../math/int.ts';
+import { fpDiv, fpMul, type Fp } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import { edgeOther } from '../state/edges.ts';
@@ -58,18 +61,17 @@ function taxCommand(view: PlayerView, war: boolean): Command[] {
   return me.taxTarget === rate ? [] : [{ t: 'setTax', rate }];
 }
 
-// Изолированный свой город без идущей дороги — перестройка снабжения.
+// Изолированный свой город, до столицы есть путь, дорога ещё не идёт — перестройка снабжения.
 function roadCommand(view: PlayerView, gold: Fp): Command | null {
   if (gold < BOT_GOLD_RESERVE) return null;
   const roads = new Set(view.constructions.filter((c) => c.kind === 'road').map((c) => c.hex));
-  const city = view.cities.find(
-    (c) => c.owner === view.playerId && c.isolated && !roads.has(c.hex),
-  );
+  const city = view.cities.find((c) => c.canRebuild && !roads.has(c.hex));
   return city ? { t: 'rebuildSupply', cityId: city.id } : null;
 }
 
-// Набор, если солдат на своих гексах у границы меньше BOT_RECRUIT_RATIO × солдат врага у неё:
-// пехота в своём городе с наибольшим населением, где нет набора.
+// Набор, если солдат на своих гексах у границы меньше BOT_RECRUIT_RATIO × солдат врага у неё и
+// лимит отрядов не исчерпан: пехота в своём городе с наибольшим набором, где нет очереди, —
+// сколько даёт город и хватает золота (шагом RECRUIT_STEP).
 function recruitCommand(
   view: PlayerView,
   near: ReturnType<typeof contact>,
@@ -81,13 +83,17 @@ function recruitCommand(
       .reduce((s, u) => s + u.soldiers, 0);
   const enemy = sum(near.theirs, false);
   if (enemy === 0 || sum(near.mine, true) >= fpMul(enemy as Fp, BOT_RECRUIT_RATIO)) return null;
-  if (gold < fpMul(BOT_RECRUIT_SOLDIERS, COST_GOLD_PER_SOLDIER.infantry)) return null;
+  const used = view.units.filter((u) => u.owner === view.playerId).length + view.recruits.length;
+  if (used >= view.me.unitLimit) return null;
   const busy = new Set(view.recruits.map((r) => r.cityId));
   const city = view.cities
     .filter((c) => c.owner === view.playerId && !busy.has(c.id))
-    .sort((a, b) => (view.hexes.pop[b.hex] ?? 0) - (view.hexes.pop[a.hex] ?? 0) || a.id - b.id)[0];
-  return city
-    ? { t: 'recruit', cityId: city.id, type: 'infantry', soldiers: BOT_RECRUIT_SOLDIERS }
+    .sort((a, b) => b.recruitMax - a.recruitMax || a.id - b.id)[0];
+  if (!city) return null;
+  const afford = fpDiv(gold, COST_GOLD_PER_SOLDIER.infantry);
+  const soldiers = Math.min(city.recruitMax, afford - (afford % RECRUIT_STEP)) as Fp;
+  return soldiers >= RECRUIT_MIN
+    ? { t: 'recruit', cityId: city.id, type: 'infantry', soldiers }
     : null;
 }
 
@@ -139,6 +145,20 @@ function improveCommand(map: MapStatic, view: PlayerView, gold: Fp): Command | n
   return hex === undefined ? null : { t: 'improve', hex };
 }
 
+// Улучшение своего города с наименьшим уровнем (при равенстве — меньший id), без стройки в нём,
+// если хватает золота с резервом: остаток золота бота не лежит без дела.
+function upgradeCommand(view: PlayerView, gold: Fp): Command | null {
+  const busy = new Set(view.constructions.filter((c) => c.kind !== 'road').map((c) => c.hex));
+  const city = view.cities
+    .filter((c) => c.owner === view.playerId && !busy.has(c.hex))
+    .filter((c) => {
+      const cost = CITY_UPGRADE_COST[c.level - 1];
+      return cost !== undefined && gold >= cost + BOT_GOLD_RESERVE;
+    })
+    .sort((a, b) => a.level - b.level || a.id - b.id)[0];
+  return city ? { t: 'upgradeCity', cityId: city.id } : null;
+}
+
 // ▶ у армий с auto, у которых фронт без наступления: на участке есть вражеский гекс, который
 // отряды армии рядом с ним берут с прогнозом «победа». Линию строит commander.
 function startCommands(map: MapStatic, view: PlayerView): Command[] {
@@ -179,7 +199,8 @@ export function economyDecide(map: MapStatic, view: PlayerView): Command[] {
     roadCommand(view, me.gold) ??
     recruitCommand(view, near, me.gold) ??
     foundCommand(map, view, me.gold) ??
-    improveCommand(map, view, me.gold);
+    improveCommand(map, view, me.gold) ??
+    upgradeCommand(view, me.gold);
   if (spend) out.push(spend);
   return out;
 }

@@ -4,7 +4,10 @@ import { planViews, type PlanView } from './plan-view.ts';
 import { playerPlace, playerScore } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
 import type { UnitType } from '../balance.ts';
+import { RECRUIT_STEP } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
+import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
+import { recruitCapacity, unitLimit } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
@@ -41,6 +44,10 @@ export interface PlayerView {
     /** Ополчение или гарнизон, fixed-point солдат, и их организованность. */
     readonly defenders: Fp;
     readonly defenseOrg: Fp;
+    /** Свой город: наибольший набор сейчас (карточка города), fixed-point солдат; чужой — 0. */
+    readonly recruitMax: Fp;
+    /** Свой изолированный город, до столицы есть путь для дороги (кнопка «Проложить дорогу»). */
+    readonly canRebuild: boolean;
   }[];
   readonly units: readonly UnitView[];
   /** Свои армии — группы отрядов (CR-001). */
@@ -72,6 +79,8 @@ export interface PlayerView {
     readonly autoCommand: boolean;
     /** Цена основания следующего города, золото, fixed-point (03-cities-buildings.md). */
     readonly foundCityCost: Fp;
+    /** Командная ёмкость: сколько отрядов (с наборами в очереди) может быть у игрока. */
+    readonly unitLimit: number;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -125,11 +134,18 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
     autoCommand: state.players[playerId]?.autoCommand ?? true,
     foundCityCost: foundCityCost(state.players[playerId]?.citiesFounded ?? 0),
+    unitLimit: unitLimit(state, playerId),
     growthMultAtTarget: taxGrowthMult(target),
     score: playerScore(state, playerId),
     place: playerPlace(state, playerId),
     players: state.players.filter((p) => p.status === 'alive').length,
   };
+}
+
+// Наибольший набор в городе сейчас: ёмкость набора вниз до шага RECRUIT_STEP.
+function recruitMax(state: MatchState, cityId: number): Fp {
+  const cap = recruitCapacity(state, cityId);
+  return (cap - (cap % RECRUIT_STEP)) as Fp;
 }
 
 /**
@@ -163,6 +179,11 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
       isolated: isCityIsolated(state, c.id),
       defenders: c.defenders,
       defenseOrg: c.defenseOrg,
+      recruitMax: c.owner === playerId ? recruitMax(state, c.id) : (0 as Fp),
+      canRebuild:
+        c.owner === playerId &&
+        isCityIsolated(state, c.id) &&
+        rebuildSupplyPlan(state, playerId, c.id).ok,
     })),
     units: unitViews(state, playerId),
     armies: armyViews(state, playerId),

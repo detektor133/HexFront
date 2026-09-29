@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOT_GOLD_RESERVE,
-  BOT_RECRUIT_SOLDIERS,
   BOT_TAX_PEACE,
   BOT_TAX_WAR,
   BOT_THINK_TICKS,
+  RECRUIT_MIN,
   TAX_MAX,
 } from '../../src/balance.ts';
 import { economyDecide } from '../../src/bots/economy.ts';
@@ -137,9 +137,31 @@ describe('экономический мозг бота: траты (04/T23)', ()
     s.setPop(at(0, 2), 300);
     s.unit('A', 'infantry', 100, at(2, 2));
     for (let r = 1; r < 4; r += 1) s.unit('B', 'infantry', 500, at(3, r));
-    const rec = decide(s).find((c) => c.t === 'recruit');
-    expect(rec).toMatchObject({ t: 'recruit', type: 'infantry', soldiers: BOT_RECRUIT_SOLDIERS });
+    const view = playerView(s.state, 0);
+    const max = view.cities.find((c) => c.owner === 0)?.recruitMax ?? 0;
+    expect(max).toBeGreaterThanOrEqual(RECRUIT_MIN);
+    const rec = economyDecide(s.state.map, view).find((c) => c.t === 'recruit');
+    // Размер набора — сколько даёт город (карточка города), шагом RECRUIT_STEP.
+    expect(rec).toMatchObject({ t: 'recruit', type: 'infantry', soldiers: max });
     expect(accepted(s, rec as Command)).toBe(true);
+  });
+
+  it('лимит отрядов исчерпан — набора нет', () => {
+    const s = scenario(FIELD, { legend });
+    rich(s);
+    s.setPop(at(0, 2), 300);
+    const limit = playerView(s.state, 0).me.unitLimit;
+    for (let i = 0; i < limit; i += 1) s.unit('A', 'infantry', 10, at(i % 3, 4));
+    for (let r = 1; r < 4; r += 1) s.unit('B', 'infantry', 500, at(3, r));
+    expect(decide(s).filter((c) => c.t === 'recruit')).toEqual([]);
+  });
+
+  it('лишнее золото — улучшение города, sim принимает', () => {
+    const s = scenario(FIELD, { legend });
+    rich(s);
+    const up = decide(s).find((c) => c.t === 'upgradeCity');
+    expect(up).toEqual({ t: 'upgradeCity', cityId: s.cityAt(at(0, 2))?.id });
+    expect(accepted(s, up as Command)).toBe(true);
   });
 
   it('врага не видно — набора нет', () => {
@@ -164,7 +186,27 @@ describe('экономический мозг бота: траты (04/T23)', ()
     const a2 = s.cityAt(at(6, 1))?.id;
     const view = playerView(s.state, 0);
     expect(view.cities.find((c) => c.id === a2)?.isolated).toBe(true);
+    expect(view.cities.find((c) => c.id === a2)?.canRebuild).toBe(true);
     expect(economyDecide(s.state.map, view)).toContainEqual({ t: 'rebuildSupply', cityId: a2 });
+  });
+
+  it('изолированный город без пути к столице — дорогу не просит', () => {
+    const s = scenario(
+      `
+      a  a  a  ~  a  a  a
+      a  A1 a  ~  a  A2 a
+      a  a  a  ~  a  a  a
+      .  .  .  ~  .  .  B1
+    `,
+      { legend },
+    );
+    rich(s);
+    s.runTicks(20);
+    const view = playerView(s.state, 0);
+    const a2 = view.cities.find((c) => c.hex === 5 + 1 * 7);
+    expect(a2?.isolated).toBe(true);
+    expect(a2?.canRebuild).toBe(false);
+    expect(decide(s).filter((c) => c.t === 'rebuildSupply')).toEqual([]);
   });
 
   it('за одно решение — не больше одной траты', () => {

@@ -30,7 +30,6 @@
 | `BOT_GOLD_RESERVE` (FP) | 50 |
 | `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
 | `BOT_RECRUIT_RATIO` (FP) | 1,2 |
-| `BOT_RECRUIT_SOLDIERS` (FP) | 100 |
 
 ## Местность
 

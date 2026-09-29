@@ -42,8 +42,7 @@ export const BOT_GOLD_RESERVE: Fp = fp(50);
 export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
 /** Набор, если солдат у границы меньше, чем столько × солдат врага у неё. */
 export const BOT_RECRUIT_RATIO: Fp = fp(1.2);
-/** Размер одного набора бота, солдат (пехота). */
-export const BOT_RECRUIT_SOLDIERS: Fp = fp(100);
+
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
 
