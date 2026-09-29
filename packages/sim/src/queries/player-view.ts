@@ -140,11 +140,12 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
     tick: state.tick,
     playerId,
     hexes: {
-      owner: Int16Array.from(hexes.owner),
-      pop: Int32Array.from(hexes.pop),
-      improvement: Uint8Array.from(hexes.improvement),
-      building: Uint8Array.from(hexes.building),
-      road: Uint8Array.from(hexes.road),
+      // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
+      owner: hexes.owner.slice(),
+      pop: hexes.pop.slice(),
+      improvement: hexes.improvement.slice(),
+      building: hexes.building.slice(),
+      road: hexes.road.slice(),
       link: links(state),
       growth,
     },

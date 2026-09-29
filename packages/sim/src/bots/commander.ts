@@ -21,6 +21,18 @@ import {
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
+// Куски границы и их армии — одни на снимок: армии игрока решают по одному снимку в один тик.
+// Кэш по объекту снимка не меняет результат (снимок не меняется, пока жив).
+const assigned = new WeakMap<PlayerView, Map<number, Piece>>();
+
+function piecesOf(map: MapStatic, view: PlayerView): Map<number, Piece> {
+  const cached = assigned.get(view);
+  if (cached) return cached;
+  const out = assignPieces(map, view, enemyPieces({ map, hexes: view.hexes }, view.playerId));
+  assigned.set(view, out);
+  return out;
+}
+
 /** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
 const LAND_KEY = 1 << 16;
 
@@ -201,8 +213,7 @@ export function decide(map: MapStatic, view: PlayerView, armyId: number): Comman
   if (!army) return [];
   const out = reinforce(view, armyId);
   const units = armyUnits(view, armyId);
-  const g = { map, hexes: view.hexes };
-  const piece = assignPieces(map, view, enemyPieces(g, view.playerId)).get(armyId);
+  const piece = piecesOf(map, view).get(armyId);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {
     if (plan?.kind !== 'front' || !plan.edges.some((e) => piece.edges.includes(e))) {
