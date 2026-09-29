@@ -4,6 +4,7 @@ import { planViews, type PlanView } from './plan-view.ts';
 import { playerPlace, playerScore } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
 import type { UnitType } from '../balance.ts';
+import { foundCityCost } from '../commands/construction.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
@@ -69,6 +70,8 @@ export interface PlayerView {
     readonly autoReinforce: boolean;
     /** Настройка «Автокомандование» (CR-006). */
     readonly autoCommand: boolean;
+    /** Цена основания следующего города, золото, fixed-point (03-cities-buildings.md). */
+    readonly foundCityCost: Fp;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -121,6 +124,7 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     bankrupt: state.players[playerId]?.bankrupt ?? false,
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
     autoCommand: state.players[playerId]?.autoCommand ?? true,
+    foundCityCost: foundCityCost(state.players[playerId]?.citiesFounded ?? 0),
     growthMultAtTarget: taxGrowthMult(target),
     score: playerScore(state, playerId),
     place: playerPlace(state, playerId),

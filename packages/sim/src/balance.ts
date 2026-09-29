@@ -29,6 +29,21 @@ export const OFFENSIVE_STUCK_TICKS = 100;
  */
 export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
+
+// Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
+
+/** Налог бота в мире (без врага у границы); 09-bots.md: 10–15 %. */
+export const BOT_TAX_PEACE: Fp = fp(0.15);
+/** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
+export const BOT_TAX_WAR: Fp = fp(0.3);
+/** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
+export const BOT_GOLD_RESERVE: Fp = fp(50);
+/** Благоустройство — гексам с населением не ниже этой доли лимита. */
+export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
+/** Набор, если солдат у границы меньше, чем столько × солдат врага у неё. */
+export const BOT_RECRUIT_RATIO: Fp = fp(1.2);
+/** Размер одного набора бота, солдат (пехота). */
+export const BOT_RECRUIT_SOLDIERS: Fp = fp(100);
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
 

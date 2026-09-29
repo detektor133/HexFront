@@ -19,6 +19,19 @@
 | `MATCH_TIME_LIMIT_S` | 1500 |
 | `PREP_TIME_S` | 5 |
 
+## Боты
+
+Пороги utility AI бота (`09-bots.md`, «Utility AI»; 04/T23).
+
+| Константа | Значение |
+| --- | --- |
+| `BOT_TAX_PEACE` (FP) | 0,15 |
+| `BOT_TAX_WAR` (FP) | 0,30 |
+| `BOT_GOLD_RESERVE` (FP) | 50 |
+| `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
+| `BOT_RECRUIT_RATIO` (FP) | 1,2 |
+| `BOT_RECRUIT_SOLDIERS` (FP) | 100 |
+
 ## Местность
 
 | terrain | `BASE_POP_CAP` | `MOVE_TIME_S` | `DEF_MULT` | `OFFROAD_SUPPLY_LOSS` |
