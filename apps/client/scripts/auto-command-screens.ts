@@ -3,7 +3,7 @@
 // затем 6,5 минуты игры в реальном времени — обе армии под commander, кадр раз в 30 с; когда у армии
 // игрока появляется фронт, жмём ▶ — линию строит commander.
 // Запуск при работающем dev-сервере:
-//   node --experimental-strip-types apps/client/scripts/auto-command-screens.ts 5173
+//   node --experimental-strip-types apps/client/scripts/auto-command-screens.ts 5173 [суффикс]
 import { renameSync } from 'node:fs';
 
 import { chromium, type Page } from '@playwright/test';
@@ -11,7 +11,9 @@ import { chromium, type Page } from '@playwright/test';
 const PORT = process.argv[2] ?? '5173';
 const OUT = new URL('../../../docs/reports/stage-04/', import.meta.url);
 const file = (name: string): string => new URL(name, OUT).pathname.replace(/^\/([A-Z]:)/, '$1');
-const png = (name: string): string => file(`${name}.png`);
+/** Суффикс имён кадров и видео — третьим аргументом (например t22a), чтобы не затереть «до». */
+const SUFFIX = process.argv[3] ? `-${process.argv[3]}` : '';
+const png = (name: string): string => file(`${name}${SUFFIX}.png`);
 
 /** 6,5 минуты: границы соседей сходятся к 5-й минуте — ▶ и начало наступления попадают в запись. */
 const MATCH_MS = 6.5 * 60 * 1000;
@@ -105,5 +107,5 @@ await page.screenshot({ path: png('auto-match-end') });
 console.log('end', await clock(page));
 const video = page.video();
 await context.close();
-if (video) renameSync(await video.path(), file('auto-command.webm'));
+if (video) renameSync(await video.path(), file(`auto-command${SUFFIX}.webm`));
 await browser.close();
