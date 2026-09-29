@@ -43,7 +43,7 @@ function niceStep(max: number): number {
   return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * pow;
 }
 
-const fmt = (v: number): string => v.toLocaleString('ru-RU').replace(/ /g, ' ');
+const fmt = (v: number): string => v.toLocaleString('ru-RU').replace(/\u00a0/g, ' ');
 
 function chart(title: string, key: 'soldiers' | 'gold', unit: string): string {
   const n = match.samples[0]?.players.length ?? 0;
