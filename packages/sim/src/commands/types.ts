@@ -95,6 +95,8 @@ export const REJECT_REASONS = [
   'notOwnArmy',
   'badName',
   'badValue',
+  /** Команда commander для армии, у которой auto уже выключен (CR-006). */
+  'notAuto',
   'noFront',
   'tooManyOffensives',
   'noOffensive',

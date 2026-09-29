@@ -37,8 +37,16 @@ describe('деление вытягиванием из фишки (CR-005)', () 
   const { map } = base;
   const first = base.view.units.find((u) => u.owner === base.view.playerId);
   if (!first) throw new Error('нет своего отряда');
-  // Отряд побольше, чтобы было что крутить на кольце (у стартового 100 — только 50/50).
-  const unit: UnitView = { ...first, soldiers: 400_000 as Fp };
+  // Отряд побольше, чтобы было что крутить на кольце (у стартового 100 — только 50/50), и стоящий:
+  // стартовую армию с auto commander с первого тика ведёт занимать землю, а жест — про стоящий.
+  const unit: UnitView = {
+    ...first,
+    soldiers: 400_000 as Fp,
+    order: 'idle',
+    path: [],
+    moveTicks: 0,
+    moveTotal: 0,
+  };
   const view = { ...base.view, units: [unit, ...base.view.units.filter((u) => u.id !== unit.id)] };
   const at = hexCenter(hexFromId(unit.hex, map.width), R);
   const setup = (): { sent: Command[]; grab: ReturnType<typeof createSplitGrab> } => {

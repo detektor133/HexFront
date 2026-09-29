@@ -11,6 +11,7 @@ import {
   own,
   raw,
   renameArmy,
+  split,
   scenario,
   setOffensiveLine,
   startOffensive,
@@ -106,6 +107,25 @@ describe('автокомандование: флаг и команды (04/T19, 
     s.cmd('A', renameArmy(army, 'Север'));
     s.runTicks(1);
     expect(autoOf(s, army)).toBe(true);
+  });
+
+  it('ручной приказ или деление в том же тике, что решение commander, — побеждает ручное (04/T22a)', () => {
+    for (const manual of ['move', 'split'] as const) {
+      const s = scenario(FIELD, { legend });
+      const { army, unit } = armyWithUnit(s);
+      // Commander (решение по снимку до ручного действия) и ручное действие — в одном тике, в
+      // любом порядке очереди.
+      s.cmd('A', move([unit], at(2, 0)), 'auto');
+      if (manual === 'move') s.cmd('A', move([unit], at(0, 4)));
+      else s.cmd('A', split({ unitOf: 'A', index: 0 }, 100));
+      s.runTicks(1);
+      expect(autoOf(s, army)).toBe(false);
+      const path = s.unitById(unit)?.path ?? [];
+      // Приказ commander отклонён: отряд идёт по ручному приказу (или стоит после деления).
+      if (manual === 'move') expect(path.at(-1)).toBe(0 + 4 * 8);
+      else expect(path).toEqual([]);
+      expect(s.state.events.some((e) => e.t === 'commandRejected' && e.auto)).toBe(true);
+    }
   });
 
   it('чужую армию переключить нельзя', () => {

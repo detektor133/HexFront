@@ -1,7 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
+import { COMMANDER_TICKS } from '../../src/balance.ts';
 import { decide } from '../../src/bots/commander.ts';
+import { commanderCommands } from '../../src/bots/run.ts';
 import { distance, hexFromId } from '../../src/math/hex.ts';
 import { playerView } from '../../src/queries/player-view.ts';
 import { edgeHex, edgeOther } from '../../src/state/edges.ts';
@@ -216,6 +218,23 @@ describe('commander: война (04/T21, CR-006)', () => {
     expect(off?.hexes.length ?? 0).toBeGreaterThan(0);
     for (const h of off?.hexes ?? []) expect(h % w).toBeLessThanOrEqual(4);
     expect((off?.hexes ?? []).some((h) => distance(hexFromId(h, w), cityAt) <= 1)).toBe(true);
+  });
+});
+
+describe('commander: когда решает (04/T22a)', () => {
+  it('раз в COMMANDER_TICKS = 5 на игрока, все его армии с auto — в один тик, тик = id mod 5', () => {
+    const s = scenario(OPEN, { legend });
+    const first = autoArmy(s, 1);
+    const second = autoArmy(s, 1, at(1, 1));
+    expect(COMMANDER_TICKS).toBe(5);
+    for (let t = 100; t < 110; t += 1) {
+      s.setTick(t);
+      const armies = commanderCommands(s.state)
+        .filter((c) => c.playerId === 0 && c.cmd.t === 'move')
+        .map((c) => (c.cmd.t === 'move' ? s.unitById(c.cmd.unitIds[0] ?? -1)?.armyId : null));
+      const turn = t % COMMANDER_TICKS === 0 % COMMANDER_TICKS;
+      expect([...new Set(armies)].sort()).toEqual(turn ? [first, second].sort() : []);
+    }
   });
 });
 

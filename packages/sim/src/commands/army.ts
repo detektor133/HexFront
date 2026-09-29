@@ -2,6 +2,7 @@
 // автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель».
 import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
+import { trimAutoFront } from '../state/front.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 
 export type ArmyCommand = Extract<
@@ -121,6 +122,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
     case 'setArmyAuto': {
       const army = state.armies.find((a) => a.id === cmd.armyId);
       if (army) army.auto = cmd.on;
+      trimAutoFront(state, cmd.armyId);
       return;
     }
   }

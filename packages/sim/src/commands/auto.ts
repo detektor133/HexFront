@@ -45,6 +45,16 @@ function touched(state: MatchState, cmd: Command): number[] {
   }
 }
 
+/**
+ * Команду commander ещё можно применить: все армии, которых она касается, — с auto. Ручная команда
+ * того же тика применяется раньше и могла выключить auto — тогда решение commander устарело.
+ */
+export function stillAuto(state: MatchState, cmd: Command): boolean {
+  const ids = touched(state, cmd);
+  if ('armyId' in cmd && typeof cmd.armyId === 'number') ids.push(cmd.armyId);
+  return ids.every((id) => state.armies.find((a) => a.id === id)?.auto !== false);
+}
+
 /** Выключает auto у армий, которые ручная команда взяла под управление игрока. */
 export function takeOver(state: MatchState, cmd: Command): void {
   const ids = armiesTakenOver(state, cmd);

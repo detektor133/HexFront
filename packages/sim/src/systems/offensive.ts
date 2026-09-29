@@ -17,6 +17,7 @@ import {
   type EdgeId,
 } from '../state/edges.ts';
 import { borderArc } from '../state/front-follow.ts';
+import { trimAutoFront } from '../state/front.ts';
 import {
   enclaveHexes,
   facingHexes,
@@ -80,6 +81,7 @@ function finish(state: MatchState, plan: FrontPlan, owner: number, line: readonl
   const edges = arc.length > 0 ? arc : [...plan.edges];
   const i = state.plans.findIndex((p) => p.armyId === plan.armyId);
   state.plans[i] = { ...plan, edges, offensive: null };
+  trimAutoFront(state, plan.armyId);
   state.events.push({ t: 'offensiveDone', playerId: owner, armyId: plan.armyId });
 }
 

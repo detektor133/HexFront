@@ -1,6 +1,6 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
 import { executeArmyCommand, validateArmyCommand } from './army.ts';
-import { takeOver } from './auto.ts';
+import { stillAuto, takeOver } from './auto.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { executePlanCommand, validatePlanCommand } from './plan.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
@@ -118,14 +118,20 @@ export function validate(state: MatchState, playerId: number, cmd: Command): Val
 }
 
 /**
- * Применяет команды по порядку: по playerId, внутри игрока — по порядку поступления.
- * Отклонённые не меняют состояние и попадают в state.events.
+ * Применяет команды по порядку: по playerId, внутри игрока — сначала ручные, потом команды
+ * commander, каждые — по порядку поступления. Команда commander для армии, у которой auto уже
+ * выключен (в том числе ручной командой этого же тика), отклоняется. Отклонённые не меняют
+ * состояние и попадают в state.events.
  */
 export function applyCommands(state: MatchState, commands: readonly PlayerCommand[]): void {
   // sort стабилен (ES2019), поэтому порядок поступления внутри игрока сохраняется.
-  const ordered = [...commands].sort((a, b) => a.playerId - b.playerId);
+  const auto = (c: PlayerCommand): number => (c.source === 'auto' ? 1 : 0);
+  const ordered = [...commands].sort((a, b) => a.playerId - b.playerId || auto(a) - auto(b));
   for (const { playerId, cmd, source } of ordered) {
-    const result = validate(state, playerId, cmd);
+    const result =
+      source === 'auto' && !stillAuto(state, cmd)
+        ? rejected('notAuto')
+        : validate(state, playerId, cmd);
     // Ручное действие игрока с армией выключает её автокомандование (CR-006).
     if (result.ok && source !== 'auto') takeOver(state, cmd);
     if (result.ok) execute(state, playerId, cmd);

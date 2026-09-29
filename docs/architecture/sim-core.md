@@ -92,7 +92,7 @@ type Command =
 ## Commander (CR-006)
 
 - `packages/sim/src/bots/commander.ts`: `decide(map: MapStatic, view: PlayerView, armyId) → Command[]` — чистая функция снимка игрока (карта — статичная и общая, в снимок не входит), без случайности и мутаций, стабильный порядок. Линию наступления для ▶ строит `bots/commander-line.ts`; запуск по тикам — `bots/run.ts` `commanderCommands(state)`.
-- Вне `step`: движок (локальный — в воркере, сервер — в комнате) раз в `COMMANDER_TICKS` для каждой армии с auto (со смещением по id армии) вызывает `decide` и кладёт команды в очередь следующего тика с `source: 'auto'`.
+- Вне `step`: движок (локальный — в воркере, сервер — в комнате) раз в `COMMANDER_TICKS` для каждого игрока (все его армии с auto — в один тик, игроки распределены по тикам: `tick mod COMMANDER_TICKS = id игрока mod COMMANDER_TICKS`; снимок игрока строится один раз) вызывает `decide` и кладёт команды в очередь следующего тика с `source: 'auto'`.
 
 ## Запросы (чистые, без мутаций)
 

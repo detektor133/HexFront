@@ -27,7 +27,9 @@ const MAP: MapStatic = loaded.map;
 
 type Engine = Exclude<ReturnType<typeof createLocalEngine>, { readonly errors: readonly string[] }>;
 
-function start(): { e: Engine; view: () => PlayerView } {
+// pretick — первый тик до теста; без него ручное действие теста попадает в тот же тик, что первое
+// решение commander, и побеждает (стартовая армия с auto ещё стоит).
+function start(pretick = true): { e: Engine; view: () => PlayerView } {
   const e = createLocalEngine(small, 42, 2);
   if ('errors' in e) throw new Error(e.errors.join('\n'));
   let last: PlayerView | null = null;
@@ -37,7 +39,7 @@ function start(): { e: Engine; view: () => PlayerView } {
     if (!last) throw new Error('нет снимка');
     return last;
   };
-  tick();
+  if (pretick) tick();
   return { e, view: tick };
 }
 
@@ -55,12 +57,11 @@ function farPlain(v: PlayerView, from: number): number {
 
 describe('группы движения (04/T15)', () => {
   it('стопка из 3 отрядов на марше — одна фишка с «3» на каждом снимке пути', () => {
-    const { e, view } = start();
-    let v = view();
-    const [a, b] = v.units.filter((u) => u.owner === v.playerId);
+    const { e, view } = start(false);
+    const [a, b] = e.state.units.filter((u) => u.owner === 0);
     if (!a || !b) throw new Error('нет стартовых отрядов');
     e.queue({ t: 'split', unitId: a.id, soldiers: (50 * FP) as Fp });
-    v = view();
+    let v = view();
     const mine = v.units.filter((u) => u.owner === v.playerId && u.hex === a.hex);
     expect(mine).toHaveLength(3);
     const ids = mine.map((u) => u.id);

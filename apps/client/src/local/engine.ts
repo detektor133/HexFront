@@ -84,11 +84,11 @@ export function createLocalEngine(
       selected = hex;
     },
     tick() {
-      // Сначала commander (армии с auto всех игроков), затем ручные команды игрока: ручная
-      // выключает auto армии и в том же тике перекрывает решение commander.
+      // Ручные команды игрока и решения commander (армии с auto всех игроков) — в один тик; sim
+      // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
       step(state, [
-        ...commanderCommands(state),
         ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+        ...commanderCommands(state),
       ]);
       pending = [];
       const rejected: { command: string; reason: RejectReason }[] = [];

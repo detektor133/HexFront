@@ -1,7 +1,7 @@
 // Геометрия планов армий (CR-002…CR-004): участок фронта — цепочка граней своей границы (с врагом
 // или ничьей землёй), которая едет за границей; линия обороны — по своим гексам.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
-import { edgeHex, edgeHexes, edgeOther } from './edges.ts';
+import { edgeHex, edgeHexes, edgeOther, type EdgeId } from './edges.ts';
 import { followEdges } from './front-follow.ts';
 import type { LineGround } from './ground.ts';
 import type { ArmyPlan, MatchState } from './types.ts';
@@ -85,6 +85,28 @@ export function defenseLinePath(
 }
 
 /**
+ * Грани фронта армии с автокомандованием: только граница с врагом — грани с ничьей землёй
+ * выпадают (07-controls.md, «Автокомандование»). Ручные фронты этим не режутся.
+ * @returns грани в прежнем порядке
+ */
+export function enemyEdges(state: LineGround, owner: number, edges: readonly EdgeId[]): EdgeId[] {
+  return edges.filter((e) => {
+    const other = state.hexes.owner[edgeOther(state, e)] ?? -1;
+    return other >= 0 && other !== owner;
+  });
+}
+
+/** Фронт армии с auto — на границу с врагом (после любой смены граней плана и при включении auto). */
+export function trimAutoFront(state: MatchState, armyId: number): void {
+  const army = state.armies.find((a) => a.id === armyId);
+  const i = state.plans.findIndex((p) => p.armyId === armyId);
+  const plan = state.plans[i];
+  if (!army?.auto || plan?.kind !== 'front') return;
+  const edges = enemyEdges(state, army.owner, plan.edges);
+  if (edges.length !== plan.edges.length) state.plans[i] = { ...plan, edges };
+}
+
+/**
  * Фронт едет за границей: переносит участки фронта, у которых есть грань гекса hex (с любой
  * стороны), — после каждой смены владельца этого гекса (setHexOwner). Остальные не трогает.
  */
@@ -100,6 +122,7 @@ export function followFrontsNear(state: MatchState, hex: HexId): void {
     if (edges.length !== plan.edges.length || edges.some((e, k) => e !== plan.edges[k])) {
       state.plans[i] = { ...plan, edges };
     }
+    trimAutoFront(state, plan.armyId);
   });
 }
 

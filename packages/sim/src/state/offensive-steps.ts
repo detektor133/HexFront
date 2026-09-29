@@ -5,8 +5,17 @@
 import { canonicalEdge } from './edge-line.ts';
 import { edgeHex, edgeOther, type EdgeId } from './edges.ts';
 import type { LineGround } from './ground.ts';
+import { OFFENSIVE_FACING_RANGE } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
-import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import {
+  distance,
+  hexFromId,
+  hexId,
+  inBounds,
+  neighbors,
+  type Hex,
+  type HexId,
+} from '../math/hex.ts';
 
 const SIDES = 6;
 
@@ -118,29 +127,54 @@ function advances(dist: Int32Array, a: HexId, b: HexId): boolean {
   return db >= 0 && (da < 0 || db < da || (da === 0 && db === 0));
 }
 
+// Гексы фронта не дальше OFFENSIVE_FACING_RANGE от «точек фронта у линии»: для каждого гекса
+// линии — ближайшие к нему гексы фронта. Длинный фронт не посылает удар издалека через свою
+// землю, а выступ, уже дошедший до линии, не сужает удар: к другим гексам линии ближе другая часть
+// фронта. Ни один гекс фронта не дотягивается до линии — ограничения нет.
+function nearLine(
+  g: LineGround,
+  edges: readonly EdgeId[],
+  dist: Int32Array,
+): (h: HexId) => boolean {
+  const hexes = [...new Set(edges.map(edgeHex))].filter((h) => (dist[h] ?? -1) >= 0);
+  if (hexes.length === 0) return () => true;
+  const width = g.map.width;
+  const front = hexes.map((h) => hexFromId(h, width));
+  const anchors: Hex[] = [];
+  dist.forEach((d, l) => {
+    if (d !== 0) return;
+    const at = hexFromId(l, width);
+    const ds = front.map((f) => distance(f, at));
+    const min = Math.min(...ds);
+    front.forEach((f, i) => {
+      if (ds[i] === min) anchors.push(f);
+    });
+  });
+  return (h) => {
+    const p = hexFromId(h, width);
+    return anchors.some((a) => distance(a, p) <= OFFENSIVE_FACING_RANGE);
+  };
+}
+
 /**
- * Грани фронта, смотрящие на линию: гекс за гранью ближе к линии, чем свой, или оба на линии.
+ * Грани фронта, смотрящие на линию: гекс за гранью ближе к линии, чем свой, или оба на линии, и
+ * свой гекс не дальше OFFENSIVE_FACING_RANGE от гекса фронта, ближайшего к какому-нибудь гексу линии.
  * @returns грани в порядке фронта
  */
 export function facingEdges(g: LineGround, edges: readonly EdgeId[], dist: Int32Array): EdgeId[] {
+  const near = nearLine(g, edges, dist);
   return edges.filter((e) => {
     const other = edgeOther(g, e);
-    return other >= 0 && advances(dist, edgeHex(e), other);
+    return other >= 0 && advances(dist, edgeHex(e), other) && near(edgeHex(e));
   });
 }
 
 /**
- * Свои гексы фронта с гранью, смотрящей на линию: гекс за гранью ближе к линии, чем свой, или
- * оба на линии (грань вдоль линии).
+ * Свои гексы фронта со смотрящей на линию гранью (facingEdges).
  * @returns HexId по возрастанию, без повторов
  */
 export function facingHexes(g: LineGround, edges: readonly EdgeId[], dist: Int32Array): HexId[] {
-  const out = new Set<HexId>();
-  for (const e of edges) {
-    const other = edgeOther(g, e);
-    if (other >= 0 && advances(dist, edgeHex(e), other)) out.add(edgeHex(e));
-  }
-  return [...out].sort((a, b) => a - b);
+  return [...new Set(facingEdges(g, edges, dist).map(edgeHex))].sort((a, b) => a - b);
 }
 
 /**
