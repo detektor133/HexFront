@@ -13,14 +13,14 @@ export interface LocalMatch {
 export function startLocalMatch(
   map: unknown,
   seed: number,
-  players: number,
+  players: { readonly count: number; readonly bots: readonly number[]; readonly speed: number },
   onMessage: (msg: FromWorker) => void,
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
   const post = (msg: ToWorker): void => worker.postMessage(msg);
   worker.onmessage = (event: MessageEvent<FromWorker>) => onMessage(event.data);
   worker.onerror = (event) => onMessage({ t: 'error', errors: [event.message] });
-  post({ t: 'start', map, seed, players });
+  post({ t: 'start', map, seed, players: players.count, bots: players.bots, speed: players.speed });
   return {
     send: (cmd) => post({ t: 'command', cmd }),
     select: (hex) => post({ t: 'select', hex }),

@@ -14,6 +14,7 @@ import { ArmyBar } from './ArmyBar.tsx';
 import styles from './DevSandboxPage.module.css';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
+import { MatchEnd } from './MatchEnd.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
 import { createOrderHooks } from './order-hooks.ts';
@@ -37,6 +38,19 @@ import { tokens } from '../theme/tokens.ts';
 /** Сид и число игроков: игрок и соперник без ботов (боты — этап 05). */
 const SEED = 42;
 const PLAYERS = 2;
+/** Наибольшее ускорение песочницы (тиков за 100 мс) — для записи матча. */
+const SPEED_MAX = 20;
+
+// Состав матча из адреса (04/T24): players — участников (человек + боты), watch=1 — человек тоже
+// под ботом (запись матча ботов), speed — ускорение.
+function matchSetup(search: string): { count: number; bots: number[]; speed: number } {
+  const params = new URLSearchParams(search);
+  const count = Math.max(2, Math.floor(Number(params.get('players') ?? PLAYERS)) || PLAYERS);
+  const watch = params.get('watch') === '1';
+  const bots = Array.from({ length: count }, (_, i) => i).filter((i) => watch || i !== 0);
+  const speed = Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
+  return { count, bots, speed };
+}
 
 type Loaded = { json: unknown; map: MapStatic } | 'loading' | 'error';
 
@@ -162,7 +176,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
-    const match = startLocalMatch(json, SEED, PLAYERS, (m) => {
+    const match = startLocalMatch(json, SEED, matchSetup(window.location.search), (m) => {
       if (m.t === 'error') return setError(m.errors.join('; '));
       viewRef.current = m.view;
       layerRef.current?.setView(m.view, pickedRef.current);
@@ -278,6 +292,7 @@ export function DevSandboxPage(): React.JSX.Element {
     <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
       {view && <Hud view={view} send={sb.send} />}
+      {view && <MatchEnd view={view} />}
       {view && (
         <ArmyBar
           view={view}

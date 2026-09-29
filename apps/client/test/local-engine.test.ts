@@ -82,6 +82,29 @@ describe('локальный режим', () => {
     }
   });
 
+  it('боты — все, кроме человека: у них мозг бота, у человека — нет (04/T24)', () => {
+    const e = createLocalEngine(small, 42, 3);
+    if ('errors' in e) throw new Error(e.errors.join(' '));
+    for (let i = 0; i < 30; i += 1) e.tick();
+    // Мозг бота включает автопополнение; человек его не трогал.
+    expect(e.state.players.map((p) => p.autoReinforce)).toEqual([false, true, true]);
+  });
+
+  it('режим наблюдения: человек тоже под ботом (04/T24)', () => {
+    const e = createLocalEngine(small, 42, 3, [0, 1, 2]);
+    if ('errors' in e) throw new Error(e.errors.join(' '));
+    for (let i = 0; i < 30; i += 1) e.tick();
+    expect(e.state.players.map((p) => p.autoReinforce)).toEqual([true, true, true]);
+  });
+
+  it('снимок показывает победителя (04/T24)', () => {
+    const e = engine();
+    const before = asView(e.tick()).view;
+    expect(before.winner).toBe(-1);
+    e.state.winner = 1;
+    expect(asView(e.tick()).view.winner).toBe(1);
+  });
+
   it('ошибка карты возвращается, а не бросается', () => {
     expect(createLocalEngine({ version: 2 }, 1, 2)).toMatchObject({ errors: expect.any(Array) });
   });

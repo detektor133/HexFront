@@ -21,6 +21,8 @@ export const LINK = { none: 0, main: 1, isolated: 2 } as const;
 
 export interface PlayerView {
   readonly tick: number;
+  /** Победитель матча (08-match.md, «Победа»); -1 — матч идёт. */
+  readonly winner: number;
   readonly playerId: number;
   readonly hexes: {
     readonly owner: Int16Array;
@@ -158,6 +160,7 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
   return {
     me: summary(state, playerId, growth),
     tick: state.tick,
+    winner: state.winner,
     playerId,
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.

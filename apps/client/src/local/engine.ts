@@ -7,6 +7,7 @@ import {
   FP,
   cityPopCap,
   hexPopCap,
+  botCommands,
   cityInfo,
   commanderCommands,
   createMatch,
@@ -22,7 +23,10 @@ import {
 
 import type { FromWorker, RecruitOption, Selection } from './messages.ts';
 
-/** В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander. */
+/**
+ * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
+ * экономикой ботов — мозг бота (09-bots.md).
+ */
 export const HUMAN_ID = 0;
 
 export interface LocalEngine {
@@ -61,13 +65,17 @@ function selectionOf(state: MatchState, hex: number): Selection {
 }
 
 /**
- * Создаёт локальный матч из JSON карты.
+ * Создаёт локальный матч из JSON карты. bots — игроки под мозгом бота: по умолчанию все, кроме
+ * человека; с человеком — режим наблюдения (запись матча ботов).
  * @returns движок или список ошибок карты
  */
 export function createLocalEngine(
   mapJson: unknown,
   seed: number,
   players: number,
+  bots: readonly number[] = Array.from({ length: players }, (_, i) => i).filter(
+    (i) => i !== HUMAN_ID,
+  ),
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
@@ -89,6 +97,7 @@ export function createLocalEngine(
       step(state, [
         ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
         ...commanderCommands(state),
+        ...botCommands(state, bots),
       ]);
       pending = [];
       const rejected: { command: string; reason: RejectReason }[] = [];

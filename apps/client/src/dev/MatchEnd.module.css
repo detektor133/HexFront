@@ -1,0 +1,43 @@
+/* Конец матча — карточка по центру экрана, как карточки гекса и города (ui.md). */
+.card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 320px;
+  max-width: calc(100% - 2 * var(--space-lg));
+  box-sizing: border-box;
+  padding: var(--space-lg);
+  transform: translate(-50%, -50%);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  color: var(--ui-ink);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  font-size: var(--font-size-hud-value);
+}
+
+.line {
+  margin: 0 0 var(--space-xs);
+  color: var(--ui-ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+.again {
+  min-height: 44px;
+  margin-top: var(--space-md);
+  padding: 0 var(--space-lg);
+  background: var(--ui-ink);
+  border: 0;
+  border-radius: var(--radius-button);
+  color: var(--ui-surface);
+  font: inherit;
+  cursor: pointer;
+}
