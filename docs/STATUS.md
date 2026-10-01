@@ -11,6 +11,7 @@
 
 ## Последняя сессия
 
+- Инфра Codex: проектные `.codex/config.toml` и `.codex/hooks.json` сверены с CLI 0.130.0; matcher shell-хука исправлен на `^Bash$`; Stop-хук блокирует завершение при сломанном тесте, PreToolUse блокирует `pnpm dev`; `pnpm verify` зелёный.
 - Инфра, агент пишет код — проверяют скрипты (вне задач этапа): `pnpm verify [--changed]` (build → типы → lint → тесты → visual, лог в `.ai-logs/`, итог ≤ 20 строк); `pnpm visual` при падении печатает процент, область и селекторы DOM; Stop-хук (`tools/ai-check/src/stop-hook.ts`) не даёт закончить ход при красном `verify --changed`; `.claude/settings.json` — deny браузерных MCP, Read PNG/WebM/MP4, `pnpm dev*`/Playwright; `commit-check` принимает `Этап: NN/infra`; правила — в `CLAUDE.md`. Проверено поломкой теста на временной ветке.
 - Инфра, экономия токенов (вне задач этапа, игровой код не тронут): `CLAUDE.md` — карта репозитория и правила работы; `pnpm ai-check --changed|--full|--staged` (тихий вывод, итог одной строкой); хуки pre-commit (lint staged) и commit-msg (тот же `commit-check`, режим `--msg`); `pnpm visual` — эталоны `/dev/map` в `apps/client/tests/visual/baseline/`, порог 0,1 %; `pnpm report:match --seeds N` — метрики, графики PNG, CSV в `docs/reports/match/` (в git не кладутся).
 - 04/T22a: фронт армии с «А» — только граница с врагом; смотрящие грани — в 3 гексах от точек фронта у линии (вариант Б); commander раз в 5 тиков на игрока; ручная команда в том же тике побеждает решение commander (был баг); замер commander 8,8 / 10,1 мс на 30 игроков; скриншоты 06:45 до/после.
