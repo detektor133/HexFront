@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { FRONT_ALLOC_TICKS } from '../../src/balance.ts';
 import { edgeOther } from '../../src/state/edges.ts';
+import { frontSystem } from '../../src/systems/front.ts';
 import {
   assignFront,
   assignUnits,
@@ -92,4 +94,28 @@ describe('фронт армии с «А» — только граница с в�
     }
     expect(done).toBe(true);
   }, 30_000);
+});
+
+describe('автослияние отрядов (04/T26)', () => {
+  it('армия без плана сливает два однотипных отряда в одном гексе', () => {
+    const s = scenario(MAP, { legend });
+    const id = army(s, 2);
+    const owned = s.state.armies.find((a) => a.id === id);
+    if (owned) owned.auto = true;
+    s.setTick((FRONT_ALLOC_TICKS - (id % FRONT_ALLOC_TICKS)) % FRONT_ALLOC_TICKS);
+    frontSystem(s.state);
+    expect(s.unitsOf('A').filter((u) => u.armyId === id)).toHaveLength(1);
+  });
+
+  it('после слияния лишних отрядов на линии не запускает обратное деление', () => {
+    const s = scenario(MAP, { legend });
+    const id = army(s, 3);
+    const owned = s.state.armies.find((a) => a.id === id);
+    if (owned) owned.auto = true;
+    s.state.plans.push({ armyId: id, kind: 'line', hexes: [1 + 2 * 8] });
+    s.setTick((FRONT_ALLOC_TICKS - (id % FRONT_ALLOC_TICKS)) % FRONT_ALLOC_TICKS);
+    frontSystem(s.state);
+    frontSystem(s.state);
+    expect(s.unitsOf('A').filter((u) => u.armyId === id)).toHaveLength(1);
+  });
 });

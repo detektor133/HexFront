@@ -159,8 +159,8 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
   return part;
 }
 
-// Остаётся отряд с наименьшим id; org — средневзвешенная по солдатам.
-function executeMerge(state: MatchState, units: readonly Unit[]): void {
+/** Сливает однотипные отряды в одном гексе; остаётся отряд с наименьшим id. */
+export function mergeUnits(state: MatchState, units: readonly Unit[]): void {
   const sorted = [...units].sort((a, b) => a.id - b.id);
   const [kept, ...rest] = sorted;
   if (!kept) return;
@@ -217,7 +217,7 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
       if (owned.units[0]) owned.units[0].focus = cmd.targetUnitId ?? -1;
       return;
     case 'merge':
-      executeMerge(state, owned.units);
+      mergeUnits(state, owned.units);
       return;
   }
 }

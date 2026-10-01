@@ -230,4 +230,19 @@ describe('набор в резерв и «Автопополнение» (CR-001
     expect(s.player('A').autoReinforce).toBe(false);
     expect(s.unitsOf('A')[0]?.armyId).toBeNull();
   });
+
+  it('закрытая линия получает солдат в существующий отряд без новой фишки', () => {
+    const s = withTwoArmies();
+    const army = s.armiesOf('A')[0]?.id ?? -1;
+    const unit = s.unit('A', 'infantry', 100, at(1, 1));
+    s.cmd('A', assignUnits([unit], army), 'auto');
+    s.state.plans.push({ armyId: army, kind: 'line', hexes: [1 + 1 * 6] });
+    const existing = s.unitById(unit);
+    if (existing) existing.slot = 1 + 1 * 6;
+    s.cmd('A', setAutoReinforce(true));
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.unitsOf('A')).toHaveLength(1);
+    expect(s.unitById(unit)?.soldiers).toBe(150 * FP);
+  });
 });

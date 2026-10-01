@@ -187,6 +187,16 @@ describe('ход боя', () => {
     expect(s.unitById(def)).toBeUndefined();
     expect(s.lastEvent('unitDestroyed')).toBeDefined();
   });
+
+  it('остаток меньше одного солдата немедленно расформировывается', () => {
+    const s = scenario(FIELD, { legend });
+    const id = s.unit('A', 'infantry', 1, at(2, 1));
+    const unit = s.unitById(id);
+    if (unit) unit.soldiers = (FP - 1) as Fp;
+    s.runTicks(1);
+    expect(s.unitById(id)).toBeUndefined();
+    expect(s.lastEvent('unitDestroyed')).toMatchObject({ unitId: id });
+  });
 });
 
 describe('города: ополчение и гарнизон', () => {

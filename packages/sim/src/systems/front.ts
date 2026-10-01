@@ -9,7 +9,7 @@ import {
   MAX_UNITS_PER_HEX,
 } from '../balance.ts';
 import { unitLimit } from '../commands/recruit.ts';
-import { splitUnit } from '../commands/unit.ts';
+import { mergeUnits, splitUnit } from '../commands/unit.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
@@ -67,11 +67,35 @@ function coverLine(state: MatchState, armyId: number, owner: number): void {
   }
 }
 
+const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b.id;
+
+// Одно слияние за распределение: пара должна быть однотипной, в одном гексе и не в бою.
+function autoMerge(state: MatchState, armyId: number): void {
+  const plan = state.plans.find((p) => p.armyId === armyId);
+  const need = plan ? planHexes(state, plan).length : 0;
+  const armyUnits = state.units.filter((u) => u.armyId === armyId && u.type !== 'artillery');
+  const eligible = armyUnits.filter(
+    (u) => !u.inBattle && (plan !== undefined || u.order === 'idle'),
+  );
+  for (const type of ['infantry', 'armor'] as const) {
+    const sameType = armyUnits.filter((u) => u.type === type);
+    if (plan && sameType.length <= need) continue;
+    const candidates = eligible.filter((u) => u.type === type).sort(bySize);
+    for (const first of candidates) {
+      const second = candidates.find((u) => u.id !== first.id && u.hex === first.hex);
+      if (!second) continue;
+      mergeUnits(state, [first, second]);
+      return;
+    }
+  }
+}
+
 function runPlan(state: MatchState, armyId: number): void {
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
+  autoMerge(state, armyId);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = state.units.filter((u) => planControls(u, plan.armyId));
@@ -93,5 +117,9 @@ function runPlan(state: MatchState, armyId: number): void {
 export function frontSystem(state: MatchState): void {
   for (const plan of state.plans) {
     if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan.armyId);
+  }
+  for (const army of state.armies) {
+    if (state.plans.some((p) => p.armyId === army.id)) continue;
+    if ((state.tick + army.id) % FRONT_ALLOC_TICKS === 0) autoMerge(state, army.id);
   }
 }
