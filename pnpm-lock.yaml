@@ -94,6 +94,8 @@ importers:
 
   tools/bench: {}
 
+  tools/ci-wait: {}
+
   tools/commit-check: {}
 
   tools/replay: {}

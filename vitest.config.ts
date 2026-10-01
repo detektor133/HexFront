@@ -10,6 +10,7 @@ const PROJECTS = [
   'tools/replay',
   'tools/ai-check',
   'tools/commit-check',
+  'tools/ci-wait',
   'tools/tokens',
 ];
 
