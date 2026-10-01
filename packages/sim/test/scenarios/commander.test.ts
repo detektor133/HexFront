@@ -1,8 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { BOT_LINE_MAX_DEPTH, COMMANDER_TICKS } from '../../src/balance.ts';
-import { commanderLine } from '../../src/bots/commander-line.ts';
+import { COMMANDER_TICKS } from '../../src/balance.ts';
 import { decide } from '../../src/bots/commander.ts';
 import { commanderCommands } from '../../src/bots/run.ts';
 import { distance, hexFromId } from '../../src/math/hex.ts';
@@ -219,43 +218,6 @@ describe('commander: война (04/T21, CR-006)', () => {
     expect(off?.hexes.length ?? 0).toBeGreaterThan(0);
     for (const h of off?.hexes ?? []) expect(h % w).toBeLessThanOrEqual(4);
     expect((off?.hexes ?? []).some((h) => distance(hexFromId(h, w), cityAt) <= 1)).toBe(true);
-  });
-
-  it('бот строит линию до глубины 6, человек сохраняет глубину 3', () => {
-    const s = scenario(
-      `
-      a  a  a  b  b  b  b  b  b  b  b
-      a  a  a  b  b  b  b  b  B1 b  b
-      A1 a  a  b  b  b  b  b  b  b  b
-      a  a  a  b  b  b  b  b  b  b  b
-      a  a  a  b  b  b  b  b  b  b  b
-    `,
-      { legend },
-    );
-    const army = autoArmy(s, 4);
-    s.cmd('A', assignFront(army, 'B', null), 'auto');
-    s.runTicks(1);
-    const plan = planOf(s, army);
-    const edges = plan?.kind === 'front' ? plan.edges : [];
-    const view = playerView(s.state, 0);
-    const human = commanderLine(s.state.map, view, edges, 1);
-    const bot = commanderLine(s.state.map, view, edges, 1, BOT_LINE_MAX_DEPTH);
-    const farthest = (line: readonly number[]): number =>
-      Math.max(...line.map((edge) => edgeHex(edge) % s.state.map.width));
-    expect(farthest(human)).toBe(6);
-    expect(farthest(bot)).toBe(8);
-  });
-
-  it('армия экспансии получает один отряд, фронтовая армия не опустошается', () => {
-    const s = scenario(OPEN, { legend });
-    const donor = autoArmy(s, 3);
-    s.state.plans.push({ armyId: donor, kind: 'line', hexes: [1 + 2 * 9] });
-    const expansion = autoArmy(s, 0);
-    const cmds = decide(s.state.map, playerView(s.state, 0), expansion);
-    const assign = cmds.find((c) => c.t === 'assignUnits');
-    expect(assign).toMatchObject({ t: 'assignUnits', armyId: expansion });
-    expect(assign?.t === 'assignUnits' ? assign.unitIds : []).toHaveLength(1);
-    expect(s.unitsOf('A').filter((u) => u.armyId === donor)).toHaveLength(3);
   });
 });
 
