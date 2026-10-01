@@ -88,6 +88,8 @@ importers:
 
   packages/sim: {}
 
+  tools/ai-check: {}
+
   tools/balance: {}
 
   tools/bench: {}

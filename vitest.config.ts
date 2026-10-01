@@ -8,6 +8,7 @@ const PROJECTS = [
   'apps/client',
   'tools/balance',
   'tools/replay',
+  'tools/ai-check',
   'tools/commit-check',
   'tools/tokens',
 ];

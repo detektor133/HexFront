@@ -3,6 +3,8 @@
 // подпись игрока на конце линии, легенда; рядом — таблица CSV.
 // Запуск: pnpm --filter @hexfront/replay bot-match-chart <результат bot-match.json>
 import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const root = new URL('../../../', import.meta.url);
 const tokens = JSON.parse(readFileSync(new URL('docs/art/tokens.json', root), 'utf8')) as {
@@ -28,7 +30,10 @@ const match = JSON.parse(readFileSync(input, 'utf8')) as {
   endS: number;
   samples: Sample[];
 };
-const OUT = new URL('docs/reports/stage-04/', root);
+// Папка результата — третьим аргументом (по умолчанию отчёт этапа 04).
+const OUT = process.argv[3]
+  ? pathToFileURL(`${resolve(process.argv[3])}${sep}`)
+  : new URL('docs/reports/stage-04/', root);
 
 const W = 760;
 const H = 320;

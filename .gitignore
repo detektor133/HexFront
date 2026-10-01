@@ -10,3 +10,7 @@ playwright-report/
 !.env.example
 # Видео прогонов для отчётов — большие файлы, в репозиторий не кладутся (путь — в отчёте).
 docs/reports/**/*.webm
+# Генерируется pnpm report:match (метрики, графики, CSV матчей) — смотреть локально.
+docs/reports/match/
+# Кадры и diff визуальной проверки (pnpm visual).
+apps/client/test-results/

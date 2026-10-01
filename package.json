@@ -13,6 +13,9 @@
     "test": "vitest run --coverage",
     "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm test",
     "format": "prettier --write .",
+    "ai-check": "node --experimental-strip-types tools/ai-check/src/cli.ts",
+    "visual": "node --disable-warning=DEP0190 --experimental-strip-types apps/client/tests/visual/visual-check.ts",
+    "report:match": "node --experimental-strip-types tools/replay/src/report-match.ts",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
     "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts",
     "prepare": "git config core.hooksPath .githooks"

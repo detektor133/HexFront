@@ -1,0 +1,100 @@
+// Отчёт матча одной командой: headless-прогоны ботов по сидам, метрики в JSON, графики PNG и CSV
+// в docs/reports/match/seed-<сид>/, в консоль — сводка до 20 строк.
+// Запуск: pnpm report:match --seeds N [--first-seed 42] [--players 6]
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const root = new URL('../../../', import.meta.url);
+const rootPath = fileURLToPath(root);
+
+function option(name: string, fallback: number): number {
+  const i = process.argv.indexOf(`--${name}`);
+  const value = i >= 0 ? Number(process.argv[i + 1]) : fallback;
+  if (!Number.isInteger(value) || value < 1) throw new Error(`--${name}: нужно целое ≥ 1`);
+  return value;
+}
+
+const seeds = option('seeds', 1);
+const firstSeed = option('first-seed', 42);
+const players = option('players', 6);
+const MAX_SUMMARY_LINES = 20;
+const NODE = ['--disable-warning=DEP0190', '--experimental-strip-types'];
+
+interface Match {
+  readonly winner: number;
+  readonly endS: number;
+  readonly wallS: number;
+  readonly rejected: Readonly<Record<string, number>>;
+  readonly samples: readonly {
+    readonly players: readonly { soldiers: number; alive: boolean }[];
+  }[];
+}
+
+function runMatch(seed: number, outDir: string): Promise<number> {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [
+        ...NODE,
+        'tools/replay/src/bot-match.ts',
+        String(players),
+        String(seed),
+        `${outDir}/metrics.json`,
+      ],
+      { cwd: rootPath, stdio: 'ignore' },
+    );
+    child.on('exit', (code) => resolve(code ?? 1));
+  });
+}
+
+const dirs = Array.from({ length: seeds }, (_, i) => {
+  const seed = firstSeed + i;
+  const dir = `docs/reports/match/seed-${seed}`;
+  mkdirSync(`${rootPath}${dir}`, { recursive: true });
+  return { seed, dir };
+});
+
+const codes = await Promise.all(dirs.map((d) => runMatch(d.seed, d.dir)));
+const summary: string[] = [`report:match — ${seeds} матч(ей), ${players} ботов, карта small`];
+const charted: string[] = [];
+
+dirs.forEach(({ seed, dir }, i) => {
+  if (codes[i] !== 0) {
+    summary.push(`сид ${seed}: прогон упал (код ${codes[i]})`);
+    return;
+  }
+  const chart = spawnSync(
+    process.execPath,
+    [...NODE, 'tools/replay/src/bot-match-chart.ts', `${dir}/metrics.json`, dir],
+    { cwd: rootPath, encoding: 'utf8' },
+  );
+  if (chart.status !== 0) summary.push(`сид ${seed}: графики не построены`);
+  else charted.push(`${rootPath}${dir}`);
+  const m = JSON.parse(readFileSync(`${rootPath}${dir}/metrics.json`, 'utf8')) as Match;
+  const last = m.samples.at(-1)?.players ?? [];
+  const alive = last.filter((p) => p.alive).length;
+  const topReject = Object.entries(m.rejected)[0];
+  const mm = String(Math.floor(m.endS / 60)).padStart(2, '0');
+  const ss = String(Math.round(m.endS % 60)).padStart(2, '0');
+  summary.push(
+    `сид ${seed}: победил P${m.winner + 1}, ${mm}:${ss}, живых ${alive}/${last.length}, ` +
+      `солдат ${last.reduce((s, p) => s + p.soldiers, 0)}, отказов ${
+        topReject ? `${topReject[0]} ×${topReject[1]}` : 'нет'
+      }, прогон ${Math.round(m.wallS)} с`,
+  );
+});
+
+if (charted.length > 0) {
+  const png = spawnSync(
+    process.execPath,
+    [...NODE, 'apps/client/scripts/svg-to-png.ts', ...charted],
+    { cwd: rootPath, encoding: 'utf8' },
+  );
+  if (png.status !== 0) summary.push('PNG графиков не построены (svg-to-png упал)');
+}
+summary.push(
+  'метрики и графики: docs/reports/match/seed-<сид>/ (metrics.json, *.png, bot-match.csv)',
+);
+console.log(summary.slice(0, MAX_SUMMARY_LINES).join('\n'));
+process.exit(codes.some((c) => c !== 0) ? 1 : 0);
