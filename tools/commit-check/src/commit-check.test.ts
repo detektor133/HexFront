@@ -19,6 +19,7 @@ describe('проверка сообщений коммитов', () => {
         'Добавлен сценарий «соседи переполнены → капитуляция».\n\nЭтап: 03/T6',
       STAGE,
     ],
+    ['chore(infra): проверка одной командой\n\nЭтап: 04/infra', STAGE],
     ['balance(sim): максимальный налог поднят с 40 до 50 %\n\nРешение: DECISIONS 2026-10-02', MAIN],
   ])('принимает пример из CONVENTIONS.md №%#', (message, ctx) => {
     expect(checkCommitMessage(message, ctx)).toEqual([]);

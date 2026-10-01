@@ -29,8 +29,8 @@ const SCOPES = [
 const HEADER_MAX = 72;
 const BODY_LINE_MAX = 100;
 const HEADER_RE = /^([a-z]+)\(([a-z-]+)\): (.+)$/;
-// Номер задачи — как в этапе: T7, T2a.
-const STAGE_TRAILER_RE = /^Этап: \d{2}\/T\d+[a-z]?$/m;
+// Номер задачи — как в этапе: T7, T2a; «infra» — инфраструктура вне задач этапа.
+const STAGE_TRAILER_RE = /^Этап: \d{2}\/(T\d+[a-z]?|infra)$/m;
 /** «Этап: NN» без задачи — только для коммитов документов (docs или change(docs)), меняющих только docs/. */
 const STAGE_ONLY_TRAILER_RE = /^Этап: \d{2}$/m;
 const DECISION_TRAILER_RE = /^Решение: \S.*$/m;

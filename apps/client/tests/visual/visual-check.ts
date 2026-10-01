@@ -87,9 +87,18 @@ async function shoot(page: Page, scene: Scene): Promise<Buffer> {
   return page.screenshot();
 }
 
+interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 interface Diff {
   readonly percent: number;
   readonly png: string | null;
+  /** Прямоугольник, охватывающий все расходящиеся пиксели; null — расхождений нет или размеры разные. */
+  readonly box: Box | null;
 }
 
 /** Сравнение в браузере через canvas: декодер PNG не нужен, новых зависимостей нет. */
@@ -110,14 +119,27 @@ async function compare(page: Page, expected: Buffer, actual: Buffer): Promise<Di
       };
       const x = await load(a);
       const y = await load(b);
-      if (x.width !== y.width || x.height !== y.height) return { percent: 100, png: null };
+      if (x.width !== y.width || x.height !== y.height)
+        return { percent: 100, png: null, box: null };
       const out = new ImageData(x.width, x.height);
       let bad = 0;
+      let minX = x.width;
+      let minY = x.height;
+      let maxX = -1;
+      let maxY = -1;
       for (let i = 0; i < x.data.length; i += 4) {
         const diff = [0, 1, 2].some(
           (k) => Math.abs((x.data[i + k] ?? 0) - (y.data[i + k] ?? 0)) > tol,
         );
-        if (diff) bad += 1;
+        if (diff) {
+          bad += 1;
+          const px = (i / 4) % x.width;
+          const py = Math.floor(i / 4 / x.width);
+          minX = Math.min(minX, px);
+          maxX = Math.max(maxX, px);
+          minY = Math.min(minY, py);
+          maxY = Math.max(maxY, py);
+        }
         out.data[i] = 255;
         out.data[i + 1] = diff ? 0 : Math.round((y.data[i + 1] ?? 0) * 0.3 + 178);
         out.data[i + 2] = diff ? 0 : Math.round((y.data[i + 2] ?? 0) * 0.3 + 178);
@@ -130,10 +152,54 @@ async function compare(page: Page, expected: Buffer, actual: Buffer): Promise<Di
       return {
         percent: (bad / (x.width * x.height)) * 100,
         png: c.toDataURL('image/png').split(',')[1] ?? null,
+        box:
+          maxX < 0 ? null : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 },
       };
     },
     { a: expected.toString('base64'), b: actual.toString('base64'), tol: CHANNEL_TOLERANCE },
   );
+}
+
+/**
+ * Самые глубокие элементы DOM, чей прямоугольник пересекает область расхождения: по ним агент
+ * находит код без просмотра картинки. Холст Pixi — один элемент, внутри него DOM нет.
+ */
+async function intersectingSelectors(page: Page, box: Box): Promise<string[]> {
+  return page.evaluate((b) => {
+    const label = (el: Element): string => {
+      const id = el.id ? `#${el.id}` : '';
+      const testId = el.getAttribute('data-testid');
+      const cls = [...el.classList]
+        .slice(0, 2)
+        .map((c) => `.${c}`)
+        .join('');
+      return `${el.tagName.toLowerCase()}${id}${cls}${testId ? `[data-testid=${testId}]` : ''}`;
+    };
+    const path = (el: Element): string => {
+      const parts: string[] = [];
+      for (let e: Element | null = el; e && e !== document.body && parts.length < 3;) {
+        parts.unshift(label(e));
+        e = e.parentElement;
+      }
+      return parts.join(' > ');
+    };
+    const hits = (el: Element): boolean => {
+      const r = el.getBoundingClientRect();
+      return (
+        r.width > 0 &&
+        r.height > 0 &&
+        r.left < b.x + b.width &&
+        r.right > b.x &&
+        r.top < b.y + b.height &&
+        r.bottom > b.y
+      );
+    };
+    const all = [...document.body.querySelectorAll('*')].filter(
+      (el) => !['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName) && hits(el),
+    );
+    const deepest = all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
+    return deepest.slice(0, 8).map(path);
+  }, box);
 }
 
 mkdirSync(toPath(BASELINE), { recursive: true });
@@ -168,6 +234,12 @@ try {
         ? `diff: ${diffPath}`
         : `размеры кадров разные, кадр: ${diffPath.replace('-diff', '-actual')}`;
     console.log(`${scene.name}: не прошло, расхождение ${shown} %, ${where}`);
+    if (diff.box !== null) {
+      const { x, y, width, height } = diff.box;
+      console.log(`  область: x=${x} y=${y} ширина=${width} высота=${height}`);
+      const selectors = await intersectingSelectors(page, diff.box);
+      for (const sel of selectors) console.log(`  элемент: ${sel}`);
+    }
   }
   await browser.close();
 } finally {

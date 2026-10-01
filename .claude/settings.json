@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__claude-in-chrome",
+      "mcp__Claude_Browser",
+      "mcp__computer-use",
+      "Read(**/*.png)",
+      "Read(**/*.webm)",
+      "Read(**/*.mp4)",
+      "Bash(pnpm dev*)",
+      "Bash(pnpm exec vite*)",
+      "Bash(npx playwright*)",
+      "Bash(pnpm exec playwright*)",
+      "Bash(playwright*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --experimental-strip-types tools/ai-check/src/stop-hook.ts",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}

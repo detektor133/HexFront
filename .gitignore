@@ -14,3 +14,5 @@ docs/reports/**/*.webm
 docs/reports/match/
 # Кадры и diff визуальной проверки (pnpm visual).
 apps/client/test-results/
+# Полные логи pnpm verify.
+.ai-logs/
