@@ -15,7 +15,7 @@ import {
   type Direction,
 } from '@hexfront/sim';
 
-import { drawCities } from './city-glyphs.ts';
+import { drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
@@ -174,6 +174,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const borders = new Graphics();
   const fog = new Graphics();
   const marks = new Graphics();
+  const labels = new Container();
 
   const container = new Container();
   container.addChild(fill, roads);
@@ -183,7 +184,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const planLayer = createPlanLayer(map, radius, center);
   // Плашка прогноза — поверх фишек.
   const plates = new Container();
-  top.addChild(borders, fog, planLayer.container, marks, unitLayer.container, plates);
+  top.addChild(borders, fog, planLayer.container, marks, labels, unitLayer.container, plates);
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
@@ -298,6 +299,19 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
+    labels.removeChildren().forEach((child) => child.destroy());
+    drawCityLabels(
+      labels,
+      v.cities.map((c) => ({
+        at: center(c.hex),
+        name: c.name,
+        level: c.level,
+        isCapital: c.isCapital,
+      })),
+      scale,
+      level,
+      radius,
+    );
     if (selected.hex !== null) {
       marks
         .poly(hexPolygon(center(selected.hex), radius))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { citySize } from '../src/dev/city-glyphs.ts';
+import { cityLabelVisible, citySize } from '../src/dev/city-glyphs.ts';
 
 describe('знак города', () => {
   it('растёт с уровнем', () => {
@@ -13,5 +13,12 @@ describe('знак города', () => {
     // Размер не зависит от масштаба камеры, поэтому на экране он умножается на масштаб.
     expect(citySize(40, 3)).toBe(citySize(20, 3) * 2);
     expect(citySize(20, 1) / 20).toBeCloseTo(0.36, 5);
+  });
+
+  it('на z1 показывает только столицы и города уровня 2 или выше', () => {
+    expect(cityLabelVisible(1, false, 1)).toBe(false);
+    expect(cityLabelVisible(1, true, 1)).toBe(true);
+    expect(cityLabelVisible(2, false, 1)).toBe(true);
+    expect(cityLabelVisible(1, false, 2)).toBe(true);
   });
 });
