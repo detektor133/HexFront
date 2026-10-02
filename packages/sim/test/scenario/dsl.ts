@@ -263,6 +263,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
   const state: MatchState = {
     tick: 0,
     seed: 1,
+    fog: true,
     map,
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
@@ -355,12 +356,13 @@ export interface Scenario {
  */
 export function scenario(
   ascii: string,
-  opts: { readonly legend: Readonly<Record<string, Cell>> },
+  opts: { readonly legend: Readonly<Record<string, Cell>>; readonly fog?: boolean },
 ): Scenario {
   const grid = parseGrid(ascii);
   const letters = playerLetters(grid, opts.legend);
   const map = buildMap(grid, opts.legend);
   const state = emptyState(map, letters);
+  state.fog = opts.fog ?? true;
   const idOf = (p: string): number => {
     const id = letters.indexOf(p);
     if (id < 0) throw new Error(`сценарий: неизвестный игрок ${p}`);

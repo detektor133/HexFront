@@ -149,6 +149,7 @@ export function hashState(state: MatchState): string {
   const s: Hasher = { h: FNV_OFFSET };
   int(s, state.tick);
   int(s, state.seed);
+  int(s, state.fog ? 1 : 0);
   int(s, state.nextId);
   str(s, state.map.id);
   int(s, state.map.width);

@@ -27,7 +27,11 @@ export interface PlayerSetup {
   readonly name: string;
 }
 
-function emptyState(map: MapStatic, seed: number): MatchState {
+export interface MatchOptions {
+  readonly fog?: boolean;
+}
+
+function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchState {
   const size = map.width * map.height;
   const cities: City[] = map.cities.map((c) => ({
     id: c.id,
@@ -43,6 +47,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
   const state: MatchState = {
     tick: 0,
     seed: seed >>> 0,
+    fog: options.fog ?? true,
     map,
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
@@ -179,11 +184,12 @@ export function createMatch(
   map: MapStatic,
   players: readonly PlayerSetup[],
   seed: number,
+  options: MatchOptions = {},
 ): MatchState {
   if (players.length === 0 || players.length > map.spawns.length) {
     throw new RangeError(`игроков ${players.length}, спавнов на карте ${map.spawns.length}`);
   }
-  const state = emptyState(map, seed);
+  const state = emptyState(map, seed, options);
   seedNeutralPopulation(state);
   const spawns = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
   players.forEach((_, playerId) => {

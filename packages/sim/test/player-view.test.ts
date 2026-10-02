@@ -14,6 +14,33 @@ const MAP = `
 const legend = { A1: city('A', 1, { capital: true }), A2: city('A', 1), a: own('A'), r: road('A') };
 
 describe('playerView', () => {
+  it('при выключенном тумане отдаёт полный снимок', () => {
+    const s = scenario(
+      `
+      .  A  .  b  b  b  b  b  b
+      .  .  .  .  .  .  .  .  .
+    `,
+      {
+        fog: false,
+        legend: { A: city('A', 1, { capital: true }), b: own('B') },
+      },
+    );
+    s.unit('B', 'infantry', 100, at(6, 0));
+    s.runTicks(1);
+    const v = playerView(s.state, 0);
+    expect(s.state.fog).toBe(false);
+    expect(v.units.some((u) => u.owner === 1)).toBe(true);
+    expect(v.hexes.pop[6]).toBeGreaterThan(0);
+    expect(v.hexes.visible.every((value) => value === 1)).toBe(true);
+  });
+
+  it('включённый и выключенный туман дают разные хэши состояния', () => {
+    const s = scenario(MAP, { legend });
+    const fogHash = hashState(s.state);
+    s.state.fog = false;
+    expect(hashState(s.state)).not.toBe(fogHash);
+  });
+
   it('скрывает чужой отряд и население вне зоны обзора', () => {
     const s = scenario(
       `

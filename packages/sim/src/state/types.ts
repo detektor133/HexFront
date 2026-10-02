@@ -248,6 +248,7 @@ export type WinReason = 'cities' | 'lastStanding' | 'score';
 export interface MatchState {
   tick: number;
   readonly seed: number;
+  fog: boolean;
   readonly map: MapStatic;
   readonly hexes: HexState;
   /** Кэш обзора и последних известных данных, обновляемый visionSystem. */

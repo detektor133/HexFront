@@ -160,7 +160,9 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
   visionSystem(state);
   const { hexes } = state;
   const vision = state.vision;
-  const visible = vision?.visible[playerId] ?? new Uint8Array(hexes.owner.length).fill(1);
+  const visible = state.fog
+    ? (vision?.visible[playerId] ?? new Uint8Array(hexes.owner.length).fill(1))
+    : new Uint8Array(hexes.owner.length).fill(1);
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
@@ -173,12 +175,22 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
-      pop: Int32Array.from(hexes.pop, (value, id) => (hexes.owner[id] === playerId ? value : 0)),
-      improvement: Uint8Array.from(hexes.improvement, (_, id) => memoryImprovement?.[id] ?? 0),
-      building: Uint8Array.from(hexes.building, (_, id) => memoryBuilding?.[id] ?? 0),
-      road: Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0),
+      pop: state.fog
+        ? Int32Array.from(hexes.pop, (value, id) => (hexes.owner[id] === playerId ? value : 0))
+        : hexes.pop.slice(),
+      improvement: state.fog
+        ? Uint8Array.from(hexes.improvement, (_, id) => memoryImprovement?.[id] ?? 0)
+        : hexes.improvement.slice(),
+      building: state.fog
+        ? Uint8Array.from(hexes.building, (_, id) => memoryBuilding?.[id] ?? 0)
+        : hexes.building.slice(),
+      road: state.fog
+        ? Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0)
+        : hexes.road.slice(),
       link: Uint8Array.from(links(state), (value, id) => (visible[id] === 1 ? value : 0)),
-      growth: Int32Array.from(growth, (value, id) => (hexes.owner[id] === playerId ? value : 0)),
+      growth: state.fog
+        ? Int32Array.from(growth, (value, id) => (hexes.owner[id] === playerId ? value : 0))
+        : growth,
       visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({
