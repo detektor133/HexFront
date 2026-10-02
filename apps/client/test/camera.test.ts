@@ -7,6 +7,8 @@ import {
   detailLevel,
   fitCamera,
   minScale,
+  panBy,
+  wheelFactor,
   zoomAt,
 } from '../src/render/camera.ts';
 import { mapBounds } from '../src/render/hex-geometry.ts';
@@ -40,6 +42,12 @@ describe('камера карты', () => {
     expect(zoomAt(fit, 0.01, 0, 0, view, world).scale).toBe(fit.scale);
   });
 
+  it('колесо приближает при движении вверх и отдаляет при движении вниз', () => {
+    expect(wheelFactor(-100)).toBeGreaterThan(1);
+    expect(wheelFactor(100)).toBeLessThan(1);
+    expect(wheelFactor(0)).toBe(1);
+  });
+
   it('зум сохраняет точку карты под курсором', () => {
     const cam = zoomAt(fitCamera(view, world), 2, 700, 450, view, world);
     const worldX = (700 - cam.x) / cam.scale;
@@ -51,6 +59,13 @@ describe('камера карты', () => {
     const cam = clampCamera({ scale: 2, x: 5000, y: 5000 }, view, world);
     expect(cam.x).toBeCloseTo(-world.x * 2, 6);
     expect(cam.y).toBeCloseTo(-world.y * 2, 6);
+  });
+
+  it('перетаскивание не выходит за границы карты', () => {
+    const fit = zoomAt(fitCamera(view, world), 2, 720, 450, view, world);
+    const moved = panBy(fit, 5000, 5000, view, world);
+    expect(moved.x).toBeCloseTo(-world.x * moved.scale, 6);
+    expect(moved.y).toBeCloseTo(-world.y * moved.scale, 6);
   });
 
   it('карта меньше экрана центрируется', () => {
