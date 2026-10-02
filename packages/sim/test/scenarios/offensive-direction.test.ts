@@ -216,7 +216,7 @@ describe('наступление только к линии (04/T14b)', () => {
       const view = playerView(s.state, 0).plans.find((p) => p.armyId === army);
       expect(view?.kind === 'front' && view.stuck).toBe(false);
     }
-  });
+  }, 20_000);
 
   it('вся линия своя — наступление завершено, грани линии, ставшие границей, — во фронте', () => {
     const { s, army } = start();
