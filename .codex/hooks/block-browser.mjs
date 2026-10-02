@@ -11,7 +11,11 @@ try {
   process.exit(0);
 }
 
-const command = JSON.stringify(event.tool_input ?? {});
+const input = event.tool_input ?? {};
+const command =
+  typeof input === 'string'
+    ? input
+    : JSON.stringify({ ...input, command: input.command ?? input.cmd ?? '' });
 const forbidden = [
   /\bpnpm\s+(run\s+)?dev\b/,
   /\bnpx\s+playwright\b/,

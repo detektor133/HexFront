@@ -82,6 +82,29 @@ describe('ожидание GitHub Actions', () => {
     expect(output.at(-1)).toBe('failure job=tests https://github.com/acme/game/actions/runs/42');
   });
 
+  it('передаёт Bearer-токен во все запросы', async () => {
+    const responses = [
+      jsonResponse({ workflow_runs: [run('completed', 'failure')] }),
+      jsonResponse({ jobs: [{ id: 7, name: 'tests', conclusion: 'failure' }] }),
+      textResponse('ошибка'),
+    ];
+    const headers: Record<string, string>[] = [];
+
+    await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      token: 'secret',
+      fetchFn: async (_url, init): Promise<HttpResponse> => {
+        headers.push(init.headers);
+        return responses.shift() ?? jsonResponse({});
+      },
+      writeLine: () => undefined,
+    });
+
+    expect(headers).toHaveLength(3);
+    expect(headers.every((value) => value.Authorization === 'Bearer secret')).toBe(true);
+  });
+
   it('завершает failure по таймауту без найденного run', async () => {
     const delays: number[] = [];
     const output: string[] = [];

@@ -119,4 +119,15 @@ describe('проверка сообщений коммитов', () => {
   it('не требует трейлер «Этап:» вне веток этапов', () => {
     expect(checkCommitMessage('docs(docs): уточнён формат карты', MAIN)).toEqual([]);
   });
+  it('требует «Решение:» для изменений golden-тестов', () => {
+    const message = 'fix(sim): исправлено ожидание golden\n\nЭтап: 04/infra';
+    const context = {
+      branch: 'stage-04',
+      files: ['packages/sim/test/golden/war.test.ts'],
+    };
+    expect(checkCommitMessage(message, context)).toContain(
+      'при изменении golden нужен трейлер «Решение:»',
+    );
+    expect(checkCommitMessage(`${message}\nРешение: DECISIONS 2026-10-02`, context)).toEqual([]);
+  });
 });

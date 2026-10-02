@@ -36,6 +36,7 @@ const STAGE_ONLY_TRAILER_RE = /^Этап: \d{2}$/m;
 const DECISION_TRAILER_RE = /^Решение: \S.*$/m;
 const CYRILLIC_RE = /[а-яё]/i;
 const TYPES_NEEDING_DECISION = new Set<string>(['balance', 'change']);
+const GOLDEN_PATH_PREFIX = 'packages/sim/test/golden/';
 
 /**
  * Запушенные коммиты, которые нельзя переписать: снимается только названное правило, остальные
@@ -110,6 +111,12 @@ export function checkCommitMessage(message: string, ctx: CheckContext): string[]
   }
   if (TYPES_NEEDING_DECISION.has(type) && !DECISION_TRAILER_RE.test(message)) {
     errors.push(`для типа «${type}» нужен трейлер «Решение:»`);
+  }
+  if (
+    ctx.files?.some((file) => file.startsWith(GOLDEN_PATH_PREFIX)) &&
+    !DECISION_TRAILER_RE.test(message)
+  ) {
+    errors.push('при изменении golden нужен трейлер «Решение:»');
   }
   return errors;
 }
