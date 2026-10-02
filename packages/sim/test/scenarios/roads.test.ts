@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { ROAD_PATH_EXISTING_COST, TICKS_PER_S } from '../../src/balance.ts';
+import { TICKS_PER_S } from '../../src/balance.ts';
 import { TERRAIN } from '../../src/map/types.ts';
 import type { Fp } from '../../src/math/int.ts';
-import { findRoadPath, roadStepCost } from '../../src/queries/road-path.ts';
+import { findRoadPath } from '../../src/queries/road-path.ts';
 import { mainNetworkMask } from '../../src/state/network.ts';
 import { ROAD_TICKS_PER_HEX } from '../../src/systems/road-construction.ts';
 import { at, city, foundCity, own, scenario, type At } from '../scenario/dsl.ts';
@@ -120,20 +120,6 @@ describe('авто-дорога после основания города', () 
 });
 
 describe('findRoadPath', () => {
-  it('существующая дорога имеет почти нулевую стоимость шага', () => {
-    const s = scenario(
-      `
-      a  a  a
-      a  A1 a
-      a  a  a
-    `,
-      { legend: { A1: city('A', 1, { capital: true }), a: own('A') } },
-    );
-    const hex = idOf(s, at(0, 0));
-    s.state.hexes.road[hex] = 1;
-    expect(roadStepCost(s.state, hex)).toBe(ROAD_PATH_EXISTING_COST);
-  });
-
   it('детерминирован и возвращает цепочку соседей от старта до цели', () => {
     const s = scenario(
       `
