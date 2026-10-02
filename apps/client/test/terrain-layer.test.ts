@@ -32,6 +32,8 @@ describe('слои рельефа карты', () => {
 
     expect(layer.base.children).toHaveLength(3);
     expect(layer.overlay.children).toHaveLength(3);
+    expect(layer.base.isCachedAsTexture).toBe(true);
+    expect(layer.overlay.isCachedAsTexture).toBe(true);
     expect(detailLevel(0.5)).toBe(1);
     expect(detailLevel(1)).toBe(2);
     expect(detailLevel(2)).toBe(3);
@@ -40,5 +42,7 @@ describe('слои рельефа карты', () => {
     layer.update(1, 2);
     layer.update(2, 3);
     layer.destroy();
+    expect(layer.base.isCachedAsTexture).toBe(false);
+    expect(layer.overlay.isCachedAsTexture).toBe(false);
   });
 });

@@ -226,6 +226,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
         .map((d) => hexEdge(cell.center, radius, d)),
     ),
   );
+  base.cacheAsTexture(true);
+  overlay.cacheAsTexture(true);
 
   return {
     base,
@@ -251,6 +253,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
       grid.visible = level >= M.hexGridVisibleFromZoom;
     },
     destroy() {
+      base.cacheAsTexture(false);
+      overlay.cacheAsTexture(false);
       base.destroy({ children: true });
       overlay.destroy({ children: true });
     },
