@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import {
   ORG_MAX,
@@ -9,7 +9,7 @@ import {
 } from '@hexfront/sim';
 
 import styles from './ArmyBar.module.css';
-import { armyName } from './army-name.ts';
+import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { offensiveButtons } from './offensive-buttons.ts';
 import type { Tool as PlanTool } from './plan-draft.ts';
 import type { ToolState } from './plan-tools.ts';
@@ -194,6 +194,7 @@ function AutoBadge(props: { on: boolean; onClick: () => void }): React.JSX.Eleme
 }
 
 function ArmyCard(props: {
+  rawName: string;
   name: string;
   color: string;
   stats: ArmyStats;
@@ -210,22 +211,60 @@ function ArmyCard(props: {
   /** Автокомандование армии — значок «А» (CR-006). */
   auto: boolean;
   onAuto: () => void;
+  onRename: (name: string) => void;
   onClick: () => void;
 }): React.JSX.Element {
   const { stats, run } = props;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(props.rawName);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
+  const beginEditing = (event: React.MouseEvent): void => {
+    event.stopPropagation();
+    setDraft(props.rawName);
+    setEditing(true);
+  };
+  const save = (): void => {
+    props.onRename(normalizeArmyName(draft));
+    setEditing(false);
+  };
+  const cancel = (): void => setEditing(false);
+  const select = (): void => props.onClick();
   return (
     <div className={`${styles.card} ${frame}`}>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         className={styles.pick}
         aria-pressed={props.selected}
-        onClick={props.onClick}
+        onClick={select}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') select();
+        }}
       >
         <span className={styles.band} style={{ background: props.color }} />
         <span className={styles.body}>
           <span className={styles.head}>
-            <span className={styles.name}>{props.name}</span>
+            {editing ? (
+              <input
+                className={styles.nameInput}
+                value={draft}
+                maxLength={MAX_ARMY_NAME_LENGTH}
+                aria-label={t('army.rename')}
+                autoFocus
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={save}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+                  if (event.key === 'Enter') save();
+                  if (event.key === 'Escape') cancel();
+                }}
+              />
+            ) : (
+              <button type="button" className={styles.nameButton} onClick={beginEditing}>
+                {props.name}
+              </button>
+            )}
             {stats.starving > 0 && (
               <span title={t('army.starving').replace('{n}', String(stats.starving))}>
                 <Icon name="warn" className={styles.alarmIcon} />
@@ -245,7 +284,7 @@ function ArmyCard(props: {
             color={supplyColor(stats.supply, stats.starving > 0)}
           />
         </span>
-      </button>
+      </div>
       {/* Колонка «А» и ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
       <span className={styles.side}>
         <AutoBadge on={props.auto} onClick={props.onAuto} />
@@ -377,6 +416,7 @@ export function ArmyBar(props: {
             <ArmyCard
               key={a.id}
               name={armyName(a)}
+              rawName={a.name}
               color={armyColor(a.number)}
               stats={armyStats(units)}
               stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
@@ -387,6 +427,7 @@ export function ArmyBar(props: {
               onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
               auto={a.auto}
               onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
+              onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
               onClick={() => select(a.id, units)}
             />
           );
