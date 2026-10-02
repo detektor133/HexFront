@@ -85,7 +85,9 @@ interface Sandbox {
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   readonly army: number | null;
+  readonly fog: boolean;
   send(cmd: Command): void;
+  setFog(on: boolean): void;
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
@@ -106,6 +108,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
+  const [fog, setFogState] = useState(true);
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -119,6 +122,10 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     if (v) layerRef.current?.setView(v, p);
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
+  const setFog = useCallback((on: boolean) => {
+    matchRef.current?.setFog(on);
+    setFogState(on);
+  }, []);
   const setArmy = useCallback((id: number | null) => {
     armyRef.current = id;
     setArmyState(id);
@@ -263,6 +270,8 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     tool,
     army,
     send,
+    fog,
+    setFog,
     pick,
     setTool,
     setArmy,
@@ -291,7 +300,7 @@ export function DevSandboxPage(): React.JSX.Element {
   return (
     <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
-      {view && <Hud view={view} send={sb.send} />}
+      {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
       {view && <MatchEnd view={view} />}
       {view && (
         <ArmyBar

@@ -32,6 +32,7 @@ export const HUMAN_ID = 0;
 export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
+  setFog(on: boolean): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): FromWorker;
@@ -76,17 +77,21 @@ export function createLocalEngine(
   bots: readonly number[] = Array.from({ length: players }, (_, i) => i).filter(
     (i) => i !== HUMAN_ID,
   ),
+  fog = false,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({ name: `P${i}` }));
-  const state = createMatch(loaded.map, setup, seed);
+  const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];
   let selected: number | null = null;
   return {
     state,
     queue(cmd) {
       pending.push(cmd);
+    },
+    setFog(on) {
+      state.fog = on;
     },
     select(hex) {
       selected = hex;

@@ -29,6 +29,15 @@ describe('локальный режим', () => {
     expect(msg.view.playerId).toBe(HUMAN_ID);
   });
 
+  it('переключает туман локального матча', () => {
+    const created = createLocalEngine(small, 42, 2, undefined, false);
+    if ('errors' in created) throw new Error(created.errors.join('\n'));
+    const msg = asView(created.tick());
+    expect(created.state.fog).toBe(false);
+    expect(msg.view.hexes.visible.every((value) => value === 1)).toBe(true);
+    expect(msg.view.units).toHaveLength(created.state.units.length);
+  });
+
   it('команды игрока применяются в следующем тике, отказы возвращаются', () => {
     const e = engine();
     e.queue({ t: 'setTax', rate: 400 as Fp });

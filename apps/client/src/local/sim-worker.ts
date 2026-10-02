@@ -14,7 +14,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
   switch (msg.t) {
     case 'start': {
       if (timer !== null) clearInterval(timer);
-      const created = createLocalEngine(msg.map, msg.seed, msg.players, msg.bots);
+      const created = createLocalEngine(msg.map, msg.seed, msg.players, msg.bots, msg.fog);
       if ('errors' in created) {
         post({ t: 'error', errors: created.errors });
         return;
@@ -30,6 +30,9 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
     }
     case 'command':
       engine?.queue(msg.cmd);
+      return;
+    case 'fog':
+      engine?.setFog(msg.on);
       return;
     case 'select':
       engine?.select(msg.hex);
