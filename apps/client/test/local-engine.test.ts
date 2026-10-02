@@ -82,6 +82,26 @@ describe('локальный режим', () => {
     expect(infantry?.amounts[0]?.check).toMatchObject({ ok: false, reason: 'notEnoughGold' });
   });
 
+  it('один снимок синхронно отражает переименование, набор и отказ повторного набора', () => {
+    const e = engine();
+    const capital = e.state.cities.find((c) => c.owner === HUMAN_ID);
+    const army = e.state.armies.find((a) => a.owner === HUMAN_ID);
+    if (!capital || !army) throw new Error('стартовые объекты не найдены');
+    e.select(capital.hex);
+    e.queue({ t: 'renameArmy', armyId: army.id, name: 'Флот резерва' });
+    e.queue({ t: 'recruit', cityId: capital.id, type: 'infantry', soldiers: (50 * FP) as Fp });
+    const started = asView(e.tick());
+    expect(started.view.armies.find((a) => a.id === army.id)?.name).toBe('Флот резерва');
+    expect(started.view.recruits).toHaveLength(1);
+    expect(started.selection?.city?.id).toBe(capital.id);
+
+    e.queue({ t: 'recruit', cityId: capital.id, type: 'infantry', soldiers: (50 * FP) as Fp });
+    const rejected = asView(e.tick());
+    expect(rejected.rejected).toEqual([{ command: 'recruit', reason: 'queueBusy' }]);
+    expect(rejected.selection?.city?.id).toBe(capital.id);
+    expect(rejected.view.recruits).toHaveLength(1);
+  });
+
   it('армии с auto всех игроков ведёт commander; ручная команда игрока выключает auto (CR-006)', () => {
     const e = engine();
     const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;
