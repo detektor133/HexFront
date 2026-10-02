@@ -59,6 +59,34 @@ describe('ожидание GitHub Actions', () => {
     expect(output).toEqual(['success https://github.com/acme/game/actions/runs/42']);
   });
 
+  it('выбирает завершённый run, если API вернул несколько run для SHA', async () => {
+    const responses = [
+      jsonResponse({
+        workflow_runs: [
+          run('in_progress'),
+          {
+            id: 43,
+            head_sha: 'abc123',
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://github.com/acme/game/actions/runs/43',
+          },
+        ],
+      }),
+    ];
+    const output: string[] = [];
+
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => responses.shift() ?? jsonResponse({}),
+      writeLine: (line: string) => output.push(line),
+    });
+
+    expect(code).toBe(0);
+    expect(output).toEqual(['success https://github.com/acme/game/actions/runs/43']);
+  });
+
   it('при failure печатает имя job, последние 30 строк лога и итог', async () => {
     const log = Array.from({ length: 35 }, (_, index) => `строка ${index + 1}`).join('\n');
     const responses = [

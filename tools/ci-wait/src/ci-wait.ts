@@ -72,6 +72,10 @@ const findFailedJob = (jobs: readonly WorkflowJob[]): WorkflowJob | undefined =>
   jobs.find((job) => job.conclusion === 'failure') ??
   jobs.find((job) => job.conclusion !== null && !SUCCESSFUL_JOB_CONCLUSIONS.has(job.conclusion));
 
+const findRun = (runs: readonly WorkflowRun[], sha: string): WorkflowRun | undefined =>
+  runs.find((run) => run.head_sha === sha && run.status === 'completed') ??
+  runs.find((run) => run.head_sha === sha);
+
 const printFailedRun = async (
   fetchFn: FetchFn,
   apiBase: string,
@@ -123,7 +127,7 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
       headers,
     );
     const payload = (await response.json()) as WorkflowRunsPayload;
-    lastRun = payload.workflow_runs?.find((run) => run.head_sha === options.sha) ?? lastRun;
+    lastRun = findRun(payload.workflow_runs ?? [], options.sha) ?? lastRun;
 
     if (lastRun?.status === 'completed') {
       if (lastRun.conclusion === 'success') {
