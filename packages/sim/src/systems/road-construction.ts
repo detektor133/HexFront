@@ -18,7 +18,7 @@ export function queueRoad(
   path: readonly HexId[],
 ): void {
   const cityHexes = new Set(state.cities.map((c) => c.hex));
-  const toBuild = path.filter((h) => state.hexes.road[h] !== 1 && !cityHexes.has(h));
+  const toBuild = [...path].reverse().filter((h) => state.hexes.road[h] !== 1 && !cityHexes.has(h));
   if (toBuild.length === 0) return;
   state.constructions.push({
     id: state.nextId,
@@ -49,7 +49,8 @@ export function queueAutoRoad(state: MatchState, owner: number, cityHex: HexId):
 /** Строится ли ещё хоть один гекс пути; потерянный непостроенный гекс отменяет прокладку. */
 export function roadLost(state: MatchState, c: Construction): boolean {
   const built = intDiv(c.progressTicks, ROAD_TICKS_PER_HEX);
-  return (c.path ?? []).slice(built).some((h) => state.hexes.owner[h] !== c.owner);
+  const targetLost = !state.cities.some((city) => city.hex === c.hex && city.owner === c.owner);
+  return targetLost || (c.path ?? []).slice(built).some((h) => state.hexes.owner[h] !== c.owner);
 }
 
 /** Тик прокладки: каждые ROAD_TICKS_PER_HEX тиков появляется следующий гекс дороги. */
