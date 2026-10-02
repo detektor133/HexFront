@@ -4,7 +4,11 @@ import {
   canFoundCity,
   checkConstruction,
   checkRecruit,
-  FP,
+  COST_POP_PER_SOLDIER,
+  RECRUIT_MIN,
+  RECRUIT_STEP,
+  fpDiv,
+  recruitCapacity,
   cityPopCap,
   hexPopCap,
   botCommands,
@@ -38,17 +42,22 @@ export interface LocalEngine {
   tick(): FromWorker;
 }
 
-/** Размер набора кнопкой песочницы, солдат (временный интерфейс до ползунка 04/T8). */
-const SANDBOX_RECRUIT = 100;
 const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
 
 function recruitOptions(state: MatchState, cityId: number): RecruitOption[] {
-  const soldiers = (SANDBOX_RECRUIT * FP) as Fp;
-  return RECRUIT_TYPES.map((type) => ({
-    type,
-    soldiers,
-    check: checkRecruit(state, HUMAN_ID, cityId, type, soldiers),
-  }));
+  return RECRUIT_TYPES.map((type) => {
+    const capacity = recruitCapacity(state, cityId);
+    const rawMax = fpDiv(capacity, COST_POP_PER_SOLDIER[type]);
+    const maxSoldiers = (Math.floor(rawMax / RECRUIT_STEP) * RECRUIT_STEP) as Fp;
+    const amounts: RecruitOption['amounts'] = [];
+    for (let amount = RECRUIT_MIN; amount <= maxSoldiers; amount = (amount + RECRUIT_STEP) as Fp) {
+      amounts.push({
+        soldiers: amount,
+        check: checkRecruit(state, HUMAN_ID, cityId, type, amount),
+      });
+    }
+    return { type, amounts };
+  });
 }
 
 function selectionOf(state: MatchState, hex: number): Selection {

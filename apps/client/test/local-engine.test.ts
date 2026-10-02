@@ -57,6 +57,31 @@ describe('локальный режим', () => {
     expect(msg.selection?.foundCity).toMatchObject({ ok: false, reason: 'isCity' });
   });
 
+  it('набор отдаёт варианты с шагом 50 и пересчитывает время', () => {
+    const e = engine();
+    const capital = e.state.cities.find((c) => c.owner === HUMAN_ID);
+    e.select(capital?.hex ?? -1);
+    const selection = asView(e.tick()).selection;
+    const infantry = selection?.recruit.find((option) => option.type === 'infantry');
+    const first = infantry?.amounts[0];
+    const second = infantry?.amounts[1];
+    expect(first?.soldiers).toBe(50 * FP);
+    expect(second?.soldiers).toBe(100 * FP);
+    expect(second?.check.timeS).toBeGreaterThan(first?.check.timeS ?? 0);
+  });
+
+  it('набор без золота блокирует каждый вариант и возвращает причину', () => {
+    const e = engine();
+    const player = e.state.players[HUMAN_ID];
+    if (!player) throw new Error('игрок не найден');
+    player.gold = 0 as Fp;
+    const capital = e.state.cities.find((c) => c.owner === HUMAN_ID);
+    e.select(capital?.hex ?? -1);
+    const selection = asView(e.tick()).selection;
+    const infantry = selection?.recruit.find((option) => option.type === 'infantry');
+    expect(infantry?.amounts[0]?.check).toMatchObject({ ok: false, reason: 'notEnoughGold' });
+  });
+
   it('армии с auto всех игроков ведёт commander; ручная команда игрока выключает auto (CR-006)', () => {
     const e = engine();
     const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;

@@ -10,11 +10,16 @@ import type {
   UnitType,
 } from '@hexfront/sim';
 
-/** Вариант набора в своём городе для кнопки: тип, размер и цена или причина отказа. */
-export interface RecruitOption {
-  readonly type: UnitType;
+/** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
+export interface RecruitAmount {
   readonly soldiers: Fp;
   readonly check: RecruitCheck;
+}
+
+/** Варианты набора в своём городе для карточки города. */
+export interface RecruitOption {
+  readonly type: UnitType;
+  readonly amounts: RecruitAmount[];
 }
 
 /** Что можно сделать с выбранным гексом: цены и причины отказа для кнопок. */

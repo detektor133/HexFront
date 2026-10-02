@@ -152,6 +152,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+.recruitControl {
+  display: grid;
+  grid-template-columns: 1fr minmax(70px, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-caption);
+}
+
+.recruitControl input {
+  accent-color: var(--ui-ink);
+  min-width: 0;
+}
+
+.time {
+  color: var(--ui-ink3);
+  font-size: var(--font-size-caption);
+  text-align: right;
+}
+
 .glyph {
   width: 18px;
   height: 18px;

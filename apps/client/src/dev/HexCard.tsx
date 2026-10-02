@@ -12,7 +12,7 @@ import styles from './HexCard.module.css';
 import { visibleActions, type HexAction } from './hex-actions.ts';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
-import type { RecruitOption, Selection } from '../local/messages.ts';
+import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
 
 function ActionButton(props: {
   a: HexAction;
@@ -103,31 +103,53 @@ function RecruitButton(props: {
   send: (cmd: Command) => void;
   cityId: number;
 }): React.JSX.Element | null {
-  const [why, setWhy] = useState(false);
+  const [soldiers, setSoldiers] = useState(
+    props.o.amounts[0]?.soldiers ?? (0 as RecruitAmount['soldiers']),
+  );
   const { o } = props;
-  const ok = o.check.ok;
-  const cost = o.check.cost;
-  if (!ok && o.check.reason !== 'notEnoughGold') return null;
+  const amount: RecruitAmount | undefined = o.amounts.find((x) => x.soldiers === soldiers);
+  if (!amount) return null;
+  const { check } = amount;
+  const label = t(`unit.${o.type}` as MessageKey);
+  const reason = check.ok ? null : reasonText(check.reason);
   return (
     <div className={styles.action}>
+      <label className={styles.recruitControl}>
+        <span className={styles.recruit}>
+          <UnitGlyph type={o.type} />
+          {label}
+        </span>
+        <input
+          type="range"
+          min={o.amounts[0]?.soldiers ?? 0}
+          max={o.amounts.at(-1)?.soldiers ?? 0}
+          step={o.amounts[1] ? o.amounts[1].soldiers - (o.amounts[0]?.soldiers ?? 0) : 1}
+          value={soldiers}
+          aria-label={`${label}: ${formatSoldiers(soldiers)}`}
+          onChange={(event) => {
+            const next = o.amounts.find((x) => x.soldiers === Number(event.currentTarget.value));
+            if (next) setSoldiers(next.soldiers);
+          }}
+        />
+        <span>{formatSoldiers(soldiers)}</span>
+      </label>
       <button
         type="button"
         className={styles.button}
-        aria-label={`${t(`unit.${o.type}` as MessageKey)} ${formatSoldiers(o.soldiers)}`}
-        title={t(`unit.${o.type}` as MessageKey)}
-        onClick={() =>
-          ok
-            ? props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers: o.soldiers })
-            : setWhy(true)
-        }
+        disabled={!check.ok}
+        aria-label={`${label} ${formatSoldiers(soldiers)}`}
+        title={label}
+        onClick={() => props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers })}
       >
-        <span className={styles.recruit}>
-          <UnitGlyph type={o.type} />
-          {formatSoldiers(o.soldiers)}
-        </span>
-        {cost !== undefined && <Price value={formatFp(cost)} ok={ok} />}
+        <span>{t('recruit.queue')}</span>
+        {check.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
       </button>
-      {why && !ok && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
+      {reason && <span className={styles.reason}>{reason}</span>}
+      {check.timeS !== undefined && (
+        <span className={styles.time}>
+          {formatFp(check.timeS)} {t('card.seconds')}
+        </span>
+      )}
     </div>
   );
 }
