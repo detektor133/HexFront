@@ -26,9 +26,35 @@ interface Match {
   readonly endS: number;
   readonly wallS: number;
   readonly rejected: Readonly<Record<string, number>>;
+  readonly acceptance?: {
+    readonly maxGoldOver5000S: number;
+    readonly maxUnitUnder10S: number;
+    readonly centralNeutralAt10: number;
+    readonly maxUnitSizeAt25?: number;
+    readonly averageSoldiersPerUnitAt25?: number;
+  };
   readonly samples: readonly {
-    readonly players: readonly { soldiers: number; alive: boolean }[];
+    readonly players: readonly { soldiers: number; units: number; alive: boolean }[];
+    readonly t: number;
   }[];
+}
+
+function acceptanceLines(match: Match): string[] {
+  const acceptance = match.acceptance;
+  if (!acceptance) return ['  критерии T26d: метрики отсутствуют'];
+  const at25 = match.samples.find((sample) => sample.t === 25 * 60);
+  const aggregateMax = Math.max(0, ...(at25?.players.map((player) => player.soldiers) ?? []));
+  const aggregateAverage = at25
+    ? at25.players.reduce((sum, player) => sum + player.soldiers, 0) /
+      at25.players.reduce((sum, player) => sum + player.units, 0)
+    : null;
+  return [
+    `  золото > 5 000: ${acceptance.maxGoldOver5000S.toFixed(1)} с`,
+    `  отряд < 10 солдат: ${acceptance.maxUnitUnder10S.toFixed(1)} с`,
+    `  ничьи проходимые гексы в центре на 10:00: ${(acceptance.centralNeutralAt10 * 100).toFixed(1)} %`,
+    `  на 25:00: макс. размер ${acceptance.maxUnitSizeAt25 ?? aggregateMax} солдат, ` +
+      `среднее ${acceptance.averageSoldiersPerUnitAt25?.toFixed(1) ?? aggregateAverage?.toFixed(1) ?? 'нет данных'} солдат/отряд`,
+  ];
 }
 
 function runMatch(seed: number, outDir: string): Promise<number> {
@@ -83,6 +109,7 @@ dirs.forEach(({ seed, dir }, i) => {
         topReject ? `${topReject[0]} ×${topReject[1]}` : 'нет'
       }, прогон ${Math.round(m.wallS)} с`,
   );
+  summary.push(...acceptanceLines(m));
 });
 
 if (charted.length > 0) {

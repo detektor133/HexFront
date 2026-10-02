@@ -73,6 +73,16 @@ let centralNeutralAt10 = 1;
 let firstEliminationS: number | null = null;
 let winReason: string | null = null;
 
+function unitsAt25Minutes(): { maxSize: number; averageSize: number } {
+  if (state.tick < 25 * 60 * TICKS_PER_S) return { maxSize: 0, averageSize: 0 };
+  const sizes = state.units.map((unit) => unit.soldiers / FP);
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  return {
+    maxSize: Math.max(0, ...sizes),
+    averageSize: sizes.length === 0 ? 0 : total / sizes.length,
+  };
+}
+
 function centralNeutralRatio(): number {
   const { width, height, terrain } = state.map;
   let passable = 0;
@@ -172,6 +182,13 @@ const result = {
     maxGoldOver5000S: maxGoldTicks / TICKS_PER_S,
     maxUnitUnder10S: maxSmallTicks / TICKS_PER_S,
     centralNeutralAt10,
+    ...(() => {
+      const units = unitsAt25Minutes();
+      return {
+        maxUnitSizeAt25: units.maxSize,
+        averageSoldiersPerUnitAt25: units.averageSize,
+      };
+    })(),
   },
   roadLog,
   final: {
