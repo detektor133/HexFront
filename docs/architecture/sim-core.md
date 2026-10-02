@@ -19,6 +19,7 @@
 interface MatchState {
   tick: number;
   seed: number;
+  fog: boolean;                   // туман войны; входит в стабильный хэш
   map: MapStatic;                 // неизменяемое: terrain, rivers, features
   hexes: HexState;                // SoA: owner: Int16Array, pop: Int32Array (FP), improvement: Uint8Array,
                                   //      building: Uint8Array, road: Uint8Array, buildProgress: Int32Array
@@ -97,14 +98,14 @@ type Command =
 
 ## Запросы (чистые, без мутаций)
 
-- `playerView(state, playerId)` — видимое состояние для клиента и ботов (туман).
+- `playerView(state, playerId)` — видимое состояние для клиента и ботов; при `fog: false` возвращает полный снимок без памяти тумана.
 - `forecastBattle(map, view, unitIds, target)` — карта нужна для рельефа и рек: статическая карта не входит в снимок.
 - `findPath(state, from, to, unitType, ownerId)`, `rebuildSupplyPath(state, cityId)`.
 - `canFoundCity`, `recruitCapacity` и т. п. — для UI (кнопки с причинами).
 
 ## Детерминизм
 
-- `hashState(state): string` — стабильный хэш (FNV-1a по сериализации в фиксированном порядке полей).
+- `hashState(state): string` — стабильный хэш (FNV-1a по сериализации в фиксированном порядке полей), включая `fog`.
 - Реплей = карта + сид + лог команд с тиками. `replay(log).hash` должен совпадать на Node и в браузере.
 
 ## Производительность (цели)
