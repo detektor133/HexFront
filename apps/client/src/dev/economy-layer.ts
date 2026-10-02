@@ -8,9 +8,11 @@ import {
   hexFromId,
   hexId,
   inBounds,
+  neighbor,
   neighbors,
   type MapStatic,
   type PlayerView,
+  type Direction,
 } from '@hexfront/sim';
 
 import { drawCities } from './city-glyphs.ts';
@@ -20,7 +22,7 @@ import { createPlanLayer } from './plan-layer.ts';
 import type { SplitOverlay } from './split-drag.ts';
 import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
-import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
+import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -119,10 +121,43 @@ export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | 
   return main ? owner : null;
 }
 
+export interface TerritoryBorder {
+  readonly hex: number;
+  readonly direction: number;
+  readonly owner: number;
+  readonly neighborOwner: number;
+}
+
+/** Возвращает кромки территории; общая граница выдаётся с обеих сторон. */
+export function territoryBorders(map: MapStatic, view: PlayerView): TerritoryBorder[] {
+  const borders: TerritoryBorder[] = [];
+  for (let id = 0; id < view.hexes.owner.length; id += 1) {
+    const owner = view.hexes.owner[id] ?? -1;
+    if (owner < 0) continue;
+    for (const direction of [0, 1, 2, 3, 4, 5] as const satisfies readonly Direction[]) {
+      const adjacent = neighbor(hexFromId(id, map.width), direction);
+      const neighborOwner = inBounds(adjacent, map.width, map.height)
+        ? (view.hexes.owner[hexId(adjacent, map.width)] ?? -1)
+        : -1;
+      if (neighborOwner !== owner) borders.push({ hex: id, direction, owner, neighborOwner });
+    }
+  }
+  return borders;
+}
+
+/** Возвращает гексы вне зоны обзора, где рисуется штриховка без затемнения. */
+export function fogHexes(view: PlayerView): number[] {
+  return Array.from(view.hexes.visible, (visible, id) => (visible === 0 ? id : -1)).filter(
+    (id) => id >= 0,
+  );
+}
+
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const fill = new Graphics();
   const roads = new Graphics();
+  const borders = new Graphics();
+  const fog = new Graphics();
   const marks = new Graphics();
 
   const container = new Container();
@@ -133,7 +168,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const planLayer = createPlanLayer(map, radius, center);
   // Плашка прогноза — поверх фишек.
   const plates = new Container();
-  top.addChild(planLayer.container, marks, unitLayer.container, plates);
+  top.addChild(borders, fog, planLayer.container, marks, unitLayer.container, plates);
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
@@ -168,6 +203,46 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         cap: 'round',
       });
     }
+  }
+
+  function drawBorders(v: PlayerView): void {
+    borders.clear();
+    const width =
+      (tokens.territory.borderWidth[level - 1] ?? tokens.territory.borderWidth[1]) / scale;
+    const byOwner = new Map<number, TerritoryBorder[]>();
+    for (const edge of territoryBorders(map, v)) {
+      const list = byOwner.get(edge.owner) ?? [];
+      list.push(edge);
+      byOwner.set(edge.owner, list);
+    }
+    for (const [owner, edges] of byOwner) {
+      for (const edge of edges) {
+        const centerPoint = center(edge.hex);
+        const [a, b] = hexEdge(centerPoint, radius - width / 2, edge.direction);
+        borders.moveTo(a.x, a.y).lineTo(b.x, b.y);
+      }
+      borders.stroke({ color: playerLine(owner), width, cap: 'round' });
+    }
+  }
+
+  function drawFog(v: PlayerView): void {
+    fog.clear();
+    const spacing = tokens.fog.hatchSpacing / scale;
+    const hatchRadius = radius * 0.68;
+    for (const id of fogHexes(v)) {
+      const point = center(id);
+      for (let offset = -hatchRadius; offset <= hatchRadius; offset += spacing) {
+        fog
+          .moveTo(point.x - hatchRadius, point.y + offset + hatchRadius * 0.35)
+          .lineTo(point.x + hatchRadius, point.y + offset - hatchRadius * 0.35);
+      }
+    }
+    fog.stroke({
+      color: tokens.fog.hatch,
+      alpha: tokens.fog.hatchAlpha,
+      width: tokens.fog.hatchWidth / scale,
+      pixelLine: true,
+    });
   }
 
   function drawMarks(v: PlayerView): void {
@@ -228,6 +303,8 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     if (!view) return;
     drawFill(view);
     drawRoads(view);
+    drawBorders(view);
+    drawFog(view);
     drawMarks(view);
     planLayer.setView(view, draft, selectedArmy, split, scale, level);
   };
