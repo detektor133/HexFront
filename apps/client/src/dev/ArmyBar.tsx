@@ -166,7 +166,7 @@ function RunButton(props: {
     <button
       type="button"
       className={styles.run}
-      aria-label={t(props.label)}
+      aria-label={props.hint ?? t(props.label)}
       title={props.hint ?? t(props.label)}
       disabled={!props.enabled}
       onClick={props.onClick}
