@@ -93,6 +93,7 @@ interface Sandbox {
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
+  setDockHeight(height: number): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -111,6 +112,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
+  const dockHeightRef = useRef(0);
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -244,6 +246,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      v.setBottomInset(dockHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
@@ -296,6 +299,10 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     setTool,
     setArmy,
     setRoadPreview,
+    setDockHeight(height) {
+      dockHeightRef.current = height;
+      mapViewRef.current?.setBottomInset(height);
+    },
   };
 }
 
@@ -328,7 +335,10 @@ export function DevSandboxPage(): React.JSX.Element {
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
           partial={partial.filter((a) => a !== army)}
-          onHeight={setDockH}
+          onHeight={(height) => {
+            setDockH(height);
+            sb.setDockHeight(height);
+          }}
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}

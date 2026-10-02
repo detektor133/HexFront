@@ -9,6 +9,7 @@ import {
   decayVelocity,
   detailLevel,
   fitCamera,
+  insetViewport,
   panBy,
   wheelFactor,
   zoomAt,
@@ -70,6 +71,8 @@ export interface MapView {
   configure(options: MapViewOptions): void;
   /** Масштаб с центром экрана; для скриншотов и отладки. */
   setScale(scale: number): void;
+  /** Оставляет нижнюю панель вне области, к которой привязаны границы камеры. */
+  setBottomInset(px: number): void;
   /** Ставит гекс в центр экрана (в пределах границ карты). */
   centerOn(hex: Hex): void;
   /**
@@ -130,7 +133,9 @@ export async function createMapView(
   mount();
   let bounds: Rect = mapBounds(map.width, map.height, opts.radius);
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
-  let cam: Camera = fitCamera(view(), bounds);
+  let bottomInset = 0;
+  const cameraView = (): Viewport => insetViewport(view(), bottomInset);
+  let cam: Camera = fitCamera(cameraView(), bounds);
   let drawnScale = 0;
   let velocity: Velocity | null = null;
   let pressed = 0;
@@ -165,12 +170,12 @@ export async function createMapView(
         cam,
         (v.vx * ticker.deltaMS) / 1000,
         (v.vy * ticker.deltaMS) / 1000,
-        view(),
+        cameraView(),
         bounds,
       );
       velocity = decayVelocity(v, ticker.deltaMS);
     }
-    cam = clampCamera(cam, view(), bounds);
+    cam = clampCamera(cam, cameraView(), bounds);
     apply();
   });
 
@@ -190,7 +195,7 @@ export async function createMapView(
     },
     (e) => {
       if (e.t === 'pan') {
-        cam = panBy(cam, e.dx, e.dy, view(), bounds);
+        cam = panBy(cam, e.dx, e.dy, cameraView(), bounds);
         const now = performance.now();
         const dt = Math.max(1, now - lastPanMs);
         const inst = { vx: (e.dx / dt) * 1000, vy: (e.dy / dt) * 1000 };
@@ -199,7 +204,7 @@ export async function createMapView(
         velocity = { vx: v.vx * (1 - k) + inst.vx * k, vy: v.vy * (1 - k) + inst.vy * k };
         lastPanMs = now;
       } else if (e.t === 'zoom') {
-        cam = zoomAt(cam, e.factor, e.at.x, e.at.y, view(), bounds);
+        cam = zoomAt(cam, e.factor, e.at.x, e.at.y, cameraView(), bounds);
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
         onTap?.(pixelToHex(world, opts.radius), e.kind, world);
@@ -232,7 +237,7 @@ export async function createMapView(
     },
   );
   const detach = attachInput(app.canvas, gesture, {
-    zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, view(), bounds)),
+    zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
     pressed: (n) => {
       pressed = n;
       if (n > 0) velocity = null;
@@ -247,8 +252,8 @@ export async function createMapView(
   return {
     configure(next) {
       const centerWorld = {
-        x: (view().width / 2 - cam.x) / cam.scale / opts.radius,
-        y: (view().height / 2 - cam.y) / cam.scale / opts.radius,
+        x: (cameraView().width / 2 - cam.x) / cam.scale / opts.radius,
+        y: (cameraView().height / 2 - cam.y) / cam.scale / opts.radius,
       };
       layer.destroy();
       mid?.destroy();
@@ -260,20 +265,20 @@ export async function createMapView(
       cam = clampCamera(
         {
           scale: cam.scale,
-          x: view().width / 2 - centerWorld.x * opts.radius * cam.scale,
-          y: view().height / 2 - centerWorld.y * opts.radius * cam.scale,
+          x: cameraView().width / 2 - centerWorld.x * opts.radius * cam.scale,
+          y: cameraView().height / 2 - centerWorld.y * opts.radius * cam.scale,
         },
-        view(),
+        cameraView(),
         bounds,
       );
       drawnScale = 0;
     },
     centerOn(hex) {
       const p = hexCenter(hex, opts.radius);
-      const v = view();
+      const v = cameraView();
       cam = clampCamera(
         { scale: cam.scale, x: v.width / 2 - p.x * cam.scale, y: v.height / 2 - p.y * cam.scale },
-        v,
+        cameraView(),
         bounds,
       );
     },
@@ -301,7 +306,13 @@ export async function createMapView(
       selection.clear();
     },
     setScale(scale) {
-      cam = zoomAt(cam, scale / cam.scale, view().width / 2, view().height / 2, view(), bounds);
+      const v = cameraView();
+      cam = zoomAt(cam, scale / cam.scale, v.width / 2, v.height / 2, v, bounds);
+    },
+    setBottomInset(px) {
+      bottomInset = Math.max(0, px);
+      cam = clampCamera(cam, cameraView(), bounds);
+      apply();
     },
     destroy() {
       detach();

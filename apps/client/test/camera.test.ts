@@ -6,6 +6,7 @@ import {
   decayVelocity,
   detailLevel,
   fitCamera,
+  insetViewport,
   minScale,
   panBy,
   wheelFactor,
@@ -17,6 +18,11 @@ const view = { width: 1440, height: 900 };
 const world = mapBounds(40, 30, 20);
 
 describe('камера карты', () => {
+  it('вычитает высоту нижней панели из области камеры', () => {
+    expect(insetViewport({ width: 390, height: 844 }, 96)).toEqual({ width: 390, height: 748 });
+    expect(insetViewport({ width: 390, height: 844 }, 900).height).toBe(0);
+  });
+
   it('детализация переключается на порогах 0,6 и 1,5', () => {
     expect(detailLevel(0.3)).toBe(1);
     expect(detailLevel(0.5999)).toBe(1);
