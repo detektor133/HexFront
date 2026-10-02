@@ -29,7 +29,7 @@ interface Scene {
   readonly height: number;
 }
 
-// /dev/map — фиксированная карта-сцена; сид и карта заданы страницей, ввода в сцене нет.
+// /dev/map и /dev/units — фиксированные сцены без ввода пользователя.
 const SCENES: readonly Scene[] = [
   {
     name: 'map-1440x900',
@@ -42,6 +42,12 @@ const SCENES: readonly Scene[] = [
     url: '/dev/map?map=small&territories=1&panel=0&scale=1',
     width: 390,
     height: 844,
+  },
+  {
+    name: 'units-1440x900',
+    url: '/dev/units',
+    width: 1440,
+    height: 900,
   },
 ];
 

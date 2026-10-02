@@ -1,0 +1,41 @@
+.page {
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: var(--space-lg);
+  background: var(--map-background);
+}
+
+.title {
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-display-family);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-display-weight);
+}
+
+.canvas {
+  height: 580px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.labels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-top: calc(-580px + var(--space-md));
+  padding: 0 var(--space-md);
+  pointer-events: none;
+  font-size: var(--font-size-caption);
+}
+
+.labels span {
+  height: 66px;
+  padding-top: 50px;
+  color: var(--ui-ink2);
+}
+
+@media (max-width: 899px) {
+  .labels {
+    grid-template-columns: 1fr;
+  }
+}

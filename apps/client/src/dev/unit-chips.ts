@@ -19,7 +19,6 @@ const MIN_TEXT = 22;
 const TEXT_SLACK = 4;
 const GLYPH = 14;
 const OUTLINE = 1.5;
-const SELECT_SCALE = 1.06;
 /** Вертикальные столбики: ширина, зазор, отступ от края плашки. */
 const BAR_W = 4;
 const BAR_GAP = 2;
@@ -162,6 +161,7 @@ function marks(p: Parts, s: ChipState, sq: number): void {
 }
 
 function drawChip(p: Parts, s: ChipState): void {
+  const top = -H / 2;
   const text = Math.max(MIN_TEXT, Math.ceil(p.label.width) + TEXT_SLACK);
   const w = (s.army ? TAB : 0) + SQUARE + PAD + text + PAD + barsWidth(s);
   const left = -w / 2;
@@ -177,6 +177,18 @@ function drawChip(p: Parts, s: ChipState): void {
   }
   vbar(g, x, barTop, barH, s.org, tokens.chip.org);
   marks(p, s, sq);
+  if (s.retreating) drawRetreatHatch(g, left, top, w);
+}
+
+/** Белая диагональная штриховка отступления остаётся внутри корпуса фишки. */
+function drawRetreatHatch(g: Graphics, left: number, top: number, width: number): void {
+  const step = 7;
+  for (let x = left - H; x < left + width; x += step) {
+    const start = Math.max(left, x);
+    const end = Math.min(left + width, x + H);
+    g.moveTo(start, top + H - (start - x)).lineTo(end, top + H - (end - x));
+  }
+  g.stroke({ color: tokens.ui.surface, alpha: 0.3, width: 1.5 });
 }
 
 // Призрак набора в городе: пунктирный контур, глиф и столбик прогресса набора.
@@ -228,7 +240,7 @@ export function createChip(): Chip {
       if (s.ghost) drawGhost(parts, s);
       else drawChip(parts, s);
       content.alpha = s.retreating ? RETREAT_ALPHA : 1;
-      content.scale.set(s.selected ? SELECT_SCALE : 1);
+      content.scale.set(1);
     },
     setResolution(r) {
       if (label.resolution === r) return;
