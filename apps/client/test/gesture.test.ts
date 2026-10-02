@@ -54,6 +54,16 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     expect(s.events[0]?.t).toBe('pan');
   });
 
+  it('Esc отменяет активное удержание без события завершения', () => {
+    const s = setup();
+    s.g.down(1, { x: 10, y: 20 }, 0, 0);
+    s.g.tick(HOLD_MS);
+    s.g.cancel();
+    expect(kinds(s)).toEqual(['hold:start', 'hold:cancel']);
+    s.g.up(1, { x: 10, y: 20 }, HOLD_MS + 1);
+    expect(kinds(s)).toEqual(['hold:start', 'hold:cancel']);
+  });
+
   it('пороги: сдвиг ≤ 8 px — тап, больше — карта; удержание — 350 мс', () => {
     expect(DRAG_SLOP_PX).toBe(8);
     expect(HOLD_MS).toBe(350);

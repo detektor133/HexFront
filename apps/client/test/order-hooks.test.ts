@@ -103,6 +103,14 @@ describe('приказ удержанием и прогноз при навед�
     expect(s.hooks.cancelZone(at(home))).toBe(true);
     expect(s.hooks.cancelZone(at(enemy.hex))).toBe(false);
   });
+
+  it('Esc очищает прогноз приказа без отправки команды', () => {
+    const s = setup(picked);
+    s.hooks.hold(at(enemy.hex), 'start');
+    s.hooks.cancel();
+    expect(s.targets.at(-1)).toBeNull();
+    expect(s.orders).toEqual([]);
+  });
 });
 
 describe('«Удалить» (04/T16)', () => {

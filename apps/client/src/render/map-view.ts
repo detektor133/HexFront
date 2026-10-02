@@ -50,6 +50,8 @@ export interface OrderHooks {
   canHold(): boolean;
   cancelZone(world: Point): boolean;
   hold(world: Point, phase: HoldPhase): void;
+  /** Сбрасывает прогноз приказа при нажатии Esc. */
+  cancel(): void;
   /** Мышь над картой без нажатия (ПК: прогноз при наведении); null — ушла с карты. */
   hover(world: Point | null): void;
 }
@@ -84,6 +86,8 @@ export interface MapView {
   setGrab(grab: ((world: Point) => StrokeHandler | null) | null): void;
   /** Приказ удержанием и наведение мыши. */
   setOrderHooks(hooks: OrderHooks | null): void;
+  /** Отменяет текущий жест и его прогноз. */
+  cancel(): void;
   destroy(): void;
 }
 
@@ -278,6 +282,14 @@ export async function createMapView(
     },
     setOrderHooks(h) {
       hooks = h;
+    },
+    cancel() {
+      gesture.cancel();
+      velocity = null;
+      grabbed = null;
+      stroking = false;
+      hooks?.cancel();
+      selection.clear();
     },
     setStroke(handler) {
       if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');

@@ -262,8 +262,13 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     });
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
-      if (toolRef.current) setTool(null);
-      else pick(NOTHING_PICKED);
+      mapViewRef.current?.cancel();
+      if (toolRef.current) {
+        input.cancel();
+        setTool(null);
+        return;
+      }
+      pick(NOTHING_PICKED);
     };
     window.addEventListener('keydown', onKey);
     return () => {

@@ -34,6 +34,8 @@ export interface PlanInputDeps {
 
 export interface PlanInput {
   readonly stroke: StrokeHandler;
+  /** Сбрасывает незавершённый черновик без отправки команды. */
+  cancel(): void;
   /** Тап при включённом инструменте; true — тап обработан (выбор на карте не меняется). */
   tap(world: Point, kind: TapKind): boolean;
   grab(world: Point): StrokeHandler | null;
@@ -68,6 +70,9 @@ export function createPlanInput(deps: PlanInputDeps): PlanInput {
   };
   return {
     stroke,
+    cancel() {
+      show(null);
+    },
     tap(world, kind) {
       const t = deps.tool();
       if (!t) return false;

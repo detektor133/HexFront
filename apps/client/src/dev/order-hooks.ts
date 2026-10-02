@@ -68,6 +68,9 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
       show(null, false);
       if (phase === 'end' && hex !== null) d.order(hex);
     },
+    cancel() {
+      show(null, false);
+    },
     hover(world) {
       const busy = d.tool() || d.picked().units.length === 0;
       show(world && !busy ? hexAt(world) : null, true);

@@ -52,6 +52,8 @@ export interface Gesture {
   down(id: number, at: Point, button: number, ms: number, shift?: boolean): void;
   move(id: number, at: Point, ms: number): void;
   up(id: number, at: Point, ms: number): void;
+  /** Отменяет активный жест без выполнения действия. */
+  cancel(): void;
   /** Проверка удержания без событий указателя (таймер). */
   tick(ms: number): void;
   /** Мышь движется без нажатия; null — ушла с карты. */
@@ -166,6 +168,15 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         emit({ t: 'tap', at, kind: button === RIGHT_BUTTON ? 'order' : 'select' });
       }
       if (active.size === 0) mode = 'idle';
+    },
+
+    cancel() {
+      if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
+      if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
+      if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
+      if (mode === 'pressed') deps.release();
+      active.clear();
+      mode = 'idle';
     },
 
     tick(ms) {
