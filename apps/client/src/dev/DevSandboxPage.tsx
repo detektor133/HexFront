@@ -51,7 +51,10 @@ function matchSetup(search: string): { count: number; bots: number[]; speed: num
   const count = Math.max(2, Math.floor(Number(params.get('players') ?? PLAYERS)) || PLAYERS);
   const watch = params.get('watch') === '1';
   const bots = Array.from({ length: count }, (_, i) => i).filter((i) => watch || i !== 0);
-  const speed = Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
+  const speed =
+    params.get('freezeTime') === '1'
+      ? 0
+      : Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
   return { count, bots, speed };
 }
 

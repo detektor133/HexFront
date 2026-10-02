@@ -14,7 +14,8 @@ function App(): React.JSX.Element {
   if (window.location.pathname === '/dev/units') return <DevUnitsPage />;
   // /dev/economy — прежний адрес песочницы (этап 02), оставлен для старых ссылок.
   const path = window.location.pathname;
-  if (path === '/dev/sandbox' || path === '/dev/economy') return <DevSandboxPage />;
+  if (path === '/dev/sandbox' || path === '/dev/economy' || path === '/dev/ui')
+    return <DevSandboxPage />;
   return <p>{t('dev.notFound')}</p>;
 }
 

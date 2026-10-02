@@ -14,7 +14,7 @@ const PORT = 5199;
 const THRESHOLD_PERCENT = 0.1;
 /** Допуск на канал: сглаживание шрифтов расходится на единицы, настоящая правка — на десятки. */
 const CHANNEL_TOLERANCE = 16;
-const SETTLE_MS = 2500;
+const SETTLE_MS = 1000;
 const FREEZE_CSS =
   '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
 
@@ -27,29 +27,33 @@ interface Scene {
   readonly url: string;
   readonly width: number;
   readonly height: number;
+  readonly deviceScaleFactor: number;
 }
 
-// /dev/map и /dev/units — фиксированные сцены без ввода пользователя.
-const SCENES: readonly Scene[] = [
-  {
-    name: 'map-1440x900',
-    url: '/dev/map?map=small&territories=1&scale=1',
-    width: 1440,
-    height: 900,
-  },
-  {
-    name: 'map-390x844',
-    url: '/dev/map?map=small&territories=1&panel=0&scale=1',
-    width: 390,
-    height: 844,
-  },
-  {
-    name: 'units-1440x900',
-    url: '/dev/units',
-    width: 1440,
-    height: 900,
-  },
-];
+const VIEWPORTS = [
+  { name: '390x844', width: 390, height: 844 },
+  { name: '844x390', width: 844, height: 390 },
+  { name: '1440x900', width: 1440, height: 900 },
+] as const;
+
+const PAGES = [
+  { name: 'units', url: '/dev/units' },
+  { name: 'map', url: '/dev/map?map=small&territories=1&scale=1' },
+  { name: 'ui', url: '/dev/ui?map=small&select=0&scale=1&freezeTime=1' },
+  { name: 'match', url: '/dev/sandbox?map=small&select=0&speed=1&freezeTime=1' },
+] as const;
+
+const SCENES: readonly Scene[] = VIEWPORTS.flatMap((viewport) =>
+  PAGES.flatMap((page) =>
+    [1, 3].map((deviceScaleFactor) => ({
+      name: `${page.name}-${viewport.name}-dpr${deviceScaleFactor}`,
+      url: page.url,
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor,
+    })),
+  ),
+);
 
 const update = process.argv.includes('--update');
 
@@ -86,6 +90,9 @@ async function shoot(page: Page, scene: Scene): Promise<Buffer> {
   await page.setViewportSize({ width: scene.width, height: scene.height });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`http://localhost:${PORT}${scene.url}`);
+  if (scene.url.includes('/dev/ui') || scene.url.includes('/dev/sandbox')) {
+    await page.locator('header').waitFor({ state: 'visible' });
+  }
   await page.addStyleTag({ content: FREEZE_CSS });
   await page.evaluate(() => document.fonts.ready);
   // Сцена Pixi дорисовывается асинхронно после появления интерфейса.
@@ -210,43 +217,56 @@ async function intersectingSelectors(page: Page, box: Box): Promise<string[]> {
 
 mkdirSync(toPath(BASELINE), { recursive: true });
 mkdirSync(toPath(DIFF), { recursive: true });
+
+async function checkScene(page: Page, scene: Scene, actual: Buffer): Promise<number> {
+  const baseline = toPath(new URL(`${scene.name}.png`, BASELINE));
+  if (update || !existsSync(baseline)) {
+    writeFileSync(baseline, actual);
+    console.log(`${scene.name}: эталон ${update ? 'обновлён' : 'создан'} — ${baseline}`);
+    return 0;
+  }
+  const diff = await compare(page, readFileSync(baseline), actual);
+  const ok = diff.percent <= THRESHOLD_PERCENT;
+  const shown = diff.percent.toFixed(3).replace('.', ',');
+  if (ok) {
+    console.log(`${scene.name}: прошло, расхождение ${shown} %`);
+    return 0;
+  }
+  const diffPath = toPath(new URL(`${scene.name}-diff.png`, DIFF));
+  if (diff.png !== null) writeFileSync(diffPath, Buffer.from(diff.png, 'base64'));
+  writeFileSync(toPath(new URL(`${scene.name}-actual.png`, DIFF)), actual);
+  const where =
+    diff.png !== null
+      ? `diff: ${diffPath}`
+      : `размеры кадров разные, кадр: ${diffPath.replace('-diff', '-actual')}`;
+  console.log(`${scene.name}: не прошло, расхождение ${shown} %, ${where}`);
+  if (diff.box !== null) {
+    const { x, y, width, height } = diff.box;
+    console.log(`  область: x=${x} y=${y} ширина=${width} высота=${height}`);
+    const selectors = await intersectingSelectors(page, diff.box);
+    for (const sel of selectors) console.log(`  элемент: ${sel}`);
+  }
+  return 1;
+}
+
 const server = startServer();
 let failed = 0;
 try {
   await waitForServer();
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  const contexts = new Map<number, Awaited<ReturnType<typeof browser.newContext>>>();
   for (const scene of SCENES) {
+    let context = contexts.get(scene.deviceScaleFactor);
+    if (!context) {
+      context = await browser.newContext({ deviceScaleFactor: scene.deviceScaleFactor });
+      contexts.set(scene.deviceScaleFactor, context);
+    }
+    const page = await context.newPage();
     const actual = await shoot(page, scene);
-    const baseline = toPath(new URL(`${scene.name}.png`, BASELINE));
-    if (update || !existsSync(baseline)) {
-      writeFileSync(baseline, actual);
-      console.log(`${scene.name}: эталон ${update ? 'обновлён' : 'создан'} — ${baseline}`);
-      continue;
-    }
-    const diff = await compare(page, readFileSync(baseline), actual);
-    const ok = diff.percent <= THRESHOLD_PERCENT;
-    const shown = diff.percent.toFixed(3).replace('.', ',');
-    if (ok) {
-      console.log(`${scene.name}: прошло, расхождение ${shown} %`);
-      continue;
-    }
-    failed += 1;
-    const diffPath = toPath(new URL(`${scene.name}-diff.png`, DIFF));
-    if (diff.png !== null) writeFileSync(diffPath, Buffer.from(diff.png, 'base64'));
-    writeFileSync(toPath(new URL(`${scene.name}-actual.png`, DIFF)), actual);
-    const where =
-      diff.png !== null
-        ? `diff: ${diffPath}`
-        : `размеры кадров разные, кадр: ${diffPath.replace('-diff', '-actual')}`;
-    console.log(`${scene.name}: не прошло, расхождение ${shown} %, ${where}`);
-    if (diff.box !== null) {
-      const { x, y, width, height } = diff.box;
-      console.log(`  область: x=${x} y=${y} ширина=${width} высота=${height}`);
-      const selectors = await intersectingSelectors(page, diff.box);
-      for (const sel of selectors) console.log(`  элемент: ${sel}`);
-    }
+    failed += await checkScene(page, scene, actual);
+    await page.close();
   }
+  for (const context of contexts.values()) await context.close();
   await browser.close();
 } finally {
   stopServer(server);

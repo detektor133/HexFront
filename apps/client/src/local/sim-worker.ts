@@ -20,7 +20,11 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
         return;
       }
       engine = created;
-      const speed = Math.max(1, Math.floor(msg.speed));
+      const speed = Math.max(0, Math.floor(msg.speed));
+      if (speed === 0) {
+        post(engine.tick());
+        return;
+      }
       timer = setInterval(() => {
         if (!engine) return;
         for (let i = 1; i < speed && engine.state.winner < 0; i += 1) engine.tick();
