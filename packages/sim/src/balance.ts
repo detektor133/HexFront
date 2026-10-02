@@ -40,8 +40,12 @@ export const BOT_TAX_WAR: Fp = fp(0.3);
 export const BOT_GOLD_RESERVE: Fp = fp(50);
 /** Благоустройство — гексам с населением не ниже этой доли лимита. */
 export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
-/** Набор, если солдат у границы меньше, чем столько × солдат врага у неё. */
-export const BOT_RECRUIT_RATIO: Fp = fp(1.2);
+/** Желаемая сила армии относительно сильнейшего соседа. */
+export const BOT_ARMY_RATIO: Fp = fp(0.8);
+/** Максимальная доля дохода на содержание армии. */
+export const BOT_ARMY_INCOME_SHARE: Fp = fp(0.5);
+/** Максимальная глубина линии наступления бота, гексов. */
+export const BOT_LINE_MAX_DEPTH = 6;
 
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
@@ -159,6 +163,8 @@ export const DEPOT_RADIUS = 3;
 export const DEPOT_LOSS_MULT: Fp = fp(0.5);
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
+/** Вес гекса существующей дороги при поиске пути. */
+export const ROAD_PATH_EXISTING_COST: Fp = fp(0.01);
 
 // Армии
 

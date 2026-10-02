@@ -96,7 +96,7 @@ export function createLocalEngine(
       // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
       step(state, [
         ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-        ...commanderCommands(state),
+        ...commanderCommands(state, bots),
         ...botCommands(state, bots),
       ]);
       pending = [];

@@ -29,7 +29,9 @@
 | `BOT_TAX_WAR` (FP) | 0,30 |
 | `BOT_GOLD_RESERVE` (FP) | 50 |
 | `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
-| `BOT_RECRUIT_RATIO` (FP) | 1,2 |
+| `BOT_ARMY_RATIO` (FP) | 0,8 |
+| `BOT_ARMY_INCOME_SHARE` (FP) | 0,5 |
+| `BOT_LINE_MAX_DEPTH` | 6 |
 
 ## Местность
 
@@ -105,6 +107,7 @@
 | `DEPOT_COST` / `DEPOT_TIME_S` / `DEPOT_RADIUS` / `DEPOT_LOSS_MULT` | 80 / 15 / 3 / 0,5 |
 | `ROAD_BUILD_S_PER_HEX` | 1,5 |
 | `SUPPLY_REBUILD_COST_PER_HEX` | 15 |
+| `ROAD_PATH_EXISTING_COST` (FP) | 0,01 |
 
 ## Армии
 

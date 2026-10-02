@@ -21,16 +21,8 @@ import {
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
-// Куски границы и их армии — одни на снимок: армии игрока решают по одному снимку в один тик.
-// Кэш по объекту снимка не меняет результат (снимок не меняется, пока жив).
-const assigned = new WeakMap<PlayerView, Map<number, Piece>>();
-
-function piecesOf(map: MapStatic, view: PlayerView): Map<number, Piece> {
-  const cached = assigned.get(view);
-  if (cached) return cached;
-  const out = assignPieces(map, view, enemyPieces({ map, hexes: view.hexes }, view.playerId));
-  assigned.set(view, out);
-  return out;
+function piecesOf(map: MapStatic, view: PlayerView, reserved: number | null): Map<number, Piece> {
+  return assignPieces(map, view, enemyPieces({ map, hexes: view.hexes }, view.playerId), reserved);
 }
 
 /** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
@@ -63,8 +55,13 @@ const armyUnits = (view: PlayerView, armyId: number): UnitView[] =>
 
 // Куски → армии с auto: сначала армия, чей фронт уже на куске, затем ближайшая свободная с
 // отрядами (при равенстве — меньший id). Одна армия — один кусок.
-function assignPieces(map: MapStatic, view: PlayerView, pieces: readonly Piece[]) {
-  const auto = view.armies.filter((a) => a.auto).map((a) => a.id);
+function assignPieces(
+  map: MapStatic,
+  view: PlayerView,
+  pieces: readonly Piece[],
+  reserved: number | null,
+) {
+  const auto = view.armies.filter((a) => a.auto && a.id !== reserved).map((a) => a.id);
   const taken = new Map<number, Piece>();
   const free = (id: number): boolean => !taken.has(id);
   for (const p of pieces) {
@@ -119,6 +116,20 @@ function reinforce(view: PlayerView, armyId: number): Command[] {
     soldiers.set(weakest[0], weakest[1] + u.soldiers);
   }
   return out;
+}
+
+// Пустая армия экспансии получает один отряд с занятого фронта; донор не опустошается.
+function seedExpansion(map: MapStatic, view: PlayerView, armyId: number): Command[] {
+  if (armyUnits(view, armyId).length > 0 || view.plans.some((p) => p.armyId === armyId)) return [];
+  if (view.units.some((u) => u.owner === view.playerId && u.armyId === null)) return [];
+  if (emptyNeutral(map, view).length === 0) return [];
+  const donors = view.armies
+    .filter((army) => army.id !== armyId && view.plans.some((p) => p.armyId === army.id))
+    .map((army) => armyUnits(view, army.id).filter(idle))
+    .filter((units) => units.length > 1)
+    .sort((a, b) => b.length - a.length || (a[0]?.id ?? 0) - (b[0]?.id ?? 0));
+  const unit = donors[0]?.sort((a, b) => a.soldiers - b.soldiers || a.id - b.id)[0];
+  return unit ? [{ t: 'assignUnits', unitIds: [unit.id], armyId }] : [];
 }
 
 // Отбить свои потерянные гексы у фронта: ближайший свободный отряд, прогноз не «Поражение».
@@ -208,12 +219,21 @@ function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] 
  * Команды commander для армии armyId игрока снимка view (07-controls.md, «Автокомандование»).
  * @returns команды по порядку (их отдают с source 'auto')
  */
-export function decide(map: MapStatic, view: PlayerView, armyId: number): Command[] {
+export function decide(
+  map: MapStatic,
+  view: PlayerView,
+  armyId: number,
+  lineDepth?: number,
+): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
-  const out = reinforce(view, armyId);
+  const out = [...reinforce(view, armyId), ...seedExpansion(map, view, armyId)];
   const units = armyUnits(view, armyId);
-  const piece = piecesOf(map, view).get(armyId);
+  const expansion =
+    lineDepth !== undefined && emptyNeutral(map, view).length > 0 && view.armies.length > 1
+      ? (view.armies.at(-1)?.id ?? null)
+      : null;
+  const piece = piecesOf(map, view, expansion).get(armyId);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {
     if (plan?.kind !== 'front' || !plan.edges.some((e) => piece.edges.includes(e))) {
@@ -222,7 +242,7 @@ export function decide(map: MapStatic, view: PlayerView, armyId: number): Comman
     }
     out.push(...retake(map, view, plan.lost, units));
     if (plan.startWanted && !plan.offensive) {
-      const line = commanderLine(map, view, plan.edges, piece.enemy);
+      const line = commanderLine(map, view, plan.edges, piece.enemy, lineDepth);
       if (line.length > 0) {
         out.push({ t: 'setOffensiveLine', armyId, edges: line }, { t: 'startOffensive', armyId });
       }

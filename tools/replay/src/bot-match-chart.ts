@@ -29,6 +29,12 @@ const match = JSON.parse(readFileSync(input, 'utf8')) as {
   winner: number;
   endS: number;
   samples: Sample[];
+  final: {
+    width: number;
+    height: number;
+    owner: number[];
+    cities: { hex: number; owner: number; capital: boolean }[];
+  };
 };
 // Папка результата — третьим аргументом (по умолчанию отчёт этапа 04).
 const OUT = process.argv[3]
@@ -117,6 +123,43 @@ function chart(title: string, key: 'soldiers' | 'gold', unit: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${parts.join('')}</svg>\n`;
 }
 
+function finalFrame(): string {
+  const radius = 11;
+  const dx = radius * 1.5;
+  const dy = radius * Math.sqrt(3);
+  const width = Math.ceil(48 + (match.final.width - 1) * dx + radius * 2);
+  const height = Math.ceil(64 + match.final.height * dy + radius);
+  const parts = [`<rect width="${width}" height="${height}" fill="${tokens.ui.surface}"/>`];
+  parts.push(
+    `<text x="18" y="24" ${FONT} font-size="14" fill="${tokens.ui.ink}">Финал · ${Math.floor(match.endS / 60)}:${String(match.endS % 60).padStart(2, '0')}</text>`,
+  );
+  match.final.owner.forEach((owner, hex) => {
+    const col = hex % match.final.width;
+    const row = Math.floor(hex / match.final.width);
+    const x = 24 + col * dx;
+    const y = 48 + row * dy + (col % 2 === 0 ? dy / 2 : 0);
+    const points = Array.from({ length: 6 }, (_, i) => {
+      const angle = (Math.PI / 180) * (60 * i);
+      return `${(x + radius * Math.cos(angle)).toFixed(1)},${(y + radius * Math.sin(angle)).toFixed(1)}`;
+    }).join(' ');
+    const fill =
+      owner < 0 ? tokens.ui.surface : (tokens.players.palette[owner]?.line ?? tokens.ui.ink);
+    parts.push(
+      `<polygon points="${points}" fill="${fill}" fill-opacity="${owner < 0 ? '1' : '0.5'}" stroke="${tokens.ui.border}" stroke-width="0.6"/>`,
+    );
+  });
+  for (const city of match.final.cities) {
+    const col = city.hex % match.final.width;
+    const row = Math.floor(city.hex / match.final.width);
+    const x = 24 + col * dx;
+    const y = 48 + row * dy + (col % 2 === 0 ? dy / 2 : 0);
+    parts.push(
+      `<circle cx="${x}" cy="${y}" r="${city.capital ? 4 : 2.5}" fill="${tokens.ui.ink}"/>`,
+    );
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${parts.join('')}</svg>\n`;
+}
+
 writeFileSync(
   new URL('bot-match-soldiers.svg', OUT),
   chart('Солдаты в армиях у каждого игрока', 'soldiers', 'солдат'),
@@ -125,6 +168,7 @@ writeFileSync(
   new URL('bot-match-gold.svg', OUT),
   chart('Золото в казне у каждого игрока', 'gold', 'золото'),
 );
+writeFileSync(new URL('bot-match-final.svg', OUT), finalFrame());
 const n = match.samples[0]?.players.length ?? 0;
 const head = [
   't_s',
@@ -144,4 +188,6 @@ const rows = match.samples.map((s) =>
   ].join(','),
 );
 writeFileSync(new URL('bot-match.csv', OUT), [head.join(','), ...rows].join('\n') + '\n');
-console.log('готово: bot-match-soldiers.svg, bot-match-gold.svg, bot-match.csv');
+console.log(
+  'готово: bot-match-soldiers.svg, bot-match-gold.svg, bot-match-final.svg, bot-match.csv',
+);

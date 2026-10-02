@@ -6,6 +6,7 @@ import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import type { PlayerView } from '../queries/player-view.ts';
+import { offensiveEdgePath } from '../state/edge-line.ts';
 import { edgeHex, edgeOf, edgeOther, isLandEdge, type EdgeId } from '../state/edges.ts';
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
@@ -50,10 +51,11 @@ export function commanderLine(
   view: PlayerView,
   front: readonly EdgeId[],
   enemy: number,
+  maxDepth: number = COMMANDER_LINE_DEPTH,
 ): EdgeId[] {
   const g = { map, hexes: view.hexes };
-  const dist = depthFromFront(g, front, enemy, COMMANDER_LINE_DEPTH + 1);
-  let depth = COMMANDER_LINE_DEPTH;
+  const dist = depthFromFront(g, front, enemy, maxDepth + 1);
+  let depth = maxDepth;
   for (const c of view.cities) {
     const d = dist.get(c.hex);
     if (c.owner === enemy && d !== undefined && d < depth) depth = d;
@@ -83,5 +85,6 @@ export function commanderLine(
     });
     return best;
   };
-  return line.sort((a, b) => at(a) - at(b) || a - b);
+  const ordered = line.sort((a, b) => at(a) - at(b) || a - b);
+  return offensiveEdgePath(g, ordered) ?? [];
 }

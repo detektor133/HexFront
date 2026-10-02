@@ -25,6 +25,11 @@ describe('проверка сообщений коммитов', () => {
     expect(checkCommitMessage(message, ctx)).toEqual([]);
   });
 
+  it.each(['T26b1', 'T26b2', 'T12c'])('принимает трейлер подзадачи %s', (task) => {
+    const message = `feat(sim): добавлена подсистема\n\nЭтап: 04/${task}`;
+    expect(checkCommitMessage(message, STAGE)).toEqual([]);
+  });
+
   it.each([
     ['без типа и области', 'добавлена система снабжения\n\nЭтап: 02/T7', STAGE],
     ['неизвестный тип', 'feature(sim): добавлена система снабжения\n\nЭтап: 02/T7', STAGE],

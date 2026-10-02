@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BOT_ARMY_RATIO,
   BOT_GOLD_RESERVE,
   BOT_TAX_PEACE,
   BOT_TAX_WAR,
   BOT_THINK_TICKS,
   RECRUIT_MIN,
+  RECRUIT_STEP,
   TAX_MAX,
 } from '../../src/balance.ts';
 import { economyDecide } from '../../src/bots/economy.ts';
@@ -131,7 +133,7 @@ describe('экономический мозг бота: траты (04/T23)', ()
     expect(decide(s).find((c) => c.t === 'improve')).toEqual({ t: 'improve', hex: 3 + 4 * 12 });
   });
 
-  it('набор: сила у границы меньше 1,2 × видимой силы врага — пехота в городе', () => {
+  it('набор: сила у границы меньше 0,8 × силы сильнейшего соседа — пехота в городе', () => {
     const s = scenario(FIELD, { legend });
     rich(s);
     s.setPop(at(0, 2), 300);
@@ -141,9 +143,31 @@ describe('экономический мозг бота: траты (04/T23)', ()
     const max = view.cities.find((c) => c.owner === 0)?.recruitMax ?? 0;
     expect(max).toBeGreaterThanOrEqual(RECRUIT_MIN);
     const rec = economyDecide(s.state.map, view).find((c) => c.t === 'recruit');
-    // Размер набора — сколько даёт город (карточка города), шагом RECRUIT_STEP.
-    expect(rec).toMatchObject({ t: 'recruit', type: 'infantry', soldiers: max });
+    expect(BOT_ARMY_RATIO).toBe(0.8 * FP);
+    expect(rec).toMatchObject({ t: 'recruit', type: 'infantry' });
+    const soldiers = rec?.t === 'recruit' ? rec.soldiers : 0;
+    expect(soldiers).toBeGreaterThanOrEqual(RECRUIT_MIN);
+    expect(soldiers).toBeLessThanOrEqual(max);
+    expect(soldiers % RECRUIT_STEP).toBe(0);
     expect(accepted(s, rec as Command)).toBe(true);
+  });
+
+  it('содержание достигло половины дохода — новых солдат не набирает', () => {
+    const s = scenario(FIELD, { legend });
+    rich(s);
+    s.setPop(at(0, 2), 300);
+    s.unit('A', 'armor', 10_000, at(0, 0));
+    for (let r = 1; r < 4; r += 1) s.unit('B', 'infantry', 500, at(3, r));
+    expect(decide(s).filter((c) => c.t === 'recruit')).toEqual([]);
+  });
+
+  it('при занятой фронтами армии создаёт отдельную армию экспансии', () => {
+    const s = scenario(PEACE, { legend });
+    s.cmd('A', createArmy(''));
+    s.runTicks(1);
+    const army = s.armiesOf('A')[0]?.id ?? -1;
+    s.state.plans.push({ armyId: army, kind: 'line', hexes: [0] });
+    expect(decide(s)).toContainEqual({ t: 'createArmy', name: '' });
   });
 
   it('лимит отрядов исчерпан — набора нет', () => {

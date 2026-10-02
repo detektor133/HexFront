@@ -9,6 +9,7 @@ import {
   commanderCommands,
   createMatch,
   FP,
+  isCityIsolated,
   loadMap,
   step,
   TICKS_PER_S,
@@ -61,19 +62,97 @@ const commands = new Map<string, number>();
 const rejected = new Map<string, number>();
 const events = new Map<string, number>();
 const count = (m: Map<string, number>, k: string): void => void m.set(k, (m.get(k) ?? 0) + 1);
+const roadLog: { t: number; playerId: number; cityId: number; reason: string }[] = [];
+const knownRoads = new Set<number>();
+const roadCause = new Map<number, string>();
+const goldTicks = state.players.map(() => 0);
+let maxGoldTicks = 0;
+const smallTicks = new Map<number, number>();
+let maxSmallTicks = 0;
+let centralNeutralAt10 = 1;
+let firstEliminationS: number | null = null;
+let winReason: string | null = null;
+
+function centralNeutralRatio(): number {
+  const { width, height, terrain } = state.map;
+  let passable = 0;
+  let neutral = 0;
+  for (let row = Math.floor(height / 3); row < Math.ceil((2 * height) / 3); row += 1) {
+    for (let col = Math.floor(width / 3); col < Math.ceil((2 * width) / 3); col += 1) {
+      const hex = col + row * width;
+      if (terrain[hex] === 0) continue;
+      passable += 1;
+      if (state.hexes.owner[hex] === -1) neutral += 1;
+    }
+  }
+  return passable === 0 ? 0 : neutral / passable;
+}
+
+function updateDurations(): void {
+  state.players.forEach((p, i) => {
+    goldTicks[i] = p.gold > 5000 * FP ? (goldTicks[i] ?? 0) + 1 : 0;
+    maxGoldTicks = Math.max(maxGoldTicks, goldTicks[i] ?? 0);
+  });
+  const current = new Set<number>();
+  for (const unit of state.units) {
+    current.add(unit.id);
+    const ticks = unit.soldiers < 10 * FP ? (smallTicks.get(unit.id) ?? 0) + 1 : 0;
+    smallTicks.set(unit.id, ticks);
+    maxSmallTicks = Math.max(maxSmallTicks, ticks);
+  }
+  for (const id of smallTicks.keys()) if (!current.has(id)) smallTicks.delete(id);
+}
 
 const started = Date.now();
 while (state.winner < 0 && state.tick < MAX_TICKS) {
   if (state.tick % (SAMPLE_EVERY_S * TICKS_PER_S) === 0) {
     samples.push({ t: state.tick / TICKS_PER_S, players: sample(state) });
   }
-  const cmds = [...commanderCommands(state), ...botCommands(state, bots)];
+  const isolation = new Map(state.cities.map((city) => [city.id, isCityIsolated(state, city.id)]));
+  const cmds = [...commanderCommands(state, bots), ...botCommands(state, bots)];
   for (const c of cmds) count(commands, `${c.source ?? 'bot'}:${c.cmd.t}`);
   step(state, cmds);
+  updateDurations();
+  if (state.tick === 10 * 60 * TICKS_PER_S) centralNeutralAt10 = centralNeutralRatio();
+  const captured = new Set<number>();
+  const moved = new Set<number>();
+  const founded = new Set<number>();
   for (const e of state.events) {
     if (e.t === 'commandRejected')
       count(rejected, `${e.auto ? 'auto' : 'bot'}:${e.command}:${e.reason}`);
     else count(events, e.t);
+    if (e.t === 'playerEliminated' && firstEliminationS === null) {
+      firstEliminationS = state.tick / TICKS_PER_S;
+    }
+    if (e.t === 'matchWon') winReason = e.reason;
+    if (e.t === 'cityCaptured') captured.add(e.cityId);
+    if (e.t === 'capitalMoved') moved.add(e.playerId);
+    if (e.t === 'constructionDone' && e.kind === 'foundCity') founded.add(e.hex);
+  }
+  for (const city of state.cities) {
+    if (isCityIsolated(state, city.id) && isolation.get(city.id) === false) {
+      roadCause.set(
+        city.id,
+        captured.has(city.id)
+          ? 'cityCaptured'
+          : moved.has(city.owner)
+            ? 'capitalMoved'
+            : 'territoryLost',
+      );
+    }
+  }
+  for (const road of state.constructions.filter((c) => c.kind === 'road')) {
+    if (knownRoads.has(road.id)) continue;
+    knownRoads.add(road.id);
+    const city = state.cities.find((c) => c.hex === road.hex);
+    roadLog.push({
+      t: state.tick / TICKS_PER_S,
+      playerId: road.owner,
+      cityId: city?.id ?? -1,
+      reason: founded.has(road.hex)
+        ? 'newCity'
+        : (roadCause.get(city?.id ?? -1) ?? 'initialIsolation'),
+    });
   }
 }
 samples.push({ t: state.tick / TICKS_PER_S, players: sample(state) });
@@ -87,6 +166,24 @@ const result = {
   commands: Object.fromEntries([...commands].sort()),
   rejected: Object.fromEntries([...rejected].sort((a, b) => b[1] - a[1])),
   events: Object.fromEntries([...events].sort()),
+  acceptance: {
+    firstEliminationS,
+    winReason,
+    maxGoldOver5000S: maxGoldTicks / TICKS_PER_S,
+    maxUnitUnder10S: maxSmallTicks / TICKS_PER_S,
+    centralNeutralAt10,
+  },
+  roadLog,
+  final: {
+    width: state.map.width,
+    height: state.map.height,
+    owner: [...state.hexes.owner],
+    cities: state.cities.map((city) => ({
+      hex: city.hex,
+      owner: city.owner,
+      capital: state.players[city.owner]?.capitalCityId === city.id,
+    })),
+  },
   samples,
 };
 if (OUT) writeFileSync(OUT, JSON.stringify(result));
