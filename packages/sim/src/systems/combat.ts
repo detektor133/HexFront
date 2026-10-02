@@ -151,7 +151,7 @@ function resolveUnits(state: MatchState, battles: readonly Battle[]): void {
   const survivors: Unit[] = [];
   for (const u of state.units) {
     if (u.soldiers <= 0) {
-      state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id });
+      state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
       continue;
     }
     const hexes = attackerHexes.get(u);

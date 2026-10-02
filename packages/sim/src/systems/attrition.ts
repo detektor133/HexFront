@@ -34,7 +34,7 @@ export function attritionSystem(state: MatchState): void {
       u.soldiers = (u.soldiers - lost) as Fp;
     }
     if (u.soldiers >= FP) survivors.push(u);
-    else state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id });
+    else state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
   }
   if (survivors.length !== state.units.length) {
     state.units.splice(0, state.units.length, ...survivors);

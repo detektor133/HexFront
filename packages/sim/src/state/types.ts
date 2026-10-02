@@ -226,6 +226,7 @@ export type GameEvent =
       readonly t: 'unitDestroyed' | 'unitRetreated' | 'unitCapitulated';
       readonly playerId: number;
       readonly unitId: number;
+      readonly hex: HexId;
     }
   | {
       readonly t: 'cityCaptured' | 'capitalMoved';

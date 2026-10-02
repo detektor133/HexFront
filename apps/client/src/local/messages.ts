@@ -8,6 +8,7 @@ import type {
   RecruitCheck,
   RejectReason,
   UnitType,
+  GameEvent,
 } from '@hexfront/sim';
 
 /** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
@@ -58,5 +59,6 @@ export type FromWorker =
       readonly view: PlayerView;
       readonly selection: Selection | null;
       readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+      readonly events: readonly GameEvent[];
     }
   | { readonly t: 'error'; readonly errors: readonly string[] };

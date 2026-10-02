@@ -12,11 +12,13 @@ import {
 
 import { ArmyBar } from './ArmyBar.tsx';
 import styles from './DevSandboxPage.module.css';
+import { EventFeed } from './EventFeed.tsx';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
 import { MatchEnd } from './MatchEnd.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
+import { appendEvents, type EventFeedItem } from './event-feed.ts';
 import { createOrderHooks } from './order-hooks.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
@@ -87,6 +89,8 @@ interface Sandbox {
   readonly tool: ToolState | null;
   readonly army: number | null;
   readonly fog: boolean;
+  readonly events: readonly EventFeedItem[];
+  focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
   pick(p: Picked): void;
@@ -112,6 +116,8 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
+  const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
+  const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
 
   const pick = useCallback((p: Picked) => {
@@ -196,6 +202,9 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       viewRef.current = m.view;
       layerRef.current?.setView(m.view, pickedRef.current);
       setMsg(m);
+      const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
+      eventsRef.current = nextEvents;
+      setEvents(nextEvents);
       const last = m.rejected.at(-1);
       if (last) setLastReject(reasonText(last.reason));
     });
@@ -264,6 +273,14 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
     });
     const onKey = (e: KeyboardEvent): void => {
+      if (e.code === 'Space' && !e.repeat) {
+        const latest = eventsRef.current.at(-1);
+        if (latest?.hex !== null && latest?.hex !== undefined) {
+          e.preventDefault();
+          mapViewRef.current?.centerOn(hexFromId(latest.hex, map.width));
+        }
+        return;
+      }
       if (e.key !== 'Escape') return;
       mapViewRef.current?.cancel();
       if (toolRef.current) {
@@ -282,6 +299,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       matchRef.current = null;
       layerRef.current = null;
       mapViewRef.current = null;
+      eventsRef.current = [];
     };
   }, [hostRef, loaded, pick, input, setTool, splitGrab]);
 
@@ -294,6 +312,12 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     army,
     send,
     fog,
+    events,
+    focusEvent(item) {
+      if (item.hex !== null && typeof loaded !== 'string') {
+        mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
+      }
+    },
     setFog,
     pick,
     setTool,
@@ -328,6 +352,7 @@ export function DevSandboxPage(): React.JSX.Element {
   return (
     <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
+      <EventFeed items={sb.events} now={performance.now()} onFocus={sb.focusEvent} />
       {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
       {view && <MatchEnd view={view} />}
       {view && (

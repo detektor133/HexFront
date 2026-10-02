@@ -125,6 +125,7 @@ export function createLocalEngine(
         view: playerView(state, HUMAN_ID),
         selection: selected === null ? null : selectionOf(state, selected),
         rejected,
+        events: state.events.slice(),
       };
     },
   };
