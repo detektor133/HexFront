@@ -2,12 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
 
-import small from '../../../packages/mapgen/maps/small.json' with { type: 'json' };
 import { detailLevel } from '../src/render/camera.ts';
 import { createTerrainLayer, hexNoise } from '../src/render/terrain-layer.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
-const loaded = loadMap(small);
+const loaded = loadMap({
+  version: 1,
+  id: 'terrain-test',
+  width: 3,
+  height: 2,
+  terrain: 'AQEBAQEB',
+  features: [],
+  riverEdges: [],
+  roads: 'AA==',
+  cities: [],
+  spawns: [{ q: 1, r: 0 }],
+});
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
 describe('слои рельефа карты', () => {
