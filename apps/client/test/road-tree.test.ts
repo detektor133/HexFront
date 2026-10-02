@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
 
-import { roadEdgeOwner, roadTree } from '../src/dev/economy-layer.ts';
+import {
+  constructionDashOffset,
+  roadEdgeOwner,
+  roadTree,
+  shouldAnimateRoadConstruction,
+} from '../src/dev/economy-layer.ts';
 
 // Карта 3×2 без городов; гексы 0, 1, 4 попарно соседние (треугольник): все пары дали бы 3 ребра.
 function view(
@@ -54,5 +59,16 @@ describe('дерево дорог', () => {
     expect(roadEdgeOwner(isolated, 0, 1)).toBeNull();
     const neutral = view([0, 1], [-1, -1, 0, 0, 0, 0]).v;
     expect(roadEdgeOwner(neutral, 0, 1)).toBeNull();
+  });
+
+  it('смещает штрихи незавершённой дороги со временем', () => {
+    expect(constructionDashOffset(0, 6, 5)).toBe(0);
+    expect(constructionDashOffset(1000, 6, 5)).toBe(1);
+    expect(constructionDashOffset(11000, 6, 5)).toBe(0);
+  });
+
+  it('отключает анимацию дороги при prefers-reduced-motion', () => {
+    expect(shouldAnimateRoadConstruction(true)).toBe(false);
+    expect(shouldAnimateRoadConstruction(false)).toBe(true);
   });
 });

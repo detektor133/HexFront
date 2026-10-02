@@ -70,15 +70,30 @@ export interface OrderTarget {
 }
 
 /** Пунктир отрезка: штрих и промежуток — в мировых единицах. */
-function dashed(g: Graphics, a: Point, b: Point, dash: number, gap: number): void {
+function dashed(g: Graphics, a: Point, b: Point, dash: number, gap: number, offset = 0): void {
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   if (len === 0) return;
   const ux = (b.x - a.x) / len;
   const uy = (b.y - a.y) / len;
-  for (let t = 0; t < len; t += dash + gap) {
+  const period = dash + gap;
+  const start = -((offset % period) + period) % period;
+  for (let t = start; t < len; t += period) {
     const e = Math.min(len, t + dash);
-    g.moveTo(a.x + ux * t, a.y + uy * t).lineTo(a.x + ux * e, a.y + uy * e);
+    const from = Math.max(0, t);
+    if (e <= from) continue;
+    g.moveTo(a.x + ux * from, a.y + uy * from).lineTo(a.x + ux * e, a.y + uy * e);
   }
+}
+
+/** Возвращает фазу пунктира дороги; один пиксель в секунду сохраняет читаемость карты. */
+export function constructionDashOffset(nowMs: number, dash: number, gap: number): number {
+  const period = dash + gap;
+  return period === 0 ? 0 : Math.floor(nowMs / 1000) % period;
+}
+
+/** Проверяет, нужно ли двигать «муравьёв» незавершённой дороги. */
+export function shouldAnimateRoadConstruction(reducedMotion: boolean): boolean {
+  return !reducedMotion;
 }
 
 /**
@@ -177,6 +192,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let orderTarget: OrderTarget | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let frameMs = 0;
 
   function drawFill(v: PlayerView): void {
     fill.clear();
@@ -253,8 +271,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       if (c.kind === 'road') {
         const [dash, gap] = tokens.road.dash;
         const pts = c.path.map(center);
+        const offset = shouldAnimateRoadConstruction(reducedMotion)
+          ? constructionDashOffset(frameMs, dash, gap)
+          : 0;
         for (let i = 1; i < pts.length; i += 1) {
-          dashed(marks, pts[i - 1] as Point, pts[i] as Point, dash * k, gap * k);
+          dashed(marks, pts[i - 1] as Point, pts[i] as Point, dash * k, gap * k, offset * k);
         }
         marks.stroke({
           color: playerLine(c.owner),
@@ -344,6 +365,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
     },
     frame(nowMs) {
+      if (frameMs !== nowMs && shouldAnimateRoadConstruction(reducedMotion)) {
+        frameMs = nowMs;
+        if (view?.constructions.some((c) => c.kind === 'road')) drawMarks(view);
+      }
       unitLayer.frame(nowMs);
       planLayer.frame(nowMs);
     },
