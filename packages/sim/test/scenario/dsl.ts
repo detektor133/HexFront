@@ -296,6 +296,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     armies: [],
     plans: [],
     networks: [],
+    supplyRatios: new Map(),
     nextId: 1,
     events: [],
     winner: -1,

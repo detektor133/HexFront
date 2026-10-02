@@ -3,6 +3,8 @@ import { useState } from 'react';
 import {
   TAX_MAX,
   TAX_STEP,
+  ATTRITION_THRESHOLD,
+  FP,
   TICKS_PER_S,
   type Command,
   type Fp,
@@ -19,11 +21,14 @@ function Slot(props: {
   rate?: string;
   negative?: boolean;
   title?: string;
+  tone?: 'warning' | 'danger';
 }): React.JSX.Element {
   return (
     <div className={styles.slot} title={props.title}>
       <span className={styles.label}>{props.label}</span>
-      <span className={styles.value}>{props.value}</span>
+      <span className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}>
+        {props.value}
+      </span>
       {props.rate && (
         <span className={props.negative ? styles.rateBad : styles.rate}>{props.rate}</span>
       )}
@@ -108,6 +113,8 @@ export function Hud(props: {
   const s = view.me;
   // Прирост золота в HUD — баланс: доход минус содержание отрядов (02-economy.md, «Золото»).
   const net = s.incomePerS - s.upkeepPerS;
+  const supplyTone =
+    s.supplyLevel < ATTRITION_THRESHOLD ? 'danger' : s.supplyLevel < FP ? 'warning' : undefined;
   return (
     <header className={styles.hud}>
       <Slot
@@ -153,7 +160,11 @@ export function Hud(props: {
           </div>
         )}
       </div>
-      <Slot label={t('hud.supply')} value="—" title={t('hud.supplyLater')} />
+      <Slot
+        label={t('hud.supply')}
+        value={formatPercent(s.supplyLevel)}
+        {...(supplyTone ? { tone: supplyTone } : {})}
+      />
       <Slot label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
       <Slot label={t('hud.place')} value={`#${s.place}/${s.players}`} />
       <Settings view={view} send={props.send} fog={props.fog} setFog={props.setFog} />

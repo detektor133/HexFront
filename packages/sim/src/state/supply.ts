@@ -166,6 +166,7 @@ export function recomputeSupply(state: MatchState, owner: number): void {
     if (o) final.set(u, o);
   }
   const r2 = ratios(state, nets, final);
+  for (const net of nets) state.supplyRatios.set(net.id, r2.get(net.id) ?? (FP as Fp));
   const bankrupt = state.players[owner]?.bankrupt === true;
   for (const u of units) {
     const o = final.get(u);

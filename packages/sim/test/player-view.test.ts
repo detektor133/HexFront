@@ -159,4 +159,12 @@ describe('playerView', () => {
       [s.cityAt(at(6, 1))?.id, 'artillery', 100_000, 1],
     ]);
   });
+
+  it('показывает снабжение основной сети с учётом спроса отрядов', () => {
+    const s = scenario(MAP, { legend });
+    s.unit('A', 'infantry', 1000, at(0, 0));
+    s.runTicks(NETWORK_RECALC_TICKS);
+
+    expect(playerView(s.state, 0).me.supplyLevel).toBe(750);
+  });
 });

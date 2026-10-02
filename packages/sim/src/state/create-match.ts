@@ -66,6 +66,7 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     armies: [],
     plans: [],
     networks: [],
+    supplyRatios: new Map(),
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
     winner: -1,

@@ -52,10 +52,11 @@
 
 ## Следующая сессия
 
-- **Задача:** 04/T7.
-- **Очередь:** T7 → T8 → T9 → T10 → T11 → T12 → T28 → T27.
-- **Сделано в этой сессии:** 04/T6 — добавлены reduced-motion анимации боя, захвата, вспышки города и контура котла.
-- **Проверки:** полный `pnpm verify` зелёный: 582 теста и visual.
+- **Задача:** 04/T8.
+- **Очередь:** T8 → T9 → T10 → T11 → T12 → T28 → T27.
+- **Читать следующей сессии:** `stages/stage-04-controls-visuals.md`, `docs/gdd/07-controls.md`, `docs/art/ui.md`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/src/dev/UnitCard.tsx`.
+- **Сделано в этой сессии:** 04/T7 — HUD показывает коэффициент снабжения основной сети с учётом спроса отрядов; добавлены цвета предупреждения/истощения, анимация изменения значений, reduced-motion и альбомная раскладка 844×390.
+- **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, 582 теста и visual.
 - **Читать:** `stages/stage-04-controls-visuals.md`, `docs/art/style-guide.md`, `docs/art/tokens.json`, `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/unit-layer.ts`.
 - **Визуальный эталон:** `apps/client/tests/visual/baseline/units-1440x900.png`.
 - **Проверки:** полный `pnpm verify` зелёный: 75 файлов, 582 теста, visual для карты и `/dev/units` прошёл.

@@ -269,6 +269,8 @@ export interface MatchState {
   readonly recruits: Recruitment[];
   /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
   networks: SupplyNetwork[];
+  /** Производительность сетей после распределения спроса; кэш для HUD, не часть хэша. */
+  supplyRatios: Map<number, Fp>;
   nextId: number;
   events: GameEvent[];
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */

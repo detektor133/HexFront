@@ -9,7 +9,7 @@ import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity, unitLimit } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
-import type { Fp } from '../math/int.ts';
+import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
@@ -75,6 +75,8 @@ export interface PlayerView {
     readonly incomeAtTargetPerS: number;
     /** Содержание отрядов, fixed-point золота в секунду. */
     readonly upkeepPerS: number;
+    /** Коэффициент снабжения основной сети после учёта спроса отрядов, fixed-point. */
+    readonly supplyLevel: Fp;
     /** Казна пуста при отрицательном балансе (02-economy.md, «Банкротство»). */
     readonly bankrupt: boolean;
     /** Переключатель «Автопополнение». */
@@ -134,6 +136,10 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     incomePerS: playerIncomePerSecond(state, playerId),
     incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target),
     upkeepPerS: playerUpkeepPerSecond(state, playerId),
+    supplyLevel:
+      state.supplyRatios.get(
+        state.networks.find((network) => network.owner === playerId && network.isMain)?.id ?? -1,
+      ) ?? (FP as Fp),
     bankrupt: state.players[playerId]?.bankrupt ?? false,
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
     autoCommand: state.players[playerId]?.autoCommand ?? true,

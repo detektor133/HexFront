@@ -35,6 +35,15 @@
   font-size: var(--font-size-hud-value);
   font-variant-numeric: tabular-nums;
   color: var(--ui-ink);
+  animation: hudValueChange 150ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.warning {
+  color: var(--status-warning);
+}
+
+.danger {
+  color: var(--status-danger);
 }
 
 .rate,
@@ -192,5 +201,38 @@
 
   .taxButton {
     min-height: 30px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .hud {
+    min-height: 44px;
+    gap: 0 var(--space-md);
+    padding: 0 var(--space-md);
+  }
+
+  .label,
+  .rate {
+    font-size: 11px;
+  }
+
+  .value {
+    font-size: var(--font-size-body);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .value {
+    animation: none;
+  }
+}
+
+@keyframes hudValueChange {
+  from {
+    opacity: 0.45;
+  }
+
+  to {
+    opacity: 1;
   }
 }
