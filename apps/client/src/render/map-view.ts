@@ -1,6 +1,6 @@
 // Pixi-сцена карты: слои рельефа и камера с перетаскиванием, колесом, щипком и инерцией.
 // ADR-0005: карта рисуется Pixi императивно, React только управляет параметрами.
-import { Application, Container } from 'pixi.js';
+import { Application, Container, Graphics } from 'pixi.js';
 
 import type { Hex, MapStatic } from '@hexfront/sim';
 
@@ -56,6 +56,7 @@ export interface OrderHooks {
 
 /** Росчерк: точка в мировых координатах карты. */
 export type StrokeHandler = (world: Point, phase: StrokePhase) => void;
+export type SelectionHandler = (from: Point, to: Point, phase: StrokePhase) => void;
 
 export interface MapViewOptions {
   readonly radius: number;
@@ -74,6 +75,8 @@ export interface MapView {
    * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
    */
   setStroke(handler: StrokeHandler | null): void;
+  /** Рамка выбора отрядов мышью; вызывается только для Shift + ЛКМ. */
+  setSelection(handler: SelectionHandler | null): void;
   /**
    * Захват: при нажатии grab(world) может вернуть обработчик росчерка — тогда этот жест тянет
    * объект (ручку конца фронта), а не карту.
@@ -109,6 +112,8 @@ export async function createMapView(
   host.appendChild(app.canvas);
   const world = new Container();
   app.stage.addChild(world);
+  const selection = new Graphics();
+  world.addChild(selection);
 
   let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
@@ -128,6 +133,7 @@ export async function createMapView(
   let stroking = false;
   let hooks: OrderHooks | null = null;
   let stroke: StrokeHandler | null = null;
+  let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
   let grabbed: StrokeHandler | null = null;
   const toWorld = (at: Point): Point => ({
@@ -193,6 +199,22 @@ export async function createMapView(
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
         onTap?.(pixelToHex(world, opts.radius), e.kind, world);
+      } else if (e.t === 'selection') {
+        const from = toWorld(e.at);
+        const to = toWorld(e.to);
+        selection.clear();
+        if (e.phase !== 'end' && e.phase !== 'cancel') {
+          selection
+            .rect(
+              Math.min(from.x, to.x),
+              Math.min(from.y, to.y),
+              Math.abs(to.x - from.x),
+              Math.abs(to.y - from.y),
+            )
+            .fill({ color: tokens.selection.color, alpha: 0.08 })
+            .stroke({ color: tokens.selection.color, width: tokens.selection.width / cam.scale });
+        }
+        selectionHandler?.(from, to, e.phase);
       } else if (e.t === 'stroke') {
         stroking = e.phase === 'start' || e.phase === 'move';
         (grabbed ?? stroke)?.(toWorld(e.at), e.phase);
@@ -262,6 +284,10 @@ export async function createMapView(
       stroking = false;
       stroke = handler;
     },
+    setSelection(handler) {
+      selectionHandler = handler;
+      selection.clear();
+    },
     setScale(scale) {
       cam = zoomAt(cam, scale / cam.scale, view().width / 2, view().height / 2, view(), bounds);
     },
@@ -291,7 +317,7 @@ function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandlers): (
     canvas.setPointerCapture(e.pointerId);
     count += 1;
     h.pressed(count);
-    g.down(e.pointerId, local(e), e.button, performance.now());
+    g.down(e.pointerId, local(e), e.button, performance.now(), e.shiftKey);
   };
   const move = (e: PointerEvent): void => {
     if (count === 0) return g.hover(local(e));

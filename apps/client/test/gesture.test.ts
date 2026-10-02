@@ -34,6 +34,26 @@ const kinds = (s: Setup): string[] =>
   s.events.map((e) => (e.t === 'tap' ? `tap:${e.kind}` : 'phase' in e ? `${e.t}:${e.phase}` : e.t));
 
 describe('жесты карты (04/T16, 07-controls.md)', () => {
+  it('выдаёт рамку выбора только для Shift + ЛКМ', () => {
+    const s = setup();
+    s.g.down(1, { x: 10, y: 20 }, 0, 0, true);
+    s.g.move(1, { x: 30, y: 50 }, 20);
+    s.g.up(1, { x: 40, y: 60 }, 40);
+    expect(s.events).toEqual([
+      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 30, y: 50 }, phase: 'start' },
+      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 30, y: 50 }, phase: 'move' },
+      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 40, y: 60 }, phase: 'end' },
+    ]);
+  });
+
+  it('не превращает обычное перетаскивание в рамку выбора', () => {
+    const s = setup();
+    s.g.down(1, { x: 10, y: 20 }, 0, 0);
+    s.g.move(1, { x: 30, y: 50 }, 20);
+    expect(s.events.some((event) => event.t === 'selection')).toBe(false);
+    expect(s.events[0]?.t).toBe('pan');
+  });
+
   it('пороги: сдвиг ≤ 8 px — тап, больше — карта; удержание — 350 мс', () => {
     expect(DRAG_SLOP_PX).toBe(8);
     expect(HOLD_MS).toBe(350);

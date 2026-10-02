@@ -25,13 +25,14 @@ import {
   NOTHING_PICKED,
   orderHex,
   selectHex,
+  selectUnitsInRect,
   type Picked,
 } from './sandbox-selection.ts';
 import { createSplitGrab } from './split-drag.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
-import type { Point } from '../render/hex-geometry.ts';
+import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -246,6 +247,15 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
+      v.setSelection((from, to, phase) => {
+        if (phase !== 'end') return;
+        const units = viewRef.current
+          ? selectUnitsInRect(viewRef.current, from, to, (id) =>
+              hexCenter(hexFromId(id, map.width), tokens.map.hexRadius),
+            )
+          : [];
+        pick({ hex: null, units, target: null });
+      });
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));

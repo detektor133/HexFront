@@ -18,6 +18,12 @@ export type TapKind = 'select' | 'order';
 export type GestureEvent =
   | { readonly t: 'tap'; readonly at: Point; readonly kind: TapKind }
   | { readonly t: 'pan'; readonly dx: number; readonly dy: number }
+  | {
+      readonly t: 'selection';
+      readonly at: Point;
+      readonly to: Point;
+      readonly phase: StrokePhase;
+    }
   | { readonly t: 'zoom'; readonly factor: number; readonly at: Point }
   | { readonly t: 'stroke'; readonly at: Point; readonly phase: StrokePhase }
   | {
@@ -43,7 +49,7 @@ export interface GestureDeps {
 }
 
 export interface Gesture {
-  down(id: number, at: Point, button: number, ms: number): void;
+  down(id: number, at: Point, button: number, ms: number, shift?: boolean): void;
   move(id: number, at: Point, ms: number): void;
   up(id: number, at: Point, ms: number): void;
   /** Проверка удержания без событий указателя (таймер). */
@@ -52,7 +58,8 @@ export interface Gesture {
   hover(at: Point | null): void;
 }
 
-type Mode = 'idle' | 'pressed' | 'panning' | 'stroking' | 'holding' | 'held' | 'multi';
+type Mode =
+  'idle' | 'pressed' | 'panning' | 'stroking' | 'selecting' | 'holding' | 'held' | 'multi';
 
 /** Создаёт машину жестов; события уходят в emit в порядке возникновения. */
 export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void): Gesture {
@@ -62,6 +69,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   let last: Point = { x: 0, y: 0 };
   let downMs = 0;
   let button = 0;
+  let shift = false;
   // Приказ удержанием: палец уходил с фишки выбранных отрядов (возврат на неё — отмена).
   let leftZone = false;
 
@@ -80,11 +88,12 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   };
 
   return {
-    down(id, at, btn, ms) {
+    down(id, at, btn, ms, withShift = false) {
       active.set(id, at);
       if (active.size > 1) {
         // Второй палец — всегда карта: росчерк, деление и приказ удержанием отменяются.
         if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
+        if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
         if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
         if (mode === 'pressed') deps.release();
         mode = 'multi';
@@ -95,8 +104,9 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       last = at;
       downMs = ms;
       button = btn;
+      shift = withShift && btn === 0;
       leftZone = false;
-      if (btn === 0) deps.press(at);
+      if (btn === 0 && !shift) deps.press(at);
     },
 
     move(id, at, ms) {
@@ -125,7 +135,11 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (mode === 'held') return;
       if (mode === 'pressed') {
         if (Math.hypot(at.x - start.x, at.y - start.y) <= DRAG_SLOP_PX) return;
-        if (button === 0 && deps.drawing()) {
+        if (shift) {
+          mode = 'selecting';
+          deps.release();
+          emit({ t: 'selection', at: start, to: at, phase: 'start' });
+        } else if (button === 0 && deps.drawing()) {
           mode = 'stroking';
           emit({ t: 'stroke', at: start, phase: 'start' });
         } else {
@@ -136,6 +150,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         }
       }
       if (mode === 'stroking') emit({ t: 'stroke', at, phase: 'move' });
+      else if (mode === 'selecting') emit({ t: 'selection', at: start, to: at, phase: 'move' });
       else if (mode === 'panning') emit({ t: 'pan', dx: at.x - prev.x, dy: at.y - prev.y });
     },
 
@@ -144,6 +159,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       active.delete(id);
       if (mode === 'pressed') this.tick(ms);
       if (mode === 'stroking') emit({ t: 'stroke', at, phase: 'end' });
+      else if (mode === 'selecting') emit({ t: 'selection', at: start, to: at, phase: 'end' });
       else if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'end' });
       else if (mode === 'pressed') {
         deps.release();

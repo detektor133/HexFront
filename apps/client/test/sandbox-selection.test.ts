@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlayerView } from '@hexfront/sim';
 
-import { isHostile, NOTHING_PICKED, orderHex, selectHex } from '../src/dev/sandbox-selection.ts';
+import {
+  isHostile,
+  NOTHING_PICKED,
+  orderHex,
+  selectHex,
+  selectUnitsInRect,
+} from '../src/dev/sandbox-selection.ts';
 import { lang } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -64,6 +70,21 @@ describe('песочница: выбор и приказы как в HoI4', () =
   it('нейтральный город с гарнизоном — враждебный гекс', () => {
     const neutral = view.cities.find((c) => c.owner < 0);
     expect(neutral && isHostile(view, neutral.hex)).toBe(true);
+  });
+
+  it('рамка выбирает только свои неотступающие отряды и допускает обратное направление', () => {
+    const selected = selectUnitsInRect(
+      view,
+      { x: 1_000_000, y: 1_000_000 },
+      { x: -1_000_000, y: -1_000_000 },
+      (hex) => ({ x: hex, y: hex }),
+    );
+    expect(selected).toEqual(
+      view.units.filter((u) => u.owner === view.playerId && u.order !== 'retreat').map((u) => u.id),
+    );
+    expect(
+      selected.some((id) => view.units.find((u) => u.id === id)?.owner !== view.playerId),
+    ).toBe(false);
   });
 });
 
