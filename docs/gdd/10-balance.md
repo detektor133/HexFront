@@ -116,6 +116,7 @@
 | `COST_POP_PER_SOLDIER` | 1 | 1 | 1 |
 | `COST_GOLD_PER_SOLDIER` | 0,1 | 1,0 | 0,6 |
 | `UPKEEP_GOLD_PER_SOLDIER_S` | 0,003 | 0,012 | 0,008 |
+| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,2 | 0,2 | 0,2 |
 | `ATK` | 1,0 | 2,0 | 0 |
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |
@@ -127,7 +128,6 @@
 | `RECRUIT_MIN` / `RECRUIT_STEP` | 50 / 50 |
 | `RECRUIT_MIN_HEX_POP_RATIO` | 0,1 |
 | `MAX_UNITS_PER_HEX` | 3 |
-| `UNIT_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
 | `START_UNITS` | 2 × 100 пехоты |
 | `START_GOLD` | 200 |
 | `START_POP_CAPITAL` / `START_POP_HEX` | 200 / 40 |
