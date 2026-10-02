@@ -15,6 +15,7 @@ import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
 import { growthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
+import { visionSystem } from '../systems/vision.ts';
 
 /** Связь узла сети: 0 — не узел, 1 — основная сеть, 2 — изолированная. */
 export const LINK = { none: 0, main: 1, isolated: 2 } as const;
@@ -34,6 +35,7 @@ export interface PlayerView {
     readonly link: Uint8Array;
     /** Отладка /dev/economy: людей в секунду (fixed-point), отрицательное — убыль. */
     readonly growth: Int32Array;
+    readonly visible: Uint8Array;
   };
   readonly cities: readonly {
     readonly id: number;
@@ -155,7 +157,13 @@ function recruitMax(state: MatchState, cityId: number): Fp {
  * @returns данные для отрисовки и интерфейса
  */
 export function playerView(state: MatchState, playerId: number): PlayerView {
+  visionSystem(state);
   const { hexes } = state;
+  const vision = state.vision;
+  const visible = vision?.visible[playerId] ?? new Uint8Array(hexes.owner.length).fill(1);
+  const memoryRoad = vision?.road[playerId];
+  const memoryImprovement = vision?.improvement[playerId];
+  const memoryBuilding = vision?.building[playerId];
   const growth = growthPerSecond(state);
   return {
     me: summary(state, playerId, growth),
@@ -165,12 +173,13 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
-      pop: hexes.pop.slice(),
-      improvement: hexes.improvement.slice(),
-      building: hexes.building.slice(),
-      road: hexes.road.slice(),
-      link: links(state),
-      growth,
+      pop: Int32Array.from(hexes.pop, (value, id) => (hexes.owner[id] === playerId ? value : 0)),
+      improvement: Uint8Array.from(hexes.improvement, (_, id) => memoryImprovement?.[id] ?? 0),
+      building: Uint8Array.from(hexes.building, (_, id) => memoryBuilding?.[id] ?? 0),
+      road: Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0),
+      link: Uint8Array.from(links(state), (value, id) => (visible[id] === 1 ? value : 0)),
+      growth: Int32Array.from(growth, (value, id) => (hexes.owner[id] === playerId ? value : 0)),
+      visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({
       id: c.id,
@@ -188,7 +197,7 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
         isCityIsolated(state, c.id) &&
         rebuildSupplyPlan(state, playerId, c.id).ok,
     })),
-    units: unitViews(state, playerId),
+    units: unitViews(state, playerId, visible),
     armies: armyViews(state, playerId),
     plans: planViews(state, playerId),
     players: state.players.map((p) => ({

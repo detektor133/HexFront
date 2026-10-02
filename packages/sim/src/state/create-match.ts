@@ -20,6 +20,7 @@ import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
+import { createVisionState } from '../systems/vision.ts';
 
 /** Участник матча; id игрока — индекс в массиве. */
 export interface PlayerSetup {
@@ -39,7 +40,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     inBattle: false,
     captureTicks: 0,
   }));
-  return {
+  const state: MatchState = {
     tick: 0,
     seed: seed >>> 0,
     map,
@@ -51,6 +52,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
       road: Uint8Array.from(map.roads),
       network: new Int32Array(size).fill(-1),
     },
+    vision: createVisionState(0, size),
     cities,
     players: [],
     units: [],
@@ -65,6 +67,7 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     holdPlayer: -1,
     holdTicks: 0,
   };
+  return state;
 }
 
 /**
@@ -189,5 +192,6 @@ export function createMatch(
   });
   state.cities.sort((a, b) => a.id - b.id);
   recomputeAllNetworks(state);
+  state.vision = createVisionState(state.players.length, state.hexes.owner.length);
   return state;
 }

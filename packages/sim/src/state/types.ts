@@ -250,6 +250,8 @@ export interface MatchState {
   readonly seed: number;
   readonly map: MapStatic;
   readonly hexes: HexState;
+  /** Кэш обзора и последних известных данных, обновляемый visionSystem. */
+  vision?: VisionState;
   /** Отсортированы по id. */
   readonly cities: City[];
   /** Индекс в массиве равен id игрока. */
@@ -273,4 +275,12 @@ export interface MatchState {
   /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и сколько тиков подряд; -1 — никто. */
   holdPlayer: number;
   holdTicks: number;
+}
+
+export interface VisionState {
+  readonly visible: Uint8Array[];
+  readonly explored: Uint8Array[];
+  readonly road: Uint8Array[];
+  readonly improvement: Uint8Array[];
+  readonly building: Uint8Array[];
 }

@@ -41,28 +41,30 @@ export interface ArmyView {
 }
 
 /** Отряды для снимка игрока playerId. */
-export function unitViews(state: MatchState, playerId: number): UnitView[] {
-  return state.units.map((u) => {
-    const mine = u.owner === playerId;
-    return {
-      id: u.id,
-      owner: u.owner,
-      type: u.type,
-      soldiers: u.soldiers,
-      org: u.org,
-      hex: u.hex,
-      order: u.order,
-      target: u.target,
-      moveTicks: u.moveTicks,
-      moveTotal: u.moveTotal,
-      supplyLevel: mine ? u.supplyLevel : null,
-      encircled: mine ? u.encircled : null,
-      starving: mine ? isStarving(u) : null,
-      armyId: mine ? u.armyId : null,
-      path: mine ? [...u.path] : [],
-      fireTarget: mine ? u.fireTarget : -1,
-    };
-  });
+export function unitViews(state: MatchState, playerId: number, visible?: Uint8Array): UnitView[] {
+  return state.units
+    .filter((u) => u.owner === playerId || (visible?.[u.hex] ?? 1) === 1)
+    .map((u) => {
+      const mine = u.owner === playerId;
+      return {
+        id: u.id,
+        owner: u.owner,
+        type: u.type,
+        soldiers: u.soldiers,
+        org: u.org,
+        hex: u.hex,
+        order: u.order,
+        target: u.target,
+        moveTicks: u.moveTicks,
+        moveTotal: u.moveTotal,
+        supplyLevel: mine ? u.supplyLevel : null,
+        encircled: mine ? u.encircled : null,
+        starving: mine ? isStarving(u) : null,
+        armyId: mine ? u.armyId : null,
+        path: mine ? [...u.path] : [],
+        fireTarget: mine ? u.fireTarget : -1,
+      };
+    });
 }
 
 /** Свои армии для снимка. */
