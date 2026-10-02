@@ -58,4 +58,21 @@ describe('действия карточки гекса', () => {
   it('пока на гексе идёт стройка — действий нет', () => {
     expect(visibleActions(plain(), 0, 0, true)).toEqual([]);
   });
+
+  it('передаёт путь перестройки снабжения для подсветки', () => {
+    const city = {
+      id: 7,
+      upgrade: ok(10),
+      rebuild: {
+        ok: true,
+        cityHex: 5,
+        path: [5, 6, 7],
+        toBuild: [6, 7],
+        cost: 20 as Fp,
+        affordable: true,
+      },
+    } as unknown as NonNullable<Selection['city']>;
+    const road = visibleActions(plain({ city }), 0, 0, false).find((a) => a.kind === 'rebuild');
+    expect(road).toMatchObject({ kind: 'rebuild', previewPath: [5, 6, 7] });
+  });
 });

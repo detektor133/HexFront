@@ -18,12 +18,15 @@ function ActionButton(props: {
   a: HexAction;
   send: (cmd: Command) => void;
   blockedText: string | null;
+  onRoadPreview?: (path: readonly number[] | null) => void;
 }): React.JSX.Element {
   const [why, setWhy] = useState(false);
   const { a } = props;
   // Что даёт постройка — во всплывающей подсказке, не текстом в карточке (04/T16).
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
+  const preview = a.kind === 'rebuild' ? a.previewPath : undefined;
+  const clearPreview = (): void => props.onRoadPreview?.(null);
   // Недоступное по правилам «Основать город»: приглушённая кнопка и причина строкой (ui.md).
   if (a.blocked) {
     return (
@@ -41,7 +44,18 @@ function ActionButton(props: {
         type="button"
         className={styles.button}
         title={hint ?? undefined}
-        onClick={() => (a.affordable ? props.send(a.cmd) : setWhy(true))}
+        onMouseEnter={() => preview && props.onRoadPreview?.(preview)}
+        onMouseLeave={clearPreview}
+        onFocus={() => preview && props.onRoadPreview?.(preview)}
+        onBlur={clearPreview}
+        onClick={() => {
+          if (a.affordable) {
+            props.send(a.cmd);
+            clearPreview();
+          } else {
+            setWhy(true);
+          }
+        }}
       >
         <span>{t(`action.${a.kind}` as MessageKey)}</span>
         <Price value={formatFp(a.cost)} ok={a.affordable} />
@@ -141,6 +155,7 @@ export function HexCard(props: {
   view: PlayerView;
   map: MapStatic;
   send: (cmd: Command) => void;
+  onRoadPreview?: (path: readonly number[] | null) => void;
 }): React.JSX.Element {
   const { s, view, map, send } = props;
   const owner = view.hexes.owner[s.hex] ?? -1;
@@ -202,7 +217,13 @@ export function HexCard(props: {
         </p>
       )}
       {actions.map((a) => (
-        <ActionButton key={a.kind} a={a} send={send} blockedText={blockedText(a, s, view)} />
+        <ActionButton
+          key={a.kind}
+          a={a}
+          send={send}
+          blockedText={blockedText(a, s, view)}
+          {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
+        />
       ))}
       {recruiting && (
         <p className={styles.progressText}>

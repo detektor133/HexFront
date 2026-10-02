@@ -91,6 +91,7 @@ interface Sandbox {
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
+  setRoadPreview(path: readonly number[] | null): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -119,6 +120,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const v = viewRef.current;
     if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
     else if (p.hex !== null) setArmyRef.current(null);
+    layerRef.current?.setRoadPreview(null);
     if (v) layerRef.current?.setView(v, p);
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
@@ -130,6 +132,9 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     armyRef.current = id;
     setArmyState(id);
     layerRef.current?.setSelectedArmy(id);
+  }, []);
+  const setRoadPreview = useCallback((path: readonly number[] | null) => {
+    layerRef.current?.setRoadPreview(path);
   }, []);
   const setArmyRef = useRef(setArmy);
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
@@ -275,6 +280,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     pick,
     setTool,
     setArmy,
+    setRoadPreview,
   };
 }
 
@@ -322,7 +328,13 @@ export function DevSandboxPage(): React.JSX.Element {
         <UnitCard view={view} map={map} picked={sb.picked} send={sb.send} onPick={sb.pick} />
       )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
-        <HexCard s={sb.msg.selection} view={view} map={map} send={sb.send} />
+        <HexCard
+          s={sb.msg.selection}
+          view={view}
+          map={map}
+          send={sb.send}
+          onRoadPreview={sb.setRoadPreview}
+        />
       )}
       {sb.lastReject && (
         <p className={styles.reject}>

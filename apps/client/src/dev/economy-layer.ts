@@ -52,6 +52,8 @@ export interface EconomyLayer {
   setDraft(draft: Draft | null): void;
   /** Выбранная армия: у её фронта — ручки на концах. */
   setSelectedArmy(id: number | null): void;
+  /** Подсветка пути перестройки снабжения из карточки города. */
+  setRoadPreview(path: readonly number[] | null): void;
   /** Кольцо «сколько взять» при вытягивании части из фишки. */
   setSplit(o: SplitOverlay | null): void;
   /**
@@ -173,13 +175,14 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const fill = new Graphics();
   const captures = new Graphics();
   const roads = new Graphics();
+  const roadPreview = new Graphics();
   const borders = new Graphics();
   const fog = new Graphics();
   const marks = new Graphics();
   const labels = new Container();
 
   const container = new Container();
-  container.addChild(fill, captures, roads);
+  container.addChild(fill, captures, roads, roadPreview);
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
@@ -191,6 +194,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
   let selectedArmy: number | null = null;
+  let roadPreviewPath: readonly number[] | null = null;
   let split: SplitOverlay | null = null;
   let orderTarget: OrderTarget | null = null;
   let scale = 1;
@@ -258,6 +262,24 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         cap: 'round',
       });
     }
+  }
+
+  function drawRoadPreview(v: PlayerView): void {
+    roadPreview.clear();
+    if (!roadPreviewPath || roadPreviewPath.length < 2) return;
+    const k = 1 / scale;
+    const [dash, gap] = tokens.road.dash;
+    for (let i = 1; i < roadPreviewPath.length; i += 1) {
+      const from = center(roadPreviewPath[i - 1] as number);
+      const to = center(roadPreviewPath[i] as number);
+      dashed(roadPreview, from, to, dash * k, gap * k);
+    }
+    roadPreview.stroke({
+      color: playerLine(v.playerId),
+      alpha: tokens.road.isolatedAlpha,
+      width: MARK_WIDTH_PX * k,
+      cap: 'round',
+    });
   }
 
   function drawBorders(v: PlayerView): void {
@@ -389,6 +411,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     if (!view) return;
     drawFill(view);
     drawRoads(view);
+    drawRoadPreview(view);
     drawBorders(view);
     drawFog(view);
     drawMarks(view);
@@ -424,6 +447,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     setSelectedArmy(id) {
       selectedArmy = id;
+      redraw();
+    },
+    setRoadPreview(path) {
+      roadPreviewPath = path;
       redraw();
     },
     setDraft(d) {
