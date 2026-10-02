@@ -45,9 +45,9 @@
 
 ## Следующая сессия
 
-- **Задача:** выполнить 04/T26b, затем T26c и T26d; после T26 — T25, плейтест владельца.
-- **Уже сделано:** T24 принят; pre-push хук (lint + commit-check); решения владельца по T26 записаны в `gdd/05-armies.md` («Набор», «Разделение и слияние»), `gdd/04-roads-supply.md` («Прокладка дороги»), `gdd/09-bots.md` (таблица Utility AI), идея `tools/evolve` — в `CHANGELOG-proposals.md`. Код T26 не тронут. Новые числа (`BOT_ARMY_RATIO`, `BOT_ARMY_INCOME_SHARE`, `BOT_LINE_MAX_DEPTH`, `ROAD_PATH_EXISTING_COST`) перечислены в задаче T26 — в `10-balance.md` вносить вместе с `balance.ts` (сторожевой тест `balance-doc`).
-- **Делать по порядку (тесты сначала падают):** лог причин прокладки дорог в `tools/replay/src/bot-match.ts`, затем порядок стройки от сети, отмена при потере города и вес готовой дороги.
+- **Задача:** выполнить 04/T26b1, затем T26b2, T26b3, T26c и T26d; после T26 — T25, плейтест владельца.
+- **Уже сделано:** T24 принят; pre-push хук (lint + commit-check); решения владельца по T26 записаны в `gdd/05-armies.md` («Набор», «Разделение и слияние»), `gdd/04-roads-supply.md` («Прокладка дороги»), `gdd/09-bots.md` (таблица Utility AI), идея `tools/evolve` — в `CHANGELOG-proposals.md`. Работа T26 сохранена в дереве; после разбиения продолжить с T26b1. Новые числа (`BOT_ARMY_RATIO`, `BOT_ARMY_INCOME_SHARE`, `BOT_LINE_MAX_DEPTH`, `ROAD_PATH_EXISTING_COST`) перечислены в задаче T26 — в `10-balance.md` вносить вместе с `balance.ts` (сторожевой тест `balance-doc`).
+- **Делать по порядку (тесты сначала падают):** T26b1 — порядок стройки от сети и отмена при потере города; T26b2 — вес готовой дороги и синхронизация баланса; T26b3 — лог причин прокладки в `tools/replay/src/bot-match.ts`.
 - **Читать:** `stages/stage-04-controls-visuals.md`, `docs/gdd/04-roads-supply.md`, `packages/sim/src/systems/road-construction.ts`, `packages/sim/src/commands/rebuild-supply.ts`, `packages/sim/src/queries/road-path.ts`, `tools/replay/src/bot-match.ts`.
 - **Экономия токенов:** одна задача — одна сессия; узкие тесты в работе, `pnpm check` один раз перед коммитом; скриншоты — только для приёмки; отчёт в чате — 5–10 строк.
 - Области коммитов: `sim, protocol, mapgen, client, server, bots, balance-tool, infra, docs`; заголовок ≤ 72 символов.
