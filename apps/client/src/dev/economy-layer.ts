@@ -15,7 +15,8 @@ import {
   type Direction,
 } from '@hexfront/sim';
 
-import { drawCities, drawCityLabels } from './city-glyphs.ts';
+import { captureProgress, cityFlashAlpha } from './battle-visuals.ts';
+import { citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
@@ -170,6 +171,7 @@ export function fogHexes(view: PlayerView): number[] {
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const fill = new Graphics();
+  const captures = new Graphics();
   const roads = new Graphics();
   const borders = new Graphics();
   const fog = new Graphics();
@@ -177,7 +179,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const labels = new Container();
 
   const container = new Container();
-  container.addChild(fill, roads);
+  container.addChild(fill, captures, roads);
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
@@ -196,9 +198,33 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const reducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let frameMs = 0;
+  let previousOwners: Int16Array | null = null;
+  const capturesByHex = new Map<number, { readonly started: number; readonly color: string }>();
+  const cityFlashes = new Map<number, { readonly started: number; readonly color: string }>();
+
+  function rememberEffects(v: PlayerView, nowMs: number): void {
+    if (previousOwners) {
+      for (let id = 0; id < v.hexes.owner.length; id += 1) {
+        const before = previousOwners[id] ?? -1;
+        const after = v.hexes.owner[id] ?? -1;
+        if (before !== after && after >= 0) {
+          capturesByHex.set(id, { started: nowMs, color: playerLine(after) });
+        }
+      }
+    }
+    const oldCities = new Map<number, number>();
+    if (view) for (const city of view.cities) oldCities.set(city.id, city.owner);
+    for (const city of v.cities) {
+      if (oldCities.get(city.id) !== undefined && oldCities.get(city.id) !== city.owner) {
+        cityFlashes.set(city.id, { started: nowMs, color: playerLine(city.owner) });
+      }
+    }
+    previousOwners = v.hexes.owner.slice();
+  }
 
   function drawFill(v: PlayerView): void {
     fill.clear();
+    captures.clear();
     v.hexes.owner.forEach((owner, id) => {
       if (owner < 0) return;
       fill.poly(hexPolygon(center(id), radius)).fill({
@@ -206,6 +232,16 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         alpha: owner === v.playerId ? tokens.territory.alphaOwn : tokens.territory.alphaOther,
       });
     });
+    for (const [id, effect] of capturesByHex) {
+      const progress = captureProgress(frameMs - effect.started, reducedMotion);
+      if (progress >= 1) {
+        capturesByHex.delete(id);
+        continue;
+      }
+      const point = center(id);
+      const polygon = hexPolygon(point, radius * progress);
+      captures.poly(polygon).fill({ color: effect.color, alpha: 1 });
+    }
   }
 
   function drawRoads(v: PlayerView): void {
@@ -299,6 +335,21 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
+    for (const [id, effect] of cityFlashes) {
+      const city = v.cities.find((item) => item.id === id);
+      if (!city) {
+        cityFlashes.delete(id);
+        continue;
+      }
+      const elapsed = frameMs - effect.started;
+      if (elapsed >= tokens.motion.capture) {
+        cityFlashes.delete(id);
+        continue;
+      }
+      marks
+        .circle(center(city.hex).x, center(city.hex).y, citySize(radius, city.level))
+        .fill({ color: effect.color, alpha: cityFlashAlpha(elapsed, reducedMotion) });
+    }
     labels.removeChildren().forEach((child) => child.destroy());
     drawCityLabels(
       labels,
@@ -354,6 +405,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
     },
     setView(v, sel) {
+      rememberEffects(v, performance.now());
       view = v;
       selected = sel;
       redraw();
@@ -379,9 +431,14 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
     },
     frame(nowMs) {
-      if (frameMs !== nowMs && shouldAnimateRoadConstruction(reducedMotion)) {
-        frameMs = nowMs;
+      const changed = frameMs !== nowMs;
+      frameMs = nowMs;
+      if (changed && shouldAnimateRoadConstruction(reducedMotion)) {
         if (view?.constructions.some((c) => c.kind === 'road')) drawMarks(view);
+      }
+      if (changed && view && (capturesByHex.size > 0 || cityFlashes.size > 0)) {
+        drawFill(view);
+        drawMarks(view);
       }
       unitLayer.frame(nowMs);
       planLayer.frame(nowMs);

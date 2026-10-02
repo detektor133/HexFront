@@ -14,11 +14,12 @@ import {
   type UnitView,
 } from '@hexfront/sim';
 
+import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
-import { hexEdge, type Point } from '../render/hex-geometry.ts';
+import { hexCorner, hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -35,12 +36,13 @@ const SMOOTH_MS = 90;
 /** Шаг разрешения текста — чтобы не перерисовывать текст на каждом шаге колеса. */
 const RES_STEP = 0.5;
 const ARTY_RANGE_HEXES = 2;
-/** Маркер боя (units.md): ⌀16, обводка 2, крест 7, пульс 1,0 → 1,15 за 800 мс. */
+/** Маркер боя (units.md): ⌀16, обводка 2, крест 7. */
 const BATTLE_R = 8;
 const BATTLE_CROSS = 3.5;
-const BATTLE_PULSE_MS = 800;
-const BATTLE_PULSE = 0.15;
 const FULL = 1000;
+const ENCIRCLED_MS = 3000;
+const ENCIRCLED_DASH = 6;
+const ENCIRCLED_GAP = 5;
 
 export interface UnitLayer {
   readonly container: Container;
@@ -104,6 +106,9 @@ export function createUnitLayer(
   let k = 1;
   let textRes = window.devicePixelRatio;
   let lastFrame = 0;
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const encircledSince = new Map<number, number>();
   /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
   const drawnAt = new Map<string, Point>();
   const shown = new Map<number, Point>();
@@ -237,9 +242,28 @@ export function createUnitLayer(
       dashedPath(ground, [p, q], 3 * k, 3 * k, 0);
       ground.stroke({ color: tokens.status.danger, width: FIRE_PX * k });
     }
+    const encircled = new Set<number>();
+    for (const u of v.units) {
+      if (!u.encircled) continue;
+      encircled.add(u.id);
+      const started = encircledSince.get(u.id) ?? nowMs;
+      encircledSince.set(u.id, started);
+      if (reducedMotion || nowMs - started <= ENCIRCLED_MS) {
+        const p = base(u.hex);
+        const outline = Array.from({ length: 7 }, (_, i) => hexCorner(p, radius * 0.82, i));
+        dashedPath(
+          ground,
+          outline,
+          ENCIRCLED_DASH * k,
+          ENCIRCLED_GAP * k,
+          encircledDashOffset(nowMs - started, ENCIRCLED_DASH + ENCIRCLED_GAP, reducedMotion) * k,
+        );
+        ground.stroke({ color: tokens.status.danger, width: 2 * k, cap: 'round' });
+      }
+    }
+    for (const id of encircledSince.keys()) if (!encircled.has(id)) encircledSince.delete(id);
     // Маркер боя на середине общего ребра — по одному на пару «откуда — куда».
-    const pulse =
-      1 + BATTLE_PULSE * (0.5 + 0.5 * Math.sin((2 * Math.PI * nowMs) / BATTLE_PULSE_MS));
+    const pulse = battlePulseScale(nowMs, reducedMotion);
     const drawn = new Set<string>();
     for (const u of v.units) {
       if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}:${u.target}`)) continue;
