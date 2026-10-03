@@ -14,6 +14,82 @@ const MAP = `
 const legend = { A1: city('A', 1, { capital: true }), A2: city('A', 1), a: own('A'), r: road('A') };
 
 describe('playerView', () => {
+  it('при выключенном тумане отдаёт полный снимок', () => {
+    const s = scenario(
+      `
+      .  A  .  b  b  b  b  b  b
+      .  .  .  .  .  .  .  .  .
+    `,
+      {
+        fog: false,
+        legend: { A: city('A', 1, { capital: true }), b: own('B') },
+      },
+    );
+    s.unit('B', 'infantry', 100, at(6, 0));
+    s.runTicks(1);
+    const v = playerView(s.state, 0);
+    expect(s.state.fog).toBe(false);
+    expect(v.units.some((u) => u.owner === 1)).toBe(true);
+    expect(v.hexes.pop[6]).toBeGreaterThan(0);
+    expect(v.hexes.visible.every((value) => value === 1)).toBe(true);
+  });
+
+  it('включённый и выключенный туман дают разные хэши состояния', () => {
+    const s = scenario(MAP, { legend });
+    const fogHash = hashState(s.state);
+    s.state.fog = false;
+    expect(hashState(s.state)).not.toBe(fogHash);
+  });
+
+  it('скрывает чужой отряд и население вне зоны обзора', () => {
+    const s = scenario(
+      `
+      .  .  .  .  .  .  .  .  .
+      .  A  .  b  b  b  b  b  b
+      .  .  .  .  .  .  .  .  .
+    `,
+      { legend: { A: city('A', 1, { capital: true }), a: own('A'), b: own('B') } },
+    );
+    s.unit('B', 'infantry', 100, at(6, 1));
+    s.runTicks(1);
+    const v = playerView(s.state, 0);
+    expect(v.units.some((u) => u.owner === 1)).toBe(false);
+    expect(v.hexes.pop[6 + 1 * 9]).toBe(0);
+    expect(v.hexes.visible[6 + 1 * 9]).toBe(0);
+  });
+
+  it('видит чужой отряд в трёх гексах от своей столицы', () => {
+    const s = scenario(
+      `
+      a  a  a  b  b  b  b
+      a  A  a  b  b  b  b
+      a  a  a  b  b  b  b
+    `,
+      { legend: { A: city('A', 1, { capital: true }), a: own('A'), b: own('B') } },
+    );
+    s.unit('B', 'infantry', 100, at(3, 1));
+    s.runTicks(1);
+    expect(playerView(s.state, 0).units.some((u) => u.owner === 1)).toBe(true);
+  });
+
+  it('сохраняет последнее известное состояние дороги после выхода из обзора', () => {
+    const s = scenario(
+      `
+      A  r  r  r  b  b  b
+      a  a  a  a  b  b  b
+      a  a  a  a  b  b  b
+    `,
+      { legend: { A: city('A', 1, { capital: true }), a: own('A'), r: road('A'), b: own('B') } },
+    );
+    s.runTicks(1);
+    expect(playerView(s.state, 0).hexes.road[2]).toBe(1);
+    s.setOwner(at(0, 0), 'B');
+    s.runTicks(10);
+    const v = playerView(s.state, 0);
+    expect(v.hexes.road[2]).toBe(1);
+    expect(v.hexes.visible[2]).toBe(0);
+  });
+
   it('содержит гексы, города, игроков, стройки и связь дорог', () => {
     const s = scenario(MAP, { legend });
     s.runTicks(1);
@@ -82,5 +158,13 @@ describe('playerView', () => {
       [s.cityAt(at(1, 1))?.id, 'infantry', 50_000, 1],
       [s.cityAt(at(6, 1))?.id, 'artillery', 100_000, 1],
     ]);
+  });
+
+  it('показывает снабжение основной сети с учётом спроса отрядов', () => {
+    const s = scenario(MAP, { legend });
+    s.unit('A', 'infantry', 1000, at(0, 0));
+    s.runTicks(NETWORK_RECALC_TICKS);
+
+    expect(playerView(s.state, 0).me.supplyLevel).toBe(750);
   });
 });

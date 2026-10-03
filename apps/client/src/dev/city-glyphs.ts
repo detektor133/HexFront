@@ -1,6 +1,6 @@
 // Знак города — круг-метка (DECISIONS 2026-09-25, style-guide «Города»): закрашенный круг цвета
 // владельца; размер — доля радиуса гекса по уровню (масштабируется с картой), у столицы — звезда.
-import type { Graphics } from 'pixi.js';
+import { Text, type Container, type Graphics } from 'pixi.js';
 
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -13,6 +13,18 @@ export interface CityGlyph {
   readonly color: string;
   readonly isCapital: boolean;
   readonly isolated: boolean;
+}
+
+export interface CityLabel {
+  readonly at: Point;
+  readonly name: string;
+  readonly level: number;
+  readonly isCapital: boolean;
+}
+
+/** Видимость подписи города на стратегическом уровне детализации. */
+export function cityLabelVisible(level: number, isCapital: boolean, detail: 1 | 2 | 3): boolean {
+  return detail !== 1 || isCapital || level >= 2;
 }
 
 /** Длина штриха пометки разрыва у изолированного города — доля радиуса знака. */
@@ -62,5 +74,37 @@ export function drawCities(
       .stroke({ color: city.fill, width: city.outline * k });
     if (c.isCapital) star(g, c.at, r * city.capitalStarOuter, r * city.capitalStarInner);
     if (c.isolated) drawBreak(g, c, r, k);
+  }
+}
+
+/** Рисует подписи городов с жёстким ореолом цвета поверхности карты. */
+export function drawCityLabels(
+  container: Container,
+  cities: readonly CityLabel[],
+  scale: number,
+  detail: 1 | 2 | 3,
+  hexRadius: number,
+): void {
+  for (const city of cities) {
+    if (city.name === '' || !cityLabelVisible(city.level, city.isCapital, detail)) continue;
+    const fontSize =
+      tokens.city.labelSize[detail - 1] ??
+      tokens.city.labelSize[tokens.city.labelSize.length - 1] ??
+      0;
+    const text = new Text({
+      text: city.name,
+      style: {
+        fontFamily: tokens.font.ui.family,
+        fontWeight: '400',
+        fontSize,
+        fill: tokens.ui.ink,
+        stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
+      },
+    });
+    text.resolution = window.devicePixelRatio * 2;
+    text.anchor.set(0.5, 0);
+    text.scale.set(1 / scale);
+    text.position.set(city.at.x, city.at.y + hexRadius * 0.68);
+    container.addChild(text);
   }
 }

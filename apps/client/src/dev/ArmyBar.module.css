@@ -1,0 +1,331 @@
+/* Панель армий как в HoI4 (ui.md, «Панель армий», CR-005): ряд карточек армий внизу экрана,
+   над ним — приказы выбранной армии иконками. Текста минимум: подписи — в подсказках. */
+.dock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0 var(--space-lg) var(--space-sm);
+  pointer-events: none;
+}
+
+.tools,
+.strip {
+  display: flex;
+  gap: var(--space-sm);
+  pointer-events: auto;
+}
+
+.strip {
+  align-items: flex-end;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Приказы — прямо над карточками армий, слева. */
+.tools {
+  flex-wrap: wrap;
+  align-self: flex-start;
+  gap: 2px;
+  max-width: 100%;
+  padding: var(--space-xs);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.tool,
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled),
+.iconButton:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.tool[aria-pressed='true'],
+.iconButton[aria-pressed='true'] {
+  border-color: var(--selection-color);
+  background: var(--ui-surface2);
+}
+
+.tool:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.card {
+  display: flex;
+  flex: 0 0 238px;
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  color: var(--ui-ink);
+}
+
+/* Вся карточка, кроме ▶/■, — кнопка выбора армии. */
+.pick {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nameButton {
+  overflow: hidden;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.nameInput {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: inherit;
+  font: inherit;
+}
+
+/* Правая колонка 88 px: сверху «А», снизу ▶ ■ (art/ui.md). */
+.side {
+  display: flex;
+  flex: 0 0 88px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.runs {
+  display: flex;
+  height: 44px;
+  align-items: center;
+}
+
+.autoBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.autoOn,
+.autoOff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-family: var(--font-ui-family);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.autoOn {
+  background: var(--ui-ink);
+  color: var(--ui-surface);
+}
+
+.autoOff {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-ink3);
+}
+
+.run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.run:disabled {
+  color: var(--ui-ink3);
+  cursor: default;
+}
+
+.runIcon {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* Выбранная армия (или армия выбранных отрядов) — золотая рамка, как у фишки. */
+.partial {
+  border-color: var(--selection-color);
+}
+
+.selected {
+  border-color: var(--selection-color);
+  box-shadow:
+    inset 0 0 0 1.5px var(--selection-color),
+    var(--shadow-hard);
+}
+
+/* Закладка цвета армии во всю высоту карточки. */
+.band {
+  flex: 0 0 8px;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-sm);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.name {
+  overflow: hidden;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.num {
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.meterIcon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--ui-ink2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.meter {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  background: var(--chip-track);
+  border-radius: 3px;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+}
+
+.alarmIcon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--status-danger);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stuckIcon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--status-warning);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reserve {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-xs);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+@media (max-width: 600px) {
+  .dock {
+    padding: 0 var(--space-sm) var(--space-sm);
+  }
+
+  .card {
+    flex-basis: 220px;
+  }
+}

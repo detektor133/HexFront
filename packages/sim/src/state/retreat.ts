@@ -53,7 +53,12 @@ export function retreatOrCapitulate(
 ): boolean {
   const target = candidates(state, unit, attackerHexes)[0];
   if (!target) {
-    state.events.push({ t: 'unitCapitulated', playerId: unit.owner, unitId: unit.id });
+    state.events.push({
+      t: 'unitCapitulated',
+      playerId: unit.owner,
+      unitId: unit.id,
+      hex: unit.hex,
+    });
     return false;
   }
   const ticks = stepTicks(state, unit, unit.hex, target.hex) ?? 1;
@@ -64,6 +69,6 @@ export function retreatOrCapitulate(
   unit.path = [];
   unit.moveTicks = 0;
   unit.moveTotal = Math.max(1, intDiv(ticks * RETREAT_MOVE_MULT, FP));
-  state.events.push({ t: 'unitRetreated', playerId: unit.owner, unitId: unit.id });
+  state.events.push({ t: 'unitRetreated', playerId: unit.owner, unitId: unit.id, hex: unit.hex });
   return true;
 }

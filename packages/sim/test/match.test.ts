@@ -29,7 +29,7 @@ describe('стартовое состояние', () => {
 
   it('совпадает с golden-хэшем на карте small', () => {
     // Эталон стартовых правил; меняется только вместе с решением в DECISIONS.md.
-    expect(hashState(state)).toBe('b3c09053');
+    expect(hashState(state)).toBe('45c923f2');
   });
 
   it('каждый игрок получает столицу уровня 1 на своём спавне и 2 соседних гекса', () => {
@@ -149,17 +149,30 @@ describe('step', () => {
       return hashState(s);
     };
     expect(run()).toBe(run());
-  });
+    // 2000 тиков на 6 игроков: в параллельном прогоне всех тестов дольше 5 с по умолчанию.
+  }, 30_000);
 
-  it('команды пока отклоняются с причиной notImplemented и не меняют состояние', () => {
+  it('отклонённая команда не меняет состояние и даёт событие с причиной', () => {
     const a = createMatch(mapOf(tiny), players(2), SEED);
     const b = createMatch(mapOf(tiny), players(2), SEED);
-    step(a, [{ playerId: 1, cmd: { t: 'arrowStop', arrowId: 1 } }]);
+    step(a, [{ playerId: 1, cmd: { t: 'stopOffensive', armyId: 999 } }]);
     step(b, []);
     expect(a.events).toEqual([
-      { t: 'commandRejected', playerId: 1, command: 'arrowStop', reason: 'notImplemented' },
+      {
+        t: 'commandRejected',
+        playerId: 1,
+        command: 'stopOffensive',
+        reason: 'unknownArmy',
+        auto: false,
+      },
     ]);
     expect(hashState(a)).toBe(hashState(b));
+  });
+
+  it('отказ команды commander помечен auto — интерфейс его не показывает (CR-006)', () => {
+    const s = createMatch(mapOf(tiny), players(2), SEED);
+    step(s, [{ playerId: 1, cmd: { t: 'stopOffensive', armyId: 999 }, source: 'auto' }]);
+    expect(s.events[0]).toMatchObject({ t: 'commandRejected', auto: true });
   });
 
   it('команда несуществующего игрока отклоняется', () => {

@@ -101,6 +101,24 @@ function cityLevels(state: MatchState): Uint8Array {
 }
 
 /**
+ * Скорость изменения населения всех гексов — то же, что hexGrowthPerSecond по каждому гексу, но
+ * одним проходом по кольцам городов (снимок игрока строится каждый тик и для каждого commander).
+ * @returns fixed-point людей в секунду по HexId (отрицательное — убыль)
+ */
+export function growthPerSecond(state: MatchState): Int32Array {
+  const { hexes } = state;
+  const best = bestCityGrowth(state);
+  const levels = cityLevels(state);
+  return Int32Array.from(hexes.pop, (pop, id) => {
+    const level = levels[id] ?? 0;
+    const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
+    if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);
+    if (pop === cap || cap === 0) return 0;
+    return intDiv(fullGrowth(state, id, best[id] ?? 0) * (cap - pop), cap);
+  });
+}
+
+/**
  * Рост в радиусе 2 от своих городов (максимум по городам), фоновый GROWTH_BACKGROUND на остальных
  * своих гексах, убыль 1 %/с сверх лимита:
  * growth/с = baseGrowth(ring) × cityLevelMult × improvementGrowthMult × taxGrowthMult

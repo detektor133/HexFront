@@ -21,7 +21,32 @@ export const NETWORK_RECALC_TICKS = 10;
 export const VISION_RECALC_TICKS = 10;
 export const FRONT_ALLOC_TICKS = 50;
 export const OFFENSIVE_STEP_TICKS = 20;
+/** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
+export const OFFENSIVE_STUCK_TICKS = 100;
+/**
+ * Период вызова commander для игрока (все его армии с автокомандованием — в один тик; игроки
+ * распределены по тикам по id), тиков (07-controls.md, CR-006).
+ */
+export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
+
+// Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
+
+/** Налог бота в мире (без врага у границы); 09-bots.md: 10–15 %. */
+export const BOT_TAX_PEACE: Fp = fp(0.15);
+/** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
+export const BOT_TAX_WAR: Fp = fp(0.3);
+/** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
+export const BOT_GOLD_RESERVE: Fp = fp(50);
+/** Благоустройство — гексам с населением не ниже этой доли лимита. */
+export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
+/** Желаемая сила армии относительно сильнейшего соседа. */
+export const BOT_ARMY_RATIO: Fp = fp(0.8);
+/** Максимальная доля дохода на содержание армии. */
+export const BOT_ARMY_INCOME_SHARE: Fp = fp(0.5);
+/** Максимальная глубина линии наступления бота, гексов. */
+export const BOT_LINE_MAX_DEPTH = 6;
+
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
 
@@ -53,11 +78,11 @@ export const DEF_MULT: ByTerrain<Fp> = {
 };
 /** Потеря снабжения на гекс вне дорог, доля. */
 export const OFFROAD_SUPPLY_LOSS: ByTerrain<Fp> = {
-  plains: fp(0.12),
-  forest: fp(0.15),
-  hills: fp(0.15),
-  mountains: fp(0.25),
-  desert: fp(0.15),
+  plains: fp(0.08),
+  forest: fp(0.1),
+  hills: fp(0.1),
+  mountains: fp(0.17),
+  desert: fp(0.1),
 };
 
 export const RIVER_MOVE_PENALTY_S: Fp = fp(1.0);
@@ -138,6 +163,8 @@ export const DEPOT_RADIUS = 3;
 export const DEPOT_LOSS_MULT: Fp = fp(0.5);
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
+/** Вес гекса существующей дороги при поиске пути. */
+export const ROAD_PATH_EXISTING_COST: Fp = fp(0.01);
 
 // Армии
 
@@ -155,6 +182,11 @@ export const UPKEEP_GOLD_PER_SOLDIER_S: ByUnit<Fp> = {
   infantry: fp(0.003),
   armor: fp(0.012),
   artillery: fp(0.008),
+};
+export const UPKEEP_GOLD_PER_UNIT_S: ByUnit<Fp> = {
+  infantry: fp(0.2),
+  armor: fp(0.2),
+  artillery: fp(0.2),
 };
 export const ATK: ByUnit<Fp> = { infantry: fp(1.0), armor: fp(2.0), artillery: fp(0) };
 export const DEF: ByUnit<Fp> = { infantry: fp(1.2), armor: fp(0.9), artillery: fp(0.6) };
@@ -232,8 +264,18 @@ export const ARTY_SUPPORT_MIN_SOLDIERS: Fp = fp(100);
 export const ARTY_FLEE_LOSS: Fp = fp(0.1);
 export const FORECAST_MARGIN: Fp = fp(0.9);
 export const OFFENSIVE_STOP_ORG: Fp = fp(30);
-export const OFFENSIVE_ARROW_RADIUS = 3;
 export const MAX_ACTIVE_ARROWS = 3;
+/** Вес гексов фронта с гранями, смотрящими на линию наступления, во время наступления. */
+export const OFFENSIVE_FACING_WEIGHT = 3;
+/**
+ * Смотрящие на линию наступления грани — не дальше стольких гексов от ближайшей к линии точки
+ * фронта (07-controls.md, «Линия наступления»), гексов.
+ */
+export const OFFENSIVE_FACING_RANGE = 3;
+/** Глубина линии наступления, которую строит commander по ▶, гексов (CR-006). */
+export const COMMANDER_LINE_DEPTH = 3;
+/** Автоделение на линии плана: часть не меньше шага набора (05-armies.md, CR-005). */
+export const FRONT_SPLIT_MIN: Fp = fp(50);
 export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);
 
 // Обзор и победа

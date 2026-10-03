@@ -1,5 +1,7 @@
 // Детерминированный сценарий «война двух игроков 5 минут» для golden-реплея этапа 03.
-// Решения — только по состоянию матча: набор пехоты в столице, затем наступление на столицу врага.
+// Решения — только по состоянию матча: набор пехоты в столице; армии ведёт commander (CR-006) —
+// фронт на границе с врагом, резерв в армию; с первой минуты игрок жмёт ▶ — линию строит commander.
+import { commanderCommands } from '../../src/bots/run.ts';
 import { checkRecruit } from '../../src/commands/recruit.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
@@ -15,11 +17,6 @@ const ATTACK_FROM = 600;
 const RECRUIT_MAX = 300;
 const RECRUIT_STEP = 50;
 
-function capitalHex(state: MatchState, playerId: number): number | undefined {
-  const id = state.players[playerId]?.capitalCityId;
-  return state.cities.find((c) => c.id === id && c.owner === playerId)?.hex;
-}
-
 // Самый крупный доступный набор пехоты в столице.
 function recruitCommand(state: MatchState, playerId: number): Command | null {
   const capital = state.cities.find((c) => c.id === state.players[playerId]?.capitalCityId);
@@ -33,33 +30,23 @@ function recruitCommand(state: MatchState, playerId: number): Command | null {
   return null;
 }
 
-// Свободные отряды идут на столицу врага; путь, упёршийся во врага, становится атакой.
-function offensive(state: MatchState, playerId: number, enemyId: number): Command | null {
-  const target = capitalHex(state, enemyId);
-  if (target === undefined) return null;
-  const ready = state.units.filter(
-    (u) => u.owner === playerId && (u.order === 'idle' || u.order === 'expand'),
-  );
-  return ready.length > 0 ? { t: 'move', unitIds: ready.map((u) => u.id), to: target } : null;
+// ▶ у армий с фронтом без идущего наступления: линию по ▶ строит commander.
+function startOffensives(state: MatchState, playerId: number): PlayerCommand[] {
+  return state.plans
+    .filter((p) => p.kind === 'front' && !p.offensive?.active && !p.startWanted)
+    .filter((p) => state.armies.some((a) => a.id === p.armyId && a.owner === playerId && a.auto))
+    .map((p) => ({ playerId, cmd: { t: 'startOffensive', armyId: p.armyId } }));
 }
 
-/** Команды обоих игроков на этот тик (пусто между моментами решений). */
+/** Команды обоих игроков на этот тик: commander каждый тик, решения сценария — раз в 10 с. */
 export function warCommands(state: MatchState): PlayerCommand[] {
-  if (state.tick % DECIDE_EVERY !== 0) return [];
-  const out: PlayerCommand[] = [];
+  const out = commanderCommands(state);
+  if (state.tick % DECIDE_EVERY !== 0) return out;
   for (const p of state.players) {
     if (p.status !== 'alive') continue;
-    const enemy = p.id === 0 ? 1 : 0;
     const recruit = recruitCommand(state, p.id);
     if (recruit) out.push({ playerId: p.id, cmd: recruit });
-    if (state.tick < ATTACK_FROM) continue;
-    // Отряды по одному: общий путь стопки упирается в лимит 3 отряда на гекс.
-    const move = offensive(state, p.id, enemy);
-    if (move && move.t === 'move') {
-      for (const id of move.unitIds) {
-        out.push({ playerId: p.id, cmd: { t: 'move', unitIds: [id], to: move.to } });
-      }
-    }
+    if (state.tick >= ATTACK_FROM) out.push(...startOffensives(state, p.id));
   }
   return out;
 }

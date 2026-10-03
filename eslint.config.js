@@ -128,7 +128,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/server/**/*.ts', 'tools/**/*.ts', '*.js', '*.ts', '*.cjs'],
+    files: [
+      'apps/server/**/*.ts',
+      'tools/**/*.ts',
+      '.codex/hooks/**/*.mjs',
+      '*.js',
+      '*.ts',
+      '*.cjs',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
   {

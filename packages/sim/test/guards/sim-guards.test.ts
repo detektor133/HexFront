@@ -1,5 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cruise } from 'dependency-cruiser';
@@ -53,5 +54,17 @@ describe('защиты симуляции', () => {
     } finally {
       process.chdir(cwd);
     }
+  });
+
+  it('владельца гекса меняет только setHexOwner (фронты рядом переносятся, 04/T13)', async () => {
+    const src = `${ROOT}packages/sim/src/`;
+    const files = (await readdir(src, { recursive: true })).filter((f) => f.endsWith('.ts'));
+    const offenders: string[] = [];
+    for (const f of files) {
+      if (f.split(sep).join('/') === 'state/hex-owner.ts') continue;
+      const code = await readFile(`${src}${f}`, 'utf8');
+      if (/owner\[[^\]]+\]\s*=[^=]/.test(code)) offenders.push(f);
+    }
+    expect(offenders).toEqual([]);
   });
 });

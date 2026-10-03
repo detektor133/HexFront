@@ -1,5 +1,4 @@
 import {
-  forecastBattle,
   FP,
   type Command,
   type Fp,
@@ -10,9 +9,10 @@ import {
 
 import styles from './HexCard.module.css';
 import { armyName } from './army-name.ts';
-import { attackCommand, type Picked } from './sandbox-selection.ts';
+import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
+import { armyColor } from '../theme/colors.ts';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -33,39 +33,64 @@ function Button(props: { label: string; onClick: () => void }): React.JSX.Elemen
   );
 }
 
-// Прогноз до подтверждения атаки (06-combat.md, «Прогноз боя»): «Победа · потери ~12 % · 8 с».
-function Forecast(props: {
-  map: MapStatic;
-  view: PlayerView;
-  picked: Picked;
-  send: (cmd: Command) => void;
-  onPick: (p: Picked) => void;
-}): React.JSX.Element | null {
-  const { map, view, picked } = props;
-  if (picked.target === null) return null;
-  const f = forecastBattle(map, view, picked.units, picked.target);
-  const cmd = attackCommand(view, picked);
-  const cls = f.outcome === 'victory' ? styles.good : f.outcome === 'defeat' ? styles.bad : '';
+// Иконка «Слить» 20×20 (линия 2, round): два пути сходятся в один (art/ui.md, иконки действий).
+function MergeIcon(): React.JSX.Element {
   return (
-    <>
-      <p className={cls}>
-        {t(`forecast.${f.outcome}` as MessageKey)} · {t('forecast.losses')} ~
-        {formatPercent(f.attackerLoss)} · {formatFp(f.timeS)} {t('card.seconds')}
-      </p>
-      {cmd && (
-        <Button
-          label={t('forecast.attack')}
-          onClick={() => {
-            props.send(cmd);
-            props.onPick({ ...picked, target: null });
-          }}
-        />
-      )}
-      <Button
-        label={t('forecast.cancel')}
-        onClick={() => props.onPick({ ...picked, target: null })}
-      />
-    </>
+    <svg viewBox="0 0 20 20" className={styles.icon} aria-hidden="true">
+      <polyline points="4,4 10,10 16,4" />
+      <line x1="10" y1="10" x2="10" y2="17" />
+    </svg>
+  );
+}
+
+// Действие одной иконкой: подпись — во всплывающей подсказке и для экранного диктора.
+function IconButton(props: {
+  label: string;
+  icon: React.JSX.Element;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <div className={styles.action}>
+      <button
+        type="button"
+        className={styles.iconButton}
+        aria-label={props.label}
+        title={props.label}
+        onClick={props.onClick}
+      >
+        {props.icon}
+      </button>
+    </div>
+  );
+}
+
+// «В армию» — плашки армий с закладкой цвета и «Резерв»; плашка армии, где сейчас все выбранные
+// отряды, в золотой рамке. Тап — перевести отряды (assignUnits).
+function ArmyPlates(props: {
+  units: readonly UnitView[];
+  view: PlayerView;
+  send: (cmd: Command) => void;
+}): React.JSX.Element {
+  const { units, view, send } = props;
+  const ids = units.map((u) => u.id);
+  const current = units.every((u) => u.armyId === units[0]?.armyId) ? units[0]?.armyId : undefined;
+  const plate = (armyId: number | null, label: string, color: string | null): React.JSX.Element => (
+    <button
+      key={armyId ?? 'reserve'}
+      type="button"
+      className={`${styles.plate} ${current === armyId ? styles.plateOn : ''}`}
+      aria-pressed={current === armyId}
+      onClick={() => send({ t: 'assignUnits', unitIds: ids, armyId })}
+    >
+      {color && <span className={styles.plateBand} style={{ background: color }} />}
+      <span>{label}</span>
+    </button>
+  );
+  return (
+    <div className={styles.plates} role="group" aria-label={t('unit.toArmy')}>
+      {view.armies.map((a) => plate(a.id, armyName(a), armyColor(a.number)))}
+      {plate(null, t('army.reserve'), null)}
+    </div>
   );
 }
 
@@ -74,7 +99,6 @@ function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   const army = view.armies.find((a) => a.id === u.armyId);
   return (
     <dl className={styles.stats}>
-      <Row label={t('unit.soldiers')} value={formatSoldiers(u.soldiers)} />
       <Row label={t('unit.org')} value={formatFp(u.org)} />
       <Row
         label={t('unit.supply')}
@@ -86,7 +110,8 @@ function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   );
 }
 
-// Приказы выбранным отрядам: держать, экспансия, разделить, слить, в армию, фокус огня.
+// Приказы выбранным отрядам: слить, в армию, фокус огня. Деление — только
+// вытягиванием из фишки (05-armies.md), кнопки «Разделить» нет.
 function Orders(props: {
   units: readonly UnitView[];
   view: PlayerView;
@@ -95,35 +120,16 @@ function Orders(props: {
   const { units, view, send } = props;
   const ids = units.map((u) => u.id);
   const [first] = units;
-  const noArtillery = units.every((u) => u.type !== 'artillery');
   const sameStack =
     units.length > 1 && units.every((u) => u.hex === first?.hex && u.type === first?.type);
   return (
     <>
-      <Button
-        label={t('unit.hold')}
-        onClick={() => send({ t: 'setOrder', unitIds: ids, order: 'hold' })}
-      />
-      {noArtillery && (
-        <Button
-          label={t('unit.expand')}
-          onClick={() => send({ t: 'setOrder', unitIds: ids, order: 'expand' })}
-        />
-      )}
-      {units.length === 1 && first && first.soldiers >= 2 * FP && (
-        <Button
-          label={t('unit.split')}
-          onClick={() =>
-            send({
-              t: 'split',
-              unitId: first.id,
-              soldiers: (Math.floor(first.soldiers / 2 / FP) * FP) as Fp,
-            })
-          }
-        />
-      )}
       {sameStack && (
-        <Button label={t('unit.merge')} onClick={() => send({ t: 'merge', unitIds: ids })} />
+        <IconButton
+          label={t('unit.merge')}
+          icon={<MergeIcon />}
+          onClick={() => send({ t: 'merge', unitIds: ids })}
+        />
       )}
       {units.length === 1 && first?.type === 'artillery' && (
         <Button
@@ -131,29 +137,12 @@ function Orders(props: {
           onClick={() => send({ t: 'bombard', unitId: first.id, targetUnitId: null })}
         />
       )}
-      <label className={styles.hint}>
-        {t('unit.toArmy')}{' '}
-        <select
-          value=""
-          onChange={(e) => {
-            const v = e.target.value;
-            send({ t: 'assignUnits', unitIds: ids, armyId: v === 'reserve' ? null : Number(v) });
-          }}
-        >
-          <option value="">—</option>
-          <option value="reserve">{t('army.reserve')}</option>
-          {view.armies.map((a) => (
-            <option key={a.id} value={a.id}>
-              {armyName(a)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <ArmyPlates units={units} view={view} send={send} />
     </>
   );
 }
 
-/** Карточка выбранных отрядов песочницы: состав, приказы, прогноз перед атакой. */
+/** Карточка выбранных отрядов песочницы: состав и приказы (атака — без подтверждения, 04/T16). */
 export function UnitCard(props: {
   view: PlayerView;
   map: MapStatic;
@@ -176,13 +165,7 @@ export function UnitCard(props: {
     <section className={styles.card} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
       {units.length === 1 && <UnitRows u={first} view={view} />}
-      <p className={styles.hint}>{t('unit.hintOrder')}</p>
-      <Forecast {...props} />
-      {picked.target === null && <Orders units={units} view={view} send={props.send} />}
-      <Button
-        label={t('unit.clear')}
-        onClick={() => props.onPick({ ...picked, units: [], target: null })}
-      />
+      <Orders units={units} view={view} send={props.send} />
     </section>
   );
 }

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "chart": "node --experimental-strip-types src/development-chart.ts"
+    "chart": "node --experimental-strip-types src/development-chart.ts",
+    "bot-match": "node --experimental-strip-types src/bot-match.ts",
+    "bot-match-chart": "node --experimental-strip-types src/bot-match-chart.ts"
   }
 }

@@ -3,8 +3,9 @@
 import { MAX_UNITS_PER_HEX, ORG_MAX } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { FP, type Fp } from '../math/int.ts';
+import { FP, intDiv, type Fp } from '../math/int.ts';
 import { neediestArmy } from '../state/armies.ts';
+import { planHexes } from '../state/front.ts';
 import type { MatchState, Recruitment } from '../state/types.ts';
 
 // Свой проходимый гекс без чужих отрядов и с местом: сначала город, иначе ближайший к нему,
@@ -54,8 +55,28 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     inBattle: false,
     focus: -1,
     fireTarget: -1,
+    slot: -1,
   });
   state.nextId += 1;
+}
+
+// При закрытой линии автопополнение доливает самый маленький однотипный отряд на линии.
+function reinforce(state: MatchState, r: Recruitment): boolean {
+  if (!state.players[r.owner]?.autoReinforce) return false;
+  const armyId = neediestArmy(state, r.owner);
+  const plan = state.plans.find((p) => p.armyId === armyId);
+  if (armyId === null || !plan) return false;
+  const line = new Set(planHexes(state, plan));
+  const units = state.units
+    .filter((u) => u.armyId === armyId && u.type === r.type && line.has(u.slot))
+    .sort((a, b) => a.soldiers - b.soldiers || a.id - b.id);
+  if (units.length < line.size) return false;
+  const target = units.find((u) => !u.inBattle);
+  if (!target) return false;
+  const total = target.soldiers + r.soldiers;
+  target.org = intDiv(target.org * target.soldiers + ORG_MAX * r.soldiers, total) as Fp;
+  target.soldiers = total as Fp;
+  return true;
 }
 
 /**
@@ -72,6 +93,10 @@ export function recruitSystem(state: MatchState): void {
       continue;
     }
     if (r.progressTicks < r.totalTicks) r.progressTicks += 1;
+    if (r.progressTicks >= r.totalTicks && reinforce(state, r)) {
+      state.events.push({ t: 'unitRecruited', ...event });
+      continue;
+    }
     const hex = r.progressTicks < r.totalTicks ? null : spawnHex(state, r.owner, city.hex);
     if (hex === null) {
       remaining.push(r);

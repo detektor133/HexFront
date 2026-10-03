@@ -44,6 +44,7 @@ describe('авто-дорога после основания города', () 
     found(s, site);
     const job = roadJob(s);
     expect(job?.path?.length).toBeGreaterThan(0);
+    expect(job?.path?.[0]).toBeLessThan(job?.path?.at(-1) ?? -1);
     const length = job?.path?.length ?? 0;
     expect(ROAD_TICKS_PER_HEX).toBe(1.5 * TICKS_PER_S);
     s.runTicks(ROAD_TICKS_PER_HEX);
@@ -93,6 +94,15 @@ describe('авто-дорога после основания города', () 
     expect(s.lastEvent('constructionCancelled')).toMatchObject({ kind: 'road' });
     expect(s.state.hexes.road[path[0] ?? -1]).toBe(1);
     expect(s.state.hexes.road[last]).toBe(0);
+  });
+
+  it('потеря целевого города отменяет прокладку', () => {
+    const s = prepare(scenario(OPEN, { legend }));
+    found(s, at(6, 1));
+    s.setOwner(at(6, 1), null);
+    s.runTicks(1);
+    expect(roadJob(s)).toBeUndefined();
+    expect(s.lastEvent('constructionCancelled')).toMatchObject({ kind: 'road' });
   });
 
   it('ведёт к городу основной сети, а не к ближайшему изолированному', () => {

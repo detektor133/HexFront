@@ -4,10 +4,16 @@ import {
   canFoundCity,
   checkConstruction,
   checkRecruit,
-  FP,
+  COST_POP_PER_SOLDIER,
+  RECRUIT_MIN,
+  RECRUIT_STEP,
+  fpDiv,
+  recruitCapacity,
   cityPopCap,
   hexPopCap,
+  botCommands,
   cityInfo,
+  commanderCommands,
   createMatch,
   loadMap,
   playerView,
@@ -21,28 +27,37 @@ import {
 
 import type { FromWorker, RecruitOption, Selection } from './messages.ts';
 
-/** В локальном режиме игрок-человек — всегда id 0; остальные ждут ботов (этап 05). */
+/**
+ * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
+ * экономикой ботов — мозг бота (09-bots.md).
+ */
 export const HUMAN_ID = 0;
 
 export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
+  setFog(on: boolean): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): FromWorker;
 }
 
-/** Размер набора кнопкой песочницы, солдат (временный интерфейс до ползунка 04/T8). */
-const SANDBOX_RECRUIT = 100;
 const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
 
 function recruitOptions(state: MatchState, cityId: number): RecruitOption[] {
-  const soldiers = (SANDBOX_RECRUIT * FP) as Fp;
-  return RECRUIT_TYPES.map((type) => ({
-    type,
-    soldiers,
-    check: checkRecruit(state, HUMAN_ID, cityId, type, soldiers),
-  }));
+  return RECRUIT_TYPES.map((type) => {
+    const capacity = recruitCapacity(state, cityId);
+    const rawMax = fpDiv(capacity, COST_POP_PER_SOLDIER[type]);
+    const maxSoldiers = (Math.floor(rawMax / RECRUIT_STEP) * RECRUIT_STEP) as Fp;
+    const amounts: RecruitOption['amounts'] = [];
+    for (let amount = RECRUIT_MIN; amount <= maxSoldiers; amount = (amount + RECRUIT_STEP) as Fp) {
+      amounts.push({
+        soldiers: amount,
+        check: checkRecruit(state, HUMAN_ID, cityId, type, amount),
+      });
+    }
+    return { type, amounts };
+  });
 }
 
 function selectionOf(state: MatchState, hex: number): Selection {
@@ -60,18 +75,23 @@ function selectionOf(state: MatchState, hex: number): Selection {
 }
 
 /**
- * Создаёт локальный матч из JSON карты.
+ * Создаёт локальный матч из JSON карты. bots — игроки под мозгом бота: по умолчанию все, кроме
+ * человека; с человеком — режим наблюдения (запись матча ботов).
  * @returns движок или список ошибок карты
  */
 export function createLocalEngine(
   mapJson: unknown,
   seed: number,
   players: number,
+  bots: readonly number[] = Array.from({ length: players }, (_, i) => i).filter(
+    (i) => i !== HUMAN_ID,
+  ),
+  fog = false,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({ name: `P${i}` }));
-  const state = createMatch(loaded.map, setup, seed);
+  const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];
   let selected: number | null = null;
   return {
@@ -79,18 +99,24 @@ export function createLocalEngine(
     queue(cmd) {
       pending.push(cmd);
     },
+    setFog(on) {
+      state.fog = on;
+    },
     select(hex) {
       selected = hex;
     },
     tick() {
-      step(
-        state,
-        pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-      );
+      // Ручные команды игрока и решения commander (армии с auto всех игроков) — в один тик; sim
+      // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
+      step(state, [
+        ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+        ...commanderCommands(state, bots),
+        ...botCommands(state, bots),
+      ]);
       pending = [];
       const rejected: { command: string; reason: RejectReason }[] = [];
       for (const e of state.events) {
-        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID) {
+        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
           rejected.push({ command: e.command, reason: e.reason as RejectReason });
         }
       }
@@ -99,6 +125,7 @@ export function createLocalEngine(
         view: playerView(state, HUMAN_ID),
         selection: selected === null ? null : selectionOf(state, selected),
         rejected,
+        events: state.events.slice(),
       };
     },
   };

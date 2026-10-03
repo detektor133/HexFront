@@ -8,19 +8,21 @@ import {
   hexId,
   inBounds,
   neighbors,
+  ORG_MAX,
   TICK_MS,
   type PlayerView,
   type UnitView,
 } from '@hexfront/sim';
 
+import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
+import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
-import { hexEdge, type Point } from '../render/hex-geometry.ts';
-import { playerLine } from '../theme/colors.ts';
+import { chipGroups } from './unit-groups.ts';
+import { hexCorner, hexEdge, type Point } from '../render/hex-geometry.ts';
+import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
-/** Сдвиг фишки вниз, если в гексе город (знак города — в центре), и призрака набора вверх. */
-const CITY_SHIFT = 0.62;
 /** Пути и линии огня — экранные px. */
 const PATH_PX = 2;
 const PATH_DASH = 6;
@@ -29,25 +31,25 @@ const PATH_GAP = 5;
 const PATH_SPEED = 24;
 const FIRE_PX = 1.5;
 const RANGE_PX = 2;
-/** Масштаб фишки в мире: при масштабе карты 1 — эта доля размеров units.md (растёт с картой). */
-const CHIP_WORLD = 0.55;
 /** Постоянная сглаживания позиции фишки, мс: скачки снимка превращаются в плавный доезд. */
 const SMOOTH_MS = 90;
 /** Шаг разрешения текста — чтобы не перерисовывать текст на каждом шаге колеса. */
 const RES_STEP = 0.5;
 const ARTY_RANGE_HEXES = 2;
-/** Маркер боя (units.md): ⌀16, обводка 2, крест 7, пульс 1,0 → 1,15 за 800 мс. */
+/** Маркер боя (units.md): ⌀16, обводка 2, крест 7. */
 const BATTLE_R = 8;
 const BATTLE_CROSS = 3.5;
-const BATTLE_PULSE_MS = 800;
-const BATTLE_PULSE = 0.15;
-const LOW_SUPPLY = 500;
 const FULL = 1000;
+const ENCIRCLED_MS = 3000;
+const ENCIRCLED_DASH = 6;
+const ENCIRCLED_GAP = 5;
 
 export interface UnitLayer {
   readonly container: Container;
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
+  /** Где стоит фишка гекса (под городом — сдвинута вниз). */
+  chipAt(hex: number): Point;
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -61,7 +63,8 @@ interface Entry {
   at(frac: number): Point;
 }
 
-function dashedPath(
+/** Пунктир по ломаной со сдвигом phase — для бегущих штрихов. */
+export function dashedPath(
   g: Graphics,
   pts: readonly Point[],
   dash: number,
@@ -103,14 +106,19 @@ export function createUnitLayer(
   let k = 1;
   let textRes = window.devicePixelRatio;
   let lastFrame = 0;
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const encircledSince = new Map<number, number>();
   /** Показанные позиции: фишек — для сглаживания, отрядов — для старта новых фишек и путей. */
   const drawnAt = new Map<string, Point>();
   const shown = new Map<number, Point>();
-  const cities = new Set<number>();
+  /** Гексы с городами и их уровень — фишка стоит ниже знака города. */
+  const cities = new Map<number, number>();
 
   const base = (hex: number): Point => {
     const c = center(hex);
-    return cities.has(hex) ? { x: c.x, y: c.y + radius * CITY_SHIFT } : c;
+    const level = cities.get(hex);
+    return level === undefined ? c : { x: c.x, y: c.y + cityChipShift(level, radius) };
   };
   // Идущий отряд — между центрами гексов по прогрессу перехода (+ доля текущего тика).
   const unitAt = (u: UnitView, frac: number): Point => {
@@ -132,45 +140,37 @@ export function createUnitLayer(
     const first = units[0] as UnitView;
     let type = first.type;
     for (const u of units) if ((byType.get(u.type) ?? 0) > (byType.get(type) ?? 0)) type = u.type;
-    const org = units.reduce((s, u) => s + u.org * u.soldiers, 0) / Math.max(1, soldiers);
+    const weighted = (f: (u: UnitView) => number): number =>
+      units.reduce((s, u) => s + f(u) * u.soldiers, 0) / Math.max(1, soldiers);
+    const army = v.armies.find((a) => a.id === first.armyId);
+    const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
+    const mine = first.owner === v.playerId;
     return {
-      color: playerLine(first.owner),
+      color: relationColor(first.owner, v.playerId),
+      army: oneArmy ? armyColor(army.number) : null,
       type,
       soldiers,
-      bar: org / FULL / 100,
+      org: weighted((u) => u.org) / ORG_MAX,
+      supply: mine ? weighted((u) => u.supplyLevel ?? FULL) / FULL : null,
+      starving: units.some((u) => u.starving === true),
       count: units.length,
       selected: units.some((u) => picked.units.includes(u.id)),
       retreating: units.some((u) => u.order === 'retreat'),
-      encircled: first.owner === v.playerId && units.some((u) => u.encircled === true),
-      lowSupply: units.some((u) => u.supplyLevel !== null && u.supplyLevel < LOW_SUPPLY),
-      hold: units.every((u) => u.order === 'hold'),
+      encircled: mine && units.some((u) => u.encircled === true),
       ghost: false,
     };
   }
 
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
-    const stacks = new Map<string, UnitView[]>();
-    for (const u of v.units) {
-      if (u.moveTotal > 0 && u.path.length > 0 && u.order !== 'retreat') {
-        out.push({
-          key: `u${u.id}`,
-          units: [u.id],
-          state: stateOf([u], v),
-          at: (f) => unitAt(u, f),
-        });
-        continue;
-      }
-      const key = `h${u.owner}:${u.hex}`;
-      stacks.set(key, [...(stacks.get(key) ?? []), u]);
-    }
-    for (const [key, units] of stacks) {
-      const hex = (units[0] as UnitView).hex;
+    // Одна фишка — отряды в одном гексе или идущие одним переходом (art/units.md, «Группа отрядов»).
+    for (const g of chipGroups(v)) {
+      const first = g.units[0] as UnitView;
       out.push({
-        key,
-        units: units.map((u) => u.id),
-        state: stateOf(units, v),
-        at: () => base(hex),
+        key: g.key,
+        units: g.units.map((u) => u.id),
+        state: stateOf(g.units, v),
+        at: g.moving ? (f) => unitAt(first, f) : () => base(first.hex),
       });
     }
     for (const r of v.recruits) {
@@ -181,19 +181,21 @@ export function createUnitLayer(
         key: `r${r.id}`,
         units: [],
         state: {
-          color: playerLine(v.playerId),
+          color: tokens.relation.own,
+          army: null,
           type: r.type,
           soldiers: r.soldiers,
-          bar: r.progressTicks / Math.max(1, r.totalTicks),
+          org: r.progressTicks / Math.max(1, r.totalTicks),
+          supply: null,
+          starving: false,
           count: 1,
           selected: false,
           retreating: false,
           encircled: false,
-          lowSupply: false,
-          hold: false,
           ghost: true,
         },
-        at: () => ({ x: c.x, y: c.y - radius * CITY_SHIFT }),
+        // Призрак набора — над знаком города, симметрично фишке под ним.
+        at: () => ({ x: c.x, y: c.y - cityChipShift(city.level, radius) }),
       });
     }
     return out;
@@ -240,9 +242,28 @@ export function createUnitLayer(
       dashedPath(ground, [p, q], 3 * k, 3 * k, 0);
       ground.stroke({ color: tokens.status.danger, width: FIRE_PX * k });
     }
+    const encircled = new Set<number>();
+    for (const u of v.units) {
+      if (!u.encircled) continue;
+      encircled.add(u.id);
+      const started = encircledSince.get(u.id) ?? nowMs;
+      encircledSince.set(u.id, started);
+      if (reducedMotion || nowMs - started <= ENCIRCLED_MS) {
+        const p = base(u.hex);
+        const outline = Array.from({ length: 7 }, (_, i) => hexCorner(p, radius * 0.82, i));
+        dashedPath(
+          ground,
+          outline,
+          ENCIRCLED_DASH * k,
+          ENCIRCLED_GAP * k,
+          encircledDashOffset(nowMs - started, ENCIRCLED_DASH + ENCIRCLED_GAP, reducedMotion) * k,
+        );
+        ground.stroke({ color: tokens.status.danger, width: 2 * k, cap: 'round' });
+      }
+    }
+    for (const id of encircledSince.keys()) if (!encircled.has(id)) encircledSince.delete(id);
     // Маркер боя на середине общего ребра — по одному на пару «откуда — куда».
-    const pulse =
-      1 + BATTLE_PULSE * (0.5 + 0.5 * Math.sin((2 * Math.PI * nowMs) / BATTLE_PULSE_MS));
+    const pulse = battlePulseScale(nowMs, reducedMotion);
     const drawn = new Set<string>();
     for (const u of v.units) {
       if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}:${u.target}`)) continue;
@@ -295,10 +316,13 @@ export function createUnitLayer(
       picked = p;
       snapAt = nowMs;
       cities.clear();
-      for (const c of v.cities) cities.add(c.hex);
+      for (const c of v.cities) cities.set(c.hex, c.level);
       entries = build(v);
       syncChips();
       layer.frame(nowMs);
+    },
+    chipAt(hex) {
+      return base(hex);
     },
     setScale(scale) {
       k = 1 / scale;

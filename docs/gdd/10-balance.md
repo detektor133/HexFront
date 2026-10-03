@@ -13,19 +13,35 @@
 | `VISION_RECALC_TICKS` | 10 |
 | `FRONT_ALLOC_TICKS` | 50 |
 | `OFFENSIVE_STEP_TICKS` | 20 |
+| `OFFENSIVE_STUCK_TICKS` | 100 |
+| `COMMANDER_TICKS` | 5 |
 | `BOT_THINK_TICKS` | 10 |
 | `MATCH_TIME_LIMIT_S` | 1500 |
 | `PREP_TIME_S` | 5 |
+
+## Боты
+
+Пороги utility AI бота (`09-bots.md`, «Utility AI»; 04/T23).
+
+| Константа | Значение |
+| --- | --- |
+| `BOT_TAX_PEACE` (FP) | 0,15 |
+| `BOT_TAX_WAR` (FP) | 0,30 |
+| `BOT_GOLD_RESERVE` (FP) | 50 |
+| `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
+| `BOT_ARMY_RATIO` (FP) | 0,8 |
+| `BOT_ARMY_INCOME_SHARE` (FP) | 0,5 |
+| `BOT_LINE_MAX_DEPTH` | 6 |
 
 ## Местность
 
 | terrain | `BASE_POP_CAP` | `MOVE_TIME_S` | `DEF_MULT` | `OFFROAD_SUPPLY_LOSS` |
 | --- | --- | --- | --- | --- |
-| plains | 100 | 2,0 | 1,0 | 0,12 |
-| forest | 60 | 3,0 | 1,25 | 0,15 |
-| hills | 50 | 3,0 | 1,25 | 0,15 |
-| mountains | 25 | 5,0 | 1,6 | 0,25 |
-| desert | 30 | 2,5 | 1,0 | 0,15 |
+| plains | 100 | 2,0 | 1,0 | 0,08 |
+| forest | 60 | 3,0 | 1,25 | 0,10 |
+| hills | 50 | 3,0 | 1,25 | 0,10 |
+| mountains | 25 | 5,0 | 1,6 | 0,17 |
+| desert | 30 | 2,5 | 1,0 | 0,10 |
 
 | Константа | Значение |
 | --- | --- |
@@ -91,6 +107,7 @@
 | `DEPOT_COST` / `DEPOT_TIME_S` / `DEPOT_RADIUS` / `DEPOT_LOSS_MULT` | 80 / 15 / 3 / 0,5 |
 | `ROAD_BUILD_S_PER_HEX` | 1,5 |
 | `SUPPLY_REBUILD_COST_PER_HEX` | 15 |
+| `ROAD_PATH_EXISTING_COST` (FP) | 0,01 |
 
 ## Армии
 
@@ -99,6 +116,7 @@
 | `COST_POP_PER_SOLDIER` | 1 | 1 | 1 |
 | `COST_GOLD_PER_SOLDIER` | 0,1 | 1,0 | 0,6 |
 | `UPKEEP_GOLD_PER_SOLDIER_S` | 0,003 | 0,012 | 0,008 |
+| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,2 | 0,2 | 0,2 |
 | `ATK` | 1,0 | 2,0 | 0 |
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |
@@ -110,7 +128,6 @@
 | `RECRUIT_MIN` / `RECRUIT_STEP` | 50 / 50 |
 | `RECRUIT_MIN_HEX_POP_RATIO` | 0,1 |
 | `MAX_UNITS_PER_HEX` | 3 |
-| `UNIT_LIMIT_BASE` / `_PER_CITY` | 4 / 2 |
 | `START_UNITS` | 2 × 100 пехоты |
 | `START_GOLD` | 200 |
 | `START_POP_CAPITAL` / `START_POP_HEX` | 200 / 40 |
@@ -142,8 +159,11 @@
 | `ARTY_FLEE_LOSS` | 0,10 |
 | `FORECAST_MARGIN` | 0,9 |
 | `OFFENSIVE_STOP_ORG` | 30 |
-| `OFFENSIVE_ARROW_RADIUS` | 3 |
 | `MAX_ACTIVE_ARROWS` | 3 |
+| `OFFENSIVE_FACING_WEIGHT` | 3 |
+| `OFFENSIVE_FACING_RANGE` | 3 |
+| `COMMANDER_LINE_DEPTH` | 3 |
+| `FRONT_SPLIT_MIN` | 50 |
 | `FRONT_REALLOC_GAIN_MIN` | 0,15 |
 
 ## Обзор и победа

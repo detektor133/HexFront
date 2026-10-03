@@ -12,6 +12,7 @@ import {
   START_POP_HEX,
   TAX_DEFAULT,
 } from '../balance.ts';
+import { setHexOwner } from './hex-owner.ts';
 import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
@@ -19,13 +20,18 @@ import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
+import { createVisionState } from '../systems/vision.ts';
 
 /** Участник матча; id игрока — индекс в массиве. */
 export interface PlayerSetup {
   readonly name: string;
 }
 
-function emptyState(map: MapStatic, seed: number): MatchState {
+export interface MatchOptions {
+  readonly fog?: boolean;
+}
+
+function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchState {
   const size = map.width * map.height;
   const cities: City[] = map.cities.map((c) => ({
     id: c.id,
@@ -38,9 +44,10 @@ function emptyState(map: MapStatic, seed: number): MatchState {
     inBattle: false,
     captureTicks: 0,
   }));
-  return {
+  const state: MatchState = {
     tick: 0,
     seed: seed >>> 0,
+    fog: options.fog ?? true,
     map,
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
@@ -50,19 +57,23 @@ function emptyState(map: MapStatic, seed: number): MatchState {
       road: Uint8Array.from(map.roads),
       network: new Int32Array(size).fill(-1),
     },
+    vision: createVisionState(0, size),
     cities,
     players: [],
     units: [],
     constructions: [],
     recruits: [],
     armies: [],
+    plans: [],
     networks: [],
+    supplyRatios: new Map(),
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
     winner: -1,
     holdPlayer: -1,
     holdTicks: 0,
   };
+  return state;
 }
 
 /**
@@ -110,10 +121,10 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     inBattle: false,
     captureTicks: 0,
   });
-  state.hexes.owner[capital] = playerId;
+  setHexOwner(state, capital, playerId);
   state.hexes.pop[capital] = START_POP_CAPITAL;
   for (const id of pickStartNeighbors(state, spawn)) {
-    state.hexes.owner[id] = playerId;
+    setHexOwner(state, id, playerId);
     state.hexes.pop[id] = START_POP_HEX;
   }
   state.players.push({
@@ -127,6 +138,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
     bankrupt: false,
     armiesCreated: 1,
     autoReinforce: false,
+    autoCommand: true,
     chaosTicks: 0,
     noCityTicks: 0,
     eliminatedTick: -1,
@@ -134,7 +146,9 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
   // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
   const armyId = state.nextId;
   state.nextId += 1;
-  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '' });
+  // Стартовая армия — с автокомандованием по настройке игрока (08-match.md, «Старт»).
+  const auto = state.players[playerId]?.autoCommand ?? true;
+  state.armies.push({ id: armyId, owner: playerId, number: 1, name: '', auto });
   for (let i = 0; i < START_UNITS; i += 1) {
     state.units.push({
       id: state.nextId,
@@ -156,6 +170,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
       inBattle: false,
       focus: -1,
       fireTarget: -1,
+      slot: -1,
     });
     state.nextId += 1;
   }
@@ -170,11 +185,12 @@ export function createMatch(
   map: MapStatic,
   players: readonly PlayerSetup[],
   seed: number,
+  options: MatchOptions = {},
 ): MatchState {
   if (players.length === 0 || players.length > map.spawns.length) {
     throw new RangeError(`игроков ${players.length}, спавнов на карте ${map.spawns.length}`);
   }
-  const state = emptyState(map, seed);
+  const state = emptyState(map, seed, options);
   seedNeutralPopulation(state);
   const spawns = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
   players.forEach((_, playerId) => {
@@ -183,5 +199,6 @@ export function createMatch(
   });
   state.cities.sort((a, b) => a.id - b.id);
   recomputeAllNetworks(state);
+  state.vision = createVisionState(state.players.length, state.hexes.owner.length);
   return state;
 }

@@ -1,5 +1,7 @@
 // Детерминированный сценарий «10 минут развития без войны» для golden-реплея этапа 02
-// и графика в отчёте (tools/replay). Решения — только по состоянию матча, без случайности.
+// и графика в отчёте (tools/replay). Решения — только по состоянию матча, без случайности;
+// армии с auto ведёт commander (CR-006) — они занимают ничью землю.
+import { commanderCommands } from '../../src/bots/run.ts';
 import { checkConstruction } from '../../src/commands/construction.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { distance, hexFromId } from '../../src/math/hex.ts';
@@ -35,10 +37,10 @@ function pick(state: MatchState, playerId: number): Command | null {
   return null;
 }
 
-/** Команды всех игроков на этот тик (пусто между моментами решений). */
+/** Команды всех игроков на этот тик: commander каждый тик, решения сценария — раз в 10 с. */
 export function developmentCommands(state: MatchState): PlayerCommand[] {
-  if (state.tick % DECIDE_EVERY !== 0) return [];
-  const commands: PlayerCommand[] = [];
+  const commands = commanderCommands(state);
+  if (state.tick % DECIDE_EVERY !== 0) return commands;
   for (const p of state.players) {
     if (state.tick === 0) commands.push({ playerId: p.id, cmd: { t: 'setTax', rate: 0 as Fp } });
     if (state.tick === LOW_TAX_UNTIL) {

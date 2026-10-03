@@ -1,0 +1,3 @@
+#!/bin/sh
+# Перед коммитом — lint и prettier только staged-файлов (тихий вывод: ошибки и итог).
+pnpm -s ai-check --staged || { echo "pre-commit: lint staged-файлов упал — коммит отменён." >&2; exit 1; }

@@ -167,17 +167,6 @@ export const tokens = {
       5
     ],
     "cornerRadius": 6,
-    "flowColor": "#FFFFFF",
-    "flowWidth": [
-      1.5,
-      2.5,
-      3.5
-    ],
-    "flowDash": [
-      2,
-      14
-    ],
-    "flowSpeed": 18,
     "isolatedAlpha": 0.45,
     "offroadDotted": [
       1,
@@ -203,24 +192,61 @@ export const tokens = {
     ],
     "labelHalo": 3
   },
+  "relation": {
+    "own": "#2E7D32",
+    "ally": "#1F5FB8",
+    "enemy": "#C62828"
+  },
+  "armies": {
+    "palette": [
+      "#7B3F8C",
+      "#0B7F8E",
+      "#9E2C8C",
+      "#4F6475",
+      "#946A08",
+      "#636A1C",
+      "#94561B"
+    ],
+    "defenseTeeth": {
+      "length": 5,
+      "spacing": 12
+    }
+  },
   "front": {
     "width": [
-      4,
-      6,
-      8
+      2.5,
+      3,
+      3.5
     ],
     "casing": "#FFFFFF",
-    "casingWidth": 2
+    "casingWidth": 1.5,
+    "handleRadius": 7
   },
   "arrow": {
+    "color": "#E8590C",
     "width": [
-      8,
-      11,
-      14
+      2.5,
+      3,
+      3.5
     ],
-    "alpha": 0.85,
-    "headLength": 16,
-    "headWidth": 22
+    "dash": [
+      8,
+      5
+    ],
+    "alpha": 0.6,
+    "plannedAlpha": 0.25,
+    "bodyWidth": 0.42,
+    "headLength": 0.7,
+    "headWidth": 1
+  },
+  "selection": {
+    "color": "#C99A2E",
+    "width": 2.5
+  },
+  "chip": {
+    "org": "#2E7D4F",
+    "supply": "#3A6EA5",
+    "track": "#E4E2DA"
   },
   "fog": {
     "hatch": "#22211E",

@@ -1,0 +1,21 @@
+# Конфиг Codex для проекта. Читается, только если проект отмечен доверенным (trusted).
+# Модель и уровень рассуждений можно менять в интерфейсе на задачу:
+# sim, баланс, сложные баги — high; UI, инфраструктура, документы — medium.
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "medium"
+project_doc_max_bytes = 65536
+
+developer_instructions = """
+Все ответы владельцу — по-русски.
+Правила проекта — AGENTS.md, они обязательны.
+Картинки, видео и браузер не открывать: проверка только через pnpm verify и текстовый вывод скриптов.
+"""
+
+[sandbox_workspace_write]
+# Нужна сеть: pnpm install, git push, проверка CI через REST API.
+network_access = true
+
+[features]
+hooks = true

@@ -1,5 +1,8 @@
-// Фишка отряда по docs/art/units.md, «Фишка отряда»: размеры в px при масштабе карты 1, фишка
-// масштабируется вместе с картой. Песочница 03/T17; эталонные скриншоты — этап 04.
+// Фишка отряда (art/units.md, «Фишка отряда», CR-005). Всё — внутри прямоугольника фишки:
+// слева закладка цвета армии, квадрат цвета отношения (свои — зелёные, враги — красные) с глифом
+// рода войск, в его углу — число отрядов в стопке; справа на белой плашке — число солдат и два
+// вертикальных столбика: организация `chip.org` и снабжение `chip.supply` (жёлтый/красный при
+// нехватке). Выбранная фишка — золотая рамка `selection` по краю. Размеры — px при масштабе 1.
 import { Container, Graphics, Text } from 'pixi.js';
 
 import type { UnitType } from '@hexfront/sim';
@@ -7,44 +10,53 @@ import type { UnitType } from '@hexfront/sim';
 import { formatSoldiers } from '../i18n/format.ts';
 import { tokens } from '../theme/tokens.ts';
 
-const H = 24;
-const MIN_W = 44;
-const PAD_L = 6;
+const H = 26;
+const TAB = 6;
+const SQUARE = 24;
+const PAD = 5;
+const MIN_TEXT = 22;
+/** Запас ширины числа: ширину текста меряют и до загрузки шрифта Golos, он шире запасного. */
+const TEXT_SLACK = 4;
 const GLYPH = 14;
-const GAP = 5;
-const PAD_R = 8;
-const GLYPH_TOP = 5;
 const OUTLINE = 1.5;
-const SELECT = 2;
-const SELECT_SCALE = 1.08;
-const ORG_H = 2;
-const ORG_GAP = 2;
-const HOLD_W = 10;
-const DOT_R = 3;
+/** Вертикальные столбики: ширина, зазор, отступ от края плашки. */
+const BAR_W = 4;
+const BAR_GAP = 2;
+const BAR_INSET = 4;
+/** Цифра стопки: кружок в правом нижнем углу квадрата. */
+const COUNT_R = 5;
+const COUNT_PX = 8;
+/** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
+const WARN = 8;
 const LABEL_PX = 12;
-const INDEX_PX = 10;
 const RETREAT_ALPHA = 0.6;
-const ORG_BG_ALPHA = 0.3;
 /** Пунктир фишки-призрака набора, px. */
 const GHOST_DASH = 3;
+/** Снабжение: ниже 50 % — истощение грозит (красный), ниже 75 % — жёлтый (04-roads-supply.md). */
+const LOW_SUPPLY = 0.5;
+const MID_SUPPLY = 0.75;
 
-/** Что показывает фишка: владелец, тип, солдаты и состояния из units.md. */
+/** Что показывает фишка: отношение, армия, тип, солдаты и состояния из units.md. */
 export interface ChipState {
+  /** Цвет фишки по отношению к игроку (`relation`). */
   readonly color: string;
+  /** Цвет армии (закладка слева); null — резерв или чужой отряд. */
+  readonly army: string | null;
   readonly type: UnitType;
   readonly soldiers: number;
-  /** Доля 0..1 для полоски: организованность (или прогресс набора у призрака). */
-  readonly bar: number;
+  /** Организация 0..1 (у призрака набора — прогресс набора). */
+  readonly org: number;
+  /** Снабжённость 0..1; null — чужой отряд (неизвестно). */
+  readonly supply: number | null;
+  /** Идёт истощение — отряд теряет солдат от нехватки снабжения. */
+  readonly starving: boolean;
   readonly count: number;
   readonly selected: boolean;
   readonly retreating: boolean;
   readonly encircled: boolean;
-  readonly lowSupply: boolean;
-  readonly hold: boolean;
   readonly ghost: boolean;
 }
 
-/** Фишка: root двигает и масштабирует слой (1 / масштаб камеры), внутри — сама фишка. */
 export interface Chip {
   readonly root: Container;
   draw(s: ChipState): void;
@@ -69,103 +81,171 @@ function glyph(g: Graphics, type: UnitType, x: number, y: number, color: string)
   }
 }
 
-function dashedRect(g: Graphics, x: number, y: number, w: number, h: number, color: string): void {
-  const sides: [number, number, number, number][] = [
-    [x, y, x + w, y],
-    [x + w, y, x + w, y + h],
-    [x + w, y + h, x, y + h],
-    [x, y + h, x, y],
-  ];
-  for (const [ax, ay, bx, by] of sides) {
-    const len = Math.hypot(bx - ax, by - ay);
-    for (let t = 0; t < len; t += GHOST_DASH * 2) {
-      const e = Math.min(len, t + GHOST_DASH);
-      g.moveTo(ax + ((bx - ax) * t) / len, ay + ((by - ay) * t) / len);
-      g.lineTo(ax + ((bx - ax) * e) / len, ay + ((by - ay) * e) / len);
-    }
-  }
-  g.stroke({ color, width: OUTLINE });
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+/** Цвет снабжения: истощение или ниже 50 % — красный, ниже 75 % — жёлтый, иначе — `chip.supply`. */
+export function supplyColor(supply: number, starving: boolean): string {
+  if (starving || supply < LOW_SUPPLY) return tokens.status.danger;
+  return supply < MID_SUPPLY ? tokens.status.lowSupply : tokens.chip.supply;
 }
 
-// Отметки состояний под и над фишкой: полоска org, «держать», снабжение, котёл.
-function marks(g: Graphics, s: ChipState, w: number): void {
+// Вертикальный столбик: подложка и заполнение снизу.
+function vbar(g: Graphics, x: number, top: number, h: number, share: number, color: string): void {
+  g.roundRect(x, top, BAR_W, h, BAR_W / 2).fill(tokens.chip.track);
+  const f = h * clamp01(share);
+  if (f > 0) g.roundRect(x, top + h - f, BAR_W, Math.max(f, BAR_W), BAR_W / 2).fill(color);
+}
+
+interface Parts {
+  readonly g: Graphics;
+  readonly label: Text;
+  readonly count: Text;
+}
+
+function barsWidth(s: ChipState): number {
+  return (s.supply === null ? 1 : 2) * (BAR_W + BAR_GAP) - BAR_GAP + BAR_INSET;
+}
+
+// Корпус: белая плашка с обводкой (золото — выбрано, красная — котёл), закладка армии, квадрат.
+function body(g: Graphics, s: ChipState, left: number, w: number): number {
+  const top = -H / 2;
+  const r = tokens.radius.chip;
+  const border = s.selected
+    ? { color: tokens.selection.color, width: tokens.selection.width }
+    : s.encircled
+      ? { color: tokens.status.encircled, width: 2 }
+      : { color: s.color, width: OUTLINE };
+  g.roundRect(left, top, w, H, r).fill(tokens.ui.surface);
+  // Закладка цвета армии — левый край фишки; без армии квадрат начинается от края.
+  const tab = s.army ? TAB : 0;
+  const sq = left + tab;
+  if (s.army) {
+    g.roundRect(left, top, TAB + r, H, r).fill(s.army);
+    g.rect(sq, top, SQUARE, H).fill(s.color);
+  } else {
+    g.roundRect(sq, top, SQUARE, H, r).fill(s.color);
+    g.rect(sq + r, top, SQUARE - r, H).fill(s.color);
+  }
+  g.roundRect(left, top, w, H, r).stroke(border);
+  // Есть цифра стопки в углу — глиф чуть выше и левее, чтобы не перекрывался.
+  const shift = s.count > 1 ? 2.5 : 0;
+  glyph(
+    g,
+    s.type,
+    sq + (SQUARE - GLYPH) / 2 - shift,
+    top + (H - GLYPH) / 2 - shift,
+    tokens.ui.surface,
+  );
+  return sq;
+}
+
+// Отметки внутри квадрата: стопка (цифра), нехватка снабжения (треугольник), «держать» (полоса).
+function marks(p: Parts, s: ChipState, sq: number): void {
+  const { g } = p;
+  const top = -H / 2;
+  const cx = sq + SQUARE - COUNT_R - 1;
+  const cy = top + H - COUNT_R - 1;
+  p.count.visible = s.count > 1;
+  if (s.count > 1) {
+    g.circle(cx, cy, COUNT_R).fill(tokens.ui.surface);
+    p.count.text = String(s.count);
+    p.count.position.set(cx, cy + 0.5);
+  }
+  if (s.supply !== null && (s.supply < LOW_SUPPLY || s.starving)) {
+    const x = sq + SQUARE - WARN / 2 - 2;
+    const y = top + WARN / 2 + 2;
+    g.poly([x, y - WARN / 2, x + WARN / 2, y + WARN / 2, x - WARN / 2, y + WARN / 2])
+      .fill(s.starving ? tokens.status.danger : tokens.status.lowSupply)
+      .stroke({ color: tokens.ui.surface, width: 1 });
+  }
+}
+
+function drawChip(p: Parts, s: ChipState): void {
+  const top = -H / 2;
+  const text = Math.max(MIN_TEXT, Math.ceil(p.label.width) + TEXT_SLACK);
+  const w = (s.army ? TAB : 0) + SQUARE + PAD + text + PAD + barsWidth(s);
+  const left = -w / 2;
+  const { g } = p;
+  const sq = body(g, s, left, w);
+  p.label.position.set(sq + SQUARE + PAD + text / 2, 0);
+  const barTop = -H / 2 + 4;
+  const barH = H - 8;
+  let x = left + w - BAR_INSET - BAR_W;
+  if (s.supply !== null) {
+    vbar(g, x, barTop, barH, s.supply, supplyColor(s.supply, s.starving));
+    x -= BAR_W + BAR_GAP;
+  }
+  vbar(g, x, barTop, barH, s.org, tokens.chip.org);
+  marks(p, s, sq);
+  if (s.retreating) drawRetreatHatch(g, left, top, w);
+}
+
+/** Белая диагональная штриховка отступления остаётся внутри корпуса фишки. */
+function drawRetreatHatch(g: Graphics, left: number, top: number, width: number): void {
+  const step = 7;
+  for (let x = left - H; x < left + width; x += step) {
+    const start = Math.max(left, x);
+    const end = Math.min(left + width, x + H);
+    g.moveTo(start, top + H - (start - x)).lineTo(end, top + H - (end - x));
+  }
+  g.stroke({ color: tokens.ui.surface, alpha: 0.3, width: 1.5 });
+}
+
+// Призрак набора в городе: пунктирный контур, глиф и столбик прогресса набора.
+function drawGhost(p: Parts, s: ChipState): void {
+  const text = Math.max(MIN_TEXT, Math.ceil(p.label.width));
+  const w = SQUARE + PAD + text + PAD + BAR_W + BAR_INSET;
   const left = -w / 2;
   const top = -H / 2;
-  const barY = H / 2 + ORG_GAP;
-  g.rect(left, barY, w, ORG_H).fill({ color: tokens.ui.surface, alpha: ORG_BG_ALPHA });
-  g.rect(left, barY, w * Math.max(0, Math.min(1, s.bar)), ORG_H).fill(s.color);
-  if (s.hold) g.rect(-HOLD_W / 2, barY + ORG_H + ORG_GAP, HOLD_W, 2).fill(tokens.ui.ink);
-  if (s.encircled) {
-    g.roundRect(left - 4, top - 4, w + 8, H + 8, tokens.radius.chip + 4).stroke({
-      color: tokens.status.encircled,
-      width: 2,
-    });
+  const { g } = p;
+  for (let x = left; x < left + w; x += GHOST_DASH * 2) {
+    const e = Math.min(x + GHOST_DASH, left + w);
+    g.moveTo(x, top).lineTo(e, top);
+    g.moveTo(x, top + H).lineTo(e, top + H);
   }
-  if (s.encircled || s.lowSupply) {
-    g.circle(w / 2, top, DOT_R)
-      .fill(s.encircled ? tokens.status.encircled : tokens.status.lowSupply)
-      .stroke({ color: tokens.ui.surface, width: OUTLINE });
-  }
+  g.moveTo(left, top).lineTo(left, top + H);
+  g.moveTo(left + w, top).lineTo(left + w, top + H);
+  g.stroke({ color: s.color, width: OUTLINE });
+  glyph(g, s.type, left + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, s.color);
+  vbar(g, left + w - BAR_INSET - BAR_W, top + 4, H - 8, s.org, s.color);
+  p.label.position.set(left + SQUARE + PAD + text / 2, 0);
+  p.count.visible = false;
 }
 
 /** Создаёт фишку; перерисовка — только при смене состояния (раз в снимок), не каждый кадр. */
 export function createChip(): Chip {
   const root = new Container();
-  const body = new Container();
-  root.addChild(body);
+  const content = new Container();
+  root.addChild(content);
   const g = new Graphics();
-  const style = {
+  const font = {
     fontFamily: tokens.font.ui.family,
-    fontWeight: '500',
-    fill: tokens.ui.surface,
+    fontWeight: '600',
+    fill: tokens.ui.ink,
   } as const;
-  const label = new Text({ text: '', style: { ...style, fontSize: LABEL_PX } });
-  const index = new Text({
-    text: '',
-    style: { ...style, fontSize: INDEX_PX, fill: tokens.ui.ink },
-  });
-  label.anchor.set(0, 0.5);
-  index.anchor.set(0, 0.5);
+  const label = new Text({ text: '', style: { ...font, fontSize: LABEL_PX } });
+  const count = new Text({ text: '', style: { ...font, fontSize: COUNT_PX } });
+  label.anchor.set(0.5, 0.5);
+  count.anchor.set(0.5, 0.5);
   label.resolution = window.devicePixelRatio * 2;
-  index.resolution = window.devicePixelRatio * 2;
-  body.addChild(g, label, index);
+  count.resolution = window.devicePixelRatio * 2;
+  content.addChild(g, label, count);
+  const parts: Parts = { g, label, count };
   return {
     root,
     draw(s) {
       label.text = formatSoldiers(s.soldiers);
-      label.style.fill = s.ghost ? s.color : tokens.ui.surface;
-      const raw = PAD_L + GLYPH + GAP + label.width + PAD_R;
-      const w = Math.max(MIN_W, Math.ceil(raw / 2) * 2);
-      const left = -w / 2;
-      const top = -H / 2;
+      label.style.fill = s.ghost ? s.color : tokens.ui.ink;
       g.clear();
-      if (s.selected) {
-        g.roundRect(
-          left - OUTLINE - SELECT / 2,
-          top - OUTLINE - SELECT / 2,
-          w + 2 * OUTLINE + SELECT,
-          H + 2 * OUTLINE + SELECT,
-          tokens.radius.chip + 2,
-        ).stroke({ color: tokens.ui.ink, width: SELECT });
-      }
-      if (s.ghost) dashedRect(g, left, top, w, H, s.color);
-      else {
-        g.roundRect(left, top, w, H, tokens.radius.chip)
-          .fill(s.color)
-          .stroke({ color: tokens.ui.surface, width: OUTLINE });
-      }
-      glyph(g, s.type, left + PAD_L, top + GLYPH_TOP, s.ghost ? s.color : tokens.ui.surface);
-      marks(g, s, w);
-      label.position.set(left + PAD_L + GLYPH + GAP, 0);
-      index.text = s.count > 1 ? `×${s.count}` : '';
-      index.position.set(w / 2 + 3, 0);
-      body.alpha = s.retreating ? RETREAT_ALPHA : 1;
-      body.scale.set(s.selected ? SELECT_SCALE : 1);
+      if (s.ghost) drawGhost(parts, s);
+      else drawChip(parts, s);
+      content.alpha = s.retreating ? RETREAT_ALPHA : 1;
+      content.scale.set(1);
     },
     setResolution(r) {
       if (label.resolution === r) return;
       label.resolution = r;
-      index.resolution = r;
+      count.resolution = r;
     },
     destroy() {
       root.destroy({ children: true });

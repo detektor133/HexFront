@@ -1,6 +1,8 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
 import { executeArmyCommand, validateArmyCommand } from './army.ts';
+import { stillAuto, takeOver } from './auto.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
+import { executePlanCommand, validatePlanCommand } from './plan.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
 import { startRecruit, validateRecruit } from './recruit.ts';
 import { validateSetTax } from './set-tax.ts';
@@ -30,7 +32,6 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
       return validateRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
     case 'move':
     case 'attack':
-    case 'setOrder':
     case 'split':
     case 'merge':
     case 'bombard':
@@ -39,13 +40,18 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'renameArmy':
     case 'disbandArmy':
     case 'assignUnits':
-    case 'armyOrder':
     case 'setAutoReinforce':
+    case 'setArmyAuto':
+    case 'setAutoCommand':
       return validateArmyCommand(state, playerId, cmd);
     case 'assignFront':
-    case 'arrow':
-    case 'arrowStop':
-      return rejected('notImplemented');
+    case 'setDefenseLine':
+    case 'clearPlan':
+    case 'setOffensiveLine':
+    case 'startOffensive':
+    case 'stopOffensive':
+    case 'clearOffensive':
+      return validatePlanCommand(state, playerId, cmd);
     default:
       return assertNever(cmd);
   }
@@ -72,7 +78,6 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'move':
     case 'attack':
-    case 'setOrder':
     case 'split':
     case 'merge':
     case 'bombard':
@@ -82,9 +87,19 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'renameArmy':
     case 'disbandArmy':
     case 'assignUnits':
-    case 'armyOrder':
     case 'setAutoReinforce':
+    case 'setArmyAuto':
+    case 'setAutoCommand':
       executeArmyCommand(state, playerId, cmd);
+      return;
+    case 'assignFront':
+    case 'setDefenseLine':
+    case 'clearPlan':
+    case 'setOffensiveLine':
+    case 'startOffensive':
+    case 'stopOffensive':
+    case 'clearOffensive':
+      executePlanCommand(state, playerId, cmd);
       return;
     default:
       return;
@@ -103,16 +118,32 @@ export function validate(state: MatchState, playerId: number, cmd: Command): Val
 }
 
 /**
- * Применяет команды по порядку: по playerId, внутри игрока — по порядку поступления.
- * Отклонённые не меняют состояние и попадают в state.events.
+ * Применяет команды по порядку: по playerId, внутри игрока — сначала ручные, потом команды
+ * commander, каждые — по порядку поступления. Команда commander для армии, у которой auto уже
+ * выключен (в том числе ручной командой этого же тика), отклоняется. Отклонённые не меняют
+ * состояние и попадают в state.events.
  */
 export function applyCommands(state: MatchState, commands: readonly PlayerCommand[]): void {
   // sort стабилен (ES2019), поэтому порядок поступления внутри игрока сохраняется.
-  const ordered = [...commands].sort((a, b) => a.playerId - b.playerId);
-  for (const { playerId, cmd } of ordered) {
-    const result = validate(state, playerId, cmd);
+  const auto = (c: PlayerCommand): number => (c.source === 'auto' ? 1 : 0);
+  const ordered = [...commands].sort((a, b) => a.playerId - b.playerId || auto(a) - auto(b));
+  for (const { playerId, cmd, source } of ordered) {
+    const result =
+      source === 'auto' && !stillAuto(state, cmd)
+        ? rejected('notAuto')
+        : validate(state, playerId, cmd);
+    // Ручное действие игрока с армией выключает её автокомандование (CR-006).
+    if (result.ok && source !== 'auto') takeOver(state, cmd);
     if (result.ok) execute(state, playerId, cmd);
-    else
-      state.events.push({ t: 'commandRejected', playerId, command: cmd.t, reason: result.reason });
+    else {
+      const auto = source === 'auto';
+      state.events.push({
+        t: 'commandRejected',
+        playerId,
+        command: cmd.t,
+        reason: result.reason,
+        auto,
+      });
+    }
   }
 }

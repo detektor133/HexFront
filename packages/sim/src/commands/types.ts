@@ -9,15 +9,25 @@ export type Command =
   | { readonly t: 'move'; readonly unitIds: readonly number[]; readonly to: HexId }
   | { readonly t: 'attack'; readonly unitIds: readonly number[]; readonly target: HexId }
   | {
-      readonly t: 'setOrder';
-      readonly unitIds: readonly number[];
-      readonly order: 'idle' | 'hold' | 'expand';
+      readonly t: 'assignFront';
+      readonly armyId: number;
+      /** Грани своей границы (EdgeId); между ними фронт достраивается по граням (CR-004). */
+      readonly edges: readonly number[];
     }
-  | { readonly t: 'assignFront'; readonly armyId: number; readonly enemyId: number }
-  | { readonly t: 'arrow'; readonly armyId: number; readonly points: readonly HexId[] }
-  | { readonly t: 'arrowStop'; readonly arrowId: number }
+  | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
+  | { readonly t: 'clearPlan'; readonly armyId: number }
+  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly edges: readonly number[] }
+  | { readonly t: 'startOffensive'; readonly armyId: number }
+  | { readonly t: 'stopOffensive'; readonly armyId: number }
+  | { readonly t: 'clearOffensive'; readonly armyId: number }
   /** soldiers — fixed-point, целое число солдат. */
-  | { readonly t: 'split'; readonly unitId: number; readonly soldiers: Fp }
+  | {
+      readonly t: 'split';
+      readonly unitId: number;
+      readonly soldiers: Fp;
+      /** Куда сразу отправить отделённую часть (вытянули из фишки, CR-005). */
+      readonly to?: HexId;
+    }
   | { readonly t: 'merge'; readonly unitIds: readonly number[] }
   | { readonly t: 'bombard'; readonly unitId: number; readonly targetUnitId: number | null }
   | {
@@ -32,13 +42,12 @@ export type Command =
   | { readonly t: 'improve'; readonly hex: HexId }
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
-  | {
-      readonly t: 'armyOrder';
-      readonly armyId: number;
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
   | { readonly t: 'createArmy'; readonly name: string }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
+  /** Значок «А» на карточке армии (CR-006). */
+  | { readonly t: 'setArmyAuto'; readonly armyId: number; readonly on: boolean }
+  /** Настройка «Автокомандование» для новых армий (CR-006). */
+  | { readonly t: 'setAutoCommand'; readonly on: boolean }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {
@@ -86,6 +95,11 @@ export const REJECT_REASONS = [
   'notOwnArmy',
   'badName',
   'badValue',
+  /** Команда commander для армии, у которой auto уже выключен (CR-006). */
+  'notAuto',
+  'noFront',
+  'tooManyOffensives',
+  'noOffensive',
   'notEnemy',
   'retreating',
 ] as const;
@@ -99,6 +113,8 @@ export type Validation =
 export interface PlayerCommand {
   readonly playerId: number;
   readonly cmd: Command;
+  /** 'auto' — команду отдал commander: не выключает auto у армии (CR-006). */
+  readonly source?: 'auto';
 }
 
 export const OK: Validation = { ok: true };

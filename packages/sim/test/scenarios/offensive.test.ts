@@ -1,0 +1,225 @@
+import { describe, expect, it } from 'vitest';
+
+import { playerView } from '../../src/queries/player-view.ts';
+import {
+  assignFront,
+  assignUnits,
+  at,
+  city,
+  createArmy,
+  own,
+  scenario,
+  setDefenseLine,
+  setOffensiveLine,
+  startOffensive,
+  stopOffensive,
+  clearOffensive,
+  clearPlan,
+  type At,
+} from '../scenario/dsl.ts';
+
+// Фронт A — столбец 2, земля B — столбцы 3–7; линия наступления — столбец 5.
+const FIELD = `
+  a  a  a  b  b  b  b  b
+  a  a  a  b  b  b  b  b
+  A1 a  a  b  b  b  b  B1
+  a  a  a  b  b  b  b  b
+  a  a  a  b  b  b  b  b
+`;
+const legend = {
+  A1: city('A', 5, { capital: true }),
+  a: own('A'),
+  B1: city('B', 1, { capital: true }),
+  b: own('B'),
+};
+const LINE: readonly At[] = [at(5, 0), at(5, 4)];
+
+type S = ReturnType<typeof scenario>;
+
+function armyOf(s: S, units: readonly number[]): number {
+  s.cmd('A', createArmy(''));
+  s.runTicks(1);
+  const army = s.armiesOf('A').at(-1)?.id ?? -1;
+  s.cmd('A', assignUnits(units, army));
+  s.runTicks(1);
+  return army;
+}
+
+function frontArmy(s: S, n: number): { army: number; ids: number[] } {
+  const ids = Array.from({ length: n }, () => s.unit('A', 'infantry', 300, at(0, 2)));
+  const army = armyOf(s, ids);
+  s.cmd('A', assignFront(army, 'B', null));
+  s.runSeconds(20);
+  return { army, ids };
+}
+
+const ownerOf = (s: S, c: number, r: number): string | null => s.owner(at(c, r));
+
+describe('линия наступления (CR-002, как в HoI4)', () => {
+  it('армия всем участком берёт зону до линии и не заходит за неё', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(80);
+    for (const c of [3, 4, 5]) {
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+    }
+    for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 6, r)).toBe('B');
+  });
+
+  it('взятая зона завершает наступление, армия остаётся на новой линии фронта', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(80);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind).toBe('front');
+    expect(plan?.kind === 'front' && plan.offensive).toBeNull();
+    expect(s.lastEvent('offensiveDone')).toBeDefined();
+  });
+
+  it('выступ фронта, уже дошедший до линии, не сужает зону: армия берёт всё до линии', () => {
+    const bulge = `
+      a  a  a  a  a  a  b  b
+      a  a  a  b  b  b  b  b
+      A1 a  a  b  b  b  b  B1
+      a  a  a  b  b  b  b  b
+      a  a  a  b  b  b  b  b
+    `;
+    const s = scenario(bulge, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(80);
+    for (const c of [3, 4, 5]) {
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+    }
+    for (let r = 1; r < 5; r += 1) expect(ownerOf(s, 6, r)).toBe('B');
+  });
+
+  it('снимок владельца показывает линию и гексы, куда наступающие могут шагнуть; чужой — нет', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runTicks(1);
+    const plan = playerView(s.state, 0).plans.find((p) => p.armyId === army);
+    const zone = plan?.kind === 'front' ? plan.zone : [];
+    const hexOf = (c: number, r: number): number => c + r * s.state.map.width;
+    // Шаг — только в соседний гекс, строго ближе к линии: столбец 3, не глубже.
+    for (let r = 0; r < 5; r += 1) {
+      expect(zone).toContain(hexOf(3, r));
+      expect(zone).not.toContain(hexOf(5, r));
+      expect(zone).not.toContain(hexOf(6, r));
+    }
+    expect(playerView(s.state, 1).plans).toEqual([]);
+  });
+
+  it('в гекс с прогнозом «Поражение» отряды не атакуют', () => {
+    const s = scenario(FIELD, { legend });
+    s.unit('B', 'infantry', 3000, at(3, 2));
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(30);
+    expect(ownerOf(s, 3, 2)).toBe('B');
+    expect(s.state.units.some((u) => u.owner === 0 && u.inBattle)).toBe(false);
+  });
+
+  it('отряды с org < 30 не наступают', () => {
+    const s = scenario(FIELD, { legend });
+    const { army, ids } = frontArmy(s, 5);
+    for (const id of ids) s.setOrg(id, 20);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runTicks(25);
+    for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 3, r)).toBe('B');
+  });
+
+  it('нарисованная линия ждёт «Начать наступление»; «Стоп» — пауза, линия остаётся', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.runSeconds(10);
+    for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 3, r)).toBe('B');
+    s.cmd('A', startOffensive(army));
+    s.cmd('A', stopOffensive(army));
+    s.runSeconds(30);
+    for (let r = 0; r < 5; r += 1) expect(ownerOf(s, 4, r)).toBe('B');
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(false);
+    s.cmd('A', clearOffensive(army));
+    s.runTicks(1);
+    const after = s.state.plans.find((p) => p.armyId === army);
+    expect(after?.kind === 'front' && after.offensive).toBeNull();
+  });
+
+  it('«Стоп» — армия стоит, линия остаётся; «Начать» продолжает до линии (04/T16)', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 5);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(4);
+    s.cmd('A', stopOffensive(army));
+    s.runSeconds(2);
+    const owned = (): number => s.state.hexes.owner.filter((o) => o === 0).length;
+    const paused = owned();
+    s.runSeconds(20);
+    expect(owned()).toBe(paused);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(false);
+    s.cmd('A', startOffensive(army));
+    s.runSeconds(80);
+    for (const c of [3, 4, 5]) {
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+    }
+  });
+
+  it('«Удалить» по фронту убирает и линию наступления (04/T16)', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 2);
+    s.cmd('A', setOffensiveLine(army, LINE));
+    s.runTicks(1);
+    s.cmd('A', clearPlan(army));
+    s.runTicks(1);
+    expect(s.state.plans.find((p) => p.armyId === army)).toBeUndefined();
+  });
+
+  it('«Начать» без нарисованной линии — noOffensive', () => {
+    const s = scenario(FIELD, { legend });
+    const { army } = frontArmy(s, 1);
+    s.cmd('A', startOffensive(army));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['noOffensive']);
+  });
+
+  it('линия наступления только у армии с линией фронта — иначе noFront', () => {
+    const s = scenario(FIELD, { legend });
+    const idle = armyOf(s, [s.unit('A', 'infantry', 100, at(0, 0))]);
+    const line = armyOf(s, [s.unit('A', 'infantry', 100, at(0, 1))]);
+    s.cmd('A', setDefenseLine(line, [at(1, 0), at(1, 4)]));
+    s.runTicks(1);
+    s.cmd('A', setOffensiveLine(idle, LINE));
+    s.cmd('A', setOffensiveLine(line, LINE));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['noFront', 'noFront']);
+  });
+
+  it('не больше 3 наступлений одновременно', () => {
+    const s = scenario(FIELD, { legend });
+    const armies = [0, 1, 2, 3].map((r) => {
+      const a = armyOf(s, [s.unit('A', 'infantry', 100, at(0, r))]);
+      s.cmd('A', assignFront(a, 'B', [at(2, r), at(2, r)]));
+      return a;
+    });
+    s.runTicks(1);
+    for (const a of armies) s.cmd('A', setOffensiveLine(a, LINE));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    for (const a of armies) s.cmd('A', startOffensive(a));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['tooManyOffensives']);
+  });
+});

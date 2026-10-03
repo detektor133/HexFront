@@ -22,3 +22,15 @@ export function playerLine(playerId: number): string {
 export function playerFill(playerId: number): string {
   return mixWithWhite(playerLine(playerId), tokens.territory.fillMix);
 }
+
+/** Цвет армии (tokens.json, armies.palette, CR-003): по номеру армии, по кругу. */
+export function armyColor(armyNumber: number): string {
+  const pool = tokens.armies.palette;
+  const index = (((armyNumber - 1) % pool.length) + pool.length) % pool.length;
+  return pool[index] ?? tokens.neutral.line;
+}
+
+/** Цвет фишки отряда по отношению к игроку me (CR-003): свои — зелёные, чужие — красные. */
+export function relationColor(owner: number, me: number): string {
+  return owner === me ? tokens.relation.own : tokens.relation.enemy;
+}

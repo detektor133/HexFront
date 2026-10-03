@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { at, city, move, own, scenario, setOrder, type At } from '../scenario/dsl.ts';
+import { at, city, move, own, scenario } from '../scenario/dsl.ts';
 
 const legend = {
   A1: city('A', 1, { capital: true }),
@@ -9,10 +9,6 @@ const legend = {
   b: own('B'),
   N2: city(null, 2),
 };
-
-function hexOf(s: ReturnType<typeof scenario>, w: At): number {
-  return w.col + w.row * s.state.map.width;
-}
 
 describe('захват пустых гексов', () => {
   const MAP = `
@@ -62,78 +58,5 @@ describe('захват пустых гексов', () => {
     s.runSeconds(3);
     expect(s.owner(at(2, 1))).toBeNull();
     expect(s.rejections()).toEqual(['noPath']);
-  });
-});
-
-describe('приказ expand', () => {
-  it('отряд занимает ближайшие нейтральные гексы у границы, пока они есть, затем idle', () => {
-    const s = scenario(
-      `
-      ~  ~  ~  ~  ~
-      A1 a  .  .  ~
-      ~  ~  ~  ~  ~
-    `,
-      { legend },
-    );
-    const id = s.unit('A', 'infantry', 100, at(1, 1));
-    s.cmd('A', setOrder([id], 'expand'));
-    s.runSeconds(3);
-    expect(s.owner(at(2, 1))).toBe('A');
-    expect(s.owner(at(3, 1))).toBeNull();
-    s.runSeconds(3);
-    expect(s.owner(at(3, 1))).toBe('A');
-    s.runTicks(1);
-    expect(s.unitById(id)?.order).toBe('idle');
-  });
-
-  it('два отряда на экспансии не идут в один гекс', () => {
-    const s = scenario(
-      `
-      ~  ~  ~  ~  ~
-      .  a  A1 a  .
-      ~  ~  ~  ~  ~
-    `,
-      { legend },
-    );
-    const x = s.unit('A', 'infantry', 100, at(2, 1));
-    const y = s.unit('A', 'infantry', 100, at(2, 1));
-    s.cmd('A', setOrder([x, y], 'expand'));
-    s.runTicks(1);
-    const targets = [x, y].map((id) => s.unitById(id)?.path.at(-1));
-    expect(new Set(targets).size).toBe(2);
-    s.runSeconds(10);
-    expect(s.owner(at(0, 1))).toBe('A');
-    expect(s.owner(at(4, 1))).toBe('A');
-  });
-
-  it('не идёт на вражеские гексы и в города с гарнизоном', () => {
-    const s = scenario(
-      `
-      ~  ~  ~  ~  ~
-      N2 a  A1 b  B1
-      ~  ~  ~  ~  ~
-    `,
-      { legend },
-    );
-    const id = s.unit('A', 'infantry', 100, at(2, 1));
-    s.cmd('A', setOrder([id], 'expand'));
-    s.runSeconds(5);
-    expect(s.owner(at(3, 1))).toBe('B');
-    expect(s.owner(at(0, 1))).toBeNull();
-    expect(s.unitById(id)?.order).toBe('idle');
-    expect(s.unitById(id)?.hex).toBe(hexOf(s, at(2, 1)));
-  });
-
-  it('артиллерии приказ expand недоступен — отказ badOrder', () => {
-    const s = scenario(
-      `
-      A1 a  .
-    `,
-      { legend },
-    );
-    const id = s.unit('A', 'artillery', 100, at(1, 0));
-    s.cmd('A', setOrder([id], 'expand'));
-    s.runTicks(1);
-    expect(s.rejections()).toEqual(['badOrder']);
   });
 });

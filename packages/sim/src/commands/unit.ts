@@ -1,4 +1,4 @@
-// Команды отрядов: move, setOrder, split, merge.
+// Команды отрядов: move, attack, split, merge, bombard.
 // GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { unitLimit } from './recruit.ts';
@@ -10,7 +10,7 @@ import type { Unit, MatchState } from '../state/types.ts';
 
 export type UnitCommand = Extract<
   Command,
-  { t: 'move' | 'attack' | 'setOrder' | 'split' | 'merge' | 'bombard' }
+  { t: 'move' | 'attack' | 'split' | 'merge' | 'bombard' }
 >;
 
 type Owned =
@@ -105,12 +105,13 @@ export function validateUnitCommand(
       return validateAttack(state, owned.units, cmd.target);
     case 'bombard':
       return validateBombard(state, owned.units[0], cmd.targetUnitId);
-    case 'setOrder':
-      // Артиллерия не захватывает гексы, поэтому экспансия ей недоступна.
-      return cmd.order === 'expand' && owned.units.some((a) => a.type === 'artillery')
-        ? rejected('badOrder')
-        : OK;
     case 'split':
+      if (
+        cmd.to !== undefined &&
+        !(Number.isInteger(cmd.to) && cmd.to >= 0 && cmd.to < state.hexes.owner.length)
+      ) {
+        return rejected('badHex');
+      }
       return owned.units[0]
         ? validateSplit(state, owned.units[0], cmd.soldiers)
         : rejected('unknownUnit');
@@ -125,10 +126,14 @@ function stop(unit: Unit): void {
   unit.moveTotal = 0;
 }
 
-function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
+/**
+ * Отделяет от отряда soldiers солдат в новый отряд в том же гексе и армии (05-armies.md).
+ * @returns новый отряд
+ */
+export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
   unit.soldiers = (unit.soldiers - soldiers) as Fp;
   // Id растут монотонно, поэтому push сохраняет сортировку отрядов по id.
-  state.units.push({
+  const part: Unit = {
     id: state.nextId,
     owner: unit.owner,
     type: unit.type,
@@ -147,12 +152,15 @@ function executeSplit(state: MatchState, unit: Unit, soldiers: Fp): void {
     inBattle: false,
     focus: -1,
     fireTarget: -1,
-  });
+    slot: -1,
+  };
+  state.units.push(part);
   state.nextId += 1;
+  return part;
 }
 
-// Остаётся отряд с наименьшим id; org — средневзвешенная по солдатам.
-function executeMerge(state: MatchState, units: readonly Unit[]): void {
+/** Сливает однотипные отряды в одном гексе; остаётся отряд с наименьшим id. */
+export function mergeUnits(state: MatchState, units: readonly Unit[]): void {
   const sorted = [...units].sort((a, b) => a.id - b.id);
   const [kept, ...rest] = sorted;
   if (!kept) return;
@@ -185,24 +193,31 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
         const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
         if (!sameStep) stop(a);
+        // Ручной приказ снимает отряд с места в плане армии; освободившись, он вернётся в план.
+        a.slot = -1;
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';
       }
       return;
-    case 'setOrder':
-      for (const a of owned.units) {
-        stop(a);
-        a.order = cmd.order;
-      }
-      return;
     case 'split':
-      if (owned.units[0]) executeSplit(state, owned.units[0], cmd.soldiers);
+      if (owned.units[0]) {
+        const part = splitUnit(state, owned.units[0], cmd.soldiers);
+        // Вытянули из фишки в другой гекс — отделённая часть сразу идёт туда.
+        const path =
+          cmd.to === undefined || cmd.to === part.hex
+            ? null
+            : findPath(state, part.hex, cmd.to, part.type, part.owner);
+        if (path && path.length > 0) {
+          part.path = path;
+          part.order = 'move';
+        }
+      }
       return;
     case 'bombard':
       if (owned.units[0]) owned.units[0].focus = cmd.targetUnitId ?? -1;
       return;
     case 'merge':
-      executeMerge(state, owned.units);
+      mergeUnits(state, owned.units);
       return;
   }
 }

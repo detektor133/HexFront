@@ -9,12 +9,15 @@ import {
   TICKS_PER_S,
   type UnitType,
 } from '../../src/balance.ts';
+import { commanderCommands } from '../../src/bots/run.ts';
 import type { Command, PlayerCommand } from '../../src/commands/types.ts';
 import { TERRAIN, type MapStatic, type TerrainName } from '../../src/map/types.ts';
 import { hexId, inBounds, neighbors, offsetToAxial } from '../../src/math/hex.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { captureHex } from '../../src/state/capture.ts';
 import { seedNeutralPopulation } from '../../src/state/create-match.ts';
+import { borderEdges, borderSegmentEdges, edgeOf, isBorderEdge } from '../../src/state/edges.ts';
+import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
 import {
   BUILDING,
@@ -53,11 +56,6 @@ type UnitRef = number | { readonly unitOf: string; readonly index: number };
 type DslCommand =
   | { readonly t: 'attack'; readonly units: readonly UnitRef[]; readonly target: At }
   | { readonly t: 'move'; readonly units: readonly UnitRef[]; readonly to: At }
-  | {
-      readonly t: 'setOrder';
-      readonly units: readonly UnitRef[];
-      readonly order: 'idle' | 'hold' | 'expand';
-    }
   | { readonly t: 'split'; readonly unit: UnitRef; readonly soldiers: number }
   | { readonly t: 'merge'; readonly units: readonly UnitRef[] }
   | { readonly t: 'bombard'; readonly unit: UnitRef; readonly targetUnitId: number | null }
@@ -71,10 +69,19 @@ type DslCommand =
     }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   | {
-      readonly t: 'armyOrder';
+      readonly t: 'assignFront';
       readonly armyId: number;
-      readonly order: 'idle' | 'hold' | 'expand';
+      readonly enemy: string;
+      readonly section: readonly [At, At] | null;
     }
+  | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'clearPlan'; readonly armyId: number }
+  | { readonly t: 'drawFront'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'raw'; readonly cmd: Command }
+  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly points: readonly At[] }
+  | { readonly t: 'stopOffensive'; readonly armyId: number }
+  | { readonly t: 'startOffensive'; readonly armyId: number }
+  | { readonly t: 'clearOffensive'; readonly armyId: number }
   | { readonly t: 'setTax'; readonly percent: number }
   | { readonly t: 'foundCity' | 'improve' | 'upgradeCity' | 'rebuildSupply'; readonly where: At }
   | { readonly t: 'build'; readonly where: At; readonly kind: 'fort' | 'depot' }
@@ -118,10 +125,6 @@ export const attack = (units: readonly UnitRef[], target: At): DslCommand => ({
 });
 
 export const move = (units: readonly UnitRef[], to: At): DslCommand => ({ t: 'move', units, to });
-export const setOrder = (
-  units: readonly UnitRef[],
-  order: 'idle' | 'hold' | 'expand',
-): DslCommand => ({ t: 'setOrder', units, order });
 /** Отделить soldiers целых солдат в новый отряд. */
 export const split = (unit: UnitRef, soldiers: number): DslCommand => ({
   t: 'split',
@@ -149,12 +152,38 @@ export const assignUnits = (units: readonly UnitRef[], armyId: number | null): D
   units,
   armyId,
 });
-export const armyOrder = (armyId: number, order: 'idle' | 'hold' | 'expand'): DslCommand => ({
-  t: 'armyOrder',
-  armyId,
-  order,
-});
 
+/** Команда sim как есть — когда удобнее задать грани напрямую. */
+export const raw = (cmd: Command): DslCommand => ({ t: 'raw', cmd });
+/** Участок фронта по точкам своей границы (с врагом или ничьей землёй), CR-003. */
+export const drawFront = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'drawFront',
+  armyId,
+  points,
+});
+/** Армия на фронт против игрока enemy (буква), вся граница или участок между двумя гексами. */
+export const assignFront = (
+  armyId: number,
+  enemy: string,
+  section: readonly [At, At] | null,
+): DslCommand => ({ t: 'assignFront', armyId, enemy, section });
+/** Линия обороны армии по точкам. */
+export const setDefenseLine = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'setDefenseLine',
+  armyId,
+  points,
+});
+/** Линия наступления армии с фронтом — граница «до куда наступать». */
+export const setOffensiveLine = (armyId: number, points: readonly At[]): DslCommand => ({
+  t: 'setOffensiveLine',
+  armyId,
+  points,
+});
+export const stopOffensive = (armyId: number): DslCommand => ({ t: 'stopOffensive', armyId });
+/** «Начать наступление» (CR-005): нарисованная линия ждёт этой команды. */
+export const startOffensive = (armyId: number): DslCommand => ({ t: 'startOffensive', armyId });
+export const clearOffensive = (armyId: number): DslCommand => ({ t: 'clearOffensive', armyId });
+export const clearPlan = (armyId: number): DslCommand => ({ t: 'clearPlan', armyId });
 export const setAutoReinforce = (on: boolean): DslCommand => ({ t: 'setAutoReinforce', on });
 
 export const foundCity = (where: At): DslCommand => ({ t: 'foundCity', where });
@@ -234,6 +263,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
   const state: MatchState = {
     tick: 0,
     seed: 1,
+    fog: true,
     map,
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
@@ -255,6 +285,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       bankrupt: false,
       armiesCreated: 0,
       autoReinforce: false,
+      autoCommand: true,
       chaosTicks: 0,
       noCityTicks: 0,
       eliminatedTick: -1,
@@ -263,7 +294,9 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     constructions: [],
     recruits: [],
     armies: [],
+    plans: [],
     networks: [],
+    supplyRatios: new Map(),
     nextId: 1,
     events: [],
     winner: -1,
@@ -277,10 +310,13 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
 export interface Scenario {
   readonly state: MatchState;
   unit(player: string, type: UnitType, soldiers: number, where: At): number;
-  cmd(player: string, command: DslCommand): void;
+  /** Команда игрока; source 'auto' — от commander (не выключает auto у армии, CR-006). */
+  cmd(player: string, command: DslCommand, source?: 'auto'): void;
   /** Прогон целых секунд; дробные — через runTicks (float-умножение даёт лишний тик). */
   runSeconds(seconds: number): void;
   runTicks(ticks: number): void;
+  /** Прогон с автокомандованием: перед каждым тиком — команды commander (CR-006). */
+  runAuto(ticks: number): void;
   owner(where: At): string | null;
   unitsOf(player: string): Unit[];
   lastEvent(t: GameEvent['t']): GameEvent | undefined;
@@ -293,7 +329,8 @@ export interface Scenario {
   cityAt(where: At): City | undefined;
   /**
    * Сменить владельца гекса в обход команд — для тестов разреза сетей и потери городов;
-   * город на гексе переходит вместе с ним. null — нейтральный.
+   * через setHexOwner, как любая смена владельца (фронты рядом переносятся); город на гексе
+   * переходит вместе с ним. null — нейтральный.
    */
   setOwner(where: At, player: string | null): void;
   /** Отказы по порядку за всё время прогона. */
@@ -320,12 +357,13 @@ export interface Scenario {
  */
 export function scenario(
   ascii: string,
-  opts: { readonly legend: Readonly<Record<string, Cell>> },
+  opts: { readonly legend: Readonly<Record<string, Cell>>; readonly fog?: boolean },
 ): Scenario {
   const grid = parseGrid(ascii);
   const letters = playerLetters(grid, opts.legend);
   const map = buildMap(grid, opts.legend);
   const state = emptyState(map, letters);
+  state.fog = opts.fog ?? true;
   const idOf = (p: string): number => {
     const id = letters.indexOf(p);
     if (id < 0) throw new Error(`сценарий: неизвестный игрок ${p}`);
@@ -336,7 +374,7 @@ export function scenario(
     const cell = opts.legend[token];
     if (!cell) throw new Error(`сценарий: токен «${token}» нет в легенде`);
     const owner = cell.player === null ? NEUTRAL : idOf(cell.player);
-    state.hexes.owner[hex] = owner;
+    setHexOwner(state, hex, owner);
     if (cell.kind === 'own' && cell.road) state.hexes.road[hex] = 1;
     if (cell.kind !== 'city') return;
     const id = state.nextId;
@@ -378,6 +416,9 @@ function makeScenario(
     if (!unit) throw new Error(`сценарий: у ${ref.unitOf} нет отряда #${ref.index}`);
     return unit.id;
   };
+  // Грани своей границы у гекса точки — так тест задаёт участок фронта гексами.
+  const borderOf = (owner: number, w: At): number[] =>
+    [0, 1, 2, 3, 4, 5].map((d) => edgeOf(hexOf(w), d)).filter((e) => isBorderEdge(state, owner, e));
   const cityIdAt = (w: At): number => state.cities.find((c) => c.hex === hexOf(w))?.id ?? -1;
   const toCommand = (c: DslCommand): Command => {
     switch (c.t) {
@@ -387,8 +428,6 @@ function makeScenario(
         return { t: 'attack', unitIds: c.units.map(resolve), target: hexOf(c.target) };
       case 'move':
         return { t: 'move', unitIds: c.units.map(resolve), to: hexOf(c.to) };
-      case 'setOrder':
-        return { t: 'setOrder', unitIds: c.units.map(resolve), order: c.order };
       case 'split':
         return { t: 'split', unitId: resolve(c.unit), soldiers: (c.soldiers * FP) as Fp };
       case 'merge':
@@ -398,9 +437,48 @@ function makeScenario(
       case 'createArmy':
       case 'renameArmy':
       case 'disbandArmy':
-      case 'armyOrder':
       case 'setAutoReinforce':
         return c;
+      case 'assignFront': {
+        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
+        if (c.section) {
+          return {
+            t: 'assignFront',
+            armyId: c.armyId,
+            edges: c.section.flatMap((w) => borderOf(owner, w)),
+          };
+        }
+        // Вся граница с соседом — все её непрерывные куски подряд.
+        const edges: number[] = [];
+        for (const e of borderEdges(state, owner)) {
+          if (!edges.includes(e)) edges.push(...borderSegmentEdges(state, owner, idOf(c.enemy), e));
+        }
+        return { t: 'assignFront', armyId: c.armyId, edges };
+      }
+      case 'raw':
+        return c.cmd;
+      case 'drawFront': {
+        const owner = state.armies.find((a) => a.id === c.armyId)?.owner ?? -1;
+        return {
+          t: 'assignFront',
+          armyId: c.armyId,
+          edges: c.points.flatMap((w) => borderOf(owner, w)),
+        };
+      }
+      case 'setDefenseLine':
+        return { t: 'setDefenseLine', armyId: c.armyId, points: c.points.map(hexOf) };
+      case 'clearPlan':
+      case 'stopOffensive':
+      case 'startOffensive':
+      case 'clearOffensive':
+        return c;
+      case 'setOffensiveLine':
+        // Точка линии — восточная грань гекса (к столбцу справа).
+        return {
+          t: 'setOffensiveLine',
+          armyId: c.armyId,
+          edges: c.points.map((w) => edgeOf(hexOf(w), 0)),
+        };
       case 'assignUnits':
         return { t: 'assignUnits', unitIds: c.units.map(resolve), armyId: c.armyId };
       case 'upgradeCity':
@@ -449,16 +527,24 @@ function makeScenario(
         inBattle: false,
         focus: -1,
         fireTarget: -1,
+        slot: -1,
       });
       return id;
     },
-    cmd(player, command) {
-      queue.push({ playerId: idOf(player), cmd: toCommand(command) });
+    cmd(player, command, source) {
+      const pc = { playerId: idOf(player), cmd: toCommand(command) };
+      queue.push(source ? { ...pc, source } : pc);
     },
     runSeconds(seconds) {
       if (!Number.isInteger(seconds))
         throw new Error('сценарий: runSeconds принимает целые секунды');
       this.runTicks(seconds * TICKS_PER_S);
+    },
+    runAuto(ticks) {
+      for (let i = 0; i < ticks; i += 1) {
+        queue.push(...commanderCommands(state));
+        this.runTicks(1);
+      }
     },
     runTicks(ticks) {
       for (let i = 0; i < ticks; i += 1) {
@@ -486,7 +572,7 @@ function makeScenario(
     },
     setOwner(where, player) {
       const owner = player === null ? NEUTRAL : idOf(player);
-      state.hexes.owner[hexOf(where)] = owner;
+      setHexOwner(state, hexOf(where), owner);
       const c = state.cities.find((x) => x.hex === hexOf(where));
       if (c) c.owner = owner;
     },

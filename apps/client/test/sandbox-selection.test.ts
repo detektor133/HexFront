@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest';
 import type { PlayerView } from '@hexfront/sim';
 
 import {
-  attackCommand,
   isHostile,
   NOTHING_PICKED,
   orderHex,
   selectHex,
+  selectUnitsInRect,
 } from '../src/dev/sandbox-selection.ts';
 import { lang } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
@@ -35,9 +35,9 @@ describe('песочница: выбор и приказы как в HoI4', () =
     (o, id) => o === view.playerId && id !== home && !isHostile(view, id),
   );
 
-  it('тап по гексу со своими отрядами выбирает их', () => {
+  it('тап по гексу со своими отрядами выбирает их, гекс не подсвечен (04/T15)', () => {
     const p = selectHex(view, NOTHING_PICKED, home);
-    expect(p.hex).toBe(home);
+    expect(p.hex).toBeNull();
     expect(p.units).toEqual(mine.filter((u) => u.hex === home).map((u) => u.id));
   });
 
@@ -54,18 +54,13 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(next.picked.units).toEqual(p.units);
   });
 
-  it('приказ по врагу — прицел атаки, подтверждение даёт attack', () => {
+  it('приказ по врагу — атака сразу, без подтверждения (04/T16)', () => {
     const p = selectHex(view, NOTHING_PICKED, home);
     const enemy = view.units.find((u) => u.owner !== view.playerId);
     if (!enemy) throw new Error('нет врага');
     const next = orderHex(view, p, enemy.hex);
-    expect(next.cmd).toBeNull();
-    expect(next.picked.target).toBe(enemy.hex);
-    expect(attackCommand(view, next.picked)).toEqual({
-      t: 'attack',
-      unitIds: p.units,
-      target: enemy.hex,
-    });
+    expect(next.cmd).toEqual({ t: 'attack', unitIds: p.units, target: enemy.hex });
+    expect(next.picked.target).toBeNull();
   });
 
   it('приказ без выбранных отрядов работает как выбор', () => {
@@ -75,6 +70,21 @@ describe('песочница: выбор и приказы как в HoI4', () =
   it('нейтральный город с гарнизоном — враждебный гекс', () => {
     const neutral = view.cities.find((c) => c.owner < 0);
     expect(neutral && isHostile(view, neutral.hex)).toBe(true);
+  });
+
+  it('рамка выбирает только свои неотступающие отряды и допускает обратное направление', () => {
+    const selected = selectUnitsInRect(
+      view,
+      { x: 1_000_000, y: 1_000_000 },
+      { x: -1_000_000, y: -1_000_000 },
+      (hex) => ({ x: hex, y: hex }),
+    );
+    expect(selected).toEqual(
+      view.units.filter((u) => u.owner === view.playerId && u.order !== 'retreat').map((u) => u.id),
+    );
+    expect(
+      selected.some((id) => view.units.find((u) => u.id === id)?.owner !== view.playerId),
+    ).toBe(false);
   });
 });
 

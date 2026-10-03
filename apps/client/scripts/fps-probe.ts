@@ -1,4 +1,4 @@
-// Замер fps на /dev/map (small, 1440×900, масштаб 1): 5 с в покое и 5 с непрерывного зума колесом.
+// Замер fps на /dev/map (4000 гексов, 1440×900, масштаб 1): 5 с в покое и 5 с непрерывного зума колесом.
 // Запуск при работающем dev-сервере: node --experimental-strip-types apps/client/scripts/fps-probe.ts [--gpu]
 // --gpu включает аппаратный WebGL (ANGLE/D3D11); без него headless Chromium рисует программно.
 import { chromium } from '@playwright/test';
@@ -7,7 +7,7 @@ const args = process.argv.includes('--gpu')
   : [];
 const browser = await chromium.launch({ args });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto('http://localhost:5173/dev/map?map=small&scale=1');
+await page.goto('http://localhost:5173/dev/map?map=perf-4000&scale=1&panel=0');
 await page.waitForFunction(
   () => document.querySelector('[data-testid=detail]')?.textContent !== '—',
 );

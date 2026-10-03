@@ -17,6 +17,8 @@ import {
 import { FP, type Fp } from '../src/math/int.ts';
 import { findPath } from '../src/queries/unit-path.ts';
 import { createMatch } from '../src/state/create-match.ts';
+import { borderEdges, borderSegmentEdges, edgeOther } from '../src/state/edges.ts';
+import { setHexOwner } from '../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../src/state/network.ts';
 import type { MatchState, Unit } from '../src/state/types.ts';
 
@@ -83,7 +85,7 @@ function partition(state: MatchState): void {
     capitals.forEach((c, i) => {
       if (distance(h, c) < distance(h, capitals[best] ?? c)) best = i;
     });
-    if (!state.cities.some((c) => c.hex === id && c.owner < 0)) state.hexes.owner[id] = best;
+    if (!state.cities.some((c) => c.hex === id && c.owner < 0)) setHexOwner(state, id, best);
   });
   for (const c of capitals) {
     for (const h of spiral(c, 2))
@@ -117,6 +119,7 @@ function unit(
     inBattle: false,
     focus: -1,
     fireTarget: -1,
+    slot: -1,
   };
   state.nextId += 1;
   state.units.push(u);
@@ -157,6 +160,23 @@ function battles(state: MatchState): Front[] {
   return fronts;
 }
 
+// У каждого игрока армия с фронтом по куску границы с первым соседом (04/T13): бои у границы
+// двигают её, и фронты едут за ней при каждом захвате.
+function planFronts(state: MatchState): void {
+  for (const p of state.players) {
+    const edge = borderEdges(state, p.id).find(
+      (e) => (state.hexes.owner[edgeOther(state, e)] ?? -1) >= 0,
+    );
+    if (edge === undefined) continue;
+    const enemy = state.hexes.owner[edgeOther(state, edge)] ?? -1;
+    const id = state.nextId;
+    state.nextId += 1;
+    state.armies.push({ id, owner: p.id, number: 1, name: '', auto: false });
+    const edges = borderSegmentEdges(state, p.id, enemy, edge);
+    state.plans.push({ armyId: id, kind: 'front', edges, offensive: null });
+  }
+}
+
 /** Синтетический матч и его фронты. */
 export function syntheticMatch(): { state: MatchState; fronts: Front[] } {
   const state = createMatch(
@@ -182,6 +202,7 @@ export function syntheticMatch(): { state: MatchState; fronts: Front[] } {
     i += 1;
   }
   state.units.sort((a, b) => a.id - b.id);
+  planFronts(state);
   recomputeAllNetworks(state);
   return { state, fronts };
 }

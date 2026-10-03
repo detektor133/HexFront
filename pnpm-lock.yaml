@@ -88,9 +88,13 @@ importers:
 
   packages/sim: {}
 
+  tools/ai-check: {}
+
   tools/balance: {}
 
   tools/bench: {}
+
+  tools/ci-wait: {}
 
   tools/commit-check: {}
 

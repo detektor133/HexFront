@@ -65,6 +65,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, p.bankrupt ? 1 : 0);
     int(s, p.armiesCreated);
     int(s, p.autoReinforce ? 1 : 0);
+    int(s, p.autoCommand ? 1 : 0);
     int(s, p.chaosTicks);
     int(s, p.noCityTicks);
     int(s, p.eliminatedTick);
@@ -89,6 +90,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.inBattle ? 1 : 0);
     int(s, a.focus);
     int(s, a.fireTarget);
+    int(s, a.slot);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {
@@ -96,6 +98,23 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.owner);
     int(s, a.number);
     str(s, a.name);
+    int(s, a.auto ? 1 : 0);
+  }
+  int(s, state.plans.length);
+  for (const p of state.plans) {
+    int(s, p.armyId);
+    str(s, p.kind);
+    if (p.kind === 'front') {
+      array(s, p.edges);
+      int(s, p.offensive ? 1 : 0);
+      array(s, p.offensive?.edges ?? []);
+      array(s, p.offensive?.hexes ?? []);
+      int(s, p.offensive?.active ? 1 : 0);
+      int(s, p.offensive?.progressTick ?? 0);
+      array(s, p.offensive?.taken ?? []);
+      array(s, p.lost ?? []);
+      int(s, p.startWanted ? 1 : 0);
+    } else array(s, p.hexes);
   }
 }
 
@@ -130,6 +149,7 @@ export function hashState(state: MatchState): string {
   const s: Hasher = { h: FNV_OFFSET };
   int(s, state.tick);
   int(s, state.seed);
+  int(s, state.fog ? 1 : 0);
   int(s, state.nextId);
   str(s, state.map.id);
   int(s, state.map.width);

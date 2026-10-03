@@ -13,6 +13,8 @@ export interface HexAction {
   readonly cost: number;
   readonly affordable: boolean;
   readonly cmd: Command;
+  /** Путь для предпросмотра дороги, если действие — перестройка снабжения. */
+  readonly previewPath?: readonly number[];
   /** Почему недоступно по правилам — только у «Основать город»; иначе такие действия скрыты. */
   readonly blocked?: RejectReason;
 }
@@ -58,6 +60,7 @@ export function visibleActions(
         cost: r.cost,
         affordable: r.affordable,
         cmd: { t: 'rebuildSupply', cityId: city.id },
+        previewPath: r.path,
       });
     }
   } else {

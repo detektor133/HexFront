@@ -1,14 +1,13 @@
-// Переходы отрядов гекс за гексом, захват пустых гексов, приказ expand, атака врага на пути,
-// отсчёт отступления. Путь не пересчитывается (05-armies.md, «Движение»).
+// Переходы отрядов гекс за гексом, захват пустых гексов, атака врага на пути, отсчёт отступления. Путь не пересчитывается (05-armies.md, «Движение»).
 // GDD: docs/gdd/05-armies.md — «Движение», «Захват», «Приказы»
 import { MAX_UNITS_PER_HEX, ORG_AFTER_RETREAT } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
-import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import { findNearestPath, isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
+import type { HexId } from '../math/hex.ts';
+import { isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
-import { NEUTRAL, type Unit, type MatchState } from '../state/types.ts';
+import type { Unit, MatchState } from '../state/types.ts';
 
-// Сбрасывает путь; отряд на экспансии сохраняет приказ и в следующий тик выбирает новую цель.
+// Сбрасывает путь; отряд с приказом move встаёт.
 function stop(unit: Unit): void {
   unit.path = [];
   unit.moveTicks = 0;
@@ -37,38 +36,8 @@ function meetEnemy(state: MatchState, unit: Unit, next: HexId): boolean {
 const isFull = (state: MatchState, unit: Unit, hex: HexId): boolean =>
   ownUnitsAt(state, unit.owner, hex) >= MAX_UNITS_PER_HEX;
 
-function borders(state: MatchState, owner: number, hex: HexId): boolean {
-  const { width, height } = state.map;
-  return neighbors(hexFromId(hex, width)).some(
-    (n) => inBounds(n, width, height) && state.hexes.owner[hexId(n, width)] === owner,
-  );
-}
-
-// Цель экспансии: ближайший по времени хода нейтральный пустой гекс у своей границы, кроме
-// целей других своих отрядов на экспансии. Нет цели — приказ снимается.
-function planExpand(state: MatchState, unit: Unit): void {
-  const reserved = new Set<HexId>();
-  for (const a of state.units) {
-    const target = a.path.at(-1);
-    if (a !== unit && a.owner === unit.owner && a.order === 'expand' && target !== undefined) {
-      reserved.add(target);
-    }
-  }
-  const isGoal = (hex: HexId): boolean =>
-    state.hexes.owner[hex] === NEUTRAL &&
-    !reserved.has(hex) &&
-    !isHostileHex(state, unit.owner, hex) &&
-    borders(state, unit.owner, hex);
-  const path = findNearestPath(state, unit.hex, unit.type, unit.owner, isGoal);
-  if (path) unit.path = path;
-  else unit.order = 'idle';
-}
-
 function startStep(state: MatchState, unit: Unit, next: HexId): boolean {
-  const target = unit.path.at(-1);
-  const lostTarget =
-    unit.order === 'expand' && target !== undefined && state.hexes.owner[target] !== NEUTRAL;
-  if (lostTarget || blocked(state, unit, next)) {
+  if (blocked(state, unit, next)) {
     stop(unit);
     return false;
   }
@@ -115,11 +84,10 @@ function retreatTick(unit: Unit): void {
   unit.org = ORG_AFTER_RETREAT;
 }
 
-/** Двигает отряды с приказами move и expand на тик; отряды — по возрастанию id. */
+/** Двигает отряды с приказом move на тик; отряды — по возрастанию id. */
 export function movementSystem(state: MatchState): void {
   for (const unit of state.units) {
-    if (unit.order === 'expand' && unit.path.length === 0) planExpand(state, unit);
-    if (unit.order === 'move' || unit.order === 'expand') advance(state, unit);
+    if (unit.order === 'move') advance(state, unit);
     else if (unit.order === 'retreat') retreatTick(unit);
   }
 }

@@ -72,6 +72,8 @@ export interface Player {
   armiesCreated: number;
   /** «Автопополнение»: новый отряд сразу уходит в самую нуждающуюся армию (CR-001). */
   autoReinforce: boolean;
+  /** Настройка «Автокомандование»: новые армии получают auto (CR-006). */
+  autoCommand: boolean;
   /** Тики «смуты» после переноса столицы: доход × CAPITAL_CHAOS_INCOME_MULT. */
   chaosTicks: number;
   /** Сколько тиков подряд у игрока нет городов. */
@@ -108,9 +110,9 @@ export interface Construction {
 
 /**
  * move — идёт по path; attack — атакует соседний гекс target; retreat — отступает (приказы не
- * принимает); expand — экспансия; idle и hold — стоит.
+ * принимает); idle — стоит.
  */
-export type UnitOrder = 'idle' | 'hold' | 'expand' | 'move' | 'attack' | 'retreat';
+export type UnitOrder = 'idle' | 'move' | 'attack' | 'retreat';
 
 export interface Unit {
   readonly id: number;
@@ -144,7 +146,53 @@ export interface Unit {
   focus: number;
   /** Артиллерия: по кому бьёт в этом тике, или -1. */
   fireTarget: number;
+  /** Место, выданное распределителем плана армии, или -1 (нет плана или ручной приказ). */
+  slot: HexId;
 }
+
+/** Линия наступления (CR-004): грани, как нарисовал игрок, и гексы линии со стороны фронта. */
+export interface OffensiveLine {
+  /** Грани линии по порядку (EdgeId = hex × 6 + d). */
+  readonly edges: readonly number[];
+  /** Гексы линии — у каждой грани тот, что ближе к фронту армии в момент приказа. */
+  readonly hexes: readonly HexId[];
+  /** Наступление идёт (кнопка «Начать наступление», CR-005); false — линия только нарисована. */
+  readonly active: boolean;
+  /**
+   * Тик последнего продвижения: приказ, «Начать», шаг к линии или бой отряда армии. Дольше
+   * OFFENSIVE_STUCK_TICKS без продвижения — армия «упёрлась» (04/T14b).
+   */
+  readonly progressTick: number;
+  /** Гексы, куда этим наступлением сделаны шаги, по возрастанию HexId (для анклавов, 04/T14b). */
+  readonly taken: readonly HexId[];
+}
+
+/**
+ * План армии (CR-002…CR-004): участок фронта — грани своей границы (с врагом или ничьей землёй)
+ * или линия обороны.
+ */
+export type ArmyPlan =
+  | {
+      readonly armyId: number;
+      readonly kind: 'front';
+      /** Грани своей границы по порядку (со своей стороны); едут за границей (setHexOwner). */
+      readonly edges: readonly number[];
+      /** Линия наступления — граница «до куда» (07-controls.md); null — наступления нет. */
+      readonly offensive: OffensiveLine | null;
+      /**
+       * Свои гексы у фронта, взятые врагом (07-controls.md, «Автокомандование»): commander их
+       * отбивает; гекс выбывает, когда снова свой или больше не у фронта.
+       */
+      readonly lost?: readonly HexId[];
+      /** Нажата ▶ у армии с auto без линии наступления: линию строит commander (CR-006). */
+      readonly startWanted?: boolean;
+    }
+  | {
+      readonly armyId: number;
+      readonly kind: 'line';
+      /** Гексы линии обороны по порядку, достроенные между точками игрока. */
+      readonly hexes: readonly HexId[];
+    };
 
 /** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
 export interface Army {
@@ -154,6 +202,8 @@ export interface Army {
   readonly number: number;
   /** Имя, заданное игроком; пустое — «N-я армия». */
   name: string;
+  /** Автокомандование: армией командует commander (CR-006). */
+  auto: boolean;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */
@@ -163,6 +213,8 @@ export type GameEvent =
       readonly playerId: number;
       readonly command: string;
       readonly reason: string;
+      /** Команда commander (CR-006): интерфейс игроку её отказ не показывает. */
+      readonly auto: boolean;
     }
   | {
       readonly t: 'unitRecruited' | 'recruitCancelled';
@@ -174,6 +226,7 @@ export type GameEvent =
       readonly t: 'unitDestroyed' | 'unitRetreated' | 'unitCapitulated';
       readonly playerId: number;
       readonly unitId: number;
+      readonly hex: HexId;
     }
   | {
       readonly t: 'cityCaptured' | 'capitalMoved';
@@ -181,6 +234,7 @@ export type GameEvent =
       readonly cityId: number;
     }
   | { readonly t: 'playerEliminated'; readonly playerId: number }
+  | { readonly t: 'offensiveDone'; readonly playerId: number; readonly armyId: number }
   | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';
@@ -195,8 +249,11 @@ export type WinReason = 'cities' | 'lastStanding' | 'score';
 export interface MatchState {
   tick: number;
   readonly seed: number;
+  fog: boolean;
   readonly map: MapStatic;
   readonly hexes: HexState;
+  /** Кэш обзора и последних известных данных, обновляемый visionSystem. */
+  vision?: VisionState;
   /** Отсортированы по id. */
   readonly cities: City[];
   /** Индекс в массиве равен id игрока. */
@@ -205,12 +262,16 @@ export interface MatchState {
   readonly units: Unit[];
   /** Армии — группы отрядов, отсортированы по id. */
   readonly armies: Army[];
+  /** Планы армий, отсортированы по armyId; у армии не больше одного плана. */
+  readonly plans: ArmyPlan[];
   /** Отсортированы по id. */
   readonly constructions: Construction[];
   /** Отсортированы по id. */
   readonly recruits: Recruitment[];
   /** Кэш сетей снабжения, отсортирован по id; пересчёт размазан по игрокам (sim-core.md). */
   networks: SupplyNetwork[];
+  /** Производительность сетей после распределения спроса; кэш для HUD, не часть хэша. */
+  supplyRatios: Map<number, Fp>;
   nextId: number;
   events: GameEvent[];
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */
@@ -218,4 +279,12 @@ export interface MatchState {
   /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и сколько тиков подряд; -1 — никто. */
   holdPlayer: number;
   holdTicks: number;
+}
+
+export interface VisionState {
+  readonly visible: Uint8Array[];
+  readonly explored: Uint8Array[];
+  readonly road: Uint8Array[];
+  readonly improvement: Uint8Array[];
+  readonly building: Uint8Array[];
 }

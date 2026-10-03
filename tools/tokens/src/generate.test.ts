@@ -8,6 +8,8 @@ const root = new URL('../../../', import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, root), 'utf8');
 const tokens = JSON.parse(read('docs/art/tokens.json')) as {
   players: { palette: { id: string; line: string }[]; minContrastOnWhite: number };
+  relation: { own: string; ally: string; enemy: string };
+  armies: { palette: string[] };
 };
 
 describe('токены', () => {
@@ -17,6 +19,13 @@ describe('токены', () => {
     const weak = palette
       .map((p) => ({ id: p.id, ratio: contrast(p.line, '#FFFFFF') }))
       .filter((p) => p.ratio < minContrastOnWhite);
+    expect(weak).toEqual([]);
+  });
+
+  it('цвета отношений и армий читаются на белом (контраст ≥ 4,5)', () => {
+    const { own, ally, enemy } = tokens.relation;
+    const colors = [own, ally, enemy, ...tokens.armies.palette];
+    const weak = colors.filter((c) => contrast(c, '#FFFFFF') < tokens.players.minContrastOnWhite);
     expect(weak).toEqual([]);
   });
 

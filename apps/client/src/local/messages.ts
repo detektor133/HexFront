@@ -8,13 +8,19 @@ import type {
   RecruitCheck,
   RejectReason,
   UnitType,
+  GameEvent,
 } from '@hexfront/sim';
 
-/** Вариант набора в своём городе для кнопки: тип, размер и цена или причина отказа. */
-export interface RecruitOption {
-  readonly type: UnitType;
+/** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
+export interface RecruitAmount {
   readonly soldiers: Fp;
   readonly check: RecruitCheck;
+}
+
+/** Варианты набора в своём городе для карточки города. */
+export interface RecruitOption {
+  readonly type: UnitType;
+  readonly amounts: RecruitAmount[];
 }
 
 /** Что можно сделать с выбранным гексом: цены и причины отказа для кнопок. */
@@ -37,8 +43,14 @@ export type ToWorker =
       readonly map: unknown;
       readonly seed: number;
       readonly players: number;
+      readonly fog: boolean;
+      /** Игроки под мозгом бота (09-bots.md). */
+      readonly bots: readonly number[];
+      /** Тиков sim за 100 мс: 1 — реальное время, больше — ускорение (запись матча). */
+      readonly speed: number;
     }
   | { readonly t: 'command'; readonly cmd: Command }
+  | { readonly t: 'fog'; readonly on: boolean }
   | { readonly t: 'select'; readonly hex: number | null };
 
 export type FromWorker =
@@ -47,5 +59,6 @@ export type FromWorker =
       readonly view: PlayerView;
       readonly selection: Selection | null;
       readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+      readonly events: readonly GameEvent[];
     }
   | { readonly t: 'error'; readonly errors: readonly string[] };

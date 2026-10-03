@@ -182,7 +182,9 @@ function drawCoast(map: MapStatic, cells: readonly HexCell[], radius: number): G
 function drawGrid(cells: readonly HexCell[], radius: number): Graphics {
   const g = new Graphics();
   for (const cell of cells) g.poly(hexPolygon(cell.center, radius));
-  g.stroke({ color: M.hexGrid, alpha: M.hexGridAlpha, width: 1, pixelLine: true });
+  // Ширина в мировых единицах даёт один CSS-пиксель при масштабе 1; pixelLine
+  // привязывает линию к физическому пикселю и делает её тоньше на DPR 3.
+  g.stroke({ color: M.hexGrid, alpha: M.hexGridAlpha, width: 1 });
   return g;
 }
 
@@ -226,6 +228,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
         .map((d) => hexEdge(cell.center, radius, d)),
     ),
   );
+  base.cacheAsTexture(true);
+  overlay.cacheAsTexture(true);
 
   return {
     base,
@@ -251,6 +255,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
       grid.visible = level >= M.hexGridVisibleFromZoom;
     },
     destroy() {
+      base.cacheAsTexture(false);
+      overlay.cacheAsTexture(false);
       base.destroy({ children: true });
       overlay.destroy({ children: true });
     },

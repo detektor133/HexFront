@@ -15,6 +15,11 @@ export interface Viewport {
   readonly height: number;
 }
 
+/** Убирает нижнюю панель из области, в которой камера ограничивает карту. */
+export function insetViewport(view: Viewport, bottomInset: number): Viewport {
+  return { width: view.width, height: Math.max(0, view.height - Math.max(0, bottomInset)) };
+}
+
 export type DetailLevel = 1 | 2 | 3;
 
 export interface Velocity {

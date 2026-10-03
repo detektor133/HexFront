@@ -2,18 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { intDiv } from '../../src/math/int.ts';
 import { findPath } from '../../src/queries/unit-path.ts';
-import {
-  at,
-  city,
-  merge,
-  move,
-  own,
-  road,
-  scenario,
-  setOrder,
-  split,
-  type At,
-} from '../scenario/dsl.ts';
+import { at, city, merge, move, own, road, scenario, split, type At } from '../scenario/dsl.ts';
 
 // Полоса своих равнин A; B — соперник справа. Соседние клетки одной строки — всегда соседи гекса.
 const LINE = `
@@ -244,24 +233,13 @@ describe('движение: путь', () => {
   });
 });
 
-describe('приказы, разделение, слияние', () => {
-  it('hold останавливает движение', () => {
-    const s = scenario(LINE, { legend });
-    const id = s.unit('A', 'infantry', 100, at(1, 1));
-    s.cmd('A', move([id], at(5, 1)));
-    s.runTicks(5);
-    s.cmd('A', setOrder([id], 'hold'));
-    s.runSeconds(10);
-    expect(s.unitById(id)?.hex).toBe(idOf(s, at(1, 1)));
-    expect(s.unitById(id)?.order).toBe('hold');
-  });
-
+describe('чужие отряды, разделение, слияние', () => {
   it('чужой и несуществующий отряд — отказ', () => {
     const s = scenario(LINE, { legend });
     const b = s.unit('B', 'infantry', 100, at(7, 0));
     s.cmd('A', move([b], at(1, 0)));
     s.cmd('A', move([999], at(1, 0)));
-    s.cmd('A', setOrder([b], 'hold'));
+    s.cmd('A', split(b, 50));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['notOwnUnit', 'unknownUnit', 'notOwnUnit']);
   });

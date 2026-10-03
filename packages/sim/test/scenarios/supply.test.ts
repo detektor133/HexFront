@@ -32,7 +32,7 @@ describe('снабжённость отрядов', () => {
     expect(supplyAfterRecalc(s, id)).toBe(100);
   });
 
-  it('4 гекса от дороги по равнине — 52 % (1 − 4 × 0,12)', () => {
+  it('4 гекса от дороги по равнине — 68 % (1 − 4 × 0,08)', () => {
     const s = scenario(
       `
       A1 r  a  a  a  a
@@ -40,10 +40,10 @@ describe('снабжённость отрядов', () => {
       { legend },
     );
     const id = s.unit('A', 'infantry', 100, at(5, 0));
-    expect(supplyAfterRecalc(s, id)).toBe(52);
+    expect(supplyAfterRecalc(s, id)).toBe(68);
   });
 
-  it('лес — 15 % за гекс, горы — 25 %', () => {
+  it('лес — 10 % за гекс, горы — 17 %', () => {
     const s = scenario(
       `
       A1 f  m
@@ -53,8 +53,8 @@ describe('снабжённость отрядов', () => {
     const forest = s.unit('A', 'infantry', 100, at(1, 0));
     const mountain = s.unit('A', 'infantry', 100, at(2, 0));
     s.runTicks(10);
-    expect(s.unitById(forest)?.supplyLevel).toBe(850);
-    expect(s.unitById(mountain)?.supplyLevel).toBe(600);
+    expect(s.unitById(forest)?.supplyLevel).toBe(900);
+    expect(s.unitById(mountain)?.supplyLevel).toBe(730);
   });
 
   it('в радиусе 3 от склада потери вне дорог вдвое меньше', () => {
@@ -66,8 +66,8 @@ describe('снабжённость отрядов', () => {
     );
     const id = s.unit('A', 'infantry', 100, at(5, 0));
     s.setBuilding(at(1, 0), 'depot');
-    // Гексы 2–4 в радиусе склада: 3 × 0,06; гекс 5 за радиусом: 0,12 → 30 % потерь.
-    expect(supplyAfterRecalc(s, id)).toBe(70);
+    // Гексы 2–4 в радиусе склада: 3 × 0,04; гекс 5 за радиусом: 0,08 → 20 % потерь.
+    expect(supplyAfterRecalc(s, id)).toBe(80);
   });
 
   it('на нейтральном гексе — путь через последний свой гекс плюс потери этого гекса', () => {
@@ -78,8 +78,8 @@ describe('снабжённость отрядов', () => {
       { legend },
     );
     const id = s.unit('A', 'infantry', 100, at(2, 0));
-    // Свой гекс (1,0) −12 %, нейтральный (2,0) −12 %.
-    expect(supplyAfterRecalc(s, id)).toBe(76);
+    // Свой гекс (1,0) −8 %, нейтральный (2,0) −8 %.
+    expect(supplyAfterRecalc(s, id)).toBe(84);
   });
 
   it('спрос больше производства: R = P / D (столица 500, пехота 1000 → 50 %)', () => {
@@ -108,12 +108,12 @@ describe('снабжённость отрядов', () => {
   it('изолированная сеть даёт снабжение ×0,5', () => {
     const s = scenario(
       `
-      A1 a  a  a  a  a  A2
+      A1 a  a  a  a  a  a  a  A2
     `,
       { legend },
     );
-    // Город ур. 1 изолирован: 250 × 0,5 = 125 на 250 пехоты → 50 %; от столицы — 1 − 6 × 0,12 = 28 %.
-    const id = s.unit('A', 'infantry', 250, at(6, 0));
+    // Город ур. 1 изолирован: 250 × 0,5 = 125 на 250 пехоты → 50 %; от столицы — 1 − 8 × 0,08 = 36 %.
+    const id = s.unit('A', 'infantry', 250, at(8, 0));
     expect(supplyAfterRecalc(s, id)).toBe(50);
   });
 
@@ -124,9 +124,9 @@ describe('снабжённость отрядов', () => {
     `,
       { legend },
     );
-    // Рядом с изолированным A2 (−12 %) выгоднее, чем в 5 гексах от столицы (−60 %).
+    // Рядом с изолированным A2 (−8 %) выгоднее, чем в 5 гексах от столицы (−40 %).
     const id = s.unit('A', 'infantry', 50, at(5, 0));
-    expect(supplyAfterRecalc(s, id)).toBe(88);
+    expect(supplyAfterRecalc(s, id)).toBe(92);
   });
 
   it('банкротство — снабжённость ×0,5', () => {
@@ -156,8 +156,8 @@ describe('снабжённость отрядов', () => {
     s.runTicks(1);
     expect(s.unitById(id)?.supplyLevel).toBe(FP);
     s.runTicks(1);
-    // 1 − 4 × 0,12 = 52 %.
-    expect(s.unitById(id)?.supplyLevel).toBe(520);
+    // 1 − 4 × 0,08 = 68 %.
+    expect(s.unitById(id)?.supplyLevel).toBe(680);
   });
 });
 

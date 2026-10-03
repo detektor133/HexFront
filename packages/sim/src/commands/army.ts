@@ -1,6 +1,8 @@
-// Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits,
-// armyOrder. GDD: docs/gdd/05-armies.md — «Модель», «Разделение и слияние», «Приказы».
+// Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits;
+// автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель».
+import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
+import { trimAutoFront } from '../state/front.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 
 export type ArmyCommand = Extract<
@@ -11,8 +13,9 @@ export type ArmyCommand = Extract<
       | 'renameArmy'
       | 'disbandArmy'
       | 'assignUnits'
-      | 'armyOrder'
-      | 'setAutoReinforce';
+      | 'setAutoReinforce'
+      | 'setArmyAuto'
+      | 'setAutoCommand';
   }
 >;
 
@@ -56,7 +59,10 @@ export function validateArmyCommand(
   cmd: ArmyCommand,
 ): Validation {
   if (cmd.t === 'createArmy') return validName(cmd.name) ? OK : rejected('badName');
-  if (cmd.t === 'setAutoReinforce') return typeof cmd.on === 'boolean' ? OK : rejected('badValue');
+  if (cmd.t === 'setAutoReinforce' || cmd.t === 'setAutoCommand') {
+    return typeof cmd.on === 'boolean' ? OK : rejected('badValue');
+  }
+  if (cmd.t === 'setArmyAuto' && typeof cmd.on !== 'boolean') return rejected('badValue');
   if (cmd.t === 'assignUnits') {
     const units = ownUnitList(state, playerId, cmd.unitIds);
     if (!units.ok) return rejected(units.reason);
@@ -68,17 +74,6 @@ export function validateArmyCommand(
   if (!army.ok) return rejected(army.reason);
   if (cmd.t === 'renameArmy' && !validName(cmd.name)) return rejected('badName');
   return OK;
-}
-
-// Приказ армии раздаётся её отрядам; экспансия недоступна артиллерии — та встаёт в idle.
-function orderArmy(state: MatchState, armyId: number, order: Unit['order']): void {
-  for (const u of state.units) {
-    if (u.armyId !== armyId || u.order === 'retreat') continue;
-    u.path = [];
-    u.moveTicks = 0;
-    u.moveTotal = 0;
-    u.order = order === 'expand' && u.type === 'artillery' ? 'idle' : order;
-  }
 }
 
 /** Применяет команду армии. Вызывается только после успешной проверки. */
@@ -94,6 +89,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
         owner: playerId,
         number: player.armiesCreated,
         name: cmd.name,
+        auto: player.autoCommand,
       });
       state.nextId += 1;
       return;
@@ -104,6 +100,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       return;
     }
     case 'disbandArmy': {
+      removePlan(state, cmd.armyId);
       for (const u of state.units) if (u.armyId === cmd.armyId) u.armyId = null;
       const rest = state.armies.filter((a) => a.id !== cmd.armyId);
       state.armies.splice(0, state.armies.length, ...rest);
@@ -112,12 +109,20 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
     case 'assignUnits':
       for (const u of state.units) if (cmd.unitIds.includes(u.id)) u.armyId = cmd.armyId;
       return;
-    case 'armyOrder':
-      orderArmy(state, cmd.armyId, cmd.order);
-      return;
     case 'setAutoReinforce': {
       const player = state.players[playerId];
       if (player) player.autoReinforce = cmd.on;
+      return;
+    }
+    case 'setAutoCommand': {
+      const player = state.players[playerId];
+      if (player) player.autoCommand = cmd.on;
+      return;
+    }
+    case 'setArmyAuto': {
+      const army = state.armies.find((a) => a.id === cmd.armyId);
+      if (army) army.auto = cmd.on;
+      trimAutoFront(state, cmd.armyId);
       return;
     }
   }

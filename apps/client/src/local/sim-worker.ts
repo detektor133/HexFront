@@ -1,4 +1,4 @@
-// Web Worker локального режима: тик 100 мс, снимок игроку после каждого тика.
+// Web Worker локального режима: раз в 100 мс — speed тиков sim, снимок игроку после последнего.
 import { TICK_MS } from '@hexfront/sim';
 
 import { createLocalEngine, type LocalEngine } from './engine.ts';
@@ -14,19 +14,29 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
   switch (msg.t) {
     case 'start': {
       if (timer !== null) clearInterval(timer);
-      const created = createLocalEngine(msg.map, msg.seed, msg.players);
+      const created = createLocalEngine(msg.map, msg.seed, msg.players, msg.bots, msg.fog);
       if ('errors' in created) {
         post({ t: 'error', errors: created.errors });
         return;
       }
       engine = created;
+      const speed = Math.max(0, Math.floor(msg.speed));
+      if (speed === 0) {
+        post(engine.tick());
+        return;
+      }
       timer = setInterval(() => {
-        if (engine) post(engine.tick());
+        if (!engine) return;
+        for (let i = 1; i < speed && engine.state.winner < 0; i += 1) engine.tick();
+        post(engine.tick());
       }, TICK_MS);
       return;
     }
     case 'command':
       engine?.queue(msg.cmd);
+      return;
+    case 'fog':
+      engine?.setFog(msg.on);
       return;
     case 'select':
       engine?.select(msg.hex);

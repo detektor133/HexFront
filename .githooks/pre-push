@@ -1,0 +1,9 @@
+#!/bin/sh
+# Перед push — lint (ESLint и Prettier) и проверка сообщений коммитов ветки: коммит с упавшим
+# стилем не уходит в CI. Хуки включает `pnpm install` (скрипт prepare → core.hooksPath).
+set -e
+pnpm -s lint || { echo "pre-push: lint упал — push отменён. Исправьте и повторите." >&2; exit 1; }
+branch=$(git rev-parse --abbrev-ref HEAD)
+if git rev-parse --verify --quiet "origin/$branch" >/dev/null; then
+  pnpm -s commit-check "origin/$branch" HEAD "$branch" || { echo "pre-push: commit-check упал — push отменён." >&2; exit 1; }
+fi

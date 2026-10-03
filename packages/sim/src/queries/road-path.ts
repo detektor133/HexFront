@@ -1,6 +1,6 @@
 // Путь для дороги: только по своим гексам, веса местности, вода и горы без перевала непроходимы.
 // GDD: docs/gdd/04-roads-supply.md — «Дороги»; docs/gdd/01-map.md — «Дороги».
-import { MOVE_TIME_S } from '../balance.ts';
+import { MOVE_TIME_S, ROAD_PATH_EXISTING_COST } from '../balance.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -15,6 +15,7 @@ export function roadStepCost(state: MatchState, hex: HexId): number | null {
   const isPass = state.map.features[hex] === FEATURE.pass;
   if (terrain === TERRAIN.water) return null;
   if (terrain === TERRAIN.mountains && !isPass) return null;
+  if (state.hexes.road[hex] === 1) return ROAD_PATH_EXISTING_COST;
   const name = isPass ? 'hills' : TERRAIN_NAMES[terrain];
   if (!name || name === 'water') return null;
   return MOVE_TIME_S[name];

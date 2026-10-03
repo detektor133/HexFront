@@ -1,0 +1,30 @@
+{
+  "description": "Hexfront: проверка перед завершением хода и запрет ручного браузера.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/stop-verify.mjs",
+            "timeout": 600,
+            "statusMessage": "pnpm verify --changed"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|exec_command)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/block-browser.mjs",
+            "timeout": 10,
+            "statusMessage": "Проверка команды"
+          }
+        ]
+      }
+    ]
+  }
+}

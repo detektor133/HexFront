@@ -3,6 +3,7 @@
 import { MAX_UNITS_PER_HEX, ORG_MAX } from '../../src/balance.ts';
 import { TERRAIN } from '../../src/map/types.ts';
 import { FP } from '../../src/math/int.ts';
+import { edgeOther } from '../../src/state/edges.ts';
 import type { MatchState } from '../../src/state/types.ts';
 
 const isSafeInt = (v: number): boolean => Number.isSafeInteger(v);
@@ -65,6 +66,17 @@ function checkOwnership(state: MatchState, out: string[]): void {
     const cities = state.cities.filter((c) => c.owner === p.id);
     const capital = cities.filter((c) => c.id === p.capitalCityId);
     if (cities.length > 0 && capital.length !== 1) out.push(`игрок ${p.id}: столица не одна`);
+  }
+  for (const p of state.plans) {
+    const army = state.armies.find((a) => a.id === p.armyId);
+    if (!army) out.push(`план несуществующей армии ${p.armyId}`);
+    // Фронт армии с auto — только граница с врагом (07-controls.md, «Автокомандование»).
+    if (!army?.auto || p.kind !== 'front') continue;
+    for (const e of p.edges) {
+      const other = state.hexes.owner[edgeOther(state, e)] ?? -1;
+      if (other < 0 || other === army.owner)
+        out.push(`армия ${army.id} с auto: грань ${e} не у врага`);
+    }
   }
   for (const u of state.units) {
     if (u.armyId === null) continue;

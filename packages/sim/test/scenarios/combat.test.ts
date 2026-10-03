@@ -40,9 +40,9 @@ describe('сила сторон', () => {
     const def = s.unit('B', 'infantry', 200, at(3, 1));
     s.cmd('A', attack([att], at(3, 1)));
     s.runTicks(10);
-    // Оба в 2 гексах от своих столиц: снабжение 76 % → множитель 0,88.
-    expect(s.unitById(att)?.supplyLevel).toBe(760);
-    expect(supplyCombatMult(760 as Fp)).toBe(880);
+    // Оба в 2 гексах от своих столиц: снабжение 1 − 2 × 0,08 = 84 % → множитель 0,92.
+    expect(s.unitById(att)?.supplyLevel).toBe(840);
+    expect(supplyCombatMult(840 as Fp)).toBe(920);
     const p = battlePowers(s.state, hexOf(s, at(3, 1)));
     expect(p.attack).toBe(infantryAttack(s.unitById(att)));
     expect(p.defense).toBe(infantryDefense(s.unitById(def)));
@@ -186,6 +186,16 @@ describe('ход боя', () => {
     s.runSeconds(2);
     expect(s.unitById(def)).toBeUndefined();
     expect(s.lastEvent('unitDestroyed')).toBeDefined();
+  });
+
+  it('остаток меньше одного солдата немедленно расформировывается', () => {
+    const s = scenario(FIELD, { legend });
+    const id = s.unit('A', 'infantry', 1, at(2, 1));
+    const unit = s.unitById(id);
+    if (unit) unit.soldiers = (FP - 1) as Fp;
+    s.runTicks(1);
+    expect(s.unitById(id)).toBeUndefined();
+    expect(s.lastEvent('unitDestroyed')).toMatchObject({ unitId: id });
   });
 });
 
