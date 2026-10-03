@@ -184,9 +184,9 @@ export const UPKEEP_GOLD_PER_SOLDIER_S: ByUnit<Fp> = {
   artillery: fp(0.008),
 };
 export const UPKEEP_GOLD_PER_UNIT_S: ByUnit<Fp> = {
-  infantry: fp(0.2),
-  armor: fp(0.2),
-  artillery: fp(0.2),
+  infantry: fp(0.05),
+  armor: fp(0.05),
+  artillery: fp(0.05),
 };
 export const ATK: ByUnit<Fp> = { infantry: fp(1.0), armor: fp(2.0), artillery: fp(0) };
 export const DEF: ByUnit<Fp> = { infantry: fp(1.2), armor: fp(0.9), artillery: fp(0.6) };

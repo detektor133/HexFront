@@ -2,6 +2,13 @@
 
 Одна строка на решение, новые сверху. Формат: дата · решение · затронутые файлы · CR (если был).
 
+- 2026-10-03 · Порядок этапа 05: T5a → T1 → T1a → T4 → T3 → T8 → T5 → T6 → T7 → T2 · `stages/stage-05-bots-maps-balance.md`, `STATUS.md` · —
+- 2026-10-03 · Добавлена T1a «Стенд плейтеста»: генераторная карта в `/dev/sandbox`, панель наблюдателя, таблица лидеров и таймлапс территории для 30 игроков; механику `sim` не менять · `stages/stage-05-bots-maps-balance.md` · —
+- 2026-10-03 · T4 выполняется до ботов и баланса; метрики считаются на сгенерированных картах для 30 игроков · `stages/stage-05-bots-maps-balance.md` · —
+- 2026-10-03 · `UPKEEP_GOLD_PER_UNIT_S` изменено с 0,2 на 0,05 з./с как `[ТЮНИНГ]`; обновлена стартовая проверка · `gdd/10-balance.md`, `gdd/02-economy.md`, `packages/sim/src/balance.ts`, `QUESTIONS.md`, `STATUS.md` · —
+- 2026-10-03 · В T6 экран матча выносится из `apps/client/src/dev/` в обычный экран игры; dev-страницы сохраняются · `stages/stage-05-bots-maps-balance.md` · —
+- 2026-10-03 · T2 «Европа» выполняется последней; решение GO/NO-GO от неё не зависит · `stages/stage-05-bots-maps-balance.md` · —
+
 - 2026-10-03 · 04/T12: ПК проверяется `fps-probe.ts --gpu` на карте 4000 гексов в покое и при зуме; Android без `adb` проверяет владелец по Wi‑Fi, критерий ≥45 fps перенесён в T27 · `stages/stage-04-controls-visuals.md`, `docs/reports/stage-04.md`, `apps/client/scripts/fps-probe.ts` · —
 
 - 2026-10-02 · Очередь этапа 04 до конца: T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12 → T28 → T27; текущая задача — T3 · `stages/stage-04-controls-visuals.md`, `STATUS.md` · —

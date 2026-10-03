@@ -116,7 +116,7 @@
 | `COST_POP_PER_SOLDIER` | 1 | 1 | 1 |
 | `COST_GOLD_PER_SOLDIER` | 0,1 | 1,0 | 0,6 |
 | `UPKEEP_GOLD_PER_SOLDIER_S` | 0,003 | 0,012 | 0,008 |
-| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,2 | 0,2 | 0,2 |
+| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,05 | 0,05 | 0,05 |
 | `ATK` | 1,0 | 2,0 | 0 |
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |
