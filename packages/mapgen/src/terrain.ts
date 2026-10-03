@@ -39,6 +39,8 @@ export interface TerrainOptions {
   readonly players: number;
 }
 
+export type MapOptions = TerrainOptions;
+
 export interface TerrainResult {
   readonly terrain: Uint8Array;
   readonly features: Uint8Array;

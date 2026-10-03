@@ -9,7 +9,7 @@ import {
   type Hex,
 } from '@hexfront/sim';
 
-import type { MapOptions } from './map.ts';
+import type { MapOptions } from './terrain.ts';
 
 interface RoadEdge {
   readonly a: number;

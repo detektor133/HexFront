@@ -16,9 +16,7 @@ import {
 } from '@hexfront/sim';
 
 import { generateRoads } from './roads.ts';
-import { generateTerrain, type TerrainOptions } from './terrain.ts';
-
-export type MapOptions = TerrainOptions;
+import { generateTerrain, type MapOptions } from './terrain.ts';
 
 const CITY_NAMES: readonly string[] = [
   'Вельск',
