@@ -142,6 +142,12 @@ describe('playerView', () => {
     expect(me.bankrupt).toBe(false);
   });
 
+  it('не передаёт глобальный лимит отрядов в снимке', () => {
+    const s = scenario(MAP, { legend });
+    const me = playerView(s.state, 0).me;
+    expect('unitLimit' in me).toBe(false);
+  });
+
   it('содержание отрядов и свои наборы в очереди', () => {
     const s = scenario(MAP, { legend });
     s.unit('A', 'infantry', 100, at(0, 0));

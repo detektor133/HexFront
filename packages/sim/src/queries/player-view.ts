@@ -7,7 +7,7 @@ import type { UnitType } from '../balance.ts';
 import { RECRUIT_STEP } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
-import { recruitCapacity, unitLimit } from '../commands/recruit.ts';
+import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
@@ -85,8 +85,6 @@ export interface PlayerView {
     readonly autoCommand: boolean;
     /** Цена основания следующего города, золото, fixed-point (03-cities-buildings.md). */
     readonly foundCityCost: Fp;
-    /** Командная ёмкость: сколько отрядов (с наборами в очереди) может быть у игрока. */
-    readonly unitLimit: number;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -144,7 +142,6 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
     autoCommand: state.players[playerId]?.autoCommand ?? true,
     foundCityCost: foundCityCost(state.players[playerId]?.citiesFounded ?? 0),
-    unitLimit: unitLimit(state, playerId),
     growthMultAtTarget: taxGrowthMult(target),
     score: playerScore(state, playerId),
     place: playerPlace(state, playerId),
