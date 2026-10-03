@@ -2,6 +2,8 @@
 
 Одна строка на решение, новые сверху. Формат: дата · решение · затронутые файлы · CR (если был).
 
+- 2026-10-03 · 04/T12: ПК проверяется `fps-probe.ts --gpu` на карте 4000 гексов в покое и при зуме; Android без `adb` проверяет владелец по Wi‑Fi, критерий ≥45 fps перенесён в T27 · `stages/stage-04-controls-visuals.md`, `docs/reports/stage-04.md`, `apps/client/scripts/fps-probe.ts` · —
+
 - 2026-10-02 · Очередь этапа 04 до конца: T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12 → T28 → T27; текущая задача — T3 · `stages/stage-04-controls-visuals.md`, `STATUS.md` · —
 - 2026-10-02 · T25 отменена; плейтест перенесён в T27 после интерфейса, T27 выполняет владелец · `stages/stage-04-controls-visuals.md` · —
 - 2026-10-02 · Добавлена T28 для мелких замечаний интерфейса одной сессией перед T27 · `stages/stage-04-controls-visuals.md` · —
