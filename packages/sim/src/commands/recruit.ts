@@ -31,6 +31,15 @@ interface Donor {
   readonly surplus: number;
 }
 
+/**
+ * Текущая ёмкость старого интерфейсного показателя; команды её больше не проверяют.
+ * @returns количество отрядов по числу городов
+ */
+export function unitLimit(state: MatchState, playerId: number): number {
+  const cities = state.cities.filter((c) => c.owner === playerId).length;
+  return UNIT_LIMIT_BASE + UNIT_LIMIT_PER_CITY * cities;
+}
+
 // Гексы владельца города в радиусе 2 по возрастанию HexId — стабильный порядок для остатков.
 function donors(state: MatchState, city: City): Donor[] {
   const { width, height } = state.map;
@@ -57,15 +66,6 @@ export function recruitCapacity(state: MatchState, cityId: number): Fp {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city) return 0 as Fp;
   return donors(state, city).reduce((sum, d) => sum + d.surplus, 0) as Fp;
-}
-
-/**
- * Командная ёмкость: UNIT_LIMIT_BASE + UNIT_LIMIT_PER_CITY × городов игрока.
- * @returns сколько отрядов (вместе с наборами в очереди) может быть у игрока
- */
-export function unitLimit(state: MatchState, playerId: number): number {
-  const cities = state.cities.filter((c) => c.owner === playerId).length;
-  return UNIT_LIMIT_BASE + UNIT_LIMIT_PER_CITY * cities;
 }
 
 /**
@@ -105,10 +105,6 @@ function checkRules(
   }
   if (state.players[playerId]?.bankrupt) return 'bankrupt';
   if (state.recruits.some((r) => r.cityId === cityId)) return 'queueBusy';
-  const used =
-    state.units.filter((a) => a.owner === playerId).length +
-    state.recruits.filter((r) => r.owner === playerId).length;
-  if (used >= unitLimit(state, playerId)) return 'unitLimit';
   if (recruitCapacity(state, cityId) < fpMul(soldiers, COST_POP_PER_SOLDIER[type])) {
     return 'notEnoughPeople';
   }

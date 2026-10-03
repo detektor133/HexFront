@@ -116,6 +116,34 @@ describe('армии — группы отрядов', () => {
     expect(fresh?.path.at(-1)).toBe(to);
   });
 
+  it('деление не зависит от глобального числа отрядов при свободном месте', () => {
+    const s = scenario(MAP, { legend });
+    const source = s.unit('A', 'infantry', 300, at(1, 1));
+    for (const [c, r] of [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [1, 0],
+      [1, 2],
+    ] as const)
+      s.unit('A', 'infantry', 50, at(c, r));
+    s.cmd('A', split(source, 100));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    expect(s.unitsOf('A')).toHaveLength(7);
+  });
+
+  it('деление отклоняется в заполненном гексе', () => {
+    const s = scenario(MAP, { legend });
+    const source = s.unit('A', 'infantry', 300, at(1, 1));
+    s.unit('A', 'infantry', 50, at(1, 1));
+    s.unit('A', 'infantry', 50, at(1, 1));
+    s.cmd('A', split(source, 100));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['hexFull']);
+    expect(s.unitsOf('A')).toHaveLength(3);
+  });
+
   it('разделение оставляет новый отряд в армии, слияние — в армии отряда с меньшим id', () => {
     const s = scenario(MAP, { legend });
     const a = s.unit('A', 'infantry', 300, at(1, 1));
