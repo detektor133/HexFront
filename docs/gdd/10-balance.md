@@ -1,6 +1,6 @@
 # GDD 10 — Баланс: все числа
 
-**Единственный источник чисел.** `packages/sim/src/balance.ts` повторяет эту таблицу 1:1 (fixed-point: значение × 1000, где указано «FP»). Все числа `[ТЮНИНГ]`, меняются только здесь и в `balance.ts` одним коммитом `balance(sim): ...` (см. `CONVENTIONS.md`).
+**Единственный источник чисел.** `packages/sim/src/balance.ts` повторяет симуляционные разделы этой таблицы 1:1 (fixed-point: значение × 1000, где указано «FP»). Параметры генератора карт повторяются в `packages/mapgen/src/params.ts` и не входят в `sim/balance.ts`. Все числа `[ТЮНИНГ]`, меняются только здесь и в соответствующем зеркале одним коммитом (см. `CONVENTIONS.md`).
 
 Единицы: время — секунды (в коде тики, 1 с = 10 тиков); проценты — доли (FP).
 
@@ -52,9 +52,30 @@
 | `FERTILE_CAP_MULT` | 1,5 |
 | `MINE_GOLD_PER_S` | 1,0 |
 | `CITY_MIN_DISTANCE` | 4 |
-| `PASSABLE_HEXES_PER_PLAYER` | 120 |
 | `NEUTRAL_CITIES_PER_PLAYER` | 1,5 |
 | `NEUTRAL_GARRISON` по уровню 1/2/3 | 150 / 300 / 600 |
+
+## Генератор карт
+
+Параметры процедурного генератора карт зеркалируются в `packages/mapgen/src/params.ts`. Проценты — доли в процентах от указанной выборки; для количества на игрока используется округление вверх.
+
+| Константа | Значение |
+| --- | --- |
+| `MAPGEN_NOISE_OCTAVES` | 3 `[ТЮНИНГ]` |
+| `MAPGEN_EDGE_WATER` | 2 гекса `[ТЮНИНГ]` |
+| `MAPGEN_WATER_SHARE` | 25 % `[ТЮНИНГ]` |
+| `MAPGEN_MIN_ISLAND` | 30 гексов `[ТЮНИНГ]` |
+| `MAPGEN_MOUNTAIN_SHARE` | 8 % суши `[ТЮНИНГ]` |
+| `MAPGEN_HILLS_SHARE` | 14 % суши `[ТЮНИНГ]` |
+| `MAPGEN_DESERT_SHARE` | 12 % оставшейся суши `[ТЮНИНГ]` |
+| `MAPGEN_FOREST_SHARE` | 24 % оставшейся суши `[ТЮНИНГ]` |
+| `MAPGEN_FERTILE_PER_PLAYER` | 0,5 `[ТЮНИНГ]` |
+| `MAPGEN_MINE_PER_PLAYER` | 0,34 `[ТЮНИНГ]` |
+| `MAPGEN_PASS_PER_MOUNTAINS` | 15 гексов гор `[ТЮНИНГ]` |
+| `MAPGEN_RIVER_MIN_EDGES` | 5 рёбер `[ТЮНИНГ]` |
+| `MAPGEN_RIVER_MAX_EDGES` | 40 рёбер `[ТЮНИНГ]` |
+| `MAPGEN_RIVERS_PER_PLAYER` | 0,5 `[ТЮНИНГ]` |
+| `PASSABLE_HEXES_PER_PLAYER` | 120 `[ТЮНИНГ]` |
 
 ## Население и налог
 
