@@ -7,6 +7,7 @@ import {
   hexFromId,
   hexId,
   inBounds,
+  neighbors,
   packBits,
   shuffle,
   spiral,
@@ -14,6 +15,7 @@ import {
   type Hex,
 } from '@hexfront/sim';
 
+import { generateRoads } from './roads.ts';
 import { generateTerrain, type TerrainOptions } from './terrain.ts';
 
 export type MapOptions = TerrainOptions;
@@ -63,13 +65,43 @@ function passableCount(center: Hex, terrain: Uint8Array, options: MapOptions): n
   }).length;
 }
 
-function chooseSpawns(seed: number, terrain: Uint8Array, options: MapOptions): Hex[] {
+function largestLand(terrain: Uint8Array, options: MapOptions): Set<number> {
+  const checked = new Set<number>();
+  let largest: number[] = [];
+  for (let start = 0; start < terrain.length; start += 1) {
+    if (terrain[start] === TERRAIN.water || checked.has(start)) continue;
+    const component: number[] = [start];
+    checked.add(start);
+    for (let i = 0; i < component.length; i += 1) {
+      const id = component[i];
+      if (id === undefined) continue;
+      for (const hex of neighbors(hexFromId(id, options.width))) {
+        if (!inBounds(hex, options.width, options.height)) continue;
+        const next = hexId(hex, options.width);
+        if (terrain[next] !== TERRAIN.water && !checked.has(next)) {
+          checked.add(next);
+          component.push(next);
+        }
+      }
+    }
+    if (component.length > largest.length) largest = component;
+  }
+  return new Set(largest);
+}
+
+function chooseSpawns(
+  seed: number,
+  terrain: Uint8Array,
+  land: ReadonlySet<number>,
+  options: MapOptions,
+): Hex[] {
   const candidates = shuffle(
     fork(seed, 401),
     Array.from({ length: terrain.length }, (_, id) => id),
   )
     .map((id) => hexFromId(id, options.width))
     .filter((hex) => {
+      if (!land.has(hexId(hex, options.width))) return false;
       const code = terrain[hexId(hex, options.width)];
       return (
         (code === TERRAIN.plains || code === TERRAIN.forest) &&
@@ -102,6 +134,7 @@ function chooseCities(
   terrain: Uint8Array,
   features: Uint8Array,
   spawns: readonly Hex[],
+  land: ReadonlySet<number>,
   options: MapOptions,
 ): MapJson['cities'] {
   const target = Math.floor((options.players * 3 + 1) / 2);
@@ -112,6 +145,7 @@ function chooseCities(
     .map((id) => hexFromId(id, options.width))
     .filter((hex) => {
       const id = hexId(hex, options.width);
+      if (!land.has(id)) return false;
       return (
         terrain[id] !== TERRAIN.water &&
         terrain[id] !== TERRAIN.mountains &&
@@ -142,8 +176,12 @@ export function generateMap(seed: number, options: MapOptions): MapJson {
   const result = generateTerrain(seed, options);
   const terrain = result.terrain;
   const features = result.features.slice();
-  const spawns = chooseSpawns(seed, terrain, options);
+  const land = largestLand(terrain, options);
+  const spawns = chooseSpawns(seed, terrain, land, options);
   clearSpawnFeatures(features, spawns, options);
+  const cities = chooseCities(seed, terrain, features, spawns, land, options);
+  const nodes = [...cities, ...spawns];
+  const roads = generateRoads(terrain, features, nodes, options);
   return {
     version: 1,
     id: `proc-${(seed >>> 0).toString(16)}`,
@@ -158,8 +196,8 @@ export function generateMap(seed: number, options: MapOptions): MapJson {
       return [{ q: hex.q, r: hex.r, type }];
     }),
     riverEdges: result.riverEdges.map(([q, r, dir]) => [q, r, dir]),
-    roads: encodeBase64(packBits(new Uint8Array(terrain.length))),
-    cities: chooseCities(seed, terrain, features, spawns, options),
+    roads: encodeBase64(packBits(roads)),
+    cities,
     spawns,
   };
 }

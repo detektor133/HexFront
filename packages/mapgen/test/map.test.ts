@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CITY_MIN_DISTANCE,
+  FEATURE,
   TERRAIN,
   decodeBase64,
   distance,
+  hexFromId,
   hexId,
   inBounds,
   loadMap,
+  neighbors,
+  unpackBits,
   spiral,
 } from '@hexfront/sim';
 
@@ -52,5 +56,35 @@ describe('города и стартовые позиции', () => {
       for (const other of map.cities.slice(i + 1))
         expect(distance(city, other)).toBeGreaterThanOrEqual(CITY_MIN_DISTANCE);
     }
+  });
+
+  it('соединяет города и спавны дорогами без воды и непроходимых гор', () => {
+    const map = generateMap(42, { width: 80, height: 60, players: 30 });
+    const terrain = decodeBase64(map.terrain);
+    const roads = decodeBase64(map.roads);
+    const loaded = loadMap(map);
+    expect(terrain).not.toBeNull();
+    expect(roads).not.toBeNull();
+    const road = roads ? unpackBits(roads, map.width * map.height) : new Uint8Array();
+    for (let id = 0; id < road.length; id += 1) {
+      if (road[id] !== 1) continue;
+      expect(terrain?.[id]).not.toBe(TERRAIN.water);
+      if (terrain?.[id] === TERRAIN.mountains && loaded.ok)
+        expect(loaded.map.features[id]).toBe(FEATURE.pass);
+    }
+    const nodes = [...map.cities, ...map.spawns];
+    const connected = new Set<number>();
+    const first = nodes[0];
+    if (first) connected.add(hexId(first, map.width));
+    for (let cursor = 0; cursor < connected.size; cursor += 1) {
+      const id = [...connected][cursor];
+      if (id === undefined) continue;
+      for (const next of neighbors(hexFromId(id, map.width))) {
+        if (!inBounds(next, map.width, map.height)) continue;
+        const nextId = hexId(next, map.width);
+        if (road[id] === 1 && road[nextId] === 1) connected.add(nextId);
+      }
+    }
+    expect(nodes.every((node) => connected.has(hexId(node, map.width)))).toBe(true);
   });
 });
