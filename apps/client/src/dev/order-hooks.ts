@@ -22,6 +22,7 @@ export interface OrderDeps {
   tool(): boolean;
   chipAt(hex: number): Point;
   setTarget(t: OrderTarget | null): void;
+  setPlanHover?(world: Point | null): void;
   /** Приказ выбранным отрядам в гекс (orderHex + отправка). */
   order(hex: number): void;
 }
@@ -70,8 +71,10 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
     },
     cancel() {
       show(null, false);
+      d.setPlanHover?.(null);
     },
     hover(world) {
+      d.setPlanHover?.(world);
       const busy = d.tool() || d.picked().units.length === 0;
       show(world && !busy ? hexAt(world) : null, true);
     },

@@ -243,6 +243,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       tool: () => toolRef.current !== null,
       chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
       setTarget: (t) => layerRef.current?.setOrderTarget(t),
+      setPlanHover: (world) => layerRef.current?.setPlanHover(world),
       order,
     });
     const options = {

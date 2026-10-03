@@ -52,6 +52,7 @@ export interface EconomyLayer {
   setDraft(draft: Draft | null): void;
   /** Выбранная армия: у её фронта — ручки на концах. */
   setSelectedArmy(id: number | null): void;
+  setPlanHover(world: Point | null): void;
   /** Подсветка пути перестройки снабжения из карточки города. */
   setRoadPreview(path: readonly number[] | null): void;
   /** Кольцо «сколько взять» при вытягивании части из фишки. */
@@ -448,6 +449,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     setSelectedArmy(id) {
       selectedArmy = id;
       redraw();
+    },
+    setPlanHover(world) {
+      planLayer.setHover(world);
     },
     setRoadPreview(path) {
       roadPreviewPath = path;

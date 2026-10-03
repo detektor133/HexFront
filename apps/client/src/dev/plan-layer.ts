@@ -59,12 +59,34 @@ export interface PlanLayer {
     scale: number,
     level: DetailLevel,
   ): void;
+  setHover(world: Point | null): void;
   /** Кадр: пока линия фронта перетекает в новое положение, слой перерисовывается. */
   frame(nowMs: number): void;
   destroy(): void;
 }
 
 type FrontPlan = PlanView & { kind: 'front' };
+
+/** Проверяет попадание указателя в линию наступления с допуском в экранных px. */
+export function isPointNearPath(
+  point: Point,
+  paths: readonly (readonly Point[])[],
+  threshold: number,
+): boolean {
+  const distanceToSegment = (a: Point, b: Point): number => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (dx === 0 && dy === 0) return Math.hypot(point.x - a.x, point.y - a.y);
+    const t = Math.max(
+      0,
+      Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)),
+    );
+    return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
+  };
+  return paths.some((path) =>
+    path.some((p, i) => i > 0 && distanceToSegment(path[i - 1] as Point, p) <= threshold),
+  );
+}
 
 /** Создаёт слой; center — центр гекса в мировых координатах. */
 export function createPlanLayer(
@@ -80,6 +102,7 @@ export function createPlanLayer(
   container.addChild(g, arrows, labels);
   let k = 1;
   let level: DetailLevel = 2;
+  let hover: Point | null = null;
 
   const width = (w: readonly number[]): number => (w[level - 1] ?? w[1] ?? 3) * k;
   const runsOf = (edges: readonly EdgeId[]): Point[][] => edgeRuns(map, radius, edges);
@@ -233,13 +256,13 @@ export function createPlanLayer(
     labels.addChild(tx);
   }
 
-  function drawOffensive(v: PlayerView, p: FrontPlan): void {
+  function drawOffensive(v: PlayerView, p: FrontPlan, showForecast: boolean): void {
     if (!p.offensive) return;
     const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
     const mid = pts[Math.floor(pts.length / 2)];
     // У линии — плашка прогноза без слов: иконка и цвет исхода + свои потери (art/units.md).
-    if (worst && mid) drawForecastPlate(labels, forecastBadge(worst), mid, k);
+    if (showForecast && worst && mid) drawForecastPlate(labels, forecastBadge(worst), mid, k);
   }
 
   // Кольцо деления: подложка, дуга «сколько взять» от верха по часовой, ручка, число; путь в гекс.
@@ -311,7 +334,10 @@ export function createPlanLayer(
           continue;
         }
         const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
-        drawOffensive(v, p);
+        const paths = runsOf(p.offensive?.edges ?? []);
+        const showForecast =
+          p.armyId === selectedArmy && hover !== null && isPointNearPath(hover, paths, 14 * k);
+        drawOffensive(v, p, showForecast);
         drawFront(front, color);
         if (p.armyId === selectedArmy && !draft) {
           drawHandles(frontHandles({ map, view: v, radius }, p), color);
@@ -322,6 +348,10 @@ export function createPlanLayer(
       const dc = draft ? colorOf(draft.armyId) : null;
       if (draft && dc) drawDraft(v, draft, dc);
       if (split) drawSplit(split);
+    },
+    setHover(world) {
+      hover = world;
+      if (last) this.setView(...last);
     },
     frame(nowMs) {
       // Ещё один кадр после конца перехода — линия встаёт точно в новое положение.
