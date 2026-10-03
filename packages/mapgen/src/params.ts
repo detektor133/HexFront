@@ -1,0 +1,22 @@
+/** Параметры процедурного рельефа; значения зеркалируют docs/gdd/10-balance.md. */
+export const MAPGEN_NOISE_OCTAVES = 3;
+export const MAPGEN_EDGE_WATER = 2;
+export const MAPGEN_WATER_SHARE = 25;
+export const MAPGEN_MIN_ISLAND = 30;
+export const MAPGEN_MOUNTAIN_SHARE = 8;
+export const MAPGEN_HILLS_SHARE = 14;
+export const MAPGEN_DESERT_SHARE = 12;
+export const MAPGEN_FOREST_SHARE = 24;
+export const MAPGEN_FERTILE_PER_PLAYER = 0.5;
+export const MAPGEN_FERTILE_PER_PLAYER_NUMERATOR = 1;
+export const MAPGEN_FERTILE_PER_PLAYER_DENOMINATOR = 2;
+export const MAPGEN_MINE_PER_PLAYER = 0.34;
+export const MAPGEN_MINE_PER_PLAYER_NUMERATOR = 34;
+export const MAPGEN_MINE_PER_PLAYER_DENOMINATOR = 100;
+export const MAPGEN_PASS_PER_MOUNTAINS = 15;
+export const MAPGEN_RIVER_MIN_EDGES = 5;
+export const MAPGEN_RIVER_MAX_EDGES = 40;
+export const MAPGEN_RIVERS_PER_PLAYER = 0.5;
+export const MAPGEN_RIVERS_PER_PLAYER_NUMERATOR = 1;
+export const MAPGEN_RIVERS_PER_PLAYER_DENOMINATOR = 2;
+export const PASSABLE_HEXES_PER_PLAYER = 120;
