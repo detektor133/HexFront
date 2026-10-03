@@ -170,14 +170,16 @@ describe('экономический мозг бота: траты (04/T23)', ()
     expect(decide(s)).toContainEqual({ t: 'createArmy', name: '' });
   });
 
-  it('лимит отрядов исчерпан — набора нет', () => {
+  it('глобальный лимит отрядов не блокирует набор при достаточном бюджете', () => {
     const s = scenario(FIELD, { legend });
     rich(s);
     s.setPop(at(0, 2), 300);
-    const limit = playerView(s.state, 0).me.unitLimit;
-    for (let i = 0; i < limit; i += 1) s.unit('A', 'infantry', 10, at(i % 3, 4));
+    for (let i = 0; i < 8; i += 1) s.unit('A', 'infantry', 10, at(i % 3, 4));
     for (let r = 1; r < 4; r += 1) s.unit('B', 'infantry', 500, at(3, r));
-    expect(decide(s).filter((c) => c.t === 'recruit')).toEqual([]);
+    expect(decide(s).find((c) => c.t === 'recruit')).toMatchObject({
+      t: 'recruit',
+      type: 'infantry',
+    });
   });
 
   it('лишнее золото — улучшение города, sim принимает', () => {

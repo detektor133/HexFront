@@ -112,8 +112,6 @@ function recruitCommand(view: PlayerView, near: readonly Contact[], gold: Fp): C
   const enemy = soldiersAt(view, strongest.theirs, strongest.enemy);
   const mine = soldiersAt(view, strongest.mine, view.playerId);
   if (enemy === 0 || mine >= fpMul(enemy as Fp, BOT_ARMY_RATIO)) return null;
-  const used = view.units.filter((u) => u.owner === view.playerId).length + view.recruits.length;
-  if (used >= view.me.unitLimit) return null;
   const busy = new Set(view.recruits.map((r) => r.cityId));
   const city = view.cities
     .filter((c) => c.owner === view.playerId && !busy.has(c.id))
