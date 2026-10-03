@@ -61,20 +61,20 @@
 
 | Константа | Значение |
 | --- | --- |
-| `MAPGEN_NOISE_OCTAVES` | 3 `[ТЮНИНГ]` |
-| `MAPGEN_EDGE_WATER` | 2 гекса `[ТЮНИНГ]` |
-| `MAPGEN_WATER_SHARE` | 25 % `[ТЮНИНГ]` |
-| `MAPGEN_MIN_ISLAND` | 30 гексов `[ТЮНИНГ]` |
-| `MAPGEN_MOUNTAIN_SHARE` | 8 % суши `[ТЮНИНГ]` |
-| `MAPGEN_HILLS_SHARE` | 14 % суши `[ТЮНИНГ]` |
-| `MAPGEN_DESERT_SHARE` | 12 % оставшейся суши `[ТЮНИНГ]` |
-| `MAPGEN_FOREST_SHARE` | 24 % оставшейся суши `[ТЮНИНГ]` |
-| `MAPGEN_FERTILE_PER_PLAYER` | 0,5 `[ТЮНИНГ]` |
-| `MAPGEN_MINE_PER_PLAYER` | 0,34 `[ТЮНИНГ]` |
-| `MAPGEN_PASS_PER_MOUNTAINS` | 15 гексов гор `[ТЮНИНГ]` |
-| `MAPGEN_RIVER_MIN_EDGES` | 5 рёбер `[ТЮНИНГ]` |
-| `MAPGEN_RIVER_MAX_EDGES` | 40 рёбер `[ТЮНИНГ]` |
-| `MAPGEN_RIVERS_PER_PLAYER` | 0,5 `[ТЮНИНГ]` |
+| MAPGEN_NOISE_OCTAVES | 3 `[ТЮНИНГ]` |
+| MAPGEN_EDGE_WATER | 2 гекса `[ТЮНИНГ]` |
+| MAPGEN_WATER_SHARE | 25 % `[ТЮНИНГ]` |
+| MAPGEN_MIN_ISLAND | 30 гексов `[ТЮНИНГ]` |
+| MAPGEN_MOUNTAIN_SHARE | 8 % суши `[ТЮНИНГ]` |
+| MAPGEN_HILLS_SHARE | 14 % суши `[ТЮНИНГ]` |
+| MAPGEN_DESERT_SHARE | 12 % оставшейся суши `[ТЮНИНГ]` |
+| MAPGEN_FOREST_SHARE | 24 % оставшейся суши `[ТЮНИНГ]` |
+| MAPGEN_FERTILE_PER_PLAYER | 0,5 `[ТЮНИНГ]` |
+| MAPGEN_MINE_PER_PLAYER | 0,34 `[ТЮНИНГ]` |
+| MAPGEN_PASS_PER_MOUNTAINS | 15 гексов гор `[ТЮНИНГ]` |
+| MAPGEN_RIVER_MIN_EDGES | 5 рёбер `[ТЮНИНГ]` |
+| MAPGEN_RIVER_MAX_EDGES | 40 рёбер `[ТЮНИНГ]` |
+| MAPGEN_RIVERS_PER_PLAYER | 0,5 `[ТЮНИНГ]` |
 | `PASSABLE_HEXES_PER_PLAYER` | 120 `[ТЮНИНГ]` |
 
 ## Население и налог
