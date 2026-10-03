@@ -6,6 +6,7 @@ import {
   ISOLATED_INCOME_MULT,
   MINE_GOLD_PER_S,
   TICKS_PER_S,
+  UPKEEP_GOLD_PER_UNIT_S,
   UPKEEP_GOLD_PER_SOLDIER_S,
 } from '../balance.ts';
 import { FEATURE } from '../map/types.ts';
@@ -104,13 +105,16 @@ function incomeFromBase(b: Base, rate: Fp): number {
 }
 
 /**
- * Содержание отрядов игрока: expense/с = Σ soldiers × UPKEEP_GOLD_PER_SOLDIER_S(type).
+ * Содержание отрядов игрока: expense/с = Σ(soldiers × upkeep(type) + upkeepPerUnit).
  * @returns fixed-point золота в секунду
  */
 export function playerUpkeepPerSecond(state: MatchState, playerId: number): number {
   let total = 0;
   for (const a of state.units) {
-    if (a.owner === playerId) total += fpMul(a.soldiers, UPKEEP_GOLD_PER_SOLDIER_S[a.type]);
+    if (a.owner === playerId) {
+      total +=
+        fpMul(a.soldiers, UPKEEP_GOLD_PER_SOLDIER_S[a.type]) + UPKEEP_GOLD_PER_UNIT_S[a.type];
+    }
   }
   return total;
 }

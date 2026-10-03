@@ -153,7 +153,7 @@ describe('playerView', () => {
     s.runTicks(1);
     const v = playerView(s.state, 0);
     // 100 пехоты × 0,003 = 0,3 золота/с.
-    expect(v.me.upkeepPerS).toBe(300);
+    expect(v.me.upkeepPerS).toBe(350);
     expect(v.recruits.map((r) => [r.cityId, r.type, r.soldiers, r.progressTicks])).toEqual([
       [s.cityAt(at(1, 1))?.id, 'infantry', 50_000, 1],
       [s.cityAt(at(6, 1))?.id, 'artillery', 100_000, 1],
