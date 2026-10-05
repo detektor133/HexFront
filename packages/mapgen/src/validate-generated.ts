@@ -24,29 +24,36 @@ function passableAround(
   }).length;
 }
 
-function reachableSpawns(
-  map: MapJson,
-  terrain: Uint8Array,
-  start: MapJson['spawns'][number],
-): number {
-  const startId = hexId(start, map.width);
-  const visited = new Set<number>([startId]);
-  const queue: number[] = [startId];
+function reachableSpawnCounts(map: MapJson, terrain: Uint8Array): Int32Array {
+  const componentByHex = new Int32Array(terrain.length).fill(-1);
   const spawnIds = new Set(map.spawns.map((spawn) => hexId(spawn, map.width)));
-  let reached = 0;
-  for (let cursor = 0; cursor < queue.length; cursor += 1) {
-    const id = queue[cursor];
-    if (id === undefined) continue;
-    if (spawnIds.has(id) && id !== startId) reached += 1;
-    for (const next of neighbors(hexFromId(id, map.width))) {
-      if (!inBounds(next, map.width, map.height)) continue;
-      const nextId = hexId(next, map.width);
-      if (terrain[nextId] === TERRAIN.water || visited.has(nextId)) continue;
-      visited.add(nextId);
-      queue.push(nextId);
+  const componentSpawnCounts: number[] = [];
+  for (let startId = 0; startId < terrain.length; startId += 1) {
+    if (terrain[startId] === TERRAIN.water || componentByHex[startId] !== -1) continue;
+    const component = componentSpawnCounts.length;
+    const queue: number[] = [startId];
+    componentByHex[startId] = component;
+    let spawnCount = 0;
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const id = queue[cursor];
+      if (id === undefined) continue;
+      if (spawnIds.has(id)) spawnCount += 1;
+      for (const next of neighbors(hexFromId(id, map.width))) {
+        if (!inBounds(next, map.width, map.height)) continue;
+        const nextId = hexId(next, map.width);
+        if (terrain[nextId] === TERRAIN.water || componentByHex[nextId] !== -1) continue;
+        componentByHex[nextId] = component;
+        queue.push(nextId);
+      }
     }
+    componentSpawnCounts.push(spawnCount);
   }
-  return reached;
+  return new Int32Array(
+    map.spawns.map((spawn) => {
+      const component = componentByHex[hexId(spawn, map.width)] ?? -1;
+      return component >= 0 ? (componentSpawnCounts[component] ?? 0) - 1 : 0;
+    }),
+  );
 }
 
 export function validateGeneratedMap(seed: number, options: MapOptions): readonly string[] {
@@ -56,10 +63,11 @@ export function validateGeneratedMap(seed: number, options: MapOptions): readonl
   const terrain = decodeBase64(json.terrain);
   if (!terrain) return ['terrain: генератор вернул некорректный base64'];
   const errors: string[] = [];
+  const reachable = reachableSpawnCounts(json, terrain);
   for (const [index, spawn] of json.spawns.entries()) {
     if (passableAround(json, terrain, spawn) < 15)
       errors.push(`спавн #${index}: менее 15 гексов в радиусе 2`);
-    if (reachableSpawns(json, terrain, spawn) < 2)
+    if ((reachable[index] ?? 0) < 2)
       errors.push(`спавн #${index}: нет двух соседних спавнов по суше`);
   }
   return errors;

@@ -19,6 +19,49 @@ interface RoadEdge {
 
 const INF = 0x3fffffff;
 
+interface RoadQueueItem {
+  readonly id: number;
+  readonly cost: number;
+}
+
+function isBefore(left: RoadQueueItem, right: RoadQueueItem): boolean {
+  return left.cost < right.cost || (left.cost === right.cost && left.id < right.id);
+}
+
+function pushRoadQueue(queue: RoadQueueItem[], item: RoadQueueItem): void {
+  queue.push(item);
+  let index = queue.length - 1;
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    const parentItem = queue[parent];
+    if (!parentItem || isBefore(parentItem, item)) break;
+    queue[index] = parentItem;
+    index = parent;
+  }
+  queue[index] = item;
+}
+
+function popRoadQueue(queue: RoadQueueItem[]): RoadQueueItem | undefined {
+  const first = queue[0];
+  const last = queue.pop();
+  if (!first || !last || queue.length === 0) return first;
+  let index = 0;
+  while (true) {
+    const left = index * 2 + 1;
+    if (left >= queue.length) break;
+    const right = left + 1;
+    const rightItem = queue[right];
+    const leftItem = queue[left];
+    const child = rightItem && leftItem && isBefore(rightItem, leftItem) ? right : left;
+    const childItem = queue[child];
+    if (!childItem || isBefore(last, childItem)) break;
+    queue[index] = childItem;
+    index = child;
+  }
+  queue[index] = last;
+  return first;
+}
+
 function edgeKey(a: number, b: number): string {
   return `${Math.min(a, b)}:${Math.max(a, b)}`;
 }
@@ -45,11 +88,11 @@ function shortestRoad(
   const goal = hexId(to, options.width);
   const distances = new Int32Array(terrain.length).fill(INF);
   const previous = new Int32Array(terrain.length).fill(-1);
-  const open: { id: number; cost: number }[] = [{ id: start, cost: 0 }];
+  const open: RoadQueueItem[] = [];
+  pushRoadQueue(open, { id: start, cost: 0 });
   distances[start] = 0;
   while (open.length > 0) {
-    open.sort((a, b) => a.cost - b.cost || a.id - b.id);
-    const current = open.shift();
+    const current = popRoadQueue(open);
     if (!current) break;
     if (current.cost !== distances[current.id]) continue;
     if (current.id === goal) break;
@@ -63,7 +106,7 @@ function shortestRoad(
       if (nextCost < (distances[nextId] ?? INF)) {
         distances[nextId] = nextCost;
         previous[nextId] = current.id;
-        open.push({ id: nextId, cost: nextCost });
+        pushRoadQueue(open, { id: nextId, cost: nextCost });
       }
     }
   }
@@ -93,8 +136,9 @@ function allEdges(nodes: readonly Hex[]): RoadEdge[] {
 
 function triangulationEdges(nodes: readonly Hex[]): RoadEdge[] {
   const candidates = new Map<string, RoadEdge>();
+  const edges = allEdges(nodes);
   for (let a = 0; a < nodes.length; a += 1) {
-    allEdges(nodes)
+    edges
       .filter((edge) => edge.a === a || edge.b === a)
       .slice(0, 3)
       .forEach((edge) => candidates.set(edgeKey(edge.a, edge.b), edge));
