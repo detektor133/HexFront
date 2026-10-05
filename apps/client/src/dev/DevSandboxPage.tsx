@@ -167,7 +167,7 @@ function useSandbox(
     matchRef.current?.setObserver(playerId);
     matchRef.current?.setFog(playerId !== null);
     setObserverId(playerId);
-    setFogState(playerId === null);
+    setFogState(playerId !== null);
   }, []);
   const setArmy = useCallback((id: number | null) => {
     armyRef.current = id;
