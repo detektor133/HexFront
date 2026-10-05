@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
@@ -6,6 +8,9 @@ import { defineConfig, type Plugin } from 'vite';
 // Карты лежат в packages/mapgen/maps; клиенту импортировать mapgen нельзя (overview.md, «Границы»),
 // поэтому они отдаются как статика по /maps/<id>.json.
 const MAPS_DIR = new URL('../../packages/mapgen/maps/', import.meta.url);
+const MAPGEN_SCRIPT = fileURLToPath(
+  new URL('../../packages/mapgen/scripts/generate-json.ts', import.meta.url),
+);
 
 function mapsPlugin(): Plugin {
   return {
@@ -28,10 +33,19 @@ function mapsPlugin(): Plugin {
             res.end('Некорректные параметры процедурной карты');
             return;
           }
-          void import('../../packages/mapgen/src/index.ts').then(({ generateMap }) => {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(generateMap(seed, { width: 80, height: 60, players })));
-          });
+          execFile(
+            process.execPath,
+            ['--experimental-strip-types', MAPGEN_SCRIPT, String(seed), String(players)],
+            (error, stdout) => {
+              if (error) {
+                res.statusCode = 500;
+                res.end('Не удалось сгенерировать карту');
+                return;
+              }
+              res.setHeader('Content-Type', 'application/json');
+              res.end(stdout);
+            },
+          );
           return;
         }
         try {
