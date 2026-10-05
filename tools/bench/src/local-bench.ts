@@ -1,4 +1,4 @@
-// Бенчмарк полного тика локального матча: 30 ботов, gen, seed 43, 4200 тиков.
+// Бенчмарк пачки тиков локального матча: 30 ботов, gen, seed 43, 4200 тиков.
 // Запуск: pnpm --filter @hexfront/bench local
 import { performance } from 'node:perf_hooks';
 
@@ -8,6 +8,7 @@ import { generateMap } from '../../../packages/mapgen/src/index.ts';
 const PLAYERS = 30;
 const SEED = 43;
 const TICKS = 4200;
+const BATCH_TICKS = 5;
 const TICKS_PER_MINUTE = 600;
 const TARGET_MEAN_MS = 15;
 
@@ -42,12 +43,13 @@ const created = createLocalEngine(map, SEED, PLAYERS, bots, false);
 if ('errors' in created) throw new Error(created.errors.join('\n'));
 
 const byMinute: number[][] = [];
-for (let tick = 0; tick < TICKS; tick += 1) {
+for (let tick = 0; tick < TICKS; tick += BATCH_TICKS) {
   const minute = Math.floor(tick / TICKS_PER_MINUTE);
   const started = performance.now();
+  for (let i = 1; i < BATCH_TICKS; i += 1) created.advance();
   created.tick();
   const times = byMinute[minute] ?? [];
-  times.push(performance.now() - started);
+  times.push((performance.now() - started) / BATCH_TICKS);
   byMinute[minute] = times;
 }
 
@@ -61,6 +63,7 @@ console.log(
       players: PLAYERS,
       bots: bots.length,
       ticks: TICKS,
+      batchTicks: BATCH_TICKS,
       minutes: report,
       targetMeanMs: TARGET_MEAN_MS,
       targetReached: report.every((item) => item.meanMs <= TARGET_MEAN_MS),

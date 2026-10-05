@@ -159,18 +159,22 @@ function retake(map: MapStatic, view: PlayerView, lost: readonly HexId[], units:
 
 // Цели занятия ничьей земли: пустые ничьи гексы у своей границы.
 function emptyNeutral(map: MapStatic, view: PlayerView): HexId[] {
-  const out: HexId[] = [];
+  const owner = view.hexes.owner;
+  const near = new Uint8Array(owner.length);
+  for (let h = 0; h < owner.length; h += 1) {
+    if (owner[h] !== view.playerId) continue;
+    for (const n of neighbors(hexOf(map, h))) {
+      if (inBounds(n, map.width, map.height)) near[hexId(n, map.width)] = 1;
+    }
+  }
   const busy = new Set(view.units.map((u) => u.hex));
   const cities = new Set(view.cities.map((c) => c.hex));
-  view.hexes.owner.forEach((o, h) => {
-    if (o >= 0 || map.terrain[h] === TERRAIN.water || busy.has(h) || cities.has(h)) return;
-    const near = neighbors(hexOf(map, h)).some(
-      (n) =>
-        inBounds(n, map.width, map.height) &&
-        view.hexes.owner[hexId(n, map.width)] === view.playerId,
-    );
-    if (near) out.push(h);
-  });
+  const out: HexId[] = [];
+  for (let h = 0; h < owner.length; h += 1) {
+    if (near[h] !== 1 || (owner[h] ?? -1) >= 0 || map.terrain[h] === TERRAIN.water) continue;
+    if (busy.has(h) || cities.has(h)) continue;
+    out.push(h);
+  }
   return out;
 }
 
@@ -178,7 +182,12 @@ function emptyNeutral(map: MapStatic, view: PlayerView): HexId[] {
 // отряду), иначе пустой ничий гекс у своей границы, ближайший к столице, затем к отряду: земля
 // растёт кольцом у ядра, а не коридором за отрядом, уходящим из снабжения. Цели, куда уже идут
 // свои отряды, не повторяются.
-function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] {
+function expand(
+  map: MapStatic,
+  view: PlayerView,
+  units: UnitView[],
+  context: CommanderContext,
+): Command[] {
   const claimed = new Set(
     view.units
       .filter((u) => u.owner === view.playerId && u.path.length > 0)
@@ -187,7 +196,7 @@ function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] 
   const capital = view.cities.find((c) => c.owner === view.playerId && c.isCapital)?.hex;
   const core = (h: HexId): number =>
     capital === undefined ? 0 : distance(hexOf(map, capital), hexOf(map, h));
-  const empty = emptyNeutral(map, view);
+  const empty = context.emptyNeutral;
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   const out: Command[] = [];
   for (const u of units.filter(idle)) {
@@ -256,7 +265,7 @@ export function decide(
     return out;
   }
   if (plan) out.push({ t: 'clearPlan', armyId });
-  out.push(...expand(map, view, units));
+  out.push(...expand(map, view, units, commanderContext));
   return out;
 }
 

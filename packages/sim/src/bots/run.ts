@@ -6,7 +6,11 @@ import { createCommanderContext, decide } from './commander.ts';
 import { economyDecide } from './economy.ts';
 import { BOT_LINE_MAX_DEPTH, BOT_THINK_TICKS, COMMANDER_TICKS } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import { createPlayerViewContext, playerView } from '../queries/player-view.ts';
+import {
+  createPlayerViewContext,
+  playerView,
+  type PlayerViewContext,
+} from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 
 /**
@@ -16,9 +20,10 @@ import type { MatchState } from '../state/types.ts';
 export function commanderCommands(
   state: MatchState,
   bots: readonly number[] = [],
+  shared?: PlayerViewContext,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const viewContext = createPlayerViewContext(state);
+  const viewContext = shared ?? createPlayerViewContext(state);
   const turn = state.tick % COMMANDER_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || p.id % COMMANDER_TICKS !== turn) continue;
@@ -41,9 +46,13 @@ export function commanderCommands(
  * бота — id mod BOT_THINK_TICKS. Армиями ботов командует commander (commanderCommands).
  * @returns команды по порядку id ботов
  */
-export function botCommands(state: MatchState, bots: readonly number[]): PlayerCommand[] {
+export function botCommands(
+  state: MatchState,
+  bots: readonly number[],
+  shared?: PlayerViewContext,
+): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const viewContext = createPlayerViewContext(state);
+  const viewContext = shared ?? createPlayerViewContext(state);
   const turn = state.tick % BOT_THINK_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id) || p.id % BOT_THINK_TICKS !== turn) continue;

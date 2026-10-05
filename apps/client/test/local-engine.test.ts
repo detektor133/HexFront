@@ -59,6 +59,15 @@ describe('локальный режим', () => {
     expect(asView(e.tick()).rejected).toEqual([]);
   });
 
+  it('снимок после пакетного продвижения содержит события всех тиков', () => {
+    const e = engine();
+    e.queue({ t: 'foundCity', hex: 0 });
+    e.advance();
+    const msg = asView(e.tick());
+    expect(msg.events.filter((event) => event.t === 'commandRejected')).toHaveLength(1);
+    expect(asView(e.tick()).events).toEqual([]);
+  });
+
   it('выбранный гекс: карточка города и проверки кнопок', () => {
     const e = engine();
     const capital = e.state.cities.find((c) => c.owner === HUMAN_ID);

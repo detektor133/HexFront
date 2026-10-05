@@ -15,6 +15,7 @@ import {
   cityInfo,
   commanderCommands,
   createMatch,
+  createPlayerViewContext,
   loadMap,
   playerView,
   step,
@@ -41,6 +42,8 @@ export interface LocalEngine {
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): FromWorker;
+  /** Продвигает один тик без построения снимка. */
+  advance(): void;
 }
 
 const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
@@ -96,6 +99,17 @@ export function createLocalEngine(
   let pending: Command[] = [];
   let selected: number | null = null;
   let observerId: number | null = null;
+  let pendingEvents: MatchState['events'] = [];
+  const advance = (): void => {
+    const viewContext = createPlayerViewContext(state);
+    step(state, [
+      ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+      ...commanderCommands(state, bots, viewContext),
+      ...botCommands(state, bots, viewContext),
+    ]);
+    pending = [];
+    pendingEvents = [...pendingEvents, ...state.events];
+  };
   return {
     state,
     queue(cmd) {
@@ -110,27 +124,25 @@ export function createLocalEngine(
     select(hex) {
       selected = hex;
     },
+    advance,
     tick() {
       // Ручные команды игрока и решения commander (армии с auto всех игроков) — в один тик; sim
       // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
-      step(state, [
-        ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-        ...commanderCommands(state, bots),
-        ...botCommands(state, bots),
-      ]);
-      pending = [];
+      advance();
       const rejected: { command: string; reason: RejectReason }[] = [];
-      for (const e of state.events) {
+      for (const e of pendingEvents) {
         if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
           rejected.push({ command: e.command, reason: e.reason as RejectReason });
         }
       }
+      const events = pendingEvents;
+      pendingEvents = [];
       return {
         t: 'view',
         view: playerView(state, observerId ?? HUMAN_ID),
         selection: selected === null ? null : selectionOf(state, selected),
         rejected,
-        events: state.events.slice(),
+        events,
       };
     },
   };

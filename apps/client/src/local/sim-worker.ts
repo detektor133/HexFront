@@ -27,7 +27,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       post(engine.tick());
       timer = setInterval(() => {
         if (!engine || paused) return;
-        for (let i = 1; i < speed && engine.state.winner < 0; i += 1) engine.tick();
+        for (let i = 1; i < speed && engine.state.winner < 0; i += 1) engine.advance();
         post(engine.tick());
       }, TICK_MS);
       return;
