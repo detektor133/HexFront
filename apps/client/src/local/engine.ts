@@ -26,7 +26,7 @@ import {
   type RejectReason,
 } from '@hexfront/sim';
 
-import type { FromWorker, RecruitOption, Selection } from './messages.ts';
+import type { RecruitOption, Selection, ViewPayload } from './messages.ts';
 
 /**
  * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
@@ -41,7 +41,9 @@ export interface LocalEngine {
   setObserver(playerId: number | null): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
-  tick(): FromWorker;
+  tick(): ViewPayload;
+  /** Возвращает накопленный снимок без продвижения симуляции. */
+  snapshot(): ViewPayload;
   /** Продвигает один тик без построения снимка. */
   advance(): void;
 }
@@ -110,6 +112,24 @@ export function createLocalEngine(
     pending = [];
     pendingEvents = [...pendingEvents, ...state.events];
   };
+  const snapshot = (): ViewPayload => {
+    const rejected: { command: string; reason: RejectReason }[] = [];
+    for (const e of pendingEvents) {
+      if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
+        rejected.push({ command: e.command, reason: e.reason as RejectReason });
+      }
+    }
+    const events = pendingEvents;
+    pendingEvents = [];
+    return {
+      t: 'view',
+      seq: 0,
+      view: playerView(state, observerId ?? HUMAN_ID),
+      selection: selected === null ? null : selectionOf(state, selected),
+      rejected,
+      events,
+    };
+  };
   return {
     state,
     queue(cmd) {
@@ -129,21 +149,8 @@ export function createLocalEngine(
       // Ручные команды игрока и решения commander (армии с auto всех игроков) — в один тик; sim
       // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
       advance();
-      const rejected: { command: string; reason: RejectReason }[] = [];
-      for (const e of pendingEvents) {
-        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
-          rejected.push({ command: e.command, reason: e.reason as RejectReason });
-        }
-      }
-      const events = pendingEvents;
-      pendingEvents = [];
-      return {
-        t: 'view',
-        view: playerView(state, observerId ?? HUMAN_ID),
-        selection: selected === null ? null : selectionOf(state, selected),
-        rejected,
-        events,
-      };
+      return snapshot();
     },
+    snapshot,
   };
 }

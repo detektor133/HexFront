@@ -230,20 +230,44 @@ function useSandbox(
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
+    let pendingMessage: ViewMessage | null = null;
+    let frameRequest = 0;
+    let appliedMessage = false;
+    const applyMessage = (m: ViewMessage): void => {
+      viewRef.current = m.view;
+      layerRef.current?.setView(m.view, pickedRef.current);
+      setMsg(m);
+      const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
+      eventsRef.current = nextEvents;
+      setEvents(nextEvents);
+      const last = m.rejected.at(-1);
+      if (last) setLastReject(reasonText(last.reason));
+      matchRef.current?.ack(m.seq);
+    };
+    const scheduleMessage = (m: ViewMessage): void => {
+      if (!appliedMessage && layerRef.current) {
+        appliedMessage = true;
+        applyMessage(m);
+        return;
+      }
+      pendingMessage = m;
+      if (frameRequest !== 0) return;
+      frameRequest = requestAnimationFrame(() => {
+        frameRequest = 0;
+        const next = pendingMessage;
+        pendingMessage = null;
+        if (!next || cancelled) return;
+        appliedMessage = true;
+        applyMessage(next);
+      });
+    };
     const match = startLocalMatch(
       json,
       mapRequest.seed,
       matchSetup(window.location.search),
       (m) => {
         if (m.t === 'error') return setError(m.errors.join('; '));
-        viewRef.current = m.view;
-        layerRef.current?.setView(m.view, pickedRef.current);
-        setMsg(m);
-        const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
-        eventsRef.current = nextEvents;
-        setEvents(nextEvents);
-        const last = m.rejected.at(-1);
-        if (last) setLastReject(reasonText(last.reason));
+        scheduleMessage(m);
       },
     );
     matchRef.current = match;
@@ -313,6 +337,12 @@ function useSandbox(
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
+      if (pendingMessage) {
+        const next = pendingMessage;
+        pendingMessage = null;
+        appliedMessage = true;
+        applyMessage(next);
+      }
     });
     const onKey = (e: KeyboardEvent): void => {
       if (e.code === 'Space' && !e.repeat) {
@@ -335,6 +365,7 @@ function useSandbox(
     window.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
+      if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       window.removeEventListener('keydown', onKey);
       match.dispose();
       view?.destroy();

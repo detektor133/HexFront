@@ -55,14 +55,16 @@ export type ToWorker =
   | { readonly t: 'step' }
   | { readonly t: 'speed'; readonly value: number }
   | { readonly t: 'observer'; readonly playerId: number | null }
-  | { readonly t: 'select'; readonly hex: number | null };
+  | { readonly t: 'select'; readonly hex: number | null }
+  | { readonly t: 'ack'; readonly seq: number };
 
-export type FromWorker =
-  | {
-      readonly t: 'view';
-      readonly view: PlayerView;
-      readonly selection: Selection | null;
-      readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
-      readonly events: readonly GameEvent[];
-    }
-  | { readonly t: 'error'; readonly errors: readonly string[] };
+export interface ViewPayload {
+  readonly t: 'view';
+  readonly seq: number;
+  readonly view: PlayerView;
+  readonly selection: Selection | null;
+  readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+  readonly events: readonly GameEvent[];
+}
+
+export type FromWorker = ViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };

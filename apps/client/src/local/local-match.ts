@@ -11,6 +11,7 @@ export interface LocalMatch {
   setSpeed(value: number): void;
   setObserver(playerId: number | null): void;
   select(hex: number | null): void;
+  ack(seq: number): void;
   dispose(): void;
 }
 
@@ -42,6 +43,7 @@ export function startLocalMatch(
     setSpeed: (value) => post({ t: 'speed', value }),
     setObserver: (playerId) => post({ t: 'observer', playerId }),
     select: (hex) => post({ t: 'select', hex }),
+    ack: (seq) => post({ t: 'ack', seq }),
     dispose: () => worker.terminate(),
   };
 }

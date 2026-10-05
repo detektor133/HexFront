@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cityLabelVisible, citySize } from '../src/dev/city-glyphs.ts';
+import { cityLabelVisible, cityLabelsKey, citySize } from '../src/dev/city-glyphs.ts';
 
 describe('знак города', () => {
   it('растёт с уровнем', () => {
@@ -20,5 +20,14 @@ describe('знак города', () => {
     expect(cityLabelVisible(1, true, 1)).toBe(true);
     expect(cityLabelVisible(2, false, 1)).toBe(true);
     expect(cityLabelVisible(1, false, 2)).toBe(true);
+  });
+
+  it('меняет ключ подписей только при изменении города или детализации', () => {
+    const cities = [{ name: 'Рига', level: 1, isCapital: false }];
+    expect(cityLabelsKey(cities, 1, 2)).toBe(cityLabelsKey(cities, 1, 2));
+    expect(cityLabelsKey(cities, 1, 2)).not.toBe(cityLabelsKey(cities, 1, 3));
+    expect(cityLabelsKey(cities, 1, 2)).not.toBe(
+      cityLabelsKey([{ name: 'Рига', level: 2, isCapital: false }], 1, 2),
+    );
   });
 });

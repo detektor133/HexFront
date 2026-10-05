@@ -11,8 +11,8 @@ const small: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
 );
 
-function engine() {
-  const e = createLocalEngine(small, 42, 2);
+function engine(fog = false) {
+  const e = createLocalEngine(small, 42, 2, undefined, fog);
   if ('errors' in e) throw new Error(e.errors.join('\n'));
   return e;
 }
@@ -23,6 +23,40 @@ function asView(msg: FromWorker): Extract<FromWorker, { t: 'view' }> {
 }
 
 describe('локальный режим', () => {
+  it('замороженная последовательность сохраняет fog, selection и tick до ack', () => {
+    const old = engine(true);
+    old.tick();
+    old.setObserver(null);
+    const oldLast = old.tick();
+    const oldFog = oldLast.view.hexes.visible.some((value) => value === 0);
+    old.setFog(false);
+    old.select(0);
+
+    const current = engine(true);
+    const currentInitial = current.snapshot();
+    current.setObserver(null);
+    current.setFog(false);
+    current.select(0);
+    const currentLast = current.snapshot();
+
+    expect({
+      old: {
+        tick: oldLast.view.tick,
+        fog: oldFog,
+        selection: oldLast.selection?.hex ?? null,
+      },
+      current: {
+        initialTick: currentInitial.view.tick,
+        tick: currentLast.view.tick,
+        fog: currentLast.view.hexes.visible.every((value) => value === 1),
+        selection: currentLast.selection?.hex ?? null,
+      },
+    }).toEqual({
+      old: { tick: 2, fog: true, selection: null },
+      current: { initialTick: 0, tick: 0, fog: true, selection: 0 },
+    });
+  });
+
   it('каждый тик отдаёт снимок игрока-человека', () => {
     const msg = asView(engine().tick());
     expect(msg.view.tick).toBe(1);

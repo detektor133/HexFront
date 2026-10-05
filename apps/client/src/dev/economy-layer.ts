@@ -16,7 +16,7 @@ import {
 } from '@hexfront/sim';
 
 import { captureProgress, cityFlashAlpha } from './battle-visuals.ts';
-import { citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
+import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
@@ -175,6 +175,8 @@ export function fogHexes(view: PlayerView): number[] {
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const fill = new Graphics();
   const captures = new Graphics();
+  const constructionEffects = new Graphics();
+  const cityEffects = new Graphics();
   const roads = new Graphics();
   const roadPreview = new Graphics();
   const borders = new Graphics();
@@ -183,7 +185,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const labels = new Container();
 
   const container = new Container();
-  container.addChild(fill, captures, roads, roadPreview);
+  container.addChild(fill, captures, roads, roadPreview, constructionEffects, cityEffects);
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
@@ -206,6 +208,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let previousOwners: Int16Array | null = null;
   const capturesByHex = new Map<number, { readonly started: number; readonly color: string }>();
   const cityFlashes = new Map<number, { readonly started: number; readonly color: string }>();
+  let labelsKey = '';
 
   function rememberEffects(v: PlayerView, nowMs: number): void {
     if (previousOwners) {
@@ -229,7 +232,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
 
   function drawFill(v: PlayerView): void {
     fill.clear();
-    captures.clear();
     v.hexes.owner.forEach((owner, id) => {
       if (owner < 0) return;
       fill.poly(hexPolygon(center(id), radius)).fill({
@@ -237,6 +239,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         alpha: owner === v.playerId ? tokens.territory.alphaOwn : tokens.territory.alphaOther,
       });
     });
+  }
+
+  function drawCaptureEffects(): void {
+    captures.clear();
     for (const [id, effect] of capturesByHex) {
       const progress = captureProgress(frameMs - effect.started, reducedMotion);
       if (progress >= 1) {
@@ -246,6 +252,60 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       const point = center(id);
       const polygon = hexPolygon(point, radius * progress);
       captures.poly(polygon).fill({ color: effect.color, alpha: 1 });
+    }
+  }
+
+  function drawConstructionEffects(v: PlayerView): void {
+    constructionEffects.clear();
+    const k = 1 / scale;
+    for (const c of v.constructions) {
+      const p = center(c.hex);
+      if (c.kind === 'road') {
+        const [dash, gap] = tokens.road.dash;
+        const pts = c.path.map(center);
+        const offset = shouldAnimateRoadConstruction(reducedMotion)
+          ? constructionDashOffset(frameMs, dash, gap)
+          : 0;
+        for (let i = 1; i < pts.length; i += 1) {
+          dashed(
+            constructionEffects,
+            pts[i - 1] as Point,
+            pts[i] as Point,
+            dash * k,
+            gap * k,
+            offset * k,
+          );
+        }
+        constructionEffects.stroke({
+          color: playerLine(c.owner),
+          alpha: tokens.road.isolatedAlpha,
+          width: MARK_WIDTH_PX * k,
+        });
+      } else {
+        const share = c.totalTicks > 0 ? c.progressTicks / c.totalTicks : 0;
+        constructionEffects
+          .arc(p.x, p.y, radius * ARC_RADIUS, -Math.PI / 2, -Math.PI / 2 + share * Math.PI * 2)
+          .stroke({ color: playerLine(c.owner), width: MARK_WIDTH_PX * k, cap: 'round' });
+      }
+    }
+  }
+
+  function drawCityFlashEffects(v: PlayerView): void {
+    cityEffects.clear();
+    for (const [id, effect] of cityFlashes) {
+      const city = v.cities.find((item) => item.id === id);
+      if (!city) {
+        cityFlashes.delete(id);
+        continue;
+      }
+      const elapsed = frameMs - effect.started;
+      if (elapsed >= tokens.motion.capture) {
+        cityFlashes.delete(id);
+        continue;
+      }
+      cityEffects
+        .circle(center(city.hex).x, center(city.hex).y, citySize(radius, city.level))
+        .fill({ color: effect.color, alpha: cityFlashAlpha(elapsed, reducedMotion) });
     }
   }
 
@@ -326,30 +386,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   function drawMarks(v: PlayerView): void {
     marks.clear();
     const k = 1 / scale;
-    for (const c of v.constructions) {
-      const p = center(c.hex);
-      if (c.kind === 'road') {
-        const [dash, gap] = tokens.road.dash;
-        const pts = c.path.map(center);
-        const offset = shouldAnimateRoadConstruction(reducedMotion)
-          ? constructionDashOffset(frameMs, dash, gap)
-          : 0;
-        for (let i = 1; i < pts.length; i += 1) {
-          dashed(marks, pts[i - 1] as Point, pts[i] as Point, dash * k, gap * k, offset * k);
-        }
-        marks.stroke({
-          color: playerLine(c.owner),
-          alpha: tokens.road.isolatedAlpha,
-          width: MARK_WIDTH_PX * k,
-        });
-        continue;
-      }
-      const share = c.totalTicks > 0 ? c.progressTicks / c.totalTicks : 0;
-      const start = -Math.PI / 2;
-      marks
-        .arc(p.x, p.y, radius * ARC_RADIUS, start, start + share * Math.PI * 2)
-        .stroke({ color: playerLine(c.owner), width: MARK_WIDTH_PX * k, cap: 'round' });
-    }
     const glyphs = v.cities.map((c) => ({
       at: center(c.hex),
       level: c.level,
@@ -358,24 +394,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
-    for (const [id, effect] of cityFlashes) {
-      const city = v.cities.find((item) => item.id === id);
-      if (!city) {
-        cityFlashes.delete(id);
-        continue;
-      }
-      const elapsed = frameMs - effect.started;
-      if (elapsed >= tokens.motion.capture) {
-        cityFlashes.delete(id);
-        continue;
-      }
-      marks
-        .circle(center(city.hex).x, center(city.hex).y, citySize(radius, city.level))
-        .fill({ color: effect.color, alpha: cityFlashAlpha(elapsed, reducedMotion) });
-    }
-    labels.removeChildren().forEach((child) => child.destroy());
-    drawCityLabels(
-      labels,
+    const nextLabelsKey = cityLabelsKey(
       v.cities.map((c) => ({
         at: center(c.hex),
         name: c.name,
@@ -384,8 +403,23 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       })),
       scale,
       level,
-      radius,
     );
+    if (nextLabelsKey !== labelsKey) {
+      labelsKey = nextLabelsKey;
+      labels.removeChildren().forEach((child) => child.destroy());
+      drawCityLabels(
+        labels,
+        v.cities.map((c) => ({
+          at: center(c.hex),
+          name: c.name,
+          level: c.level,
+          isCapital: c.isCapital,
+        })),
+        scale,
+        level,
+        radius,
+      );
+    }
     if (selected.hex !== null) {
       marks
         .poly(hexPolygon(center(selected.hex), radius))
@@ -416,6 +450,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawBorders(view);
     drawFog(view);
     drawMarks(view);
+    drawConstructionEffects(view);
+    drawCaptureEffects();
+    drawCityFlashEffects(view);
     planLayer.setView(view, draft, selectedArmy, split, scale, level);
   };
 
@@ -465,11 +502,11 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       const changed = frameMs !== nowMs;
       frameMs = nowMs;
       if (changed && shouldAnimateRoadConstruction(reducedMotion)) {
-        if (view?.constructions.some((c) => c.kind === 'road')) drawMarks(view);
+        if (view?.constructions.some((c) => c.kind === 'road')) drawConstructionEffects(view);
       }
       if (changed && view && (capturesByHex.size > 0 || cityFlashes.size > 0)) {
-        drawFill(view);
-        drawMarks(view);
+        drawCaptureEffects();
+        drawCityFlashEffects(view);
       }
       unitLayer.frame(nowMs);
       planLayer.frame(nowMs);
