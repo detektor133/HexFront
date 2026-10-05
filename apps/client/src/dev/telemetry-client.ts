@@ -6,6 +6,7 @@ import {
   gameTelemetry,
   percentile,
   type PixiTelemetry,
+  type SnapshotTelemetryCounts,
   type TelemetryLine,
   type WorkerTelemetry,
 } from './telemetry.ts';
@@ -18,6 +19,7 @@ export interface TelemetrySource {
   view(): PlayerView | null;
   pixi(): PixiTelemetry;
   worker(): WorkerTelemetry | null;
+  snapshots(): SnapshotTelemetryCounts;
 }
 
 /** Записывает dev-метрики раз в 5 секунд; production-сборка не создаёт наблюдателей. */
@@ -68,6 +70,7 @@ export function useTelemetry(source: TelemetrySource): () => void {
         },
         pixi: current.pixi(),
         worker,
+        snapshots: current.snapshots(),
         game: gameTelemetry(view),
       };
       lines.current.push(line);

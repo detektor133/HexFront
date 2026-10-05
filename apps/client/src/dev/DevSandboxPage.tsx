@@ -35,7 +35,13 @@ import {
 } from './sandbox-selection.ts';
 import { createSplitGrab } from './split-drag.ts';
 import { useTelemetry } from './telemetry-client.ts';
-import type { PixiTelemetry, WorkerTelemetry } from './telemetry.ts';
+import {
+  createSnapshotTelemetry,
+  type PixiTelemetry,
+  type SnapshotTelemetry,
+  type SnapshotTelemetryCounts,
+  type WorkerTelemetry,
+} from './telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -99,6 +105,7 @@ interface Sandbox {
   readonly observerId: number | null;
   readonly events: readonly EventFeedItem[];
   readonly workerTelemetry: WorkerTelemetry | null;
+  snapshotTelemetry(): SnapshotTelemetryCounts;
   focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
@@ -142,6 +149,10 @@ function useSandbox(
   const dockHeightRef = useRef(0);
   const observerIdRef = useRef<number | null>(null);
   const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
+  const snapshotTelemetryRef = useRef<SnapshotTelemetry | null>(null);
+  if (snapshotTelemetryRef.current === null) {
+    snapshotTelemetryRef.current = createSnapshotTelemetry();
+  }
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -240,6 +251,7 @@ function useSandbox(
     let frameRequest = 0;
     let appliedMessage = false;
     const applyMessage = (m: ViewMessage): void => {
+      snapshotTelemetryRef.current?.track(m);
       viewRef.current = m.view;
       workerTelemetryRef.current = m.telemetry ?? null;
       layerRef.current?.setView(m.view, pickedRef.current);
@@ -396,6 +408,8 @@ function useSandbox(
     observerId,
     events,
     workerTelemetry: workerTelemetryRef.current,
+    snapshotTelemetry: () =>
+      snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {
       if (item.hex !== null && typeof loaded !== 'string') {
         mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
@@ -438,6 +452,7 @@ export function DevSandboxPage(): React.JSX.Element {
     view: () => sb.msg?.view ?? null,
     pixi: sb.pixiTelemetry,
     worker: () => sb.workerTelemetry,
+    snapshots: sb.snapshotTelemetry,
   });
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);

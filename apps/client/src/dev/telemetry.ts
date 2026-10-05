@@ -7,6 +7,46 @@ export interface WorkerTelemetry {
   readonly ackMs: number | null;
 }
 
+export interface SnapshotTelemetryCounts {
+  readonly received: number;
+  readonly collected: number;
+  readonly live: number;
+}
+
+interface SnapshotRegistry {
+  register(snapshot: object): void;
+}
+
+type CreateSnapshotRegistry = (onCollected: () => void) => SnapshotRegistry;
+
+export interface SnapshotTelemetry {
+  track(snapshot: object): void;
+  counts(): SnapshotTelemetryCounts;
+}
+
+const createFinalizationRegistry: CreateSnapshotRegistry = (onCollected) => {
+  const registry = new FinalizationRegistry(onCollected);
+  return { register: (snapshot) => registry.register(snapshot, undefined) };
+};
+
+/** Отслеживает сообщения воркера, которые ещё не освободил сборщик мусора. */
+export function createSnapshotTelemetry(
+  createRegistry: CreateSnapshotRegistry = createFinalizationRegistry,
+): SnapshotTelemetry {
+  let received = 0;
+  let collected = 0;
+  const registry = createRegistry(() => {
+    collected += 1;
+  });
+  return {
+    track(snapshot) {
+      received += 1;
+      registry.register(snapshot);
+    },
+    counts: () => ({ received, collected, live: Math.max(0, received - collected) }),
+  };
+}
+
 export interface PixiTelemetry {
   readonly objects: number;
   readonly text: number;
@@ -24,6 +64,7 @@ export interface TelemetryLine {
   readonly heap: { readonly used: number | null; readonly total: number | null };
   readonly pixi: PixiTelemetry;
   readonly worker: WorkerTelemetry;
+  readonly snapshots: SnapshotTelemetryCounts;
   readonly game: {
     readonly units: number;
     readonly armies: number;
