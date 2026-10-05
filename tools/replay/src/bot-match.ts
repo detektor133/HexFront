@@ -4,6 +4,7 @@
 // Запуск: pnpm --filter @hexfront/replay bot-match [игроков] [сид] [out.json]
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   botCommands,
   commanderCommands,
@@ -20,7 +21,9 @@ const root = new URL('../../../', import.meta.url);
 const PLAYERS = Number(process.argv[2] ?? 6);
 const SEED = Number(process.argv[3] ?? 42);
 const OUT = process.argv[4] ?? null;
+const MAP_KIND = process.argv[5] ?? 'small';
 const SAMPLE_EVERY_S = 10;
+const FRAME_EVERY_S = 60;
 /** Предохранитель: таймер матча — 25:00, дальше победа по очкам; с запасом. */
 const MAX_TICKS = 30 * 60 * TICKS_PER_S;
 
@@ -47,9 +50,12 @@ function sample(state: MatchState): PlayerSample[] {
   }));
 }
 
-const loaded = loadMap(
-  JSON.parse(readFileSync(new URL('packages/mapgen/maps/small.json', root), 'utf8')),
-);
+if (MAP_KIND !== 'small' && MAP_KIND !== 'gen') throw new Error(`неизвестная карта: ${MAP_KIND}`);
+const mapJson =
+  MAP_KIND === 'gen'
+    ? generateMap(SEED, { width: 80, height: 60, players: PLAYERS })
+    : JSON.parse(readFileSync(new URL('packages/mapgen/maps/small.json', root), 'utf8'));
+const loaded = loadMap(mapJson);
 if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
 const state = createMatch(
   loaded.map,
@@ -58,6 +64,7 @@ const state = createMatch(
 );
 const bots = state.players.map((p) => p.id);
 const samples: { t: number; players: PlayerSample[] }[] = [];
+const frames: { t: number; owner: number[] }[] = [];
 const commands = new Map<string, number>();
 const rejected = new Map<string, number>();
 const events = new Map<string, number>();
@@ -118,6 +125,8 @@ while (state.winner < 0 && state.tick < MAX_TICKS) {
   if (state.tick % (SAMPLE_EVERY_S * TICKS_PER_S) === 0) {
     samples.push({ t: state.tick / TICKS_PER_S, players: sample(state) });
   }
+  if (state.tick % (FRAME_EVERY_S * TICKS_PER_S) === 0)
+    frames.push({ t: state.tick / TICKS_PER_S, owner: [...state.hexes.owner] });
   const isolation = new Map(state.cities.map((city) => [city.id, isCityIsolated(state, city.id)]));
   const cmds = [...commanderCommands(state, bots), ...botCommands(state, bots)];
   for (const c of cmds) count(commands, `${c.source ?? 'bot'}:${c.cmd.t}`);
@@ -166,10 +175,13 @@ while (state.winner < 0 && state.tick < MAX_TICKS) {
   }
 }
 samples.push({ t: state.tick / TICKS_PER_S, players: sample(state) });
+if (frames.at(-1)?.t !== state.tick / TICKS_PER_S)
+  frames.push({ t: state.tick / TICKS_PER_S, owner: [...state.hexes.owner] });
 
 const result = {
   players: PLAYERS,
   seed: SEED,
+  map: MAP_KIND,
   winner: state.winner,
   endS: state.tick / TICKS_PER_S,
   wallS: (Date.now() - started) / 1000,
@@ -194,6 +206,7 @@ const result = {
   final: {
     width: state.map.width,
     height: state.map.height,
+    terrain: [...state.map.terrain],
     owner: [...state.hexes.owner],
     cities: state.cities.map((city) => ({
       hex: city.hex,
@@ -201,6 +214,7 @@ const result = {
       capital: state.players[city.owner]?.capitalCityId === city.id,
     })),
   },
+  frames,
   samples,
 };
 if (OUT) writeFileSync(OUT, JSON.stringify(result));
