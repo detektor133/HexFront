@@ -15,6 +15,7 @@ import styles from './DevSandboxPage.module.css';
 import { EventFeed } from './EventFeed.tsx';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
+import { Leaderboard } from './Leaderboard.tsx';
 import { MatchEnd } from './MatchEnd.tsx';
 import { ObserverPanel } from './ObserverPanel.tsx';
 import { UnitCard } from './UnitCard.tsx';
@@ -414,6 +415,7 @@ export function DevSandboxPage(): React.JSX.Element {
           setObserver={sb.setObserver}
         />
       )}
+      {view && <Leaderboard view={view} />}
       {view && <MatchEnd view={view} />}
       {view && (
         <ArmyBar
