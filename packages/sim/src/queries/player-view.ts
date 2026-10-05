@@ -12,13 +12,24 @@ import type { HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
-import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
+import {
+  incomeBases,
+  playerIncomePerSecond,
+  playerUpkeepPerSecond,
+  type IncomeBase,
+} from '../systems/economy.ts';
 import { growthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
 import { visionSystem } from '../systems/vision.ts';
 
 /** Связь узла сети: 0 — не узел, 1 — основная сеть, 2 — изолированная. */
 export const LINK = { none: 0, main: 1, isolated: 2 } as const;
+
+export interface PlayerViewContext {
+  readonly growth: Int32Array;
+  readonly incomeBases: readonly IncomeBase[];
+  readonly links: Uint8Array;
+}
 
 export interface PlayerView {
   readonly tick: number;
@@ -119,20 +130,24 @@ function links(state: MatchState): Uint8Array {
   );
 }
 
-function summary(state: MatchState, playerId: number, growth: Int32Array): PlayerView['me'] {
+function summary(
+  state: MatchState,
+  playerId: number,
+  context: PlayerViewContext,
+): PlayerView['me'] {
   let popTotal = 0;
   let popGrowthPerS = 0;
   state.hexes.owner.forEach((o, id) => {
     if (o !== playerId) return;
     popTotal += state.hexes.pop[id] ?? 0;
-    popGrowthPerS += growth[id] ?? 0;
+    popGrowthPerS += context.growth[id] ?? 0;
   });
   const target = state.players[playerId]?.taxTarget ?? (0 as Fp);
   return {
     popTotal,
     popGrowthPerS,
-    incomePerS: playerIncomePerSecond(state, playerId),
-    incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target),
+    incomePerS: playerIncomePerSecond(state, playerId, undefined, context.incomeBases),
+    incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target, context.incomeBases),
     upkeepPerS: playerUpkeepPerSecond(state, playerId),
     supplyLevel:
       state.supplyRatios.get(
@@ -149,6 +164,18 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
   };
 }
 
+/**
+ * Строит общий контекст снимков для одного состояния матча.
+ * @returns рост людей в секунду, базы дохода и связи сетей
+ */
+export function createPlayerViewContext(state: MatchState): PlayerViewContext {
+  return {
+    growth: growthPerSecond(state),
+    incomeBases: incomeBases(state),
+    links: links(state),
+  };
+}
+
 // Наибольший набор в городе сейчас: ёмкость набора вниз до шага RECRUIT_STEP.
 function recruitMax(state: MatchState, cityId: number): Fp {
   const cap = recruitCapacity(state, cityId);
@@ -159,7 +186,11 @@ function recruitMax(state: MatchState, cityId: number): Fp {
  * Снимок для игрока. Массивы — копии: клиент может их менять, состояние не пострадает.
  * @returns данные для отрисовки и интерфейса
  */
-export function playerView(state: MatchState, playerId: number): PlayerView {
+export function playerView(
+  state: MatchState,
+  playerId: number,
+  context?: PlayerViewContext,
+): PlayerView {
   visionSystem(state);
   const { hexes } = state;
   const vision = state.vision;
@@ -169,9 +200,9 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
-  const growth = growthPerSecond(state);
+  const viewContext = context ?? createPlayerViewContext(state);
   return {
-    me: summary(state, playerId, growth),
+    me: summary(state, playerId, viewContext),
     tick: state.tick,
     winner: state.winner,
     playerId,
@@ -190,10 +221,12 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
       road: state.fog
         ? Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0)
         : hexes.road.slice(),
-      link: Uint8Array.from(links(state), (value, id) => (visible[id] === 1 ? value : 0)),
+      link: Uint8Array.from(viewContext.links, (value, id) => (visible[id] === 1 ? value : 0)),
       growth: state.fog
-        ? Int32Array.from(growth, (value, id) => (hexes.owner[id] === playerId ? value : 0))
-        : growth,
+        ? Int32Array.from(viewContext.growth, (value, id) =>
+            hexes.owner[id] === playerId ? value : 0,
+          )
+        : viewContext.growth,
       visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({

@@ -39,7 +39,7 @@ function isolatedHexes(state: MatchState): Uint8Array {
   return covered.map((cov, id) => (cov === 1 && connected[id] === 0 ? 1 : 0));
 }
 
-interface Base {
+export interface IncomeBase {
   pop: number;
   isolatedPop: number;
   mines: number;
@@ -48,8 +48,8 @@ interface Base {
   cityGold: number;
 }
 
-function incomeBases(state: MatchState): Base[] {
-  const bases: Base[] = state.players.map(() => ({
+export function incomeBases(state: MatchState): IncomeBase[] {
+  const bases: IncomeBase[] = state.players.map(() => ({
     pop: 0,
     isolatedPop: 0,
     mines: 0,
@@ -85,8 +85,13 @@ function incomePerSecond(pop: number, tax: Fp, mines: number): number {
  * фактическая), чтобы интерфейс мог показать итог выбранной ставки.
  * @returns fixed-point золота в секунду
  */
-export function playerIncomePerSecond(state: MatchState, playerId: number, tax?: Fp): number {
-  const b = incomeBases(state)[playerId];
+export function playerIncomePerSecond(
+  state: MatchState,
+  playerId: number,
+  tax?: Fp,
+  bases: readonly IncomeBase[] = incomeBases(state),
+): number {
+  const b = bases[playerId];
   const p = state.players[playerId];
   if (!b || !p) return 0;
   return withChaos(p, incomeFromBase(b, tax ?? p.taxEffective));
@@ -98,7 +103,7 @@ function withChaos(p: Player, income: number): number {
 }
 
 // Одна формула для начисления и для подсказок интерфейса.
-function incomeFromBase(b: Base, rate: Fp): number {
+function incomeFromBase(b: IncomeBase, rate: Fp): number {
   const connected = incomePerSecond(b.pop, rate, b.mines);
   const isolated = incomePerSecond(b.isolatedPop, rate, b.isolatedMines);
   return connected + fpMul(isolated as Fp, ISOLATED_INCOME_MULT) + b.cityGold;
