@@ -18,6 +18,13 @@ import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, spiral } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
 
+interface LossCache {
+  readonly revision: number;
+  readonly maps: Map<number, Int32Array>;
+}
+
+const lossCaches = new WeakMap<MatchState, LossCache>();
+
 /**
  * Снабжение, которое производит город: CITY_SUPPLY_PER_LEVEL × level (+ CAPITAL_SUPPLY_BONUS
  * у столицы) × выработка после захвата, в изолированной сети — × ISOLATED_SUPPLY_MULT.
@@ -32,6 +39,11 @@ export function citySupply(state: MatchState, city: City): Fp {
 
 // Потери снабжения за гекс вне дорог; в радиусе склада — × DEPOT_LOSS_MULT.
 function lossMap(state: MatchState, owner: number): Int32Array {
+  const cached = lossCaches.get(state);
+  if (cached?.revision === state.supplyRevision) {
+    const map = cached.maps.get(owner);
+    if (map) return map;
+  }
   const { width, height, terrain } = state.map;
   const nearDepot = new Uint8Array(width * height);
   state.hexes.building.forEach((b, id) => {
@@ -40,12 +52,18 @@ function lossMap(state: MatchState, owner: number): Int32Array {
       if (inBounds(h, width, height)) nearDepot[hexId(h, width)] = 1;
     }
   });
-  return Int32Array.from(terrain, (code, id) => {
+  const result = Int32Array.from(terrain, (code, id) => {
     const name = TERRAIN_NAMES[code];
     if (name === undefined || name === 'water') return FP;
     const loss = OFFROAD_SUPPLY_LOSS[name];
     return nearDepot[id] === 1 ? fpMul(loss, DEPOT_LOSS_MULT) : loss;
   });
+  if (cached?.revision === state.supplyRevision) {
+    cached.maps.set(owner, result);
+  } else {
+    lossCaches.set(state, { revision: state.supplyRevision, maps: new Map([[owner, result]]) });
+  }
+  return result;
 }
 
 const UNREACHED = 0x7fffffff;

@@ -169,6 +169,7 @@ function summary(
  * @returns рост людей в секунду, базы дохода и связи сетей
  */
 export function createPlayerViewContext(state: MatchState): PlayerViewContext {
+  visionSystem(state);
   return {
     growth: growthPerSecond(state),
     incomeBases: incomeBases(state),
@@ -191,7 +192,8 @@ export function playerView(
   playerId: number,
   context?: PlayerViewContext,
 ): PlayerView {
-  visionSystem(state);
+  // Контекст уже пересчитал обзор на этот тик; без контекста — как раньше.
+  const viewContext = context ?? createPlayerViewContext(state);
   const { hexes } = state;
   const vision = state.vision;
   const visible = state.fog
@@ -200,7 +202,6 @@ export function playerView(
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
-  const viewContext = context ?? createPlayerViewContext(state);
   return {
     me: summary(state, playerId, viewContext),
     tick: state.tick,

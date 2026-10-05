@@ -41,6 +41,7 @@ export function setHexOwner(state: MatchState, hex: HexId, owner: number): void 
   if (was === owner) return;
   if (was >= 0) markLost(state, hex, was);
   state.hexes.owner[hex] = owner;
+  state.supplyRevision += 1;
   followFrontsNear(state, hex);
   pruneLost(state);
 }

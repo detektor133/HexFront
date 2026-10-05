@@ -23,6 +23,7 @@ export function cloneState(s: MatchState): MatchState {
     recruits: s.recruits.map((r) => ({ ...r })),
     networks: s.networks.map((n) => ({ ...n })),
     supplyRatios: new Map(s.supplyRatios),
+    supplyRevision: s.supplyRevision,
     events: [...s.events],
   };
 }

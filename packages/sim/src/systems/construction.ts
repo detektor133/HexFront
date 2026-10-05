@@ -34,9 +34,11 @@ function complete(state: MatchState, c: Construction): void {
       return;
     case 'fort':
       hexes.building[c.hex] = BUILDING.fort;
+      state.supplyRevision += 1;
       return;
     case 'depot':
       hexes.building[c.hex] = BUILDING.depot;
+      state.supplyRevision += 1;
       return;
     case 'road':
       return;

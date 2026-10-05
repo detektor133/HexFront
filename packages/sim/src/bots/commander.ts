@@ -21,8 +21,18 @@ import {
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
-function piecesOf(map: MapStatic, view: PlayerView, reserved: number | null): Map<number, Piece> {
-  return assignPieces(map, view, enemyPieces({ map, hexes: view.hexes }, view.playerId), reserved);
+function piecesOf(
+  map: MapStatic,
+  view: PlayerView,
+  reserved: number | null,
+  context: CommanderContext,
+): Map<number, Piece> {
+  const key = reserved ?? -1;
+  const cached = context.assigned.get(key);
+  if (cached) return cached;
+  const result = assignPieces(map, view, context.enemyPieces, reserved);
+  context.assigned.set(key, result);
+  return result;
 }
 
 /** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
@@ -36,6 +46,9 @@ interface Piece {
 
 export interface CommanderContext {
   readonly emptyNeutral: readonly HexId[];
+  readonly enemyPieces: readonly Piece[];
+  /** Распределение кусков по армиям для одного снимка; ключ — резервная армия или -1. */
+  readonly assigned: Map<number, Map<number, Piece>>;
 }
 
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
@@ -248,7 +261,7 @@ export function decide(
     lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1
       ? (view.armies.at(-1)?.id ?? null)
       : null;
-  const piece = piecesOf(map, view, expansion).get(armyId);
+  const piece = piecesOf(map, view, expansion, commanderContext).get(armyId);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {
     if (plan?.kind !== 'front' || !plan.edges.some((e) => piece.edges.includes(e))) {
@@ -274,5 +287,9 @@ export function decide(
  * @returns пустые нейтральные гексы, доступные для экспансии
  */
 export function createCommanderContext(map: MapStatic, view: PlayerView): CommanderContext {
-  return { emptyNeutral: emptyNeutral(map, view) };
+  return {
+    emptyNeutral: emptyNeutral(map, view),
+    enemyPieces: enemyPieces({ map, hexes: view.hexes }, view.playerId),
+    assigned: new Map(),
+  };
 }

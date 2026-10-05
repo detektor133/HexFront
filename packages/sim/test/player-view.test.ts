@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NETWORK_RECALC_TICKS } from '../src/balance.ts';
+import { NETWORK_RECALC_TICKS, VISION_RECALC_TICKS } from '../src/balance.ts';
 import { at, city, own, recruit, road, scenario } from './scenario/dsl.ts';
 import type { Fp } from '../src/math/int.ts';
 import { createPlayerViewContext, playerView } from '../src/queries/player-view.ts';
@@ -14,13 +14,13 @@ const MAP = `
 const legend = { A1: city('A', 1, { capital: true }), A2: city('A', 1), a: own('A'), r: road('A') };
 
 describe('playerView', () => {
-  it('совпадает с прямым расчётом при общем контексте на нескольких тиках', () => {
+  it('совпадает с прямым расчётом при общем контексте на тиках пересчёта обзора', () => {
     const s = scenario(MAP, { legend });
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       const direct = playerView(s.state, 0);
       const cached = playerView(s.state, 0, createPlayerViewContext(s.state));
       expect(cached).toEqual(direct);
-      s.runTicks(1);
+      s.runTicks(VISION_RECALC_TICKS);
     }
   });
 

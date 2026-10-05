@@ -272,6 +272,8 @@ export interface MatchState {
   networks: SupplyNetwork[];
   /** Производительность сетей после распределения спроса; кэш для HUD, не часть хэша. */
   supplyRatios: Map<number, Fp>;
+  /** Ревизия владельцев и зданий для кэша карт потерь снабжения. */
+  supplyRevision: number;
   nextId: number;
   events: GameEvent[];
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */
