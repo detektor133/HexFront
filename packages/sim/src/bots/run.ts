@@ -2,11 +2,11 @@
 // COMMANDER_TICKS для каждого живого игрока — все его армии с auto в один тик, по одному снимку;
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
-import { decide } from './commander.ts';
+import { createCommanderContext, decide } from './commander.ts';
 import { economyDecide } from './economy.ts';
 import { BOT_LINE_MAX_DEPTH, BOT_THINK_TICKS, COMMANDER_TICKS } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import { playerView } from '../queries/player-view.ts';
+import { createPlayerViewContext, playerView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 
 /**
@@ -18,15 +18,17 @@ export function commanderCommands(
   bots: readonly number[] = [],
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
+  const viewContext = createPlayerViewContext(state);
   const turn = state.tick % COMMANDER_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || p.id % COMMANDER_TICKS !== turn) continue;
     const armies = state.armies.filter((a) => a.owner === p.id && a.auto);
     if (armies.length === 0) continue;
-    const view = playerView(state, p.id);
+    const view = playerView(state, p.id, viewContext);
+    const commanderContext = createCommanderContext(state.map, view);
     for (const a of armies) {
       const depth = bots.includes(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
-      for (const cmd of decide(state.map, view, a.id, depth)) {
+      for (const cmd of decide(state.map, view, a.id, depth, commanderContext)) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
     }
@@ -41,10 +43,11 @@ export function commanderCommands(
  */
 export function botCommands(state: MatchState, bots: readonly number[]): PlayerCommand[] {
   const out: PlayerCommand[] = [];
+  const viewContext = createPlayerViewContext(state);
   const turn = state.tick % BOT_THINK_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id) || p.id % BOT_THINK_TICKS !== turn) continue;
-    for (const cmd of economyDecide(state.map, playerView(state, p.id))) {
+    for (const cmd of economyDecide(state.map, playerView(state, p.id, viewContext))) {
       out.push({ playerId: p.id, cmd });
     }
   }

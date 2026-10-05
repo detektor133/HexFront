@@ -34,6 +34,10 @@ interface Piece {
   readonly edges: readonly EdgeId[];
 }
 
+export interface CommanderContext {
+  readonly emptyNeutral: readonly HexId[];
+}
+
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
 
 // Куски границы с каждым врагом (до дипломатии все игроки — враги), по первой грани.
@@ -119,10 +123,10 @@ function reinforce(view: PlayerView, armyId: number): Command[] {
 }
 
 // Пустая армия экспансии получает один отряд с занятого фронта; донор не опустошается.
-function seedExpansion(map: MapStatic, view: PlayerView, armyId: number): Command[] {
+function seedExpansion(view: PlayerView, armyId: number, context: CommanderContext): Command[] {
   if (armyUnits(view, armyId).length > 0 || view.plans.some((p) => p.armyId === armyId)) return [];
   if (view.units.some((u) => u.owner === view.playerId && u.armyId === null)) return [];
-  if (emptyNeutral(map, view).length === 0) return [];
+  if (context.emptyNeutral.length === 0) return [];
   const donors = view.armies
     .filter((army) => army.id !== armyId && view.plans.some((p) => p.armyId === army.id))
     .map((army) => armyUnits(view, army.id).filter(idle))
@@ -224,13 +228,15 @@ export function decide(
   view: PlayerView,
   armyId: number,
   lineDepth?: number,
+  context?: CommanderContext,
 ): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
-  const out = [...reinforce(view, armyId), ...seedExpansion(map, view, armyId)];
+  const commanderContext = context ?? createCommanderContext(map, view);
+  const out = [...reinforce(view, armyId), ...seedExpansion(view, armyId, commanderContext)];
   const units = armyUnits(view, armyId);
   const expansion =
-    lineDepth !== undefined && emptyNeutral(map, view).length > 0 && view.armies.length > 1
+    lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1
       ? (view.armies.at(-1)?.id ?? null)
       : null;
   const piece = piecesOf(map, view, expansion).get(armyId);
@@ -252,4 +258,12 @@ export function decide(
   if (plan) out.push({ t: 'clearPlan', armyId });
   out.push(...expand(map, view, units));
   return out;
+}
+
+/**
+ * Строит контекст решений commander для одного снимка игрока.
+ * @returns пустые нейтральные гексы, доступные для экспансии
+ */
+export function createCommanderContext(map: MapStatic, view: PlayerView): CommanderContext {
+  return { emptyNeutral: emptyNeutral(map, view) };
 }

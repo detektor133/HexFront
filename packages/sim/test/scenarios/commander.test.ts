@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { COMMANDER_TICKS } from '../../src/balance.ts';
-import { decide } from '../../src/bots/commander.ts';
+import { createCommanderContext, decide } from '../../src/bots/commander.ts';
 import { commanderCommands } from '../../src/bots/run.ts';
 import { distance, hexFromId } from '../../src/math/hex.ts';
 import { playerView } from '../../src/queries/player-view.ts';
@@ -250,6 +250,21 @@ describe('commander: детерминизм (04/T21, CR-006)', () => {
         expect(decide(s.state.map, view, army)).toEqual(decide(s.state.map, copy, army));
       }),
       { numRuns: 20, seed: 6 },
+    );
+  });
+
+  it('контекст пустой ничьей земли не меняет команды для нескольких армий', () => {
+    const s = scenario(OPEN, { legend });
+    const first = autoArmy(s, 2);
+    const second = autoArmy(s, 1, at(1, 1));
+    const view = playerView(s.state, 0);
+    const context = createCommanderContext(s.state.map, view);
+
+    expect(decide(s.state.map, view, first, undefined, context)).toEqual(
+      decide(s.state.map, view, first),
+    );
+    expect(decide(s.state.map, view, second, undefined, context)).toEqual(
+      decide(s.state.map, view, second),
     );
   });
 });
