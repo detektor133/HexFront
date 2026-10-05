@@ -14,6 +14,7 @@ export interface ObserverPanelProps {
   readonly step: () => void;
   readonly setSpeed: (value: number) => void;
   readonly setObserver: (playerId: number | null) => void;
+  readonly downloadTelemetry: () => void;
   readonly onHeight?: (height: number) => void;
 }
 
@@ -37,6 +38,9 @@ export function ObserverPanel(props: ObserverPanelProps): React.JSX.Element {
       </button>
       <button type="button" onClick={props.step} disabled={!props.paused}>
         {t('observer.step')}
+      </button>
+      <button type="button" onClick={props.downloadTelemetry}>
+        {t('observer.downloadTelemetry')}
       </button>
       <div className={styles.group} role="group" aria-label={t('observer.title')}>
         {[1, 5, 20].map((value) => (

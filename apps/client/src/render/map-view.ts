@@ -29,6 +29,14 @@ export interface MapViewState {
   readonly fps: number;
 }
 
+export interface PixiSceneStats {
+  readonly objects: number;
+  readonly text: number;
+  readonly graphics: number;
+  readonly textures: number;
+  readonly canvasTextTextures: number | null;
+}
+
 /** Слой между заливкой рельефа и его узорами (территории, дороги); top — над узорами (города). */
 export interface MidLayer {
   readonly container: Container;
@@ -91,6 +99,8 @@ export interface MapView {
   setOrderHooks(hooks: OrderHooks | null): void;
   /** Отменяет текущий жест и его прогноз. */
   cancel(): void;
+  /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
+  sceneStats(): PixiSceneStats;
   destroy(): void;
 }
 
@@ -295,6 +305,27 @@ export async function createMapView(
       stroking = false;
       hooks?.cancel();
       selection.clear();
+    },
+    sceneStats() {
+      const counts = { objects: 0, text: 0, graphics: 0 };
+      const visit = (node: Container): void => {
+        counts.objects += 1;
+        if (node.constructor.name === 'Text') counts.text += 1;
+        if (node instanceof Graphics) counts.graphics += 1;
+        node.children.forEach(visit);
+      };
+      visit(app.stage);
+      const renderer = app.renderer as unknown as {
+        texture: { managedTextures: readonly unknown[] };
+        canvasText?: { _activeTextures?: Readonly<Record<string, unknown>> };
+      };
+      return {
+        ...counts,
+        textures: renderer.texture.managedTextures.length,
+        canvasTextTextures: renderer.canvasText?._activeTextures
+          ? Object.keys(renderer.canvasText._activeTextures).length
+          : null,
+      };
     },
     setStroke(handler) {
       if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');

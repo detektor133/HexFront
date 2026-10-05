@@ -17,6 +17,7 @@
     "verify": "node --experimental-strip-types tools/ai-check/src/verify.ts",
     "visual": "node --disable-warning=DEP0190 --experimental-strip-types apps/client/tests/visual/visual-check.ts",
     "report:match": "node --experimental-strip-types tools/replay/src/report-match.ts",
+    "telemetry:report": "node --experimental-strip-types tools/telemetry/src/cli.ts",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
     "ci:wait": "node --experimental-strip-types tools/ci-wait/src/cli.ts",
     "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts",

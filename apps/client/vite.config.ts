@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
@@ -71,9 +71,42 @@ function mapsPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), mapsPlugin()],
+/** Принимает JSONL телеметрии только от dev-сервера, чтобы production не получил endpoint записи. */
+function telemetryPlugin(): Plugin {
+  const started = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
+  const directory = new URL('../../telemetry/', import.meta.url);
+  const file = new URL(`${started}.jsonl`, directory);
+  return {
+    name: 'hexfront-telemetry',
+    configureServer(server) {
+      server.middlewares.use('/__telemetry', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        let body = '';
+        req.setEncoding('utf8');
+        req.on('data', (chunk: string) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          try {
+            const parsed: unknown = JSON.parse(body);
+            if (!parsed || typeof parsed !== 'object' || !('tick' in parsed))
+              throw new Error('schema');
+            mkdirSync(directory, { recursive: true });
+            appendFileSync(file, `${JSON.stringify(parsed)}\n`);
+            res.statusCode = 204;
+          } catch {
+            res.statusCode = 400;
+          }
+          res.end();
+        });
+      });
+    },
+  };
+}
+
+export default defineConfig(({ command }) => ({
+  plugins: [react(), mapsPlugin(), ...(command === 'serve' ? [telemetryPlugin()] : [])],
   server: { port: 5173, strictPort: true },
   // Прямой путь /dev/map отдаёт index.html — роутинг на клиенте.
   appType: 'spa',
-});
+}));

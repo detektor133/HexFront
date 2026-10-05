@@ -11,6 +11,8 @@ import type {
   GameEvent,
 } from '@hexfront/sim';
 
+import type { WorkerTelemetry } from '../dev/telemetry.ts';
+
 /** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
 export interface RecruitAmount {
   readonly soldiers: Fp;
@@ -66,6 +68,7 @@ export interface ViewPayload {
   readonly selection: Selection | null;
   readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
   readonly events: readonly GameEvent[];
+  readonly telemetry?: WorkerTelemetry;
 }
 
 export type FromWorker = ViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };

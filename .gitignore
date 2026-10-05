@@ -16,3 +16,5 @@ docs/reports/match/
 apps/client/test-results/
 # Полные логи pnpm verify.
 .ai-logs/
+# Локальные записи производительности стенда.
+/telemetry/

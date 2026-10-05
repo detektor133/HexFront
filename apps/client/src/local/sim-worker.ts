@@ -2,7 +2,7 @@
 import { TICK_MS } from '@hexfront/sim';
 
 import { createLocalEngine, type LocalEngine } from './engine.ts';
-import type { FromWorker, ToWorker } from './messages.ts';
+import type { FromWorker, ToWorker, ViewPayload } from './messages.ts';
 
 let engine: LocalEngine | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -10,13 +10,37 @@ let paused = false;
 let speed = 1;
 let awaitingAck = false;
 let snapshotSeq = 0;
+let tickMs: number[] = [];
+let lastSnapshotAt = 0;
+let lastAckMs: number | null = null;
 
 const post = (msg: FromWorker): void => postMessage(msg);
 const emitSnapshot = (): void => {
   if (!engine || awaitingAck) return;
   awaitingAck = true;
   snapshotSeq += 1;
-  post({ ...engine.snapshot(), seq: snapshotSeq });
+  const snapshot: ViewPayload = { ...engine.snapshot(), seq: snapshotSeq };
+  const total = tickMs.reduce((sum, value) => sum + value, 0);
+  const telemetryBase = {
+    tickMsAvg: tickMs.length === 0 ? 0 : total / tickMs.length,
+    tickMsMax: tickMs.length === 0 ? 0 : Math.max(...tickMs),
+    snapshotBytes: 0,
+    ackMs: lastAckMs,
+  };
+  const snapshotBytes = new TextEncoder().encode(
+    JSON.stringify({ ...snapshot, telemetry: telemetryBase }),
+  ).byteLength;
+  const telemetry = { ...telemetryBase, snapshotBytes };
+  tickMs = [];
+  lastSnapshotAt = performance.now();
+  post({ ...snapshot, telemetry });
+};
+
+const advance = (): void => {
+  if (!engine) return;
+  const started = performance.now();
+  engine.advance();
+  tickMs.push(performance.now() - started);
 };
 
 onmessage = (event: MessageEvent<ToWorker>): void => {
@@ -34,12 +58,12 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       speed = Math.max(1, Math.floor(msg.speed) || 1);
       awaitingAck = false;
       snapshotSeq = 0;
-      snapshotSeq += 1;
-      awaitingAck = true;
-      post({ ...engine.snapshot(), seq: snapshotSeq });
+      tickMs = [];
+      lastAckMs = null;
+      emitSnapshot();
       timer = setInterval(() => {
         if (!engine || paused) return;
-        for (let i = 0; i < speed && engine.state.winner < 0; i += 1) engine.advance();
+        for (let i = 0; i < speed && engine.state.winner < 0; i += 1) advance();
         emitSnapshot();
       }, TICK_MS);
       return;
@@ -54,7 +78,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       paused = msg.on;
       return;
     case 'step':
-      engine?.advance();
+      advance();
       emitSnapshot();
       return;
     case 'speed':
@@ -73,6 +97,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       return;
     case 'ack':
       if (msg.seq !== snapshotSeq) return;
+      lastAckMs = performance.now() - lastSnapshotAt;
       awaitingAck = false;
       emitSnapshot();
       return;

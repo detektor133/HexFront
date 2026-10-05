@@ -34,6 +34,8 @@ import {
   type Picked,
 } from './sandbox-selection.ts';
 import { createSplitGrab } from './split-drag.ts';
+import { useTelemetry } from './telemetry-client.ts';
+import type { PixiTelemetry, WorkerTelemetry } from './telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -96,6 +98,7 @@ interface Sandbox {
   readonly speed: number;
   readonly observerId: number | null;
   readonly events: readonly EventFeedItem[];
+  readonly workerTelemetry: WorkerTelemetry | null;
   focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
@@ -108,6 +111,7 @@ interface Sandbox {
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number): void;
+  pixiTelemetry(): PixiTelemetry;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -137,6 +141,7 @@ function useSandbox(
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
   const observerIdRef = useRef<number | null>(null);
+  const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -236,6 +241,7 @@ function useSandbox(
     let appliedMessage = false;
     const applyMessage = (m: ViewMessage): void => {
       viewRef.current = m.view;
+      workerTelemetryRef.current = m.telemetry ?? null;
       layerRef.current?.setView(m.view, pickedRef.current);
       setMsg(m);
       const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
@@ -389,6 +395,7 @@ function useSandbox(
     speed,
     observerId,
     events,
+    workerTelemetry: workerTelemetryRef.current,
     focusEvent(item) {
       if (item.hex !== null && typeof loaded !== 'string') {
         mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
@@ -407,6 +414,17 @@ function useSandbox(
       dockHeightRef.current = height;
       mapViewRef.current?.setBottomInset(height);
     },
+    pixiTelemetry() {
+      return (
+        mapViewRef.current?.sceneStats() ?? {
+          objects: 0,
+          text: 0,
+          graphics: 0,
+          textures: 0,
+          canvasTextTextures: null,
+        }
+      );
+    },
   };
 }
 
@@ -416,6 +434,11 @@ export function DevSandboxPage(): React.JSX.Element {
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
   const sb = useSandbox(hostRef, loaded, mapRequest);
+  const downloadTelemetry = useTelemetry({
+    view: () => sb.msg?.view ?? null,
+    pixi: sb.pixiTelemetry,
+    worker: () => sb.workerTelemetry,
+  });
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
   const [observerH, setObserverH] = useState(0);
@@ -450,6 +473,7 @@ export function DevSandboxPage(): React.JSX.Element {
           step={sb.step}
           setSpeed={sb.setSpeed}
           setObserver={sb.setObserver}
+          downloadTelemetry={downloadTelemetry}
           onHeight={setObserverH}
         />
       )}
