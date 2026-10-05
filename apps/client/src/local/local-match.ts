@@ -6,6 +6,10 @@ import type { FromWorker, ToWorker } from './messages.ts';
 export interface LocalMatch {
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  setPaused(on: boolean): void;
+  step(): void;
+  setSpeed(value: number): void;
+  setObserver(playerId: number | null): void;
   select(hex: number | null): void;
   dispose(): void;
 }
@@ -33,6 +37,10 @@ export function startLocalMatch(
   return {
     send: (cmd) => post({ t: 'command', cmd }),
     setFog: (on) => post({ t: 'fog', on }),
+    setPaused: (on) => post({ t: 'pause', on }),
+    step: () => post({ t: 'step' }),
+    setSpeed: (value) => post({ t: 'speed', value }),
+    setObserver: (playerId) => post({ t: 'observer', playerId }),
     select: (hex) => post({ t: 'select', hex }),
     dispose: () => worker.terminate(),
   };

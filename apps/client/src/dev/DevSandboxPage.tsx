@@ -16,6 +16,7 @@ import { EventFeed } from './EventFeed.tsx';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
 import { MatchEnd } from './MatchEnd.tsx';
+import { ObserverPanel } from './ObserverPanel.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
 import { appendEvents, type EventFeedItem } from './event-feed.ts';
@@ -90,10 +91,17 @@ interface Sandbox {
   readonly tool: ToolState | null;
   readonly army: number | null;
   readonly fog: boolean;
+  readonly paused: boolean;
+  readonly speed: number;
+  readonly observerId: number | null;
   readonly events: readonly EventFeedItem[];
   focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  setPaused(on: boolean): void;
+  step(): void;
+  setSpeed(value: number): void;
+  setObserver(playerId: number | null): void;
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
@@ -121,6 +129,9 @@ function useSandbox(
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
+  const [paused, setPausedState] = useState(matchSetup(window.location.search).speed === 0);
+  const [speed, setSpeedState] = useState(Math.max(1, matchSetup(window.location.search).speed));
+  const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
@@ -141,6 +152,22 @@ function useSandbox(
   const setFog = useCallback((on: boolean) => {
     matchRef.current?.setFog(on);
     setFogState(on);
+  }, []);
+  const setPaused = useCallback((on: boolean) => {
+    matchRef.current?.setPaused(on);
+    setPausedState(on);
+  }, []);
+  const step = useCallback(() => matchRef.current?.step(), []);
+  const setSpeed = useCallback((value: number) => {
+    matchRef.current?.setSpeed(value);
+    setSpeedState(value);
+    setPausedState(false);
+  }, []);
+  const setObserver = useCallback((playerId: number | null) => {
+    matchRef.current?.setObserver(playerId);
+    matchRef.current?.setFog(playerId !== null);
+    setObserverId(playerId);
+    setFogState(playerId === null);
   }, []);
   const setArmy = useCallback((id: number | null) => {
     armyRef.current = id;
@@ -219,6 +246,9 @@ function useSandbox(
       },
     );
     matchRef.current = match;
+    match.setObserver(null);
+    match.setFog(false);
+    setFogState(false);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
     const params = new URLSearchParams(window.location.search);
     const initialSelect = params.get('select');
@@ -323,6 +353,9 @@ function useSandbox(
     army,
     send,
     fog,
+    paused,
+    speed,
+    observerId,
     events,
     focusEvent(item) {
       if (item.hex !== null && typeof loaded !== 'string') {
@@ -330,6 +363,10 @@ function useSandbox(
       }
     },
     setFog,
+    setPaused,
+    step,
+    setSpeed,
+    setObserver,
     pick,
     setTool,
     setArmy,
@@ -365,6 +402,18 @@ export function DevSandboxPage(): React.JSX.Element {
       <div ref={hostRef} className={styles.map} />
       <EventFeed items={sb.events} now={performance.now()} onFocus={sb.focusEvent} />
       {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
+      {view && (
+        <ObserverPanel
+          view={view}
+          paused={sb.paused}
+          speed={sb.speed}
+          observerId={sb.observerId}
+          setPaused={sb.setPaused}
+          step={sb.step}
+          setSpeed={sb.setSpeed}
+          setObserver={sb.setObserver}
+        />
+      )}
       {view && <MatchEnd view={view} />}
       {view && (
         <ArmyBar

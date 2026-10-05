@@ -51,6 +51,10 @@ export type ToWorker =
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }
+  | { readonly t: 'pause'; readonly on: boolean }
+  | { readonly t: 'step' }
+  | { readonly t: 'speed'; readonly value: number }
+  | { readonly t: 'observer'; readonly playerId: number | null }
   | { readonly t: 'select'; readonly hex: number | null };
 
 export type FromWorker =

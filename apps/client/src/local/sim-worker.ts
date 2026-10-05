@@ -6,6 +6,8 @@ import type { FromWorker, ToWorker } from './messages.ts';
 
 let engine: LocalEngine | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
+let paused = false;
+let speed = 1;
 
 const post = (msg: FromWorker): void => postMessage(msg);
 
@@ -20,13 +22,11 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
         return;
       }
       engine = created;
-      const speed = Math.max(0, Math.floor(msg.speed));
-      if (speed === 0) {
-        post(engine.tick());
-        return;
-      }
+      paused = msg.speed === 0;
+      speed = Math.max(1, Math.floor(msg.speed) || 1);
+      post(engine.tick());
       timer = setInterval(() => {
-        if (!engine) return;
+        if (!engine || paused) return;
         for (let i = 1; i < speed && engine.state.winner < 0; i += 1) engine.tick();
         post(engine.tick());
       }, TICK_MS);
@@ -37,6 +37,19 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       return;
     case 'fog':
       engine?.setFog(msg.on);
+      return;
+    case 'pause':
+      paused = msg.on;
+      return;
+    case 'step':
+      if (engine) post(engine.tick());
+      return;
+    case 'speed':
+      speed = Math.max(1, Math.floor(msg.value));
+      return;
+    case 'observer':
+      engine?.setObserver(msg.playerId);
+      if (engine) post(engine.tick());
       return;
     case 'select':
       engine?.select(msg.hex);

@@ -38,6 +38,17 @@ describe('локальный режим', () => {
     expect(msg.view.units).toHaveLength(created.state.units.length);
   });
 
+  it('показывает снимок выбранного игрока и всю карту без изменения sim', () => {
+    const created = createLocalEngine(small, 42, 2, undefined, true);
+    if ('errors' in created) throw new Error(created.errors.join('\n'));
+    const before = created.state.fog;
+    created.setObserver(1);
+    expect(asView(created.tick()).view.playerId).toBe(1);
+    created.setObserver(null);
+    expect(asView(created.tick()).view.playerId).toBe(HUMAN_ID);
+    expect(created.state.fog).toBe(before);
+  });
+
   it('команды игрока применяются в следующем тике, отказы возвращаются', () => {
     const e = engine();
     e.queue({ t: 'setTax', rate: 400 as Fp });

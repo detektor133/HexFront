@@ -37,6 +37,7 @@ export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
   setFog(on: boolean): void;
+  setObserver(playerId: number | null): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): FromWorker;
@@ -94,6 +95,7 @@ export function createLocalEngine(
   const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];
   let selected: number | null = null;
+  let observerId: number | null = null;
   return {
     state,
     queue(cmd) {
@@ -101,6 +103,9 @@ export function createLocalEngine(
     },
     setFog(on) {
       state.fog = on;
+    },
+    setObserver(playerId) {
+      observerId = playerId;
     },
     select(hex) {
       selected = hex;
@@ -122,7 +127,7 @@ export function createLocalEngine(
       }
       return {
         t: 'view',
-        view: playerView(state, HUMAN_ID),
+        view: playerView(state, observerId ?? HUMAN_ID),
         selection: selected === null ? null : selectionOf(state, selected),
         rejected,
         events: state.events.slice(),
