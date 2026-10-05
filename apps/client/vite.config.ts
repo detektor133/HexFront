@@ -12,8 +12,28 @@ function mapsPlugin(): Plugin {
     name: 'hexfront-maps',
     configureServer(server) {
       server.middlewares.use('/maps', (req, res, next) => {
-        const id = /^\/([a-z0-9-]+)\.json$/.exec(req.url ?? '')?.[1];
+        const url = new URL(req.url ?? '/', 'http://localhost');
+        const id = /^\/([a-z0-9-]+)\.json$/.exec(url.pathname)?.[1];
         if (!id) return next();
+        if (id === 'gen') {
+          const seed = Number(url.searchParams.get('seed'));
+          const players = Number(url.searchParams.get('players'));
+          if (
+            !Number.isSafeInteger(seed) ||
+            !Number.isInteger(players) ||
+            players < 2 ||
+            players > 30
+          ) {
+            res.statusCode = 400;
+            res.end('Некорректные параметры процедурной карты');
+            return;
+          }
+          void import('../../packages/mapgen/src/index.ts').then(({ generateMap }) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(generateMap(seed, { width: 80, height: 60, players })));
+          });
+          return;
+        }
         try {
           const body = readFileSync(new URL(`${id}.json`, MAPS_DIR));
           res.setHeader('Content-Type', 'application/json');

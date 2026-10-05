@@ -22,6 +22,7 @@ import { appendEvents, type EventFeedItem } from './event-feed.ts';
 import { createOrderHooks } from './order-hooks.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
+import { readSandboxMap, sandboxMapUrl, type SandboxMapRequest } from './sandbox-map.ts';
 import {
   armySelection,
   NOTHING_PICKED,
@@ -38,9 +39,6 @@ import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
-/** Сид и число игроков: игрок и соперник без ботов (боты — этап 05). */
-const SEED = 42;
-const PLAYERS = 2;
 /** Наибольшее ускорение песочницы (тиков за 100 мс) — для записи матча. */
 const SPEED_MAX = 20;
 
@@ -48,7 +46,7 @@ const SPEED_MAX = 20;
 // под ботом (запись матча ботов), speed — ускорение.
 function matchSetup(search: string): { count: number; bots: number[]; speed: number } {
   const params = new URLSearchParams(search);
-  const count = Math.max(2, Math.floor(Number(params.get('players') ?? PLAYERS)) || PLAYERS);
+  const count = readSandboxMap(search).players;
   const watch = params.get('watch') === '1';
   const bots = Array.from({ length: count }, (_, i) => i).filter((i) => watch || i !== 0);
   const speed =
@@ -60,11 +58,11 @@ function matchSetup(search: string): { count: number; bots: number[]; speed: num
 
 type Loaded = { json: unknown; map: MapStatic } | 'loading' | 'error';
 
-function useMapJson(id: string): Loaded {
+function useMapJson(request: SandboxMapRequest): Loaded {
   const [state, setState] = useState<Loaded>('loading');
   useEffect(() => {
     let alive = true;
-    fetch(`/maps/${encodeURIComponent(id)}.json`)
+    fetch(sandboxMapUrl(request))
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((json: unknown) => {
         const result = loadMap(json);
@@ -78,7 +76,7 @@ function useMapJson(id: string): Loaded {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [request]);
   return state;
 }
 
@@ -104,7 +102,11 @@ interface Sandbox {
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
-function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loaded): Sandbox {
+function useSandbox(
+  hostRef: React.RefObject<HTMLDivElement | null>,
+  loaded: Loaded,
+  mapRequest: SandboxMapRequest,
+): Sandbox {
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
@@ -200,17 +202,22 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
-    const match = startLocalMatch(json, SEED, matchSetup(window.location.search), (m) => {
-      if (m.t === 'error') return setError(m.errors.join('; '));
-      viewRef.current = m.view;
-      layerRef.current?.setView(m.view, pickedRef.current);
-      setMsg(m);
-      const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
-      eventsRef.current = nextEvents;
-      setEvents(nextEvents);
-      const last = m.rejected.at(-1);
-      if (last) setLastReject(reasonText(last.reason));
-    });
+    const match = startLocalMatch(
+      json,
+      mapRequest.seed,
+      matchSetup(window.location.search),
+      (m) => {
+        if (m.t === 'error') return setError(m.errors.join('; '));
+        viewRef.current = m.view;
+        layerRef.current?.setView(m.view, pickedRef.current);
+        setMsg(m);
+        const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
+        eventsRef.current = nextEvents;
+        setEvents(nextEvents);
+        const last = m.rejected.at(-1);
+        if (last) setLastReject(reasonText(last.reason));
+      },
+    );
     matchRef.current = match;
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
     const params = new URLSearchParams(window.location.search);
@@ -305,7 +312,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       mapViewRef.current = null;
       eventsRef.current = [];
     };
-  }, [hostRef, loaded, pick, input, setTool, splitGrab]);
+  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab]);
 
   return {
     msg,
@@ -336,10 +343,10 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
 export function DevSandboxPage(): React.JSX.Element {
-  const params = new URLSearchParams(window.location.search);
-  const loaded = useMapJson(params.get('map') ?? 'small');
+  const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
+  const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
-  const sb = useSandbox(hostRef, loaded);
+  const sb = useSandbox(hostRef, loaded, mapRequest);
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
   const { army } = sb;
