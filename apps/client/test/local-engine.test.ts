@@ -75,12 +75,13 @@ describe('локальный режим', () => {
   it('показывает снимок выбранного игрока и всю карту без изменения sim', () => {
     const created = createLocalEngine(small, 42, 2, undefined, true);
     if ('errors' in created) throw new Error(created.errors.join('\n'));
-    const before = created.state.fog;
-    created.setObserver(1);
-    expect(asView(created.tick()).view.playerId).toBe(1);
-    created.setObserver(null);
-    expect(asView(created.tick()).view.playerId).toBe(HUMAN_ID);
-    expect(created.state.fog).toBe(before);
+    created.setView(1, true);
+    expect(asView(created.snapshot()).view.playerId).toBe(1);
+    created.setView(null, false);
+    expect(asView(created.snapshot()).view.playerId).toBe(HUMAN_ID);
+    expect(asView(created.snapshot()).view.hexes.visible.every((value) => value === 1)).toBe(true);
+    expect(created.state.fog).toBe(false);
+    expect(created.state.tick).toBe(0);
   });
 
   it('команды игрока применяются в следующем тике, отказы возвращаются', () => {

@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react';
+
 import type { PlayerView } from '@hexfront/sim';
 
 import styles from './ObserverPanel.module.css';
@@ -12,12 +14,24 @@ export interface ObserverPanelProps {
   readonly step: () => void;
   readonly setSpeed: (value: number) => void;
   readonly setObserver: (playerId: number | null) => void;
+  readonly onHeight?: (height: number) => void;
 }
 
 /** Управление стендом плейтеста без участия в командах симуляции. */
 export function ObserverPanel(props: ObserverPanelProps): React.JSX.Element {
+  const panelRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const onHeight = props.onHeight;
+    if (!panel || !onHeight) return;
+    const report = (): void => onHeight(panel.getBoundingClientRect().height);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [props.onHeight]);
   return (
-    <section className={styles.panel} aria-label={t('observer.title')}>
+    <section className={styles.panel} ref={panelRef} aria-label={t('observer.title')}>
       <button type="button" onClick={() => props.setPaused(!props.paused)}>
         {props.paused ? t('observer.resume') : t('observer.pause')}
       </button>

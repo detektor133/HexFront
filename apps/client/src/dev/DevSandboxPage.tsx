@@ -136,6 +136,7 @@ function useSandbox(
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
+  const observerIdRef = useRef<number | null>(null);
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -151,7 +152,7 @@ function useSandbox(
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
   const setFog = useCallback((on: boolean) => {
-    matchRef.current?.setFog(on);
+    matchRef.current?.setView(observerIdRef.current, on);
     setFogState(on);
   }, []);
   const setPaused = useCallback((on: boolean) => {
@@ -165,8 +166,8 @@ function useSandbox(
     setPausedState(false);
   }, []);
   const setObserver = useCallback((playerId: number | null) => {
-    matchRef.current?.setObserver(playerId);
-    matchRef.current?.setFog(playerId !== null);
+    matchRef.current?.setView(playerId, playerId !== null);
+    observerIdRef.current = playerId;
     setObserverId(playerId);
     setFogState(playerId !== null);
   }, []);
@@ -271,8 +272,7 @@ function useSandbox(
       },
     );
     matchRef.current = match;
-    match.setObserver(null);
-    match.setFog(false);
+    match.setView(null, false);
     setFogState(false);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
     const params = new URLSearchParams(window.location.search);
@@ -418,6 +418,7 @@ export function DevSandboxPage(): React.JSX.Element {
   const sb = useSandbox(hostRef, loaded, mapRequest);
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
+  const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
@@ -432,7 +433,12 @@ export function DevSandboxPage(): React.JSX.Element {
   return (
     <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
-      <EventFeed items={sb.events} now={performance.now()} onFocus={sb.focusEvent} />
+      <EventFeed
+        items={sb.events}
+        now={performance.now()}
+        onFocus={sb.focusEvent}
+        style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
+      />
       {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
       {view && (
         <ObserverPanel
@@ -444,6 +450,7 @@ export function DevSandboxPage(): React.JSX.Element {
           step={sb.step}
           setSpeed={sb.setSpeed}
           setObserver={sb.setObserver}
+          onHeight={setObserverH}
         />
       )}
       {view && <Leaderboard view={view} />}

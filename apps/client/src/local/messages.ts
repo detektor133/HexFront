@@ -55,6 +55,7 @@ export type ToWorker =
   | { readonly t: 'step' }
   | { readonly t: 'speed'; readonly value: number }
   | { readonly t: 'observer'; readonly playerId: number | null }
+  | { readonly t: 'view'; readonly playerId: number | null; readonly fog: boolean }
   | { readonly t: 'select'; readonly hex: number | null }
   | { readonly t: 'ack'; readonly seq: number };
 

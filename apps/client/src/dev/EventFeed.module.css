@@ -1,6 +1,6 @@
 .feed {
   position: absolute;
-  top: 64px;
+  top: calc(56px + var(--observer-h, 0px) + var(--space-sm));
   left: var(--space-lg);
   z-index: 3;
   display: flex;

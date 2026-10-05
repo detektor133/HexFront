@@ -39,6 +39,7 @@ export interface LocalEngine {
   queue(cmd: Command): void;
   setFog(on: boolean): void;
   setObserver(playerId: number | null): void;
+  setView(playerId: number | null, fog: boolean): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): ViewPayload;
@@ -140,6 +141,10 @@ export function createLocalEngine(
     },
     setObserver(playerId) {
       observerId = playerId;
+    },
+    setView(playerId, fog) {
+      observerId = playerId;
+      state.fog = fog;
     },
     select(hex) {
       selected = hex;

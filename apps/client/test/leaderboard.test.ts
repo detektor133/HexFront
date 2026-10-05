@@ -103,8 +103,8 @@ function view(overrides: Partial<PlayerView>): PlayerView {
 describe('таблица лидеров', () => {
   it('считает показатели каждого игрока по снимку', () => {
     expect(leaderboardRows(view({}))).toEqual([
-      { playerId: 0, hexes: 2, cities: 1, soldiers: 1500, gold: 1250, status: 'alive' },
-      { playerId: 1, hexes: 1, cities: 1, soldiers: 700, gold: 0, status: 'eliminated' },
+      { playerId: 0, hexes: 2, cities: 1, soldiers: 1500, gold: 1250, score: 12, status: 'alive' },
+      { playerId: 1, hexes: 1, cities: 1, soldiers: 700, gold: 0, score: 11, status: 'eliminated' },
     ]);
   });
 
@@ -123,7 +123,25 @@ describe('таблица лидеров', () => {
       cities: 0,
       soldiers: 0,
       gold: 0,
+      score: 0,
       status: 'eliminated',
     });
+  });
+
+  it('сортирует живых по очкам, выбывших ставит ниже, при равенстве использует id', () => {
+    const rows = leaderboardRows(
+      view({
+        players: [
+          { id: 0, gold: fp(0), taxTarget: fp(0), taxEffective: fp(0), status: 'alive' },
+          { id: 1, gold: fp(0), taxTarget: fp(0), taxEffective: fp(0), status: 'alive' },
+          { id: 2, gold: fp(0), taxTarget: fp(0), taxEffective: fp(0), status: 'eliminated' },
+        ],
+        hexes: { ...view({}).hexes, owner: Int16Array.from([1, 1, 0, 2]) },
+        cities: [],
+        units: [],
+      }),
+    );
+
+    expect(rows.map((row) => row.playerId)).toEqual([1, 0, 2]);
   });
 });

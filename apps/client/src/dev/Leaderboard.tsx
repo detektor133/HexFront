@@ -38,6 +38,7 @@ export function Leaderboard({ view }: LeaderboardProps): React.JSX.Element {
             <th scope="col">{t('leaderboard.cities')}</th>
             <th scope="col">{t('leaderboard.soldiers')}</th>
             <th scope="col">{t('leaderboard.gold')}</th>
+            <th scope="col">{t('leaderboard.score')}</th>
             <th scope="col">{t('leaderboard.status')}</th>
           </tr>
         </thead>
@@ -52,6 +53,7 @@ export function Leaderboard({ view }: LeaderboardProps): React.JSX.Element {
               <td>{row.cities}</td>
               <td>{formatSoldiers(row.soldiers)}</td>
               <td>{formatFp(row.gold)}</td>
+              <td>{row.score}</td>
               <td>{t(row.status === 'alive' ? 'leaderboard.alive' : 'leaderboard.eliminated')}</td>
             </tr>
           ))}

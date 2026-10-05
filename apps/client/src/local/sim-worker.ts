@@ -64,6 +64,10 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       engine?.setObserver(msg.playerId);
       emitSnapshot();
       return;
+    case 'view':
+      engine?.setView(msg.playerId, msg.fog);
+      emitSnapshot();
+      return;
     case 'select':
       engine?.select(msg.hex);
       return;
