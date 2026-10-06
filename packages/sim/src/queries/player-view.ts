@@ -277,3 +277,67 @@ export function playerView(
       })),
   };
 }
+
+/**
+ * Снимок для commander без копирования массивов карты.
+ * @returns данные, нужные автокомандованию; массивы карты принадлежат состоянию тика
+ */
+export function commanderView(
+  state: MatchState,
+  playerId: number,
+  context: PlayerViewContext,
+  cities = state.cities.map((c) => ({
+    id: c.id,
+    hex: c.hex,
+    owner: c.owner,
+    level: c.level,
+    name: c.name,
+    isCapital: state.players[c.owner]?.capitalCityId === c.id,
+    isolated: false,
+    defenders: c.defenders,
+    defenseOrg: c.defenseOrg,
+    recruitMax: 0 as Fp,
+    canRebuild: false,
+  })),
+): PlayerView {
+  const { hexes } = state;
+  const visible = state.fog ? (state.vision?.visible[playerId] ?? new Uint8Array(0)) : undefined;
+  return {
+    me: {
+      popTotal: 0,
+      popGrowthPerS: 0,
+      incomePerS: 0,
+      incomeAtTargetPerS: 0,
+      upkeepPerS: 0,
+      supplyLevel: FP as Fp,
+      bankrupt: false,
+      autoReinforce: false,
+      autoCommand: true,
+      foundCityCost: 0 as Fp,
+      growthMultAtTarget: FP as Fp,
+      score: 0,
+      place: 0,
+      players: 0,
+    },
+    tick: state.tick,
+    winner: state.winner,
+    playerId,
+    hexes: {
+      owner: hexes.owner,
+      pop: hexes.pop,
+      improvement: hexes.improvement,
+      building: hexes.building,
+      road: hexes.road,
+      link: context.links,
+      growth: context.growth,
+      visible: visible ?? new Uint8Array(0),
+    },
+    cities,
+    units: unitViews(state, playerId, visible),
+    armies: armyViews(state, playerId),
+    plans: planViews(state, playerId),
+    players: state.players,
+    constructions: [],
+    recruits: [],
+  };
+}

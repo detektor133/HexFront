@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import small from '../../mapgen/maps/small.json' with { type: 'json' };
 import { commanderCommands } from '../src/bots/run.ts';
 import { loadMap } from '../src/map/load.ts';
+import { commanderView, createPlayerViewContext } from '../src/queries/player-view.ts';
 import { playerScore, playerScores } from '../src/queries/score.ts';
 import { createMatch } from '../src/state/create-match.ts';
 import { step } from '../src/step.ts';
@@ -26,6 +27,15 @@ function matchAt(ticks: number, tax: number) {
 }
 
 describe('снимок игрока одним проходом (04/T21, бюджет commander)', () => {
+  it('commander переиспользует массивы карты общего состояния тика', () => {
+    const state = createMatch(MAP, [{ name: 'P0' }, { name: 'P1' }], 11);
+    const view = commanderView(state, 0, createPlayerViewContext(state));
+
+    expect(view.hexes.owner).toBe(state.hexes.owner);
+    expect(view.hexes.pop).toBe(state.hexes.pop);
+    expect(view.hexes.building).toBe(state.hexes.building);
+  });
+
   it('рост населения всех гексов совпадает с расчётом по одному гексу', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 600 }), fc.integer({ min: 0, max: 1000 }), (t, tax) => {

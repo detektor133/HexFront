@@ -7,7 +7,9 @@ import { economyDecide } from './economy.ts';
 import { BOT_LINE_MAX_DEPTH, BOT_THINK_TICKS, COMMANDER_TICKS } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
 import type { HexId } from '../math/hex.ts';
+import type { Fp } from '../math/int.ts';
 import {
+  commanderView,
   createPlayerViewContext,
   playerView,
   type PlayerViewContext,
@@ -46,11 +48,24 @@ export function commanderCommands(
   }
   const botIds = new Set(bots);
   const turn = state.tick % COMMANDER_TICKS;
+  const cities = state.cities.map((c) => ({
+    id: c.id,
+    hex: c.hex,
+    owner: c.owner,
+    level: c.level,
+    name: c.name,
+    isCapital: state.players[c.owner]?.capitalCityId === c.id,
+    isolated: false,
+    defenders: c.defenders,
+    defenseOrg: c.defenseOrg,
+    recruitMax: 0 as Fp,
+    canRebuild: false,
+  }));
   for (const p of state.players) {
     if (p.status !== 'alive' || p.id % COMMANDER_TICKS !== turn) continue;
     const armies = armiesByOwner.get(p.id) ?? [];
     if (armies.length === 0) continue;
-    const view = playerView(state, p.id, viewContext);
+    const view = commanderView(state, p.id, viewContext, cities);
     const commanderContext = createCommanderContext(state.map, view, ownedHexes.get(p.id));
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
