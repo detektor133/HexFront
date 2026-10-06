@@ -6,6 +6,7 @@ import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
+import { addUnitToIndex, removeUnitFromIndex } from '../state/unit-index.ts';
 
 export type UnitCommand = Extract<
   Command,
@@ -151,6 +152,7 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
     slot: -1,
   };
   state.units.push(part);
+  addUnitToIndex(state, part);
   state.nextId += 1;
   return part;
 }
@@ -171,6 +173,7 @@ export function mergeUnits(state: MatchState, units: readonly Unit[]): void {
   kept.order = 'idle';
   stop(kept);
   const removed = new Set(rest.map((a) => a.id));
+  for (const unit of rest) removeUnitFromIndex(state, unit);
   const remaining = state.units.filter((a) => !removed.has(a.id));
   state.units.splice(0, state.units.length, ...remaining);
 }

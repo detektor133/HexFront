@@ -17,6 +17,7 @@ import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
+import { rebuildUnitIndex } from './unit-index.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
@@ -199,6 +200,7 @@ export function createMatch(
     if (spawn) addPlayer(state, playerId, spawn);
   });
   state.cities.sort((a, b) => a.id - b.id);
+  rebuildUnitIndex(state);
   recomputeAllNetworks(state);
   state.vision = createVisionState(state.players.length, state.hexes.owner.length);
   return state;

@@ -6,7 +6,8 @@ import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { neediestArmy } from '../state/armies.ts';
 import { planHexes } from '../state/front.ts';
-import type { MatchState, Recruitment } from '../state/types.ts';
+import type { MatchState, Recruitment, Unit } from '../state/types.ts';
+import { addUnitToIndex } from '../state/unit-index.ts';
 
 // Свой проходимый гекс без чужих отрядов и с местом: сначала город, иначе ближайший к нему,
 // при равной дистанции — наименьший HexId.
@@ -35,7 +36,7 @@ function spawnHex(state: MatchState, owner: number, cityHex: HexId): HexId | nul
 
 function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
   // Id растут монотонно, поэтому push сохраняет сортировку отрядов по id.
-  state.units.push({
+  const unit: Unit = {
     id: state.nextId,
     owner: r.owner,
     type: r.type,
@@ -56,7 +57,9 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     focus: -1,
     fireTarget: -1,
     slot: -1,
-  });
+  };
+  state.units.push(unit);
+  addUnitToIndex(state, unit);
   state.nextId += 1;
 }
 

@@ -10,6 +10,7 @@ export * from './state/types.ts';
 export * from './state/pop-cap.ts';
 export * from './state/create-match.ts';
 export * from './state/hash.ts';
+export { indexMatchesUnits, rebuildUnitIndex } from './state/unit-index.ts';
 export * from './commands/types.ts';
 export { applyCommands, validate } from './commands/apply.ts';
 export * from './step.ts';

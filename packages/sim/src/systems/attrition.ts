@@ -8,6 +8,7 @@ import {
 } from '../balance.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState, Unit } from '../state/types.ts';
+import { removeUnitFromIndex } from '../state/unit-index.ts';
 
 const GRACE_TICKS = intDiv(ATTRITION_GRACE_S * TICKS_PER_S, FP);
 
@@ -34,7 +35,10 @@ export function attritionSystem(state: MatchState): void {
       u.soldiers = (u.soldiers - lost) as Fp;
     }
     if (u.soldiers >= FP) survivors.push(u);
-    else state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
+    else {
+      removeUnitFromIndex(state, u);
+      state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
+    }
   }
   if (survivors.length !== state.units.length) {
     state.units.splice(0, state.units.length, ...survivors);

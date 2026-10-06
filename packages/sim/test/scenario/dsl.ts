@@ -29,6 +29,7 @@ import {
   type MatchState,
   type Player,
 } from '../../src/state/types.ts';
+import { addUnitToIndex } from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
 
 /** Клетка сетки: столбец и строка. */
@@ -509,7 +510,7 @@ function makeScenario(
     unit(player, type, soldiers, where) {
       const id = state.nextId;
       state.nextId += 1;
-      state.units.push({
+      const unit: Unit = {
         id,
         owner: idOf(player),
         type,
@@ -529,7 +530,9 @@ function makeScenario(
         focus: -1,
         fireTarget: -1,
         slot: -1,
-      });
+      };
+      state.units.push(unit);
+      addUnitToIndex(state, unit);
       return id;
     },
     cmd(player, command, source) {

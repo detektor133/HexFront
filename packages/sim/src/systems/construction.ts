@@ -3,13 +3,14 @@
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
+import { addCityToIndex } from '../state/unit-index.ts';
 
 function complete(state: MatchState, c: Construction): void {
   const { hexes } = state;
   switch (c.kind) {
-    case 'foundCity':
+    case 'foundCity': {
       // Id растут монотонно, поэтому push сохраняет сортировку городов по id.
-      state.cities.push({
+      const city = {
         id: state.nextId,
         hex: c.hex,
         owner: c.owner,
@@ -20,10 +21,13 @@ function complete(state: MatchState, c: Construction): void {
         defenseOrg: ORG_MAX,
         inBattle: false,
         captureTicks: 0,
-      });
+      };
+      state.cities.push(city);
+      addCityToIndex(state, city);
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);
       return;
+    }
     case 'upgradeCity': {
       const city = state.cities.find((x) => x.hex === c.hex);
       if (city) city.level += 1;

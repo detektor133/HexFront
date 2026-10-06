@@ -3,6 +3,7 @@
 import { MAX_UNITS_PER_HEX, RETREAT_MOVE_MULT, RETREAT_SOLDIER_LOSS } from '../balance.ts';
 import { hexSupplyEff } from './supply.ts';
 import type { MatchState, Unit } from './types.ts';
+import { moveUnitInIndex, unitIndex } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { fpMul, intDiv, FP, type Fp } from '../math/int.ts';
@@ -22,13 +23,9 @@ function candidates(state: MatchState, unit: Unit, attackerHexes: readonly HexId
     if (!inBounds(n, width, height)) continue;
     const id = hexId(n, width);
     if (state.hexes.owner[id] !== unit.owner || state.map.terrain[id] === TERRAIN.water) continue;
-    let own = 0;
-    let foreign = false;
-    for (const u of state.units) {
-      if (u.hex !== id) continue;
-      if (u.owner === unit.owner) own += 1;
-      else foreign = true;
-    }
+    const occupants = unitIndex(state).unitsByHex[id] ?? [];
+    const own = occupants.filter((occupant) => occupant.owner === unit.owner).length;
+    const foreign = occupants.some((occupant) => occupant.owner !== unit.owner);
     if (foreign || own >= MAX_UNITS_PER_HEX) continue;
     const nearAttacker = attackerHexes.some((a) => distance(hexFromId(a, width), n) <= 1);
     result.push({ hex: id, nearAttacker, supply: hexSupplyEff(state, unit.owner, id) });
@@ -63,7 +60,9 @@ export function retreatOrCapitulate(
   }
   const ticks = stepTicks(state, unit, unit.hex, target.hex) ?? 1;
   unit.soldiers = (unit.soldiers - fpMul(unit.soldiers, loss)) as Fp;
+  const from = unit.hex;
   unit.hex = target.hex;
+  moveUnitInIndex(state, unit, from);
   unit.order = 'retreat';
   unit.target = -1;
   unit.path = [];

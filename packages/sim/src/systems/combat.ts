@@ -19,6 +19,7 @@ import {
 import { captureHex } from '../state/capture.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
 import type { City, MatchState, Unit } from '../state/types.ts';
+import { moveUnitInIndex, removeUnitFromIndex } from '../state/unit-index.ts';
 
 export { flankMultiplier, supplyCombatMult } from '../queries/battle-math.ts';
 
@@ -151,12 +152,16 @@ function resolveUnits(state: MatchState, battles: readonly Battle[]): void {
   const survivors: Unit[] = [];
   for (const u of state.units) {
     if (u.soldiers <= 0) {
+      removeUnitFromIndex(state, u);
       state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
       continue;
     }
     const hexes = attackerHexes.get(u);
-    if (hexes && u.org <= 0 && u.order !== 'retreat' && !retreatOrCapitulate(state, u, hexes)) {
-      continue;
+    if (hexes && u.org <= 0 && u.order !== 'retreat') {
+      if (!retreatOrCapitulate(state, u, hexes)) {
+        removeUnitFromIndex(state, u);
+        continue;
+      }
     }
     if (u.order === 'attack' && u.org <= 0) {
       u.order = 'idle';
@@ -178,7 +183,9 @@ function occupy(state: MatchState, hex: HexId): void {
   const power = (u: Unit): number => attackContribution(state.map, u, hex, state.units);
   for (const u of attackers) if (power(u) > power(winner)) winner = u;
   const city = state.cities.find((c) => c.hex === hex && c.owner !== winner.owner);
+  const from = winner.hex;
   winner.hex = hex;
+  moveUnitInIndex(state, winner, from);
   captureHex(state, hex, winner.owner);
   if (city) state.events.push({ t: 'cityCaptured', playerId: winner.owner, cityId: city.id });
   for (const u of attackersOf(state, hex).concat(winner)) {
@@ -198,6 +205,7 @@ function fleeLoneArtillery(state: MatchState, hex: HexId): void {
   const hexes = attackers.map((a) => a.hex);
   const lost = defenders.filter((u) => !retreatOrCapitulate(state, u, hexes, ARTY_FLEE_LOSS));
   if (lost.length === 0) return;
+  for (const unit of lost) removeUnitFromIndex(state, unit);
   const rest = state.units.filter((u) => !lost.includes(u));
   state.units.splice(0, state.units.length, ...rest);
 }
