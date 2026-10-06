@@ -2,6 +2,7 @@
 // GDD: docs/gdd/03-cities-buildings.md
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
+import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
 
@@ -24,6 +25,7 @@ function complete(state: MatchState, c: Construction): void {
       };
       state.cities.push(city);
       addCityToIndex(state, city);
+      markNetworkDirty(state, c.owner);
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);
       return;
@@ -39,10 +41,12 @@ function complete(state: MatchState, c: Construction): void {
     case 'fort':
       hexes.building[c.hex] = BUILDING.fort;
       state.supplyRevision += 1;
+      markSupplyDirty(state, c.owner);
       return;
     case 'depot':
       hexes.building[c.hex] = BUILDING.depot;
       state.supplyRevision += 1;
+      markSupplyDirty(state, c.owner);
       return;
     case 'road':
       return;

@@ -1,5 +1,6 @@
 // Основная сеть снабжения игрока: узлы (свои гексы с дорогой или городом), связанные со столицей.
 // GDD: docs/gdd/04-roads-supply.md — «Сети снабжения». Кэш и изоляция — networkSystem (02/T7).
+import { markNetworkClean, networkNeedsRecompute } from './derived-cache.ts';
 import type { MatchState } from './types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 
@@ -63,7 +64,8 @@ function components(state: MatchState, playerId: number): { id: number; hexes: H
 }
 
 /** Пересчитывает сети одного игрока: компоненты узлов, основная — со столицей. */
-export function recomputeNetworks(state: MatchState, playerId: number): void {
+export function recomputeNetworks(state: MatchState, playerId: number, force = false): void {
+  if (!force && !networkNeedsRecompute(state, playerId)) return;
   const { network } = state.hexes;
   const own = new Set(state.networks.filter((n) => n.owner === playerId).map((n) => n.id));
   network.forEach((id, hex) => {
@@ -82,11 +84,12 @@ export function recomputeNetworks(state: MatchState, playerId: number): void {
   state.networks = [...state.networks.filter((n) => n.owner !== playerId), ...fresh].sort(
     (a, b) => a.id - b.id,
   );
+  markNetworkClean(state, playerId);
 }
 
 /** Пересчитывает сети всех игроков (создание матча и сценарии). */
 export function recomputeAllNetworks(state: MatchState): void {
-  for (const p of state.players) recomputeNetworks(state, p.id);
+  for (const p of state.players) recomputeNetworks(state, p.id, true);
 }
 
 /**
