@@ -12,6 +12,8 @@ playwright-report/
 docs/reports/**/*.webm
 # Генерируется pnpm report:match (метрики, графики, CSV матчей) — смотреть локально.
 docs/reports/match/
+# Результаты локального бенчмарка полного матча.
+tools/bench/results/
 # Кадры и diff визуальной проверки (pnpm visual).
 apps/client/test-results/
 # Полные логи pnpm verify.

@@ -1,104 +1,249 @@
-// Бенчмарк полного локального матча: симуляция, боты и снимок на каждом тике.
-// Запуск: pnpm --filter @hexfront/bench full-match [--players=30,100] [--ticks=15000]
+// Раздельный бенчмарк полного локального матча.
+// Запуск: pnpm --filter @hexfront/bench full-match [--players=30,100] [--minutes=N]
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 
-import { createLocalEngine } from '../../../apps/client/src/local/engine.ts';
+import { buildViewDelta, canBuildViewDelta } from '../../../apps/client/src/local/view-delta.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
+import {
+  encodeDelta,
+  encodeSnapshot,
+  type DeltaMessage,
+  type SnapshotMessage,
+} from '../../../packages/protocol/src/index.ts';
+import {
+  botCommands,
+  commanderCommands,
+  createMatch,
+  createPlayerViewContext,
+  loadMap,
+  playerView,
+  step,
+  type MatchState,
+  type PlayerCommand,
+  type PlayerView,
+} from '../../../packages/sim/src/index.ts';
 
 const DEFAULT_PLAYERS: readonly number[] = [30, 100];
-const DEFAULT_TICKS = 15_000;
+const DEFAULT_MINUTES = 25;
+const TICKS_PER_MINUTE = 600;
 const SEED = 43;
+const SAMPLE_INTERVAL_TICKS = 50;
 const TARGETS_MS = new Map<number, number>([
   [30, 15],
   [100, 40],
 ]);
 
-interface MatchReport {
+export interface TimingSummary {
+  readonly meanMs: number;
+  readonly p95Ms: number;
+}
+
+export interface MinuteReport {
+  readonly minute: number;
+  readonly step: TimingSummary;
+  readonly commander: TimingSummary;
+  readonly economy: TimingSummary;
+  readonly snapshot: TimingSummary;
+  readonly playerView: TimingSummary;
+  readonly delta: TimingSummary;
+  readonly serialization: TimingSummary;
+  readonly snapshotBytes: number;
+}
+
+export interface MatchReport {
   readonly players: number;
   readonly bots: number;
   readonly ticks: number;
   readonly seed: number;
-  readonly elapsedMs: number;
-  readonly meanMs: number;
-  readonly p50Ms: number;
-  readonly p95Ms: number;
-  readonly p99Ms: number;
-  readonly maxMs: number;
   readonly targetMeanMs: number;
+  readonly minutes: readonly MinuteReport[];
+  readonly total: MinuteReport;
   readonly budgetExceeded: boolean;
 }
 
-interface FullMatchReport {
-  readonly node: string;
-  readonly map: 'gen';
-  readonly scenarios: readonly MatchReport[];
+interface Options {
+  readonly players: readonly number[];
+  readonly minutes: number;
 }
 
 function rounded(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-function percentile(sorted: readonly number[], quantile: number): number {
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * quantile))] ?? 0;
+function summarize(values: readonly number[]): TimingSummary {
+  if (values.length === 0) return { meanMs: 0, p95Ms: 0 };
+  const sorted = [...values].sort((left, right) => left - right);
+  const meanMs = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return {
+    meanMs: rounded(meanMs),
+    p95Ms: rounded(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 0),
+  };
 }
 
-function parsePlayers(): readonly number[] {
-  const value = process.argv.find((argument) => argument.startsWith('--players='))?.slice(10);
-  if (value === undefined || value.length === 0) return DEFAULT_PLAYERS;
-  const players = value.split(',').map((item) => Number(item));
+export function estimateSnapshotBytes(view: PlayerView): number {
+  const arrays = [
+    view.hexes.owner,
+    view.hexes.pop,
+    view.hexes.improvement,
+    view.hexes.building,
+    view.hexes.road,
+    view.hexes.link,
+    view.hexes.growth,
+    view.hexes.visible,
+  ].reduce((total, values) => total + values.length * 4, 0);
+  return arrays + view.units.length * 180 + view.plans.length * 100 + 512;
+}
+
+export function parseOptions(arguments_: readonly string[]): Options {
+  const playersValue = arguments_.find((argument) => argument.startsWith('--players='))?.slice(10);
+  const players =
+    playersValue === undefined || playersValue.length === 0
+      ? DEFAULT_PLAYERS
+      : playersValue.split(',').map((item) => Number(item));
   if (players.some((item) => !Number.isInteger(item) || !TARGETS_MS.has(item))) {
     throw new Error('--players должен содержать только 30 и 100');
   }
-  return players;
+  const minutesValue = arguments_.find((argument) => argument.startsWith('--minutes='))?.slice(10);
+  const minutes = minutesValue === undefined ? DEFAULT_MINUTES : Number(minutesValue);
+  if (!Number.isInteger(minutes) || minutes < 1)
+    throw new Error('--minutes должен быть положительным целым');
+  return { players, minutes };
 }
 
-function parseTicks(): number {
-  const value = process.argv.find((argument) => argument.startsWith('--ticks='))?.slice(8);
-  const ticks = value === undefined ? DEFAULT_TICKS : Number(value);
-  if (!Number.isInteger(ticks) || ticks < 1)
-    throw new Error('--ticks должен быть положительным целым');
-  return ticks;
+type Timings = Record<
+  'step' | 'commander' | 'economy' | 'snapshot' | 'playerView' | 'delta' | 'serialization',
+  number[]
+>;
+
+function emptyTimings(): Timings {
+  return {
+    step: [],
+    commander: [],
+    economy: [],
+    snapshot: [],
+    playerView: [],
+    delta: [],
+    serialization: [],
+  };
 }
 
-function runScenario(players: number, ticks: number): MatchReport {
-  const map = generateMap(SEED, { players });
+function toMinuteReport(minute: number, timings: Timings, snapshotBytes: number): MinuteReport {
+  return {
+    minute,
+    step: summarize(timings.step),
+    commander: summarize(timings.commander),
+    economy: summarize(timings.economy),
+    snapshot: summarize(timings.snapshot),
+    playerView: summarize(timings.playerView),
+    delta: summarize(timings.delta),
+    serialization: summarize(timings.serialization),
+    snapshotBytes,
+  };
+}
+
+function buildCommands(
+  state: MatchState,
+  bots: readonly number[],
+): { commander: PlayerCommand[]; economy: PlayerCommand[] } {
+  const context = createPlayerViewContext(state);
+  return {
+    commander: commanderCommands(state, bots, context),
+    economy: botCommands(state, bots, context),
+  };
+}
+
+function runScenario(players: number, minutes: number): MatchReport {
+  const loaded = loadMap(generateMap(SEED, { players }));
+  if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
   const bots = Array.from({ length: players }, (_, id) => id);
-  const created = createLocalEngine(map, SEED, players, bots, false);
-  if ('errors' in created) throw new Error(created.errors.join('\n'));
+  const state = createMatch(
+    loaded.map,
+    bots.map((id) => ({ name: `P${id}` })),
+    SEED,
+    { fog: false },
+  );
+  const minuteReports: MinuteReport[] = [];
+  const all = emptyTimings();
+  let currentMinute = emptyTimings();
+  let previousView: PlayerView | null = null;
+  let snapshotBytes = 0;
+  const ticks = minutes * TICKS_PER_MINUTE;
 
-  const times: number[] = [];
-  const started = performance.now();
   for (let tick = 0; tick < ticks; tick += 1) {
-    const tickStarted = performance.now();
-    created.tick();
-    times.push(performance.now() - tickStarted);
-  }
-  const elapsedMs = performance.now() - started;
-  const sorted = [...times].sort((a, b) => a - b);
-  const meanMs = times.reduce((sum, time) => sum + time, 0) / times.length;
-  const targetMeanMs = TARGETS_MS.get(players);
-  if (targetMeanMs === undefined) throw new Error(`нет бюджета для ${players} игроков`);
+    const timings = emptyTimings();
+    const commanderStart = performance.now();
+    const commands = buildCommands(state, bots);
+    timings.commander.push(performance.now() - commanderStart);
+    const economyStart = performance.now();
+    const allCommands = [...commands.commander, ...commands.economy];
+    timings.economy.push(performance.now() - economyStart);
+    const stepStart = performance.now();
+    step(state, allCommands);
+    timings.step.push(performance.now() - stepStart);
 
+    const viewStart = performance.now();
+    const view = playerView(state, 0);
+    timings.playerView.push(performance.now() - viewStart);
+    const deltaStart = performance.now();
+    const delta: DeltaMessage | null =
+      previousView !== null && canBuildViewDelta(previousView, view)
+        ? buildViewDelta(previousView, view, state.events)
+        : null;
+    timings.delta.push(performance.now() - deltaStart);
+    previousView = view;
+    if (tick % SAMPLE_INTERVAL_TICKS === 0) {
+      const serializationStart = performance.now();
+      const snapshot: SnapshotMessage = { t: 'snapshot', tick: view.tick, view };
+      const snapshotText = encodeSnapshot(snapshot);
+      const payloadText = delta === null ? snapshotText : encodeDelta(delta);
+      timings.serialization.push(performance.now() - serializationStart);
+      snapshotBytes = new TextEncoder().encode(payloadText).byteLength;
+    } else {
+      snapshotBytes = estimateSnapshotBytes(view);
+    }
+    timings.snapshot.push(
+      (timings.playerView[0] ?? 0) + (timings.delta[0] ?? 0) + (timings.serialization[0] ?? 0),
+    );
+
+    for (const key of Object.keys(all) as (keyof Timings)[]) all[key].push(...timings[key]);
+    for (const key of Object.keys(currentMinute) as (keyof Timings)[])
+      currentMinute[key].push(...timings[key]);
+    if ((tick + 1) % TICKS_PER_MINUTE === 0) {
+      const minute = (tick + 1) / TICKS_PER_MINUTE;
+      minuteReports.push(toMinuteReport(minute, currentMinute, snapshotBytes));
+      currentMinute = emptyTimings();
+      process.stderr.write(`players=${players} minute=${minute}/${minutes}\n`);
+    }
+  }
+  const total = toMinuteReport(minutes, all, snapshotBytes);
+  const targetMeanMs = TARGETS_MS.get(players) ?? 0;
+  const fullTickMean =
+    total.step.meanMs + total.commander.meanMs + total.economy.meanMs + total.snapshot.meanMs;
   return {
     players,
     bots: bots.length,
     ticks,
     seed: SEED,
-    elapsedMs: rounded(elapsedMs),
-    meanMs: rounded(meanMs),
-    p50Ms: rounded(percentile(sorted, 0.5)),
-    p95Ms: rounded(percentile(sorted, 0.95)),
-    p99Ms: rounded(percentile(sorted, 0.99)),
-    maxMs: rounded(sorted.at(-1) ?? 0),
     targetMeanMs,
-    budgetExceeded: meanMs > targetMeanMs,
+    minutes: minuteReports,
+    total,
+    budgetExceeded: fullTickMean > targetMeanMs,
   };
 }
 
-const ticks = parseTicks();
-const report: FullMatchReport = {
-  node: process.version,
-  map: 'gen',
-  scenarios: parsePlayers().map((players) => runScenario(players, ticks)),
-};
-console.log(JSON.stringify(report, null, 2));
+export function run(arguments_: readonly string[] = process.argv.slice(2)): readonly MatchReport[] {
+  const options = parseOptions(arguments_);
+  const reports = options.players.map((players) => runScenario(players, options.minutes));
+  const resultDirectory = new URL('../results/', import.meta.url);
+  mkdirSync(resultDirectory, { recursive: true });
+  writeFileSync(
+    new URL(`full-match-${Date.now()}.json`, resultDirectory),
+    JSON.stringify({ node: process.version, map: 'gen', scenarios: reports }, null, 2),
+  );
+  return reports;
+}
+
+if (process.argv[1]?.endsWith('full-match-bench.ts')) {
+  console.log(JSON.stringify({ node: process.version, map: 'gen', scenarios: run() }, null, 2));
+}
