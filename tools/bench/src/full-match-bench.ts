@@ -19,8 +19,6 @@ import {
   loadMap,
   playerView,
   step,
-  type MatchState,
-  type PlayerCommand,
   type PlayerView,
 } from '../../../packages/sim/src/index.ts';
 
@@ -142,17 +140,6 @@ function toMinuteReport(minute: number, timings: Timings, snapshotBytes: number)
   };
 }
 
-function buildCommands(
-  state: MatchState,
-  bots: readonly number[],
-): { commander: PlayerCommand[]; economy: PlayerCommand[] } {
-  const context = createPlayerViewContext(state);
-  return {
-    commander: commanderCommands(state, bots, context),
-    economy: botCommands(state, bots, context),
-  };
-}
-
 function runScenario(players: number, minutes: number): MatchReport {
   const loaded = loadMap(generateMap(SEED, { players }));
   if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
@@ -172,12 +159,14 @@ function runScenario(players: number, minutes: number): MatchReport {
 
   for (let tick = 0; tick < ticks; tick += 1) {
     const timings = emptyTimings();
+    const context = createPlayerViewContext(state);
     const commanderStart = performance.now();
-    const commands = buildCommands(state, bots);
+    const commander = commanderCommands(state, bots, context);
     timings.commander.push(performance.now() - commanderStart);
     const economyStart = performance.now();
-    const allCommands = [...commands.commander, ...commands.economy];
+    const economy = botCommands(state, bots, context);
     timings.economy.push(performance.now() - economyStart);
+    const allCommands = [...commander, ...economy];
     const stepStart = performance.now();
     step(state, allCommands);
     timings.step.push(performance.now() - stepStart);
