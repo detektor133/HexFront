@@ -61,6 +61,7 @@
 
 | Константа | Значение |
 | --- | --- |
+| `MAPGEN_MAX_PLAYERS` | 100 `[ТЮНИНГ]` |
 | MAPGEN_NOISE_OCTAVES | 3 `[ТЮНИНГ]` |
 | MAPGEN_EDGE_WATER | 2 гекса `[ТЮНИНГ]` |
 | MAPGEN_WATER_SHARE | 25 % `[ТЮНИНГ]` |
