@@ -5,6 +5,7 @@ import small from '../../../mapgen/maps/small.json' with { type: 'json' };
 import { loadMap } from '../../src/map/load.ts';
 import { createMatch } from '../../src/state/create-match.ts';
 import { hashState } from '../../src/state/hash.ts';
+import { indexMatchesUnits, unitIndexMismatch } from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
 
 interface Result {
@@ -21,6 +22,7 @@ function run(): Result {
   let rejected = 0;
   for (let i = 0; i < DEVELOPMENT_TICKS; i += 1) {
     step(state, developmentCommands(state));
+    expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
     rejected += state.events.filter((e) => e.t === 'commandRejected').length;
   }
   const capital = state.cities.find((c) => c.id === state.players[0]?.capitalCityId);

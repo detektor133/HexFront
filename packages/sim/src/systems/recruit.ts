@@ -7,7 +7,7 @@ import { FP, intDiv, type Fp } from '../math/int.ts';
 import { neediestArmy } from '../state/armies.ts';
 import { planHexes } from '../state/front.ts';
 import type { MatchState, Recruitment, Unit } from '../state/types.ts';
-import { addUnitToIndex } from '../state/unit-index.ts';
+import { addUnit, allUnits } from '../state/unit-index.ts';
 
 // Свой проходимый гекс без чужих отрядов и с местом: сначала город, иначе ближайший к нему,
 // при равной дистанции — наименьший HexId.
@@ -58,8 +58,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     fireTarget: -1,
     slot: -1,
   };
-  state.units.push(unit);
-  addUnitToIndex(state, unit);
+  addUnit(state, unit);
   state.nextId += 1;
 }
 
@@ -70,7 +69,7 @@ function reinforce(state: MatchState, r: Recruitment): boolean {
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (armyId === null || !plan) return false;
   const line = new Set(planHexes(state, plan));
-  const units = state.units
+  const units = allUnits(state)
     .filter((u) => u.armyId === armyId && u.type === r.type && line.has(u.slot))
     .sort((a, b) => a.soldiers - b.soldiers || a.id - b.id);
   if (units.length < line.size) return false;

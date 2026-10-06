@@ -3,7 +3,7 @@
 import { MAX_UNITS_PER_HEX, RETREAT_MOVE_MULT, RETREAT_SOLDIER_LOSS } from '../balance.ts';
 import { hexSupplyEff } from './supply.ts';
 import type { MatchState, Unit } from './types.ts';
-import { moveUnitInIndex, unitIndex } from './unit-index.ts';
+import { moveUnit, unitIndex } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { fpMul, intDiv, FP, type Fp } from '../math/int.ts';
@@ -60,9 +60,7 @@ export function retreatOrCapitulate(
   }
   const ticks = stepTicks(state, unit, unit.hex, target.hex) ?? 1;
   unit.soldiers = (unit.soldiers - fpMul(unit.soldiers, loss)) as Fp;
-  const from = unit.hex;
-  unit.hex = target.hex;
-  moveUnitInIndex(state, unit, from);
+  moveUnit(state, unit, target.hex);
   unit.order = 'retreat';
   unit.target = -1;
   unit.path = [];

@@ -33,10 +33,21 @@ export function unitIndex(state: MatchState): UnitHexIndex {
   return indexes.get(state) ?? rebuildUnitIndex(state);
 }
 
+/** Возвращает массив отрядов для чтения без прямого обращения к контейнеру состояния. */
+export function allUnits(state: MatchState): readonly Unit[] {
+  return state.units;
+}
+
 /** Добавляет новый отряд в уже созданный индекс. */
 export function addUnitToIndex(state: MatchState, unit: Unit): void {
   const index = indexes.get(state);
   if (index) addToBucket(index, unit);
+}
+
+/** Добавляет отряд в состояние и производный индекс одной операцией. */
+export function addUnit(state: MatchState, unit: Unit): void {
+  state.units.push(unit);
+  addUnitToIndex(state, unit);
 }
 
 /** Удаляет отряд из индекса перед удалением из MatchState. */
@@ -60,6 +71,23 @@ export function moveUnitInIndex(state: MatchState, unit: Unit, from: HexId): voi
   addToBucket(index, unit);
 }
 
+/** Перемещает отряд в состоянии и производном индексе одной операцией. */
+export function moveUnit(state: MatchState, unit: Unit, to: HexId): void {
+  const from = unit.hex;
+  if (from === to) return;
+  unit.hex = to;
+  moveUnitInIndex(state, unit, from);
+}
+
+/** Удаляет набор отрядов из состояния и производного индекса одной операцией. */
+export function removeUnits(state: MatchState, units: readonly Unit[]): void {
+  if (units.length === 0) return;
+  const removed = new Set(units);
+  for (const unit of units) removeUnitFromIndex(state, unit);
+  const survivors = state.units.filter((unit) => !removed.has(unit));
+  state.units.splice(0, state.units.length, ...survivors);
+}
+
 /** Добавляет город в индекс после основания города. */
 export function addCityToIndex(state: MatchState, city: City): void {
   const index = indexes.get(state);
@@ -68,6 +96,11 @@ export function addCityToIndex(state: MatchState, city: City): void {
 
 /** Проверяет индекс полным построением; используется только тестами эквивалентности. */
 export function indexMatchesUnits(state: MatchState): boolean {
+  return unitIndexMismatch(state) === null;
+}
+
+/** Возвращает первую рассинхронизацию индекса с гексом и id отряда. */
+export function unitIndexMismatch(state: MatchState): string | null {
   const index = unitIndex(state);
   const expected = new Map<HexId, Unit[]>();
   for (const unit of state.units) {
@@ -78,7 +111,10 @@ export function indexMatchesUnits(state: MatchState): boolean {
   for (let hex = 0; hex < index.unitsByHex.length; hex += 1) {
     const actual = (index.unitsByHex[hex] ?? []).map((unit) => unit.id).sort((a, b) => a - b);
     const wanted = (expected.get(hex) ?? []).map((unit) => unit.id).sort((a, b) => a - b);
-    if (actual.length !== wanted.length || actual.some((id, i) => id !== wanted[i])) return false;
+    if (actual.length !== wanted.length || actual.some((id, i) => id !== wanted[i])) {
+      const unitId = actual.find((id) => !wanted.includes(id)) ?? wanted[0] ?? actual[0] ?? -1;
+      return `гекс ${hex}, отряд ${unitId}: индекс не совпадает с state.units`;
+    }
   }
-  return true;
+  return null;
 }

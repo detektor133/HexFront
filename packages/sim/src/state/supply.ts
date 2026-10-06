@@ -13,6 +13,7 @@ import {
 import { cityOutputMult } from './city-output.ts';
 import { isCityIsolated } from './network.ts';
 import { BUILDING, type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
+import { allUnits } from './unit-index.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, spiral } from '../math/hex.ts';
@@ -160,7 +161,7 @@ function best(options: readonly Option[], score: (o: Option) => number): Option 
  */
 export function recomputeSupply(state: MatchState, owner: number): void {
   const nets = state.networks.filter((n) => n.owner === owner);
-  const units = state.units.filter((u) => u.owner === owner);
+  const units = allUnits(state).filter((u) => u.owner === owner);
   const loss = lossMap(state, owner);
   const dists = nets.map((n) => lossFrom(state, owner, n.id, loss));
   const options = new Map<Unit, Option[]>();

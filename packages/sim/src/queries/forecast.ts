@@ -14,6 +14,7 @@ import type { MapStatic } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState, Unit } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 export type ForecastOutcome = 'victory' | 'defeat' | 'stalemate';
 
@@ -154,7 +155,7 @@ export function forecastInState(
       hasCity: (hex) => state.cities.some((c) => c.hex === hex),
     },
     attackers,
-    defenders: state.units.filter((u) => u.hex === target && u.owner !== owner),
+    defenders: allUnits(state).filter((u) => u.hex === target && u.owner !== owner),
     city: city ?? null,
     all: state.units,
     target,

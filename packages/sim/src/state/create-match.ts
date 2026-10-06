@@ -17,7 +17,7 @@ import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
-import { rebuildUnitIndex } from './unit-index.ts';
+import { addUnit, rebuildUnitIndex } from './unit-index.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
@@ -152,7 +152,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
   const auto = state.players[playerId]?.autoCommand ?? true;
   state.armies.push({ id: armyId, owner: playerId, number: 1, name: '', auto });
   for (let i = 0; i < START_UNITS; i += 1) {
-    state.units.push({
+    addUnit(state, {
       id: state.nextId,
       owner: playerId,
       type: START_UNIT_TYPE,

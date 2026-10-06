@@ -5,7 +5,7 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const SIM_FILES = ['packages/sim/**/*.ts'];
+const SIM_FILES = ['packages/sim/src/**/*.ts'];
 
 const simRestrictedGlobals = [
   'Date',
@@ -62,6 +62,25 @@ const simRestrictedProperties = floatMath.map((property) => ({
 }));
 
 const simRestrictedSyntax = [
+  {
+    selector: "AssignmentExpression[left.computed=false][left.property.name='hex']",
+    message: 'Изменение unit.hex выполняется только через state/unit-index.ts.',
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='push'][callee.object.object.name='state'][callee.object.property.name='units']",
+    message: 'Добавление в state.units выполняется только через state/unit-index.ts.',
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='splice'][callee.object.object.name='state'][callee.object.property.name='units']",
+    message: 'Удаление из state.units выполняется только через state/unit-index.ts.',
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='filter'][callee.object.object.name='state'][callee.object.property.name='units']",
+    message: 'Фильтрация state.units выполняется через accessor из state/unit-index.ts.',
+  },
   {
     selector: "BinaryExpression[operator='/']",
     message: 'Деление только через intDiv/fpDiv из src/math.',
@@ -171,13 +190,35 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/sim/src/state/unit-index.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ExportDefaultDeclaration', message: 'Только именованные экспорты.' },
+        ...simRestrictedSyntax.filter(
+          (rule) =>
+            !rule.selector.includes("property.name='hex'") &&
+            !rule.selector.includes("property.name='units'") &&
+            !rule.selector.includes("property.name='push'") &&
+            !rule.selector.includes("property.name='splice'") &&
+            !rule.selector.includes("property.name='filter'"),
+        ),
+      ],
+    },
+  },
+  {
     // Тесты сверяют результат с эталоном на BigInt; Math.random по-прежнему запрещён.
     files: ['packages/sim/**/*.test.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
         { selector: 'ExportDefaultDeclaration', message: 'Только именованные экспорты.' },
-        ...simRestrictedSyntax.filter((r) => !r.selector.includes("'/'")),
+        ...simRestrictedSyntax.filter(
+          (r) =>
+            !r.selector.includes("'/'") &&
+            !r.selector.includes("property.name='units'") &&
+            !r.selector.includes("property.name='hex'"),
+        ),
       ],
     },
   },

@@ -4,6 +4,7 @@ import type { UnitType } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import type { MatchState, UnitOrder } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 import { isStarving } from '../systems/attrition.ts';
 
 /** Отряд в снимке; поля null/пусто у чужих отрядов. */
@@ -42,7 +43,7 @@ export interface ArmyView {
 
 /** Отряды для снимка игрока playerId. */
 export function unitViews(state: MatchState, playerId: number, visible?: Uint8Array): UnitView[] {
-  return state.units
+  return allUnits(state)
     .filter((u) => u.owner === playerId || (visible?.[u.hex] ?? 1) === 1)
     .map((u) => {
       const mine = u.owner === playerId;

@@ -2,6 +2,7 @@
 import { SCORE_CITY, SCORE_HEX, SCORE_PER_100_SOLDIERS } from '../balance.ts';
 import { FP, intDiv } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 /** Солдат на одно очко за войска. */
 const SOLDIERS_PER_SCORE = 100;
@@ -16,7 +17,7 @@ export function playerScore(state: MatchState, playerId: number): number {
   state.hexes.owner.forEach((o) => {
     if (o === playerId) hexes += 1;
   });
-  const soldiers = state.units
+  const soldiers = allUnits(state)
     .filter((a) => a.owner === playerId)
     .reduce((sum, a) => sum + a.soldiers, 0);
   return (

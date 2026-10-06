@@ -29,7 +29,12 @@ import {
   type MatchState,
   type Player,
 } from '../../src/state/types.ts';
-import { addUnitToIndex } from '../../src/state/unit-index.ts';
+import {
+  addUnit,
+  indexMatchesUnits,
+  removeUnits,
+  unitIndexMismatch,
+} from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
 
 /** Клетка сетки: столбец и строка. */
@@ -351,6 +356,7 @@ export interface Scenario {
   armiesOf(player: string): Army[];
   /** Отряд по id или undefined. */
   unitById(id: number): Unit | undefined;
+  removeUnits(ids: readonly number[]): void;
 }
 
 /**
@@ -531,8 +537,7 @@ function makeScenario(
         fireTarget: -1,
         slot: -1,
       };
-      state.units.push(unit);
-      addUnitToIndex(state, unit);
+      addUnit(state, unit);
       return id;
     },
     cmd(player, command, source) {
@@ -553,6 +558,9 @@ function makeScenario(
     runTicks(ticks) {
       for (let i = 0; i < ticks; i += 1) {
         step(state, queue.splice(0));
+        if (!indexMatchesUnits(state)) {
+          throw new Error(`сценарий: ${unitIndexMismatch(state) ?? 'индекс рассинхронизирован'}`);
+        }
         log.push(...state.events);
       }
     },
@@ -612,6 +620,12 @@ function makeScenario(
     },
     unitById(id) {
       return state.units.find((a) => a.id === id);
+    },
+    removeUnits(ids) {
+      removeUnits(
+        state,
+        state.units.filter((unit) => ids.includes(unit.id)),
+      );
     },
   };
 }

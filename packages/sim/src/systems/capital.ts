@@ -5,6 +5,7 @@ import { FP, intDiv } from '../math/int.ts';
 import { setHexOwner } from '../state/hex-owner.ts';
 import { recomputeNetworks } from '../state/network.ts';
 import { NEUTRAL, type City, type MatchState, type Player } from '../state/types.ts';
+import { allUnits, removeUnits } from '../state/unit-index.ts';
 
 const CHAOS_TICKS = intDiv(CAPITAL_MOVE_CHAOS_S * TICKS_PER_S, FP);
 const GRACE_TICKS = intDiv(NO_CITY_GRACE_S * TICKS_PER_S, FP);
@@ -45,7 +46,10 @@ function eliminate(state: MatchState, p: Player): void {
     const rest = list.filter((x) => x.owner !== p.id);
     list.splice(0, list.length, ...rest);
   };
-  keep(state.units);
+  removeUnits(
+    state,
+    allUnits(state).filter((unit) => unit.owner === p.id),
+  );
   keep(state.armies);
   keep(state.constructions);
   keep(state.recruits);

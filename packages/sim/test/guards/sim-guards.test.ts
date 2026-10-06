@@ -31,6 +31,22 @@ describe('защиты симуляции', () => {
     expect(result?.errorCount).toBeGreaterThan(0);
   });
 
+  it('ESLint запрещает прямую мутацию индекса отрядов', async () => {
+    const eslint = new ESLint({ cwd: ROOT, ignore: false });
+    const code = `
+      function broken(state, unit) {
+        unit.hex = 1;
+        state.units.push(unit);
+        state.units.splice(0, 1);
+      }
+    `;
+    const [result] = await eslint.lintText(code, {
+      filePath: `${ROOT}packages/sim/src/forbidden.ts`,
+    });
+    const messages = result?.messages.map((m) => m.message) ?? [];
+    expect(messages.filter((m) => m.includes('state/unit-index.ts')).length).toBe(3);
+  });
+
   it('dependency-cruiser отклоняет импорт из apps/* в packages/sim', async () => {
     const require = createRequire(import.meta.url);
     const config = require(`${ROOT}.dependency-cruiser.cjs`) as {

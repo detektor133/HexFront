@@ -6,7 +6,7 @@ import { splitUnit, mergeUnits } from '../src/commands/unit.ts';
 import { loadMap } from '../src/map/load.ts';
 import { FP, type Fp } from '../src/math/int.ts';
 import { createMatch } from '../src/state/create-match.ts';
-import { indexMatchesUnits, rebuildUnitIndex } from '../src/state/unit-index.ts';
+import { indexMatchesUnits, rebuildUnitIndex, unitIndexMismatch } from '../src/state/unit-index.ts';
 import { step } from '../src/step.ts';
 import { attritionSystem } from '../src/systems/attrition.ts';
 
@@ -25,15 +25,15 @@ describe('индекс отрядов для запросов пути', () => {
 
     const part = splitUnit(state, first, (FP * 10) as Fp);
     mergeUnits(state, [first, part]);
-    expect(indexMatchesUnits(state)).toBe(true);
+    expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
 
     part.soldiers = 0 as Fp;
     attritionSystem(state);
-    expect(indexMatchesUnits(state)).toBe(true);
+    expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
 
     for (let tick = 0; tick < WAR_TICKS; tick += 1) {
       step(state, warCommands(state));
-      expect(indexMatchesUnits(state)).toBe(true);
+      expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
     }
   }, 30_000);
 });
