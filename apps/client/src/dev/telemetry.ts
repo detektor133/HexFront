@@ -1,5 +1,7 @@
 import type { PlayerView } from '@hexfront/sim';
 
+import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
+
 export interface WorkerTelemetry {
   readonly tickMsAvg: number;
   readonly tickMsMax: number;
@@ -55,6 +57,10 @@ export interface PixiTelemetry {
   readonly canvasTextTextures: number | null;
 }
 
+export interface CacheTelemetry {
+  readonly unit: UnitLayerCacheTelemetry;
+}
+
 export interface TelemetryLine {
   readonly realSeconds: number;
   readonly tick: number;
@@ -65,6 +71,7 @@ export interface TelemetryLine {
   readonly pixi: PixiTelemetry;
   readonly worker: WorkerTelemetry;
   readonly snapshots: SnapshotTelemetryCounts;
+  readonly caches: CacheTelemetry;
   readonly game: {
     readonly units: number;
     readonly armies: number;

@@ -16,6 +16,7 @@ import {
 } from '@hexfront/sim';
 
 import { captureProgress, cityFlashAlpha } from './battle-visuals.ts';
+import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
@@ -48,6 +49,7 @@ export interface EconomyLayer {
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
+  cacheTelemetry(): UnitLayerCacheTelemetry;
   /** Рисуемый план армии (режим рисования) или null. */
   setDraft(draft: Draft | null): void;
   /** Выбранная армия: у её фронта — ручки на концах. */
@@ -471,6 +473,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       selected = sel;
       redraw();
       unitLayer.setView(v, sel, performance.now());
+    },
+    cacheTelemetry() {
+      return unitLayer.cacheTelemetry();
     },
     setSplit(o) {
       split = o;

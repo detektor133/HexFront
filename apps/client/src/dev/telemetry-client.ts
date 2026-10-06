@@ -5,6 +5,7 @@ import type { PlayerView } from '@hexfront/sim';
 import {
   gameTelemetry,
   percentile,
+  type CacheTelemetry,
   type PixiTelemetry,
   type SnapshotTelemetryCounts,
   type TelemetryLine,
@@ -20,6 +21,7 @@ export interface TelemetrySource {
   pixi(): PixiTelemetry;
   worker(): WorkerTelemetry | null;
   snapshots(): SnapshotTelemetryCounts;
+  caches(): CacheTelemetry;
 }
 
 /** Записывает dev-метрики раз в 5 секунд; production-сборка не создаёт наблюдателей. */
@@ -71,6 +73,7 @@ export function useTelemetry(source: TelemetrySource): () => void {
         pixi: current.pixi(),
         worker,
         snapshots: current.snapshots(),
+        caches: current.caches(),
         game: gameTelemetry(view),
       };
       lines.current.push(line);

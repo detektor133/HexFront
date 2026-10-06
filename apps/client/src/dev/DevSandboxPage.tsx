@@ -37,6 +37,7 @@ import { createSplitGrab } from './split-drag.ts';
 import { useTelemetry } from './telemetry-client.ts';
 import {
   createSnapshotTelemetry,
+  type CacheTelemetry,
   type PixiTelemetry,
   type SnapshotTelemetry,
   type SnapshotTelemetryCounts,
@@ -106,6 +107,7 @@ interface Sandbox {
   readonly events: readonly EventFeedItem[];
   readonly workerTelemetry: WorkerTelemetry | null;
   snapshotTelemetry(): SnapshotTelemetryCounts;
+  cacheTelemetry(): CacheTelemetry;
   focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
@@ -439,6 +441,16 @@ function useSandbox(
         }
       );
     },
+    cacheTelemetry() {
+      return {
+        unit: layerRef.current?.cacheTelemetry() ?? {
+          shown: 0,
+          drawnAt: 0,
+          chips: 0,
+          encircledSince: 0,
+        },
+      };
+    },
   };
 }
 
@@ -453,6 +465,7 @@ export function DevSandboxPage(): React.JSX.Element {
     pixi: sb.pixiTelemetry,
     worker: () => sb.workerTelemetry,
     snapshots: sb.snapshotTelemetry,
+    caches: sb.cacheTelemetry,
   });
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);

@@ -15,6 +15,7 @@ import {
 } from '@hexfront/sim';
 
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
+import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
@@ -48,11 +49,14 @@ export interface UnitLayer {
   readonly container: Container;
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
+  cacheTelemetry(): UnitLayerCacheTelemetry;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
   frame(nowMs: number): void;
   destroy(): void;
 }
+
+export type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 
 interface Entry {
   readonly key: string;
@@ -61,6 +65,36 @@ interface Entry {
   readonly state: ChipState;
   /** Точка фишки при доле текущего тика frac ∈ [0, 1]. */
   at(frac: number): Point;
+}
+
+/** Удаляет значения снимка, которым больше не соответствует отряд или фишка. */
+export function pruneUnitLayerCaches<T, U, V>(
+  shown: Map<number, T>,
+  drawnAt: Map<string, T>,
+  chips: Map<string, U>,
+  encircledSince: Map<number, V>,
+  unitIds: ReadonlySet<number>,
+  chipKeys: ReadonlySet<string>,
+): void {
+  for (const id of shown.keys()) if (!unitIds.has(id)) shown.delete(id);
+  for (const id of encircledSince.keys()) if (!unitIds.has(id)) encircledSince.delete(id);
+  for (const key of drawnAt.keys()) if (!chipKeys.has(key)) drawnAt.delete(key);
+  for (const key of chips.keys()) if (!chipKeys.has(key)) chips.delete(key);
+}
+
+/** Возвращает размеры кэшей слоя для телеметрии песочницы. */
+export function unitLayerCacheTelemetry<T, U, V>(
+  shown: ReadonlyMap<number, T>,
+  drawnAt: ReadonlyMap<string, U>,
+  chips: ReadonlyMap<string, V>,
+  encircledSince: ReadonlyMap<number, number>,
+): UnitLayerCacheTelemetry {
+  return {
+    shown: shown.size,
+    drawnAt: drawnAt.size,
+    chips: chips.size,
+    encircledSince: encircledSince.size,
+  };
 }
 
 /** Пунктир по ломаной со сдвигом phase — для бегущих штрихов. */
@@ -291,9 +325,9 @@ export function createUnitLayer(
     for (const [key, chip] of chips) {
       if (keep.has(key)) continue;
       chip.destroy();
-      chips.delete(key);
-      drawnAt.delete(key);
     }
+    const unitIds = new Set(entries.flatMap((entry) => entry.units));
+    pruneUnitLayerCaches(shown, drawnAt, chips, encircledSince, unitIds, keep);
     for (const e of entries) {
       let chip = chips.get(e.key);
       if (!chip) {
@@ -329,6 +363,9 @@ export function createUnitLayer(
       const res = Math.ceil((window.devicePixelRatio * scale * CHIP_WORLD) / RES_STEP) * RES_STEP;
       textRes = Math.max(1, res * 2);
       for (const chip of chips.values()) chip.setResolution(textRes);
+    },
+    cacheTelemetry() {
+      return unitLayerCacheTelemetry(shown, drawnAt, chips, encircledSince);
     },
     frame(nowMs) {
       if (!view) return;
