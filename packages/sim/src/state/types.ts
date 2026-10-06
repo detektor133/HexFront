@@ -289,4 +289,18 @@ export interface VisionState {
   readonly road: Uint8Array[];
   readonly improvement: Uint8Array[];
   readonly building: Uint8Array[];
+  readonly coverage: Uint16Array[];
+  readonly ownerByHex: Int16Array;
+  readonly roadByHex: Uint8Array;
+  readonly improvementByHex: Uint8Array;
+  readonly buildingByHex: Uint8Array;
+  readonly unitSources: Map<number, VisionSource>;
+  readonly citySources: Map<number, VisionSource>;
+  readonly dirty: Set<number>[];
+  initialized: boolean;
+}
+
+export interface VisionSource {
+  readonly owner: number;
+  readonly hex: HexId;
 }
