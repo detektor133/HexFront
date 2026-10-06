@@ -46,6 +46,7 @@ import {
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
+import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -91,7 +92,8 @@ function useMapJson(request: SandboxMapRequest): Loaded {
   return state;
 }
 
-type ViewMessage = Extract<FromWorker, { t: 'view' }>;
+type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
+type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
 
 interface Sandbox {
   readonly msg: ViewMessage | null;
@@ -249,23 +251,29 @@ function useSandbox(
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
-    let pendingMessage: ViewMessage | null = null;
+    let pendingMessage: WorkerViewMessage | null = null;
     let frameRequest = 0;
     let appliedMessage = false;
-    const applyMessage = (m: ViewMessage): void => {
-      snapshotTelemetryRef.current?.track(m);
-      viewRef.current = m.view;
+    const deltaApplier = new ViewDeltaApplier();
+    const applyMessage = (m: WorkerViewMessage): void => {
+      const view =
+        m.kind === 'snapshot'
+          ? deltaApplier.applySnapshot(m.snapshot)
+          : deltaApplier.applyDelta(m.delta);
+      const applied = { ...m, view } as ViewMessage;
+      snapshotTelemetryRef.current?.track(applied);
+      viewRef.current = view;
       workerTelemetryRef.current = m.telemetry ?? null;
-      layerRef.current?.setView(m.view, pickedRef.current);
-      setMsg(m);
-      const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
+      layerRef.current?.setView(view, pickedRef.current);
+      setMsg(applied);
+      const nextEvents = appendEvents(eventsRef.current, m.events, view, performance.now());
       eventsRef.current = nextEvents;
       setEvents(nextEvents);
       const last = m.rejected.at(-1);
       if (last) setLastReject(reasonText(last.reason));
       matchRef.current?.ack(m.seq);
     };
-    const scheduleMessage = (m: ViewMessage): void => {
+    const scheduleMessage = (m: WorkerViewMessage): void => {
       if (!appliedMessage && layerRef.current) {
         appliedMessage = true;
         applyMessage(m);

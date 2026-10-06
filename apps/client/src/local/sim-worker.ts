@@ -3,6 +3,7 @@ import { TICK_MS } from '@hexfront/sim';
 
 import { createLocalEngine, type LocalEngine } from './engine.ts';
 import type { FromWorker, ToWorker, ViewPayload } from './messages.ts';
+import { ConfirmedViewDeltaStream } from './view-delta.ts';
 
 let engine: LocalEngine | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -13,6 +14,7 @@ let snapshotSeq = 0;
 let tickMs: number[] = [];
 let lastSnapshotAt = 0;
 let lastAckMs: number | null = null;
+const deltaStream = new ConfirmedViewDeltaStream();
 
 const post = (msg: FromWorker): void => postMessage(msg);
 const emitSnapshot = (): void => {
@@ -20,6 +22,15 @@ const emitSnapshot = (): void => {
   awaitingAck = true;
   snapshotSeq += 1;
   const snapshot: ViewPayload = { ...engine.snapshot(), seq: snapshotSeq };
+  const transport = deltaStream.next(snapshot.view, snapshot.events);
+  if (transport === null) return;
+  const snapshotPayload = {
+    t: snapshot.t,
+    seq: snapshot.seq,
+    selection: snapshot.selection,
+    rejected: snapshot.rejected,
+    events: snapshot.events,
+  };
   const total = tickMs.reduce((sum, value) => sum + value, 0);
   const telemetryBase = {
     tickMsAvg: tickMs.length === 0 ? 0 : total / tickMs.length,
@@ -28,12 +39,12 @@ const emitSnapshot = (): void => {
     ackMs: lastAckMs,
   };
   const snapshotBytes = new TextEncoder().encode(
-    JSON.stringify({ ...snapshot, telemetry: telemetryBase }),
+    JSON.stringify({ ...snapshotPayload, ...transport, telemetry: telemetryBase }),
   ).byteLength;
   const telemetry = { ...telemetryBase, snapshotBytes };
   tickMs = [];
   lastSnapshotAt = performance.now();
-  post({ ...snapshot, telemetry });
+  post({ ...snapshotPayload, ...transport, telemetry } as FromWorker);
 };
 
 const advance = (): void => {
@@ -60,6 +71,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       snapshotSeq = 0;
       tickMs = [];
       lastAckMs = null;
+      deltaStream.reset();
       emitSnapshot();
       timer = setInterval(() => {
         if (!engine || paused) return;
@@ -73,6 +85,8 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       return;
     case 'fog':
       engine?.setFog(msg.on);
+      deltaStream.requestFull();
+      emitSnapshot();
       return;
     case 'pause':
       paused = msg.on;
@@ -86,10 +100,12 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       return;
     case 'observer':
       engine?.setObserver(msg.playerId);
+      deltaStream.requestFull();
       emitSnapshot();
       return;
     case 'view':
       engine?.setView(msg.playerId, msg.fog);
+      deltaStream.requestFull();
       emitSnapshot();
       return;
     case 'select':
@@ -98,6 +114,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
     case 'ack':
       if (msg.seq !== snapshotSeq) return;
       lastAckMs = performance.now() - lastSnapshotAt;
+      deltaStream.acknowledge();
       awaitingAck = false;
       emitSnapshot();
       return;

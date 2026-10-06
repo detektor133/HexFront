@@ -9,6 +9,134 @@ import type { GameEvent, PlanView, PlayerView, UnitView } from '@hexfront/sim';
 export type FullSnapshotReason = 'start' | 'view' | 'fog';
 type ViewEvent = GameEvent;
 
+function equalJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function deltaMetadata(view: PlayerView): unknown {
+  return JSON.stringify(view, (key, value: unknown) =>
+    ['tick', 'hexes', 'units', 'plans'].includes(key) ? undefined : value,
+  );
+}
+
+function sameHexShape(left: PlayerView, right: PlayerView): boolean {
+  const names: readonly (keyof PlayerView['hexes'])[] = [
+    'owner',
+    'pop',
+    'improvement',
+    'building',
+    'road',
+    'link',
+    'growth',
+    'visible',
+  ];
+  return names.every((name) => left.hexes[name].length === right.hexes[name].length);
+}
+
+function collectionDelta<T extends { readonly id: number }>(
+  before: readonly T[],
+  after: readonly T[],
+): { readonly upsert: readonly T[]; readonly removed: readonly number[] } {
+  const oldById = new Map(before.map((item) => [item.id, item]));
+  const currentIds = new Set(after.map((item) => item.id));
+  const upsert = after.filter((item) => !equalJson(oldById.get(item.id), item));
+  const removed = before.filter((item) => !currentIds.has(item.id)).map((item) => item.id);
+  return { upsert, removed };
+}
+
+function planDelta(
+  before: readonly PlanView[],
+  after: readonly PlanView[],
+): { readonly upsert: readonly PlanView[]; readonly removed: readonly number[] } {
+  const oldById = new Map(before.map((plan) => [plan.armyId, plan]));
+  const currentIds = new Set(after.map((plan) => plan.armyId));
+  const upsert = after.filter((plan) => !equalJson(oldById.get(plan.armyId), plan));
+  const removed = before.filter((plan) => !currentIds.has(plan.armyId)).map((plan) => plan.armyId);
+  return { upsert, removed };
+}
+
+export function canBuildViewDelta(before: PlayerView, after: PlayerView): boolean {
+  return sameHexShape(before, after) && equalJson(deltaMetadata(before), deltaMetadata(after));
+}
+
+export function buildViewDelta(
+  before: PlayerView,
+  after: PlayerView,
+  events: readonly GameEvent[],
+): DeltaMessage {
+  const hexes: HexChange[] = [];
+  const names: readonly (keyof PlayerView['hexes'])[] = [
+    'owner',
+    'pop',
+    'improvement',
+    'building',
+    'road',
+    'link',
+    'growth',
+    'visible',
+  ];
+  for (let id = 0; id < after.hexes.owner.length; id += 1) {
+    const change: HexChange = { id };
+    for (const name of names) {
+      const value = after.hexes[name][id];
+      if (value !== before.hexes[name][id]) Object.assign(change, { [name]: value });
+    }
+    if (Object.keys(change).length > 1) hexes.push(change);
+  }
+  return {
+    t: 'delta',
+    baseTick: before.tick,
+    tick: after.tick,
+    d: {
+      hexes,
+      units: collectionDelta(before.units, after.units),
+      fronts: planDelta(before.plans, after.plans),
+      events,
+    },
+  };
+}
+
+export type ViewTransport =
+  | { readonly kind: 'snapshot'; readonly snapshot: SnapshotMessage }
+  | { readonly kind: 'delta'; readonly delta: DeltaMessage };
+
+export class ConfirmedViewDeltaStream {
+  private confirmed: PlayerView | null = null;
+  private sent: PlayerView | null = null;
+  private waiting = false;
+  private forceFull = true;
+
+  public requestFull(): void {
+    this.forceFull = true;
+  }
+
+  public reset(): void {
+    this.confirmed = null;
+    this.sent = null;
+    this.waiting = false;
+    this.forceFull = true;
+  }
+
+  public next(view: PlayerView, events: readonly GameEvent[]): ViewTransport | null {
+    if (this.waiting) return null;
+    const transport: ViewTransport =
+      this.forceFull || this.confirmed === null || !canBuildViewDelta(this.confirmed, view)
+        ? { kind: 'snapshot', snapshot: { t: 'snapshot', tick: view.tick, view } }
+        : { kind: 'delta', delta: buildViewDelta(this.confirmed, view, events) };
+    this.forceFull = false;
+    this.sent = view;
+    this.waiting = true;
+    return transport;
+  }
+
+  public acknowledge(): void {
+    if (this.sent === null) return;
+    this.confirmed = this.sent;
+    this.sent = null;
+    this.waiting = false;
+  }
+}
+
 function replaceCollection<T extends { readonly id: number }>(
   current: readonly T[],
   upsert: readonly T[],

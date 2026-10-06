@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DeltaMessage, SnapshotMessage } from '@hexfront/protocol';
 import type { Fp, PlayerView } from '@hexfront/sim';
 
-import { ViewDeltaApplier } from '../src/local/view-delta.ts';
+import {
+  ConfirmedViewDeltaStream,
+  ViewDeltaApplier,
+  buildViewDelta,
+} from '../src/local/view-delta.ts';
 
 const makeView = (): PlayerView => ({
   tick: 1,
@@ -81,6 +85,44 @@ const delta = (events: DeltaMessage['d']['events'] = []): DeltaMessage => ({
 });
 
 describe('применение дельта-снимков на клиенте', () => {
+  it('строит компактную дельту без изменений территории и сохраняет события', () => {
+    const before = makeView();
+    const after = { ...makeView(), tick: 2 };
+    const event = { t: 'playerEliminated' as const, playerId: 1 };
+
+    const message = buildViewDelta(before, after, [event]);
+
+    expect(message).toEqual({
+      t: 'delta',
+      baseTick: 1,
+      tick: 2,
+      d: {
+        hexes: [],
+        units: { upsert: [], removed: [] },
+        fronts: { upsert: [], removed: [] },
+        events: [event],
+      },
+    });
+    expect(JSON.stringify(message).length).toBeLessThan(JSON.stringify(snapshot()).length);
+  });
+
+  it('после подтверждения строит дельту, а смена вида и тумана возвращает полный снимок', () => {
+    const stream = new ConfirmedViewDeltaStream();
+    const first = stream.next(makeView(), []);
+    expect(first?.kind).toBe('snapshot');
+    stream.acknowledge();
+
+    const second = stream.next({ ...makeView(), tick: 2 }, []);
+    expect(second?.kind).toBe('delta');
+    stream.acknowledge();
+
+    stream.requestFull();
+    expect(stream.next({ ...makeView(), tick: 3 }, [])?.kind).toBe('snapshot');
+    stream.acknowledge();
+    stream.requestFull();
+    expect(stream.next({ ...makeView(), tick: 4 }, [])?.kind).toBe('snapshot');
+  });
+
   it('последовательно применяет изменения и не дублирует повторную дельту', () => {
     const applier = new ViewDeltaApplier();
     applier.applySnapshot(snapshot());

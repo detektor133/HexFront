@@ -1,5 +1,6 @@
 // Движок локального режима: матч sim, очередь команд игрока, снимок каждый тик.
 // Живёт в Web Worker (sim-worker.ts); отдельно — чтобы тестироваться без браузера.
+import type { SnapshotMessage } from '@hexfront/protocol';
 import {
   canFoundCity,
   checkConstruction,
@@ -122,10 +123,14 @@ export function createLocalEngine(
     }
     const events = pendingEvents;
     pendingEvents = [];
+    const view = playerView(state, observerId ?? HUMAN_ID);
+    const snapshot: SnapshotMessage = { t: 'snapshot', tick: view.tick, view };
     return {
       t: 'view',
       seq: 0,
-      view: playerView(state, observerId ?? HUMAN_ID),
+      view,
+      kind: 'snapshot',
+      snapshot,
       selection: selected === null ? null : selectionOf(state, selected),
       rejected,
       events,

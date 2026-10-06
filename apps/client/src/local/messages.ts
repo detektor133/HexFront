@@ -1,4 +1,5 @@
 // Сообщения между страницей и Web Worker локального режима (overview.md, «Локальный режим»).
+import type { DeltaMessage, SnapshotMessage } from '@hexfront/protocol';
 import type {
   Command,
   ConstructionCheck,
@@ -65,10 +66,28 @@ export interface ViewPayload {
   readonly t: 'view';
   readonly seq: number;
   readonly view: PlayerView;
+  readonly kind: 'snapshot';
+  readonly snapshot: SnapshotMessage;
   readonly selection: Selection | null;
   readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
   readonly events: readonly GameEvent[];
   readonly telemetry?: WorkerTelemetry;
 }
 
-export type FromWorker = ViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };
+interface DeltaViewPayloadBase {
+  readonly t: 'view';
+  readonly seq: number;
+  /** В дельта-сообщении поле отсутствует в wire-данных; используется для совместимости типов движка. */
+  readonly view: PlayerView;
+  readonly selection: Selection | null;
+  readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+  readonly events: readonly GameEvent[];
+  readonly telemetry?: WorkerTelemetry;
+}
+
+export type DeltaViewPayload =
+  | (DeltaViewPayloadBase & { readonly kind: 'snapshot'; readonly snapshot: SnapshotMessage })
+  | (DeltaViewPayloadBase & { readonly kind: 'delta'; readonly delta: DeltaMessage });
+
+export type FromWorker =
+  ViewPayload | DeltaViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };
