@@ -11,6 +11,7 @@ import {
   type DeltaMessage,
   type SnapshotMessage,
 } from '../../../packages/protocol/src/index.ts';
+import { BOT_THINK_TICKS, COMMANDER_TICKS } from '../../../packages/sim/src/balance.ts';
 import {
   botCommands,
   commanderCommands,
@@ -46,6 +47,8 @@ export interface MinuteReport {
   readonly playerView: TimingSummary;
   readonly delta: TimingSummary;
   readonly serialization: TimingSummary;
+  readonly commanderMsPerBotTurn: number;
+  readonly economyMsPerBotTurn: number;
   readonly snapshotBytes: number;
 }
 
@@ -77,6 +80,10 @@ function summarize(values: readonly number[]): TimingSummary {
     meanMs: rounded(meanMs),
     p95Ms: rounded(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 0),
   };
+}
+
+export function millisecondsPerBotTurn(totalMs: number, botTurns: number): number {
+  return botTurns === 0 ? 0 : rounded(totalMs / botTurns);
 }
 
 export function estimateSnapshotBytes(view: PlayerView): number {
@@ -114,6 +121,11 @@ type Timings = Record<
   number[]
 >;
 
+interface BotTurnCounts {
+  commander: number;
+  economy: number;
+}
+
 function emptyTimings(): Timings {
   return {
     step: [],
@@ -126,7 +138,16 @@ function emptyTimings(): Timings {
   };
 }
 
-function toMinuteReport(minute: number, timings: Timings, snapshotBytes: number): MinuteReport {
+function emptyBotTurnCounts(): BotTurnCounts {
+  return { commander: 0, economy: 0 };
+}
+
+function toMinuteReport(
+  minute: number,
+  timings: Timings,
+  botTurns: BotTurnCounts,
+  snapshotBytes: number,
+): MinuteReport {
   return {
     minute,
     step: summarize(timings.step),
@@ -136,8 +157,28 @@ function toMinuteReport(minute: number, timings: Timings, snapshotBytes: number)
     playerView: summarize(timings.playerView),
     delta: summarize(timings.delta),
     serialization: summarize(timings.serialization),
+    commanderMsPerBotTurn: millisecondsPerBotTurn(
+      timings.commander.reduce((sum, value) => sum + value, 0),
+      botTurns.commander,
+    ),
+    economyMsPerBotTurn: millisecondsPerBotTurn(
+      timings.economy.reduce((sum, value) => sum + value, 0),
+      botTurns.economy,
+    ),
     snapshotBytes,
   };
+}
+
+function countScheduledBotTurns(
+  state: { readonly players: readonly { readonly id: number; readonly status: string }[] },
+  bots: readonly number[],
+  period: number,
+  tick: number,
+): number {
+  return state.players.filter(
+    (player) =>
+      player.status === 'alive' && bots.includes(player.id) && player.id % period === tick % period,
+  ).length;
 }
 
 function runScenario(players: number, minutes: number): MatchReport {
@@ -153,12 +194,18 @@ function runScenario(players: number, minutes: number): MatchReport {
   const minuteReports: MinuteReport[] = [];
   const all = emptyTimings();
   let currentMinute = emptyTimings();
+  const allBotTurns = emptyBotTurnCounts();
+  let currentBotTurns = emptyBotTurnCounts();
   let previousView: PlayerView | null = null;
   let snapshotBytes = 0;
   const ticks = minutes * TICKS_PER_MINUTE;
 
   for (let tick = 0; tick < ticks; tick += 1) {
     const timings = emptyTimings();
+    const botTurns = {
+      commander: countScheduledBotTurns(state, bots, COMMANDER_TICKS, state.tick),
+      economy: countScheduledBotTurns(state, bots, BOT_THINK_TICKS, state.tick),
+    };
     const context = createPlayerViewContext(state);
     const commanderStart = performance.now();
     const commander = commanderCommands(state, bots, context);
@@ -196,16 +243,21 @@ function runScenario(players: number, minutes: number): MatchReport {
     );
 
     for (const key of Object.keys(all) as (keyof Timings)[]) all[key].push(...timings[key]);
+    allBotTurns.commander += botTurns.commander;
+    allBotTurns.economy += botTurns.economy;
     for (const key of Object.keys(currentMinute) as (keyof Timings)[])
       currentMinute[key].push(...timings[key]);
+    currentBotTurns.commander += botTurns.commander;
+    currentBotTurns.economy += botTurns.economy;
     if ((tick + 1) % TICKS_PER_MINUTE === 0) {
       const minute = (tick + 1) / TICKS_PER_MINUTE;
-      minuteReports.push(toMinuteReport(minute, currentMinute, snapshotBytes));
+      minuteReports.push(toMinuteReport(minute, currentMinute, currentBotTurns, snapshotBytes));
       currentMinute = emptyTimings();
+      currentBotTurns = emptyBotTurnCounts();
       process.stderr.write(`players=${players} minute=${minute}/${minutes}\n`);
     }
   }
-  const total = toMinuteReport(minutes, all, snapshotBytes);
+  const total = toMinuteReport(minutes, all, allBotTurns, snapshotBytes);
   const targetMeanMs = TARGETS_MS.get(players) ?? 0;
   const fullTickMean =
     total.step.meanMs + total.commander.meanMs + total.economy.meanMs + total.snapshot.meanMs;

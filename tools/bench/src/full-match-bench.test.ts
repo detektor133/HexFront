@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { estimateSnapshotBytes, parseOptions } from './full-match-bench.ts';
+import { estimateSnapshotBytes, millisecondsPerBotTurn, parseOptions } from './full-match-bench.ts';
 
 describe('бенчмарк полного матча', () => {
   it('ограничивает игроков допустимыми сценариями и принимает минуты', () => {
@@ -29,5 +29,10 @@ describe('бенчмарк полного матча', () => {
       plans: [],
     } as never;
     expect(estimateSnapshotBytes(view)).toBe(576);
+  });
+
+  it('нормирует время на число ходов ботов и обнуляет пустую выборку', () => {
+    expect(millisecondsPerBotTurn(6, 3)).toBe(2);
+    expect(millisecondsPerBotTurn(6, 0)).toBe(0);
   });
 });
