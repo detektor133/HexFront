@@ -2,10 +2,10 @@
 
 ## Условия
 
-- Node: `v22.12.0`, один процесс, одно ядро, карта `gen`, сид `43`.
+- Node: `v24.15.0`, один процесс, одно ядро, карта `gen`, сид `43`.
 - Команды:
-  - `fnm exec --using=v22.12.0 'C:\\Users\\Danil\\AppData\\Local\\pnpm\\pnpm.CMD' --filter @hexfront/bench full-match --players=30 --minutes=25`
-  - `fnm exec --using=v22.12.0 'C:\\Users\\Danil\\AppData\\Local\\pnpm\\pnpm.CMD' --filter @hexfront/bench full-match --players=100 --minutes=5`
+  - `pnpm --filter @hexfront/bench full-match --players=30 --minutes=25`
+  - `pnpm --filter @hexfront/bench full-match --players=100 --minutes=5`
 - Golden: полный `pnpm verify` прошёл; golden-хэши не изменялись.
 
 ## Результаты до/после

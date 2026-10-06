@@ -29,7 +29,7 @@
 ## 2. Стек (зафиксирован, см. ADR)
 
 - TypeScript 5.x, `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`.
-- pnpm workspaces, Node 22 LTS.
+- pnpm workspaces, Node 24 LTS.
 - `packages/sim` — чистая симуляция, **ноль runtime-зависимостей**.
 - `packages/protocol` — типы сообщений клиент/сервер, кодеки.
 - `apps/server` — Node, `ws`.
