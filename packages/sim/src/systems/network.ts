@@ -9,11 +9,7 @@ import type { MatchState } from '../state/types.ts';
 export function networkSystem(state: MatchState): void {
   const phase = state.tick % NETWORK_RECALC_TICKS;
   for (const p of state.players) {
-    if (
-      p.status === 'alive' &&
-      p.id % NETWORK_RECALC_TICKS === phase &&
-      networkNeedsRecompute(state, p.id)
-    )
-      recomputeNetworks(state, p.id);
+    if (p.status !== 'alive' || p.id % NETWORK_RECALC_TICKS !== phase) continue;
+    if (networkNeedsRecompute(state, p.id)) recomputeNetworks(state, p.id);
   }
 }

@@ -1,6 +1,6 @@
 // Основная сеть снабжения игрока: узлы (свои гексы с дорогой или городом), связанные со столицей.
 // GDD: docs/gdd/04-roads-supply.md — «Сети снабжения». Кэш и изоляция — networkSystem (02/T7).
-import { markNetworkClean, networkNeedsRecompute } from './derived-cache.ts';
+import { markNetworkClean, markSupplyDirty, networkNeedsRecompute } from './derived-cache.ts';
 import type { MatchState } from './types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 
@@ -84,6 +84,7 @@ export function recomputeNetworks(state: MatchState, playerId: number, force = f
   state.networks = [...state.networks.filter((n) => n.owner !== playerId), ...fresh].sort(
     (a, b) => a.id - b.id,
   );
+  markSupplyDirty(state, playerId);
   markNetworkClean(state, playerId);
 }
 

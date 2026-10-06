@@ -18,7 +18,7 @@ import { allUnits } from './unit-index.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, spiral } from '../math/hex.ts';
-import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
+import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 
 interface LossCache {
   readonly maps: Map<
@@ -197,9 +197,10 @@ export function recomputeSupply(state: MatchState, owner: number): void {
     if (o) final.set(u, o);
   }
   const r2 = ratios(state, nets, final);
+  const mapSize = state.map.width * state.map.height;
+  const currentIds = new Set(nets.map((network) => network.id));
   for (const id of state.supplyRatios.keys()) {
-    if (state.networks.find((net) => net.owner === owner && net.id === id) === undefined)
-      state.supplyRatios.delete(id);
+    if (intDiv(id, mapSize) === owner && !currentIds.has(id)) state.supplyRatios.delete(id);
   }
   for (const net of nets) state.supplyRatios.set(net.id, r2.get(net.id) ?? (FP as Fp));
   const bankrupt = state.players[owner]?.bankrupt === true;
