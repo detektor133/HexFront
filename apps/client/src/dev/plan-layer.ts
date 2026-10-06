@@ -23,6 +23,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import type { FrontTweenCacheTelemetry } from './cache-telemetry.ts';
 import { drawForecastPlate, forecastBadge } from './forecast-plate.ts';
 import { createFrontTweens } from './front-tween.ts';
 import {
@@ -62,6 +63,7 @@ export interface PlanLayer {
   setHover(world: Point | null): void;
   /** Кадр: пока линия фронта перетекает в новое положение, слой перерисовывается. */
   frame(nowMs: number): void;
+  cacheTelemetry(): FrontTweenCacheTelemetry;
   destroy(): void;
 }
 
@@ -358,6 +360,9 @@ export function createPlanLayer(
       if (!animating || !last) return;
       animating = tweens.active(nowMs);
       this.setView(...last);
+    },
+    cacheTelemetry() {
+      return tweens.cacheTelemetry();
     },
     destroy() {
       container.destroy({ children: true });

@@ -9,3 +9,7 @@ export interface EconomyLayerCacheTelemetry {
   readonly capturesByHex: number;
   readonly cityFlashes: number;
 }
+
+export interface FrontTweenCacheTelemetry {
+  readonly byArmy: number;
+}

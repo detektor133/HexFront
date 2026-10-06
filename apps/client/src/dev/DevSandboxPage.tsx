@@ -454,6 +454,7 @@ function useSandbox(
           capturesByHex: 0,
           cityFlashes: 0,
         },
+        frontTween: economy?.frontTween ?? { byArmy: 0 },
       };
     },
   };

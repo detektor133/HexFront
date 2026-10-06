@@ -1,5 +1,6 @@
 // Плавный переход линии фронта (04/T13): когда фронт едет за границей, линия не прыгает, а
 // перетекает в новое положение за `motion.map` мс с кривой `motion.easing` (style-guide, «Движение»).
+import type { FrontTweenCacheTelemetry } from './cache-telemetry.ts';
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -105,6 +106,8 @@ export interface FrontTweens {
   active(nowMs: number): boolean;
   /** Забыть армии без фронта. */
   keep(armyIds: ReadonlySet<number>): void;
+  /** Возвращает размер кэша переходов для телеметрии песочницы. */
+  cacheTelemetry(): FrontTweenCacheTelemetry;
 }
 
 /** Переходы линий фронта; reduced — prefers-reduced-motion: линия встаёт сразу. */
@@ -133,6 +136,9 @@ export function createFrontTweens(reduced: boolean): FrontTweens {
     },
     keep(armyIds) {
       for (const id of [...byArmy.keys()]) if (!armyIds.has(id)) byArmy.delete(id);
+    },
+    cacheTelemetry() {
+      return { byArmy: byArmy.size };
     },
   };
 }

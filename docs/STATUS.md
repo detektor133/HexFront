@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 05 — Боты, генератор карт, баланс, плейтест |
-| Текущая задача | 05/T9d |
+| Текущая задача | 05/T9e |
 | Ветка | `stage-05` |
 | Последнее обновление | 2026-10-06 |
 
@@ -105,11 +105,11 @@
 
 ## Следующая сессия
 
-- **05/T9c завершена:** `economy-layer` удаляет записи `capturesByHex` и `cityFlashes`, которым больше не соответствуют гексы или города снимка; размеры кэшей попадают в JSONL по пути `caches.economy`.
-- **Тесты:** добавлены проверки удаления неактуальных ключей и телеметрии размеров кэшей.
+- **05/T9d завершена:** `front-tween` удаляет записи `byArmy` через `keep`, а размер кэша попадает в JSONL по пути `caches.frontTween`.
+- **Тесты:** добавлена проверка удаления армии без фронта и телеметрии размера `byArmy`.
 - **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, тесты и visual.
-- **Следующая задача:** 05/T9d — кэш `front-tween`.
-- **Читать:** `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/cache-telemetry.ts`, `apps/client/src/dev/telemetry.ts`, `apps/client/test/economy-layer-cache.test.ts`.
+- **Следующая задача:** 05/T9e — итоговый замер утечки и число инструкций `Graphics`.
+- **Читать:** `apps/client/src/dev/front-tween.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/src/dev/telemetry.ts`, `apps/client/test/front-tween.test.ts`.
 
 - **05/T9b завершена:** снимок удаляет неактуальные записи `shown`, `drawnAt`, `chips` и `encircledSince`; их размеры попадают в JSONL по пути `caches.unit`.
 - **Тесты:** добавлена проверка удаления устаревших ключей и размеров кэшей; `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
