@@ -365,7 +365,7 @@ export function createPlanLayer(
       return tweens.cacheTelemetry();
     },
     destroy() {
-      container.destroy({ children: true });
+      container.destroy({ children: true, context: true });
     },
   };
 }

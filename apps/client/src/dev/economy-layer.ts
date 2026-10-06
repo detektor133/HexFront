@@ -461,7 +461,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         .poly(hexPolygon(center(selected.target), radius))
         .stroke({ color: tokens.status.danger, width: MARK_WIDTH_PX * k });
     }
-    for (const p of plates.removeChildren()) p.destroy({ children: true });
+    for (const p of plates.removeChildren()) p.destroy({ children: true, context: true });
     if (orderTarget) {
       const at = center(orderTarget.hex);
       marks.poly(hexPolygon(at, radius)).stroke({
@@ -550,8 +550,8 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       planLayer.frame(nowMs);
     },
     destroy() {
-      container.destroy({ children: true });
-      top.destroy({ children: true });
+      container.destroy({ children: true, context: true });
+      top.destroy({ children: true, context: true });
     },
   };
 }

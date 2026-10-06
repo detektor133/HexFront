@@ -105,7 +105,7 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
       }
     },
     destroy() {
-      container.destroy({ children: true });
+      container.destroy({ children: true, context: true });
     },
   };
 }

@@ -390,7 +390,7 @@ export function createUnitLayer(
     },
     destroy() {
       for (const chip of chips.values()) chip.destroy();
-      container.destroy({ children: true });
+      container.destroy({ children: true, context: true });
     },
   };
   return layer;

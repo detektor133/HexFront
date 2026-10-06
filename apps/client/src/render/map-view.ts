@@ -357,7 +357,7 @@ export async function createMapView(
     },
     destroy() {
       detach();
-      app.destroy({ removeView: true }, { children: true });
+      app.destroy({ removeView: true }, { children: true, context: true });
     },
   };
 }

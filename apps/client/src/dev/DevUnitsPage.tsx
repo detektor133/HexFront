@@ -147,7 +147,7 @@ export function DevUnitsPage(): React.JSX.Element {
       .init({ background: tokens.map.background, resizeTo: host, antialias: true })
       .then(() => {
         if (!alive) {
-          app.destroy(true);
+          app.destroy({ removeView: true }, { children: true, context: true });
           return;
         }
         host.appendChild(app.canvas);
@@ -167,7 +167,7 @@ export function DevUnitsPage(): React.JSX.Element {
       });
     return () => {
       alive = false;
-      app.destroy(true);
+      app.destroy({ removeView: true }, { children: true, context: true });
     };
   }, []);
 

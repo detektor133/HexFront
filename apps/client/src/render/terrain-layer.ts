@@ -257,8 +257,8 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
     destroy() {
       base.cacheAsTexture(false);
       overlay.cacheAsTexture(false);
-      base.destroy({ children: true });
-      overlay.destroy({ children: true });
+      base.destroy({ children: true, context: true });
+      overlay.destroy({ children: true, context: true });
     },
   };
 }

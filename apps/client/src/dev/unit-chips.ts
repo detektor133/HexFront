@@ -248,7 +248,7 @@ export function createChip(): Chip {
       count.resolution = r;
     },
     destroy() {
-      root.destroy({ children: true });
+      root.destroy({ children: true, context: true });
     },
   };
 }
