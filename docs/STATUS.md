@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 05 — Боты, генератор карт, баланс, плейтест |
-| Текущая задача | 05/T12a |
+| Текущая задача | 05/T12b |
 | Ветка | `stage-05` |
 | Последнее обновление | 2026-10-06 |
 
@@ -112,12 +112,13 @@
 
 ## Следующая сессия
 
-- **05/T12a завершена:** в `packages/protocol` добавлены типы полного снимка и дельты, JSON-кодеки с восстановлением typed-массивов и проверкой `baseTick`; дельта содержит изменения гексов, upsert/remove отрядов и фронтов, а также события.
-- **Тесты:** добавлен `packages/protocol/test/view-delta.test.ts` для round-trip снимка, сохранения дельты и отказа неверной базы.
-- **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, 659 тестов и visual.
-- **CI:** `pnpm ci:wait` для `HEAD c2ace56` не получил ответа GitHub API и был остановлен; повторить в начале следующей сессии.
-- **Следующая задача:** 05/T12b — применение дельт в клиенте.
-- **Читать:** `docs/architecture/protocol.md`, `docs/architecture/adr/0008-incremental-rendering-and-deltas.md`, `packages/protocol/src/index.ts`, `apps/client/src/local/`.
+- **05/T12b завершена:** в `apps/client/src/local/view-delta.ts` добавлен `ViewDeltaApplier`; он применяет изменения гексов, отрядов и планов от подтверждённого `tick`, сохраняет события и игнорирует повторную дельту.
+- **Полный снимок:** клиент запрашивает его при старте, смене вида и смене режима тумана; дельта до нового полного снимка отклоняется.
+- **Тесты:** добавлен `apps/client/test/view-delta.test.ts` для последовательности дельт, идемпотентности, событий, неверной базы и трёх причин полного снимка.
+- **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, тесты и visual; последняя строка `verify: OK (283 с)`.
+- **CI:** `pnpm ci:wait` для исходного `HEAD` завершился без ошибки; CI после push не ждать.
+- **Следующая задача:** 05/T12c — дельты локального воркера.
+- **Читать:** `docs/architecture/protocol.md`, `docs/architecture/adr/0008-incremental-rendering-and-deltas.md`, `packages/protocol/src/index.ts`, `apps/client/src/local/view-delta.ts`, `apps/client/src/local/sim-worker.ts`.
 
 - **05/T10a завершена:** мелкие динамические `Graphics` в фишках, плашках прогноза, метках и рамке выбора используют `context.batchMode = 'batch'`; telemetry передаёт `id`, инструкции, вершины и перестроения геометрии в секунду по каждому `Graphics`.
 - **Тесты:** добавлены проверки batch mode и исходниковый сторож для `unit-chips`/`forecast-plate`, а также `graphics-telemetry.test.ts`.

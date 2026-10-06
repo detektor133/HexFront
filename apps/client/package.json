@@ -12,6 +12,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@hexfront/protocol": "workspace:*",
     "@hexfront/sim": "workspace:*",
     "pixi.js": "^8.21.0",
     "react": "^19.3.0",
