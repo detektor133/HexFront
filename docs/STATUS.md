@@ -252,9 +252,6 @@
 ## Блокеры и открытые вопросы
 
 - 05/T5a разбита на T5a1–T5a4b по подсистемам; следующая задача — 05/T1a6d.
-- `pnpm ci:wait` для HEAD до начала задачи завис на запросе GitHub API без ответа; локальный полный `pnpm verify` зелёный.
-- 2026-10-06 · `pnpm ci:wait` для HEAD `12015f8` не получил ответа GitHub API и был остановлен; локальный полный `pnpm verify` для 05/T10a зелёный.
-- 2026-10-06 · `pnpm ci:wait` перед 05/T12c не получил ответа GitHub API и был остановлен; локальный полный `pnpm verify` для 05/T12c зелёный.
 - Полный `pnpm verify` после 05/T1a8: четыре падения вне области задачи — `mapgen/test/terrain.test.ts`, `mapgen/test/map.test.ts`, `sim/test/scenarios/front-follow.test.ts`, `sim/test/scenarios/front-ring.test.ts`; client typecheck, lint, tests и visual зелёные.
 - **Следующее действие:** владелец проверяет 30-ботовый матч и три таймлапса для 05/T1a5.
 

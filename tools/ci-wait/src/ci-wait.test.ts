@@ -56,7 +56,10 @@ describe('ожидание GitHub Actions', () => {
 
     expect(code).toBe(0);
     expect(delays).toEqual([30_000]);
-    expect(output).toEqual(['success https://github.com/acme/game/actions/runs/42']);
+    expect(output).toEqual([
+      'pending https://github.com/acme/game/actions/runs/42 0',
+      'success https://github.com/acme/game/actions/runs/42',
+    ]);
   });
 
   it('выбирает завершённый run, если API вернул несколько run для SHA', async () => {
@@ -153,6 +156,11 @@ describe('ожидание GitHub Actions', () => {
 
     expect(code).toBe(1);
     expect(delays).toEqual([30_000, 30_000]);
-    expect(output).toEqual(['failure run=not-found sha=abc123']);
+    expect(output).toEqual([
+      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 0',
+      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 30',
+      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 60',
+      'failure run=not-found sha=abc123',
+    ]);
   });
 });

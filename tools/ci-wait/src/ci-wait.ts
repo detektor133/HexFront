@@ -137,7 +137,11 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
       return printFailedRun(fetchFn, apiBase, headers, lastRun, writeLine);
     }
 
-    if (now() - startedAt >= timeoutMs) {
+    const elapsedMs = now() - startedAt;
+    const pendingUrl =
+      lastRun?.html_url ?? `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}`;
+    writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}`);
+    if (elapsedMs >= timeoutMs) {
       writeLine(
         lastRun
           ? `failure timeout ${lastRun.html_url}`
