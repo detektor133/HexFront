@@ -16,7 +16,7 @@ import {
 } from '@hexfront/sim';
 
 import { captureProgress, cityFlashAlpha } from './battle-visuals.ts';
-import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
+import type { EconomyLayerCacheTelemetry, UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
@@ -49,7 +49,7 @@ export interface EconomyLayer {
   readonly top: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
-  cacheTelemetry(): UnitLayerCacheTelemetry;
+  cacheTelemetry(): UnitLayerCacheTelemetry & { readonly economy: EconomyLayerCacheTelemetry };
   /** Рисуемый план армии (режим рисования) или null. */
   setDraft(draft: Draft | null): void;
   /** Выбранная армия: у её фронта — ручки на концах. */
@@ -100,6 +100,25 @@ export function constructionDashOffset(nowMs: number, dash: number, gap: number)
 /** Проверяет, нужно ли двигать «муравьёв» незавершённой дороги. */
 export function shouldAnimateRoadConstruction(reducedMotion: boolean): boolean {
   return !reducedMotion;
+}
+
+/** Удаляет записи эффектов, которым больше не соответствуют гексы или города снимка. */
+export function pruneEconomyLayerCaches<T, U>(
+  capturesByHex: Map<number, T>,
+  cityFlashes: Map<number, U>,
+  hexIds: ReadonlySet<number>,
+  cityIds: ReadonlySet<number>,
+): void {
+  for (const id of capturesByHex.keys()) if (!hexIds.has(id)) capturesByHex.delete(id);
+  for (const id of cityFlashes.keys()) if (!cityIds.has(id)) cityFlashes.delete(id);
+}
+
+/** Возвращает размеры кэшей эффектов экономики для телеметрии песочницы. */
+export function economyLayerCacheTelemetry<T, U>(
+  capturesByHex: ReadonlyMap<number, T>,
+  cityFlashes: ReadonlyMap<number, U>,
+): EconomyLayerCacheTelemetry {
+  return { capturesByHex: capturesByHex.size, cityFlashes: cityFlashes.size };
 }
 
 /**
@@ -229,6 +248,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         cityFlashes.set(city.id, { started: nowMs, color: playerLine(city.owner) });
       }
     }
+    const hexIds = new Set(v.hexes.owner.keys());
+    const cityIds = new Set(v.cities.map((city) => city.id));
+    pruneEconomyLayerCaches(capturesByHex, cityFlashes, hexIds, cityIds);
     previousOwners = v.hexes.owner.slice();
   }
 
@@ -475,7 +497,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       unitLayer.setView(v, sel, performance.now());
     },
     cacheTelemetry() {
-      return unitLayer.cacheTelemetry();
+      return {
+        ...unitLayer.cacheTelemetry(),
+        economy: economyLayerCacheTelemetry(capturesByHex, cityFlashes),
+      };
     },
     setSplit(o) {
       split = o;

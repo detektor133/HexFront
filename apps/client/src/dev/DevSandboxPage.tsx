@@ -442,12 +442,17 @@ function useSandbox(
       );
     },
     cacheTelemetry() {
+      const economy = layerRef.current?.cacheTelemetry();
       return {
-        unit: layerRef.current?.cacheTelemetry() ?? {
+        unit: economy ?? {
           shown: 0,
           drawnAt: 0,
           chips: 0,
           encircledSince: 0,
+        },
+        economy: economy?.economy ?? {
+          capturesByHex: 0,
+          cityFlashes: 0,
         },
       };
     },

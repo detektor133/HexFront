@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 05 — Боты, генератор карт, баланс, плейтест |
-| Текущая задача | 05/T9c |
+| Текущая задача | 05/T9d |
 | Ветка | `stage-05` |
 | Последнее обновление | 2026-10-06 |
 
@@ -104,6 +104,12 @@
 Ранее в этапе 04: T13 (фронт без скачков), стоп-аудит и переписанные документы, T1–T2d.
 
 ## Следующая сессия
+
+- **05/T9c завершена:** `economy-layer` удаляет записи `capturesByHex` и `cityFlashes`, которым больше не соответствуют гексы или города снимка; размеры кэшей попадают в JSONL по пути `caches.economy`.
+- **Тесты:** добавлены проверки удаления неактуальных ключей и телеметрии размеров кэшей.
+- **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, тесты и visual.
+- **Следующая задача:** 05/T9d — кэш `front-tween`.
+- **Читать:** `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/cache-telemetry.ts`, `apps/client/src/dev/telemetry.ts`, `apps/client/test/economy-layer-cache.test.ts`.
 
 - **05/T9b завершена:** снимок удаляет неактуальные записи `shown`, `drawnAt`, `chips` и `encircledSince`; их размеры попадают в JSONL по пути `caches.unit`.
 - **Тесты:** добавлена проверка удаления устаревших ключей и размеров кэшей; `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.

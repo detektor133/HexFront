@@ -4,3 +4,8 @@ export interface UnitLayerCacheTelemetry {
   readonly chips: number;
   readonly encircledSince: number;
 }
+
+export interface EconomyLayerCacheTelemetry {
+  readonly capturesByHex: number;
+  readonly cityFlashes: number;
+}

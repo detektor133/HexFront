@@ -1,6 +1,6 @@
 import type { PlayerView } from '@hexfront/sim';
 
-import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
+import type { EconomyLayerCacheTelemetry, UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 
 export interface WorkerTelemetry {
   readonly tickMsAvg: number;
@@ -59,6 +59,7 @@ export interface PixiTelemetry {
 
 export interface CacheTelemetry {
   readonly unit: UnitLayerCacheTelemetry;
+  readonly economy: EconomyLayerCacheTelemetry;
 }
 
 export interface TelemetryLine {
