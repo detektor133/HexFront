@@ -18,6 +18,28 @@ import {
 import { generateMap } from '../src/index.ts';
 
 describe('города и стартовые позиции', () => {
+  it('масштабирует карту для 50 и 100 игроков на нескольких сидах', () => {
+    for (const players of [50, 100]) {
+      for (const seed of [0, 42, 99]) {
+        const map = generateMap(seed, { players });
+        expect(map.spawns).toHaveLength(players);
+        const terrain = decodeBase64(map.terrain);
+        expect(terrain?.filter((code) => code !== TERRAIN.water).length).toBeGreaterThanOrEqual(
+          players * 120,
+        );
+        const loaded = loadMap(map);
+        expect(
+          loaded.ok,
+          `${players} игроков, сид ${seed}: ${loaded.ok ? '' : loaded.errors.join('; ')}`,
+        ).toBe(true);
+      }
+    }
+  }, 120_000);
+
+  it('отклоняет больше 100 игроков', () => {
+    expect(() => generateMap(42, { players: 101 })).toThrow('2–100 игроков');
+  });
+
   it('принимает от 2 до 30 игроков и выдаёт столько же спавнов', () => {
     for (let players = 2; players <= 30; players += 1) {
       const map = generateMap(42, { width: 80, height: 60, players });

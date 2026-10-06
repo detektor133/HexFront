@@ -15,8 +15,12 @@ import {
   type Hex,
 } from '@hexfront/sim';
 
+import { MAPGEN_MAX_PLAYERS, PASSABLE_HEXES_PER_PLAYER, MAPGEN_WATER_SHARE } from './params.ts';
 import { generateRoads } from './roads.ts';
 import { generateTerrain, type MapOptions } from './terrain.ts';
+
+type MapInputOptions = Omit<MapOptions, 'width' | 'height'> &
+  Partial<Pick<MapOptions, 'width' | 'height'>>;
 
 const CITY_NAMES: readonly string[] = [
   'Вельск',
@@ -42,17 +46,32 @@ const cityName = (id: number): string => {
   return cycle === 0 ? base : `${base}-${cycle + 1}`;
 };
 
-function validateOptions(options: MapOptions): void {
+function mapDimensions(players: number): { width: number; height: number } {
+  const area = Math.ceil((players * PASSABLE_HEXES_PER_PLAYER * 100) / (100 - MAPGEN_WATER_SHARE));
+  const width = Math.ceil(Math.sqrt((area * 4) / 3));
+  return { width, height: Math.ceil(area / width) };
+}
+
+function resolveOptions(options: MapInputOptions): MapOptions {
+  const dimensions = mapDimensions(options.players);
+  return {
+    players: options.players,
+    width: options.width ?? dimensions.width,
+    height: options.height ?? dimensions.height,
+  };
+}
+
+function validateOptions(options: Required<MapOptions>): void {
   if (
     !Number.isInteger(options.players) ||
     options.players < 2 ||
-    options.players > 30 ||
+    options.players > MAPGEN_MAX_PLAYERS ||
     !Number.isInteger(options.width) ||
     !Number.isInteger(options.height) ||
     options.width <= 0 ||
     options.height <= 0
   ) {
-    throw new RangeError('генератор карты: ожидается 2–30 игроков и положительный размер карты');
+    throw new RangeError('генератор карты: ожидается 2–100 игроков и положительный размер карты');
   }
 }
 
@@ -182,26 +201,27 @@ function chooseCities(
   throw new Error(`генератор карты: не удалось разместить ${target} городов`);
 }
 
-export function generateMap(seed: number, options: MapOptions): MapJson {
-  validateOptions(options);
-  const result = generateTerrain(seed, options);
+export function generateMap(seed: number, options: MapInputOptions): MapJson {
+  const resolvedOptions = resolveOptions(options);
+  validateOptions(resolvedOptions);
+  const result = generateTerrain(seed, resolvedOptions);
   const terrain = result.terrain;
   const features = result.features.slice();
-  const land = largestRoadableLand(terrain, features, options);
-  const spawns = chooseSpawns(seed, terrain, land, options);
-  clearSpawnFeatures(features, spawns, options);
-  const cities = chooseCities(seed, terrain, features, spawns, land, options);
+  const land = largestRoadableLand(terrain, features, resolvedOptions);
+  const spawns = chooseSpawns(seed, terrain, land, resolvedOptions);
+  clearSpawnFeatures(features, spawns, resolvedOptions);
+  const cities = chooseCities(seed, terrain, features, spawns, land, resolvedOptions);
   const nodes = [...cities, ...spawns];
-  const roads = generateRoads(terrain, features, nodes, options);
+  const roads = generateRoads(terrain, features, nodes, resolvedOptions);
   return {
     version: 1,
     id: `proc-${(seed >>> 0).toString(16)}`,
-    width: options.width,
-    height: options.height,
+    width: resolvedOptions.width,
+    height: resolvedOptions.height,
     terrain: encodeBase64(terrain),
     features: Array.from(features).flatMap((feature, id) => {
       if (feature === FEATURE.none) return [];
-      const hex = hexFromId(id, options.width);
+      const hex = hexFromId(id, resolvedOptions.width);
       const type =
         feature === FEATURE.fertile ? 'fertile' : feature === FEATURE.mine ? 'mine' : 'pass';
       return [{ q: hex.q, r: hex.r, type }];

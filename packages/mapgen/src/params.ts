@@ -1,4 +1,5 @@
 /** Параметры процедурного рельефа; значения зеркалируют docs/gdd/10-balance.md. */
+export const MAPGEN_MAX_PLAYERS = 100;
 export const MAPGEN_NOISE_OCTAVES = 3;
 export const MAPGEN_EDGE_WATER = 2;
 export const MAPGEN_WATER_SHARE = 25;
