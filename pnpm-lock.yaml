@@ -84,7 +84,11 @@ importers:
         specifier: workspace:*
         version: link:../sim
 
-  packages/protocol: {}
+  packages/protocol:
+    dependencies:
+      '@hexfront/sim':
+        specifier: workspace:*
+        version: link:../sim
 
   packages/sim: {}
 

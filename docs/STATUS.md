@@ -112,6 +112,13 @@
 
 ## Следующая сессия
 
+- **05/T12a завершена:** в `packages/protocol` добавлены типы полного снимка и дельты, JSON-кодеки с восстановлением typed-массивов и проверкой `baseTick`; дельта содержит изменения гексов, upsert/remove отрядов и фронтов, а также события.
+- **Тесты:** добавлен `packages/protocol/test/view-delta.test.ts` для round-trip снимка, сохранения дельты и отказа неверной базы.
+- **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, 659 тестов и visual.
+- **CI:** `pnpm ci:wait` для `HEAD c2ace56` не получил ответа GitHub API и был остановлен; повторить в начале следующей сессии.
+- **Следующая задача:** 05/T12b — применение дельт в клиенте.
+- **Читать:** `docs/architecture/protocol.md`, `docs/architecture/adr/0008-incremental-rendering-and-deltas.md`, `packages/protocol/src/index.ts`, `apps/client/src/local/`.
+
 - **05/T10a завершена:** мелкие динамические `Graphics` в фишках, плашках прогноза, метках и рамке выбора используют `context.batchMode = 'batch'`; telemetry передаёт `id`, инструкции, вершины и перестроения геометрии в секунду по каждому `Graphics`.
 - **Тесты:** добавлены проверки batch mode и исходниковый сторож для `unit-chips`/`forecast-plate`, а также `graphics-telemetry.test.ts`.
 - **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, тесты и visual.
