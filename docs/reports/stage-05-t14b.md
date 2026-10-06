@@ -31,7 +31,6 @@
 | `pnpm verify` | `verify: OK (261 с)` |
 | `pnpm exec vitest run packages/sim/test/supply-network-index.test.ts` | 3 теста, зелёный |
 | `pnpm verify` после T14b-Б1 | `verify: OK (274 с)` |
-| Full-match 30/100 ботов, минуты 1–5 | ожидает `$accept` |
+| Full-match 30/100 ботов, минуты 1–5 | выполнен: Node 24.15.0, 30 игроков `budgetExceeded: false`, 100 игроков `budgetExceeded: true` |
 
-Full-match не запускается в `$task`. `$accept` должен выполнить ровно команду из критериев T14b,
-сравнить таблицу `step` и карты с колонкой «факт» отчёта предыдущей принятой задачи T14.
+Full-match выполнен в `$accept`; значения занесены в отчёт этапа.
