@@ -65,6 +65,7 @@ export function drawForecastPlate(
   text.resolution = window.devicePixelRatio * 2;
   const w = PAD_X + ICON_PX + GAP + text.width + PAD_X;
   const g = new Graphics();
+  g.context.batchMode = 'batch';
   const x0 = -w / 2;
   const y0 = -HEIGHT;
   g.roundRect(x0, y0 + SHADOW_DY, w, HEIGHT, RADIUS).fill({

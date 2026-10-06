@@ -210,6 +210,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const borders = new Graphics();
   const fog = new Graphics();
   const marks = new Graphics();
+  marks.context.batchMode = 'batch';
   const labels = new Container();
 
   const container = new Container();

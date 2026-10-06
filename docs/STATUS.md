@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 05 — Боты, генератор карт, баланс, плейтест |
-| Текущая задача | 05/T10a |
+| Текущая задача | 05/T1a5 |
 | Ветка | `stage-05` |
 | Последнее обновление | 2026-10-06 |
 
-Очередь: 05/T10a → 05/T10 → 05/T9a → 05/T9b → 05/T9c → 05/T9d → 05/T9e → 05/T1a5 → 05/T4 → 05/T3 → 05/T8 → 05/T5 → 05/T6 → 05/T7 → 05/T2.
+Очередь: 05/T10 → 05/T9a → 05/T9b → 05/T9c → 05/T9d → 05/T9e → 05/T1a5 → 05/T4 → 05/T3 → 05/T8 → 05/T5 → 05/T6 → 05/T7 → 05/T2.
 
 ## Последняя сессия
 
@@ -106,11 +106,11 @@
 
 ## Следующая сессия
 
-- **05/T10 завершена:** все уничтожения контейнеров с `Graphics` в `apps/client/src` передают `context: true`, включая фишки, плашки прогноза, слои и отладочные приложения.
-- **Тесты:** добавлен `graphics-context.test.ts`: проверка уничтожения контекстов фишки и плашки, а также статический сторож небезопасных `destroy({ children: true })`.
+- **05/T10a завершена:** мелкие динамические `Graphics` в фишках, плашках прогноза, метках и рамке выбора используют `context.batchMode = 'batch'`; telemetry передаёт `id`, инструкции, вершины и перестроения геометрии в секунду по каждому `Graphics`.
+- **Тесты:** добавлены проверки batch mode и исходниковый сторож для `unit-chips`/`forecast-plate`, а также `graphics-telemetry.test.ts`.
 - **Проверки:** полный `pnpm verify` зелёный: build, типы, lint, prettier, тесты и visual.
-- **Следующая задача:** 05/T9a.
-- **Читать:** `docs/stages/stage-05-bots-maps-balance.md`, `apps/client/src/dev/unit-chips.ts`, `apps/client/src/dev/economy-layer.ts`, `apps/client/test/graphics-context.test.ts`.
+- **Следующая задача:** 05/T1a5 — задача владельца: ручная проверка 30 ботов и трёх таймлапсов.
+- **Читать:** `docs/stages/stage-05-bots-maps-balance.md`, `apps/client/src/render/graphics-telemetry.ts`, `apps/client/src/render/map-view.ts`, `apps/client/src/dev/telemetry.ts`.
 
 - **05/T9e завершена:** `sceneStats()` передаёт количество инструкций каждого `Graphics` в `pixi.graphicsInstructions`, а `telemetry:report` печатает их последним столбцом.
 - **Тесты:** добавлен регрессионный тест на `GraphicsContext.instructions`; старые JSONL без поля остаются совместимыми.
@@ -227,6 +227,7 @@
 
 - 05/T5a разбита на T5a1–T5a4b по подсистемам; следующая задача — 05/T1a6d.
 - `pnpm ci:wait` для HEAD до начала задачи завис на запросе GitHub API без ответа; локальный полный `pnpm verify` зелёный.
+- 2026-10-06 · `pnpm ci:wait` для HEAD `12015f8` не получил ответа GitHub API и был остановлен; локальный полный `pnpm verify` для 05/T10a зелёный.
 - Полный `pnpm verify` после 05/T1a8: четыре падения вне области задачи — `mapgen/test/terrain.test.ts`, `mapgen/test/map.test.ts`, `sim/test/scenarios/front-follow.test.ts`, `sim/test/scenarios/front-ring.test.ts`; client typecheck, lint, tests и visual зелёные.
 - **Следующее действие:** владелец проверяет 30-ботовый матч и три таймлапса для 05/T1a5.
 

@@ -5,6 +5,7 @@ import type {
   FrontTweenCacheTelemetry,
   UnitLayerCacheTelemetry,
 } from './cache-telemetry.ts';
+import type { GraphicsTelemetry } from '../render/graphics-telemetry.ts';
 
 export interface WorkerTelemetry {
   readonly tickMsAvg: number;
@@ -58,6 +59,7 @@ export interface PixiTelemetry {
   readonly text: number;
   readonly graphics: number;
   readonly graphicsInstructions: readonly number[];
+  readonly graphicsDetails: readonly GraphicsTelemetry[];
   readonly textures: number;
   readonly canvasTextTextures: number | null;
 }

@@ -437,6 +437,7 @@ function useSandbox(
           text: 0,
           graphics: 0,
           graphicsInstructions: [],
+          graphicsDetails: [],
           textures: 0,
           canvasTextTextures: null,
         }
