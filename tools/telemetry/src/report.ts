@@ -3,7 +3,12 @@ export interface TelemetryLine {
   readonly matchSeconds: number;
   readonly frameMs: { readonly p95: number };
   readonly heap: { readonly used: number | null };
-  readonly pixi: { readonly textures: number; readonly text: number; readonly objects: number };
+  readonly pixi: {
+    readonly textures: number;
+    readonly text: number;
+    readonly objects: number;
+    readonly graphicsInstructions?: readonly number[];
+  };
   readonly worker: { readonly tickMsAvg: number };
   readonly game: { readonly units: number };
 }
@@ -17,6 +22,7 @@ export interface TelemetryMinute {
   readonly text: number;
   readonly objects: number;
   readonly units: number;
+  readonly graphicsInstructions: readonly number[];
 }
 
 export function parseTelemetry(text: string): TelemetryLine[] {
@@ -39,6 +45,9 @@ function isTelemetryLine(value: unknown): value is TelemetryLine {
     typeof line.frameMs?.p95 === 'number' &&
     typeof line.worker?.tickMsAvg === 'number' &&
     typeof line.pixi?.textures === 'number' &&
+    (line.pixi?.graphicsInstructions === undefined ||
+      (Array.isArray(line.pixi.graphicsInstructions) &&
+        line.pixi.graphicsInstructions.every((count) => typeof count === 'number'))) &&
     typeof line.game?.units === 'number'
   );
 }
@@ -56,6 +65,7 @@ export function aggregateMinutes(lines: readonly TelemetryLine[]): TelemetryMinu
     text: line.pixi.text,
     objects: line.pixi.objects,
     units: line.game.units,
+    graphicsInstructions: line.pixi.graphicsInstructions ?? [],
   }));
 }
 
@@ -75,11 +85,13 @@ export function fastestGrowth(rows: readonly TelemetryMinute[]): string {
 
 export function formatReport(lines: readonly TelemetryLine[]): string[] {
   const rows = aggregateMinutes(lines);
-  const output = ['мин | тик мс | кадр p95 | heap МБ | текстуры | Text | объекты | отряды'];
+  const output = [
+    'мин | тик мс | кадр p95 | heap МБ | текстуры | Text | объекты | отряды | Graphics',
+  ];
   output.push(
     ...rows.map(
       (row) =>
-        `${row.minute} | ${row.tickMs.toFixed(2)} | ${row.frameP95.toFixed(2)} | ${row.heapMb?.toFixed(1) ?? '—'} | ${row.textures} | ${row.text} | ${row.objects} | ${row.units}`,
+        `${row.minute} | ${row.tickMs.toFixed(2)} | ${row.frameP95.toFixed(2)} | ${row.heapMb?.toFixed(1) ?? '—'} | ${row.textures} | ${row.text} | ${row.objects} | ${row.units} | ${row.graphicsInstructions.join(',')}`,
     ),
   );
   output.push(`быстрее всего растёт: ${fastestGrowth(rows)}`);

@@ -7,7 +7,7 @@ const line = (matchSeconds: number, textures: number) => ({
   matchSeconds,
   frameMs: { p95: 18 },
   heap: { used: 64 * 1024 * 1024 },
-  pixi: { textures, text: 3, objects: 12 },
+  pixi: { textures, text: 3, objects: 12, graphicsInstructions: [4, 2] },
   worker: { tickMsAvg: 4 },
   game: { units: 20 },
 });
@@ -30,8 +30,8 @@ describe('отчёт телеметрии', () => {
 
   it('печатает компактную таблицу синтетического файла', () => {
     expect(formatReport(parseTelemetry(`${JSON.stringify(line(0, 1))}\n`))).toEqual([
-      'мин | тик мс | кадр p95 | heap МБ | текстуры | Text | объекты | отряды',
-      '0 | 4.00 | 18.00 | 64.0 | 1 | 3 | 12 | 20',
+      'мин | тик мс | кадр p95 | heap МБ | текстуры | Text | объекты | отряды | Graphics',
+      '0 | 4.00 | 18.00 | 64.0 | 1 | 3 | 12 | 20 | 4,2',
       'быстрее всего растёт: текстуры',
     ]);
   });

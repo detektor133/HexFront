@@ -33,6 +33,7 @@ export interface PixiSceneStats {
   readonly objects: number;
   readonly text: number;
   readonly graphics: number;
+  readonly graphicsInstructions: readonly number[];
   readonly textures: number;
   readonly canvasTextTextures: number | null;
 }
@@ -50,6 +51,10 @@ export interface MidLayer {
 export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
 
 export type { StrokePhase, TapKind } from './gesture.ts';
+
+export function graphicsInstructionCount(graphics: Graphics): number {
+  return graphics.context.instructions.length;
+}
 
 /** Приказ удержанием (07-controls.md, «Приказ удержанием»): фаза. */
 export type HoldPhase = 'start' | 'move' | 'end' | 'cancel';
@@ -307,11 +312,15 @@ export async function createMapView(
       selection.clear();
     },
     sceneStats() {
+      const graphicsInstructions: number[] = [];
       const counts = { objects: 0, text: 0, graphics: 0 };
       const visit = (node: Container): void => {
         counts.objects += 1;
         if (node.constructor.name === 'Text') counts.text += 1;
-        if (node instanceof Graphics) counts.graphics += 1;
+        if (node instanceof Graphics) {
+          counts.graphics += 1;
+          graphicsInstructions.push(graphicsInstructionCount(node));
+        }
         node.children.forEach(visit);
       };
       visit(app.stage);
@@ -321,6 +330,7 @@ export async function createMapView(
       };
       return {
         ...counts,
+        graphicsInstructions,
         textures: renderer.texture.managedTextures.length,
         canvasTextTextures: renderer.canvasText?._activeTextures
           ? Object.keys(renderer.canvasText._activeTextures).length

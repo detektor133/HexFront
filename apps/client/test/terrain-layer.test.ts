@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { detailLevel } from '../src/render/camera.ts';
+import { graphicsInstructionCount } from '../src/render/map-view.ts';
 import { createTerrainLayer, hexNoise } from '../src/render/terrain-layer.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
@@ -21,6 +22,14 @@ const loaded = loadMap({
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
 describe('слои рельефа карты', () => {
+  it('считает инструкции Graphics через контекст Pixi', async () => {
+    const { Graphics } = await import('pixi.js');
+    const graphics = new Graphics().rect(0, 0, 10, 10).fill(0xffffff);
+
+    expect(graphicsInstructionCount(graphics)).toBe(1);
+    graphics.destroy();
+  });
+
   it('узор получает стабильное значение по координатам гекса', () => {
     expect(hexNoise(3, -2, 1)).toBe(hexNoise(3, -2, 1));
     expect(hexNoise(3, -2, 1)).not.toBe(hexNoise(4, -2, 1));

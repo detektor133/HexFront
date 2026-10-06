@@ -57,6 +57,7 @@ export interface PixiTelemetry {
   readonly objects: number;
   readonly text: number;
   readonly graphics: number;
+  readonly graphicsInstructions: readonly number[];
   readonly textures: number;
   readonly canvasTextTextures: number | null;
 }
