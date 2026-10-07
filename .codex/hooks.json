@@ -24,6 +24,17 @@
             "statusMessage": "Проверка команды"
           }
         ]
+      },
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/agent-permissions.mjs",
+            "timeout": 10,
+            "statusMessage": "Проверка прав роли"
+          }
+        ]
       }
     ]
   }

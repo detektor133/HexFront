@@ -1,0 +1,14 @@
+{
+  "planner": ["docs/stages/**", "docs/STATUS.md", "docs/QUESTIONS.md"],
+  "tester": ["**/test/**", "**/*.test.ts"],
+  "coder": [
+    "packages/*/src/**",
+    "apps/*/src/**",
+    "tools/*/src/**",
+    "package.json",
+    "**/package.json",
+    "**/tsconfig.json",
+    "*.config.*"
+  ],
+  "reviewer": ["docs/stages/**", "docs/STATUS.md", "docs/reports/**"]
+}

@@ -13,6 +13,7 @@ const PROJECTS = [
   'tools/ci-wait',
   'tools/tokens',
   'tools/telemetry',
+  'tools/agent-loop',
 ];
 
 // Vitest читает конфиг только через default-экспорт.
