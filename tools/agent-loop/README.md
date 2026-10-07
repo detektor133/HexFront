@@ -1,6 +1,8 @@
 # Agent loop
 
-`pnpm agent:run [--max-tasks=3] [--max-minutes=N] [--dry-run]` запускает planner, tester, coder и reviewer отдельными сессиями `codex exec`.
+`pnpm agent:run [--max-tasks=3] [--max-minutes=N] [--dry-run]` запускает planner, tester, coder и reviewer отдельными сессиями `codex exec`. Текущий этап и файл этапа берутся из `docs/STATUS.md`.
+
+Скиллы ролей находятся в `.agents/skills/plan`, `tests`, `code` и `review`. Оркестратор читает модели и усилие из `roles.json`, а разрешённые пути — из `permissions.json`; hook использует тот же файл.
 
 Проверено командой `codex exec --help`: `--dangerously-bypass-approvals-and-sandbox` отключает подтверждения и sandbox, `--model` выбирает модель, `-c model_reasoning_effort="high|medium"` задаёт усилие, `--output-last-message <file>` сохраняет последний ответ, а `--json` выдаёт JSONL-события. Отдельного флага расхода токенов нет; оркестратор ищет `total_tokens`/`tokens` в stdout JSONL, если текущая версия CLI их возвращает.
 
