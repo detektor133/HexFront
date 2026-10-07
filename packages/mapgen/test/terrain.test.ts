@@ -5,6 +5,7 @@ import { FEATURE, TERRAIN } from '@hexfront/sim';
 import { generateTerrain } from '../src/index.ts';
 
 const OPTIONS = { width: 80, height: 60, players: 30 } as const;
+const DISTRIBUTION_OPTIONS = { width: 40, height: 30, players: 30 } as const;
 
 describe('процедурный рельеф', () => {
   it('даёт байт-в-байт одинаковый результат для одинакового сида', () => {
@@ -19,7 +20,7 @@ describe('процедурный рельеф', () => {
 
   it('держит доли местности в пределах двух процентных пунктов на 100 сидах', () => {
     for (let seed = 0; seed < 100; seed += 1) {
-      const { terrain } = generateTerrain(seed, OPTIONS);
+      const { terrain } = generateTerrain(seed, DISTRIBUTION_OPTIONS);
       const counts = terrain.reduce((result, code) => {
         result[code] = (result[code] ?? 0) + 1;
         return result;

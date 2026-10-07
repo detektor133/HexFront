@@ -1,7 +1,7 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
 import { planViews, type PlanView } from './plan-view.ts';
-import { playerPlace, playerScore } from './score.ts';
+import { playerPlace, playerPlaces, playerScore, playerScores } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
 import type { UnitType } from '../balance.ts';
 import { RECRUIT_STEP } from '../balance.ts';
@@ -29,6 +29,8 @@ export interface PlayerViewContext {
   readonly growth: Int32Array;
   readonly incomeBases: readonly IncomeBase[];
   readonly links: Uint8Array;
+  readonly scores: Int32Array;
+  readonly places: Int32Array;
 }
 
 export interface PlayerView {
@@ -158,8 +160,8 @@ function summary(
     autoCommand: state.players[playerId]?.autoCommand ?? true,
     foundCityCost: foundCityCost(state.players[playerId]?.citiesFounded ?? 0),
     growthMultAtTarget: taxGrowthMult(target),
-    score: playerScore(state, playerId),
-    place: playerPlace(state, playerId),
+    score: context.scores[playerId] ?? playerScore(state, playerId),
+    place: context.places[playerId] ?? playerPlace(state, playerId),
     players: state.players.filter((p) => p.status === 'alive').length,
   };
 }
@@ -170,10 +172,13 @@ function summary(
  */
 export function createPlayerViewContext(state: MatchState): PlayerViewContext {
   visionSystem(state);
+  const scores = playerScores(state);
   return {
     growth: growthPerSecond(state),
     incomeBases: incomeBases(state),
     links: links(state),
+    scores,
+    places: playerPlaces(state, scores),
   };
 }
 

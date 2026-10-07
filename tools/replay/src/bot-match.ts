@@ -8,6 +8,7 @@ import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   botCommands,
   commanderCommands,
+  createBotTickContext,
   createMatch,
   FP,
   isCityIsolated,
@@ -128,7 +129,8 @@ while (state.winner < 0 && state.tick < MAX_TICKS) {
   if (state.tick % (FRAME_EVERY_S * TICKS_PER_S) === 0)
     frames.push({ t: state.tick / TICKS_PER_S, owner: [...state.hexes.owner] });
   const isolation = new Map(state.cities.map((city) => [city.id, isCityIsolated(state, city.id)]));
-  const cmds = [...commanderCommands(state, bots), ...botCommands(state, bots)];
+  const context = createBotTickContext(state);
+  const cmds = [...commanderCommands(state, bots, context), ...botCommands(state, bots, context)];
   for (const c of cmds) count(commands, `${c.source ?? 'bot'}:${c.cmd.t}`);
   step(state, cmds);
   updateDurations();

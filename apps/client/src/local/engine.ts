@@ -16,7 +16,7 @@ import {
   cityInfo,
   commanderCommands,
   createMatch,
-  createPlayerViewContext,
+  createBotTickContext,
   loadMap,
   playerView,
   step,
@@ -105,11 +105,11 @@ export function createLocalEngine(
   let observerId: number | null = null;
   let pendingEvents: MatchState['events'] = [];
   const advance = (): void => {
-    const viewContext = createPlayerViewContext(state);
+    const botContext = createBotTickContext(state);
     step(state, [
       ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-      ...commanderCommands(state, bots, viewContext),
-      ...botCommands(state, bots, viewContext),
+      ...commanderCommands(state, bots, botContext),
+      ...botCommands(state, bots, botContext),
     ]);
     pending = [];
     pendingEvents = [...pendingEvents, ...state.events];

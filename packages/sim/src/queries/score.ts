@@ -53,6 +53,30 @@ export function playerScores(state: MatchState): Int32Array {
 }
 
 /**
+ * Места всех игроков по уже рассчитанным очкам.
+ * @returns место по id игрока, 1 — лидер
+ */
+export function playerPlaces(state: MatchState, scores: Int32Array): Int32Array {
+  const places = new Int32Array(state.players.length);
+  const alive = state.players.filter((p) => p.status === 'alive');
+  for (const player of state.players) {
+    if (player.status === 'eliminated') {
+      const above = state.players.filter(
+        (p) =>
+          p.status === 'eliminated' &&
+          (p.eliminatedTick > player.eliminatedTick ||
+            (p.eliminatedTick === player.eliminatedTick && p.id < player.id)),
+      ).length;
+      places[player.id] = alive.length + above + 1;
+      continue;
+    }
+    const mine = scores[player.id] ?? 0;
+    places[player.id] = 1 + alive.filter((p) => (scores[p.id] ?? 0) > mine).length;
+  }
+  return places;
+}
+
+/**
  * Место игрока: живые — по очкам (1 + число живых с большим счётом); выбывшие — после всех
  * живых, по порядку выбывания: выбывший позже стоит выше, в одном тике — меньший id выше.
  * @returns место (1 — лидер)

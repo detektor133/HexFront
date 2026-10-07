@@ -51,4 +51,5 @@ export * from './state/offensive-steps.ts';
 export * from './queries/plan-view.ts';
 export { decide } from './bots/commander.ts';
 export { botCommands, commanderCommands } from './bots/run.ts';
+export { createBotTickContext, type BotTickContext } from './bots/context.ts';
 export { economyDecide } from './bots/economy.ts';

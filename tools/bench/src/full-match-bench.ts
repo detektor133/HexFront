@@ -16,7 +16,7 @@ import {
   botCommands,
   commanderCommands,
   createMatch,
-  createPlayerViewContext,
+  createBotTickContext,
   loadMap,
   playerView,
   step,
@@ -206,7 +206,7 @@ function runScenario(players: number, minutes: number): MatchReport {
       commander: countScheduledBotTurns(state, bots, COMMANDER_TICKS, state.tick),
       economy: countScheduledBotTurns(state, bots, BOT_THINK_TICKS, state.tick),
     };
-    const context = createPlayerViewContext(state);
+    const context = createBotTickContext(state);
     const commanderStart = performance.now();
     const commander = commanderCommands(state, bots, context);
     timings.commander.push(performance.now() - commanderStart);

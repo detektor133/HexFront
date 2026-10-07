@@ -3,29 +3,13 @@
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
 import { createCommanderContext, decide } from './commander.ts';
+import { createBotTickContext, type BotTickContext } from './context.ts';
 import { economyDecide } from './economy.ts';
 import { BOT_LINE_MAX_DEPTH, BOT_THINK_TICKS, COMMANDER_TICKS } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
-import {
-  commanderView,
-  createPlayerViewContext,
-  playerView,
-  type PlayerViewContext,
-} from '../queries/player-view.ts';
+import { commanderView, playerView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
-
-function indexOwnedHexes(state: MatchState): Map<number, HexId[]> {
-  const result = new Map<number, HexId[]>();
-  state.hexes.owner.forEach((owner, hex) => {
-    if (owner < 0) return;
-    const hexes = result.get(owner) ?? [];
-    hexes.push(hex);
-    result.set(owner, hexes);
-  });
-  return result;
-}
 
 /**
  * Команды commander на этот тик: игроки, чей это тик, — все их армии с автокомандованием.
@@ -34,11 +18,11 @@ function indexOwnedHexes(state: MatchState): Map<number, HexId[]> {
 export function commanderCommands(
   state: MatchState,
   bots: readonly number[] = [],
-  shared?: PlayerViewContext,
+  shared?: BotTickContext,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const viewContext = shared ?? createPlayerViewContext(state);
-  const ownedHexes = indexOwnedHexes(state);
+  const tickContext = shared ?? createBotTickContext(state);
+  const viewContext = tickContext.playerView;
   const armiesByOwner = new Map<number, number[]>();
   for (const army of state.armies) {
     if (!army.auto) continue;
@@ -66,7 +50,7 @@ export function commanderCommands(
     const armies = armiesByOwner.get(p.id) ?? [];
     if (armies.length === 0) continue;
     const view = commanderView(state, p.id, viewContext, cities);
-    const commanderContext = createCommanderContext(state.map, view, ownedHexes.get(p.id));
+    const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
       for (const cmd of decide(state.map, view, armyId, depth, commanderContext)) {
@@ -85,10 +69,10 @@ export function commanderCommands(
 export function botCommands(
   state: MatchState,
   bots: readonly number[],
-  shared?: PlayerViewContext,
+  shared?: BotTickContext,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const viewContext = shared ?? createPlayerViewContext(state);
+  const viewContext = (shared ?? createBotTickContext(state)).playerView;
   const turn = state.tick % BOT_THINK_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id) || p.id % BOT_THINK_TICKS !== turn) continue;
