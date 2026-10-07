@@ -17,7 +17,6 @@ import { OK, rejected, type RejectReason, type Validation } from './types.ts';
 import { hexFromId, hexId, inBounds, spiral, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
-import { materializePopulation, setPopulation } from '../state/population.ts';
 import type { City, MatchState } from '../state/types.ts';
 
 /** Радиус, из которого город набирает людей: городской гекс и кольца 1–2. */
@@ -164,8 +163,7 @@ function takePeople(state: MatchState, city: City, need: number): void {
     });
   }
   list.forEach((d, i) => {
-    materializePopulation(state, d.hex);
-    setPopulation(state, d.hex, (state.hexes.pop[d.hex] ?? 0) - (takes[i] ?? 0));
+    state.hexes.pop[d.hex] = (state.hexes.pop[d.hex] ?? 0) - (takes[i] ?? 0);
   });
 }
 

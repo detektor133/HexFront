@@ -3,7 +3,6 @@
 import { CAPTURE_POP_LOSS_CITY, CAPTURE_POP_LOSS_HEX, ORG_MAX } from '../balance.ts';
 import { CAPTURE_RAMP_TICKS } from './city-output.ts';
 import { setHexOwner } from './hex-owner.ts';
-import { materializePopulation, setPopulation } from './population.ts';
 import { NEUTRAL, type MatchState } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { fpMul, type Fp } from '../math/int.ts';
@@ -16,8 +15,6 @@ export function captureHex(state: MatchState, hex: HexId, owner: number): void {
   const { hexes } = state;
   const previous = hexes.owner[hex] ?? NEUTRAL;
   if (previous === owner) return;
-  materializePopulation(state, hex);
-  const beforeCapture = hexes.pop[hex] ?? 0;
   setHexOwner(state, hex, owner);
   const city = state.cities.find((c) => c.hex === hex);
   if (city) {
@@ -27,10 +24,7 @@ export function captureHex(state: MatchState, hex: HexId, owner: number): void {
     city.defenseOrg = ORG_MAX;
     city.captureTicks = CAPTURE_RAMP_TICKS;
   }
-  if (previous === NEUTRAL) {
-    setPopulation(state, hex, beforeCapture);
-    return;
-  }
-  const loss = city ? CAPTURE_POP_LOSS_CITY : CAPTURE_POP_LOSS_HEX;
-  setPopulation(state, hex, beforeCapture - fpMul(beforeCapture as Fp, loss));
+  if (previous === NEUTRAL) return;
+  const pop = (hexes.pop[hex] ?? 0) as Fp;
+  hexes.pop[hex] = pop - fpMul(pop, city ? CAPTURE_POP_LOSS_CITY : CAPTURE_POP_LOSS_HEX);
 }

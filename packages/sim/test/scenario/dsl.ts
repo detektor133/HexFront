@@ -19,7 +19,6 @@ import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { borderEdges, borderSegmentEdges, edgeOf, isBorderEdge } from '../../src/state/edges.ts';
 import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
-import { initializePopulationState, setPopulation } from '../../src/state/population.ts';
 import {
   BUILDING,
   NEUTRAL,
@@ -275,9 +274,6 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
       pop: new Int32Array(size),
-      populationAnchor: new Int32Array(size),
-      populationAnchorM: new Int32Array(size),
-      populationRate: new Int32Array(size),
       improvement: new Uint8Array(size),
       building: new Uint8Array(size),
       road: new Uint8Array(size),
@@ -300,7 +296,6 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
       noCityTicks: 0,
       eliminatedTick: -1,
     })),
-    populationM: players.map(() => 0),
     units: [],
     constructions: [],
     recruits: [],
@@ -316,7 +311,6 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     holdTicks: 0,
   };
   seedNeutralPopulation(state);
-  initializePopulationState(state);
   return state;
 }
 
@@ -582,7 +576,7 @@ function makeScenario(
       return state.hexes.pop[hexOf(where)] ?? 0;
     },
     setPop(where, people) {
-      setPopulation(state, hexOf(where), people * FP);
+      state.hexes.pop[hexOf(where)] = people * FP;
     },
     player: playerOf,
     cityAt(where) {

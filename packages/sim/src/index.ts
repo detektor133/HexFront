@@ -9,12 +9,6 @@ export * from './map/load.ts';
 export * from './map/validate.ts';
 export * from './state/types.ts';
 export * from './state/pop-cap.ts';
-export {
-  initializePopulationState,
-  materializePopulation,
-  populationAt,
-  setPopulation,
-} from './state/population.ts';
 export * from './state/create-match.ts';
 export * from './state/hash.ts';
 export { indexMatchesUnits, rebuildUnitIndex } from './state/unit-index.ts';
