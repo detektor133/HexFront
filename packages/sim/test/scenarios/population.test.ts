@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { TICKS_PER_S } from '../../src/balance.ts';
 import { hexFromId, distance } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
+import { growthPerSecond as bulkGrowthPerSecond } from '../../src/systems/population.ts';
 import { at, city, own, road, scenario, setTax, type At } from '../scenario/dsl.ts';
 
 // Равнина: лимит гекса 100 чел.; город уровня L — 300 × L.
@@ -115,6 +116,17 @@ describe('рост населения', () => {
     expect(people(s.pop(at(6, 2)))).toBeCloseTo(150 * 0.99, 0);
     s.runSeconds(300);
     expect(s.pop(at(6, 2))).toBe(100_000);
+  });
+
+  it('расчёт роста использует материализованный pop, а не якорь', () => {
+    const s = scenario(RINGS, { legend });
+    const hex = at(3, 2);
+    const id = s.state.cities.find((city) => city.name === 'A1')?.hex ?? 0;
+    s.setPop(hex, 100);
+    s.state.hexes.pop[id] = 200_000;
+    const growth = bulkGrowthPerSecond(s.state);
+    expect(growth.length).toBeGreaterThan(id);
+    expect(growth[id]).toBe(1_000);
   });
 });
 

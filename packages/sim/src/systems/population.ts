@@ -17,7 +17,6 @@ import { distance, hexFromId, hexId, inBounds, ring } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
-import { populationAt } from '../state/population.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
 import { unitIndex } from '../state/unit-index.ts';
 
@@ -82,7 +81,7 @@ export function hexGrowthPerSecond(state: MatchState, hex: number): number {
   const { width } = state.map;
   const city = unitIndex(state).cityByHex[hex];
   const cap = city ? cityPopCap(city.level) : hexPopCap(state, hex);
-  const pop = populationAt(state, hex);
+  const pop = state.hexes.pop[hex] ?? 0;
   if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);
   const here = hexFromId(hex, width);
   let best = 0;
@@ -112,8 +111,7 @@ export function growthPerSecond(state: MatchState): Int32Array {
   const { hexes } = state;
   const best = bestCityGrowth(state);
   const levels = cityLevels(state);
-  return Int32Array.from(hexes.pop, (_, id) => {
-    const pop = populationAt(state, id);
+  return Int32Array.from(hexes.pop, (pop, id) => {
     const level = levels[id] ?? 0;
     const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
     if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);

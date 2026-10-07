@@ -7,6 +7,7 @@ import { createMatch } from '../../src/state/create-match.ts';
 import { hashState } from '../../src/state/hash.ts';
 import { indexMatchesUnits, unitIndexMismatch } from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
+import { growthPerSecond, hexGrowthPerSecond } from '../../src/systems/population.ts';
 import { invariantViolations } from '../invariants/invariants.ts';
 
 interface Result {
@@ -28,6 +29,9 @@ function run(): Result {
   for (let t = 0; t < WAR_TICKS; t += 1) {
     step(state, warCommands(state));
     expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
+    const growthHex = state.cities[0]?.hex ?? 0;
+    const growth = growthPerSecond(state);
+    expect(growth[growthHex]).toBe(hexGrowthPerSecond(state, growthHex));
     if (state.units.some((u) => u.inBattle)) battleTicks += 1;
     for (const e of state.events) {
       if (e.t === 'unitRetreated' || e.t === 'unitCapitulated') retreats += 1;
