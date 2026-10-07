@@ -16,6 +16,7 @@ import { setHexOwner } from './hex-owner.ts';
 import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
+import { initializePopulationState } from './population.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { addUnit, rebuildUnitIndex } from './unit-index.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
@@ -53,6 +54,9 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
       pop: new Int32Array(size),
+      populationAnchor: new Int32Array(size),
+      populationAnchorM: new Int32Array(size),
+      populationRate: new Int32Array(size),
       improvement: new Uint8Array(size),
       building: new Uint8Array(size),
       road: Uint8Array.from(map.roads),
@@ -61,6 +65,7 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     vision: createVisionState(0, size),
     cities,
     players: [],
+    populationM: [],
     units: [],
     constructions: [],
     recruits: [],
@@ -202,6 +207,7 @@ export function createMatch(
   state.cities.sort((a, b) => a.id - b.id);
   rebuildUnitIndex(state);
   recomputeAllNetworks(state);
+  initializePopulationState(state);
   state.vision = createVisionState(state.players.length, state.hexes.owner.length);
   return state;
 }

@@ -10,6 +10,9 @@ export function cloneState(s: MatchState): MatchState {
     hexes: {
       owner: h.owner.slice(),
       pop: h.pop.slice(),
+      populationAnchor: h.populationAnchor.slice(),
+      populationAnchorM: h.populationAnchorM.slice(),
+      populationRate: h.populationRate.slice(),
       improvement: h.improvement.slice(),
       building: h.building.slice(),
       road: h.road.slice(),
@@ -17,6 +20,7 @@ export function cloneState(s: MatchState): MatchState {
     },
     cities: s.cities.map((c) => ({ ...c })),
     players: s.players.map((p) => ({ ...p })),
+    populationM: [...s.populationM],
     units: s.units.map((u) => ({ ...u, path: [...u.path] })),
     armies: s.armies.map((a) => ({ ...a })),
     constructions: s.constructions.map((c) => ({ ...c })),

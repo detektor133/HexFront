@@ -17,6 +17,12 @@ export interface HexState {
   readonly owner: Int16Array;
   /** Население, fixed-point людей. */
   readonly pop: Int32Array;
+  /** Якорный дефицит `d₀ = popCap − pop` в fixed-point людях. */
+  readonly populationAnchor: Int32Array;
+  /** Значение интеграла `M₀` якоря, масштаб `ANALYTIC_FP × секунда`. */
+  readonly populationAnchorM: Int32Array;
+  /** Коэффициент `a / popCap`, масштаб `ANALYTIC_FP`. */
+  readonly populationRate: Int32Array;
   /** Уровень благоустройства 0–3. */
   readonly improvement: Uint8Array;
   /** Код постройки, 0 — нет. */
@@ -252,6 +258,8 @@ export interface MatchState {
   fog: boolean;
   readonly map: MapStatic;
   readonly hexes: HexState;
+  /** Накопленный интеграл taxGrowthMult по игрокам. */
+  readonly populationM: number[];
   /** Кэш обзора и последних известных данных, обновляемый visionSystem. */
   vision?: VisionState;
   /** Отсортированы по id. */

@@ -5,6 +5,7 @@
 import { markNetworkDirty } from './derived-cache.ts';
 import { edgeHex } from './edges.ts';
 import { followFrontsNear } from './front.ts';
+import { materializePopulation } from './population.ts';
 import type { MatchState } from './types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 
@@ -40,6 +41,7 @@ function pruneLost(state: MatchState): void {
 export function setHexOwner(state: MatchState, hex: HexId, owner: number): void {
   const was = state.hexes.owner[hex] ?? -1;
   if (was === owner) return;
+  materializePopulation(state, hex);
   if (was >= 0) markLost(state, hex, was);
   state.hexes.owner[hex] = owner;
   state.supplyRevision += 1;
