@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { appendFile, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -436,6 +436,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     '.ai-logs',
     `agent-loop-${new Date(config.now()).toISOString().slice(0, 10)}.md`,
   );
+  await mkdir(join(config.root, '.ai-logs'), { recursive: true });
   const log = async (line: string): Promise<void> => appendFile(logPath, `${line}\n`, 'utf8');
   const status = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
   const definitions = await loadAgentDefinitions(config.root);
