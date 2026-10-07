@@ -6,7 +6,6 @@ import type { HexId } from '../math/hex.ts';
 export interface UnitHexIndex {
   readonly unitsByHex: Array<Unit[] | undefined>;
   readonly cityByHex: Array<City | undefined>;
-  readonly cityCount: number;
 }
 
 const indexes = new WeakMap<MatchState, UnitHexIndex>();
@@ -22,7 +21,6 @@ export function rebuildUnitIndex(state: MatchState): UnitHexIndex {
   const index: UnitHexIndex = {
     unitsByHex: new Array<Unit[] | undefined>(state.map.width * state.map.height),
     cityByHex: new Array<City | undefined>(state.map.width * state.map.height),
-    cityCount: state.cities.length,
   };
   for (const unit of state.units) addToBucket(index, unit);
   for (const city of state.cities) index.cityByHex[city.hex] = city;
@@ -32,8 +30,7 @@ export function rebuildUnitIndex(state: MatchState): UnitHexIndex {
 
 /** Возвращает индекс, восстанавливая его для состояния после сериализации. */
 export function unitIndex(state: MatchState): UnitHexIndex {
-  const index = indexes.get(state);
-  return index && index.cityCount === state.cities.length ? index : rebuildUnitIndex(state);
+  return indexes.get(state) ?? rebuildUnitIndex(state);
 }
 
 /** Возвращает массив отрядов для чтения без прямого обращения к контейнеру состояния. */

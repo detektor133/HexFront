@@ -12,14 +12,13 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { taxGrowthMult } from './tax.ts';
-import { growthIntegral } from '../math/exponential.ts';
+import { growthIntegral, growthRate } from '../math/exponential.ts';
 import { distance, hexFromId, hexId, inBounds, ring } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
-import { populationAt } from '../state/population.ts';
+import { populationAt, setPopulationRate } from '../state/population.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
-import { unitIndex } from '../state/unit-index.ts';
 
 /** Базовый рост по кольцу от города: сам город, кольцо 1, кольцо 2 (людей/с). */
 const BASE_GROWTH: readonly Fp[] = [GROWTH_CITY_HEX, GROWTH_RING1, GROWTH_RING2];
@@ -80,7 +79,7 @@ function fullGrowth(state: MatchState, id: number, cityPart: number): number {
  */
 export function hexGrowthPerSecond(state: MatchState, hex: number): number {
   const { width } = state.map;
-  const city = unitIndex(state).cityByHex[hex];
+  const city = state.cities.find((c) => c.hex === hex);
   const cap = city ? cityPopCap(city.level) : hexPopCap(state, hex);
   const pop = populationAt(state, hex);
   if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);
@@ -136,8 +135,17 @@ export function populationSystem(state: MatchState): void {
     const pop = hexes.pop[id] ?? 0;
     const level = levels[id] ?? 0;
     const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
+    const improvement = (FP + IMPROVEMENT_GROWTH_STEP * (state.hexes.improvement[id] ?? 0)) as Fp;
+    const rate =
+      pop > cap
+        ? growthRate(POP_OVERCAP_DECAY, FP as Fp)
+        : cap === 0
+          ? 0
+          : growthRate(fpMul(best[id] as Fp, improvement), cap);
+    setPopulationRate(state, id, rate);
     if (pop > cap) {
-      hexes.pop[id] = Math.max(cap, pop - intDiv(fpMul(pop as Fp, POP_OVERCAP_DECAY), TICKS_PER_S));
+      const decay = intDiv(fpMul(pop as Fp, POP_OVERCAP_DECAY), TICKS_PER_S);
+      hexes.pop[id] = Math.max(cap, pop - decay);
       continue;
     }
     const full = fullGrowth(state, id, best[id] ?? 0);

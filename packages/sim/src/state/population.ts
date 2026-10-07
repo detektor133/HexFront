@@ -1,12 +1,11 @@
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { NEUTRAL, type MatchState } from './types.ts';
-import { unitIndex } from './unit-index.ts';
 import { ANALYTIC_FP, decayDeficit } from '../math/exponential.ts';
 import type { HexId } from '../math/hex.ts';
 import { type Fp } from '../math/int.ts';
 
 function capOf(state: MatchState, hex: HexId): Fp {
-  const city = unitIndex(state).cityByHex[hex];
+  const city = state.cities.find((candidate) => candidate.hex === hex);
   return city ? cityPopCap(city.level) : hexPopCap(state, hex);
 }
 
