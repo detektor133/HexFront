@@ -1,4 +1,5 @@
 export * from './math/int.ts';
+export * from './math/exponential.ts';
 export * from './math/hex.ts';
 export * from './rng.ts';
 export * from './balance.ts';
