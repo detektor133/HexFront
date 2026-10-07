@@ -56,7 +56,7 @@ export function botCommands(
     if (p.status !== 'alive' || !bots.includes(p.id) || p.id % BOT_THINK_TICKS !== turn) continue;
     const view = tickContext.viewsByPlayer[p.id];
     if (!view) continue;
-    for (const cmd of economyDecide(state.map, view)) {
+    for (const cmd of economyDecide(state.map, view, tickContext.unitsByHex)) {
       out.push({ playerId: p.id, cmd });
     }
   }
