@@ -16,7 +16,6 @@ import { hexSupplyEff, recalculateSupply } from '../src/state/supply.ts';
 import type { MatchState, Player } from '../src/state/types.ts';
 import { rebuildUnitIndex } from '../src/state/unit-index.ts';
 import { step, SYSTEMS } from '../src/step.ts';
-import { createEconomyContext } from '../src/systems/economy-context.ts';
 import { economySystem } from '../src/systems/economy.ts';
 
 function generatedMap(seed: number, players: number) {
@@ -102,7 +101,7 @@ function manualTick(state: MatchState, commands: Parameters<typeof applyCommands
   expectProcessedPlayersEquivalent(state, reference, tick);
 
   for (const system of SYSTEMS.slice(5)) {
-    if (system === economySystem) economySystem(state, createEconomyContext(state).incomeBases);
+    if (system === economySystem) economySystem(state);
     else system(state);
   }
   state.tick += 1;
