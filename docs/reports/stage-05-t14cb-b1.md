@@ -9,9 +9,13 @@
 ## Проверки
 
 - Целевые тесты war-script и населения: 17/17.
-- `pnpm verify --changed`: зелёный — build, types, lint, prettier, 683 теста и visual; 195 с.
-- Полный `pnpm verify`: зелёный — build, types, lint, prettier, 683 теста и visual; 324 с.
+- `pnpm verify --changed`: зелёный — build, types и тесты; 10 с. Предыдущий прогон после исправления занимал 195 с.
+- Полный `pnpm verify`: зелёный — build, types, lint, prettier, 683 теста и visual; 305 с.
+- CI для исправляющего коммита: зелёный, GitHub Actions run `37572336302`.
 
-## Ограничение
+## Итог приёмки
 
-- CI для исправляющего коммита ожидает push; задача остаётся `[ ]` до зелёного CI.
+- Длительность тестов sim и golden не выше зафиксированной базы: подтверждено полным `pnpm verify` за 305 с без увеличения таймаутов.
+- Все тесты зелёные: 683 теста, build, types, lint, prettier и visual прошли.
+- Полный `pnpm verify` до коммита: подтверждено.
+- CI после push: зелёный, run `37572336302`.
