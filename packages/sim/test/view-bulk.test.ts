@@ -32,7 +32,7 @@ describe('снимок игрока одним проходом (04/T21, бюд�
     const view = commanderView(state, 0, createPlayerViewContext(state));
 
     expect(view.hexes.owner).toBe(state.hexes.owner);
-    expect(view.hexes.pop).toBe(state.hexes.pop);
+    expect(view.hexes.pop).not.toBe(state.hexes.pop);
     expect(view.hexes.building).toBe(state.hexes.building);
   });
 
@@ -41,7 +41,7 @@ describe('снимок игрока одним проходом (04/T21, бюд�
       fc.property(fc.integer({ min: 0, max: 600 }), fc.integer({ min: 0, max: 1000 }), (t, tax) => {
         const state = matchAt(t, tax);
         const bulk = growthPerSecond(state);
-        const one = Int32Array.from(state.hexes.pop, (_, id) => hexGrowthPerSecond(state, id));
+        const one = Int32Array.from(state.hexes.owner, (_, id) => hexGrowthPerSecond(state, id));
         expect(bulk).toEqual(one);
       }),
       { numRuns: 8, seed: 21 },

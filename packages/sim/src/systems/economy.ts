@@ -14,6 +14,7 @@ import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { fpMul, intDiv, type Fp } from '../math/int.ts';
 import { cityGold } from '../state/city-output.ts';
 import { isCityIsolated } from '../state/network.ts';
+import { populationAt } from '../state/population.ts';
 import { NEUTRAL, type MatchState, type Player } from '../state/types.ts';
 
 /** Радиус, в котором гекс относится к городу (тот же, что у роста населения). */
@@ -57,13 +58,14 @@ export function incomeBases(state: MatchState): IncomeBase[] {
     cityGold: 0,
   }));
   const cut = isolatedHexes(state);
-  const { owner, pop } = state.hexes;
+  const { owner } = state.hexes;
   for (let id = 0; id < owner.length; id += 1) {
     const base = bases[owner[id] ?? NEUTRAL];
     if (!base) continue;
     const isolated = cut[id] === 1;
-    if (isolated) base.isolatedPop += pop[id] ?? 0;
-    else base.pop += pop[id] ?? 0;
+    const population = populationAt(state, id);
+    if (isolated) base.isolatedPop += population;
+    else base.pop += population;
     if (state.map.features[id] !== FEATURE.mine) continue;
     if (isolated) base.isolatedMines += 1;
     else base.mines += 1;

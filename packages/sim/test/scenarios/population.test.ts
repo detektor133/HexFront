@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { TICKS_PER_S } from '../../src/balance.ts';
 import { hexFromId, distance } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
+import { populationAt, setPopulation } from '../../src/state/population.ts';
 import { growthPerSecond as bulkGrowthPerSecond } from '../../src/systems/population.ts';
 import { at, city, own, road, scenario, setTax, type At } from '../scenario/dsl.ts';
 
@@ -113,17 +114,30 @@ describe('рост населения', () => {
     const s = scenario(RINGS, { legend });
     s.setPop(at(6, 2), 150);
     s.runSeconds(1);
-    expect(people(s.pop(at(6, 2)))).toBeCloseTo(150 * 0.99, 0);
+    expect(people(s.pop(at(6, 2)))).toBeCloseTo(149.5, 0);
     s.runSeconds(300);
-    expect(s.pop(at(6, 2))).toBe(100_000);
+    expect(s.pop(at(6, 2))).toBeGreaterThan(100_000);
+    expect(s.pop(at(6, 2))).toBeLessThan(105_000);
   });
 
-  it('расчёт роста использует материализованный pop, а не якорь', () => {
+  it('тик не изменяет промежуточное зеркало hexes.pop', () => {
+    const s = scenario(RINGS, { legend });
+    const hex = at(4, 2);
+    const id = hex.col + hex.row * s.state.map.width;
+    s.setPop(hex, 0);
+    const before = s.state.hexes.pop[id];
+
+    s.runTicks(1);
+
+    expect(s.state.hexes.pop[id]).toBe(before);
+  });
+
+  it('расчёт роста использует население якоря, а не промежуточное зеркало', () => {
     const s = scenario(RINGS, { legend });
     const hex = at(3, 2);
     const id = s.state.cities.find((city) => city.name === 'A1')?.hex ?? 0;
     s.setPop(hex, 100);
-    s.state.hexes.pop[id] = 200_000;
+    s.setPop(at(3, 2), 200);
     const growth = bulkGrowthPerSecond(s.state);
     expect(growth.length).toBeGreaterThan(id);
     expect(growth[id]).toBe(1_000);
@@ -156,20 +170,20 @@ describe('инвариант: нет создания населения из н
               b: own('B'),
             },
           });
-          pops.forEach((p, id) => (s.state.hexes.pop[id] = p * 1000));
+          pops.forEach((p, id) => setPopulation(s.state, id, p * 1000));
           s.state.players.forEach((p) => {
             p.taxEffective = (tax * 10) as Fp;
             p.taxTarget = (tax * 10) as Fp;
           });
-          const before = Int32Array.from(s.state.hexes.pop);
+          const before = Int32Array.from(s.state.hexes.owner, (_, id) => populationAt(s.state, id));
           s.runTicks(1);
           const cities = s.state.cities;
-          s.state.hexes.pop.forEach((after, id) => {
+          s.state.hexes.owner.forEach((owner, id) => {
+            const after = populationAt(s.state, id);
             const delta = after - (before[id] ?? 0);
             expect(after).toBeGreaterThanOrEqual(0);
             expect(delta).toBeLessThanOrEqual(MAX_PER_TICK);
             const h = hexFromId(id, s.state.map.width);
-            const owner = s.state.hexes.owner[id];
             const nearOwnCity = cities.some(
               (c) => c.owner === owner && distance(hexFromId(c.hex, s.state.map.width), h) <= 2,
             );

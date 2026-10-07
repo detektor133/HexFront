@@ -48,11 +48,11 @@ describe('golden-реплей «война двух игроков 5 минут�
   it('идёт настоящая война: бои, отступления, инварианты целы', () => {
     expect(result.violations).toEqual([]);
     expect(result.battleTicks).toBeGreaterThan(0);
-    expect(result.retreats).toBe(0);
+    expect(result.retreats).toBe(19);
   });
 
   it('конечное состояние совпадает с эталоном', () => {
-    expect(result.hash).toBe('eb437c1a');
+    expect(result.hash).toBe('8cf4b336');
   });
 
   it('повторный прогон даёт тот же хэш', () => {

@@ -19,7 +19,11 @@ import { seedNeutralPopulation } from '../../src/state/create-match.ts';
 import { borderEdges, borderSegmentEdges, edgeOf, isBorderEdge } from '../../src/state/edges.ts';
 import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../../src/state/network.ts';
-import { initializePopulationState, setPopulation } from '../../src/state/population.ts';
+import {
+  initializePopulationState,
+  populationAt,
+  setPopulation,
+} from '../../src/state/population.ts';
 import {
   BUILDING,
   NEUTRAL,
@@ -579,7 +583,7 @@ function makeScenario(
       return [...log].reverse().find((e) => e.t === t);
     },
     pop(where) {
-      return state.hexes.pop[hexOf(where)] ?? 0;
+      return populationAt(state, hexOf(where));
     },
     setPop(where, people) {
       setPopulation(state, hexOf(where), people * FP);

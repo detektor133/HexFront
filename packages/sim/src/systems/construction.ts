@@ -4,7 +4,12 @@ import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
 import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
-import { materializePopulation, setPopulation } from '../state/population.ts';
+import {
+  invalidatePopulationRates,
+  materializePopulation,
+  populationAt,
+  setPopulation,
+} from '../state/population.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
 
@@ -19,7 +24,7 @@ function materializeCityRadius(state: MatchState, hex: number, owner: number): v
 
 function complete(state: MatchState, c: Construction): void {
   const { hexes } = state;
-  const population = hexes.pop[c.hex] ?? 0;
+  const population = populationAt(state, c.hex);
   materializeCityRadius(state, c.hex, c.owner);
   switch (c.kind) {
     case 'foundCity': {
@@ -39,6 +44,8 @@ function complete(state: MatchState, c: Construction): void {
       state.cities.push(city);
       addCityToIndex(state, city);
       setPopulation(state, c.hex, population);
+      invalidatePopulationRates(state);
+      state.supplyRevision += 1;
       markNetworkDirty(state, c.owner);
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);
@@ -47,12 +54,16 @@ function complete(state: MatchState, c: Construction): void {
     case 'upgradeCity': {
       const city = state.cities.find((x) => x.hex === c.hex);
       if (city) city.level += 1;
+      state.supplyRevision += 1;
       setPopulation(state, c.hex, population);
+      invalidatePopulationRates(state);
       return;
     }
     case 'improve':
       hexes.improvement[c.hex] = (hexes.improvement[c.hex] ?? 0) + 1;
+      state.supplyRevision += 1;
       setPopulation(state, c.hex, population);
+      invalidatePopulationRates(state);
       return;
     case 'fort':
       hexes.building[c.hex] = BUILDING.fort;

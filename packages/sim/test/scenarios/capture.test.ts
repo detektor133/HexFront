@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { setPopulation } from '../../src/state/population.ts';
 import { at, city, move, own, scenario } from '../scenario/dsl.ts';
 
 const legend = {
@@ -31,7 +32,7 @@ describe('захват пустых гексов', () => {
 
   it('пустой вражеский гекс захватывается, население −20 %', () => {
     const s = scenario(MAP, { legend });
-    s.state.hexes.pop.fill(0);
+    for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
     s.setPop(at(4, 1), 50);
     const id = s.unit('A', 'armor', 100, at(3, 1));
     s.cmd('A', move([id], at(4, 1)));

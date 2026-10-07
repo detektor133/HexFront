@@ -4,6 +4,7 @@ import { NETWORK_RECALC_TICKS, TICKS_PER_S } from '../../src/balance.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { hashState } from '../../src/state/hash.ts';
 import { isCityIsolated } from '../../src/state/network.ts';
+import { setPopulation } from '../../src/state/population.ts';
 import { at, city, own, road, scenario, type At } from '../scenario/dsl.ts';
 
 // Столица A1 и город A2 соединены дорогой по строке 1.
@@ -97,7 +98,7 @@ describe('сети снабжения', () => {
       if (cut) s.setOwner(CUT, null);
       s.runTicks(NETWORK_RECALC_TICKS);
       // Население задаём после пересчёта сетей и меряем один тик, чтобы рост не добавлял налог.
-      s.state.hexes.pop.fill(0);
+      for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
       s.setPop(at(7, 1), 100);
       const before = s.player('A').gold;
       s.runTicks(1);
@@ -120,7 +121,7 @@ describe('сети снабжения', () => {
     function taxFrom(where: At): number {
       const s = scenario(MIXED, { legend: mixed });
       s.runTicks(NETWORK_RECALC_TICKS);
-      s.state.hexes.pop.fill(0);
+      for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
       const before = s.player('A').gold;
       s.runTicks(1);
       const citiesOnly = s.player('A').gold - before;

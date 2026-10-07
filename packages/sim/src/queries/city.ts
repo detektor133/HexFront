@@ -8,6 +8,7 @@ import { intDiv, type Fp } from '../math/int.ts';
 import { cityGold } from '../state/city-output.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap } from '../state/pop-cap.ts';
+import { populationAt } from '../state/population.ts';
 import { citySupply } from '../state/supply.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { hexGrowthPerSecond } from '../systems/population.ts';
@@ -83,7 +84,7 @@ export function cityInfo(state: MatchState, cityId: number): CityInfo | null {
     level: city.level,
     owner: city.owner,
     isCapital,
-    pop: state.hexes.pop[city.hex] ?? 0,
+    pop: populationAt(state, city.hex),
     popCap: cityPopCap(city.level),
     growthPerS: hexGrowthPerSecond(state, city.hex),
     supply: citySupply(state, city),
