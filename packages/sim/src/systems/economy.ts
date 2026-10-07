@@ -130,10 +130,10 @@ export function playerUpkeepPerSecond(state: MatchState, playerId: number): numb
  * (для гексов и городов изолированных сетей — × ISOLATED_INCOME_MULT) − содержание отрядов.
  * Золото не уходит в минус; казна пуста при отрицательном балансе — банкротство.
  */
-export function economySystem(state: MatchState, bases?: readonly IncomeBase[]): void {
-  const currentBases = bases ?? incomeBases(state);
+export function economySystem(state: MatchState): void {
+  const bases = incomeBases(state);
   state.players.forEach((p, i) => {
-    const b = currentBases[i];
+    const b = bases[i];
     if (p.status !== 'alive' || !b) return;
     const net = withChaos(p, incomeFromBase(b, p.taxEffective)) - playerUpkeepPerSecond(state, i);
     p.gold = Math.max(0, p.gold + intDiv(net, TICKS_PER_S)) as Fp;

@@ -12,12 +12,13 @@ import type { HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
-import { createEconomyContext } from '../systems/economy-context.ts';
 import {
+  incomeBases,
   playerIncomePerSecond,
   playerUpkeepPerSecond,
   type IncomeBase,
 } from '../systems/economy.ts';
+import { growthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
 import { visionSystem } from '../systems/vision.ts';
 
@@ -169,10 +170,9 @@ function summary(
  */
 export function createPlayerViewContext(state: MatchState): PlayerViewContext {
   visionSystem(state);
-  const economy = createEconomyContext(state);
   return {
-    growth: economy.growth,
-    incomeBases: economy.incomeBases,
+    growth: growthPerSecond(state),
+    incomeBases: incomeBases(state),
     links: links(state),
   };
 }

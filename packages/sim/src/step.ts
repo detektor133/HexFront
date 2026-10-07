@@ -7,7 +7,6 @@ import { attritionSystem } from './systems/attrition.ts';
 import { capitalSystem } from './systems/capital.ts';
 import { combatSystem } from './systems/combat.ts';
 import { constructionSystem } from './systems/construction.ts';
-import { createEconomyContext } from './systems/economy-context.ts';
 import { economySystem } from './systems/economy.ts';
 import { frontSystem } from './systems/front.ts';
 import { movementSystem } from './systems/movement.ts';
@@ -52,10 +51,7 @@ export const SYSTEMS: readonly System[] = [
 export function step(state: MatchState, commands: readonly PlayerCommand[]): MatchState {
   state.events = [];
   applyCommands(state, commands);
-  for (const system of SYSTEMS) {
-    if (system === economySystem) economySystem(state, createEconomyContext(state).incomeBases);
-    else system(state);
-  }
+  for (const system of SYSTEMS) system(state);
   state.tick += 1;
   return state;
 }
