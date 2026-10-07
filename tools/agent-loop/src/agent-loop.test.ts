@@ -26,6 +26,10 @@ interface Scenario {
   readonly issues?: readonly GithubIssue[];
   readonly changedRole?: string;
   readonly changeQuestions?: boolean;
+  readonly coderCommit?: boolean;
+  readonly dirtyAfterCoder?: boolean;
+  readonly queue?: string;
+  readonly plannedIssue?: number;
   readonly maxTasks?: number;
 }
 
@@ -34,20 +38,30 @@ async function runScenario(scenario: Scenario): Promise<{
   readonly roles: string[];
   readonly comments: string[];
   readonly resets: number;
+  readonly tasks: string[];
 }> {
   const outputs = [...scenario.outputs];
   const ci = [...scenario.ci];
   const roles: string[] = [];
+  const tasks: string[] = [];
   const comments: string[] = [];
   let resets = 0;
   let listCalls = 0;
   let dirtyRole = '';
+  let head = 'base';
   const runCommand = async (command: string, args: readonly string[]): Promise<CommandResult> => {
     if (command === 'git' && args[0] === 'branch')
       return { code: 0, stdout: 'stage-05', stderr: '' };
-    if (command === 'git' && args[0] === 'rev-parse')
-      return { code: 0, stdout: 'base', stderr: '' };
-    if (command === 'git' && args[0] === 'status') return { code: 0, stdout: '', stderr: '' };
+    if (command === 'git' && args[0] === 'rev-parse') return { code: 0, stdout: head, stderr: '' };
+    if (command === 'git' && args[0] === 'status')
+      return {
+        code: 0,
+        stdout:
+          scenario.dirtyAfterCoder && roles.at(-1) === 'coder'
+            ? ' M tools/agent-loop/src/agent-loop.ts'
+            : '',
+        stderr: '',
+      };
     if (command === 'git' && args[0] === 'diff')
       return {
         code: 0,
@@ -69,7 +83,9 @@ async function runScenario(scenario: Scenario): Promise<{
       const prompt = String(args.at(-1));
       const role = prompt.match(/Роль: (\w+)/)?.[1] ?? '';
       roles.push(role);
+      tasks.push(prompt.match(/Задача: ([^\n]+)/)?.[1] ?? '');
       dirtyRole = scenario.changedRole === role ? role : '';
+      if (role === 'coder' && scenario.coderCommit !== false) head = `commit-${roles.length}`;
       if (scenario.changeQuestions && role === 'planner')
         await writeFile(
           `${root}/docs/QUESTIONS.md`,
@@ -84,7 +100,7 @@ async function runScenario(scenario: Scenario): Promise<{
     ensureAgentLabel: async () => undefined,
     listAgentIssues: async () => {
       listCalls += 1;
-      return scenario.issues ?? [issue(1)];
+      return scenario.issues ?? [];
     },
     comment: async (_number, body) => {
       comments.push(body);
@@ -106,10 +122,31 @@ async function runScenario(scenario: Scenario): Promise<{
   };
   const questionsPath = `${root}/docs/QUESTIONS.md`;
   const questions = await readFile(questionsPath, 'utf8');
+  const statusPath = `${root}/docs/STATUS.md`;
+  const status = await readFile(statusPath, 'utf8');
+  const stagePath = `${root}/docs/stages/stage-05-bots-maps-balance.md`;
+  const stage = await readFile(stagePath, 'utf8');
   try {
-    return { code: await runAgentLoop(config), roles, comments, resets };
+    if (scenario.queue)
+      await writeFile(
+        statusPath,
+        status.replace(/^Очередь:.*$/m, `Очередь: ${scenario.queue}`),
+        'utf8',
+      );
+    if (scenario.plannedIssue)
+      await writeFile(
+        stagePath,
+        stage.replace(
+          '  *Приёмка:* тесты подтверждают, что ход бота',
+          `  Issue #${scenario.plannedIssue}\n  План: существующий план\n  *Приёмка:* тесты подтверждают, что ход бота`,
+        ),
+        'utf8',
+      );
+    return { code: await runAgentLoop(config), roles, comments, resets, tasks };
   } finally {
     if (scenario.changeQuestions) await writeFile(questionsPath, questions, 'utf8');
+    if (scenario.queue) await writeFile(statusPath, status, 'utf8');
+    if (scenario.plannedIssue) await writeFile(stagePath, stage, 'utf8');
     void listCalls;
   }
 }
@@ -119,11 +156,19 @@ describe('выбор задач', () => {
     expect(selectIssueOrQueue([issue(4), issue(2)], 'Очередь: 05/T15c → 05/T15d')?.number).toBe(2);
     expect(selectIssueOrQueue([], 'Очередь: 05/T15c → 05/T15d')?.task).toBe('05/T15c');
   });
+
+  it('пропускает выполненные и отменённые задачи очереди', () => {
+    const stage = '- [x] **T10. Готово**\n- [—] **T9a. Отменено**\n- [ ] **T15c. Открыто**';
+    expect(
+      selectIssueOrQueue([], 'Очередь: 05/T10 → 05/T9a → 05/T15c', new Set(), new Set(), stage)
+        ?.task,
+    ).toBe('05/T15c');
+  });
 });
 
 describe('runAgentLoop', () => {
   it('проходит успешную задачу в точной последовательности', async () => {
-    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0] });
+    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0], issues: [] });
     expect(result.code).toBe(0);
     expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer']);
   });
@@ -145,7 +190,7 @@ describe('runAgentLoop', () => {
     const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [1, 1] });
     expect(result.code).toBe(1);
     expect(result.roles).toEqual(['planner', 'tester', 'coder', 'coder']);
-    expect(result.comments).toHaveLength(1);
+    expect(result.comments).toHaveLength(0);
   });
 
   it('ремонтирует coder после ВОЗВРАТ и вызывает reviewer повторно', async () => {
@@ -162,7 +207,7 @@ describe('runAgentLoop', () => {
       ci: [0, 0],
     });
     expect(result.code).toBe(1);
-    expect(result.comments).toHaveLength(1);
+    expect(result.comments).toHaveLength(0);
   });
 
   it.each(['planner', 'tester', 'coder', 'reviewer'])(
@@ -175,7 +220,7 @@ describe('runAgentLoop', () => {
       });
       expect(result.code).toBe(1);
       expect(result.resets).toBe(1);
-      expect(result.comments).toHaveLength(1);
+      expect(result.comments).toHaveLength(0);
     },
   );
 
@@ -183,22 +228,86 @@ describe('runAgentLoop', () => {
     const result = await runScenario({
       outputs: [],
       ci: [],
-      issues: [issue(1, 'плейтест владельца')],
+      issues: [{ ...issue(1), body: 'T1a5' }],
     });
     expect(result.code).toBe(1);
     expect(result.roles).toEqual([]);
     expect(result.comments).toHaveLength(1);
   });
 
+  it('не считает строку Приёмка задачей владельца', async () => {
+    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0], issues: [] });
+    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer']);
+  });
+
+  it.each(['05/T1a5', '05/T15d'])('останавливает задачу владельца из очереди %s', async (task) => {
+    const result = await runScenario({ outputs: [], ci: [], issues: [], queue: task });
+    expect(result.code).toBe(1);
+    expect(result.roles).toEqual([]);
+  });
+
+  it('требует номер задачи в ответе planner для Issue и передаёт его ролям', async () => {
+    const result = await runScenario({
+      outputs: ['ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK'],
+      ci: [0],
+      issues: [issue(7)],
+    });
+    expect(result.code).toBe(0);
+    expect(result.tasks.slice(1)).toEqual([
+      '05/T15c (Issue #7)',
+      '05/T15c (Issue #7)',
+      '05/T15c (Issue #7)',
+    ]);
+  });
+
+  it('останавливается для Issue без номера задачи от planner', async () => {
+    const result = await runScenario({ outputs: ['OK'], ci: [], issues: [issue(7)] });
+    expect(result.code).toBe(1);
+    expect(result.roles).toEqual(['planner']);
+  });
+
+  it('не вызывает planner для Issue с уже записанным планом и ссылкой', async () => {
+    const result = await runScenario({
+      outputs: ['OK', 'OK', 'OK'],
+      ci: [0],
+      issues: [issue(7)],
+      plannedIssue: 7,
+    });
+    expect(result.code).toBe(0);
+    expect(result.roles).toEqual(['tester', 'coder', 'reviewer']);
+  });
+
+  it('останавливается перед push, если coder не создал коммит', async () => {
+    const result = await runScenario({
+      outputs: ['OK', 'OK', 'OK'],
+      ci: [],
+      issues: [],
+      coderCommit: false,
+    });
+    expect(result.code).toBe(1);
+    expect(result.roles).toEqual(['planner', 'tester', 'coder']);
+  });
+
+  it('останавливается перед push при грязном дереве после coder', async () => {
+    const result = await runScenario({
+      outputs: ['OK', 'OK', 'OK'],
+      ci: [],
+      issues: [],
+      dirtyAfterCoder: true,
+    });
+    expect(result.code).toBe(1);
+    expect(result.roles).toEqual(['planner', 'tester', 'coder']);
+  });
+
   it('останавливается при изменении QUESTIONS после planner', async () => {
     const result = await runScenario({ outputs: ['OK'], ci: [], changeQuestions: true });
     expect(result.code).toBe(1);
-    expect(result.comments).toHaveLength(1);
+    expect(result.comments).toHaveLength(0);
   });
 
   it('берёт две задачи при maxTasks=2', async () => {
     const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'OK'],
+      outputs: ['ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK', 'ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK'],
       ci: [0, 0],
       issues: [issue(1), issue(2)],
       maxTasks: 2,

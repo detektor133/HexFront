@@ -96,8 +96,7 @@ const git = async (config: AgentConfig, args: readonly string[]): Promise<string
 const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';
 const lastLines = (text: string, count = 15): string =>
   text.trim().split(/\r?\n/).slice(-count).join('\n');
-const isOwnerTask = (text: string): boolean =>
-  /плейтест|при[её]мк|задач[ауы] владельца|команда владельца/i.test(text);
+const isOwnerTask = (text: string): boolean => /задача владельца|плейтест|\$accept/i.test(text);
 const isTestReply = (text: string): boolean => /^ТЕСТ:/im.test(text);
 const isReturnReply = (text: string): boolean => /^ВОЗВРАТ(?:\s|$)/im.test(text);
 
@@ -150,19 +149,33 @@ async function resolveStageFile(root: string, status: string): Promise<string> {
 
 function taskBlock(stageText: string, task: string): string {
   const short = task.match(/\d+\/(T[\da-z]+)/i)?.[1] ?? task.match(/\bT[\da-z]+\b/i)?.[0] ?? task;
-  const start = stageText.search(new RegExp(`^[-*].*\\*?${short}\\b`, 'im'));
+  const escapedShort = short.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = stageText.search(new RegExp(`^[-*].*\\*?${escapedShort}\\b`, 'im'));
   if (start < 0) return '';
   const next = stageText.slice(start + 1).search(/^[-*].*\*?T[\da-z]+\b/im);
   return stageText.slice(start, next < 0 ? undefined : start + 1 + next);
 }
 
 const hasPlan = (block: string): boolean => /(^|\n)\s*\*?План\*?\s*:/i.test(block);
+const hasIssueReference = (block: string, issueNumber: number): boolean =>
+  new RegExp(`#${issueNumber}\\b`).test(block);
+const isCompletedTask = (block: string): boolean => /^\s*[-*]\s*\[(?:x|—)\]/i.test(block);
+const taskReference = (text: string, stageFile: string): string | undefined => {
+  const full = text.match(/\b(\d+\/T[\da-z]+)\b/i)?.[1];
+  if (full) return full;
+  const short = text.match(/\b(T[\da-z]+)\b/i)?.[1];
+  const stage = stageFile.match(/stage-(\d+)-/)?.[1];
+  return short && stage ? `${stage}/${short}` : undefined;
+};
+const plannerTask = (text: string): string | undefined =>
+  firstLine(text).match(/^ЗАДАЧА:\s*(\d+\/T[\da-z0-9]+)\s*$/i)?.[1];
 
 export function selectIssueOrQueue(
   issues: readonly GithubIssue[],
   status: string,
   usedIssues: ReadonlySet<number> = new Set(),
   usedTasks: ReadonlySet<string> = new Set(),
+  stageText = '',
 ): TaskSelection | undefined {
   const issue = [...issues]
     .filter(
@@ -183,7 +196,9 @@ export function selectIssueOrQueue(
     ?.split('→')
     .map((item) => item.trim())
     .filter(Boolean);
-  const task = queue?.find((item) => !usedTasks.has(item));
+  const task = queue?.find(
+    (item) => !usedTasks.has(item) && !isCompletedTask(taskBlock(stageText, item)),
+  );
   return task ? { task } : undefined;
 }
 
@@ -293,6 +308,36 @@ async function callRole(
   return { ok: true, message: agent.message };
 }
 
+type RoleResult =
+  { readonly ok: true; readonly message: string } | { readonly ok: false; readonly code: number };
+
+async function callCoder(
+  config: AgentConfig,
+  definitions: AgentDefinitions,
+  selected: TaskSelection,
+  log: (line: string) => Promise<void>,
+  task: string,
+  feedback = '',
+): Promise<RoleResult> {
+  const base = await git(config, ['rev-parse', 'HEAD']);
+  const result = await callRole(config, definitions, selected, log, 'coder', task, feedback);
+  if (!result.ok) return result;
+  const head = await git(config, ['rev-parse', 'HEAD']);
+  const dirty = await git(config, ['status', '--porcelain']);
+  if (head !== base && dirty === '') return result;
+  return {
+    ok: false,
+    code: await stop(
+      config,
+      selected,
+      log,
+      'coder',
+      head === base ? 'coder не добавил коммит' : 'после coder рабочее дерево не чистое',
+      result.message,
+    ),
+  };
+}
+
 async function pushAndCi(
   config: AgentConfig,
   selected: TaskSelection,
@@ -321,13 +366,18 @@ async function processTask(
   stageFile: string,
   log: (line: string) => Promise<void>,
 ): Promise<number> {
-  if (isOwnerTask(selected.task))
-    return stop(config, selected, log, 'выбор задачи', 'задача владельца', selected.task);
   const stageText = await readFile(stageFile, 'utf8');
   const block = taskBlock(stageText, selected.task);
+  if (isOwnerTask(block))
+    return stop(config, selected, log, 'выбор задачи', 'задача владельца', block);
   const questionsFile = join(config.root, 'docs/QUESTIONS.md');
   const beforeQuestions = await readFile(questionsFile, 'utf8');
-  if (!hasPlan(block)) {
+  const issueHasPlan =
+    selected.issue !== undefined &&
+    hasIssueReference(block, selected.issue.number) &&
+    hasPlan(block);
+  let roleTask = selected.task;
+  if (!issueHasPlan) {
     const planner = await callRole(config, definitions, selected, log, 'planner', selected.task);
     if (!planner.ok) return planner.code;
     if ((await readFile(questionsFile, 'utf8')) !== beforeQuestions)
@@ -339,10 +389,35 @@ async function processTask(
         'planner изменил docs/QUESTIONS.md',
         planner.message,
       );
+    if (selected.issue) {
+      const plannedTask = plannerTask(planner.message);
+      if (!plannedTask)
+        return stop(
+          config,
+          selected,
+          log,
+          'planner',
+          'planner не указал задачу первой строкой',
+          planner.message,
+        );
+      roleTask = `${plannedTask} (Issue #${selected.issue.number})`;
+    }
+  } else if (selected.issue) {
+    const existingTask = taskReference(block, stageFile);
+    if (!existingTask)
+      return stop(
+        config,
+        selected,
+        log,
+        'выбор задачи',
+        'в блоке Issue не найден номер задачи',
+        block,
+      );
+    roleTask = `${existingTask} (Issue #${selected.issue.number})`;
   }
-  const tester = await callRole(config, definitions, selected, log, 'tester', selected.task);
+  const tester = await callRole(config, definitions, selected, log, 'tester', roleTask);
   if (!tester.ok) return tester.code;
-  let coder = await callRole(config, definitions, selected, log, 'coder', selected.task);
+  let coder = await callCoder(config, definitions, selected, log, roleTask);
   if (!coder.ok) return coder.code;
   if (isTestReply(coder.message)) {
     const retryTester = await callRole(
@@ -351,17 +426,16 @@ async function processTask(
       selected,
       log,
       'tester',
-      selected.task,
+      roleTask,
       lastLines(coder.message),
     );
     if (!retryTester.ok) return retryTester.code;
-    coder = await callRole(
+    coder = await callCoder(
       config,
       definitions,
       selected,
       log,
-      'coder',
-      selected.task,
+      roleTask,
       lastLines(retryTester.message),
     );
     if (!coder.ok) return coder.code;
@@ -370,36 +444,34 @@ async function processTask(
   }
   let ci = await pushAndCi(config, selected, log, 'CI после coder');
   if (!ci.ok) {
-    const repair = await callRole(
+    const repair = await callCoder(
       config,
       definitions,
       selected,
       log,
-      'coder',
-      selected.task,
+      roleTask,
       lastLines(ci.output),
     );
     if (!repair.ok) return repair.code;
     ci = await pushAndCi(config, selected, log, 'CI после ремонта coder');
     if (!ci.ok) return stop(config, selected, log, 'CI', 'второй красный CI', ci.output);
   }
-  let reviewer = await callRole(config, definitions, selected, log, 'reviewer', selected.task);
+  let reviewer = await callRole(config, definitions, selected, log, 'reviewer', roleTask);
   if (!reviewer.ok) return reviewer.code;
   if (isReturnReply(reviewer.message)) {
-    const repair = await callRole(
+    const repair = await callCoder(
       config,
       definitions,
       selected,
       log,
-      'coder',
-      selected.task,
+      roleTask,
       lastLines(reviewer.message),
     );
     if (!repair.ok) return repair.code;
     ci = await pushAndCi(config, selected, log, 'CI после ВОЗВРАТ');
     if (!ci.ok)
       return stop(config, selected, log, 'ВОЗВРАТ/CI', 'красный CI после возврата', ci.output);
-    reviewer = await callRole(config, definitions, selected, log, 'reviewer', selected.task);
+    reviewer = await callRole(config, definitions, selected, log, 'reviewer', roleTask);
     if (!reviewer.ok) return reviewer.code;
     if (isReturnReply(reviewer.message))
       return stop(config, selected, log, 'reviewer', 'второй ВОЗВРАТ', reviewer.message);
@@ -441,14 +513,23 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   const status = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
   const definitions = await loadAgentDefinitions(config.root);
   await config.github.ensureAgentLabel();
-  const stageFile = await resolveStageFile(config.root, status);
   const usedIssues = new Set<number>();
   const usedTasks = new Set<string>();
   let taskCount = 0;
   const started = config.now();
   const summary: string[] = [];
-  const select = async (): Promise<TaskSelection | undefined> =>
-    selectIssueOrQueue(await config.github.listAgentIssues(), status, usedIssues, usedTasks);
+  const select = async (): Promise<TaskSelection | undefined> => {
+    const freshStatus = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
+    const freshStageFile = await resolveStageFile(config.root, freshStatus);
+    const freshStageText = await readFile(freshStageFile, 'utf8');
+    return selectIssueOrQueue(
+      await config.github.listAgentIssues(),
+      freshStatus,
+      usedIssues,
+      usedTasks,
+      freshStageText,
+    );
+  };
   if (config.dryRun) {
     const selected = await select();
     config.writeLine(
@@ -475,6 +556,8 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     if (!selected) break;
     if (selected.number !== undefined) usedIssues.add(selected.number);
     usedTasks.add(selected.task);
+    const freshStatus = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
+    const stageFile = await resolveStageFile(config.root, freshStatus);
     const result = await processTask(config, definitions, selected, stageFile, log);
     if (result !== 0) return result;
     taskCount += 1;
