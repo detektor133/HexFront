@@ -2,6 +2,10 @@
 
 Одна строка на решение, новые сверху. Формат: дата · решение · затронутые файлы · CR (если был).
 
+- 2026-10-07 · Аналитическая модель населения отменена: после обычного `git revert` коммитов `e17ffc6`, `68bf9f6`, `0ca649a`, `06020e8`, `6763965`, `bf16da9` код `packages/sim/src` должен совпасть с `3466cfa`, golden — с T14b; сохраняется ручной тик снабжения T14cc-Б1a; один линейный проход по гексам за тик допустим, население пошаговое · `docs/gdd/02-economy.md`, `docs/architecture/sim-core.md`, `docs/architecture/adr/0009-incremental-simulation-derived-data.md`, `docs/stages/stage-05-bots-maps-balance.md`, `docs/STATUS.md` · —
+- 2026-10-07 · Оптимизация закрыта одной задачей T15 «Боты без проходов по карте»: общий контекст тика строится один раз, виды ботов используют ссылки на массивы состояния только для чтения, `playerView` остаётся снимком клиента, механика и golden не меняются · `docs/stages/stage-05-bots-maps-balance.md`, `docs/architecture/adr/0009-incremental-simulation-derived-data.md`, `docs/STATUS.md` · —
+- 2026-10-07 · T14c, T14ca, T14cb, T14cb-Б1, T14cc, T14cd, T14d, T13b4 и T13c отменены/заменены T15; вопрос T14cd закрыт; очередь изменена на T15 → T1a5 · `docs/stages/stage-05-bots-maps-balance.md`, `docs/QUESTIONS.md`, `docs/STATUS.md` · —
+
 - 2026-10-06 · Задача отмечается `[x]` только после подтверждения каждого пункта «Приёмки» измерением, тестом или командой с результатом в отчёте; неподтверждённая приёмка оставляет `[ ]`, а `STATUS.md` фиксирует ожидающее подтверждение и владельца команды · `AGENTS.md`, `.agents/skills/task/SKILL.md`, `.agents/skills/next/SKILL.md`, `docs/STATUS.md` · —
 - 2026-10-03 · Порядок этапа 05: T5a → T1 → T1a → T4 → T3 → T8 → T5 → T6 → T7 → T2 · `stages/stage-05-bots-maps-balance.md`, `STATUS.md` · —
 - 2026-10-03 · Добавлена T1a «Стенд плейтеста»: генераторная карта в `/dev/sandbox`, панель наблюдателя, таблица лидеров и таймлапс территории для 30 игроков; механику `sim` не менять · `stages/stage-05-bots-maps-balance.md` · —
