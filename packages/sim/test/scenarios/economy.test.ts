@@ -6,7 +6,6 @@ import { loadMap } from '../../src/map/load.ts';
 import { FEATURE } from '../../src/map/types.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { createMatch } from '../../src/state/create-match.ts';
-import { setPopulation } from '../../src/state/population.ts';
 import { step } from '../../src/step.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../../src/systems/economy.ts';
 import { at, build, city, own, recruit, scenario, setTax } from '../scenario/dsl.ts';
@@ -47,7 +46,7 @@ describe('доход', () => {
 
   function incomeOf(setup: (s: ReturnType<typeof scenario>) => void): number {
     const s = scenario(MAP, { legend });
-    for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
+    s.state.hexes.pop.fill(0);
     setup(s);
     const before = s.player('A').gold;
     // Налог выставлен заранее, чтобы не ждать инерции; рост на доход за 1 с не влияет.
@@ -114,7 +113,7 @@ describe('содержание отрядов и банкротство', () => 
 
   function empty(): ReturnType<typeof scenario> {
     const s = scenario(MAP, { legend });
-    for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
+    s.state.hexes.pop.fill(0);
     return s;
   }
 

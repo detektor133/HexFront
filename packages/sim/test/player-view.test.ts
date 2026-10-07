@@ -5,7 +5,6 @@ import { at, city, own, recruit, road, scenario } from './scenario/dsl.ts';
 import type { Fp } from '../src/math/int.ts';
 import { createPlayerViewContext, playerView } from '../src/queries/player-view.ts';
 import { hashState } from '../src/state/hash.ts';
-import { setPopulation } from '../src/state/population.ts';
 
 const MAP = `
   a  a  a  a  a  a  a  a  a
@@ -135,7 +134,7 @@ describe('playerView', () => {
 
   it('сводка игрока для верхней полосы: население, прирост, доход, эффект выбранного налога, место', () => {
     const s = scenario(MAP, { legend });
-    for (let id = 0; id < s.state.hexes.pop.length; id += 1) setPopulation(s.state, id, 0);
+    s.state.hexes.pop.fill(0);
     s.setPop(at(0, 0), 100);
     s.player('A').taxTarget = 400 as Fp;
     const me = playerView(s.state, 0).me;

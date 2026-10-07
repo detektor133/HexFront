@@ -5,7 +5,6 @@ import { FP, intDiv } from '../math/int.ts';
 import { markNetworkDirty } from '../state/derived-cache.ts';
 import { setHexOwner } from '../state/hex-owner.ts';
 import { recomputeNetworks } from '../state/network.ts';
-import { invalidatePopulationRatesForPlayer, populationAt } from '../state/population.ts';
 import { NEUTRAL, type City, type MatchState, type Player } from '../state/types.ts';
 import { allUnits, removeUnits } from '../state/unit-index.ts';
 
@@ -18,7 +17,7 @@ function pickCapital(state: MatchState, cities: readonly City[]): City | undefin
   for (const id of state.hexes.network) if (id >= 0) size.set(id, (size.get(id) ?? 0) + 1);
   const key = (c: City): [number, number] => [
     size.get(state.hexes.network[c.hex] ?? -1) ?? 0,
-    populationAt(state, c.hex),
+    state.hexes.pop[c.hex] ?? 0,
   ];
   let best: City | undefined;
   for (const c of cities) {
@@ -75,13 +74,11 @@ function updatePlayer(state: MatchState, p: Player): void {
   const lost = p.capitalCityId >= 0;
   markNetworkDirty(state, p.id);
   recomputeNetworks(state, p.id);
-  invalidatePopulationRatesForPlayer(state, p.id);
   const capital = pickCapital(state, cities);
   if (!capital) return;
   p.capitalCityId = capital.id;
   markNetworkDirty(state, p.id);
   recomputeNetworks(state, p.id);
-  invalidatePopulationRatesForPlayer(state, p.id);
   if (lost) p.chaosTicks = CHAOS_TICKS;
   state.events.push({ t: 'capitalMoved', playerId: p.id, cityId: capital.id });
 }

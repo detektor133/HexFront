@@ -5,7 +5,7 @@
 import { markNetworkDirty } from './derived-cache.ts';
 import { edgeHex } from './edges.ts';
 import { followFrontsNear } from './front.ts';
-import { invalidatePopulationRate, materializePopulation } from './population.ts';
+import { materializePopulation } from './population.ts';
 import type { MatchState } from './types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 
@@ -44,7 +44,7 @@ export function setHexOwner(state: MatchState, hex: HexId, owner: number): void 
   materializePopulation(state, hex);
   if (was >= 0) markLost(state, hex, was);
   state.hexes.owner[hex] = owner;
-  invalidatePopulationRate(state, hex);
+  state.supplyRevision += 1;
   markNetworkDirty(state, was);
   markNetworkDirty(state, owner);
   followFrontsNear(state, hex);

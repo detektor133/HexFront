@@ -9,6 +9,7 @@ import {
   IMPROVEMENT_GROWTH_STEP,
   ISOLATED_GROWTH_MULT,
   POP_OVERCAP_DECAY,
+  TICKS_PER_S,
 } from '../balance.ts';
 import { taxGrowthMult } from './tax.ts';
 import { growthIntegral } from '../math/exponential.ts';
@@ -111,7 +112,7 @@ export function growthPerSecond(state: MatchState): Int32Array {
   const { hexes } = state;
   const best = bestCityGrowth(state);
   const levels = cityLevels(state);
-  return Int32Array.from(hexes.owner, (_, id) => {
+  return Int32Array.from(hexes.pop, (_, id) => {
     const pop = populationAt(state, id);
     const level = levels[id] ?? 0;
     const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
@@ -128,6 +129,22 @@ export function growthPerSecond(state: MatchState): Int32Array {
  *            × networkMult × (1 − pop / popCap)
  */
 export function populationSystem(state: MatchState): void {
+  const { hexes } = state;
+  const best = bestCityGrowth(state);
+  const levels = cityLevels(state);
+  for (let id = 0; id < hexes.pop.length; id += 1) {
+    const pop = hexes.pop[id] ?? 0;
+    const level = levels[id] ?? 0;
+    const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
+    if (pop > cap) {
+      hexes.pop[id] = Math.max(cap, pop - intDiv(fpMul(pop as Fp, POP_OVERCAP_DECAY), TICKS_PER_S));
+      continue;
+    }
+    const full = fullGrowth(state, id, best[id] ?? 0);
+    if (full === 0 || pop === cap) continue;
+    const growth = intDiv(full * (cap - pop), cap * TICKS_PER_S);
+    hexes.pop[id] = Math.min(cap, pop + growth);
+  }
   for (const player of state.players) {
     if (player.status === 'alive') {
       state.populationM[player.id] =

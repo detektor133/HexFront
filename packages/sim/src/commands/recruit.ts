@@ -17,7 +17,7 @@ import { OK, rejected, type RejectReason, type Validation } from './types.ts';
 import { hexFromId, hexId, inBounds, spiral, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
-import { materializePopulation, populationAt, setPopulation } from '../state/population.ts';
+import { materializePopulation, setPopulation } from '../state/population.ts';
 import type { City, MatchState } from '../state/types.ts';
 
 /** Радиус, из которого город набирает людей: городской гекс и кольца 1–2. */
@@ -52,7 +52,7 @@ function donors(state: MatchState, city: City): Donor[] {
     const here = state.cities.find((c) => c.hex === id);
     const cap = here ? cityPopCap(here.level) : hexPopCap(state, id);
     const floor = fpMul(cap, RECRUIT_MIN_HEX_POP_RATIO);
-    const surplus = Math.max(0, populationAt(state, id) - floor);
+    const surplus = Math.max(0, (state.hexes.pop[id] ?? 0) - floor);
     if (surplus > 0) result.push({ hex: id, surplus });
   }
   return result.sort((a, b) => a.hex - b.hex);
@@ -165,7 +165,7 @@ function takePeople(state: MatchState, city: City, need: number): void {
   }
   list.forEach((d, i) => {
     materializePopulation(state, d.hex);
-    setPopulation(state, d.hex, populationAt(state, d.hex) - (takes[i] ?? 0));
+    setPopulation(state, d.hex, (state.hexes.pop[d.hex] ?? 0) - (takes[i] ?? 0));
   });
 }
 

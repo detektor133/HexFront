@@ -11,7 +11,6 @@ import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
-import { populationAt } from '../state/population.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { createEconomyContext } from '../systems/economy-context.ts';
 import {
@@ -139,7 +138,7 @@ function summary(
   let popGrowthPerS = 0;
   state.hexes.owner.forEach((o, id) => {
     if (o !== playerId) return;
-    popTotal += populationAt(state, id);
+    popTotal += state.hexes.pop[id] ?? 0;
     popGrowthPerS += context.growth[id] ?? 0;
   });
   const target = state.players[playerId]?.taxTarget ?? (0 as Fp);
@@ -203,7 +202,6 @@ export function playerView(
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
-  const population = Int32Array.from(hexes.owner, (_, id) => populationAt(state, id));
   return {
     me: summary(state, playerId, viewContext),
     tick: state.tick,
@@ -213,8 +211,8 @@ export function playerView(
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
       pop: state.fog
-        ? Int32Array.from(population, (value, id) => (hexes.owner[id] === playerId ? value : 0))
-        : population,
+        ? Int32Array.from(hexes.pop, (value, id) => (hexes.owner[id] === playerId ? value : 0))
+        : hexes.pop.slice(),
       improvement: state.fog
         ? Uint8Array.from(hexes.improvement, (_, id) => memoryImprovement?.[id] ?? 0)
         : hexes.improvement.slice(),
@@ -304,7 +302,6 @@ export function commanderView(
 ): PlayerView {
   const { hexes } = state;
   const visible = state.fog ? (state.vision?.visible[playerId] ?? new Uint8Array(0)) : undefined;
-  const population = Int32Array.from(hexes.owner, (_, id) => populationAt(state, id));
   return {
     me: {
       popTotal: 0,
@@ -327,7 +324,7 @@ export function commanderView(
     playerId,
     hexes: {
       owner: hexes.owner,
-      pop: population,
+      pop: hexes.pop,
       improvement: hexes.improvement,
       building: hexes.building,
       road: hexes.road,

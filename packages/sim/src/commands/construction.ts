@@ -20,7 +20,6 @@ import { OK, rejected, type Command, type RejectReason, type Validation } from '
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
-import { populationAt } from '../state/population.ts';
 import { BUILDING, type ConstructionKind, type MatchState } from '../state/types.ts';
 
 type BuildCommand = Extract<Command, { t: 'foundCity' | 'upgradeCity' | 'improve' | 'build' }>;
@@ -77,7 +76,7 @@ function planFoundCity(state: MatchState, playerId: number, hex: HexId): PlanRes
   if (cityAt(state, hex)) return fail('isCity');
   if (tooCloseToCity(state, hex)) return fail('cityTooClose');
   const minPop = fpMul(hexPopCap(state, hex), CITY_FOUND_MIN_POP_RATIO);
-  if (populationAt(state, hex) < minPop) return fail('popTooLow');
+  if ((state.hexes.pop[hex] ?? 0) < minPop) return fail('popTooLow');
   const citiesFounded = state.players[playerId]?.citiesFounded ?? 0;
   return plan({
     kind: 'foundCity',
