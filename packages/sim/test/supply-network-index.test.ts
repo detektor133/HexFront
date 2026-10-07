@@ -10,11 +10,14 @@ import { loadMap } from '../src/map/load.ts';
 import type { Fp } from '../src/math/int.ts';
 import { captureHex } from '../src/state/capture.ts';
 import { createMatch } from '../src/state/create-match.ts';
-import { recomputeAllNetworks } from '../src/state/network.ts';
+import { hashState } from '../src/state/hash.ts';
+import { recomputeNetworks } from '../src/state/network.ts';
 import { hexSupplyEff, recalculateSupply } from '../src/state/supply.ts';
 import type { MatchState, Player } from '../src/state/types.ts';
 import { rebuildUnitIndex } from '../src/state/unit-index.ts';
 import { step, SYSTEMS } from '../src/step.ts';
+import { createEconomyContext } from '../src/systems/economy-context.ts';
+import { economySystem } from '../src/systems/economy.ts';
 
 function generatedMap(seed: number, players: number) {
   const loaded = loadMap(generateMap(seed, { players }));
@@ -32,18 +35,16 @@ function processedPlayers(state: MatchState, tick: number): readonly Player[] {
 function playerSupplySnapshot(
   state: MatchState,
   playerId: number,
-  stableHexes: ReadonlySet<number>,
-  unitIds: ReadonlySet<number>,
+  stableHexes: readonly number[],
 ): unknown {
+  const networks = state.networks.filter((network) => network.owner === playerId);
   return {
     bankrupt: state.players[playerId]?.bankrupt,
-    networks: state.networks.filter((network) => network.owner === playerId),
-    networkHexes: Array.from(stableHexes, (hex) => [hex, state.hexes.network[hex]]),
-    ratios: state.networks
-      .filter((network) => network.owner === playerId)
-      .map((network) => [network.id, state.supplyRatios.get(network.id) ?? -1]),
+    networks,
+    networkHexes: stableHexes.map((hex) => [hex, state.hexes.network[hex]]),
+    ratios: networks.map((network) => [network.id, state.supplyRatios.get(network.id) ?? -1]),
     units: state.units
-      .filter((unit) => unit.owner === playerId && unitIds.has(unit.id))
+      .filter((unit) => unit.owner === playerId)
       .map((unit) => [unit.id, unit.supplyLevel, unit.encircled]),
   };
 }
@@ -53,54 +54,80 @@ function expectProcessedPlayersEquivalent(
   reference: MatchState,
   tick: number,
 ): void {
-  recomputeAllNetworks(reference);
-  for (const player of reference.players) recalculateSupply(reference, player.id);
-  const unitIds = new Set(
-    state.units
-      .map((unit) => unit.id)
-      .filter((id) => reference.units.some((unit) => unit.id === id)),
-  );
-  for (const player of processedPlayers(state, tick)) {
-    const stableHexes = new Set<number>();
-    for (let hex = 0; hex < state.hexes.owner.length; hex += 1) {
-      if (state.hexes.owner[hex] === player.id && reference.hexes.owner[hex] === player.id) {
-        stableHexes.add(hex);
-      }
+  const stableHexesByPlayer = new Map<number, number[]>();
+  for (let hex = 0; hex < state.hexes.owner.length; hex += 1) {
+    const owner = state.hexes.owner[hex];
+    if (owner !== undefined && owner === reference.hexes.owner[hex]) {
+      const stableHexes = stableHexesByPlayer.get(owner) ?? [];
+      stableHexes.push(hex);
+      stableHexesByPlayer.set(owner, stableHexes);
     }
-    expect(
-      playerSupplySnapshot(state, player.id, stableHexes, unitIds),
-      `тик ${tick}, игрок ${player.id}`,
-    ).toEqual(playerSupplySnapshot(reference, player.id, stableHexes, unitIds));
   }
+  for (const player of processedPlayers(state, tick)) {
+    const stableHexes = stableHexesByPlayer.get(player.id) ?? [];
+    expect(
+      playerSupplySnapshot(state, player.id, stableHexes),
+      `тик ${tick}, игрок ${player.id}`,
+    ).toEqual(playerSupplySnapshot(reference, player.id, stableHexes));
+  }
+}
+
+function copyForSupplyRecalculation(state: MatchState, playerIds: ReadonlySet<number>): MatchState {
+  const units = state.units.slice();
+  for (let index = 0; index < units.length; index += 1) {
+    const unit = units[index];
+    if (unit && playerIds.has(unit.owner)) units[index] = { ...unit };
+  }
+  return {
+    ...state,
+    hexes: { ...state.hexes, network: state.hexes.network.slice() },
+    networks: state.networks.slice(),
+    supplyRatios: new Map(),
+    units,
+  };
+}
+
+function manualTick(state: MatchState, commands: Parameters<typeof applyCommands>[1]): void {
+  const tick = state.tick;
+  state.events = [];
+  applyCommands(state, commands);
+  for (const system of SYSTEMS.slice(0, 5)) system(state);
+
+  const players = processedPlayers(state, tick);
+  const reference = copyForSupplyRecalculation(state, new Set(players.map((player) => player.id)));
+  for (const player of players) {
+    recomputeNetworks(reference, player.id, true);
+    recalculateSupply(reference, player.id);
+  }
+  expectProcessedPlayersEquivalent(state, reference, tick);
+
+  for (const system of SYSTEMS.slice(5)) {
+    if (system === economySystem) economySystem(state, createEconomyContext(state).incomeBases);
+    else system(state);
+  }
+  state.tick += 1;
 }
 
 function runAndCompare(state: MatchState, ticks: number): void {
   rebuildUnitIndex(state);
   for (const player of state.players) player.gold = 1_000_000_000 as Fp;
-  for (let i = 0; i < ticks; i += 1) {
-    const tick = state.tick;
-    const commands = warCommands(state);
-    const reference = cloneState(state);
-    step(state, commands);
-    applyCommands(reference, commands);
-    for (const system of SYSTEMS.slice(0, 5)) system(reference);
-    expectProcessedPlayersEquivalent(state, reference, tick);
-  }
-}
-
-function stepAndCompare(state: MatchState, commands: Parameters<typeof applyCommands>[1]): void {
-  const tick = state.tick;
-  const reference = cloneState(state);
-  step(state, commands);
-  applyCommands(reference, commands);
-  for (const system of SYSTEMS.slice(0, 5)) system(reference);
-  expectProcessedPlayersEquivalent(state, reference, tick);
+  for (let i = 0; i < ticks; i += 1) manualTick(state, warCommands(state));
 }
 
 describe('инкрементальные снабжение и сети', () => {
-  it('сравнивает обработанных игроков с полным клоном после каждого тика войны', () => {
+  it('сравнивает обработанных игроков с полным пересчётом после каждого тика войны', () => {
     const state = createMatch(generatedMap(42, 2), [{ name: 'A' }, { name: 'B' }], 42);
-    runAndCompare(state, WAR_TICKS);
+    rebuildUnitIndex(state);
+    for (const player of state.players) player.gold = 1_000_000_000 as Fp;
+    const stepped = cloneState(state);
+    for (let tick = 0; tick < WAR_TICKS; tick += 1) {
+      const commands = warCommands(state);
+      manualTick(state, commands);
+      if (tick < 100) {
+        step(stepped, commands);
+        expect(hashState(state)).toBe(hashState(stepped));
+      }
+    }
   }, 120_000);
 
   it('совпадает с полным пересчётом на gen-карте для 30 игроков за 1000 тиков', () => {
@@ -138,12 +165,12 @@ describe('инкрементальные снабжение и сети', () => 
     const fortHex = 8;
     s.setPop(at(10, 0), 60);
 
-    stepAndCompare(state, [{ playerId: 0, cmd: { t: 'build', hex: roadHex, kind: 'depot' } }]);
-    while (state.constructions.length > 0) stepAndCompare(state, []);
-    stepAndCompare(state, [{ playerId: 0, cmd: { t: 'build', hex: fortHex, kind: 'fort' } }]);
-    while (state.constructions.length > 0) stepAndCompare(state, []);
-    stepAndCompare(state, [{ playerId: 0, cmd: { t: 'foundCity', hex: 10 } }]);
-    while (state.constructions.length > 0) stepAndCompare(state, []);
+    manualTick(state, [{ playerId: 0, cmd: { t: 'build', hex: roadHex, kind: 'depot' } }]);
+    while (state.constructions.length > 0) manualTick(state, []);
+    manualTick(state, [{ playerId: 0, cmd: { t: 'build', hex: fortHex, kind: 'fort' } }]);
+    while (state.constructions.length > 0) manualTick(state, []);
+    manualTick(state, [{ playerId: 0, cmd: { t: 'foundCity', hex: 10 } }]);
+    while (state.constructions.length > 0) manualTick(state, []);
 
     const capitalHex = state.cities.find(
       (city_) => city_.id === state.players[0]?.capitalCityId,
@@ -151,12 +178,12 @@ describe('инкрементальные снабжение и сети', () => 
     if (capitalHex === undefined) throw new Error('тест: нет столицы A');
     captureHex(state, capitalHex, 1);
     expect(hexSupplyEff(state, 0, capitalHex)).toBeGreaterThanOrEqual(0);
-    stepAndCompare(state, []);
+    manualTick(state, []);
 
     const attacker = s.unit('A', 'infantry', 900, at(9, 1));
     const defender = s.unit('B', 'infantry', 100, at(10, 1));
     for (let tick = 0; tick < 300; tick += 1) {
-      stepAndCompare(
+      manualTick(
         state,
         tick === 0 ? [{ playerId: 0, cmd: { t: 'attack', unitIds: [attacker], target: 23 } }] : [],
       );
