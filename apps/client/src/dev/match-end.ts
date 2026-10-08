@@ -9,6 +9,47 @@ interface EndView {
   readonly players: readonly { readonly id: number }[];
 }
 
+interface StatisticsView {
+  readonly playerId: number;
+  readonly hexes: { readonly owner: ArrayLike<number> };
+  readonly cities: readonly { readonly owner: number }[];
+  readonly units: readonly { readonly owner: number; readonly soldiers: number }[];
+  readonly players: readonly { readonly id: number; readonly gold: number }[];
+  readonly me: { readonly score: number };
+}
+
+export interface MatchStatistics {
+  readonly hexes: number;
+  readonly cities: number;
+  readonly soldiers: number;
+  readonly gold: number;
+  readonly score: number;
+}
+
+/** Статистика игрока для итогового экрана. */
+export function matchStatistics(view: StatisticsView): MatchStatistics {
+  const player = view.players.find((item) => item.id === view.playerId);
+  return {
+    hexes: Array.from(view.hexes.owner).filter((owner) => owner === view.playerId).length,
+    cities: view.cities.filter((city) => city.owner === view.playerId).length,
+    soldiers: view.units
+      .filter((unit) => unit.owner === view.playerId)
+      .reduce((total, unit) => total + unit.soldiers, 0),
+    gold: player?.gold ?? 0,
+    score: view.me.score,
+  };
+}
+
+/** Сжимает историю снимков до 16 кадров: по одному кадру на секунду реплея. */
+export function replayFrames<T>(views: readonly T[], maxFrames: number = 16): readonly T[] {
+  if (views.length === 0 || maxFrames < 1) return [];
+  if (views.length <= maxFrames) return views;
+  return Array.from({ length: maxFrames }, (_, index) => {
+    const source = Math.floor((index * (views.length - 1)) / (maxFrames - 1));
+    return views[source] as T;
+  });
+}
+
 /** Итог для карточки. */
 export interface MatchEndInfo {
   readonly won: boolean;
