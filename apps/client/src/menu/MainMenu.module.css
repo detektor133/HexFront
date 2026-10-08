@@ -1,0 +1,53 @@
+.page {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: var(--space-lg);
+  box-sizing: border-box;
+  background: var(--map-background);
+}
+
+.card {
+  width: min(100%, 420px);
+  box-sizing: border-box;
+  padding: var(--space-xl);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  text-align: center;
+}
+
+.kicker {
+  margin: 0 0 var(--space-md);
+  color: var(--ui-ink2);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display-family);
+  font-weight: var(--font-display-weight);
+  font-size: var(--font-size-display);
+}
+
+.subtitle {
+  margin: var(--space-sm) 0 var(--space-lg);
+  color: var(--ui-ink2);
+}
+
+.play {
+  display: inline-flex;
+  min-height: var(--touch-target-min);
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-xl);
+  box-sizing: border-box;
+  border-radius: var(--radius-button);
+  background: var(--ui-button-primary-bg);
+  color: var(--ui-button-primary-ink);
+  font: inherit;
+  text-decoration: none;
+}

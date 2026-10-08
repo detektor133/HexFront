@@ -1,6 +1,9 @@
 // Словари интерфейса (CONVENTIONS.md §1: тексты UI — только через i18n).
 
 const ru = {
+  'menu.title': 'Быстрый матч',
+  'menu.subtitle': 'Локальная игра против ботов',
+  'menu.play': 'Играть',
   'dev.map.title': 'Карта: отладка',
   'dev.map.scale': 'Масштаб',
   'dev.map.detail': 'Детализация',
@@ -227,6 +230,9 @@ const ru = {
 export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
+  'menu.title': 'Quick match',
+  'menu.subtitle': 'Local game against bots',
+  'menu.play': 'Play',
   'dev.map.title': 'Map: debug',
   'dev.map.scale': 'Scale',
   'dev.map.detail': 'Detail',
