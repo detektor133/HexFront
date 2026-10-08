@@ -28,6 +28,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
+- **06/T1d завершена:** commander для ботов направляет резерв и новые отряды в армию активной цели, малые однотипные отряды сближаются и сливаются; человеческий режим и golden сохранены.
+- **Проверки:** `commander.test.ts` — 16/16; bot-тесты — 24/24; benchmark commander — 0,077 мс/бот/ход для 30 и 0,293 для 100 при лимите 0,348; полный `pnpm verify` — `verify: OK (285 с)`.
+- **Отчёт:** `docs/reports/stage-06-t1d.md`.
+- **Следующая задача:** 06/T1e — два детерминированных прогона, бюджет полного тика и удаление старого `economy.ts`.
+- **Читать:** `docs/gdd/09-bots.md`, `docs/architecture/sim-core.md`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `docs/stages/stage-06-bots-balance.md`.
+
 - **06/T1b завершена:** добавлен `bots/snapshot.ts`; снимок использует индекс `гекс → отряды`, базы дохода контекста и пограничные гексы, без `playerView` и полного обхода карты.
 - **Проверки:** `bot-snapshot.test.ts` — 3/3, включая 30 игроков на тиках 600 и 3000; `bot-context.test.ts` — 2/2; `pnpm --filter @hexfront/sim typecheck` — OK; полный `pnpm verify` — `verify: OK (292 с)`.
 - **Отчёт:** `docs/reports/stage-06-t1b.md`.

@@ -11,12 +11,12 @@ import {
   BOT_THINK_TICKS,
   COMMANDER_TICKS,
 } from '../balance.ts';
+import type { BotLevel } from './types.ts';
 import type { PlayerCommand } from '../commands/types.ts';
 import type { Fp } from '../math/int.ts';
 import { commanderView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
-
-export type BotLevel = 'easy' | 'medium';
+export type { BotLevel } from './types.ts';
 
 function isBotTickContext(
   value: readonly (BotLevel | undefined)[] | BotTickContext | undefined,
@@ -76,7 +76,14 @@ export function commanderCommands(
     const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
-      for (const cmd of decide(state.map, view, armyId, depth, commanderContext)) {
+      for (const cmd of decide(
+        state.map,
+        view,
+        armyId,
+        depth,
+        commanderContext,
+        botIds.has(p.id),
+      )) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
     }

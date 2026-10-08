@@ -263,6 +263,66 @@ describe('commander: когда решает (04/T22a)', () => {
   });
 });
 
+describe('commander: путь бота (06/T1d)', () => {
+  it('отправляет резерв в армию цели, а не в самую слабую', () => {
+    const s = scenario(FIELD, { legend });
+    const target = autoArmy(s, 1);
+    const fallback = autoArmy(s, 1, at(1, 1));
+    s.cmd('A', assignFront(target, 'B', null), 'auto');
+    s.runTicks(1);
+    s.cmd('A', startOffensive(target));
+    s.runTicks(1);
+    const reserve = s.unit('A', 'infantry', 100, at(0, 0));
+    s.setTick(0);
+
+    const commands = commanderCommands(s.state, [0]);
+    expect(commands).toContainEqual({
+      playerId: 0,
+      cmd: { t: 'assignUnits', unitIds: [reserve], armyId: target },
+      source: 'auto',
+    });
+    expect(commands).not.toContainEqual({
+      playerId: 0,
+      cmd: { t: 'assignUnits', unitIds: [reserve], armyId: fallback },
+      source: 'auto',
+    });
+  });
+
+  it('направляет малый однотипный отряд к ближайшему отряду своей армии', () => {
+    const s = scenario(FIELD, { legend });
+    const army = autoArmy(s, 1, at(1, 2), 100);
+    const small = s.unit('A', 'infantry', 10, at(2, 2));
+    s.cmd('A', assignUnits([small], army), 'auto');
+    s.runTicks(1);
+    s.setTick(0);
+
+    const commands = commanderCommands(s.state, [0]);
+    expect(commands).toContainEqual({
+      playerId: 0,
+      cmd: { t: 'move', unitIds: [small], to: 1 + 2 * 8 },
+      source: 'auto',
+    });
+  });
+
+  it('для игрока без ботов сохраняет прежнюю выдачу команд', () => {
+    const s = scenario(FIELD, { legend });
+    const army = autoArmy(s, 1);
+    const reserve = s.unit('A', 'infantry', 100, at(0, 0));
+    s.setTick(0);
+
+    const human = commanderCommands(s.state);
+    const bot = commanderCommands(s.state, [0]);
+    expect(bot.filter((command) => command.cmd.t === 'assignUnits')).toEqual(
+      human.filter((command) => command.cmd.t === 'assignUnits'),
+    );
+    expect(human).toContainEqual({
+      playerId: 0,
+      cmd: { t: 'assignUnits', unitIds: [reserve], armyId: army },
+      source: 'auto',
+    });
+  });
+});
+
 describe('commander: детерминизм (04/T21, CR-006)', () => {
   it('одинаковый снимок — одинаковые команды', () => {
     fc.assert(

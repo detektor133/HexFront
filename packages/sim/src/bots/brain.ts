@@ -16,8 +16,8 @@ import {
   UPKEEP_GOLD_PER_SOLDIER_S,
 } from '../balance.ts';
 import type { BotTickContext } from './context.ts';
-import type { BotLevel } from './run.ts';
 import { createBotSnapshot } from './snapshot.ts';
+import type { BotLevel } from './types.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import type { Command } from '../commands/types.ts';
