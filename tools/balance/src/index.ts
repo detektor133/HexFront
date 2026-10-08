@@ -6,12 +6,22 @@ export interface BalanceMatchOptions {
   readonly parallelism: number;
   readonly players: number;
   readonly ticks: number;
+  readonly revision: string;
+}
+
+export interface BalanceMapResult {
+  readonly id: string;
+  readonly players: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface BalanceMatchResult {
   readonly runIndex: number;
   readonly seed: number;
   readonly ticks: number;
+  readonly revision: string;
+  readonly map: BalanceMapResult;
 }
 
 interface WorkerMessage extends BalanceMatchResult {
@@ -39,7 +49,8 @@ export function parseOptions(arguments_: readonly string[]): CliOptions {
     arguments_.find((argument) => argument.startsWith(`${name}=`))?.slice(name.length + 1);
   const matches = positiveInteger(value('--matches') ?? '1', 'число матчей');
   const parallelism = positiveInteger(value('--parallelism') ?? '1', 'параллельность');
-  const players = positiveInteger(value('--players') ?? '2', 'число игроков');
+  const players = positiveInteger(value('--players') ?? '30', 'число игроков');
+  if (players !== 30) throw new Error('стенд балансировки поддерживает только 30 игроков');
   const ticks =
     value('--ticks') === undefined ? 600 : positiveInteger(value('--ticks') ?? '0', 'число тиков');
   const seeds =
@@ -47,7 +58,14 @@ export function parseOptions(arguments_: readonly string[]): CliOptions {
       ? Array.from({ length: matches }, (_, index) => index)
       : parseSeeds(value('--seeds') ?? '');
   if (seeds.length !== matches) throw new Error('число сидов должно совпадать с числом матчей');
-  return { matches, seeds, parallelism, players, ticks };
+  return {
+    matches,
+    seeds,
+    parallelism,
+    players,
+    ticks,
+    revision: value('--revision') ?? 'working-tree',
+  };
 }
 
 function runWorker(runIndex: number, options: BalanceMatchOptions): Promise<BalanceMatchResult> {
@@ -58,10 +76,17 @@ function runWorker(runIndex: number, options: BalanceMatchOptions): Promise<Bala
         seed: options.seeds[runIndex],
         players: options.players,
         ticks: options.ticks,
+        revision: options.revision,
       },
     });
     worker.once('message', (message: WorkerMessage) => {
-      resolve({ runIndex: message.runIndex, seed: message.seed, ticks: message.ticks });
+      resolve({
+        runIndex: message.runIndex,
+        seed: message.seed,
+        ticks: message.ticks,
+        revision: message.revision,
+        map: message.map,
+      });
       void worker.terminate();
     });
     worker.once('error', reject);
@@ -76,6 +101,7 @@ export async function runBalanceMatches(
 ): Promise<readonly BalanceMatchResult[]> {
   if (options.seeds.length !== options.matches)
     throw new Error('число сидов должно совпадать с числом матчей');
+  if (options.players !== 30) throw new Error('стенд балансировки поддерживает только 30 игроков');
   const results: BalanceMatchResult[] = [];
   let nextIndex = 0;
   const runNext = async (): Promise<void> => {

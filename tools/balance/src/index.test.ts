@@ -14,14 +14,61 @@ describe('запуск балансировочных матчей', () => {
       matches: 3,
       seeds: [41, 42, 43],
       parallelism: 2,
-      players: 2,
+      players: 30,
       ticks: 0,
+      revision: 'test-revision',
     });
 
     expect(results).toEqual([
-      { runIndex: 0, seed: 41, ticks: 0 },
-      { runIndex: 1, seed: 42, ticks: 0 },
-      { runIndex: 2, seed: 43, ticks: 0 },
+      {
+        runIndex: 0,
+        seed: 41,
+        ticks: 0,
+        revision: 'test-revision',
+        map: { id: 'proc-29', players: 30, width: 80, height: 60 },
+      },
+      {
+        runIndex: 1,
+        seed: 42,
+        ticks: 0,
+        revision: 'test-revision',
+        map: { id: 'proc-2a', players: 30, width: 80, height: 60 },
+      },
+      {
+        runIndex: 2,
+        seed: 43,
+        ticks: 0,
+        revision: 'test-revision',
+        map: { id: 'proc-2b', players: 30, width: 80, height: 60 },
+      },
     ]);
+  });
+
+  it('отклоняет стенд с числом игроков, отличным от 30', async () => {
+    await expect(
+      runBalanceMatches({
+        matches: 1,
+        seeds: [41],
+        parallelism: 1,
+        players: 2,
+        ticks: 0,
+        revision: 'test',
+      }),
+    ).rejects.toThrow('30 игроков');
+  });
+
+  it('получает одинаковые параметры карты для одинакового сида', async () => {
+    const options = {
+      matches: 1,
+      seeds: [41],
+      parallelism: 1,
+      players: 30,
+      ticks: 0,
+      revision: 'test-revision',
+    } as const;
+    const first = await runBalanceMatches(options);
+    const second = await runBalanceMatches(options);
+
+    expect(first[0]?.map).toEqual(second[0]?.map);
   });
 });
