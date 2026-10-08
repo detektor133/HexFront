@@ -5,8 +5,9 @@ import { DevMapPage } from './dev/DevMapPage.tsx';
 import { DevSandboxPage } from './dev/DevSandboxPage.tsx';
 import { DevUnitsPage } from './dev/DevUnitsPage.tsx';
 import { t } from './i18n/dict.ts';
+import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
-import { isDevPath } from './routes.ts';
+import { isDevPath, isMatchPath } from './routes.ts';
 import './theme/tokens.css';
 import './theme/fonts.css';
 import './theme/global.css';
@@ -14,6 +15,7 @@ import './theme/global.css';
 function App(): React.JSX.Element {
   const path = window.location.pathname;
   if (path === '/' || path === '/menu') return <MainMenu />;
+  if (isMatchPath(path)) return <MatchPage />;
   if (path === '/dev/map') return <DevMapPage />;
   if (path === '/dev/units') return <DevUnitsPage />;
   // /dev/economy — прежний адрес песочницы (этап 02), оставлен для старых ссылок.

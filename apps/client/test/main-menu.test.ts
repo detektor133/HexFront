@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { quickMatchUrl, isDevPath } from '../src/routes.ts';
+import { isDevPath, isMatchPath, quickMatchUrl } from '../src/routes.ts';
 
 describe('маршруты главного меню', () => {
   it('ведёт кнопку «Играть» на матч с 30 участниками и процедурной картой', () => {
@@ -11,5 +11,10 @@ describe('маршруты главного меню', () => {
     expect(isDevPath('/dev/sandbox')).toBe(true);
     expect(isDevPath('/')).toBe(false);
     expect(isDevPath('/match')).toBe(false);
+  });
+
+  it('выделяет обычный экран матча отдельным маршрутом', () => {
+    expect(isMatchPath('/match')).toBe(true);
+    expect(isMatchPath('/dev/sandbox')).toBe(false);
   });
 });

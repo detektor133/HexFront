@@ -11,6 +11,11 @@ export function quickMatchUrl(): string {
   return `/match?${params.toString()}`;
 }
 
+/** Проверяет, относится ли путь к обычному экрану матча. */
+export function isMatchPath(path: string): boolean {
+  return path === '/match';
+}
+
 /** Проверяет, относится ли путь к dev-страницам. */
 export function isDevPath(path: string): boolean {
   return path === '/dev' || path.startsWith('/dev/');
