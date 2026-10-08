@@ -59,7 +59,7 @@ describe('права агентной роли', () => {
     expect(runHook(undefined, 'echo x > packages/sim/src/step.ts')).toBe('');
   });
 
-  it.each(['planner', 'tester', 'reviewer'])('пропускает stop-хук для %s', (role) => {
+  it.each(['planner', 'tester', 'coder', 'reviewer'])('пропускает stop-хук для %s', (role) => {
     expect(runStopHook(role)).toBe(0);
   });
 });

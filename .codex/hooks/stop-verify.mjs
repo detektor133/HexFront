@@ -16,7 +16,7 @@ function readEvent() {
 
 const event = readEvent();
 
-if (['planner', 'tester', 'reviewer'].includes(process.env.AGENT_ROLE)) process.exit(0);
+if (['planner', 'tester', 'coder', 'reviewer'].includes(process.env.AGENT_ROLE)) process.exit(0);
 
 // Ход уже был продолжен этим хуком — не зацикливаемся, решение за агентом.
 if (event.stop_hook_active === true) process.exit(0);
