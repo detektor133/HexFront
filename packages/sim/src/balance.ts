@@ -29,6 +29,8 @@ export const OFFENSIVE_STUCK_TICKS = 100;
  */
 export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
+/** Период экономического решения easy-бота, тиков. */
+export const BOT_EASY_THINK_TICKS = 30;
 
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
 
@@ -36,6 +38,8 @@ export const BOT_THINK_TICKS = 10;
 export const BOT_TAX_PEACE: Fp = fp(0.15);
 /** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
 export const BOT_TAX_WAR: Fp = fp(0.3);
+/** Фиксированный налог easy-бота. */
+export const BOT_EASY_TAX: Fp = fp(0.2);
 /** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
 export const BOT_GOLD_RESERVE: Fp = fp(50);
 /** Благоустройство — гексам с населением не ниже этой доли лимита. */
