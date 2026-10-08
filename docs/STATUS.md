@@ -31,8 +31,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1e3 завершена:** удалены `packages/sim/src/bots/economy.ts`, экспорт `economyDecide` и актуальная архитектурная ссылка; проверки налогов, дороги, easy и автопополнения перенесены на `brainDecide`.
 - **Проверки:** профильный тест `bot-brain-regressions.test.ts` — 5/5; `pnpm verify --changed` — `verify: OK (117 с)`; полный `pnpm verify` — `verify: OK (286 с)`.
 - **Отчёт:** `docs/reports/stage-06-t1e3.md`.
-- **Следующая задача:** 06/T1e4 — сквозная проверка родителя T1.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1e1.md`, `docs/reports/stage-06-t1e2.md`, `docs/reports/stage-06-t1e3.md`.
+- **06/T1e4:** таблица трассировки T1 подготовлена в `docs/reports/stage-06-t1e4.md`; задачи T1e и T1 остаются `[ ]` до отдельного `$accept 06/T1`.
+- **Ожидается:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
+- **Следующая задача:** после `$accept 06/T1` — сверить результат и закрыть T1e/T1 либо изменить только `BOT_*` по метрикам.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1e1.md`, `docs/reports/stage-06-t1e2.md`, `docs/reports/stage-06-t1e3.md`, `docs/reports/stage-06-t1e4.md`.
 
 - **06/T1e2 завершена:** полный benchmark 30 ботов на 5 минуте показал `4,156 / 3,935 / 3,864 / 3,794 / 5,003 мс` на минутах 1–5 при лимите `15 мс`.
 - **Проверки:** `pnpm --filter @hexfront/bench full-match --players=30 --minutes=5` — `budgetExceeded: false`; `pnpm verify --changed` — `verify: OK (10 с)`; полный `pnpm verify` — `verify: OK (283 с)`.
