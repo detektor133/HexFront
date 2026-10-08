@@ -79,6 +79,11 @@
 | MAPGEN_RIVER_MAX_EDGES | 40 рёбер `[ТЮНИНГ]` |
 | MAPGEN_RIVERS_PER_PLAYER | 0,5 `[ТЮНИНГ]` |
 | `PASSABLE_HEXES_PER_PLAYER` | 120 `[ТЮНИНГ]` |
+| `EUROPE_MAP_MIN_LONGITUDE` | −11° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MAX_LONGITUDE` | 40° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MIN_LATITUDE` | 35° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MAX_LATITUDE` | 71° `[ТЮНИНГ]` |
+| `EUROPE_MAP_TARGET_PLAYERS` | 30 `[ТЮНИНГ]` |
 
 ## Население и налог
 
