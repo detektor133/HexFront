@@ -45,28 +45,12 @@ import {
 } from './telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
+import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
-
-/** Наибольшее ускорение песочницы (тиков за 100 мс) — для записи матча. */
-const SPEED_MAX = 20;
-
-// Состав матча из адреса (04/T24): players — участников (человек + боты), watch=1 — человек тоже
-// под ботом (запись матча ботов), speed — ускорение.
-function matchSetup(search: string): { count: number; bots: number[]; speed: number } {
-  const params = new URLSearchParams(search);
-  const count = readSandboxMap(search).players;
-  const watch = params.get('watch') === '1';
-  const bots = Array.from({ length: count }, (_, i) => i).filter((i) => watch || i !== 0);
-  const speed =
-    params.get('freezeTime') === '1'
-      ? 0
-      : Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
-  return { count, bots, speed };
-}
 
 type Loaded = { json: unknown; map: MapStatic } | 'loading' | 'error';
 
@@ -145,8 +129,12 @@ function useSandbox(
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
-  const [paused, setPausedState] = useState(matchSetup(window.location.search).speed === 0);
-  const [speed, setSpeedState] = useState(Math.max(1, matchSetup(window.location.search).speed));
+  const [paused, setPausedState] = useState(
+    readLocalMatchSetup(window.location.search).speed === 0,
+  );
+  const [speed, setSpeedState] = useState(
+    Math.max(1, readLocalMatchSetup(window.location.search).speed),
+  );
   const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
@@ -293,7 +281,7 @@ function useSandbox(
     const match = startLocalMatch(
       json,
       mapRequest.seed,
-      matchSetup(window.location.search),
+      readLocalMatchSetup(window.location.search),
       (m) => {
         if (m.t === 'error') return setError(m.errors.join('; '));
         scheduleMessage(m);
