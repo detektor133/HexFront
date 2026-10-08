@@ -50,6 +50,26 @@ export const BOT_ARMY_RATIO: Fp = fp(0.8);
 export const BOT_ARMY_INCOME_SHARE: Fp = fp(0.5);
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
+export const BOT_W_ROAD: Fp = fp(1.0);
+export const BOT_W_DEFEND: Fp = fp(0.9);
+export const BOT_W_ATTACK: Fp = fp(0.8);
+export const BOT_W_RECRUIT: Fp = fp(0.7);
+export const BOT_W_FOUND: Fp = fp(0.6);
+export const BOT_W_UPGRADE: Fp = fp(0.4);
+export const BOT_W_IMPROVE: Fp = fp(0.3);
+export const BOT_W_FORT: Fp = fp(0.3);
+export const BOT_MIN_UTILITY: Fp = fp(0.1);
+export const BOT_MAX_SPENDS = 3;
+export const BOT_ATTACK_MIN_RATIO: Fp = fp(1.2);
+export const BOT_ATTACK_STOP_RATIO: Fp = fp(0.8);
+export const BOT_RATIO_CAP: Fp = fp(3.0);
+export const BOT_TARGET_STICKY: Fp = fp(0.25);
+export const BOT_ELIM_CITIES = 2;
+export const BOT_ELIM_BONUS: Fp = fp(0.5);
+export const BOT_GOLD_TARGET: Fp = fp(1500);
+export const BOT_GOLD_RUNWAY_S: Fp = fp(300);
+export const BOT_MERGE_BELOW: Fp = fp(25);
+export const BOT_MERGE_RADIUS = 3;
 
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
