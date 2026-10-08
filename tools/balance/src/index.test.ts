@@ -19,7 +19,7 @@ describe('запуск балансировочных матчей', () => {
       revision: 'test-revision',
     });
 
-    expect(results).toEqual([
+    expect(results.map(({ metrics: _metrics, ...result }) => result)).toEqual([
       {
         runIndex: 0,
         seed: 41,
@@ -42,6 +42,16 @@ describe('запуск балансировочных матчей', () => {
         map: { id: 'proc-2b', players: 30, width: 80, height: 60 },
       },
     ]);
+    for (const result of results) {
+      expect(result.metrics).toMatchObject({
+        durationTicks: 0,
+        neutralHexShareAt3Min: null,
+        firstBattleMinute: null,
+        cauldrons: 0,
+        placesByStartPosition: expect.any(Array),
+        timeline: [],
+      });
+    }
   });
 
   it('отклоняет стенд с числом игроков, отличным от 30', async () => {

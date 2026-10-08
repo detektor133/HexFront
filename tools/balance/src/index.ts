@@ -16,12 +16,38 @@ export interface BalanceMapResult {
   readonly height: number;
 }
 
+export interface BalanceTimelinePoint {
+  readonly tick: number;
+  readonly populationMean: number;
+  readonly goldMean: number;
+}
+
+export interface BalanceStartPositionResult {
+  readonly playerId: number;
+  readonly startPosition: number;
+  readonly finalPlace: number;
+}
+
+export interface BalanceMetrics {
+  readonly durationTicks: number;
+  readonly neutralHexShareAt3Min: {
+    readonly tick: number;
+    readonly neutralHexes: number;
+    readonly totalHexes: number;
+  } | null;
+  readonly firstBattleMinute: number | null;
+  readonly cauldrons: number;
+  readonly placesByStartPosition: readonly BalanceStartPositionResult[];
+  readonly timeline: readonly BalanceTimelinePoint[];
+}
+
 export interface BalanceMatchResult {
   readonly runIndex: number;
   readonly seed: number;
   readonly ticks: number;
   readonly revision: string;
   readonly map: BalanceMapResult;
+  readonly metrics: BalanceMetrics;
 }
 
 interface WorkerMessage extends BalanceMatchResult {
@@ -86,6 +112,7 @@ function runWorker(runIndex: number, options: BalanceMatchOptions): Promise<Bala
         ticks: message.ticks,
         revision: message.revision,
         map: message.map,
+        metrics: message.metrics,
       });
       void worker.terminate();
     });
