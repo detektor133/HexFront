@@ -2,11 +2,10 @@
 // COMMANDER_TICKS для каждого живого игрока — все его армии с auto в один тик, по одному снимку;
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
+import { brainDecide } from './brain.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
-import { economyDecide } from './economy.ts';
 import {
-  BOT_EASY_TAX,
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
   BOT_THINK_TICKS,
@@ -14,7 +13,7 @@ import {
 } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
 import type { Fp } from '../math/int.ts';
-import { commanderView, playerView } from '../queries/player-view.ts';
+import { commanderView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 
 export type BotLevel = 'easy' | 'medium';
@@ -98,16 +97,15 @@ export function botCommands(
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
   const { levels, context } = botArguments(levelsOrContext, shared);
-  const viewContext = (context ?? createBotTickContext(state)).playerView;
+  const tickContext = context ?? createBotTickContext(state);
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id)) continue;
     const level = levels[p.id] ?? 'medium';
     const thinkTicks = level === 'easy' ? BOT_EASY_THINK_TICKS : BOT_THINK_TICKS;
     if (p.id % thinkTicks !== state.tick % thinkTicks) continue;
-    const commands = economyDecide(state.map, playerView(state, p.id, viewContext));
-    if (level === 'easy') out.push({ playerId: p.id, cmd: { t: 'setTax', rate: BOT_EASY_TAX } });
+    const commands = brainDecide(state, p.id, tickContext, level);
     for (const cmd of commands) {
-      if (level === 'easy' && (cmd.t === 'setTax' || cmd.t === 'startOffensive')) continue;
+      if (level === 'easy' && cmd.t === 'startOffensive') continue;
       out.push({ playerId: p.id, cmd });
     }
   }
