@@ -17,6 +17,7 @@ import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
+import { addUnit, rebuildUnitIndex } from './unit-index.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
@@ -67,6 +68,7 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     plans: [],
     networks: [],
     supplyRatios: new Map(),
+    supplyRevision: 0,
     nextId: cities.reduce((max, c) => Math.max(max, c.id), 0) + 1,
     events: [],
     winner: -1,
@@ -150,7 +152,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
   const auto = state.players[playerId]?.autoCommand ?? true;
   state.armies.push({ id: armyId, owner: playerId, number: 1, name: '', auto });
   for (let i = 0; i < START_UNITS; i += 1) {
-    state.units.push({
+    addUnit(state, {
       id: state.nextId,
       owner: playerId,
       type: START_UNIT_TYPE,
@@ -198,6 +200,7 @@ export function createMatch(
     if (spawn) addPlayer(state, playerId, spawn);
   });
   state.cities.sort((a, b) => a.id - b.id);
+  rebuildUnitIndex(state);
   recomputeAllNetworks(state);
   state.vision = createVisionState(state.players.length, state.hexes.owner.length);
   return state;

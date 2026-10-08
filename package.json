@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.21.0",
   "engines": {
-    "node": ">=22.12"
+    "node": ">=24"
   },
   "scripts": {
     "typecheck": "pnpm -r --parallel typecheck",
@@ -17,14 +17,16 @@
     "verify": "node --experimental-strip-types tools/ai-check/src/verify.ts",
     "visual": "node --disable-warning=DEP0190 --experimental-strip-types apps/client/tests/visual/visual-check.ts",
     "report:match": "node --experimental-strip-types tools/replay/src/report-match.ts",
+    "telemetry:report": "node --experimental-strip-types tools/telemetry/src/cli.ts",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
     "ci:wait": "node --experimental-strip-types tools/ci-wait/src/cli.ts",
+    "agent:run": "node --experimental-strip-types tools/agent-loop/src/cli.ts",
     "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts",
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.20.4",
+    "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^5.0.1",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^10.11.0",

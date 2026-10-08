@@ -23,12 +23,12 @@ describe('доход', () => {
       const income = playerIncomePerSecond(s, i) / 1000;
       expect(income).toBeGreaterThan(1.06 * 0.95);
       expect(income).toBeLessThan(1.06 * 1.05);
-      expect(playerUpkeepPerSecond(s, i)).toBe(600);
+      expect(playerUpkeepPerSecond(s, i)).toBe(700);
     });
     for (let i = 0; i < TICKS_PER_S; i += 1) step(s, []);
-    // За вычетом содержания 200 пехоты (0,6/с) — ≈ +0,46.
+    // За вычетом содержания 200 пехоты и двух отрядов (0,7/с) — ≈ +0,36.
     s.players.forEach((p, i) => {
-      expect(goldPerSecond(before[i] ?? 0, p.gold, 1)).toBeCloseTo(0.46, 1);
+      expect(goldPerSecond(before[i] ?? 0, p.gold, 1)).toBeCloseTo(0.36, 1);
     });
   });
 
@@ -117,16 +117,16 @@ describe('содержание отрядов и банкротство', () => 
     return s;
   }
 
-  it('содержание: пехота 0,003, бронетехника 0,012, артиллерия 0,008 золота/с на солдата', () => {
+  it('содержание: солдаты и отряды платят отдельные расходы', () => {
     const s = empty();
     s.unit('A', 'infantry', 1000, at(1, 1));
     s.unit('A', 'armor', 100, at(1, 1));
     s.unit('A', 'artillery', 100, at(1, 1));
-    expect(playerUpkeepPerSecond(s.state, 0)).toBe(3000 + 1200 + 800);
+    expect(playerUpkeepPerSecond(s.state, 0)).toBe(3000 + 1200 + 800 + 3 * 50);
     const before = s.player('A').gold;
     s.runSeconds(1);
-    // Город 0,5 − содержание 5,0 = −4,5 золота/с (плюс налог с выросшего за секунду города).
-    expect(goldPerSecond(before, s.player('A').gold, 1)).toBeCloseTo(-4.5, 1);
+    // Город 0,5 − содержание 5,15 = −4,65 золота/с (плюс налог с выросшего за секунду города).
+    expect(goldPerSecond(before, s.player('A').gold, 1)).toBeCloseTo(-4.65, 1);
     expect(s.player('A').bankrupt).toBe(false);
   });
 

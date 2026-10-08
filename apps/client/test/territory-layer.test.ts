@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
 
-import { fogHexes, territoryBorders } from '../src/dev/economy-layer.ts';
+import {
+  borderMapChunks,
+  changedMapChunks,
+  fogHexes,
+  mapChunkKey,
+  territoryBorders,
+} from '../src/dev/economy-layer.ts';
 
 const loaded = loadMap({
   version: 1,
@@ -28,6 +34,15 @@ const view = (visible: number[]): PlayerView =>
   }) as unknown as PlayerView;
 
 describe('слои границ и тумана', () => {
+  it('инвалидирует только чанк изменившегося гекса', () => {
+    expect(mapChunkKey(17, 32)).toBe('1:0');
+    expect(changedMapChunks([0, 17, 17], 32)).toEqual(['0:0', '1:0']);
+  });
+
+  it('инвалидирует соседний чанк для общей границы', () => {
+    expect(borderMapChunks([15], 32, 16)).toEqual(['0:0', '1:0']);
+  });
+
   it('рисует общую границу цветом каждого владельца с его стороны', () => {
     const borders = territoryBorders(loaded.map, view([1, 1]));
 

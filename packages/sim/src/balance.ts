@@ -29,6 +29,8 @@ export const OFFENSIVE_STUCK_TICKS = 100;
  */
 export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
+/** Период экономического решения easy-бота, тиков. */
+export const BOT_EASY_THINK_TICKS = 30;
 
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
 
@@ -36,6 +38,8 @@ export const BOT_THINK_TICKS = 10;
 export const BOT_TAX_PEACE: Fp = fp(0.15);
 /** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
 export const BOT_TAX_WAR: Fp = fp(0.3);
+/** Фиксированный налог easy-бота. */
+export const BOT_EASY_TAX: Fp = fp(0.2);
 /** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
 export const BOT_GOLD_RESERVE: Fp = fp(50);
 /** Благоустройство — гексам с населением не ниже этой доли лимита. */
@@ -94,6 +98,12 @@ export const MINE_GOLD_PER_S: Fp = fp(1.0);
 /** Минимальная дистанция между любыми городами, гексов. */
 export const CITY_MIN_DISTANCE = 4;
 export const PASSABLE_HEXES_PER_PLAYER = 120;
+export const EUROPE_MAP_MIN_LONGITUDE = -11;
+export const EUROPE_MAP_MAX_LONGITUDE = 40;
+export const EUROPE_MAP_MIN_LATITUDE = 35;
+export const EUROPE_MAP_MAX_LATITUDE = 71;
+export const EUROPE_MAP_TARGET_PLAYERS = 30;
+export const MAPGEN_MAX_PLAYERS = 100;
 export const NEUTRAL_CITIES_PER_PLAYER: Fp = fp(1.5);
 /** Гарнизон нейтрального города по уровню 1/2/3, солдат. */
 export const NEUTRAL_GARRISON: readonly [Fp, Fp, Fp] = [fp(150), fp(300), fp(600)];
@@ -184,9 +194,9 @@ export const UPKEEP_GOLD_PER_SOLDIER_S: ByUnit<Fp> = {
   artillery: fp(0.008),
 };
 export const UPKEEP_GOLD_PER_UNIT_S: ByUnit<Fp> = {
-  infantry: fp(0.2),
-  armor: fp(0.2),
-  artillery: fp(0.2),
+  infantry: fp(0.05),
+  armor: fp(0.05),
+  artillery: fp(0.05),
 };
 export const ATK: ByUnit<Fp> = { infantry: fp(1.0), armor: fp(2.0), artillery: fp(0) };
 export const DEF: ByUnit<Fp> = { infantry: fp(1.2), armor: fp(0.9), artillery: fp(0.6) };

@@ -2,9 +2,11 @@
 // GDD: docs/gdd/03-cities-buildings.md — «Столица»; 08-match.md — «Выбывание».
 import { CAPITAL_MOVE_CHAOS_S, NO_CITY_GRACE_S, TICKS_PER_S } from '../balance.ts';
 import { FP, intDiv } from '../math/int.ts';
+import { markNetworkDirty } from '../state/derived-cache.ts';
 import { setHexOwner } from '../state/hex-owner.ts';
 import { recomputeNetworks } from '../state/network.ts';
 import { NEUTRAL, type City, type MatchState, type Player } from '../state/types.ts';
+import { allUnits, removeUnits } from '../state/unit-index.ts';
 
 const CHAOS_TICKS = intDiv(CAPITAL_MOVE_CHAOS_S * TICKS_PER_S, FP);
 const GRACE_TICKS = intDiv(NO_CITY_GRACE_S * TICKS_PER_S, FP);
@@ -45,7 +47,10 @@ function eliminate(state: MatchState, p: Player): void {
     const rest = list.filter((x) => x.owner !== p.id);
     list.splice(0, list.length, ...rest);
   };
-  keep(state.units);
+  removeUnits(
+    state,
+    allUnits(state).filter((unit) => unit.owner === p.id),
+  );
   keep(state.armies);
   keep(state.constructions);
   keep(state.recruits);
@@ -67,10 +72,12 @@ function updatePlayer(state: MatchState, p: Player): void {
   if (cities.some((c) => c.id === p.capitalCityId)) return;
   // Столица потеряна при других городах — «смута»; первый город после безгородья — без неё.
   const lost = p.capitalCityId >= 0;
+  markNetworkDirty(state, p.id);
   recomputeNetworks(state, p.id);
   const capital = pickCapital(state, cities);
   if (!capital) return;
   p.capitalCityId = capital.id;
+  markNetworkDirty(state, p.id);
   recomputeNetworks(state, p.id);
   if (lost) p.chaosTicks = CHAOS_TICKS;
   state.events.push({ t: 'capitalMoved', playerId: p.id, cityId: capital.id });

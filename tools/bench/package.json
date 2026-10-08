@@ -6,6 +6,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "step": "node --experimental-strip-types src/step-bench.ts",
-    "commander": "node --experimental-strip-types src/commander-bench.ts"
+    "commander": "node --experimental-strip-types src/commander-bench.ts",
+    "local": "node --experimental-strip-types src/local-bench.ts",
+    "full-match": "node --experimental-strip-types src/full-match-bench.ts"
   }
 }

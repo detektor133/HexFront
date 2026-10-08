@@ -1,0 +1,15 @@
+{
+  "planner": ["docs/stages/**", "docs/STATUS.md", "docs/QUESTIONS.md", ".ai-logs/**"],
+  "tester": ["**/test/**", "**/*.test.ts", ".ai-logs/**"],
+  "coder": [
+    "packages/*/src/**",
+    "apps/*/src/**",
+    "tools/*/src/**",
+    "package.json",
+    "**/package.json",
+    "**/tsconfig.json",
+    "*.config.*",
+    ".ai-logs/**"
+  ],
+  "reviewer": ["docs/stages/**", "docs/STATUS.md", "docs/reports/**", ".ai-logs/**"]
+}

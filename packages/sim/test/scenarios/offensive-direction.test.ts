@@ -268,7 +268,7 @@ describe('наступление только к линии (04/T14b)', () => {
     s.runSeconds(6);
     expect(stuck()).toBe(true);
     const gone = new Set(walls);
-    s.state.units.splice(0, s.state.units.length, ...s.state.units.filter((u) => !gone.has(u.id)));
+    s.removeUnits([...gone]);
     s.runSeconds(3);
     expect(stuck()).toBe(false);
   });

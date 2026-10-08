@@ -6,6 +6,7 @@ import type { HexId } from '../math/hex.ts';
 import { isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
 import type { Unit, MatchState } from '../state/types.ts';
+import { moveUnit } from '../state/unit-index.ts';
 
 // Сбрасывает путь; отряд с приказом move встаёт.
 function stop(unit: Unit): void {
@@ -54,7 +55,7 @@ function startStep(state: MatchState, unit: Unit, next: HexId): boolean {
 }
 
 function arrive(state: MatchState, unit: Unit, next: HexId): void {
-  unit.hex = next;
+  moveUnit(state, unit, next);
   unit.path.shift();
   unit.moveTicks = 0;
   unit.moveTotal = 0;

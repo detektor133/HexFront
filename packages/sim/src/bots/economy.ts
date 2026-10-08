@@ -103,17 +103,18 @@ function roadCommand(view: PlayerView, gold: Fp): Command | null {
 // лимит отрядов не исчерпан: пехота в своём городе с наибольшим набором, где нет очереди, —
 // сколько даёт город и хватает золота (шагом RECRUIT_STEP).
 function recruitCommand(view: PlayerView, near: readonly Contact[], gold: Fp): Command | null {
+  const needsReinforcement = view.units.some((u) => u.soldiers < RECRUIT_MIN);
   const strongest = [...near].sort(
     (a, b) =>
       soldiersAt(view, b.theirs, b.enemy) - soldiersAt(view, a.theirs, a.enemy) ||
       a.enemy - b.enemy,
   )[0];
-  if (!strongest) return null;
-  const enemy = soldiersAt(view, strongest.theirs, strongest.enemy);
-  const mine = soldiersAt(view, strongest.mine, view.playerId);
-  if (enemy === 0 || mine >= fpMul(enemy as Fp, BOT_ARMY_RATIO)) return null;
-  const used = view.units.filter((u) => u.owner === view.playerId).length + view.recruits.length;
-  if (used >= view.me.unitLimit) return null;
+  if (!needsReinforcement && !strongest) return null;
+  if (!needsReinforcement && strongest) {
+    const enemy = soldiersAt(view, strongest.theirs, strongest.enemy);
+    const mine = soldiersAt(view, strongest.mine, view.playerId);
+    if (enemy === 0 || mine >= fpMul(enemy as Fp, BOT_ARMY_RATIO)) return null;
+  }
   const busy = new Set(view.recruits.map((r) => r.cityId));
   const city = view.cities
     .filter((c) => c.owner === view.playerId && !busy.has(c.id))

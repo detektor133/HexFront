@@ -11,12 +11,31 @@ import {
   SUPPLY_PER_SOLDIER,
 } from '../balance.ts';
 import { cityOutputMult } from './city-output.ts';
+import { supplyRevision } from './derived-cache.ts';
 import { isCityIsolated } from './network.ts';
 import { BUILDING, type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
+import { allUnits } from './unit-index.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, spiral } from '../math/hex.ts';
-import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
+import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
+
+interface LossCache {
+  readonly maps: Map<
+    number,
+    { revision: number; loss: Int32Array; distances: Map<number, Int32Array> }
+  >;
+}
+
+const lossCaches = new WeakMap<MatchState, LossCache>();
+
+function cacheOf(state: MatchState): LossCache {
+  const cached = lossCaches.get(state);
+  if (cached) return cached;
+  const created: LossCache = { maps: new Map() };
+  lossCaches.set(state, created);
+  return created;
+}
 
 /**
  * Снабжение, которое производит город: CITY_SUPPLY_PER_LEVEL × level (+ CAPITAL_SUPPLY_BONUS
@@ -32,6 +51,10 @@ export function citySupply(state: MatchState, city: City): Fp {
 
 // Потери снабжения за гекс вне дорог; в радиусе склада — × DEPOT_LOSS_MULT.
 function lossMap(state: MatchState, owner: number): Int32Array {
+  const cached = cacheOf(state);
+  const previous = cached.maps.get(owner);
+  const revision = supplyRevision(state, owner);
+  if (previous?.revision === revision) return previous.loss;
   const { width, height, terrain } = state.map;
   const nearDepot = new Uint8Array(width * height);
   state.hexes.building.forEach((b, id) => {
@@ -40,18 +63,25 @@ function lossMap(state: MatchState, owner: number): Int32Array {
       if (inBounds(h, width, height)) nearDepot[hexId(h, width)] = 1;
     }
   });
-  return Int32Array.from(terrain, (code, id) => {
+  const result = Int32Array.from(terrain, (code, id) => {
     const name = TERRAIN_NAMES[code];
     if (name === undefined || name === 'water') return FP;
     const loss = OFFROAD_SUPPLY_LOSS[name];
     return nearDepot[id] === 1 ? fpMul(loss, DEPOT_LOSS_MULT) : loss;
   });
+  cached.maps.set(owner, { revision, loss: result, distances: new Map() });
+  return result;
 }
 
 const UNREACHED = 0x7fffffff;
 
 // Мультиисточниковая Дейкстра от узлов сети по своим гексам; узлы этой сети — без потерь.
 function lossFrom(state: MatchState, owner: number, net: number, loss: Int32Array): Int32Array {
+  const cached = cacheOf(state).maps.get(owner);
+  if (cached?.revision === supplyRevision(state, owner)) {
+    const distance = cached.distances.get(net);
+    if (distance) return distance;
+  }
   const { width, height } = state.map;
   const dist = new Int32Array(width * height).fill(UNREACHED);
   const heap = createHeap();
@@ -75,6 +105,7 @@ function lossFrom(state: MatchState, owner: number, net: number, loss: Int32Arra
       }
     }
   }
+  if (cached) cached.distances.set(net, dist);
   return dist;
 }
 
@@ -142,7 +173,7 @@ function best(options: readonly Option[], score: (o: Option) => number): Option 
  */
 export function recomputeSupply(state: MatchState, owner: number): void {
   const nets = state.networks.filter((n) => n.owner === owner);
-  const units = state.units.filter((u) => u.owner === owner);
+  const units = allUnits(state).filter((u) => u.owner === owner);
   const loss = lossMap(state, owner);
   const dists = nets.map((n) => lossFrom(state, owner, n.id, loss));
   const options = new Map<Unit, Option[]>();
@@ -166,6 +197,11 @@ export function recomputeSupply(state: MatchState, owner: number): void {
     if (o) final.set(u, o);
   }
   const r2 = ratios(state, nets, final);
+  const mapSize = state.map.width * state.map.height;
+  const currentIds = new Set(nets.map((network) => network.id));
+  for (const id of state.supplyRatios.keys()) {
+    if (intDiv(id, mapSize) === owner && !currentIds.has(id)) state.supplyRatios.delete(id);
+  }
   for (const net of nets) state.supplyRatios.set(net.id, r2.get(net.id) ?? (FP as Fp));
   const bankrupt = state.players[owner]?.bankrupt === true;
   for (const u of units) {
@@ -174,6 +210,12 @@ export function recomputeSupply(state: MatchState, owner: number): void {
     const level = o ? fpMul(r2.get(o.net.id) ?? (FP as Fp), o.eff) : 0;
     u.supplyLevel = bankrupt ? fpMul(level as Fp, BANKRUPT_SUPPLY_MULT) : (level as Fp);
   }
+}
+
+/** Полностью пересчитывает снабжение для тестов эквивалентности. */
+export function recalculateSupply(state: MatchState, owner: number): void {
+  cacheOf(state).maps.delete(owner);
+  recomputeSupply(state, owner);
 }
 
 /**

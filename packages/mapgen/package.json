@@ -8,7 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "maps": "node --experimental-strip-types scripts/hand-maps.ts"
+    "europe": "node --experimental-strip-types import/europe.ts",
+    "maps": "node --experimental-strip-types scripts/hand-maps.ts",
+    "gallery": "node --experimental-strip-types scripts/generated-gallery.ts"
   },
   "dependencies": {
     "@hexfront/sim": "workspace:*"

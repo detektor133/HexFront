@@ -218,6 +218,7 @@ export function createChip(): Chip {
   const content = new Container();
   root.addChild(content);
   const g = new Graphics();
+  g.context.batchMode = 'batch';
   const font = {
     fontFamily: tokens.font.ui.family,
     fontWeight: '600',
@@ -248,7 +249,7 @@ export function createChip(): Chip {
       count.resolution = r;
     },
     destroy() {
-      root.destroy({ children: true });
+      root.destroy({ children: true, context: true });
     },
   };
 }

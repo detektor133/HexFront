@@ -2,8 +2,10 @@
 // в docs/reports/match/seed-<сид>/, в консоль — сводка до 20 строк.
 // Запуск: pnpm report:match --seeds N [--first-seed 42] [--players 6]
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+import { renderTerritoryTimelapse, type TerritoryFrame } from './territory-timelapse.ts';
 
 const root = new URL('../../../', import.meta.url);
 const rootPath = fileURLToPath(root);
@@ -15,13 +17,21 @@ function option(name: string, fallback: number): number {
   return value;
 }
 
+function textOption(name: string, fallback: string): string {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? (process.argv[i + 1] ?? fallback) : fallback;
+}
+
 const seeds = option('seeds', 1);
 const firstSeed = option('first-seed', 42);
 const players = option('players', 6);
+const map = textOption('map', 'small');
+if (map !== 'small' && map !== 'gen') throw new Error('--map: ожидается small или gen');
 const MAX_SUMMARY_LINES = 20;
 const NODE = ['--disable-warning=DEP0190', '--experimental-strip-types'];
 
 interface Match {
+  readonly map: string;
   readonly winner: number;
   readonly endS: number;
   readonly wallS: number;
@@ -37,6 +47,12 @@ interface Match {
     readonly players: readonly { soldiers: number; units: number; alive: boolean }[];
     readonly t: number;
   }[];
+  readonly final: {
+    readonly width: number;
+    readonly height: number;
+    readonly terrain: readonly number[];
+  };
+  readonly frames: readonly TerritoryFrame[];
 }
 
 function acceptanceLines(match: Match): string[] {
@@ -67,6 +83,7 @@ function runMatch(seed: number, outDir: string): Promise<number> {
         String(players),
         String(seed),
         `${outDir}/metrics.json`,
+        map,
       ],
       { cwd: rootPath, stdio: 'ignore' },
     );
@@ -82,7 +99,7 @@ const dirs = Array.from({ length: seeds }, (_, i) => {
 });
 
 const codes = await Promise.all(dirs.map((d) => runMatch(d.seed, d.dir)));
-const summary: string[] = [`report:match — ${seeds} матч(ей), ${players} ботов, карта small`];
+const summary: string[] = [`report:match — ${seeds} матч(ей), ${players} ботов, карта ${map}`];
 const charted: string[] = [];
 
 dirs.forEach(({ seed, dir }, i) => {
@@ -98,6 +115,27 @@ dirs.forEach(({ seed, dir }, i) => {
   if (chart.status !== 0) summary.push(`сид ${seed}: графики не построены`);
   else charted.push(`${rootPath}${dir}`);
   const m = JSON.parse(readFileSync(`${rootPath}${dir}/metrics.json`, 'utf8')) as Match;
+  if (map === 'gen') {
+    const tokens = JSON.parse(
+      readFileSync(new URL('../../../docs/art/tokens.json', import.meta.url), 'utf8'),
+    ) as {
+      map: { background: string; terrain: Record<string, string> };
+      players: { palette: { line: string }[] };
+    };
+    const png = renderTerritoryTimelapse(m.final.width, m.final.height, m.final.terrain, m.frames, {
+      background: tokens.map.background,
+      terrain: [
+        tokens.map.background,
+        tokens.map.terrain.plains ?? tokens.map.background,
+        tokens.map.terrain.forest ?? tokens.map.background,
+        tokens.map.terrain.hills ?? tokens.map.background,
+        tokens.map.terrain.mountains ?? tokens.map.background,
+        tokens.map.terrain.desert ?? tokens.map.background,
+      ],
+      players: tokens.players.palette.map((player) => player.line),
+    });
+    writeFileSync(`${rootPath}${dir}/territory-timelapse.png`, png);
+  }
   const last = m.samples.at(-1)?.players ?? [];
   const alive = last.filter((p) => p.alive).length;
   const topReject = Object.entries(m.rejected)[0];

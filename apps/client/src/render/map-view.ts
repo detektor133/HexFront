@@ -19,6 +19,7 @@ import {
   type Viewport,
 } from './camera.ts';
 import { createGesture, type Gesture, type StrokePhase, type TapKind } from './gesture.ts';
+import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -27,6 +28,16 @@ export interface MapViewState {
   readonly scale: number;
   readonly level: DetailLevel;
   readonly fps: number;
+}
+
+export interface PixiSceneStats {
+  readonly objects: number;
+  readonly text: number;
+  readonly graphics: number;
+  readonly graphicsInstructions: readonly number[];
+  readonly graphicsDetails: readonly GraphicsTelemetry[];
+  readonly textures: number;
+  readonly canvasTextTextures: number | null;
 }
 
 /** Слой между заливкой рельефа и его узорами (территории, дороги); top — над узорами (города). */
@@ -42,6 +53,10 @@ export interface MidLayer {
 export type MidLayerFactory = (map: MapStatic, radius: number) => MidLayer;
 
 export type { StrokePhase, TapKind } from './gesture.ts';
+
+export function graphicsInstructionCount(graphics: Graphics): number {
+  return graphics.context.instructions.length;
+}
 
 /** Приказ удержанием (07-controls.md, «Приказ удержанием»): фаза. */
 export type HoldPhase = 'start' | 'move' | 'end' | 'cancel';
@@ -91,6 +106,8 @@ export interface MapView {
   setOrderHooks(hooks: OrderHooks | null): void;
   /** Отменяет текущий жест и его прогноз. */
   cancel(): void;
+  /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
+  sceneStats(): PixiSceneStats;
   destroy(): void;
 }
 
@@ -120,6 +137,7 @@ export async function createMapView(
   const world = new Container();
   app.stage.addChild(world);
   const selection = new Graphics();
+  selection.context.batchMode = 'batch';
   world.addChild(selection);
 
   let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
@@ -296,6 +314,36 @@ export async function createMapView(
       hooks?.cancel();
       selection.clear();
     },
+    sceneStats() {
+      const graphicsInstructions: number[] = [];
+      const graphicsDetails: GraphicsTelemetry[] = [];
+      const counts = { objects: 0, text: 0, graphics: 0 };
+      const visit = (node: Container): void => {
+        counts.objects += 1;
+        if (node.constructor.name === 'Text') counts.text += 1;
+        if (node instanceof Graphics) {
+          counts.graphics += 1;
+          const details = graphicsTelemetry(node, performance.now());
+          graphicsInstructions.push(details.instructions);
+          graphicsDetails.push(details);
+        }
+        node.children.forEach(visit);
+      };
+      visit(app.stage);
+      const renderer = app.renderer as unknown as {
+        texture: { managedTextures: readonly unknown[] };
+        canvasText?: { _activeTextures?: Readonly<Record<string, unknown>> };
+      };
+      return {
+        ...counts,
+        graphicsInstructions,
+        graphicsDetails,
+        textures: renderer.texture.managedTextures.length,
+        canvasTextTextures: renderer.canvasText?._activeTextures
+          ? Object.keys(renderer.canvasText._activeTextures).length
+          : null,
+      };
+    },
     setStroke(handler) {
       if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
       stroking = false;
@@ -316,7 +364,7 @@ export async function createMapView(
     },
     destroy() {
       detach();
-      app.destroy({ removeView: true }, { children: true });
+      app.destroy({ removeView: true }, { children: true, context: true });
     },
   };
 }

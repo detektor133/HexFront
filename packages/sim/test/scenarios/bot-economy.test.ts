@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOT_ARMY_RATIO,
+  BOT_EASY_TAX,
+  BOT_EASY_THINK_TICKS,
   BOT_GOLD_RESERVE,
   BOT_TAX_PEACE,
   BOT_TAX_WAR,
@@ -12,6 +14,7 @@ import {
 } from '../../src/balance.ts';
 import { economyDecide } from '../../src/bots/economy.ts';
 import { botCommands } from '../../src/bots/run.ts';
+import { commanderCommands } from '../../src/bots/run.ts';
 import type { Command } from '../../src/commands/types.ts';
 import { FP, type Fp } from '../../src/math/int.ts';
 import { playerView } from '../../src/queries/player-view.ts';
@@ -170,14 +173,16 @@ describe('экономический мозг бота: траты (04/T23)', ()
     expect(decide(s)).toContainEqual({ t: 'createArmy', name: '' });
   });
 
-  it('лимит отрядов исчерпан — набора нет', () => {
+  it('глобальный лимит отрядов не блокирует набор при достаточном бюджете', () => {
     const s = scenario(FIELD, { legend });
     rich(s);
     s.setPop(at(0, 2), 300);
-    const limit = playerView(s.state, 0).me.unitLimit;
-    for (let i = 0; i < limit; i += 1) s.unit('A', 'infantry', 10, at(i % 3, 4));
+    for (let i = 0; i < 8; i += 1) s.unit('A', 'infantry', 10, at(i % 3, 4));
     for (let r = 1; r < 4; r += 1) s.unit('B', 'infantry', 500, at(3, r));
-    expect(decide(s).filter((c) => c.t === 'recruit')).toEqual([]);
+    expect(decide(s).find((c) => c.t === 'recruit')).toMatchObject({
+      t: 'recruit',
+      type: 'infantry',
+    });
   });
 
   it('лишнее золото — улучшение города, sim принимает', () => {
@@ -193,6 +198,17 @@ describe('экономический мозг бота: траты (04/T23)', ()
     rich(s);
     s.setPop(at(3, 3), 300);
     expect(decide(s).filter((c) => c.t === 'recruit')).toEqual([]);
+  });
+
+  it('малый отряд пополняется даже без видимого врага', () => {
+    const s = scenario(PEACE, { legend });
+    rich(s);
+    s.setPop(at(3, 3), 300);
+    s.unit('A', 'infantry', 5, at(3, 3));
+    expect(decide(s).find((c) => c.t === 'recruit')).toMatchObject({
+      t: 'recruit',
+      type: 'infantry',
+    });
   });
 
   it('изолированный город — перестройка снабжения', () => {
@@ -268,6 +284,19 @@ describe('экономический мозг бота: ▶ «Начать» (04
     for (let r = 0; r < 5; r += 1) s.unit('B', 'infantry', 900, at(3, r));
     expect(decide(s).filter((c) => c.t === 'startOffensive')).toEqual([]);
   });
+
+  it('easy не нажимает ▶, а commander сохраняет обычные команды', () => {
+    const s = scenario(FIELD, { legend });
+    const army = frontArmy(s, 300);
+    s.unit('B', 'infantry', 20, at(3, 2));
+    s.setTick(210);
+
+    expect(decide(s)).toContainEqual({ t: 'startOffensive', armyId: army });
+    expect(botCommands(s.state, [0], ['easy'])).not.toContainEqual(
+      expect.objectContaining({ cmd: { t: 'startOffensive', armyId: army } }),
+    );
+    expect(commanderCommands(s.state, [0], ['easy'])).toEqual(commanderCommands(s.state, [0]));
+  });
 });
 
 describe('экономический мозг бота: когда решает и детерминизм (04/T23)', () => {
@@ -287,5 +316,18 @@ describe('экономический мозг бота: когда решает 
     expect(economyDecide(s.state.map, playerView(s.state, 0))).toEqual(
       economyDecide(s.state.map, playerView(s.state, 0)),
     );
+  });
+
+  it('easy думает раз в BOT_EASY_THINK_TICKS и удерживает налог 20 %', () => {
+    const s = scenario(FIELD, { legend });
+    for (let t = 200; t < 200 + BOT_EASY_THINK_TICKS; t += 1) {
+      s.setTick(t);
+      const commands = botCommands(s.state, [1], [undefined, 'easy']);
+      expect(new Set(commands.map((c) => c.playerId))).toEqual(
+        t % BOT_EASY_THINK_TICKS === 1 ? new Set([1]) : new Set(),
+      );
+      if (commands.length > 0)
+        expect(commands).toContainEqual({ playerId: 1, cmd: { t: 'setTax', rate: BOT_EASY_TAX } });
+    }
   });
 });

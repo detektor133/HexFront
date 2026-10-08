@@ -1,12 +1,12 @@
 // Команды отрядов: move, attack, split, merge, bombard.
 // GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
-import { unitLimit } from './recruit.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
+import { addUnit, removeUnits } from '../state/unit-index.ts';
 
 export type UnitCommand = Extract<
   Command,
@@ -70,10 +70,7 @@ function validateSplit(state: MatchState, unit: Unit, soldiers: number): Validat
   }
   if (soldiers >= unit.soldiers) return rejected('invalidAmount');
   if (ownUnitsAt(state, unit.owner, unit.hex) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
-  const used =
-    state.units.filter((a) => a.owner === unit.owner).length +
-    state.recruits.filter((r) => r.owner === unit.owner).length;
-  return used >= unitLimit(state, unit.owner) ? rejected('unitLimit') : OK;
+  return OK;
 }
 
 function validateMerge(units: readonly Unit[]): Validation {
@@ -154,7 +151,7 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
     fireTarget: -1,
     slot: -1,
   };
-  state.units.push(part);
+  addUnit(state, part);
   state.nextId += 1;
   return part;
 }
@@ -174,9 +171,7 @@ export function mergeUnits(state: MatchState, units: readonly Unit[]): void {
   kept.org = intDiv(orgWeighted, soldiers) as Fp;
   kept.order = 'idle';
   stop(kept);
-  const removed = new Set(rest.map((a) => a.id));
-  const remaining = state.units.filter((a) => !removed.has(a.id));
-  state.units.splice(0, state.units.length, ...remaining);
+  removeUnits(state, rest);
 }
 
 /** Применяет команду отряда. Вызывается только после успешной проверки. */

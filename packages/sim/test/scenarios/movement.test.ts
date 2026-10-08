@@ -273,13 +273,13 @@ describe('чужие отряды, разделение, слияние', () => 
     expect(s.rejections()).toEqual(['invalidAmount', 'invalidAmount', 'hexFull']);
   });
 
-  it('разделение упирается в лимит отрядов', () => {
+  it('разделение не ограничено глобальным числом отрядов', () => {
     const s = scenario(LINE, { legend });
-    // Лимит 4 + 2 × 1 город = 6.
     const ids = [0, 1, 2, 3, 4, 5].map((i) => s.unit('A', 'infantry', 100, at(i, 0)));
     s.cmd('A', split(ids[0] ?? -1, 50));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['unitLimit']);
+    expect(s.rejections()).toEqual([]);
+    expect(s.unitsOf('A')).toHaveLength(7);
   });
 
   it('слияние: солдаты суммируются, org — средневзвешенная', () => {

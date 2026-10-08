@@ -272,6 +272,8 @@ export interface MatchState {
   networks: SupplyNetwork[];
   /** Производительность сетей после распределения спроса; кэш для HUD, не часть хэша. */
   supplyRatios: Map<number, Fp>;
+  /** Ревизия владельцев и зданий для кэша карт потерь снабжения. */
+  supplyRevision: number;
   nextId: number;
   events: GameEvent[];
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */
@@ -287,4 +289,18 @@ export interface VisionState {
   readonly road: Uint8Array[];
   readonly improvement: Uint8Array[];
   readonly building: Uint8Array[];
+  readonly coverage: Uint16Array[];
+  readonly ownerByHex: Int16Array;
+  readonly roadByHex: Uint8Array;
+  readonly improvementByHex: Uint8Array;
+  readonly buildingByHex: Uint8Array;
+  readonly unitSources: Map<number, VisionSource>;
+  readonly citySources: Map<number, VisionSource>;
+  readonly dirty: Set<number>[];
+  initialized: boolean;
+}
+
+export interface VisionSource {
+  readonly owner: number;
+  readonly hex: HexId;
 }

@@ -5,6 +5,7 @@ import { ARTY_RANGE, MAX_UNITS_PER_HEX, OFFENSIVE_FACING_WEIGHT } from '../balan
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
 import type { ArmyPlan, MatchState, Unit } from './types.ts';
+import { allUnits } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
@@ -177,13 +178,13 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
       w.set(h, (w.get(h) ?? 0) * OFFENSIVE_FACING_WEIGHT);
     }
   }
-  const units = state.units.filter((u) => planControls(u, plan.armyId));
+  const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
   const lineUnits = units.filter((u) => u.type !== 'artillery');
   const arty = units.filter((u) => u.type === 'artillery');
   // Место в гексе занимают и чужие для плана свои отряды (другие армии, резерв).
   const cap = (h: HexId): number =>
     MAX_UNITS_PER_HEX -
-    state.units.filter((u) => u.owner === owner && u.hex === h && !units.includes(u)).length;
+    allUnits(state).filter((u) => u.owner === owner && u.hex === h && !units.includes(u)).length;
   const slots = new Map(assignLine(state, lineSlots(line, w, lineUnits.length, cap), lineUnits, w));
   const art = assignArtillery(state, owner, arty, line, w);
   for (const [id, h] of art.slots) slots.set(id, h);

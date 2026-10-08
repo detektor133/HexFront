@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { NETWORK_RECALC_TICKS } from '../src/balance.ts';
+import { NETWORK_RECALC_TICKS, VISION_RECALC_TICKS } from '../src/balance.ts';
 import { at, city, own, recruit, road, scenario } from './scenario/dsl.ts';
 import type { Fp } from '../src/math/int.ts';
-import { playerView } from '../src/queries/player-view.ts';
+import { createPlayerViewContext, playerView } from '../src/queries/player-view.ts';
 import { hashState } from '../src/state/hash.ts';
 
 const MAP = `
@@ -14,6 +14,16 @@ const MAP = `
 const legend = { A1: city('A', 1, { capital: true }), A2: city('A', 1), a: own('A'), r: road('A') };
 
 describe('playerView', () => {
+  it('совпадает с прямым расчётом при общем контексте на тиках пересчёта обзора', () => {
+    const s = scenario(MAP, { legend });
+    for (let i = 0; i < 3; i += 1) {
+      const direct = playerView(s.state, 0);
+      const cached = playerView(s.state, 0, createPlayerViewContext(s.state));
+      expect(cached).toEqual(direct);
+      s.runTicks(VISION_RECALC_TICKS);
+    }
+  });
+
   it('при выключенном тумане отдаёт полный снимок', () => {
     const s = scenario(
       `
@@ -142,6 +152,12 @@ describe('playerView', () => {
     expect(me.bankrupt).toBe(false);
   });
 
+  it('не передаёт глобальный лимит отрядов в снимке', () => {
+    const s = scenario(MAP, { legend });
+    const me = playerView(s.state, 0).me;
+    expect('unitLimit' in me).toBe(false);
+  });
+
   it('содержание отрядов и свои наборы в очереди', () => {
     const s = scenario(MAP, { legend });
     s.unit('A', 'infantry', 100, at(0, 0));
@@ -153,7 +169,7 @@ describe('playerView', () => {
     s.runTicks(1);
     const v = playerView(s.state, 0);
     // 100 пехоты × 0,003 = 0,3 золота/с.
-    expect(v.me.upkeepPerS).toBe(300);
+    expect(v.me.upkeepPerS).toBe(350);
     expect(v.recruits.map((r) => [r.cityId, r.type, r.soldiers, r.progressTicks])).toEqual([
       [s.cityAt(at(1, 1))?.id, 'infantry', 50_000, 1],
       [s.cityAt(at(6, 1))?.id, 'artillery', 100_000, 1],

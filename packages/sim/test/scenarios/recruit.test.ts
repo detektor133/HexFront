@@ -129,7 +129,7 @@ describe('набор отрядов', () => {
     expect(s.rejections()).toEqual(['queueBusy']);
   });
 
-  it('лимит отрядов 4 + 2 × городов считает и очередь набора', () => {
+  it('набор не ограничен глобальным числом отрядов', () => {
     const s = setup();
     for (let i = 0; i < 5; i += 1) s.unit('A', 'infantry', 50, at(0, 0 + (i % 3)));
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
@@ -138,7 +138,7 @@ describe('набор отрядов', () => {
     s.runTicks(100);
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['unitLimit']);
+    expect(s.rejections()).toEqual([]);
   });
 
   it('не хватает золота — отказ notEnoughGold', () => {
@@ -159,6 +159,27 @@ describe('набор отрядов', () => {
     // Соседи города — кольцо 1; при равенстве дистанции — наименьший HexId. Столбец 1 нечётный
     // и сдвинут вверх (even-q), поэтому (0,0) — сосед (1,1), его HexId 0.
     expect(fresh?.hex).toBe(0);
+  });
+
+  it('заполненный гекс не принимает четвёртый отряд при наборе', () => {
+    const s = setup();
+    for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(1, 1));
+    for (const [c, r] of [
+      [0, 0],
+      [0, 1],
+      [0, 2],
+      [1, 0],
+      [1, 2],
+      [2, 0],
+      [2, 1],
+      [2, 2],
+    ] as const)
+      s.unit('A', 'infantry', 50, at(c, r));
+    s.cmd('A', recruit(at(1, 1), 'infantry', 50));
+    s.runSeconds(9);
+    expect(s.rejections()).toEqual([]);
+    expect(s.unitsOf('A')).toHaveLength(12);
+    expect(s.unitsOf('A').filter((unit) => unit.hex === 1 + 1 * 6)).toHaveLength(3);
   });
 
   it('потеря города отменяет набор без возврата золота', () => {

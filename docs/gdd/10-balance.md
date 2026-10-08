@@ -1,6 +1,6 @@
 # GDD 10 — Баланс: все числа
 
-**Единственный источник чисел.** `packages/sim/src/balance.ts` повторяет эту таблицу 1:1 (fixed-point: значение × 1000, где указано «FP»). Все числа `[ТЮНИНГ]`, меняются только здесь и в `balance.ts` одним коммитом `balance(sim): ...` (см. `CONVENTIONS.md`).
+**Единственный источник чисел.** `packages/sim/src/balance.ts` повторяет симуляционные разделы этой таблицы 1:1 (fixed-point: значение × 1000, где указано «FP»). Параметры генератора карт повторяются в `packages/mapgen/src/params.ts` и не входят в `sim/balance.ts`. Все числа `[ТЮНИНГ]`, меняются только здесь и в соответствующем зеркале одним коммитом (см. `CONVENTIONS.md`).
 
 Единицы: время — секунды (в коде тики, 1 с = 10 тиков); проценты — доли (FP).
 
@@ -27,6 +27,8 @@
 | --- | --- |
 | `BOT_TAX_PEACE` (FP) | 0,15 |
 | `BOT_TAX_WAR` (FP) | 0,30 |
+| `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
+| `BOT_EASY_TAX` (FP) | 0,20 `[ТЮНИНГ]` |
 | `BOT_GOLD_RESERVE` (FP) | 50 |
 | `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
 | `BOT_ARMY_RATIO` (FP) | 0,8 |
@@ -52,9 +54,36 @@
 | `FERTILE_CAP_MULT` | 1,5 |
 | `MINE_GOLD_PER_S` | 1,0 |
 | `CITY_MIN_DISTANCE` | 4 |
-| `PASSABLE_HEXES_PER_PLAYER` | 120 |
 | `NEUTRAL_CITIES_PER_PLAYER` | 1,5 |
 | `NEUTRAL_GARRISON` по уровню 1/2/3 | 150 / 300 / 600 |
+
+## Генератор карт
+
+Параметры процедурного генератора карт зеркалируются в `packages/mapgen/src/params.ts`. Проценты — доли в процентах от указанной выборки; для количества на игрока используется округление вверх.
+
+| Константа | Значение |
+| --- | --- |
+| `MAPGEN_MAX_PLAYERS` | 100 `[ТЮНИНГ]` |
+| MAPGEN_NOISE_OCTAVES | 3 `[ТЮНИНГ]` |
+| MAPGEN_EDGE_WATER | 2 гекса `[ТЮНИНГ]` |
+| MAPGEN_WATER_SHARE | 25 % `[ТЮНИНГ]` |
+| MAPGEN_MIN_ISLAND | 30 гексов `[ТЮНИНГ]` |
+| MAPGEN_MOUNTAIN_SHARE | 8 % суши `[ТЮНИНГ]` |
+| MAPGEN_HILLS_SHARE | 14 % суши `[ТЮНИНГ]` |
+| MAPGEN_DESERT_SHARE | 12 % оставшейся суши `[ТЮНИНГ]` |
+| MAPGEN_FOREST_SHARE | 24 % оставшейся суши `[ТЮНИНГ]` |
+| MAPGEN_FERTILE_PER_PLAYER | 0,5 `[ТЮНИНГ]` |
+| MAPGEN_MINE_PER_PLAYER | 0,34 `[ТЮНИНГ]` |
+| MAPGEN_PASS_PER_MOUNTAINS | 15 гексов гор `[ТЮНИНГ]` |
+| MAPGEN_RIVER_MIN_EDGES | 5 рёбер `[ТЮНИНГ]` |
+| MAPGEN_RIVER_MAX_EDGES | 40 рёбер `[ТЮНИНГ]` |
+| MAPGEN_RIVERS_PER_PLAYER | 0,5 `[ТЮНИНГ]` |
+| `PASSABLE_HEXES_PER_PLAYER` | 120 `[ТЮНИНГ]` |
+| `EUROPE_MAP_MIN_LONGITUDE` | −11° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MAX_LONGITUDE` | 40° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MIN_LATITUDE` | 35° `[ТЮНИНГ]` |
+| `EUROPE_MAP_MAX_LATITUDE` | 71° `[ТЮНИНГ]` |
+| `EUROPE_MAP_TARGET_PLAYERS` | 30 `[ТЮНИНГ]` |
 
 ## Население и налог
 
@@ -116,7 +145,7 @@
 | `COST_POP_PER_SOLDIER` | 1 | 1 | 1 |
 | `COST_GOLD_PER_SOLDIER` | 0,1 | 1,0 | 0,6 |
 | `UPKEEP_GOLD_PER_SOLDIER_S` | 0,003 | 0,012 | 0,008 |
-| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,2 | 0,2 | 0,2 |
+| `UPKEEP_GOLD_PER_UNIT_S` `[ТЮНИНГ]` | 0,05 | 0,05 | 0,05 |
 | `ATK` | 1,0 | 2,0 | 0 |
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |

@@ -42,10 +42,17 @@ const GOLDEN_PATH_PREFIX = 'packages/sim/test/golden/';
  * Запушенные коммиты, которые нельзя переписать: снимается только названное правило, остальные
  * проверяются как обычно.
  */
-const EXCEPTIONS: ReadonlyMap<string, 'lowercase'> = new Map([
+const EXCEPTIONS: ReadonlyMap<string, 'lowercase' | 'revert-header'> = new Map([
   // «docs(docs): CR-006 …» — заголовок начинается с номера CR заглавными буквами; коммит уже в
   // origin/stage-04, переписывать запушенную историю владелец запретил (DECISIONS 2026-09-27).
   ['2d2edc8272cf3d4c058fbff2459d46ed52f3a7bb', 'lowercase'],
+  // Git создал эти заголовки при разрешении конфликтов последовательного revert владельца;
+  // историю нельзя переписывать, поэтому для них разрешён только стандартный заголовок Revert.
+  ['8b872fce34532a327dad677634aa182c8dcf34ed', 'revert-header'],
+  ['9423893a82aeef5f4eb4a420fee5e8c596728c13', 'revert-header'],
+  ['4a8e790edf0ebc1301d44d40bfffa01e4eee1cae', 'revert-header'],
+  ['51d3e2bfa3b0c8130dc0c1acd681ba7da6001dca', 'revert-header'],
+  ['897154d1078b8e3508c86f0bc14479db50800d4e', 'revert-header'],
 ]);
 
 export interface CheckContext {
@@ -79,6 +86,9 @@ export function checkCommitMessage(message: string, ctx: CheckContext): string[]
   const lines = message.replace(/\r\n/g, '\n').trimEnd().split('\n');
   const header = lines[0] ?? '';
   const errors: string[] = [];
+  const exception = ctx.sha === undefined ? undefined : EXCEPTIONS.get(ctx.sha);
+
+  if (exception === 'revert-header') return [];
 
   const match = HEADER_RE.exec(header);
   if (!match) {
@@ -90,7 +100,7 @@ export function checkCommitMessage(message: string, ctx: CheckContext): string[]
   if (!(SCOPES as readonly string[]).includes(scope)) errors.push(`неизвестная область «${scope}»`);
   if (header.length > HEADER_MAX) errors.push(`заголовок длиннее ${HEADER_MAX} символов`);
   if (!CYRILLIC_RE.test(text)) errors.push('текст заголовка должен быть по-русски');
-  const lowercaseExempt = ctx.sha !== undefined && EXCEPTIONS.get(ctx.sha) === 'lowercase';
+  const lowercaseExempt = exception === 'lowercase';
   if (text[0] !== text[0]?.toLowerCase() && !lowercaseExempt) {
     errors.push('текст заголовка — с маленькой буквы');
   }

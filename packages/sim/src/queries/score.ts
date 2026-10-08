@@ -2,6 +2,7 @@
 import { SCORE_CITY, SCORE_HEX, SCORE_PER_100_SOLDIERS } from '../balance.ts';
 import { FP, intDiv } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 /** Солдат на одно очко за войска. */
 const SOLDIERS_PER_SCORE = 100;
@@ -16,7 +17,7 @@ export function playerScore(state: MatchState, playerId: number): number {
   state.hexes.owner.forEach((o) => {
     if (o === playerId) hexes += 1;
   });
-  const soldiers = state.units
+  const soldiers = allUnits(state)
     .filter((a) => a.owner === playerId)
     .reduce((sum, a) => sum + a.soldiers, 0);
   return (
@@ -49,6 +50,30 @@ export function playerScores(state: MatchState): Int32Array {
       SCORE_HEX * (hexes[p] ?? 0) +
       SCORE_PER_100_SOLDIERS * intDiv(soldiers[p] ?? 0, SOLDIERS_PER_SCORE * FP),
   );
+}
+
+/**
+ * Места всех игроков по уже рассчитанным очкам.
+ * @returns место по id игрока, 1 — лидер
+ */
+export function playerPlaces(state: MatchState, scores: Int32Array): Int32Array {
+  const places = new Int32Array(state.players.length);
+  const alive = state.players.filter((p) => p.status === 'alive');
+  for (const player of state.players) {
+    if (player.status === 'eliminated') {
+      const above = state.players.filter(
+        (p) =>
+          p.status === 'eliminated' &&
+          (p.eliminatedTick > player.eliminatedTick ||
+            (p.eliminatedTick === player.eliminatedTick && p.id < player.id)),
+      ).length;
+      places[player.id] = alive.length + above + 1;
+      continue;
+    }
+    const mine = scores[player.id] ?? 0;
+    places[player.id] = 1 + alive.filter((p) => (scores[p.id] ?? 0) > mine).length;
+  }
+  return places;
 }
 
 /**

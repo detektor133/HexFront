@@ -1,5 +1,6 @@
 // Движок локального режима: матч sim, очередь команд игрока, снимок каждый тик.
 // Живёт в Web Worker (sim-worker.ts); отдельно — чтобы тестироваться без браузера.
+import type { SnapshotMessage } from '@hexfront/protocol';
 import {
   canFoundCity,
   checkConstruction,
@@ -15,6 +16,7 @@ import {
   cityInfo,
   commanderCommands,
   createMatch,
+  createBotTickContext,
   loadMap,
   playerView,
   step,
@@ -25,7 +27,7 @@ import {
   type RejectReason,
 } from '@hexfront/sim';
 
-import type { FromWorker, RecruitOption, Selection } from './messages.ts';
+import type { RecruitOption, Selection, ViewPayload } from './messages.ts';
 
 /**
  * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
@@ -37,9 +39,15 @@ export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
   setFog(on: boolean): void;
+  setObserver(playerId: number | null): void;
+  setView(playerId: number | null, fog: boolean): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
-  tick(): FromWorker;
+  tick(): ViewPayload;
+  /** Возвращает накопленный снимок без продвижения симуляции. */
+  snapshot(): ViewPayload;
+  /** Продвигает один тик без построения снимка. */
+  advance(): void;
 }
 
 const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
@@ -94,6 +102,40 @@ export function createLocalEngine(
   const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];
   let selected: number | null = null;
+  let observerId: number | null = null;
+  let pendingEvents: MatchState['events'] = [];
+  const advance = (): void => {
+    const botContext = createBotTickContext(state);
+    step(state, [
+      ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+      ...commanderCommands(state, bots, botContext),
+      ...botCommands(state, bots, botContext),
+    ]);
+    pending = [];
+    pendingEvents = [...pendingEvents, ...state.events];
+  };
+  const snapshot = (): ViewPayload => {
+    const rejected: { command: string; reason: RejectReason }[] = [];
+    for (const e of pendingEvents) {
+      if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
+        rejected.push({ command: e.command, reason: e.reason as RejectReason });
+      }
+    }
+    const events = pendingEvents;
+    pendingEvents = [];
+    const view = playerView(state, observerId ?? HUMAN_ID);
+    const snapshot: SnapshotMessage = { t: 'snapshot', tick: view.tick, view };
+    return {
+      t: 'view',
+      seq: 0,
+      view,
+      kind: 'snapshot',
+      snapshot,
+      selection: selected === null ? null : selectionOf(state, selected),
+      rejected,
+      events,
+    };
+  };
   return {
     state,
     queue(cmd) {
@@ -102,31 +144,23 @@ export function createLocalEngine(
     setFog(on) {
       state.fog = on;
     },
+    setObserver(playerId) {
+      observerId = playerId;
+    },
+    setView(playerId, fog) {
+      observerId = playerId;
+      state.fog = fog;
+    },
     select(hex) {
       selected = hex;
     },
+    advance,
     tick() {
       // Ручные команды игрока и решения commander (армии с auto всех игроков) — в один тик; sim
       // применяет ручные первыми, и устаревшее решение commander для взятой армии отклоняется.
-      step(state, [
-        ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
-        ...commanderCommands(state, bots),
-        ...botCommands(state, bots),
-      ]);
-      pending = [];
-      const rejected: { command: string; reason: RejectReason }[] = [];
-      for (const e of state.events) {
-        if (e.t === 'commandRejected' && e.playerId === HUMAN_ID && !e.auto) {
-          rejected.push({ command: e.command, reason: e.reason as RejectReason });
-        }
-      }
-      return {
-        t: 'view',
-        view: playerView(state, HUMAN_ID),
-        selection: selected === null ? null : selectionOf(state, selected),
-        rejected,
-        events: state.events.slice(),
-      };
+      advance();
+      return snapshot();
     },
+    snapshot,
   };
 }

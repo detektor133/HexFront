@@ -1,24 +1,37 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
 import { planViews, type PlanView } from './plan-view.ts';
-import { playerPlace, playerScore } from './score.ts';
+import { playerPlace, playerPlaces, playerScore, playerScores } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
 import type { UnitType } from '../balance.ts';
 import { RECRUIT_STEP } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
-import { recruitCapacity, unitLimit } from '../commands/recruit.ts';
+import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
-import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
+import {
+  incomeBases,
+  playerIncomePerSecond,
+  playerUpkeepPerSecond,
+  type IncomeBase,
+} from '../systems/economy.ts';
 import { growthPerSecond } from '../systems/population.ts';
 import { taxGrowthMult } from '../systems/tax.ts';
 import { visionSystem } from '../systems/vision.ts';
 
 /** Связь узла сети: 0 — не узел, 1 — основная сеть, 2 — изолированная. */
 export const LINK = { none: 0, main: 1, isolated: 2 } as const;
+
+export interface PlayerViewContext {
+  readonly growth: Int32Array;
+  readonly incomeBases: readonly IncomeBase[];
+  readonly links: Uint8Array;
+  readonly scores: Int32Array;
+  readonly places: Int32Array;
+}
 
 export interface PlayerView {
   readonly tick: number;
@@ -85,8 +98,6 @@ export interface PlayerView {
     readonly autoCommand: boolean;
     /** Цена основания следующего города, золото, fixed-point (03-cities-buildings.md). */
     readonly foundCityCost: Fp;
-    /** Командная ёмкость: сколько отрядов (с наборами в очереди) может быть у игрока. */
-    readonly unitLimit: number;
     /** Множитель роста населения при выбранном налоге, fixed-point. */
     readonly growthMultAtTarget: Fp;
     readonly score: number;
@@ -121,20 +132,24 @@ function links(state: MatchState): Uint8Array {
   );
 }
 
-function summary(state: MatchState, playerId: number, growth: Int32Array): PlayerView['me'] {
+function summary(
+  state: MatchState,
+  playerId: number,
+  context: PlayerViewContext,
+): PlayerView['me'] {
   let popTotal = 0;
   let popGrowthPerS = 0;
   state.hexes.owner.forEach((o, id) => {
     if (o !== playerId) return;
     popTotal += state.hexes.pop[id] ?? 0;
-    popGrowthPerS += growth[id] ?? 0;
+    popGrowthPerS += context.growth[id] ?? 0;
   });
   const target = state.players[playerId]?.taxTarget ?? (0 as Fp);
   return {
     popTotal,
     popGrowthPerS,
-    incomePerS: playerIncomePerSecond(state, playerId),
-    incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target),
+    incomePerS: playerIncomePerSecond(state, playerId, undefined, context.incomeBases),
+    incomeAtTargetPerS: playerIncomePerSecond(state, playerId, target, context.incomeBases),
     upkeepPerS: playerUpkeepPerSecond(state, playerId),
     supplyLevel:
       state.supplyRatios.get(
@@ -144,11 +159,26 @@ function summary(state: MatchState, playerId: number, growth: Int32Array): Playe
     autoReinforce: state.players[playerId]?.autoReinforce ?? false,
     autoCommand: state.players[playerId]?.autoCommand ?? true,
     foundCityCost: foundCityCost(state.players[playerId]?.citiesFounded ?? 0),
-    unitLimit: unitLimit(state, playerId),
     growthMultAtTarget: taxGrowthMult(target),
-    score: playerScore(state, playerId),
-    place: playerPlace(state, playerId),
+    score: context.scores[playerId] ?? playerScore(state, playerId),
+    place: context.places[playerId] ?? playerPlace(state, playerId),
     players: state.players.filter((p) => p.status === 'alive').length,
+  };
+}
+
+/**
+ * Строит общий контекст снимков для одного состояния матча.
+ * @returns рост людей в секунду, базы дохода и связи сетей
+ */
+export function createPlayerViewContext(state: MatchState): PlayerViewContext {
+  visionSystem(state);
+  const scores = playerScores(state);
+  return {
+    growth: growthPerSecond(state),
+    incomeBases: incomeBases(state),
+    links: links(state),
+    scores,
+    places: playerPlaces(state, scores),
   };
 }
 
@@ -162,8 +192,13 @@ function recruitMax(state: MatchState, cityId: number): Fp {
  * Снимок для игрока. Массивы — копии: клиент может их менять, состояние не пострадает.
  * @returns данные для отрисовки и интерфейса
  */
-export function playerView(state: MatchState, playerId: number): PlayerView {
-  visionSystem(state);
+export function playerView(
+  state: MatchState,
+  playerId: number,
+  context?: PlayerViewContext,
+): PlayerView {
+  // Контекст уже пересчитал обзор на этот тик; без контекста — как раньше.
+  const viewContext = context ?? createPlayerViewContext(state);
   const { hexes } = state;
   const vision = state.vision;
   const visible = state.fog
@@ -172,9 +207,8 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
-  const growth = growthPerSecond(state);
   return {
-    me: summary(state, playerId, growth),
+    me: summary(state, playerId, viewContext),
     tick: state.tick,
     winner: state.winner,
     playerId,
@@ -193,10 +227,12 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
       road: state.fog
         ? Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0)
         : hexes.road.slice(),
-      link: Uint8Array.from(links(state), (value, id) => (visible[id] === 1 ? value : 0)),
+      link: Uint8Array.from(viewContext.links, (value, id) => (visible[id] === 1 ? value : 0)),
       growth: state.fog
-        ? Int32Array.from(growth, (value, id) => (hexes.owner[id] === playerId ? value : 0))
-        : growth,
+        ? Int32Array.from(viewContext.growth, (value, id) =>
+            hexes.owner[id] === playerId ? value : 0,
+          )
+        : viewContext.growth,
       visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({
@@ -244,5 +280,69 @@ export function playerView(state: MatchState, playerId: number): PlayerView {
         progressTicks: r.progressTicks,
         totalTicks: r.totalTicks,
       })),
+  };
+}
+
+/**
+ * Снимок для commander без копирования массивов карты.
+ * @returns данные, нужные автокомандованию; массивы карты принадлежат состоянию тика
+ */
+export function commanderView(
+  state: MatchState,
+  playerId: number,
+  context: PlayerViewContext,
+  cities = state.cities.map((c) => ({
+    id: c.id,
+    hex: c.hex,
+    owner: c.owner,
+    level: c.level,
+    name: c.name,
+    isCapital: state.players[c.owner]?.capitalCityId === c.id,
+    isolated: false,
+    defenders: c.defenders,
+    defenseOrg: c.defenseOrg,
+    recruitMax: 0 as Fp,
+    canRebuild: false,
+  })),
+): PlayerView {
+  const { hexes } = state;
+  const visible = state.fog ? (state.vision?.visible[playerId] ?? new Uint8Array(0)) : undefined;
+  return {
+    me: {
+      popTotal: 0,
+      popGrowthPerS: 0,
+      incomePerS: 0,
+      incomeAtTargetPerS: 0,
+      upkeepPerS: 0,
+      supplyLevel: FP as Fp,
+      bankrupt: false,
+      autoReinforce: false,
+      autoCommand: true,
+      foundCityCost: 0 as Fp,
+      growthMultAtTarget: FP as Fp,
+      score: 0,
+      place: 0,
+      players: 0,
+    },
+    tick: state.tick,
+    winner: state.winner,
+    playerId,
+    hexes: {
+      owner: hexes.owner,
+      pop: hexes.pop,
+      improvement: hexes.improvement,
+      building: hexes.building,
+      road: hexes.road,
+      link: context.links,
+      growth: context.growth,
+      visible: visible ?? new Uint8Array(0),
+    },
+    cities,
+    units: unitViews(state, playerId, visible),
+    armies: armyViews(state, playerId),
+    plans: planViews(state, playerId),
+    players: state.players,
+    constructions: [],
+    recruits: [],
   };
 }

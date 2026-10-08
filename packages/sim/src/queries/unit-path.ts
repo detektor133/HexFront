@@ -14,10 +14,11 @@ import {
   type UnitType,
 } from '../balance.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
-import { createHeap, heapPop, heapPush } from '../math/heap.ts';
+import { createHeap, heapPop, heapPush, type MinHeap } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
+import { unitIndex } from '../state/unit-index.ts';
 
 /** Местность для времени хода: перевал — как холмы; null — вода. */
 function moveTerrain(state: MatchState, hex: HexId): LandTerrain | null {
@@ -31,7 +32,7 @@ function moveTerrain(state: MatchState, hex: HexId): LandTerrain | null {
 /** Сколько отрядов игрока стоит в гексе. */
 export function ownUnitsAt(state: MatchState, owner: number, hex: HexId): number {
   let n = 0;
-  for (const a of state.units) if (a.owner === owner && a.hex === hex) n += 1;
+  for (const unit of unitIndex(state).unitsByHex[hex] ?? []) if (unit.owner === owner) n += 1;
   return n;
 }
 
@@ -40,8 +41,8 @@ export function ownUnitsAt(state: MatchState, owner: number, hex: HexId): number
  * Войти в такой гекс можно только через бой.
  */
 export function isHostileHex(state: MatchState, owner: number, hex: HexId): boolean {
-  if (state.units.some((a) => a.hex === hex && a.owner !== owner)) return true;
-  const city = state.cities.find((c) => c.hex === hex);
+  if ((unitIndex(state).unitsByHex[hex] ?? []).some((unit) => unit.owner !== owner)) return true;
+  const city = unitIndex(state).cityByHex[hex];
   if (!city || city.owner === owner) return false;
   return city.defenders > 0;
 }
@@ -52,7 +53,7 @@ function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
   for (const n of neighbors(hexFromId(hex, width))) {
     if (!inBounds(n, width, height)) continue;
     const id = hexId(n, width);
-    if (state.units.some((a) => a.hex === id && a.owner !== owner)) return true;
+    if ((unitIndex(state).unitsByHex[id] ?? []).some((unit) => unit.owner !== owner)) return true;
   }
   return false;
 }
@@ -114,6 +115,46 @@ function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boo
 
 const UNREACHED = 0x7fffffff;
 
+interface SearchBuffers {
+  readonly g: Int32Array;
+  readonly prev: Int32Array;
+  readonly generation: Uint32Array;
+  readonly heap: MinHeap;
+  currentGeneration: number;
+}
+
+const searchBuffers = new WeakMap<MatchState, SearchBuffers>();
+
+function buffersFor(state: MatchState): SearchBuffers {
+  const size = state.map.width * state.map.height;
+  const current = searchBuffers.get(state);
+  if (current) return current;
+  const buffers: SearchBuffers = {
+    g: new Int32Array(size),
+    prev: new Int32Array(size),
+    generation: new Uint32Array(size),
+    heap: createHeap(),
+    currentGeneration: 0,
+  };
+  searchBuffers.set(state, buffers);
+  return buffers;
+}
+
+function beginSearch(buffers: SearchBuffers): void {
+  buffers.currentGeneration += 1;
+  if (buffers.currentGeneration === 0) {
+    buffers.generation.fill(0);
+    buffers.currentGeneration = 1;
+  }
+  buffers.heap.items.length = 0;
+}
+
+function distanceAt(buffers: SearchBuffers, hex: HexId): number {
+  return buffers.generation[hex] === buffers.currentGeneration
+    ? (buffers.g[hex] ?? UNREACHED)
+    : UNREACHED;
+}
+
 // A* по времени хода; h — допустимая эвристика (0 — Дейкстра до ближайшей цели).
 function search(
   state: MatchState,
@@ -124,34 +165,36 @@ function search(
   ownLand = false,
 ): HexId[] | null {
   const { width, height } = state.map;
-  const g = new Int32Array(width * height).fill(UNREACHED);
-  const prev = new Int32Array(width * height).fill(-1);
-  const heap = createHeap();
-  g[from] = 0;
-  heapPush(heap, 0, from);
+  const buffers = buffersFor(state);
+  beginSearch(buffers);
+  buffers.generation[from] = buffers.currentGeneration;
+  buffers.g[from] = 0;
+  buffers.prev[from] = -1;
+  heapPush(buffers.heap, 0, from);
   let found = -1;
-  for (let top = heapPop(heap); top; top = heapPop(heap)) {
+  for (let top = heapPop(buffers.heap); top; top = heapPop(buffers.heap)) {
     const hex = top[1];
     if (hex !== from && isGoal(hex)) {
       found = hex;
       break;
     }
-    const gh = g[hex] ?? UNREACHED;
+    const gh = distanceAt(buffers, hex);
     for (const n of neighbors(hexFromId(hex, width))) {
       if (!inBounds(n, width, height)) continue;
       const id = hexId(n, width);
       if (!canEnter(state, mover, id, isGoal(id))) continue;
       if (ownLand && state.hexes.owner[id] !== mover.owner) continue;
       const cost = stepTicks(state, mover, hex, id);
-      if (cost === null || gh + cost >= (g[id] ?? UNREACHED)) continue;
-      g[id] = gh + cost;
-      prev[id] = hex;
-      heapPush(heap, gh + cost + h(id), id);
+      if (cost === null || gh + cost >= distanceAt(buffers, id)) continue;
+      buffers.generation[id] = buffers.currentGeneration;
+      buffers.g[id] = gh + cost;
+      buffers.prev[id] = hex;
+      heapPush(buffers.heap, gh + cost + h(id), id);
     }
   }
   if (found < 0) return null;
   const path: HexId[] = [];
-  for (let at = found; at !== from; at = prev[at] ?? from) path.push(at);
+  for (let at = found; at !== from; at = buffers.prev[at] ?? from) path.push(at);
   return path.reverse();
 }
 

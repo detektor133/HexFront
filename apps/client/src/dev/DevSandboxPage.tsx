@@ -15,13 +15,16 @@ import styles from './DevSandboxPage.module.css';
 import { EventFeed } from './EventFeed.tsx';
 import { HexCard } from './HexCard.tsx';
 import { Hud } from './Hud.tsx';
+import { Leaderboard } from './Leaderboard.tsx';
 import { MatchEnd } from './MatchEnd.tsx';
+import { ObserverPanel } from './ObserverPanel.tsx';
 import { UnitCard } from './UnitCard.tsx';
 import { createEconomyLayer, type EconomyLayer } from './economy-layer.ts';
 import { appendEvents, type EventFeedItem } from './event-feed.ts';
 import { createOrderHooks } from './order-hooks.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
+import { readSandboxMap, sandboxMapUrl, type SandboxMapRequest } from './sandbox-map.ts';
 import {
   armySelection,
   NOTHING_PICKED,
@@ -31,40 +34,32 @@ import {
   type Picked,
 } from './sandbox-selection.ts';
 import { createSplitGrab } from './split-drag.ts';
+import { useTelemetry } from './telemetry-client.ts';
+import {
+  createSnapshotTelemetry,
+  type CacheTelemetry,
+  type PixiTelemetry,
+  type SnapshotTelemetry,
+  type SnapshotTelemetryCounts,
+  type WorkerTelemetry,
+} from './telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
+import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
+import { ViewDeltaApplier } from '../local/view-delta.ts';
+import { OnboardingHints } from '../match/OnboardingHints.tsx';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
-/** Сид и число игроков: игрок и соперник без ботов (боты — этап 05). */
-const SEED = 42;
-const PLAYERS = 2;
-/** Наибольшее ускорение песочницы (тиков за 100 мс) — для записи матча. */
-const SPEED_MAX = 20;
-
-// Состав матча из адреса (04/T24): players — участников (человек + боты), watch=1 — человек тоже
-// под ботом (запись матча ботов), speed — ускорение.
-function matchSetup(search: string): { count: number; bots: number[]; speed: number } {
-  const params = new URLSearchParams(search);
-  const count = Math.max(2, Math.floor(Number(params.get('players') ?? PLAYERS)) || PLAYERS);
-  const watch = params.get('watch') === '1';
-  const bots = Array.from({ length: count }, (_, i) => i).filter((i) => watch || i !== 0);
-  const speed =
-    params.get('freezeTime') === '1'
-      ? 0
-      : Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
-  return { count, bots, speed };
-}
-
 type Loaded = { json: unknown; map: MapStatic } | 'loading' | 'error';
 
-function useMapJson(id: string): Loaded {
+function useMapJson(request: SandboxMapRequest): Loaded {
   const [state, setState] = useState<Loaded>('loading');
   useEffect(() => {
     let alive = true;
-    fetch(`/maps/${encodeURIComponent(id)}.json`)
+    fetch(sandboxMapUrl(request))
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((json: unknown) => {
         const result = loadMap(json);
@@ -78,33 +73,50 @@ function useMapJson(id: string): Loaded {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [request]);
   return state;
 }
 
-type ViewMessage = Extract<FromWorker, { t: 'view' }>;
+type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
+type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
 
 interface Sandbox {
   readonly msg: ViewMessage | null;
+  readonly replay: readonly PlayerView[];
   readonly error: string | null;
   readonly picked: Picked;
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   readonly army: number | null;
   readonly fog: boolean;
+  readonly paused: boolean;
+  readonly speed: number;
+  readonly observerId: number | null;
   readonly events: readonly EventFeedItem[];
+  readonly workerTelemetry: WorkerTelemetry | null;
+  snapshotTelemetry(): SnapshotTelemetryCounts;
+  cacheTelemetry(): CacheTelemetry;
   focusEvent(item: EventFeedItem): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  setPaused(on: boolean): void;
+  step(): void;
+  setSpeed(value: number): void;
+  setObserver(playerId: number | null): void;
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number): void;
+  pixiTelemetry(): PixiTelemetry;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
-function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loaded): Sandbox {
+function useSandbox(
+  hostRef: React.RefObject<HTMLDivElement | null>,
+  loaded: Loaded,
+  mapRequest: SandboxMapRequest,
+): Sandbox {
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
@@ -115,13 +127,27 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
+  const [replay, setReplay] = useState<readonly PlayerView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
+  const [paused, setPausedState] = useState(
+    readLocalMatchSetup(window.location.search).speed === 0,
+  );
+  const [speed, setSpeedState] = useState(
+    Math.max(1, readLocalMatchSetup(window.location.search).speed),
+  );
+  const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
+  const observerIdRef = useRef<number | null>(null);
+  const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
+  const snapshotTelemetryRef = useRef<SnapshotTelemetry | null>(null);
+  if (snapshotTelemetryRef.current === null) {
+    snapshotTelemetryRef.current = createSnapshotTelemetry();
+  }
 
   const pick = useCallback((p: Picked) => {
     if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
@@ -137,8 +163,24 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
   }, []);
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
   const setFog = useCallback((on: boolean) => {
-    matchRef.current?.setFog(on);
+    matchRef.current?.setView(observerIdRef.current, on);
     setFogState(on);
+  }, []);
+  const setPaused = useCallback((on: boolean) => {
+    matchRef.current?.setPaused(on);
+    setPausedState(on);
+  }, []);
+  const step = useCallback(() => matchRef.current?.step(), []);
+  const setSpeed = useCallback((value: number) => {
+    matchRef.current?.setSpeed(value);
+    setSpeedState(value);
+    setPausedState(false);
+  }, []);
+  const setObserver = useCallback((playerId: number | null) => {
+    matchRef.current?.setView(playerId, playerId !== null);
+    observerIdRef.current = playerId;
+    setObserverId(playerId);
+    setFogState(playerId !== null);
   }, []);
   const setArmy = useCallback((id: number | null) => {
     armyRef.current = id;
@@ -200,18 +242,63 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
-    const match = startLocalMatch(json, SEED, matchSetup(window.location.search), (m) => {
-      if (m.t === 'error') return setError(m.errors.join('; '));
-      viewRef.current = m.view;
-      layerRef.current?.setView(m.view, pickedRef.current);
-      setMsg(m);
-      const nextEvents = appendEvents(eventsRef.current, m.events, m.view, performance.now());
+    let pendingMessage: WorkerViewMessage | null = null;
+    let frameRequest = 0;
+    let appliedMessage = false;
+    const deltaApplier = new ViewDeltaApplier();
+    const applyMessage = (m: WorkerViewMessage): void => {
+      const view =
+        m.kind === 'snapshot'
+          ? deltaApplier.applySnapshot(m.snapshot)
+          : deltaApplier.applyDelta(m.delta);
+      const applied = { ...m, view } as ViewMessage;
+      if (view.tick % 10 === 0 || view.winner >= 0) {
+        setReplay((current) => {
+          if (current.at(-1)?.tick === view.tick) return current;
+          return [...current, view].slice(-151);
+        });
+      }
+      snapshotTelemetryRef.current?.track(applied);
+      viewRef.current = view;
+      workerTelemetryRef.current = m.telemetry ?? null;
+      layerRef.current?.setView(view, pickedRef.current);
+      setMsg(applied);
+      const nextEvents = appendEvents(eventsRef.current, m.events, view, performance.now());
       eventsRef.current = nextEvents;
       setEvents(nextEvents);
       const last = m.rejected.at(-1);
       if (last) setLastReject(reasonText(last.reason));
-    });
+      matchRef.current?.ack(m.seq);
+    };
+    const scheduleMessage = (m: WorkerViewMessage): void => {
+      if (!appliedMessage && layerRef.current) {
+        appliedMessage = true;
+        applyMessage(m);
+        return;
+      }
+      pendingMessage = m;
+      if (frameRequest !== 0) return;
+      frameRequest = requestAnimationFrame(() => {
+        frameRequest = 0;
+        const next = pendingMessage;
+        pendingMessage = null;
+        if (!next || cancelled) return;
+        appliedMessage = true;
+        applyMessage(next);
+      });
+    };
+    const match = startLocalMatch(
+      json,
+      mapRequest.seed,
+      readLocalMatchSetup(window.location.search),
+      (m) => {
+        if (m.t === 'error') return setError(m.errors.join('; '));
+        scheduleMessage(m);
+      },
+    );
     matchRef.current = match;
+    match.setView(null, false);
+    setFogState(false);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
     const params = new URLSearchParams(window.location.search);
     const initialSelect = params.get('select');
@@ -275,6 +362,12 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
+      if (pendingMessage) {
+        const next = pendingMessage;
+        pendingMessage = null;
+        appliedMessage = true;
+        applyMessage(next);
+      }
     });
     const onKey = (e: KeyboardEvent): void => {
       if (e.code === 'Space' && !e.repeat) {
@@ -297,6 +390,7 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     window.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
+      if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       window.removeEventListener('keydown', onKey);
       match.dispose();
       view?.destroy();
@@ -305,10 +399,11 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       mapViewRef.current = null;
       eventsRef.current = [];
     };
-  }, [hostRef, loaded, pick, input, setTool, splitGrab]);
+  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab]);
 
   return {
     msg,
+    replay,
     error,
     picked,
     lastReject,
@@ -316,13 +411,23 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
     army,
     send,
     fog,
+    paused,
+    speed,
+    observerId,
     events,
+    workerTelemetry: workerTelemetryRef.current,
+    snapshotTelemetry: () =>
+      snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {
       if (item.hex !== null && typeof loaded !== 'string') {
         mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
       }
     },
     setFog,
+    setPaused,
+    step,
+    setSpeed,
+    setObserver,
     pick,
     setTool,
     setArmy,
@@ -331,17 +436,56 @@ function useSandbox(hostRef: React.RefObject<HTMLDivElement | null>, loaded: Loa
       dockHeightRef.current = height;
       mapViewRef.current?.setBottomInset(height);
     },
+    pixiTelemetry() {
+      return (
+        mapViewRef.current?.sceneStats() ?? {
+          objects: 0,
+          text: 0,
+          graphics: 0,
+          graphicsInstructions: [],
+          graphicsDetails: [],
+          textures: 0,
+          canvasTextTextures: null,
+        }
+      );
+    },
+    cacheTelemetry() {
+      const economy = layerRef.current?.cacheTelemetry();
+      return {
+        unit: economy ?? {
+          shown: 0,
+          drawnAt: 0,
+          chips: 0,
+          encircledSince: 0,
+        },
+        economy: economy?.economy ?? {
+          capturesByHex: 0,
+          cityFlashes: 0,
+        },
+        frontTween: economy?.frontTween ?? { byArmy: 0 },
+      };
+    },
   };
 }
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
-export function DevSandboxPage(): React.JSX.Element {
-  const params = new URLSearchParams(window.location.search);
-  const loaded = useMapJson(params.get('map') ?? 'small');
+export function DevSandboxPage({
+  showOnboarding = false,
+}: { showOnboarding?: boolean } = {}): React.JSX.Element {
+  const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
+  const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
-  const sb = useSandbox(hostRef, loaded);
+  const sb = useSandbox(hostRef, loaded, mapRequest);
+  const downloadTelemetry = useTelemetry({
+    view: () => sb.msg?.view ?? null,
+    pixi: sb.pixiTelemetry,
+    worker: () => sb.workerTelemetry,
+    snapshots: sb.snapshotTelemetry,
+    caches: sb.cacheTelemetry,
+  });
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
+  const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
@@ -356,9 +500,30 @@ export function DevSandboxPage(): React.JSX.Element {
   return (
     <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
       <div ref={hostRef} className={styles.map} />
-      <EventFeed items={sb.events} now={performance.now()} onFocus={sb.focusEvent} />
+      <EventFeed
+        items={sb.events}
+        now={performance.now()}
+        onFocus={sb.focusEvent}
+        style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
+      />
       {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
-      {view && <MatchEnd view={view} />}
+      {view && (
+        <ObserverPanel
+          view={view}
+          paused={sb.paused}
+          speed={sb.speed}
+          observerId={sb.observerId}
+          setPaused={sb.setPaused}
+          step={sb.step}
+          setSpeed={sb.setSpeed}
+          setObserver={sb.setObserver}
+          downloadTelemetry={downloadTelemetry}
+          onHeight={setObserverH}
+        />
+      )}
+      {view && <Leaderboard view={view} />}
+      {view && <MatchEnd view={view} replay={sb.replay} />}
+      {showOnboarding && view && <OnboardingHints view={view} />}
       {view && (
         <ArmyBar
           view={view}

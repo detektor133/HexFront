@@ -2,14 +2,16 @@
 // GDD: docs/gdd/03-cities-buildings.md
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
+import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
+import { addCityToIndex } from '../state/unit-index.ts';
 
 function complete(state: MatchState, c: Construction): void {
   const { hexes } = state;
   switch (c.kind) {
-    case 'foundCity':
+    case 'foundCity': {
       // Id растут монотонно, поэтому push сохраняет сортировку городов по id.
-      state.cities.push({
+      const city = {
         id: state.nextId,
         hex: c.hex,
         owner: c.owner,
@@ -20,10 +22,14 @@ function complete(state: MatchState, c: Construction): void {
         defenseOrg: ORG_MAX,
         inBattle: false,
         captureTicks: 0,
-      });
+      };
+      state.cities.push(city);
+      addCityToIndex(state, city);
+      markNetworkDirty(state, c.owner);
       state.nextId += 1;
       queueAutoRoad(state, c.owner, c.hex);
       return;
+    }
     case 'upgradeCity': {
       const city = state.cities.find((x) => x.hex === c.hex);
       if (city) city.level += 1;
@@ -34,9 +40,13 @@ function complete(state: MatchState, c: Construction): void {
       return;
     case 'fort':
       hexes.building[c.hex] = BUILDING.fort;
+      state.supplyRevision += 1;
+      markSupplyDirty(state, c.owner);
       return;
     case 'depot':
       hexes.building[c.hex] = BUILDING.depot;
+      state.supplyRevision += 1;
+      markSupplyDirty(state, c.owner);
       return;
     case 'road':
       return;

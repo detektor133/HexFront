@@ -11,8 +11,8 @@ const small: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
 );
 
-function engine() {
-  const e = createLocalEngine(small, 42, 2);
+function engine(fog = false) {
+  const e = createLocalEngine(small, 42, 2, undefined, fog);
   if ('errors' in e) throw new Error(e.errors.join('\n'));
   return e;
 }
@@ -23,6 +23,40 @@ function asView(msg: FromWorker): Extract<FromWorker, { t: 'view' }> {
 }
 
 describe('локальный режим', () => {
+  it('замороженная последовательность сохраняет fog, selection и tick до ack', () => {
+    const old = engine(true);
+    old.tick();
+    old.setObserver(null);
+    const oldLast = old.tick();
+    const oldFog = oldLast.view.hexes.visible.some((value) => value === 0);
+    old.setFog(false);
+    old.select(0);
+
+    const current = engine(true);
+    const currentInitial = current.snapshot();
+    current.setObserver(null);
+    current.setFog(false);
+    current.select(0);
+    const currentLast = current.snapshot();
+
+    expect({
+      old: {
+        tick: oldLast.view.tick,
+        fog: oldFog,
+        selection: oldLast.selection?.hex ?? null,
+      },
+      current: {
+        initialTick: currentInitial.view.tick,
+        tick: currentLast.view.tick,
+        fog: currentLast.view.hexes.visible.every((value) => value === 1),
+        selection: currentLast.selection?.hex ?? null,
+      },
+    }).toEqual({
+      old: { tick: 2, fog: true, selection: null },
+      current: { initialTick: 0, tick: 0, fog: true, selection: 0 },
+    });
+  });
+
   it('каждый тик отдаёт снимок игрока-человека', () => {
     const msg = asView(engine().tick());
     expect(msg.view.tick).toBe(1);
@@ -38,6 +72,18 @@ describe('локальный режим', () => {
     expect(msg.view.units).toHaveLength(created.state.units.length);
   });
 
+  it('показывает снимок выбранного игрока и всю карту без изменения sim', () => {
+    const created = createLocalEngine(small, 42, 2, undefined, true);
+    if ('errors' in created) throw new Error(created.errors.join('\n'));
+    created.setView(1, true);
+    expect(asView(created.snapshot()).view.playerId).toBe(1);
+    created.setView(null, false);
+    expect(asView(created.snapshot()).view.playerId).toBe(HUMAN_ID);
+    expect(asView(created.snapshot()).view.hexes.visible.every((value) => value === 1)).toBe(true);
+    expect(created.state.fog).toBe(false);
+    expect(created.state.tick).toBe(0);
+  });
+
   it('команды игрока применяются в следующем тике, отказы возвращаются', () => {
     const e = engine();
     e.queue({ t: 'setTax', rate: 400 as Fp });
@@ -46,6 +92,15 @@ describe('локальный режим', () => {
     expect(msg.view.players[HUMAN_ID]?.taxTarget).toBe(400);
     expect(msg.rejected).toEqual([{ command: 'foundCity', reason: 'notOwnHex' }]);
     expect(asView(e.tick()).rejected).toEqual([]);
+  });
+
+  it('снимок после пакетного продвижения содержит события всех тиков', () => {
+    const e = engine();
+    e.queue({ t: 'foundCity', hex: 0 });
+    e.advance();
+    const msg = asView(e.tick());
+    expect(msg.events.filter((event) => event.t === 'commandRejected')).toHaveLength(1);
+    expect(asView(e.tick()).events).toEqual([]);
   });
 
   it('выбранный гекс: карточка города и проверки кнопок', () => {

@@ -15,6 +15,7 @@ import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import type { MatchState, Unit } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 // Отряд идёт на своё место или встаёт на нём в оборону.
 function goTo(state: MatchState, u: Unit, slot: number): void {
@@ -51,9 +52,9 @@ function coverLine(state: MatchState, armyId: number, owner: number): void {
   if (!plan) return;
   const need = planHexes(state, plan).length;
   for (;;) {
-    const units = state.units.filter((u) => planControls(u, armyId) && u.type !== 'artillery');
+    const units = allUnits(state).filter((u) => planControls(u, armyId) && u.type !== 'artillery');
     const used =
-      state.units.filter((u) => u.owner === owner).length +
+      allUnits(state).filter((u) => u.owner === owner).length +
       state.recruits.filter((r) => r.owner === owner).length;
     if (units.length >= need || used >= unitLimit(state, owner)) return;
     let best: Unit | null = null;
@@ -73,7 +74,7 @@ const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b
 function autoMerge(state: MatchState, armyId: number): void {
   const plan = state.plans.find((p) => p.armyId === armyId);
   const need = plan ? planHexes(state, plan).length : 0;
-  const armyUnits = state.units.filter((u) => u.armyId === armyId && u.type !== 'artillery');
+  const armyUnits = allUnits(state).filter((u) => u.armyId === armyId && u.type !== 'artillery');
   const eligible = armyUnits.filter(
     (u) => !u.inBattle && (plan !== undefined || u.order === 'idle'),
   );
@@ -98,7 +99,7 @@ function runPlan(state: MatchState, armyId: number): void {
   autoMerge(state, armyId);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
-  const units = state.units.filter((u) => planControls(u, plan.armyId));
+  const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
   const lineSet = new Set(next.line);
   const settled = units.every(
     (u) => u.slot >= 0 && (u.type === 'artillery' || lineSet.has(u.slot)),

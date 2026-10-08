@@ -15,14 +15,26 @@ import {
   borderEdges,
   borderSegmentEdges,
   edgeHex,
+  edgeOf,
   edgeOther,
+  isBorderEdge,
   type EdgeId,
 } from '../state/edges.ts';
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
-function piecesOf(map: MapStatic, view: PlayerView, reserved: number | null): Map<number, Piece> {
-  return assignPieces(map, view, enemyPieces({ map, hexes: view.hexes }, view.playerId), reserved);
+function piecesOf(
+  map: MapStatic,
+  view: PlayerView,
+  reserved: number | null,
+  context: CommanderContext,
+): Map<number, Piece> {
+  const key = reserved ?? -1;
+  const cached = context.assigned.get(key);
+  if (cached) return cached;
+  const result = assignPieces(map, view, context.enemyPieces, reserved);
+  context.assigned.set(key, result);
+  return result;
 }
 
 /** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
@@ -34,13 +46,28 @@ interface Piece {
   readonly edges: readonly EdgeId[];
 }
 
+export interface CommanderContext {
+  readonly emptyNeutral: readonly HexId[];
+  readonly enemyPieces: readonly Piece[];
+  /** Распределение кусков по армиям для одного снимка; ключ — резервная армия или -1. */
+  readonly assigned: Map<number, Map<number, Piece>>;
+}
+
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
 
 // Куски границы с каждым врагом (до дипломатии все игроки — враги), по первой грани.
-function enemyPieces(g: Ground, me: number): Piece[] {
+function enemyPieces(g: Ground, me: number, ownedHexes?: readonly HexId[]): Piece[] {
   const out: Piece[] = [];
   const seen = new Set<EdgeId>();
-  for (const e of borderEdges(g, me)) {
+  const borders =
+    ownedHexes === undefined
+      ? borderEdges(g, me)
+      : ownedHexes.flatMap((h) =>
+          Array.from({ length: 6 }, (_, direction) => edgeOf(h, direction)).filter((e) =>
+            isBorderEdge(g, me, e),
+          ),
+        );
+  for (const e of borders) {
     const enemy = g.hexes.owner[edgeOther(g, e)] ?? -1;
     if (enemy < 0 || seen.has(e)) continue;
     const edges = borderSegmentEdges(g, me, enemy, e);
@@ -119,10 +146,10 @@ function reinforce(view: PlayerView, armyId: number): Command[] {
 }
 
 // Пустая армия экспансии получает один отряд с занятого фронта; донор не опустошается.
-function seedExpansion(map: MapStatic, view: PlayerView, armyId: number): Command[] {
+function seedExpansion(view: PlayerView, armyId: number, context: CommanderContext): Command[] {
   if (armyUnits(view, armyId).length > 0 || view.plans.some((p) => p.armyId === armyId)) return [];
   if (view.units.some((u) => u.owner === view.playerId && u.armyId === null)) return [];
-  if (emptyNeutral(map, view).length === 0) return [];
+  if (context.emptyNeutral.length === 0) return [];
   const donors = view.armies
     .filter((army) => army.id !== armyId && view.plans.some((p) => p.armyId === army.id))
     .map((army) => armyUnits(view, army.id).filter(idle))
@@ -154,19 +181,40 @@ function retake(map: MapStatic, view: PlayerView, lost: readonly HexId[], units:
 }
 
 // Цели занятия ничьей земли: пустые ничьи гексы у своей границы.
-function emptyNeutral(map: MapStatic, view: PlayerView): HexId[] {
-  const out: HexId[] = [];
+function emptyNeutral(map: MapStatic, view: PlayerView, ownedHexes?: readonly HexId[]): HexId[] {
+  const owner = view.hexes.owner;
+  let candidates: HexId[];
+  if (ownedHexes === undefined) {
+    const near = new Uint8Array(owner.length);
+    for (let h = 0; h < owner.length; h += 1) {
+      if (owner[h] !== view.playerId) continue;
+      for (const n of neighbors(hexOf(map, h))) {
+        if (inBounds(n, map.width, map.height)) near[hexId(n, map.width)] = 1;
+      }
+    }
+    candidates = Array.from({ length: owner.length }, (_, h) => h as HexId).filter(
+      (h) => near[h] === 1,
+    );
+  } else {
+    candidates = [
+      ...new Set(
+        ownedHexes.flatMap((h) =>
+          neighbors(hexOf(map, h))
+            .filter((n) => inBounds(n, map.width, map.height))
+            .map((n) => hexId(n, map.width)),
+        ),
+      ),
+    ].sort((a, b) => a - b);
+  }
   const busy = new Set(view.units.map((u) => u.hex));
   const cities = new Set(view.cities.map((c) => c.hex));
-  view.hexes.owner.forEach((o, h) => {
-    if (o >= 0 || map.terrain[h] === TERRAIN.water || busy.has(h) || cities.has(h)) return;
-    const near = neighbors(hexOf(map, h)).some(
-      (n) =>
-        inBounds(n, map.width, map.height) &&
-        view.hexes.owner[hexId(n, map.width)] === view.playerId,
-    );
-    if (near) out.push(h);
-  });
+  const out: HexId[] = [];
+  for (const h of candidates) {
+    if ((owner[h] ?? -1) >= 0) continue;
+    if (map.terrain[h] === TERRAIN.water) continue;
+    if (busy.has(h) || cities.has(h)) continue;
+    out.push(h);
+  }
   return out;
 }
 
@@ -174,7 +222,12 @@ function emptyNeutral(map: MapStatic, view: PlayerView): HexId[] {
 // отряду), иначе пустой ничий гекс у своей границы, ближайший к столице, затем к отряду: земля
 // растёт кольцом у ядра, а не коридором за отрядом, уходящим из снабжения. Цели, куда уже идут
 // свои отряды, не повторяются.
-function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] {
+function expand(
+  map: MapStatic,
+  view: PlayerView,
+  units: UnitView[],
+  context: CommanderContext,
+): Command[] {
   const claimed = new Set(
     view.units
       .filter((u) => u.owner === view.playerId && u.path.length > 0)
@@ -183,7 +236,7 @@ function expand(map: MapStatic, view: PlayerView, units: UnitView[]): Command[] 
   const capital = view.cities.find((c) => c.owner === view.playerId && c.isCapital)?.hex;
   const core = (h: HexId): number =>
     capital === undefined ? 0 : distance(hexOf(map, capital), hexOf(map, h));
-  const empty = emptyNeutral(map, view);
+  const empty = context.emptyNeutral;
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   const out: Command[] = [];
   for (const u of units.filter(idle)) {
@@ -224,16 +277,18 @@ export function decide(
   view: PlayerView,
   armyId: number,
   lineDepth?: number,
+  context?: CommanderContext,
 ): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
-  const out = [...reinforce(view, armyId), ...seedExpansion(map, view, armyId)];
+  const commanderContext = context ?? createCommanderContext(map, view);
+  const out = [...reinforce(view, armyId), ...seedExpansion(view, armyId, commanderContext)];
   const units = armyUnits(view, armyId);
   const expansion =
-    lineDepth !== undefined && emptyNeutral(map, view).length > 0 && view.armies.length > 1
+    lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1
       ? (view.armies.at(-1)?.id ?? null)
       : null;
-  const piece = piecesOf(map, view, expansion).get(armyId);
+  const piece = piecesOf(map, view, expansion, commanderContext).get(armyId);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {
     if (plan?.kind !== 'front' || !plan.edges.some((e) => piece.edges.includes(e))) {
@@ -250,6 +305,22 @@ export function decide(
     return out;
   }
   if (plan) out.push({ t: 'clearPlan', armyId });
-  out.push(...expand(map, view, units));
+  out.push(...expand(map, view, units, commanderContext));
   return out;
+}
+
+/**
+ * Строит контекст решений commander для одного снимка игрока.
+ * @returns пустые нейтральные гексы, доступные для экспансии
+ */
+export function createCommanderContext(
+  map: MapStatic,
+  view: PlayerView,
+  ownedHexes?: readonly HexId[],
+): CommanderContext {
+  return {
+    emptyNeutral: emptyNeutral(map, view, ownedHexes),
+    enemyPieces: enemyPieces({ map, hexes: view.hexes }, view.playerId, ownedHexes),
+    assigned: new Map(),
+  };
 }

@@ -6,7 +6,13 @@ import type { FromWorker, ToWorker } from './messages.ts';
 export interface LocalMatch {
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  setPaused(on: boolean): void;
+  step(): void;
+  setSpeed(value: number): void;
+  setObserver(playerId: number | null): void;
+  setView(playerId: number | null, fog: boolean): void;
   select(hex: number | null): void;
+  ack(seq: number): void;
   dispose(): void;
 }
 
@@ -33,7 +39,13 @@ export function startLocalMatch(
   return {
     send: (cmd) => post({ t: 'command', cmd }),
     setFog: (on) => post({ t: 'fog', on }),
+    setPaused: (on) => post({ t: 'pause', on }),
+    step: () => post({ t: 'step' }),
+    setSpeed: (value) => post({ t: 'speed', value }),
+    setObserver: (playerId) => post({ t: 'observer', playerId }),
+    setView: (playerId, fog) => post({ t: 'view', playerId, fog }),
     select: (hex) => post({ t: 'select', hex }),
+    ack: (seq) => post({ t: 'ack', seq }),
     dispose: () => worker.terminate(),
   };
 }

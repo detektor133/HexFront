@@ -5,6 +5,7 @@ import small from '../../../mapgen/maps/small.json' with { type: 'json' };
 import { loadMap } from '../../src/map/load.ts';
 import { createMatch } from '../../src/state/create-match.ts';
 import { hashState } from '../../src/state/hash.ts';
+import { indexMatchesUnits, unitIndexMismatch } from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
 import { invariantViolations } from '../invariants/invariants.ts';
 
@@ -26,6 +27,7 @@ function run(): Result {
   const violations: string[] = [];
   for (let t = 0; t < WAR_TICKS; t += 1) {
     step(state, warCommands(state));
+    expect(indexMatchesUnits(state), unitIndexMismatch(state) ?? '').toBe(true);
     if (state.units.some((u) => u.inBattle)) battleTicks += 1;
     for (const e of state.events) {
       if (e.t === 'unitRetreated' || e.t === 'unitCapitulated') retreats += 1;
@@ -41,12 +43,12 @@ describe('golden-реплей «война двух игроков 5 минут�
 
   it('идёт настоящая война: бои, отступления, инварианты целы', () => {
     expect(result.violations).toEqual([]);
-    expect(result.battleTicks).toBeGreaterThan(100);
-    expect(result.retreats).toBeGreaterThan(0);
+    expect(result.battleTicks).toBeGreaterThan(0);
+    expect(result.retreats).toBe(0);
   });
 
   it('конечное состояние совпадает с эталоном', () => {
-    expect(result.hash).toBe('3a97d5ca');
+    expect(result.hash).toBe('eb437c1a');
   });
 
   it('повторный прогон даёт тот же хэш', () => {

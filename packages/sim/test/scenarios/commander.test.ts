@@ -2,9 +2,10 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { COMMANDER_TICKS } from '../../src/balance.ts';
-import { decide } from '../../src/bots/commander.ts';
+import { createCommanderContext, decide } from '../../src/bots/commander.ts';
 import { commanderCommands } from '../../src/bots/run.ts';
-import { distance, hexFromId } from '../../src/math/hex.ts';
+import { TERRAIN } from '../../src/map/types.ts';
+import { distance, hexFromId, hexId, inBounds, neighbors } from '../../src/math/hex.ts';
 import { playerView } from '../../src/queries/player-view.ts';
 import { edgeHex, edgeOther } from '../../src/state/edges.ts';
 import {
@@ -29,6 +30,30 @@ const legend = {
 };
 
 type S = ReturnType<typeof scenario>;
+
+function oldEmptyNeutral(s: S, playerId: number): number[] {
+  const view = playerView(s.state, playerId);
+  const busy = new Set(view.units.map((unit) => unit.hex));
+  const cities = new Set(view.cities.map((city) => city.hex));
+  const out: number[] = [];
+  view.hexes.owner.forEach((owner, hex) => {
+    if (
+      owner >= 0 ||
+      s.state.map.terrain[hex] === TERRAIN.water ||
+      busy.has(hex) ||
+      cities.has(hex)
+    ) {
+      return;
+    }
+    const near = neighbors(hexFromId(hex, s.state.map.width)).some(
+      (neighbor) =>
+        inBounds(neighbor, s.state.map.width, s.state.map.height) &&
+        view.hexes.owner[hexId(neighbor, s.state.map.width)] === playerId,
+    );
+    if (near) out.push(hex);
+  });
+  return out;
+}
 
 // Армия игрока A с отрядами в гексе where (передача — как от commander, auto не выключает).
 function autoArmy(s: S, n: number, where: At = at(1, 2), soldiers = 300): number {
@@ -251,5 +276,30 @@ describe('commander: детерминизм (04/T21, CR-006)', () => {
       }),
       { numRuns: 20, seed: 6 },
     );
+  });
+
+  it('контекст пустой ничьей земли не меняет команды для нескольких армий', () => {
+    const s = scenario(OPEN, { legend });
+    const first = autoArmy(s, 2);
+    const second = autoArmy(s, 1, at(1, 1));
+    const view = playerView(s.state, 0);
+    const context = createCommanderContext(s.state.map, view);
+
+    expect(decide(s.state.map, view, first, undefined, context)).toEqual(
+      decide(s.state.map, view, first),
+    );
+    expect(decide(s.state.map, view, second, undefined, context)).toEqual(
+      decide(s.state.map, view, second),
+    );
+  });
+
+  it('пустая ничья совпадает со старым обходом на нескольких снимках', () => {
+    const s = scenario(OPEN, { legend });
+    autoArmy(s, 2);
+    for (let tick = 0; tick < 4; tick += 1) {
+      const view = playerView(s.state, 0);
+      expect(createCommanderContext(s.state.map, view).emptyNeutral).toEqual(oldEmptyNeutral(s, 0));
+      s.runTicks(1);
+    }
   });
 });

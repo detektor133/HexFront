@@ -10,6 +10,7 @@ import { supplyCombatMult } from './combat.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState, Unit } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 // Самый крупный отряд, при равенстве — с меньшим id (отряды отсортированы по id).
 function largest(units: readonly Unit[]): Unit | undefined {
@@ -33,7 +34,7 @@ function bordersOwner(state: MatchState, hex: HexId, owner: number): boolean {
 export function fireTargetOf(state: MatchState, art: Unit): Unit | undefined {
   const { width } = state.map;
   const at = hexFromId(art.hex, width);
-  const inRange = state.units.filter(
+  const inRange = allUnits(state).filter(
     (u) => u.owner !== art.owner && distance(at, hexFromId(u.hex, width)) <= ARTY_RANGE,
   );
   const focused = inRange.find((u) => u.id === art.focus);

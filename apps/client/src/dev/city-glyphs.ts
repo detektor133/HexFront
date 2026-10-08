@@ -22,6 +22,15 @@ export interface CityLabel {
   readonly isCapital: boolean;
 }
 
+/** Ключ полей, при изменении которых подпись города нужно пересоздать. */
+export function cityLabelsKey(
+  cities: readonly Pick<CityLabel, 'name' | 'level' | 'isCapital'>[],
+  scale: number,
+  detail: 1 | 2 | 3,
+): string {
+  return `${scale}|${detail}|${cities.map((c) => `${c.name}:${c.level}:${c.isCapital}`).join(',')}`;
+}
+
 /** Видимость подписи города на стратегическом уровне детализации. */
 export function cityLabelVisible(level: number, isCapital: boolean, detail: 1 | 2 | 3): boolean {
   return detail !== 1 || isCapital || level >= 2;

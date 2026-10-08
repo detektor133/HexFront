@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { easeMap, tweenRuns } from '../src/dev/front-tween.ts';
+import { createFrontTweens, easeMap, tweenRuns } from '../src/dev/front-tween.ts';
 
 // 04/T13: линия фронта переходит в новое положение плавно, за 250 мс (style-guide, «Движение»).
 
@@ -50,5 +50,17 @@ describe('плавный переход линии фронта (04/T13)', () =>
     const from = [line(0, 0, 50)];
     const to = [line(10, 0, 40), line(10, 60, 100)];
     expect(tweenRuns(from, to, 0.3)).toEqual(to);
+  });
+
+  it('удаляет армии без фронта и сообщает размер кэша', () => {
+    const tweens = createFrontTweens(false);
+    const target = [line(0, 0, 100)];
+
+    tweens.runs(1, 'front-1', target, 0);
+    tweens.runs(2, 'front-2', target, 0);
+    expect(tweens.cacheTelemetry()).toEqual({ byArmy: 2 });
+
+    tweens.keep(new Set([1]));
+    expect(tweens.cacheTelemetry()).toEqual({ byArmy: 1 });
   });
 });

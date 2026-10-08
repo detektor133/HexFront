@@ -8,6 +8,7 @@ import {
 } from '../balance.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState, Unit } from '../state/types.ts';
+import { removeUnits } from '../state/unit-index.ts';
 
 const GRACE_TICKS = intDiv(ATTRITION_GRACE_S * TICKS_PER_S, FP);
 
@@ -27,16 +28,16 @@ export function attritionPerSecond(supplyLevel: Fp): Fp {
 
 /** Снимает потери истощения за тик; отряд без солдат уничтожается. */
 export function attritionSystem(state: MatchState): void {
-  const survivors: Unit[] = [];
+  const removed: Unit[] = [];
   for (const u of state.units) {
     if (isStarving(u)) {
       const lost = intDiv(fpMul(u.soldiers, attritionPerSecond(u.supplyLevel)), TICKS_PER_S);
       u.soldiers = (u.soldiers - lost) as Fp;
     }
-    if (u.soldiers >= FP) survivors.push(u);
-    else state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
+    if (u.soldiers < FP) {
+      removed.push(u);
+      state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
+    }
   }
-  if (survivors.length !== state.units.length) {
-    state.units.splice(0, state.units.length, ...survivors);
-  }
+  removeUnits(state, removed);
 }

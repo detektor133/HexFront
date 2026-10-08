@@ -1,4 +1,5 @@
 // Сообщения между страницей и Web Worker локального режима (overview.md, «Локальный режим»).
+import type { DeltaMessage, SnapshotMessage } from '@hexfront/protocol';
 import type {
   Command,
   ConstructionCheck,
@@ -10,6 +11,8 @@ import type {
   UnitType,
   GameEvent,
 } from '@hexfront/sim';
+
+import type { WorkerTelemetry } from '../dev/telemetry.ts';
 
 /** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
 export interface RecruitAmount {
@@ -51,14 +54,40 @@ export type ToWorker =
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }
-  | { readonly t: 'select'; readonly hex: number | null };
+  | { readonly t: 'pause'; readonly on: boolean }
+  | { readonly t: 'step' }
+  | { readonly t: 'speed'; readonly value: number }
+  | { readonly t: 'observer'; readonly playerId: number | null }
+  | { readonly t: 'view'; readonly playerId: number | null; readonly fog: boolean }
+  | { readonly t: 'select'; readonly hex: number | null }
+  | { readonly t: 'ack'; readonly seq: number };
+
+export interface ViewPayload {
+  readonly t: 'view';
+  readonly seq: number;
+  readonly view: PlayerView;
+  readonly kind: 'snapshot';
+  readonly snapshot: SnapshotMessage;
+  readonly selection: Selection | null;
+  readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+  readonly events: readonly GameEvent[];
+  readonly telemetry?: WorkerTelemetry;
+}
+
+interface DeltaViewPayloadBase {
+  readonly t: 'view';
+  readonly seq: number;
+  /** В дельта-сообщении поле отсутствует в wire-данных; используется для совместимости типов движка. */
+  readonly view: PlayerView;
+  readonly selection: Selection | null;
+  readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
+  readonly events: readonly GameEvent[];
+  readonly telemetry?: WorkerTelemetry;
+}
+
+export type DeltaViewPayload =
+  | (DeltaViewPayloadBase & { readonly kind: 'snapshot'; readonly snapshot: SnapshotMessage })
+  | (DeltaViewPayloadBase & { readonly kind: 'delta'; readonly delta: DeltaMessage });
 
 export type FromWorker =
-  | {
-      readonly t: 'view';
-      readonly view: PlayerView;
-      readonly selection: Selection | null;
-      readonly rejected: readonly { readonly command: string; readonly reason: RejectReason }[];
-      readonly events: readonly GameEvent[];
-    }
-  | { readonly t: 'error'; readonly errors: readonly string[] };
+  ViewPayload | DeltaViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };

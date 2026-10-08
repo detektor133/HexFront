@@ -16,6 +16,7 @@ export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
+  readonly style?: React.CSSProperties;
 }): React.JSX.Element | null {
   const [, redraw] = useState(0);
   useEffect(() => {
@@ -25,7 +26,7 @@ export function EventFeed(props: {
   const items = visibleEvents(props.items, props.now);
   if (items.length === 0) return null;
   return (
-    <div className={styles.feed} aria-label={t('event.feed')}>
+    <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
       {items.map((item) => (
         <button
           className={`${styles.item} ${item.important ? styles.important : ''}`}

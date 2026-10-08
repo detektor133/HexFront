@@ -29,6 +29,12 @@ import {
   type MatchState,
   type Player,
 } from '../../src/state/types.ts';
+import {
+  addUnit,
+  indexMatchesUnits,
+  removeUnits,
+  unitIndexMismatch,
+} from '../../src/state/unit-index.ts';
 import { step } from '../../src/step.ts';
 
 /** Клетка сетки: столбец и строка. */
@@ -297,6 +303,7 @@ function emptyState(map: MapStatic, players: readonly string[]): MatchState {
     plans: [],
     networks: [],
     supplyRatios: new Map(),
+    supplyRevision: 0,
     nextId: 1,
     events: [],
     winner: -1,
@@ -349,6 +356,7 @@ export interface Scenario {
   armiesOf(player: string): Army[];
   /** Отряд по id или undefined. */
   unitById(id: number): Unit | undefined;
+  removeUnits(ids: readonly number[]): void;
 }
 
 /**
@@ -508,7 +516,7 @@ function makeScenario(
     unit(player, type, soldiers, where) {
       const id = state.nextId;
       state.nextId += 1;
-      state.units.push({
+      const unit: Unit = {
         id,
         owner: idOf(player),
         type,
@@ -528,7 +536,8 @@ function makeScenario(
         focus: -1,
         fireTarget: -1,
         slot: -1,
-      });
+      };
+      addUnit(state, unit);
       return id;
     },
     cmd(player, command, source) {
@@ -549,6 +558,9 @@ function makeScenario(
     runTicks(ticks) {
       for (let i = 0; i < ticks; i += 1) {
         step(state, queue.splice(0));
+        if (!indexMatchesUnits(state)) {
+          throw new Error(`сценарий: ${unitIndexMismatch(state) ?? 'индекс рассинхронизирован'}`);
+        }
         log.push(...state.events);
       }
     },
@@ -608,6 +620,12 @@ function makeScenario(
     },
     unitById(id) {
       return state.units.find((a) => a.id === id);
+    },
+    removeUnits(ids) {
+      removeUnits(
+        state,
+        state.units.filter((unit) => ids.includes(unit.id)),
+      );
     },
   };
 }

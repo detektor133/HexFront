@@ -2,6 +2,7 @@
 // через setHexOwner, чтобы фронты рядом переносились сразу (04/T13), а потерянные гексы у фронта
 // запоминались для commander (CR-006).
 // GDD: docs/gdd/07-controls.md — «Линия фронта», «Автокомандование».
+import { markNetworkDirty } from './derived-cache.ts';
 import { edgeHex } from './edges.ts';
 import { followFrontsNear } from './front.ts';
 import type { MatchState } from './types.ts';
@@ -41,6 +42,9 @@ export function setHexOwner(state: MatchState, hex: HexId, owner: number): void 
   if (was === owner) return;
   if (was >= 0) markLost(state, hex, was);
   state.hexes.owner[hex] = owner;
+  state.supplyRevision += 1;
+  markNetworkDirty(state, was);
+  markNetworkDirty(state, owner);
   followFrontsNear(state, hex);
   pruneLost(state);
 }

@@ -21,6 +21,7 @@ import { borderEdges, borderSegmentEdges, edgeOther } from '../src/state/edges.t
 import { setHexOwner } from '../src/state/hex-owner.ts';
 import { recomputeAllNetworks } from '../src/state/network.ts';
 import type { MatchState, Unit } from '../src/state/types.ts';
+import { addUnit } from '../src/state/unit-index.ts';
 
 export const WIDTH = 80;
 export const HEIGHT = 50;
@@ -122,7 +123,7 @@ function unit(
     slot: -1,
   };
   state.nextId += 1;
-  state.units.push(u);
+  addUnit(state, u);
   return u;
 }
 

@@ -71,6 +71,13 @@ describe('подписи и причины отказа (04/T16, art/ui.md)', ()
       expect(Object.keys(messages.ru)).not.toContain(k);
     }
   });
+
+  it('не показывает глобальный лимит, но сохраняет ограничение гекса', () => {
+    for (const dict of Object.values(messages)) {
+      expect(Object.keys(dict)).not.toContain('reason.unitLimit');
+      expect(dict['reason.hexFull']).toBeDefined();
+    }
+  });
 });
 
 describe('плашка прогноза без слов (04/T16, art/units.md)', () => {

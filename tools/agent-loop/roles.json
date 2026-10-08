@@ -1,0 +1,6 @@
+{
+  "planner": { "model": "gpt-6-astra", "reasoningEffort": "high", "skill": "plan" },
+  "tester": { "model": "gpt-6.1-sol", "reasoningEffort": "medium", "skill": "tests" },
+  "coder": { "model": "gpt-6.1-sol", "reasoningEffort": "medium", "skill": "code" },
+  "reviewer": { "model": "gpt-6-astra", "reasoningEffort": "high", "skill": "review" }
+}

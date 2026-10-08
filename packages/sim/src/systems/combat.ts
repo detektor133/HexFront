@@ -19,6 +19,7 @@ import {
 import { captureHex } from '../state/capture.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
 import type { City, MatchState, Unit } from '../state/types.ts';
+import { allUnits, moveUnit, removeUnits } from '../state/unit-index.ts';
 
 export { flankMultiplier, supplyCombatMult } from '../queries/battle-math.ts';
 
@@ -28,7 +29,7 @@ function direction(state: MatchState, from: HexId, to: HexId): number {
 
 // Отряд, выбитый обстрелом в этом же тике (солдат 0), в бою уже не участвует.
 function attackersOf(state: MatchState, hex: HexId): Unit[] {
-  return state.units.filter(
+  return allUnits(state).filter(
     (u) =>
       u.order === 'attack' &&
       u.target === hex &&
@@ -65,7 +66,7 @@ function battleAt(state: MatchState, hex: HexId): Battle | null {
   const attackers = attackersOf(state, hex);
   const first = attackers[0];
   if (!first) return null;
-  const defenders = state.units.filter(
+  const defenders = allUnits(state).filter(
     (u) => u.hex === hex && u.owner !== first.owner && u.soldiers > 0,
   );
   const city = activeCity(state, hex, first.owner);
@@ -148,23 +149,26 @@ function resolveUnits(state: MatchState, battles: readonly Battle[]): void {
         b.attackers.map((a) => a.hex),
       );
   }
-  const survivors: Unit[] = [];
+  const removed: Unit[] = [];
   for (const u of state.units) {
     if (u.soldiers <= 0) {
+      removed.push(u);
       state.events.push({ t: 'unitDestroyed', playerId: u.owner, unitId: u.id, hex: u.hex });
       continue;
     }
     const hexes = attackerHexes.get(u);
-    if (hexes && u.org <= 0 && u.order !== 'retreat' && !retreatOrCapitulate(state, u, hexes)) {
-      continue;
+    if (hexes && u.org <= 0 && u.order !== 'retreat') {
+      if (!retreatOrCapitulate(state, u, hexes)) {
+        removed.push(u);
+        continue;
+      }
     }
     if (u.order === 'attack' && u.org <= 0) {
       u.order = 'idle';
       u.target = -1;
     }
-    survivors.push(u);
   }
-  state.units.splice(0, state.units.length, ...survivors);
+  removeUnits(state, removed);
 }
 
 // Гекс без защитников: сильнейший атакующий сразу входит и захватывает его, остальные встают.
@@ -178,7 +182,7 @@ function occupy(state: MatchState, hex: HexId): void {
   const power = (u: Unit): number => attackContribution(state.map, u, hex, state.units);
   for (const u of attackers) if (power(u) > power(winner)) winner = u;
   const city = state.cities.find((c) => c.hex === hex && c.owner !== winner.owner);
-  winner.hex = hex;
+  moveUnit(state, winner, hex);
   captureHex(state, hex, winner.owner);
   if (city) state.events.push({ t: 'cityCaptured', playerId: winner.owner, cityId: city.id });
   for (const u of attackersOf(state, hex).concat(winner)) {
@@ -193,13 +197,12 @@ function fleeLoneArtillery(state: MatchState, hex: HexId): void {
   const attackers = attackersOf(state, hex);
   const first = attackers[0];
   if (!first || activeCity(state, hex, first.owner)) return;
-  const defenders = state.units.filter((u) => u.hex === hex && u.owner !== first.owner);
+  const defenders = allUnits(state).filter((u) => u.hex === hex && u.owner !== first.owner);
   if (defenders.length === 0 || defenders.some((u) => u.type !== 'artillery')) return;
   const hexes = attackers.map((a) => a.hex);
   const lost = defenders.filter((u) => !retreatOrCapitulate(state, u, hexes, ARTY_FLEE_LOSS));
   if (lost.length === 0) return;
-  const rest = state.units.filter((u) => !lost.includes(u));
-  state.units.splice(0, state.units.length, ...rest);
+  removeUnits(state, lost);
 }
 
 /**
@@ -209,7 +212,11 @@ function fleeLoneArtillery(state: MatchState, hex: HexId): void {
 export function combatSystem(state: MatchState): void {
   for (const c of state.cities) c.inBattle = false;
   const targets = [
-    ...new Set(state.units.filter((u) => u.order === 'attack').map((u) => u.target)),
+    ...new Set(
+      allUnits(state)
+        .filter((u) => u.order === 'attack')
+        .map((u) => u.target),
+    ),
   ];
   targets.sort((a, b) => a - b);
   for (const hex of targets) fleeLoneArtillery(state, hex);

@@ -7,13 +7,14 @@ Dev-зависимости корня монорепо (в `sim` runtime-зав�
 
 | Пакет | Зачем |
 | --- | --- |
+| Node 24 LTS | Среда выполнения сервера, инструментов и CI; версия берётся из `.nvmrc` |
 | `typescript` 5.x | Язык (ADR-0001) |
 | `eslint`, `@eslint/js`, `typescript-eslint`, `globals` | Линтер и правила детерминизма `sim` (AGENTS.md §3) |
 | `eslint-plugin-import-x` | Автоматический порядок импортов (CONVENTIONS.md §4) |
 | `prettier` | Форматирование (CONVENTIONS.md §4) |
 | `dependency-cruiser` | Границы пакетов (`overview.md`) |
 | `vitest`, `@vitest/coverage-v8`, `fast-check` | Тесты и покрытие `sim` ≥ 90 % (`testing.md`) |
-| `@types/node` 22 | Типы Node для сервера и инструментов |
+| `@types/node` 24 | Типы Node для сервера и инструментов |
 
 Клиент (`apps/client`), этап 01/T7:
 
