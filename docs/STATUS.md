@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1d |
+| Текущая задача | 06/T1e1 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-08 |
 
-Очередь: 06/T1d → 06/T1e → 06/T2
+Очередь: 06/T1e1 → 06/T1e2 → 06/T1e3 → 06/T1e4 → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`. Константы `BOT_*` новой системы добавляет 06/T1a одним коммитом в `10-balance.md` и `balance.ts`.
 
@@ -33,6 +33,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Отчёт:** `docs/reports/stage-06-t1d.md`.
 - **Следующая задача:** 06/T1e — два детерминированных прогона, бюджет полного тика и удаление старого `economy.ts`.
 - **Читать:** `docs/gdd/09-bots.md`, `docs/architecture/sim-core.md`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `docs/stages/stage-06-bots-balance.md`.
+
+- **06/T1e разбита:** T1e1 проверяет детерминизм, T1e2 — бюджет полного тика, T1e3 — удаление старой цепочки экономики, T1e4 — сквозная проверка родителя и `$accept 06/T1`.
+- **Следующая задача:** 06/T1e1.
+- **Читать:** `packages/sim/test`, `packages/sim/src/bots`, `tools/bench`, `docs/stages/stage-06-bots-balance.md`.
 
 - **06/T1b завершена:** добавлен `bots/snapshot.ts`; снимок использует индекс `гекс → отряды`, базы дохода контекста и пограничные гексы, без `playerView` и полного обхода карты.
 - **Проверки:** `bot-snapshot.test.ts` — 3/3, включая 30 игроков на тиках 600 и 3000; `bot-context.test.ts` — 2/2; `pnpm --filter @hexfront/sim typecheck` — OK; полный `pnpm verify` — `verify: OK (292 с)`.
