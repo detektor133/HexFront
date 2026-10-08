@@ -14,6 +14,7 @@ export type RunCommand = (
   options?: {
     readonly cwd?: string;
     readonly env?: NodeJS.ProcessEnv;
+    readonly input?: string;
     readonly timeoutMs?: number;
   },
 ) => Promise<CommandResult>;
@@ -61,6 +62,12 @@ type TaskSelection = {
 
 const ROLE_NAMES: readonly Role[] = ['planner', 'tester', 'coder', 'reviewer'];
 
+export const quoteWindowsArgument = (argument: string): string =>
+  `"${argument.replaceAll('"', '\\"')}"`;
+
+export const prepareProcessArguments = (args: readonly string[]): readonly string[] =>
+  process.platform === 'win32' ? args.map(quoteWindowsArgument) : args;
+
 const runProcess: RunCommand = (command, args, options = {}) =>
   new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -68,6 +75,7 @@ const runProcess: RunCommand = (command, args, options = {}) =>
       env: options.env,
       shell: process.platform === 'win32',
     });
+    if (options.input !== undefined) child.stdin.end(options.input);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {
@@ -216,23 +224,24 @@ async function runAgent(
   const prompt = `Роль: ${role}. Скилл: $${roleConfig.skill}. Задача: ${task}${feedback ? `\nОбратная связь:\n${feedback}` : ''}`;
   const result = await config.runCommand(
     'codex',
-    [
+    prepareProcessArguments([
       'exec',
       '--dangerously-bypass-approvals-and-sandbox',
       '--model',
       roleConfig.model,
       '-c',
-      `model_reasoning_effort="${roleConfig.reasoningEffort}"`,
+      `model_reasoning_effort=${roleConfig.reasoningEffort}`,
       '--output-last-message',
       outputFile,
       '--json',
       '--cd',
       config.root,
-      prompt,
-    ],
+      '-',
+    ]),
     {
       cwd: config.root,
       env: { ...process.env, AGENT_ROLE: role },
+      input: prompt,
       timeoutMs: config.maxMinutes * 60_000,
     },
   );
@@ -254,10 +263,15 @@ async function stop(
   step: string,
   reason: string,
   answer: string,
+  stderr = '',
 ): Promise<number> {
-  const detail = `Стоп: шаг ${step}; причина: ${reason}; последние строки:\n${lastLines(answer)}`;
+  const detail =
+    `Стоп: шаг ${step}; причина: ${reason}; последние строки ответа:\n${lastLines(answer)}` +
+    `\nПоследние строки stderr:\n${lastLines(stderr)}`;
   if (selected.issue) await config.github.comment(selected.issue.number, detail);
-  await log(`- стоп: шаг ${step}; причина: ${reason}; ответ: ${lastLines(answer)}`);
+  await log(
+    `- стоп: шаг ${step}; причина: ${reason}; ответ: ${lastLines(answer)}; stderr: ${lastLines(stderr)}`,
+  );
   config.writeLine(`стоп: ${step} — ${reason}`);
   return 1;
 }
@@ -289,6 +303,7 @@ async function callRole(
         role,
         `codex завершился с кодом ${agent.result.code}`,
         agent.message,
+        agent.result.stderr,
       ),
     };
   if (!(await checkPermissions(config, base, role, definitions))) {

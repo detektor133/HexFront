@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   runAgentLoop,
+  defaultRunCommand,
+  prepareProcessArguments,
   selectIssueOrQueue,
   type AgentConfig,
   type CommandResult,
@@ -31,6 +33,8 @@ interface Scenario {
   readonly queue?: string;
   readonly plannedIssue?: number;
   readonly maxTasks?: number;
+  readonly codexCode?: number;
+  readonly codexStderr?: string;
 }
 
 async function runScenario(scenario: Scenario): Promise<{
@@ -39,17 +43,25 @@ async function runScenario(scenario: Scenario): Promise<{
   readonly comments: string[];
   readonly resets: number;
   readonly tasks: string[];
+  readonly codexInputs: string[];
+  readonly codexArguments: readonly (readonly string[])[];
 }> {
   const outputs = [...scenario.outputs];
   const ci = [...scenario.ci];
   const roles: string[] = [];
   const tasks: string[] = [];
+  const codexInputs: string[] = [];
+  const codexArguments: string[][] = [];
   const comments: string[] = [];
   let resets = 0;
   let listCalls = 0;
   let dirtyRole = '';
   let head = 'base';
-  const runCommand = async (command: string, args: readonly string[]): Promise<CommandResult> => {
+  const runCommand = async (
+    command: string,
+    args: readonly string[],
+    options?: { readonly input?: string },
+  ): Promise<CommandResult> => {
     if (command === 'git' && args[0] === 'branch')
       return { code: 0, stdout: 'stage-05', stderr: '' };
     if (command === 'git' && args[0] === 'rev-parse') return { code: 0, stdout: head, stderr: '' };
@@ -80,7 +92,9 @@ async function runScenario(scenario: Scenario): Promise<{
     if (command === 'git' && args[0] === 'push') return { code: 0, stdout: '', stderr: '' };
     if (command === 'pnpm') return { code: ci.shift() ?? 0, stdout: 'ci', stderr: '' };
     if (command === 'codex') {
-      const prompt = String(args.at(-1));
+      const prompt = options?.input ?? '';
+      codexInputs.push(prompt);
+      codexArguments.push([...args]);
       const role = prompt.match(/Роль: (\w+)/)?.[1] ?? '';
       roles.push(role);
       tasks.push(prompt.match(/Задача: ([^\n]+)/)?.[1] ?? '');
@@ -92,7 +106,11 @@ async function runScenario(scenario: Scenario): Promise<{
           `${await readFile(`${root}/docs/QUESTIONS.md`, 'utf8')}\nизменение теста`,
           'utf8',
         );
-      return { code: 0, stdout: outputs.shift() ?? 'OK', stderr: '' };
+      return {
+        code: scenario.codexCode ?? 0,
+        stdout: outputs.shift() ?? 'OK',
+        stderr: scenario.codexStderr ?? '',
+      };
     }
     return { code: 0, stdout: '', stderr: '' };
   };
@@ -142,7 +160,15 @@ async function runScenario(scenario: Scenario): Promise<{
         ),
         'utf8',
       );
-    return { code: await runAgentLoop(config), roles, comments, resets, tasks };
+    return {
+      code: await runAgentLoop(config),
+      roles,
+      comments,
+      resets,
+      tasks,
+      codexInputs,
+      codexArguments,
+    };
   } finally {
     if (scenario.changeQuestions) await writeFile(questionsPath, questions, 'utf8');
     if (scenario.queue) await writeFile(statusPath, status, 'utf8');
@@ -167,10 +193,48 @@ describe('выбор задач', () => {
 });
 
 describe('runAgentLoop', () => {
+  it('передаёт спецсимволы stdin подмененному процессу без изменений', async () => {
+    const input = 'строка 1 с пробелами и "кавычками"\n& | < > кириллица';
+    const script = 'process.stdin.pipe(process.stdout)';
+    const result = await defaultRunCommand('node', prepareProcessArguments(['-e', script]), {
+      input,
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(input);
+  });
+
   it('проходит успешную задачу в точной последовательности', async () => {
     const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0], issues: [] });
     expect(result.code).toBe(0);
     expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer']);
+  });
+
+  it('передаёт многострочный промпт через stdin без изменений', async () => {
+    const task = 'строка 1\nстрока 2 с пробелами, "кавычками", & | < > и кириллицей';
+    const result = await runScenario({
+      outputs: ['OK', 'OK', 'OK', 'OK'],
+      ci: [0],
+      issues: [{ ...issue(1), body: task }],
+    });
+    expect(result.codexInputs[0]).toContain(`Задача: Issue #1: задача 1\n${task}`);
+    expect(result.codexArguments[0]?.at(-1)).toBe(process.platform === 'win32' ? '"-"' : '-');
+    expect(result.codexArguments[0]).toContain(
+      process.platform === 'win32'
+        ? '"model_reasoning_effort=high"'
+        : 'model_reasoning_effort=high',
+    );
+  });
+
+  it('добавляет stderr codex в комментарий при ненулевом коде', async () => {
+    const result = await runScenario({
+      outputs: [],
+      ci: [],
+      issues: [issue(1)],
+      codexCode: 7,
+      codexStderr: 'ошибка 1\nошибка 2',
+    });
+    expect(result.code).toBe(1);
+    expect(result.comments[0]).toContain('Последние строки stderr:\nошибка 1\nошибка 2');
   });
 
   it('повторяет tester и coder после ответа ТЕСТ:', async () => {
