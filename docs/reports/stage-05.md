@@ -1,4 +1,29 @@
-# Отчёт этапа 05 — приёмка 05/T14e
+# Отчёт этапа 05 — проверка 05/T4e
+
+## 05/T4e — проверка родителя `tools/balance`
+
+Таблица трассировки T4 в `docs/stages/stage-05-bots-maps-balance.md` не содержит пропусков:
+
+| Строки родителя T4 | Подтверждение | Результат |
+| --- | --- | --- |
+| Headless-прогон N матчей ботов | `tools/balance/src/index.test.ts`: результат каждого worker содержит `runIndex`, `seed`, `ticks`; 2 теста T4a | выполнено |
+| Параллельный запуск через `worker_threads` | `runBalanceMatches` создаёт пул до `min(parallelism, matches)` worker_threads; тест T4a с `parallelism=2` | выполнено |
+| Сгенерированные карты | тесты T4b сравнивают параметры карты для одинакового сида; CLI вернул `proc-29`/`proc-2a`, `80×60` | выполнено |
+| 30 игроков | тест T4b отклоняет другое число игроков; CLI-прогон выполнен с `--players=30` | выполнено |
+| Прогон до правок ботов и баланса | CLI принимает ревизию и сохраняет её в структурированном результате и отчётах; проверено с `--revision=t4e` | выполнено |
+| Длительность матча | `metrics.durationTicks` и колонка `durationTicks` в CSV; тест T4c и CLI | выполнено |
+| Доля нейтральных гексов на 3:00 | `metrics.neutralHexShareAt3Min` содержит `tick=1800`; тест T4c | выполнено |
+| Минута первого боя | `metrics.firstBattleMinute` и колонка CSV; тест T4c | выполнено |
+| Число котлов | `metrics.cauldrons` и колонка CSV; тест T4c | выполнено |
+| Распределение мест по стартовым позициям | `placesByStartPosition` хранит `startPosition` отдельно от `finalPlace`; тест T4c | выполнено |
+| Среднее население по времени | `timeline` хранит `tick` и `populationMean`; тест T4c и CSV | выполнено |
+| Среднее золото по времени | `timeline` хранит `tick` и `goldMean`; тест T4c и CSV | выполнено |
+| Отчёт в Markdown | тест T4d и CLI создали читаемый `balance-report.md` с параметрами и строками матчей | выполнено |
+| Отчёт в CSV | тест T4d и CLI создали одну строку на матч со всеми колонками T4c | выполнено |
+
+Профильная проверка: `pnpm exec vitest run tools/balance/src/index.test.ts` — 1 файл, 6 тестов, `6 passed`.
+
+Повторный CLI-прогон: `pnpm --filter @hexfront/balance run run -- --matches=2 --seeds=41,42 --parallelism=2 --players=30 --ticks=1 --revision=t4e`; оба прогона создали по 2 строки CSV, карты `80×60`, а SHA-256 Markdown и CSV совпали между прогонами. T4 и T4e отмечены `[x]`.
 
 ## 05/T14b — инкрементальные снабжение, сети и изоляция
 
