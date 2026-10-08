@@ -27,6 +27,8 @@
 | --- | --- |
 | `BOT_TAX_PEACE` (FP) | 0,15 |
 | `BOT_TAX_WAR` (FP) | 0,30 |
+| `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
+| `BOT_EASY_TAX` (FP) | 0,20 `[ТЮНИНГ]` |
 | `BOT_GOLD_RESERVE` (FP) | 50 |
 | `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
 | `BOT_ARMY_RATIO` (FP) | 0,8 |
