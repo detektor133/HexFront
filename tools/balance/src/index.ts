@@ -1,8 +1,17 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
 
 export interface BalanceMatchOptions {
   readonly matches: number;
   readonly seeds: readonly number[];
+  readonly parallelism: number;
+  readonly players: number;
+  readonly ticks: number;
+  readonly revision: string;
+}
+
+export interface BalanceReportOptions {
+  readonly matches: number;
   readonly parallelism: number;
   readonly players: number;
   readonly ticks: number;
@@ -55,6 +64,103 @@ interface WorkerMessage extends BalanceMatchResult {
 }
 
 type CliOptions = BalanceMatchOptions;
+
+const CSV_COLUMNS = [
+  'runIndex',
+  'seed',
+  'revision',
+  'players',
+  'mapId',
+  'mapWidth',
+  'mapHeight',
+  'durationTicks',
+  'neutralHexShareAt3MinTick',
+  'neutralHexesAt3Min',
+  'totalHexesAt3Min',
+  'firstBattleMinute',
+  'cauldrons',
+  'populationTimeline',
+  'goldTimeline',
+  'placesByStartPosition',
+] as const;
+
+function csvCell(value: number | string | null): string {
+  const text = value === null ? '' : String(value);
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function jsonCell(value: unknown): string {
+  return csvCell(JSON.stringify(value));
+}
+
+function reportRow(result: BalanceMatchResult): readonly (number | string | null)[] {
+  const neutral = result.metrics.neutralHexShareAt3Min;
+  return [
+    result.runIndex,
+    result.seed,
+    result.revision,
+    result.map.players,
+    result.map.id,
+    result.map.width,
+    result.map.height,
+    result.metrics.durationTicks,
+    neutral?.tick ?? null,
+    neutral?.neutralHexes ?? null,
+    neutral?.totalHexes ?? null,
+    result.metrics.firstBattleMinute,
+    result.metrics.cauldrons,
+    jsonCell(
+      result.metrics.timeline.map(({ tick, populationMean }) => ({ tick, mean: populationMean })),
+    ),
+    jsonCell(result.metrics.timeline.map(({ tick, goldMean }) => ({ tick, mean: goldMean }))),
+    jsonCell(result.metrics.placesByStartPosition),
+  ];
+}
+
+export function formatBalanceCsv(
+  results: readonly BalanceMatchResult[],
+  _options: BalanceReportOptions,
+): string {
+  const rows = results.map((result) => reportRow(result));
+  return [
+    CSV_COLUMNS.join(','),
+    ...rows.map((row) => row.map((value) => csvCell(value)).join(',')),
+    '',
+  ].join('\n');
+}
+
+export function formatBalanceMarkdown(
+  results: readonly BalanceMatchResult[],
+  options: BalanceReportOptions,
+): string {
+  const rows = results.map((result) => {
+    const neutral = result.metrics.neutralHexShareAt3Min;
+    const neutralShare = neutral === null ? '—' : `${neutral.neutralHexes}/${neutral.totalHexes}`;
+    return `| ${result.runIndex} | ${result.seed} | ${result.revision} | ${result.map.id} (${result.map.width}×${result.map.height}) | ${result.metrics.durationTicks} | ${neutralShare} | ${result.metrics.firstBattleMinute ?? '—'} | ${result.metrics.cauldrons} | ${result.metrics.timeline.length} | ${result.metrics.placesByStartPosition.length} |`;
+  });
+  return [
+    '# Отчёт балансировочного прогона',
+    '',
+    `Параметры: матчей — ${options.matches}; параллельность — ${options.parallelism}; игроков — ${options.players}; тиков — ${options.ticks}; ревизия — ${options.revision}.`,
+    '',
+    '| Запуск | Сид | Ревизия | Карта | Длительность, тики | Нейтральные гексы на 3:00 | Первый бой, минута | Котлы | Точек временного ряда | Стартовых позиций |',
+    '| ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: |',
+    ...rows,
+    '',
+  ].join('\n');
+}
+
+export async function writeBalanceReports(
+  results: readonly BalanceMatchResult[],
+  options: BalanceReportOptions,
+  directory: string,
+): Promise<void> {
+  await mkdir(directory, { recursive: true });
+  await Promise.all([
+    writeFile(`${directory}/balance-report.md`, formatBalanceMarkdown(results, options), 'utf8'),
+    writeFile(`${directory}/balance-report.csv`, formatBalanceCsv(results, options), 'utf8'),
+  ]);
+}
 
 function positiveInteger(value: string, name: string): number {
   const parsed = Number(value);
@@ -145,5 +251,12 @@ export async function runBalanceMatches(
 
 if (process.argv[1]?.match(/[\\/]src[\\/]index\.ts$/)) {
   const options = parseOptions(process.argv.slice(2).filter((argument) => argument !== '--'));
-  console.log(JSON.stringify(await runBalanceMatches(options), null, 2));
+  const results = await runBalanceMatches(options);
+  const reportDirectory =
+    process.argv
+      .slice(2)
+      .find((argument) => argument.startsWith('--report-dir='))
+      ?.slice('--report-dir='.length) ?? 'tools/balance/results';
+  await writeBalanceReports(results, options, reportDirectory);
+  console.log(`Отчёты записаны в ${reportDirectory}`);
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseOptions, runBalanceMatches } from './index.ts';
+import {
+  formatBalanceCsv,
+  formatBalanceMarkdown,
+  parseOptions,
+  runBalanceMatches,
+} from './index.ts';
 
 describe('запуск балансировочных матчей', () => {
   it('отклоняет нулевое число матчей и параллельность вне диапазона', () => {
@@ -80,5 +85,50 @@ describe('запуск балансировочных матчей', () => {
     const second = await runBalanceMatches(options);
 
     expect(first[0]?.map).toEqual(second[0]?.map);
+  });
+
+  it('форматирует один матч в CSV со всеми метриками T4c', async () => {
+    const results = await runBalanceMatches({
+      matches: 1,
+      seeds: [41],
+      parallelism: 1,
+      players: 30,
+      ticks: 0,
+      revision: 'test-revision',
+    });
+
+    const csv = formatBalanceCsv(results, {
+      matches: 1,
+      parallelism: 1,
+      players: 30,
+      ticks: 0,
+      revision: 'test-revision',
+    });
+
+    expect(csv.split('\n')).toHaveLength(3);
+    expect(csv).toContain('runIndex,seed,revision,players,mapId,mapWidth,mapHeight');
+    expect(csv).toContain('durationTicks,neutralHexShareAt3MinTick');
+    expect(csv).toContain('populationTimeline,goldTimeline,placesByStartPosition');
+    expect(csv).toContain('0,41,test-revision,30,proc-29,80,60');
+  });
+
+  it('форматирует детерминированный Markdown с параметрами и таблицей матчей', async () => {
+    const options = {
+      matches: 1,
+      seeds: [41],
+      parallelism: 1,
+      players: 30,
+      ticks: 0,
+      revision: 'test-revision',
+    } as const;
+    const results = await runBalanceMatches(options);
+
+    const first = formatBalanceMarkdown(results, options);
+    const second = formatBalanceMarkdown(results, options);
+
+    expect(first).toBe(second);
+    expect(first).toContain('# Отчёт балансировочного прогона');
+    expect(first).toContain('| Запуск | Сид | Ревизия | Карта | Длительность, тики |');
+    expect(first).toContain('| 0 | 41 | test-revision | proc-29 (80×60) | 0 |');
   });
 });
