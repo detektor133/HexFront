@@ -1,10 +1,5 @@
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import {
-  createPlayerViewContext,
-  commanderView,
-  type PlayerView,
-  type PlayerViewContext,
-} from '../queries/player-view.ts';
+import { createPlayerViewContext, type PlayerViewContext } from '../queries/player-view.ts';
 import type { Army, ArmyPlan, City, MatchState, Unit } from '../state/types.ts';
 
 export interface BotTickContext {
@@ -12,12 +7,10 @@ export interface BotTickContext {
   readonly ownedHexes: readonly (readonly HexId[])[];
   readonly borderHexes: readonly (readonly HexId[])[];
   readonly unitsByPlayer: readonly (readonly Unit[])[];
-  readonly unitsByHex: readonly (readonly Unit[])[];
   readonly armiesByPlayer: readonly (readonly Army[])[];
   readonly citiesByPlayer: readonly (readonly City[])[];
   readonly plansByPlayer: readonly (readonly ArmyPlan[])[];
   readonly networks: MatchState['networks'];
-  readonly viewsByPlayer: readonly (PlayerView | undefined)[];
 }
 
 function playerLists<T>(players: number): T[][] {
@@ -45,15 +38,11 @@ function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][]
  */
 export function createBotTickContext(state: MatchState): BotTickContext {
   const unitsByPlayer = playerLists<Unit>(state.players.length);
-  const unitsByHex = playerLists<Unit>(state.map.width * state.map.height);
   const armiesByPlayer = playerLists<Army>(state.players.length);
   const citiesByPlayer = playerLists<City>(state.players.length);
   const plansByPlayer = playerLists<ArmyPlan>(state.players.length);
   const armyOwners = new Map<number, number>();
-  for (const unit of state.units) {
-    unitsByPlayer[unit.owner]?.push(unit);
-    unitsByHex[unit.hex]?.push(unit);
-  }
+  for (const unit of state.units) unitsByPlayer[unit.owner]?.push(unit);
   for (const army of state.armies) {
     armiesByPlayer[army.owner]?.push(army);
     armyOwners.set(army.id, army.owner);
@@ -64,19 +53,14 @@ export function createBotTickContext(state: MatchState): BotTickContext {
     if (owner !== undefined) plansByPlayer[owner]?.push(plan);
   }
   const hexes = mapOwnedHexes(state);
-  const playerViewContext = createPlayerViewContext(state);
   return {
-    playerView: playerViewContext,
+    playerView: createPlayerViewContext(state),
     ownedHexes: hexes.owned,
     borderHexes: hexes.border,
     unitsByPlayer,
-    unitsByHex,
     armiesByPlayer,
     citiesByPlayer,
     plansByPlayer,
     networks: state.networks,
-    viewsByPlayer: state.players.map((player) =>
-      commanderView(state, player.id, playerViewContext),
-    ),
   };
 }

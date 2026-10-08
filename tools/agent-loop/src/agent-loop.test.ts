@@ -1,4 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -13,7 +15,32 @@ import {
   type GithubIssue,
 } from './agent-loop.ts';
 
-const root = process.cwd();
+const fixtureStatus = `# Статус
+
+| Текущий этап | 05 — тестовый этап |
+
+Очередь: 05/T15c → 05/T15d
+`;
+const fixtureStage = `# Этап 05
+
+- [ ] **T15c. Тестовая задача**
+  *Приёмка:* тесты подтверждают, что ход бота не строит playerView.
+- [ ] **T15d. Задача владельца**
+  *Приёмка:* $accept запускает проверку.
+- [ ] **T1a5. Плейтест** — задача владельца
+`;
+const fixtureRoles = JSON.stringify({
+  planner: { model: 'planner', reasoningEffort: 'high', skill: 'plan' },
+  tester: { model: 'tester', reasoningEffort: 'medium', skill: 'tests' },
+  coder: { model: 'coder', reasoningEffort: 'medium', skill: 'code' },
+  reviewer: { model: 'reviewer', reasoningEffort: 'high', skill: 'review' },
+});
+const fixturePermissions = JSON.stringify({
+  planner: ['docs/**', '.ai-logs/**'],
+  tester: ['**/test/**', '**/*.test.ts', '.ai-logs/**'],
+  coder: ['packages/*/src/**', 'tools/*/src/**', '.ai-logs/**'],
+  reviewer: ['docs/**', 'docs/reports/**', '.ai-logs/**'],
+});
 const issue = (number: number, title = `задача ${number}`): GithubIssue => ({
   number,
   title,
@@ -46,6 +73,7 @@ async function runScenario(scenario: Scenario): Promise<{
   readonly codexInputs: string[];
   readonly codexArguments: readonly (readonly string[])[];
 }> {
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'hexfront-agent-loop-test-'));
   const outputs = [...scenario.outputs];
   const ci = [...scenario.ci];
   const roles: string[] = [];
@@ -102,8 +130,8 @@ async function runScenario(scenario: Scenario): Promise<{
       if (role === 'coder' && scenario.coderCommit !== false) head = `commit-${roles.length}`;
       if (scenario.changeQuestions && role === 'planner')
         await writeFile(
-          `${root}/docs/QUESTIONS.md`,
-          `${await readFile(`${root}/docs/QUESTIONS.md`, 'utf8')}\nизменение теста`,
+          `${fixtureRoot}/docs/QUESTIONS.md`,
+          `${await readFile(`${fixtureRoot}/docs/QUESTIONS.md`, 'utf8')}\nизменение теста`,
           'utf8',
         );
       return {
@@ -126,7 +154,7 @@ async function runScenario(scenario: Scenario): Promise<{
     close: async () => undefined,
   };
   const config: AgentConfig = {
-    root,
+    root: fixtureRoot,
     maxTasks: scenario.maxTasks ?? 1,
     maxMinutes: 10,
     dryRun: false,
@@ -138,12 +166,19 @@ async function runScenario(scenario: Scenario): Promise<{
     })(),
     writeLine: () => undefined,
   };
-  const questionsPath = `${root}/docs/QUESTIONS.md`;
-  const questions = await readFile(questionsPath, 'utf8');
-  const statusPath = `${root}/docs/STATUS.md`;
-  const status = await readFile(statusPath, 'utf8');
-  const stagePath = `${root}/docs/stages/stage-05-bots-maps-balance.md`;
-  const stage = await readFile(stagePath, 'utf8');
+  const questionsPath = `${fixtureRoot}/docs/QUESTIONS.md`;
+  const statusPath = `${fixtureRoot}/docs/STATUS.md`;
+  const stagePath = `${fixtureRoot}/docs/stages/stage-05-bots-maps-balance.md`;
+  await mkdir(`${fixtureRoot}/docs/stages`, { recursive: true });
+  await mkdir(`${fixtureRoot}/tools/agent-loop`, { recursive: true });
+  const questions = '# Вопросы\n';
+  await writeFile(questionsPath, questions, 'utf8');
+  await writeFile(statusPath, fixtureStatus, 'utf8');
+  await writeFile(stagePath, fixtureStage, 'utf8');
+  await writeFile(`${fixtureRoot}/tools/agent-loop/roles.json`, fixtureRoles, 'utf8');
+  await writeFile(`${fixtureRoot}/tools/agent-loop/permissions.json`, fixturePermissions, 'utf8');
+  const status = fixtureStatus;
+  const stage = fixtureStage;
   try {
     if (scenario.queue)
       await writeFile(
@@ -173,6 +208,7 @@ async function runScenario(scenario: Scenario): Promise<{
     if (scenario.changeQuestions) await writeFile(questionsPath, questions, 'utf8');
     if (scenario.queue) await writeFile(statusPath, status, 'utf8');
     if (scenario.plannedIssue) await writeFile(stagePath, stage, 'utf8');
+    await rm(fixtureRoot, { recursive: true, force: true });
     void listCalls;
   }
 }

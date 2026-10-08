@@ -7,6 +7,8 @@ import { createBotTickContext, type BotTickContext } from './context.ts';
 import { economyDecide } from './economy.ts';
 import { BOT_LINE_MAX_DEPTH, BOT_THINK_TICKS, COMMANDER_TICKS } from '../balance.ts';
 import type { PlayerCommand } from '../commands/types.ts';
+import type { Fp } from '../math/int.ts';
+import { commanderView, playerView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 
 /**
@@ -20,18 +22,38 @@ export function commanderCommands(
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
   const tickContext = shared ?? createBotTickContext(state);
+  const viewContext = tickContext.playerView;
+  const armiesByOwner = new Map<number, number[]>();
+  for (const army of state.armies) {
+    if (!army.auto) continue;
+    const armies = armiesByOwner.get(army.owner) ?? [];
+    armies.push(army.id);
+    armiesByOwner.set(army.owner, armies);
+  }
   const botIds = new Set(bots);
   const turn = state.tick % COMMANDER_TICKS;
+  const cities = state.cities.map((c) => ({
+    id: c.id,
+    hex: c.hex,
+    owner: c.owner,
+    level: c.level,
+    name: c.name,
+    isCapital: state.players[c.owner]?.capitalCityId === c.id,
+    isolated: false,
+    defenders: c.defenders,
+    defenseOrg: c.defenseOrg,
+    recruitMax: 0 as Fp,
+    canRebuild: false,
+  }));
   for (const p of state.players) {
     if (p.status !== 'alive' || p.id % COMMANDER_TICKS !== turn) continue;
-    const armies = tickContext.armiesByPlayer[p.id]?.filter((army) => army.auto) ?? [];
+    const armies = armiesByOwner.get(p.id) ?? [];
     if (armies.length === 0) continue;
-    const view = tickContext.viewsByPlayer[p.id];
-    if (!view) continue;
+    const view = commanderView(state, p.id, viewContext, cities);
     const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
-    for (const army of armies) {
+    for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
-      for (const cmd of decide(state.map, view, army.id, depth, commanderContext)) {
+      for (const cmd of decide(state.map, view, armyId, depth, commanderContext)) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
     }
@@ -50,13 +72,11 @@ export function botCommands(
   shared?: BotTickContext,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const tickContext = shared ?? createBotTickContext(state);
+  const viewContext = (shared ?? createBotTickContext(state)).playerView;
   const turn = state.tick % BOT_THINK_TICKS;
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id) || p.id % BOT_THINK_TICKS !== turn) continue;
-    const view = tickContext.viewsByPlayer[p.id];
-    if (!view) continue;
-    for (const cmd of economyDecide(state.map, view, tickContext.unitsByHex)) {
+    for (const cmd of economyDecide(state.map, playerView(state, p.id, viewContext))) {
       out.push({ playerId: p.id, cmd });
     }
   }

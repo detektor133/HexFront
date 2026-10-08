@@ -29,7 +29,6 @@ import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import { edgeOther } from '../state/edges.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
-import type { Unit } from '../state/types.ts';
 
 /** Радиус благоустройства вокруг города, гексов: кольца роста города (02-economy.md). */
 const CITY_RING = 2;
@@ -64,39 +63,19 @@ function contacts(map: MapStatic, view: PlayerView): Contact[] {
   return [...byEnemy.values()].sort((a, b) => a.enemy - b.enemy);
 }
 
-const soldiersAt = (
-  view: PlayerView,
-  hexes: Set<HexId>,
-  owner: number,
-  unitsByHex?: readonly (readonly Unit[])[],
-): number => {
-  if (unitsByHex) {
-    let soldiers = 0;
-    for (const hex of hexes) {
-      for (const unit of unitsByHex[hex] ?? []) {
-        if (unit.owner === owner) soldiers += unit.soldiers;
-      }
-    }
-    return soldiers;
-  }
-  return view.units
+const soldiersAt = (view: PlayerView, hexes: Set<HexId>, owner: number): number =>
+  view.units
     .filter((u) => u.owner === owner && hexes.has(u.hex))
     .reduce((sum, u) => sum + u.soldiers, 0);
-};
 
 const enemyCities = (view: PlayerView, owner: number): number =>
   view.cities.filter((c) => c.owner === owner).length;
 
-function weakestNeighbor(
-  view: PlayerView,
-  near: readonly Contact[],
-  unitsByHex?: readonly (readonly Unit[])[],
-): number | null {
+function weakestNeighbor(view: PlayerView, near: readonly Contact[]): number | null {
   return (
     [...near].sort(
       (a, b) =>
-        soldiersAt(view, a.theirs, a.enemy, unitsByHex) -
-          soldiersAt(view, b.theirs, b.enemy, unitsByHex) ||
+        soldiersAt(view, a.theirs, a.enemy) - soldiersAt(view, b.theirs, b.enemy) ||
         enemyCities(view, a.enemy) - enemyCities(view, b.enemy) ||
         a.enemy - b.enemy,
     )[0]?.enemy ?? null
@@ -123,20 +102,15 @@ function roadCommand(view: PlayerView, gold: Fp): Command | null {
 // Набор, если солдат на своих гексах у границы меньше BOT_RECRUIT_RATIO × солдат врага у неё и
 // лимит отрядов не исчерпан: пехота в своём городе с наибольшим набором, где нет очереди, —
 // сколько даёт город и хватает золота (шагом RECRUIT_STEP).
-function recruitCommand(
-  view: PlayerView,
-  near: readonly Contact[],
-  gold: Fp,
-  unitsByHex?: readonly (readonly Unit[])[],
-): Command | null {
+function recruitCommand(view: PlayerView, near: readonly Contact[], gold: Fp): Command | null {
   const strongest = [...near].sort(
     (a, b) =>
-      soldiersAt(view, b.theirs, b.enemy, unitsByHex) -
-        soldiersAt(view, a.theirs, a.enemy, unitsByHex) || a.enemy - b.enemy,
+      soldiersAt(view, b.theirs, b.enemy) - soldiersAt(view, a.theirs, a.enemy) ||
+      a.enemy - b.enemy,
   )[0];
   if (!strongest) return null;
-  const enemy = soldiersAt(view, strongest.theirs, strongest.enemy, unitsByHex);
-  const mine = soldiersAt(view, strongest.mine, view.playerId, unitsByHex);
+  const enemy = soldiersAt(view, strongest.theirs, strongest.enemy);
+  const mine = soldiersAt(view, strongest.mine, view.playerId);
   if (enemy === 0 || mine >= fpMul(enemy as Fp, BOT_ARMY_RATIO)) return null;
   const busy = new Set(view.recruits.map((r) => r.cityId));
   const city = view.cities
@@ -261,24 +235,20 @@ function expansionCommand(map: MapStatic, view: PlayerView): Command | null {
  * Решение экономического мозга бота по снимку игрока (09-bots.md, «Utility AI»).
  * @returns команды: настройки и налог, ▶ армиям, не больше одной траты
  */
-export function economyDecide(
-  map: MapStatic,
-  view: PlayerView,
-  unitsByHex?: readonly (readonly Unit[])[],
-): Command[] {
+export function economyDecide(map: MapStatic, view: PlayerView): Command[] {
   const me = view.players[view.playerId];
   if (!me) return [];
   const near = contacts(map, view);
   const out: Command[] = [];
   if (!view.me.autoReinforce) out.push({ t: 'setAutoReinforce', on: true });
   out.push(...taxCommand(view, near.length > 0));
-  out.push(...startCommands(map, view, weakestNeighbor(view, near, unitsByHex)));
+  out.push(...startCommands(map, view, weakestNeighbor(view, near)));
   const expansion = expansionCommand(map, view);
   if (expansion) out.push(expansion);
   if (view.me.bankrupt) return out;
   const spend =
     roadCommand(view, me.gold) ??
-    recruitCommand(view, near, me.gold, unitsByHex) ??
+    recruitCommand(view, near, me.gold) ??
     foundCommand(map, view, me.gold) ??
     improveCommand(map, view, me.gold) ??
     upgradeCommand(view, me.gold);

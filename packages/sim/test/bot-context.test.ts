@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { at, city, own, scenario } from './scenario/dsl.ts';
+import { city, own, scenario } from './scenario/dsl.ts';
 import { createBotTickContext } from '../src/bots/context.ts';
 import { playerPlace, playerScore } from '../src/queries/score.ts';
 
@@ -30,19 +30,6 @@ describe('контекст тика ботов', () => {
     expect(context.armiesByPlayer[0]).toEqual([]);
     expect(context.plansByPlayer[1]).toEqual([]);
     expect(context.citiesByPlayer[0]?.[0]?.hex).toBe(0);
-    expect(context.unitsByHex).toHaveLength(match.state.map.width * match.state.map.height);
-    expect(context.viewsByPlayer).toHaveLength(match.state.players.length);
-  });
-
-  it('хранит отряды гекса без повторного поиска по общему списку', () => {
-    const match = scenario('A1 a  .  B1 b', { legend });
-    const unitId = match.unit('A', 'infantry', 10, at(1, 0));
-    const unit = match.state.units.find((candidate) => candidate.id === unitId);
-    expect(unit).toBeDefined();
-    const context = createBotTickContext(match.state);
-
-    expect(context.unitsByHex[unit?.hex ?? -1]).toEqual([unit]);
-    expect(context.unitsByPlayer[0]).toEqual([unit]);
   });
 
   it('считает очки и места один раз в общем контексте', () => {
@@ -55,18 +42,5 @@ describe('контекст тика ботов', () => {
     expect([...context.playerView.places]).toEqual(
       match.state.players.map((player) => playerPlace(match.state, player.id)),
     );
-  });
-
-  it('не копирует массивы карты для вида бота', () => {
-    const match = scenario('A1 a  .  B1 b', { legend });
-    const view = match.state.players[0]
-      ? createBotTickContext(match.state).viewsByPlayer[0]
-      : undefined;
-
-    expect(view?.hexes.owner).toBe(match.state.hexes.owner);
-    expect(view?.hexes.pop).toBe(match.state.hexes.pop);
-    expect(view?.hexes.improvement).toBe(match.state.hexes.improvement);
-    expect(view?.hexes.building).toBe(match.state.hexes.building);
-    expect(view?.hexes.road).toBe(match.state.hexes.road);
   });
 });
