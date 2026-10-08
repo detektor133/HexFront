@@ -1,7 +1,7 @@
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import {
   createPlayerViewContext,
-  playerView,
+  commanderView,
   type PlayerView,
   type PlayerViewContext,
 } from '../queries/player-view.ts';
@@ -75,6 +75,8 @@ export function createBotTickContext(state: MatchState): BotTickContext {
     citiesByPlayer,
     plansByPlayer,
     networks: state.networks,
-    viewsByPlayer: state.players.map((player) => playerView(state, player.id, playerViewContext)),
+    viewsByPlayer: state.players.map((player) =>
+      commanderView(state, player.id, playerViewContext),
+    ),
   };
 }

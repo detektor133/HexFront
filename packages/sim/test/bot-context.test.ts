@@ -56,4 +56,17 @@ describe('контекст тика ботов', () => {
       match.state.players.map((player) => playerPlace(match.state, player.id)),
     );
   });
+
+  it('не копирует массивы карты для вида бота', () => {
+    const match = scenario('A1 a  .  B1 b', { legend });
+    const view = match.state.players[0]
+      ? createBotTickContext(match.state).viewsByPlayer[0]
+      : undefined;
+
+    expect(view?.hexes.owner).toBe(match.state.hexes.owner);
+    expect(view?.hexes.pop).toBe(match.state.hexes.pop);
+    expect(view?.hexes.improvement).toBe(match.state.hexes.improvement);
+    expect(view?.hexes.building).toBe(match.state.hexes.building);
+    expect(view?.hexes.road).toBe(match.state.hexes.road);
+  });
 });
