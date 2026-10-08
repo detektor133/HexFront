@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1e3 |
+| Текущая задача | 06/T1e4 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-08 |
 
-Очередь: 06/T1e3 → 06/T1e4 → 06/T2
+Очередь: 06/T1e4 → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`. Константы `BOT_*` новой системы добавляет 06/T1a одним коммитом в `10-balance.md` и `balance.ts`.
 
@@ -27,6 +27,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 Инфраструктура агентного цикла ускорена: planner больше не запускает полный verify, coder ограничен профильными тестами и одним полным verify перед коммитом, reviewer полагается на CI, coder пропускается stop-хуком. Профильный тест stop-хука — 10 тестов, `pnpm ai-check --changed` — OK за 13 с, `pnpm verify` — OK за 382 с.
 
 ## Следующая сессия
+
+- **06/T1e3 завершена:** удалены `packages/sim/src/bots/economy.ts`, экспорт `economyDecide` и актуальная архитектурная ссылка; проверки налогов, дороги, easy и автопополнения перенесены на `brainDecide`.
+- **Проверки:** профильный тест `bot-brain-regressions.test.ts` — 5/5; `pnpm verify --changed` — `verify: OK (117 с)`; полный `pnpm verify` — `verify: OK (286 с)`.
+- **Отчёт:** `docs/reports/stage-06-t1e3.md`.
+- **Следующая задача:** 06/T1e4 — сквозная проверка родителя T1.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1e1.md`, `docs/reports/stage-06-t1e2.md`, `docs/reports/stage-06-t1e3.md`.
 
 - **06/T1e2 завершена:** полный benchmark 30 ботов на 5 минуте показал `4,156 / 3,935 / 3,864 / 3,794 / 5,003 мс` на минутах 1–5 при лимите `15 мс`.
 - **Проверки:** `pnpm --filter @hexfront/bench full-match --players=30 --minutes=5` — `budgetExceeded: false`; `pnpm verify --changed` — `verify: OK (10 с)`; полный `pnpm verify` — `verify: OK (283 с)`.

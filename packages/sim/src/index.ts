@@ -54,5 +54,4 @@ export { botCommands, commanderCommands, type BotLevel } from './bots/run.ts';
 export { createBotTickContext, type BotTickContext } from './bots/context.ts';
 export { brainDecide } from './bots/brain.ts';
 export { createBotSnapshot, type BotContact, type BotSnapshot } from './bots/snapshot.ts';
-export { economyDecide } from './bots/economy.ts';
 export * from './bots/goals.ts';
