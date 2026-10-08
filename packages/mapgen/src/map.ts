@@ -22,7 +22,7 @@ import { generateTerrain, type MapOptions } from './terrain.ts';
 type MapInputOptions = Omit<MapOptions, 'width' | 'height'> &
   Partial<Pick<MapOptions, 'width' | 'height'>>;
 
-const CITY_NAMES: readonly string[] = [
+export const CITY_NAMES: readonly string[] = [
   'Вельск',
   'Ольховка',
   'Сосногорск',

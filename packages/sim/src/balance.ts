@@ -98,6 +98,11 @@ export const MINE_GOLD_PER_S: Fp = fp(1.0);
 /** Минимальная дистанция между любыми городами, гексов. */
 export const CITY_MIN_DISTANCE = 4;
 export const PASSABLE_HEXES_PER_PLAYER = 120;
+export const EUROPE_MAP_MIN_LONGITUDE = -11;
+export const EUROPE_MAP_MAX_LONGITUDE = 40;
+export const EUROPE_MAP_MIN_LATITUDE = 35;
+export const EUROPE_MAP_MAX_LATITUDE = 71;
+export const EUROPE_MAP_TARGET_PLAYERS = 30;
 export const MAPGEN_MAX_PLAYERS = 100;
 export const NEUTRAL_CITIES_PER_PLAYER: Fp = fp(1.5);
 /** Гарнизон нейтрального города по уровню 1/2/3, солдат. */
