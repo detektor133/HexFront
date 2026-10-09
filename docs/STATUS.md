@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1gc |
+| Текущая задача | 06/T1gd |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -40,7 +40,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки T1ga:** профильный тест — 5/5; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (286 с)`.
 - **06/T1gb завершена:** brain строит каталог действий, проверяет фактическую цену через валидаторы команд, удерживает `BOT_GOLD_RESERVE` с учётом накопленных трат и выполняет одну трату на физический город/гекс.
 - **Проверки T1gb:** профильные тесты — 15/15; локальный движок — 16/16; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (92 с); полный `pnpm verify` — `verify: OK (279 с)`.
-- **Следующая задача:** 06/T1gc — ограничения армий и easy.
+- **06/T1gc завершена:** brain создаёт `▶/■` только для армий игрока; easy не создаёт военные команды и удерживает `BOT_EASY_TAX`.
+- **Проверки T1gc:** тесты мозга и детерминизма — 18/18; `pnpm ai-check --changed` — OK (89 с); полный `pnpm verify` — `verify: OK (279 с)`.
+- **Следующая задача:** 06/T1gd — удаление старого мозга и бюджет.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/actions.ts`, `packages/sim/src/bots/features.ts`.
 

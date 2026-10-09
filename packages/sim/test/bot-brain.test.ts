@@ -79,4 +79,48 @@ describe('мозг бота', () => {
     expect(commands).toContainEqual({ t: 'setTax', rate: BOT_EASY_TAX });
     expect(commands.some((command) => command.t === 'startOffensive')).toBe(false);
   });
+
+  it('не выдаёт ▶ или ■ для чужой армии', () => {
+    const match = scenario(FIELD, { legend, fog: false });
+    const unitIds = [0, 1, 2].map(() => match.unit('B', 'infantry', 300, at(5, 2)));
+    match.cmd('B', createArmy(''));
+    match.runTicks(1);
+    const armyId = match.armiesOf('B')[0]?.id ?? -1;
+    match.cmd('B', assignUnits(unitIds, armyId), 'auto');
+    match.cmd('B', assignFront(armyId, 'A', null), 'auto');
+    match.runSeconds(20);
+    const plan = match.state.plans.find((value) => value.armyId === armyId);
+    if (!plan || plan.kind !== 'front') throw new Error('фронт армии не создан');
+    match.state.plans[match.state.plans.indexOf(plan)] = {
+      ...plan,
+      offensive: { edges: plan.edges, hexes: [], active: true, progressTick: 0, taken: [] },
+    };
+
+    const commands = brainDecide(match.state, 0, createBotTickContext(match.state), 'medium');
+
+    expect(commands).not.toContainEqual({ t: 'stopOffensive', armyId });
+    expect(commands).not.toContainEqual({ t: 'startOffensive', armyId });
+  });
+
+  it('easy не выдаёт ■ для активного наступления', () => {
+    const match = scenario(FIELD, { legend, fog: false });
+    const unitIds = [0, 1, 2].map(() => match.unit('A', 'infantry', 300, at(2, 2)));
+    match.cmd('A', createArmy(''));
+    match.runTicks(1);
+    const armyId = match.armiesOf('A')[0]?.id ?? -1;
+    match.cmd('A', assignUnits(unitIds, armyId), 'auto');
+    match.cmd('A', assignFront(armyId, 'B', null), 'auto');
+    match.runSeconds(20);
+    const plan = match.state.plans.find((value) => value.armyId === armyId);
+    if (!plan || plan.kind !== 'front') throw new Error('фронт армии не создан');
+    match.state.plans[match.state.plans.indexOf(plan)] = {
+      ...plan,
+      offensive: { edges: plan.edges, hexes: [], active: true, progressTick: 0, taken: [] },
+    };
+
+    const commands = brainDecide(match.state, 0, createBotTickContext(match.state), 'easy');
+
+    expect(commands.some((command) => command.t === 'startOffensive')).toBe(false);
+    expect(commands.some((command) => command.t === 'stopOffensive')).toBe(false);
+  });
 });

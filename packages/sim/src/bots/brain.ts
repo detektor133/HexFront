@@ -91,6 +91,8 @@ function offensiveCommands(
   const commands: Command[] = [];
   for (const plan of state.plans) {
     if (plan.kind !== 'front') continue;
+    const army = state.armies.find((candidate) => candidate.id === plan.armyId);
+    if (army?.owner !== playerId) continue;
     const enemies = new Set(
       plan.edges
         .map((edge) => edgeOther(ground, edge))
