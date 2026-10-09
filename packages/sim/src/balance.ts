@@ -177,8 +177,13 @@ export const ROAD_PATH_EXISTING_COST: Fp = fp(0.01);
 
 /** Определения построек для каталога действий бота. */
 export const BUILDING_DEFS = {
-  fort: { costGold: FORT_COST, defenseMult: FORT_DEF_MULT, supplyLossMult: fp(1) },
-  depot: { costGold: DEPOT_COST, defenseMult: fp(1), supplyLossMult: DEPOT_LOSS_MULT },
+  fort: { costGold: FORT_COST, defenseMult: FORT_DEF_MULT, supplyLossMult: fp(1), supplyRadius: 0 },
+  depot: {
+    costGold: DEPOT_COST,
+    defenseMult: fp(1),
+    supplyLossMult: DEPOT_LOSS_MULT,
+    supplyRadius: DEPOT_RADIUS,
+  },
 } as const;
 
 // Армии
