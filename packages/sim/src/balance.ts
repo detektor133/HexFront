@@ -36,8 +36,6 @@ export const BOT_EASY_THINK_TICKS = 30;
 
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
-export const BOT_MERGE_BELOW: Fp = fp(25);
-export const BOT_MERGE_RADIUS = 3;
 
 export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);

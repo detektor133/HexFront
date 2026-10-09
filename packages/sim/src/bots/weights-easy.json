@@ -41,5 +41,7 @@
   "activeOffensive": 0,
   "activeOffensive*threat": 0,
   "activeOffensive*goldSeconds": 0,
-  "activeOffensive*neutralBorderShare": 0
+  "activeOffensive*neutralBorderShare": 0,
+  "commander.mergeBelowSoldiers": 25,
+  "commander.mergeRadius": 3
 }

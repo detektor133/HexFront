@@ -264,6 +264,24 @@ describe('commander: когда решает (04/T22a)', () => {
 });
 
 describe('commander: путь бота (06/T1d)', () => {
+  it('берёт порог и радиус слияния из весов игрока и обнуляет отрицательные значения', () => {
+    const s = scenario(FIELD, { legend });
+    const army = autoArmy(s, 1, at(1, 2), 100);
+    const small = s.unit('A', 'infantry', 10, at(2, 2));
+    s.cmd('A', assignUnits([small], army), 'auto');
+    s.runTicks(1);
+    s.setTick(0);
+
+    const commands = commanderCommands(s.state, [0], undefined, undefined, [
+      { 'commander.mergeBelowSoldiers': -1, 'commander.mergeRadius': -1 },
+    ]);
+    expect(commands).not.toContainEqual({
+      playerId: 0,
+      cmd: { t: 'move', unitIds: [small], to: 1 + 2 * 8 },
+      source: 'auto',
+    });
+  });
+
   it('отправляет резерв в армию цели, а не в самую слабую', () => {
     const s = scenario(FIELD, { legend });
     const target = autoArmy(s, 1);

@@ -104,7 +104,7 @@
   4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Варианты и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
   Возврат ревью: `packages/sim/test/guards/bot-brain-source.test.ts:27-30` формирует URL файла с завершающим `/`; GitHub Actions на Linux падает с `ENOTDIR` при чтении `packages/sim/src/balance.ts/`. Тест-страж не переносим до исправления пути.
 
-- [ ] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+- [~] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) Путь ботов в commander берёт порог слияния малых отрядов и радиус слияния из весов своего игрока: ключи commander.mergeBelowSoldiers и commander.mergeRadius в weights.json и weights-easy.json, начальные значения 25 и 3 (прежние BOT_MERGE_BELOW и BOT_MERGE_RADIUS, дальше их подбирает обучение); значения < 0 считаются 0. commanderCommands принимает веса по id игрока.
   2) BOT_MERGE_BELOW и BOT_MERGE_RADIUS удалены из balance.ts и packages/sim/src; тест-страж.
   3) Для игроков без бота и для армий людей команды commander не меняются: golden-хэши и тест «для игрока без ботов сохраняет прежнюю выдачу команд» (packages/sim/test/scenarios/commander.test.ts:307) без изменений.

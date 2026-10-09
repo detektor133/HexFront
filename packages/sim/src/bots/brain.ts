@@ -21,7 +21,8 @@ export type BotWeightsByPlayer = readonly (BotWeights | undefined)[];
 export const BOT_WEIGHTS: BotWeights = mediumWeights;
 export const BOT_EASY_WEIGHTS: BotWeights = easyWeights;
 
-function resolveWeights(
+/** Возвращает веса игрока с учётом уровня бота и массива весов по id. */
+export function resolveBotWeights(
   weights: BotWeights | BotWeightsByPlayer | undefined,
   playerId: number,
   level: 'easy' | 'medium',
@@ -134,7 +135,7 @@ export function brainDecide(
   _level: 'easy' | 'medium' = 'medium',
   botWeights?: BotWeights | BotWeightsByPlayer,
 ): Command[] {
-  return planBotActions(state, playerId, context, resolveWeights(botWeights, playerId, _level));
+  return planBotActions(state, playerId, context, resolveBotWeights(botWeights, playerId, _level));
 }
 
 export function scoreAction(

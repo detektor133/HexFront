@@ -44,7 +44,7 @@ describe('страж мозга бота', () => {
 
   it('не содержит удалённых констант мозга в исходниках sim', () => {
     const pattern =
-      /BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_MIN_RATIO|BOT_ATTACK_STOP_RATIO|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX/;
+      /BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_MIN_RATIO|BOT_ATTACK_STOP_RATIO|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX|BOT_MERGE_BELOW|BOT_MERGE_RADIUS/;
     for (const file of simSourceFiles(new URL('../../src/', import.meta.url))) {
       expect(readFileSync(file, 'utf8')).not.toMatch(pattern);
     }

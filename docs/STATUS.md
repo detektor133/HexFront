@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j3 |
+| Текущая задача | 06/T1j4 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -30,10 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j3 принята ревью 2026-10-09:** исправлен Linux-путь в рекурсивном тесте-стражe, профильные тесты 7/7 и оба typecheck зелёные; benchmark подтвердил 30 ботов: полный тик 1,606 мс, экономика 0,370 мс/бот/ход. Следующая задача — 06/T1j4. Отчёт — `docs/reports/stage-06-t1j3.md`.
-- **Изменённые файлы T1j3:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/bot-weights.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `tools/evolve/src/evaluate.ts`.
-- **Проверки T1j3:** профильные тесты — 7/7; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; benchmark 30 ботов — полный тик 1,606 мс, экономика 0,370 мс/бот/ход; запрещённые имена отсутствуют в `packages/sim/src`.
-- **Следующая задача:** `$task 06/T1j4`.
+- **06/T1j4 выполнена:** commander получает `commander.mergeBelowSoldiers` и `commander.mergeRadius` из весов игрока; отрицательные значения обнуляются, `BOT_MERGE_*` удалены. Профильные тесты 23/23, typecheck и `pnpm ai-check --changed` зелёные. Benchmark: 30 ботов — полный тик 1,757 мс, commander 0,084 мс/бот/ход; 100 ботов — 10,930 мс и 0,299 мс/бот/ход. Полный `pnpm verify` — `verify: OK (296 с)`. Отчёт — `docs/reports/stage-06-t1j4.md`.
+- **Следующая задача:** 06/T1j5.
+- **Изменённые файлы T1j4:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/scenarios/commander.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `docs/reports/stage-06-t1j4.md`.
+- **Проверки T1j4:** профильные тесты — 23/23; `pnpm --filter @hexfront/sim typecheck` и `pnpm ai-check --changed` — OK; benchmark 30/100 ботов — commander 0,084/0,299 мс на бот/ход; полный `pnpm verify` — `verify: OK (296 с)`.
 
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.

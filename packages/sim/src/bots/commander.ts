@@ -4,11 +4,12 @@
 // земля — занять без плана, нейтральный город — штурм при прогнозе «успех», в приоритете; ▶ без
 // линии — построить линию; лишние отряды резерва — в самую слабую армию. Сам на игроков не наступает.
 import { commanderLine } from './commander-line.ts';
-import { BOT_MERGE_BELOW, BOT_MERGE_RADIUS, MAX_UNITS_PER_HEX } from '../balance.ts';
+import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { fp, type Fp } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
@@ -154,12 +155,18 @@ function reinforce(view: PlayerView, armyId: number, bot: boolean): Command[] {
   return out;
 }
 
-function mergeSmall(map: MapStatic, view: PlayerView, armyId: number): Command[] {
+function mergeSmall(
+  map: MapStatic,
+  view: PlayerView,
+  armyId: number,
+  mergeBelow: Fp,
+  mergeRadius: number,
+): Command[] {
   const own = view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId);
   const out: Command[] = [];
   for (const small of own) {
     if (
-      small.soldiers >= BOT_MERGE_BELOW ||
+      small.soldiers >= mergeBelow ||
       small.order !== 'idle' ||
       small.moveTotal !== 0 ||
       small.path.length > 0 ||
@@ -170,7 +177,7 @@ function mergeSmall(map: MapStatic, view: PlayerView, armyId: number): Command[]
     const target = own
       .filter((unit) => unit.id !== small.id && unit.type === small.type && !unit.inBattle)
       .map((unit) => ({ unit, distance: distance(hexOf(map, small.hex), hexOf(map, unit.hex)) }))
-      .filter(({ distance: distanceTo }) => distanceTo <= BOT_MERGE_RADIUS && distanceTo > 0)
+      .filter(({ distance: distanceTo }) => distanceTo <= mergeRadius && distanceTo > 0)
       .sort((a, b) => a.distance - b.distance || a.unit.id - b.unit.id)[0]?.unit;
     if (!target) continue;
     const atTarget = view.units.filter(
@@ -320,13 +327,15 @@ export function decide(
   lineDepth?: number,
   context?: CommanderContext,
   bot = false,
+  mergeBelow: Fp = fp(25),
+  mergeRadius = 3,
 ): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
   const commanderContext = context ?? createCommanderContext(map, view);
   const out = [
     ...reinforce(view, armyId, bot),
-    ...(bot ? mergeSmall(map, view, armyId) : []),
+    ...(bot ? mergeSmall(map, view, armyId, mergeBelow, mergeRadius) : []),
     ...seedExpansion(view, armyId, commanderContext),
   ];
   const units = armyUnits(view, armyId);

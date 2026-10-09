@@ -2,7 +2,7 @@
 // COMMANDER_TICKS для каждого живого игрока — все его армии с auto в один тик, по одному снимку;
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
-import { brainDecide, type BotWeightsByPlayer } from './brain.ts';
+import { brainDecide, resolveBotWeights, type BotWeightsByPlayer } from './brain.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
 import {
@@ -13,7 +13,7 @@ import {
 } from '../balance.ts';
 import type { BotLevel } from './types.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import type { Fp } from '../math/int.ts';
+import { fp, type Fp } from '../math/int.ts';
 import { commanderView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 export type { BotLevel } from './types.ts';
@@ -41,9 +41,10 @@ export function commanderCommands(
   bots: readonly number[] = [],
   levelsOrContext?: readonly (BotLevel | undefined)[] | BotTickContext,
   shared?: BotTickContext,
+  weights?: BotWeightsByPlayer,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const { context } = botArguments(levelsOrContext, shared);
+  const { levels, context } = botArguments(levelsOrContext, shared);
   const tickContext = context ?? createBotTickContext(state);
   const viewContext = tickContext.playerView;
   const armiesByOwner = new Map<number, number[]>();
@@ -76,6 +77,16 @@ export function commanderCommands(
     const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
+      const botWeights = botIds.has(p.id)
+        ? resolveBotWeights(weights, p.id, levels[p.id] ?? 'medium')
+        : undefined;
+      const mergeBelow = fp(
+        botWeights === undefined
+          ? 25
+          : Math.max(0, botWeights['commander.mergeBelowSoldiers'] ?? 25),
+      );
+      const mergeRadius =
+        botWeights === undefined ? 3 : Math.max(0, botWeights['commander.mergeRadius'] ?? 3);
       for (const cmd of decide(
         state.map,
         view,
@@ -83,6 +94,8 @@ export function commanderCommands(
         depth,
         commanderContext,
         botIds.has(p.id),
+        mergeBelow,
+        mergeRadius,
       )) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
