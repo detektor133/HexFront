@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1ge |
+| Текущая задача | 06/T1h |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -44,9 +44,11 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки T1gc:** тесты мозга и детерминизма — 18/18; `pnpm ai-check --changed` — OK (89 с); полный `pnpm verify` — `verify: OK (279 с)`.
 - **06/T1gd завершена:** удалены `goals.ts`, его тест, экспорт legacy-целей и неиспользуемые ручные коэффициенты; easy, автопополнение и золотой резерв сохранены.
 - **Проверки T1gd:** профильные тесты — 23/23; typecheck sim — OK; замер 30 ботов: полный тик 5,527 мс, экономика 0,347 мс/бот/ход; полный `pnpm verify` — `verify: OK (281 с)`.
-- **Следующая задача:** 06/T1ge — проверка родителя T1g.
+- **06/T1ge завершена:** сверены T1ga–T1gd, удалён legacy-код, golden commander не изменились, оба бюджетных критерия повторно подтверждены.
+- **Проверки T1ge:** профильные тесты — 23/23; typecheck sim — OK; замер 30 ботов: полный тик 5,536 мс, экономика 0,347 мс/бот/ход; отчёт — `docs/reports/stage-06-t1ge.md`.
+- **Следующая задача:** 06/T1h — `tools/evolve`.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1gd.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/actions.ts`, `packages/sim/src/bots/features.ts`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1ge.md`, `tools/evolve`, `packages/sim/src/bots/weights.json`.
 
 ## Архив сессий
 
