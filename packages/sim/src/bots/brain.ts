@@ -198,6 +198,7 @@ function spendCommands(
   playerId: number,
   snapshot: ReturnType<typeof createBotSnapshot>,
   context: BotTickContext,
+  botWeights: BotWeights,
 ): Command[] {
   const player = state.players[playerId];
   if (!player || player.gold <= BOT_GOLD_RESERVE) return [];
@@ -250,6 +251,7 @@ function spendCommands(
     ...rankActions(
       pricedCatalog.filter((action) => action.kind !== 'rebuildSupply'),
       actionContext(snapshot),
+      botWeights,
     ),
   ];
   for (const action of ranked) {
@@ -274,6 +276,7 @@ export function brainDecide(
   playerId: number,
   context: BotTickContext,
   level: BotLevel = 'medium',
+  botWeights: BotWeights = BOT_WEIGHTS,
 ): Command[] {
   const snapshot = createBotSnapshot(state, playerId, context);
   const player = state.players[playerId];
@@ -283,6 +286,7 @@ export function brainDecide(
   const easyTax: Command[] = [{ t: 'setTax', rate: BOT_EASY_TAX }];
   commands.push(...(easy ? easyTax : taxCommand(state, playerId, snapshot.contacts.length > 0)));
   commands.push(...offensiveCommands(state, playerId, context, easy));
-  if (!player.bankrupt) commands.push(...spendCommands(state, playerId, snapshot, context));
+  if (!player.bankrupt)
+    commands.push(...spendCommands(state, playerId, snapshot, context, botWeights));
   return commands;
 }

@@ -14,6 +14,7 @@ const PROJECTS = [
   'tools/tokens',
   'tools/telemetry',
   'tools/agent-loop',
+  'tools/evolve',
 ];
 
 // Vitest читает конфиг только через default-экспорт.
