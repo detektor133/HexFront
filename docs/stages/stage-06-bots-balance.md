@@ -97,7 +97,7 @@
 
   Возврат ревью: пункт 4 не подтверждён — `bot-brain-dynamic.test.ts` не передаёт фиктивные definitions с новым типом юнита, не создаёт угрозу > 0 и не проверяет `strength*threat`; тест-страж, читающий `brain.ts`, `actions.ts`, `features.ts` на запрещённые литералы и импорт `balance.ts`, отсутствует.
 
-- [ ] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+- [x] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) brainDecide и botCommands принимают веса по id игрока (массив); по умолчанию medium — weights.json, easy — weights-easy.json. Тест: два бота с разными весами в одном тике выбирают каждый по своим. Тест на явных весах: изменение одного веса меняет выбранную ставку налога, и изменение одного веса меняет решение ▶.
   2) Уровни различаются только весами и частотой решения: easy — weights-easy.json и раз в BOT_EASY_THINK_TICKS; отдельных правил easy (налог, запрет ▶/■) нет.
   3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS, BOT_GOLD_RESERVE, BOT_EASY_TAX. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j. weights.json и weights-easy.json — ключ на каждый признак вариантов реестра по умолчанию, все значения 0.

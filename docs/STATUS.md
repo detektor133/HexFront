@@ -9,7 +9,7 @@
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
-Очередь: 06/T1j3 → 06/T1j4 → 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
+Очередь: 06/T1j4 → 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
@@ -30,10 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j3 возвращена ревью 2026-10-09:** CI на Linux падала с `ENOTDIR` в рекурсивном тесте-стражe из-за завершающего `/` у URL файлов. Путь исправлен, профильный тест 2/2 и полный `pnpm verify` зелёные; следующее действие — `$review 06/T1j3`. Отчёт — `docs/reports/stage-06-t1j3.md`.
+- **06/T1j3 принята ревью 2026-10-09:** исправлен Linux-путь в рекурсивном тесте-стражe, профильные тесты 7/7 и оба typecheck зелёные; benchmark подтвердил 30 ботов: полный тик 1,606 мс, экономика 0,370 мс/бот/ход. Следующая задача — 06/T1j4. Отчёт — `docs/reports/stage-06-t1j3.md`.
 - **Изменённые файлы T1j3:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/bot-weights.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `tools/evolve/src/evaluate.ts`.
-- **Проверки T1j3:** профильные тесты — 28/28; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; запрещённые имена отсутствуют в `packages/sim/src`.
-- **Следующая задача:** `$review 06/T1j3` в новой сессии.
+- **Проверки T1j3:** профильные тесты — 7/7; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; benchmark 30 ботов — полный тик 1,606 мс, экономика 0,370 мс/бот/ход; запрещённые имена отсутствуют в `packages/sim/src`.
+- **Следующая задача:** `$task 06/T1j4`.
 
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
