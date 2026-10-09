@@ -30,10 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j3 возвращена ревью 2026-10-09:** CI на Linux падает с `ENOTDIR` в рекурсивном тесте-стражe из-за завершающего `/` у URL файлов. Исправить тест и повторить `$review 06/T1j3`; отчёт — `docs/reports/stage-06-t1j3.md`.
+- **06/T1j3 возвращена ревью 2026-10-09:** CI на Linux падала с `ENOTDIR` в рекурсивном тесте-стражe из-за завершающего `/` у URL файлов. Путь исправлен, профильный тест 2/2 и полный `pnpm verify` зелёные; следующее действие — `$review 06/T1j3`. Отчёт — `docs/reports/stage-06-t1j3.md`.
 - **Изменённые файлы T1j3:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/bot-weights.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `tools/evolve/src/evaluate.ts`.
 - **Проверки T1j3:** профильные тесты — 28/28; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; запрещённые имена отсутствуют в `packages/sim/src`.
-- **Следующая задача:** исправить возврат T1j3, затем `$review 06/T1j3`.
+- **Следующая задача:** `$review 06/T1j3` в новой сессии.
 
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.

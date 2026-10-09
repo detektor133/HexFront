@@ -25,7 +25,7 @@ function sourceOf(file: string): string {
 
 function simSourceFiles(directory: URL): URL[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = new URL(`${entry.name}/`, directory);
+    const path = new URL(entry.isDirectory() ? `${entry.name}/` : entry.name, directory);
     if (entry.isDirectory()) return simSourceFiles(path);
     return entry.name.endsWith('.ts') ? [path] : [];
   });
