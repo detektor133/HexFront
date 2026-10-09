@@ -30,6 +30,11 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
+- **06/T1j3 остановлена после двух полных verify:** веса по игрокам, `weights-easy.json`, удаление старых констант и тесты готовы; оба прогона verify падают только на таймауте `packages/sim/test/bot-determinism.test.ts` — 1200 тиков занимают 36,2 с при лимите 30 с. Build, types, lint, prettier, visual и остальные 744 теста зелёные. Коммит и push не выполнены; нужен отдельный разбор производительности или решение владельца.
+- **Изменённые файлы T1j3:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/bot-weights.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `tools/evolve/src/evaluate.ts`.
+- **Проверки T1j3 до блокера:** профильные тесты — 28/28; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; запрещённые имена отсутствуют в `packages/sim/src`.
+- **06/T1j3 возвращена ревью:** замер `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` показал для 30 ботов экономику 2,056 мс/бот/ход при лимите 0,508; код не изменён, требуется устранить превышение бюджета.
+
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
 - **06/T1e4:** заменена новой T1e; таблица трассировки будет обновлена после T1j1–T1j4/T1i.

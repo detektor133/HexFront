@@ -103,6 +103,9 @@
   3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS, BOT_GOLD_RESERVE, BOT_EASY_TAX. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j. weights.json и weights-easy.json — ключ на каждый признак вариантов реестра по умолчанию, все значения 0.
   4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Варианты и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
 
+  Возврат ревью:
+  - пункт 4 — `tools/bench` замер: экономика 30 ботов составляет 2,056 мс/бот/ход при лимите 0,508 мс/бот/ход; критерий не выполнен.
+
 - [ ] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) Путь ботов в commander берёт порог слияния малых отрядов и радиус слияния из весов своего игрока: ключи commander.mergeBelowSoldiers и commander.mergeRadius в weights.json и weights-easy.json, начальные значения 25 и 3 (прежние BOT_MERGE_BELOW и BOT_MERGE_RADIUS, дальше их подбирает обучение); значения < 0 считаются 0. commanderCommands принимает веса по id игрока.
   2) BOT_MERGE_BELOW и BOT_MERGE_RADIUS удалены из balance.ts и packages/sim/src; тест-страж.
