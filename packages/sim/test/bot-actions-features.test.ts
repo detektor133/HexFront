@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILDING_DEFS, type UnitType } from '../src/balance.ts';
 import { createActionCatalog, type ActionCatalogInput } from '../src/bots/actions.ts';
+import { rankActions, scoreAction, type BotWeights } from '../src/bots/brain.ts';
 import { actionFeatures } from '../src/bots/features.ts';
 import { fp } from '../src/math/int.ts';
 
@@ -94,5 +95,61 @@ describe('признаки действий бота', () => {
     expect(features.effectStrength).toBe(fp(1.1));
     expect(features.threat).toBe(fp(0.25));
     expect(features.effectStrengthThreat).toBe(fp(0.275));
+  });
+
+  it('считает сумму весов и признаков в fixed-point', () => {
+    const action = createActionCatalog(input()).find((candidate) => candidate.kind === 'recruit');
+    expect(action).toBeDefined();
+    if (!action) throw new Error('действие набора не создано');
+
+    const context = {
+      gold: fp(100),
+      incomePerS: fp(2),
+      upkeepPerS: fp(1),
+      strength: fp(100),
+      threat: fp(0.25),
+      goldReserve: fp(0.5),
+      neutralBorderShare: fp(0.4),
+      ownSoldiers: fp(50),
+      enemySoldiers: fp(50),
+      enemyCities: 1,
+    };
+    const weights: BotWeights = { effectGold: 2, effectStrength: 3 };
+
+    expect(scoreAction(action, context, weights)).toBe(2 * fp(-0.05) + 3 * fp(1.1));
+  });
+
+  it('меняет выбранное действие при изменении веса и сохраняет порядок равных оценок', () => {
+    const catalog = createActionCatalog(
+      input({
+        cityIds: [3, 4],
+        units: {
+          ...input().units,
+          scouts: {
+            costGoldPerSoldier: fp(0.2),
+            upkeepGoldPerSoldierS: fp(0.003),
+            attack: fp(0.5),
+            defense: fp(0.5),
+            supplyPerSoldier: fp(1),
+          },
+        },
+      }),
+    ).filter((action) => action.kind === 'recruit');
+    const context = {
+      gold: fp(100),
+      incomePerS: fp(2),
+      upkeepPerS: fp(1),
+      strength: fp(100),
+      threat: fp(0.25),
+      goldReserve: fp(0.5),
+      neutralBorderShare: fp(0.4),
+      ownSoldiers: fp(50),
+      enemySoldiers: fp(50),
+      enemyCities: 1,
+    };
+
+    expect(rankActions(catalog, context, { effectGold: -1 })[0]?.unitType).toBe('scouts');
+    expect(rankActions(catalog, context, { effectStrength: 1 })[0]?.unitType).toBe('infantry');
+    expect(rankActions(catalog, context, { effectGold: -1 })[0]?.order).toBe(1);
   });
 });

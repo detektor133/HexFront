@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1ga |
+| Текущая задача | 06/T1gb |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -36,9 +36,11 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1f завершена:** добавлены расширяемые каталог действий и признаки; `BUILDING_DEFS` собирается из существующих констант.
 - **Проверки T1f:** профильный тест — 3/3; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (278 с)`.
 - **06/T1g разбита:** T1ga — веса и выбор, T1gb — траты, T1gc — ограничения армий и easy, T1gd — удаление старого мозга и бюджеты, T1ge — проверка родителя.
-- **Следующая задача:** 06/T1ga — весовая оценка мозга.
+- **06/T1ga завершена:** добавлены целочисленная оценка `Σ вес × признак`, выбор положительных действий и стабильный порядок равных оценок; веса хранятся в `packages/sim/src/bots/weights.json`.
+- **Проверки T1ga:** профильный тест — 5/5; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (286 с)`.
+- **Следующая задача:** 06/T1gb — траты до `BOT_GOLD_RESERVE` и одно действие на цель.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `packages/sim/src/bots/actions.ts`, `packages/sim/src/bots/features.ts`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/actions.ts`, `packages/sim/src/bots/features.ts`.
 
 ## Архив сессий
 

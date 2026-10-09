@@ -15,15 +15,61 @@ import {
   TAX_MAX,
   UPKEEP_GOLD_PER_SOLDIER_S,
 } from '../balance.ts';
+import type { BotAction } from './actions.ts';
 import type { BotTickContext } from './context.ts';
+import { actionFeatures, type ActionFeatureContext, type ActionFeatures } from './features.ts';
 import { createBotSnapshot } from './snapshot.ts';
 import type { BotLevel } from './types.ts';
+import weights from './weights.json' with { type: 'json' };
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import type { Command } from '../commands/types.ts';
 import { fpDiv, fpMul, type Fp } from '../math/int.ts';
 import { edgeOther } from '../state/edges.ts';
 import type { MatchState } from '../state/types.ts';
+
+export type ActionFeatureName = keyof ActionFeatures;
+export type BotWeights = Partial<Record<ActionFeatureName, number>>;
+
+export const BOT_WEIGHTS: BotWeights = weights;
+
+/**
+ * Оценивает действие суммой `вес × признак`; вес — целое число, признак — fixed-point.
+ * @returns оценка действия в масштабе fixed-point (1000 = 1,0)
+ */
+export function scoreAction(
+  action: BotAction,
+  context: ActionFeatureContext,
+  botWeights: BotWeights = BOT_WEIGHTS,
+): number {
+  const features = actionFeatures(action, context);
+  let score = 0;
+  for (const name of Object.keys(features) as ActionFeatureName[]) {
+    score += (botWeights[name] ?? 0) * features[name];
+  }
+  return score;
+}
+
+/**
+ * Отбирает положительные оценки и сортирует их по оценке, каталогу и id цели.
+ * @returns действия в порядке исполнения решения бота
+ */
+export function rankActions(
+  actions: readonly BotAction[],
+  context: ActionFeatureContext,
+  botWeights: BotWeights = BOT_WEIGHTS,
+): BotAction[] {
+  return actions
+    .map((action) => ({ action, score: scoreAction(action, context, botWeights) }))
+    .filter(({ score }) => score > 0)
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.action.order - right.action.order ||
+        left.action.targetId - right.action.targetId,
+    )
+    .map(({ action }) => action);
+}
 
 function taxCommand(state: MatchState, playerId: number, war: boolean): Command[] {
   const player = state.players[playerId];

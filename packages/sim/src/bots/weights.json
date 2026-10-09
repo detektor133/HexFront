@@ -1,0 +1,15 @@
+{
+  "effectGold": -1,
+  "effectUpkeep": 0,
+  "effectIncome": 2,
+  "effectStrength": 1,
+  "effectDefense": 1,
+  "effectSupply": 1,
+  "threat": 2,
+  "goldReserve": 1,
+  "neutralBorderShare": 1,
+  "effectStrengthThreat": 2,
+  "effectDefenseThreat": 2,
+  "frontRatio": 2,
+  "enemyCities": 1
+}
