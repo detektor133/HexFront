@@ -97,11 +97,12 @@
 
   Возврат ревью: пункт 4 не подтверждён — `bot-brain-dynamic.test.ts` не передаёт фиктивные definitions с новым типом юнита, не создаёт угрозу > 0 и не проверяет `strength*threat`; тест-страж, читающий `brain.ts`, `actions.ts`, `features.ts` на запрещённые литералы и импорт `balance.ts`, отсутствует.
 
-- [~] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+- [ ] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) brainDecide и botCommands принимают веса по id игрока (массив); по умолчанию medium — weights.json, easy — weights-easy.json. Тест: два бота с разными весами в одном тике выбирают каждый по своим. Тест на явных весах: изменение одного веса меняет выбранную ставку налога, и изменение одного веса меняет решение ▶.
   2) Уровни различаются только весами и частотой решения: easy — weights-easy.json и раз в BOT_EASY_THINK_TICKS; отдельных правил easy (налог, запрет ▶/■) нет.
   3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS, BOT_GOLD_RESERVE, BOT_EASY_TAX. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j. weights.json и weights-easy.json — ключ на каждый признак вариантов реестра по умолчанию, все значения 0.
   4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Варианты и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
+  Возврат ревью: пункт 3 не подтверждён тестом-стражем — `packages/sim/test/guards/bot-brain-source.test.ts:39-44` проверяет удалённые имена только в `balance.ts`, а не во всём `packages/sim/src`, как требует критерий.
 
 - [ ] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) Путь ботов в commander берёт порог слияния малых отрядов и радиус слияния из весов своего игрока: ключи commander.mergeBelowSoldiers и commander.mergeRadius в weights.json и weights-easy.json, начальные значения 25 и 3 (прежние BOT_MERGE_BELOW и BOT_MERGE_RADIUS, дальше их подбирает обучение); значения < 0 считаются 0. commanderCommands принимает веса по id игрока.
