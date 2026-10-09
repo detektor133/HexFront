@@ -22,9 +22,10 @@ export function buildOptions(
 ): readonly CommandOption[] {
   if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
-  const hexes = [
-    ...new Set([...(context.borderHexes[playerId] ?? []), ...(context.ownedHexes[playerId] ?? [])]),
-  ].sort((a, b) => a - b);
+  const cityHexes = new Set((context.citiesByPlayer[playerId] ?? []).map((city) => city.hex));
+  const hexes = [...new Set([...(context.borderHexes[playerId] ?? []), ...cityHexes])].sort(
+    (a, b) => a - b,
+  );
   for (const hex of hexes) {
     for (const [kind, definition] of Object.entries(definitions.buildings)) {
       const command = { t: 'build', hex, kind: kind as keyof typeof BUILDING_DEFS } as const;

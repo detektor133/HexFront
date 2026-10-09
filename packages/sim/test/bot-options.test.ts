@@ -86,6 +86,28 @@ describe('варианты команд бота', () => {
     );
   });
 
+  it('не предлагает строить на внутреннем негородском гексе', () => {
+    const { state } = fixture();
+    state.hexes.owner.fill(0);
+    const context = createBotTickContext(state);
+    const border = new Set(context.borderHexes[0] ?? []);
+    const cityHexes = new Set((context.citiesByPlayer[0] ?? []).map((candidate) => candidate.hex));
+    const interior = (context.ownedHexes[0] ?? []).find(
+      (hex) => !border.has(hex) && !cityHexes.has(hex),
+    );
+    if (interior === undefined) throw new Error('внутренний гекс не найден');
+
+    const options = COMMAND_OPTIONS.flatMap((entry) =>
+      entry.options(state, 0, context, definitions),
+    );
+
+    expect(
+      options.some(
+        (candidate) => candidate.command.t === 'build' && candidate.command.hex === interior,
+      ),
+    ).toBe(false);
+  });
+
   it('возвращает эффекты fixed-point, а не пустой каталог', () => {
     const { state, context } = fixture();
     const options = COMMAND_OPTIONS.flatMap((entry) =>
