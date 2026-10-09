@@ -8,14 +8,30 @@ import {
 import type { CommandOption, CommandOptionEntry } from './options/types.ts';
 import type { BotOptionDefinitions } from './options/types.ts';
 import { createBotSnapshot } from './snapshot.ts';
+import easyWeights from './weights-easy.json' with { type: 'json' };
+import mediumWeights from './weights.json' with { type: 'json' };
 import type { Command } from '../commands/types.ts';
 import { fpMul, type Fp } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
 
 export type ActionFeatureName = string;
 export type BotWeights = Readonly<Record<ActionFeatureName, number>>;
+export type BotWeightsByPlayer = readonly (BotWeights | undefined)[];
 
-export const BOT_WEIGHTS: BotWeights = {};
+export const BOT_WEIGHTS: BotWeights = mediumWeights;
+export const BOT_EASY_WEIGHTS: BotWeights = easyWeights;
+
+function resolveWeights(
+  weights: BotWeights | BotWeightsByPlayer | undefined,
+  playerId: number,
+  level: 'easy' | 'medium',
+): BotWeights {
+  if (weights === undefined) return level === 'easy' ? BOT_EASY_WEIGHTS : BOT_WEIGHTS;
+  if (Array.isArray(weights)) {
+    return weights[playerId] ?? (level === 'easy' ? BOT_EASY_WEIGHTS : BOT_WEIGHTS);
+  }
+  return weights as BotWeights;
+}
 
 function scoreOption(
   option: CommandOption,
@@ -116,9 +132,9 @@ export function brainDecide(
   playerId: number,
   context: BotTickContext,
   _level: 'easy' | 'medium' = 'medium',
-  botWeights: BotWeights = BOT_WEIGHTS,
+  botWeights?: BotWeights | BotWeightsByPlayer,
 ): Command[] {
-  return planBotActions(state, playerId, context, botWeights);
+  return planBotActions(state, playerId, context, resolveWeights(botWeights, playerId, _level));
 }
 
 export function scoreAction(

@@ -34,19 +34,8 @@ export const BOT_EASY_THINK_TICKS = 30;
 
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
 
-/** Налог бота в мире (без врага у границы); 09-bots.md: 10–15 %. */
-export const BOT_TAX_PEACE: Fp = fp(0.15);
-/** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
-export const BOT_TAX_WAR: Fp = fp(0.3);
-/** Фиксированный налог easy-бота. */
-export const BOT_EASY_TAX: Fp = fp(0.2);
-/** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
-export const BOT_GOLD_RESERVE: Fp = fp(50);
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
-export const BOT_MAX_SPENDS = 3;
-export const BOT_ATTACK_MIN_RATIO: Fp = fp(1.2);
-export const BOT_ATTACK_STOP_RATIO: Fp = fp(0.8);
 export const BOT_MERGE_BELOW: Fp = fp(25);
 export const BOT_MERGE_RADIUS = 3;
 

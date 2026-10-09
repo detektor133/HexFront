@@ -26,7 +26,9 @@ export function buildOptions(
   const hexes = [...new Set([...(context.borderHexes[playerId] ?? []), ...cityHexes])].sort(
     (a, b) => a - b,
   );
+  const units = context.unitsByPlayer[playerId] ?? [];
   for (const hex of hexes) {
+    const origin = hexFromId(hex, state.map.width);
     for (const [kind, definition] of Object.entries(definitions.buildings)) {
       const command = { t: 'build', hex, kind: kind as keyof typeof BUILDING_DEFS } as const;
       const check = Object.hasOwn(BUILDING_DEFS, kind)
@@ -36,16 +38,13 @@ export function buildOptions(
       const soldiers = (context.unitsByHex[hex] ?? [])
         .filter((unit) => unit.owner === playerId)
         .reduce((sum, unit) => (sum + unit.soldiers) as typeof ZERO, ZERO);
-      const supply = (context.unitsByHex ?? [])
-        .flatMap((units, unitHex) =>
-          state.map &&
-          distance(hexFromId(hex, state.map.width), hexFromId(unitHex, state.map.width)) <=
-            definition.supplyRadius
-            ? units
-            : [],
-        )
-        .filter((unit) => unit.owner === playerId)
-        .reduce((sum, unit) => (sum - unit.soldiers) as typeof ZERO, ZERO);
+      const supply = units.reduce(
+        (sum, unit) =>
+          distance(origin, hexFromId(unit.hex, state.map.width)) <= definition.supplyRadius
+            ? ((sum - unit.soldiers) as typeof ZERO)
+            : sum,
+        ZERO,
+      );
       result.push(
         option(
           command,

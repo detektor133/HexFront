@@ -2,7 +2,7 @@
 // COMMANDER_TICKS для каждого живого игрока — все его армии с auto в один тик, по одному снимку;
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
-import { brainDecide, type BotWeights } from './brain.ts';
+import { brainDecide, type BotWeightsByPlayer } from './brain.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
 import {
@@ -101,7 +101,7 @@ export function botCommands(
   bots: readonly number[],
   levelsOrContext?: readonly (BotLevel | undefined)[] | BotTickContext,
   shared?: BotTickContext,
-  weights?: BotWeights,
+  weights?: BotWeightsByPlayer,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
   const { levels, context } = botArguments(levelsOrContext, shared);
@@ -113,7 +113,6 @@ export function botCommands(
     if (p.id % thinkTicks !== state.tick % thinkTicks) continue;
     const commands = brainDecide(state, p.id, tickContext, level, weights);
     for (const cmd of commands) {
-      if (level === 'easy' && cmd.t === 'startOffensive') continue;
       out.push({ playerId: p.id, cmd });
     }
   }

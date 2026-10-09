@@ -48,12 +48,23 @@ export interface PlayerOptionMetrics {
   readonly supply: Fp;
 }
 
+const metricsCache = new WeakMap<
+  BotTickContext,
+  WeakMap<BotOptionDefinitions, Map<number, PlayerOptionMetrics>>
+>();
+
 export function playerOptionMetrics(
   state: MatchState,
   playerId: number,
   context: BotTickContext,
   definitions: BotOptionDefinitions,
 ): PlayerOptionMetrics {
+  const byDefinitions = metricsCache.get(context) ?? new WeakMap();
+  metricsCache.set(context, byDefinitions);
+  const byPlayer = byDefinitions.get(definitions) ?? new Map<number, PlayerOptionMetrics>();
+  byDefinitions.set(definitions, byPlayer);
+  const cached = byPlayer.get(playerId);
+  if (cached) return cached;
   let strength = ZERO;
   let defense = ZERO;
   let supply = ZERO;
@@ -65,7 +76,7 @@ export function playerOptionMetrics(
     defense = (defense + fpMul(unit.soldiers, definition.defense)) as Fp;
     supply = (supply + fpMul(unit.soldiers, definition.supplyPerSoldier)) as Fp;
   }
-  return {
+  const metrics = {
     gold: playerGold(state, playerId),
     upkeep: playerUpkeep(state, playerId),
     income: playerIncome(state, playerId, context),
@@ -73,6 +84,8 @@ export function playerOptionMetrics(
     defense,
     supply,
   };
+  byPlayer.set(playerId, metrics);
+  return metrics;
 }
 
 export function relativeEffects(

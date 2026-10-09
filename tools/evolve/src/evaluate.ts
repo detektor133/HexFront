@@ -43,7 +43,13 @@ export function evaluateWeights(
       const context = createBotTickContext(state);
       step(state, [
         ...commanderCommands(state, bots, context),
-        ...botCommands(state, bots, context, undefined, weights),
+        ...botCommands(
+          state,
+          bots,
+          context,
+          undefined,
+          state.players.map(() => weights),
+        ),
       ]);
     }
     fitness += scoreState(state);

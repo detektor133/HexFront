@@ -33,4 +33,11 @@ describe('страж мозга бота', () => {
       }
     }
   });
+
+  it('не содержит удалённых констант мозга в исходниках sim', () => {
+    const source = readFileSync(new URL('../../src/balance.ts', import.meta.url), 'utf8');
+    expect(source).not.toMatch(
+      /BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_MIN_RATIO|BOT_ATTACK_STOP_RATIO|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX/,
+    );
+  });
 });

@@ -97,24 +97,11 @@
 
   Возврат ревью: пункт 4 не подтверждён — `bot-brain-dynamic.test.ts` не передаёт фиктивные definitions с новым типом юнита, не создаёт угрозу > 0 и не проверяет `strength*threat`; тест-страж, читающий `brain.ts`, `actions.ts`, `features.ts` на запрещённые литералы и импорт `balance.ts`, отсутствует.
 
-- [ ] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+- [~] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) brainDecide и botCommands принимают веса по id игрока (массив); по умолчанию medium — weights.json, easy — weights-easy.json. Тест: два бота с разными весами в одном тике выбирают каждый по своим. Тест на явных весах: изменение одного веса меняет выбранную ставку налога, и изменение одного веса меняет решение ▶.
   2) Уровни различаются только весами и частотой решения: easy — weights-easy.json и раз в BOT_EASY_THINK_TICKS; отдельных правил easy (налог, запрет ▶/■) нет.
   3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS, BOT_GOLD_RESERVE, BOT_EASY_TAX. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j. weights.json и weights-easy.json — ключ на каждый признак вариантов реестра по умолчанию, все значения 0.
   4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Варианты и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
-
-  Возврат ревью:
-  - пункт 4 — `tools/bench` замер: экономика 30 ботов составляет 2,056 мс/бот/ход при лимите 0,508 мс/бот/ход; критерий не выполнен.
-  - Причина по коду (решение владельца 2026-10-09). До T1j3 варианты не строились: при пустых весах planBotActions выходила сразу (brain.ts:96-98). С weights.json строится весь реестр T1j1, а в нём проходы, пропорциональные размеру карты, на каждый вариант:
-    · options/city.ts:59 — копия всего `state.hexes.improvement` (размер карты) на каждый свой гекс;
-    · options/build.ts:39-48 — на каждый граничный гекс и каждый тип постройки перебор всего `context.unitsByHex` (размер карты) с distance;
-    · options/build.ts:62 и options/recruit.ts:49 — playerOptionMetrics на каждый вариант; внутри playerUpkeepPerSecond перебирает все `state.units`.
-  - Что сделать, в объёме T1j3; для этого разрешено править bots/options/city.ts, bots/options/build.ts, bots/options/recruit.ts, state/pop-cap.ts:
-    · city.ts: Δлимита благоустройства — без копии массива; в hexPopCap добавить необязательный параметр уровня благоустройства (по умолчанию текущий уровень гекса), формула остаётся одна;
-    · build.ts: снабжение — перебор только своих отрядов `context.unitsByPlayer[playerId]` с distance ≤ supplyRadius, а не всей карты;
-    · build.ts, recruit.ts: playerOptionMetrics — один раз на вызов функции вариантов, как в city.ts.
-  - Запреты: удалить ранний выход brain.ts:96-98 и не вводить другие обходы — пропуск или урезание реестра при нулевых весах, выборку части гексов или вариантов, лимиты, кэш между тиками. Эффекты и признаки не меняются: табличные тесты T1j1 и T1j2 проходят без правок. Таймаут bot-determinism.test.ts:50 не трогать.
-  - Подтверждение — тот же замер `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1`: 30 ботов, полный тик ≤ 15 мс и экономика ≤ 0,508 мс/бот/ход; полный `pnpm verify` зелёный. Если после этих трёх правок бюджет не выполнен — остановиться и записать замер в STATUS, новых оптимизаций не придумывать.
 
 - [ ] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) Путь ботов в commander берёт порог слияния малых отрядов и радиус слияния из весов своего игрока: ключи commander.mergeBelowSoldiers и commander.mergeRadius в weights.json и weights-easy.json, начальные значения 25 и 3 (прежние BOT_MERGE_BELOW и BOT_MERGE_RADIUS, дальше их подбирает обучение); значения < 0 считаются 0. commanderCommands принимает веса по id игрока.
