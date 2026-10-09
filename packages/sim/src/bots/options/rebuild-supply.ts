@@ -13,7 +13,7 @@ export function rebuildSupplyOptions(
   context: BotTickContext,
   _definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
   const metrics = playerOptionMetrics(state, playerId, context, _definitions);
   for (const city of context.citiesByPlayer[playerId] ?? []) {

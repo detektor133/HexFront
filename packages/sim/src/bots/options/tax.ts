@@ -20,7 +20,7 @@ export function taxOptions(
   context: BotTickContext,
   _definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const target = currentTax(state, playerId);
   const result: CommandOption[] = [];
   const metrics = playerOptionMetrics(state, playerId, context, _definitions);

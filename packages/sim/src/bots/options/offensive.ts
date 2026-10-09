@@ -12,7 +12,7 @@ function offensiveOptions(
   context: BotTickContext,
   active: boolean,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
   for (const army of context.armiesByPlayer[playerId] ?? []) {
     const plan = context.plansByPlayer[playerId]?.find((candidate) => candidate.armyId === army.id);

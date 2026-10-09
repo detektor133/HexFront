@@ -95,8 +95,27 @@ export function relativeEffects(
   );
 }
 
-export function hasOptionState(state: MatchState): boolean {
-  return Boolean(state.map && state.hexes && state.players && state.cities && state.recruits);
+export function hasOptionState(state: MatchState, context: BotTickContext): boolean {
+  return Boolean(
+    state.map?.width !== undefined &&
+    state.map.height !== undefined &&
+    state.hexes?.owner &&
+    state.hexes.building &&
+    state.hexes.improvement &&
+    state.hexes.pop &&
+    state.players &&
+    state.cities &&
+    state.recruits &&
+    state.constructions &&
+    context?.ownedHexes &&
+    context.borderHexes &&
+    context.unitsByHex &&
+    context.unitsByPlayer &&
+    context.armiesByPlayer &&
+    context.citiesByPlayer &&
+    context.plansByPlayer &&
+    context.incomeBases,
+  );
 }
 
 export function customRecruitIsValid(

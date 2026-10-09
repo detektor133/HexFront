@@ -1,13 +1,13 @@
-import { CITY_GOLD_PER_LEVEL, IMPROVEMENT_CAP_STEP } from '../../balance.ts';
+import { CITY_GOLD_PER_LEVEL } from '../../balance.ts';
 import { checkConstruction } from '../../commands/construction.ts';
-import { fpMul } from '../../math/int.ts';
 import type { Fp } from '../../math/int.ts';
+import { cityGold } from '../../state/city-output.ts';
 import { cityPopCap, hexPopCap } from '../../state/pop-cap.ts';
 import type { MatchState } from '../../state/types.ts';
+import { incomePerSecond } from '../../systems/economy.ts';
 import type { BotTickContext } from '../context.ts';
 import { hasOptionState, option, playerOptionMetrics, relativeEffects, ZERO } from './helpers.ts';
 import type { BotOptionDefinitions, CommandOption } from './types.ts';
-import { incomePerSecond } from '../../systems/economy.ts';
 
 function constructionOption(
   state: MatchState,
@@ -29,7 +29,7 @@ export function cityOptions(
   context: BotTickContext,
   _definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
   const metrics = playerOptionMetrics(state, playerId, context, _definitions);
   for (const city of context.citiesByPlayer[playerId] ?? []) {
@@ -41,7 +41,8 @@ export function cityOptions(
       {
         income:
           city.level < 5
-            ? ((CITY_GOLD_PER_LEVEL +
+            ? ((cityGold(state, { ...city, level: city.level + 1 }) -
+                cityGold(state, city) +
                 incomePerSecond(
                   cityPopCap(city.level + 1) - cityPopCap(city.level),
                   state.players[playerId]?.taxTarget ?? ZERO,
@@ -55,7 +56,10 @@ export function cityOptions(
   }
   if (!state.map || !state.hexes) return result;
   for (const hex of context.ownedHexes[playerId] ?? []) {
-    const improvedCap = fpMul(hexPopCap(state, hex), IMPROVEMENT_CAP_STEP);
+    const improvement = new Uint8Array(state.hexes.improvement);
+    improvement[hex] = (improvement[hex] ?? 0) + 1;
+    const improvedCap = (hexPopCap({ map: state.map, hexes: { improvement } }, hex) -
+      hexPopCap(state, hex)) as Fp;
     const improve = constructionOption(
       state,
       playerId,

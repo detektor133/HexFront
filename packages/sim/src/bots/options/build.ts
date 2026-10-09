@@ -20,7 +20,7 @@ export function buildOptions(
   context: BotTickContext,
   definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
   const hexes = [
     ...new Set([...(context.borderHexes[playerId] ?? []), ...(context.ownedHexes[playerId] ?? [])]),

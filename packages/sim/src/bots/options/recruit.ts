@@ -20,7 +20,7 @@ export function recruitOptions(
   context: BotTickContext,
   definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
-  if (!hasOptionState(state)) return [];
+  if (!hasOptionState(state, context)) return [];
   const result: CommandOption[] = [];
   for (const city of context.citiesByPlayer[playerId] ?? []) {
     if (state.recruits?.some((recruitment) => recruitment.cityId === city.id)) continue;
