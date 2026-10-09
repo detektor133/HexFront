@@ -11,12 +11,19 @@
 ## Подтверждение
 
 - `packages/sim/test/bot-weights.test.ts` — 4/4: разные веса двух ботов, смена налоговой ставки, одинаковые правила easy/medium при явных весах, смена решения ▶.
-- `packages/sim/test/guards/bot-brain-source.test.ts` и `packages/sim/test/bot-determinism.test.ts` вместе с тестом весов — 7/7.
+- `packages/sim/test/guards/bot-brain-source.test.ts` рекурсивно проверяет удалённые имена во всём `packages/sim/src`; вместе с `packages/sim/test/bot-determinism.test.ts` и тестом весов — 7/7.
 - `pnpm --filter @hexfront/sim typecheck` — OK.
 - `pnpm --filter @hexfront/evolve typecheck` — OK.
 - `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — 30 ботов: полный тик 5,801 мс, экономика 0,410 мс/бот/ход; 100 ботов: полный тик 30,417 мс, экономика 0,558 мс/бот/ход.
 - `pnpm verify --changed` — `verify: OK (191 с)`.
 - Полный `pnpm verify` — `verify: OK (297 с)`; лог `.ai-logs/verify-2026-10-09T09-24-41.log`.
+
+## Исправление после ревью
+
+- Тест-страж читает все TypeScript-файлы `packages/sim/src`, поэтому удалённые имена не могут остаться вне `balance.ts`.
+- `pnpm vitest run packages/sim/test/guards/bot-brain-source.test.ts` — 2/2.
+- `pnpm verify --changed` — `verify: OK (101 с)`.
+- Полный `pnpm verify` — `verify: OK (291 с)`; лог `.ai-logs/verify-2026-10-09T09-44-40.log`.
 
 Следующая задача: `$review 06/T1j3`.
 

@@ -30,11 +30,11 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j3 остановлена после двух полных verify:** веса по игрокам, `weights-easy.json`, удаление старых констант и тесты готовы; оба прогона verify падают только на таймауте `packages/sim/test/bot-determinism.test.ts` — 1200 тиков занимают 36,2 с при лимите 30 с. Build, types, lint, prettier, visual и остальные 744 теста зелёные. Коммит и push не выполнены; нужен отдельный разбор производительности или решение владельца.
+- **06/T1j3 исправлена после ревью:** тест-страж удалённых констант рекурсивно проверяет все TypeScript-исходники `packages/sim/src`, а не только `balance.ts`.
 - **Изменённые файлы T1j3:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/bot-weights.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `tools/evolve/src/evaluate.ts`.
-- **Проверки T1j3 до блокера:** профильные тесты — 28/28; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; запрещённые имена отсутствуют в `packages/sim/src`.
-- **06/T1j3, решение владельца 2026-10-09:** причина превышения и разрешённые правки записаны в «Возврат ревью» T1j3 (stage-06-bots-balance.md). Незакоммиченные изменения T1j3 в рабочем дереве — работа этой задачи, следующая сессия продолжает с них.
-- **06/T1j3 возвращена ревью 2026-10-09:** критерий 3 не подтверждён тестом-стражем, который проверяет удалённые имена только в `balance.ts`, а не во всём `packages/sim/src`; код не изменён. Обязательный замер ревью: 30 ботов — полный тик 1,700 мс, экономика 0,387 мс/бот/ход; 100 ботов — полный тик 10,677 мс, экономика 0,533 мс/бот/ход.
+- **Проверки T1j3:** профильные тесты — 28/28; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm --filter @hexfront/evolve typecheck` — OK; запрещённые имена отсутствуют в `packages/sim/src`.
+- **06/T1j3:** реализация и исправление тест-стража готовы; отчёт — `docs/reports/stage-06-t1j3.md`.
+- **06/T1j3 возвращена ревью 2026-10-09:** критерий 3 не подтверждён тестом-стражем; исправление добавлено и подтверждено тестом.
 
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
@@ -60,7 +60,7 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1j2 исправлена после ревью:** `planBotActions` передаёт definitions в реестр; добавлены интеграционный тест с фиктивным юнитом, `threat > 0`, `strength*threat` и тест-страж исходников мозга.
 - **Проверки T1j2:** профильный прогон — 22/22; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (281 с)`; отчёт — `docs/reports/stage-06-t1j2.md`.
 - **06/T1j2 принята ревью:** все четыре критерия подтверждены 22/22 профильными тестами; тест-страж запретов, typecheck и замер 30/100 ботов прошли. Отчёт — `docs/reports/stage-06-t1j2.md`.
-- **Следующая задача:** `$task 06/T1j3`.
+- **Следующая задача:** `$review 06/T1j3` в новой сессии.
 - **CI:** `pnpm ci:wait` для исходного HEAD — success; после push проверится в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`.
