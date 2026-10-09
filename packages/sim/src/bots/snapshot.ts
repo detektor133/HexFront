@@ -2,7 +2,7 @@ import { RECRUIT_STEP } from '../balance.ts';
 import type { BotTickContext } from './context.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import { neighbors, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
-import { type Fp } from '../math/int.ts';
+import { fpDiv, type Fp } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
 
@@ -19,6 +19,9 @@ export interface BotSnapshot {
   readonly upkeepPerS: number;
   readonly contacts: readonly BotContact[];
   readonly freeCities: readonly number[];
+  readonly threat: Fp;
+  readonly goldSeconds: Fp;
+  readonly neutralBorderShare: Fp;
 }
 
 function visibleEnemy(state: MatchState, playerId: number, hex: HexId): boolean {
@@ -69,6 +72,18 @@ function freeCities(state: MatchState, context: BotTickContext, playerId: number
     .map((city) => city.id);
 }
 
+function neutralBorderShare(state: MatchState, context: BotTickContext, playerId: number): Fp {
+  const border = context.borderHexes[playerId] ?? [];
+  if (border.length === 0) return 0 as Fp;
+  const neutral = border.filter((hex) =>
+    neighbors(hexFromId(hex, state.map.width)).some((neighbor) => {
+      if (!inBounds(neighbor, state.map.width, state.map.height)) return false;
+      return (state.hexes.owner[hexId(neighbor, state.map.width)] ?? -1) < 0;
+    }),
+  ).length;
+  return fpDiv(neutral as Fp, border.length as Fp);
+}
+
 /**
  * Строит компактный снимок бота из общего контекста тика.
  * @returns экономика и силы на видимых участках границы
@@ -100,12 +115,21 @@ export function createBotSnapshot(
     }))
     .sort((a, b) => a.enemy - b.enemy);
   const player = state.players[playerId];
+  const strongestContact = contacts.reduce((strongest, contact) => {
+    const total = (contact.mine + contact.theirs) as Fp;
+    const threat = total === 0 ? (0 as Fp) : fpDiv(contact.theirs, total);
+    return threat > strongest ? threat : strongest;
+  }, 0 as Fp);
+  const incomePerS = playerIncomePerSecond(state, playerId, undefined, context.incomeBases) as Fp;
   return {
     playerId,
     gold: player?.gold ?? (0 as Fp),
-    incomePerS: playerIncomePerSecond(state, playerId, undefined, context.incomeBases),
+    incomePerS,
     upkeepPerS: playerUpkeepPerSecond(state, playerId),
     contacts,
     freeCities: freeCities(state, context, playerId),
+    threat: strongestContact,
+    goldSeconds: incomePerS === 0 ? (0 as Fp) : fpDiv(player?.gold ?? (0 as Fp), incomePerS),
+    neutralBorderShare: neutralBorderShare(state, context, playerId),
   };
 }

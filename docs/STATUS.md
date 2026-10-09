@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j1 |
+| Текущая задача | 06/T1j2 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -13,7 +13,7 @@
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
-Решение владельца 2026-10-09: T1f, T1g и T1h закрыты с невыполненными требованиями; добавлена доделка T1j1–T1j4. Ручные пороги и `BOT_MAX_SPENDS` удаляются, обучение расширяется соперниками из текущего поколения и зала славы, элитой и новым фитнесом. Следующая работа — T1j1.
+Решение владельца 2026-10-09: T1f, T1g и T1h закрыты с невыполненными требованиями; добавлена доделка T1j1–T1j4. Ручные пороги и `BOT_MAX_SPENDS` удаляются, обучение расширяется соперниками из текущего поколения и зала славы, элитой и новым фитнесом. Следующая работа — T1j2.
 
 Этап 05 закрыт и смержен в `main` (PR #6): `pnpm verify` — `verify: OK (271 с)`, `pnpm report:match --seeds 3` — 0/3 побед или выбываний. Отчёт: `docs/reports/stage-05.md`.
 
@@ -51,10 +51,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1j1 исправлено после ревью:** `buildOptions` больше не добавляет внутренние негородские гексы; добавлен регрессионный тест на это ограничение.
 - **Проверки T1j1:** профильный тест — 9/9; `pnpm verify --changed` — `verify: OK (102 с)`; полный `pnpm verify` — `verify: OK (290 с)`; отчёт — `docs/reports/stage-06-t1j1.md`.
 - **06/T1j1 принята ревью:** критерии реестра, допустимости вариантов, fixed-point эффектов и расширяемости подтверждены тестами; typecheck и dependency-cruiser зелёные. Отчёт — `docs/reports/stage-06-t1j1.md`.
-- **Следующая задача:** `$task 06/T1j2`.
-- **CI:** начальный `pnpm ci:wait` завершился инфраструктурной ошибкой `fetch failed`; повторная проверка выполняется в начале следующей сессии.
+- **06/T1j2 выполнена:** brain выбирает варианты только через `COMMAND_OPTIONS`, признаки строятся по ключам effects и контекстам снимка, новые фиктивные эффекты проходят без правки мозга.
+- **Проверки T1j2:** профильные тесты — 20/20; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (95 с); полный `pnpm verify` — `verify: OK (286 с)`. Отчёт — `docs/reports/stage-06-t1j2.md`.
+- **Следующая задача:** `$review 06/T1j2` в новой сессии.
+- **CI:** `pnpm ci:wait` для исходного HEAD — success; после push проверится в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1h.md`, `tools/evolve`, `packages/sim/src/bots/weights.json`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/options/index.ts`, `packages/sim/src/bots/weights.json`.
 
 ## Архив сессий
 
