@@ -48,9 +48,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки T1ge:** профильные тесты — 23/23; typecheck sim — OK; замер 30 ботов: полный тик 5,536 мс, экономика 0,347 мс/бот/ход; отчёт — `docs/reports/stage-06-t1ge.md`.
 - **06/T1h завершена:** добавлен `(μ,λ)-ES` с seeded RNG, worker_threads, resume и сохранением весов/отчётов; `brainDecide` принимает обучаемые веса.
 - **Проверки T1h:** тесты 2/2, включая 300 тиков при 1 и 4 worker_threads и resume; typecheck evolve — OK; полный `pnpm verify` — `verify: OK (285 с)`; отчёт — `docs/reports/stage-06-t1h.md`.
-- **06/T1j1 исправлена и ждёт ревью:** `upgradeCity` и `improve` считают прирост выработки, генераторы защищены от частичного `state/context`, тест проверяет все девять видов команд на игровом сценарии; отчёт — `docs/reports/stage-06-t1j1.md`.
+- **06/T1j1 возвращена ревью:** `buildOptions` добавляет варианты на всех `context.ownedHexes`, хотя критерий разрешает только граничные гексы и гексы собственных городов; отчёт — `docs/reports/stage-06-t1j1.md`.
 - **Проверки T1j1:** профильный тест — 8/8; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (13 с); полный `pnpm verify` — `verify: OK (278 с)`.
-- **Следующая задача:** `$review 06/T1j1` в новой сессии.
+- **Следующая задача:** исправить замечание ревью T1j1.
 - **CI:** начальный `pnpm ci:wait` завершился инфраструктурной ошибкой `fetch failed`; повторная проверка выполняется в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1h.md`, `tools/evolve`, `packages/sim/src/bots/weights.json`.

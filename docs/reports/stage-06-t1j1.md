@@ -19,4 +19,13 @@
 
 ## Ревью
 
-Замечания исправлены: формулы используют фактический прирост, частичное состояние отбрасывается, а сценарий проверяет ненулевые эффекты всех видов команд.
+ВОЗВРАТ:
+
+- `buildOptions` перебирает все `context.ownedHexes`, а критерий разрешает только `context.borderHexes` и гексы собственных городов; внутренние негородские гексы попадают в каталог вариантов (`packages/sim/src/bots/options/build.ts:25-27`).
+
+Проверки ревью:
+
+- `pnpm exec vitest run packages/sim/test/bot-options.test.ts` — 8/8.
+- `pnpm --filter @hexfront/sim typecheck` — OK.
+- `pnpm exec depcruise packages/sim/src packages/sim/test --config .dependency-cruiser.cjs` — 160 модулей, 861 зависимость, нарушений нет.
+- `pnpm ai-check --changed` — OK (10 с).
