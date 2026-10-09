@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
+import small from '../../mapgen/maps/small.json' with { type: 'json' };
+import { createBotTickContext } from '../src/bots/context.ts';
 import { COMMAND_OPTIONS, type BotOptionDefinitions } from '../src/bots/options/index.ts';
+import { createMatch, loadMap } from '../src/index.ts';
 import { fp } from '../src/math/int.ts';
 import type { MatchState } from '../src/state/types.ts';
 
-const state = {} as MatchState;
-const context = {
-  borderHexes: [[1]],
-  ownedHexes: [[1, 2]],
-  unitsByHex: [[], []],
-  unitsByPlayer: [[]],
-  citiesByPlayer: [[{ id: 1, hex: 1 }]],
-  armiesByPlayer: [[]],
-  plansByPlayer: [[]],
-  incomeBases: [],
-} as never;
+function fixture(): { state: MatchState; context: ReturnType<typeof createBotTickContext> } {
+  const loaded = loadMap(small);
+  if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+  const state = createMatch(loaded.map, [{ name: 'A' }, { name: 'B' }], 42);
+  const player = state.players[0];
+  if (!player) throw new Error('игрок не создан');
+  player.gold = fp(1000);
+  return { state, context: createBotTickContext(state) };
+}
 
 const definitions: BotOptionDefinitions = {
   units: {
@@ -53,6 +54,7 @@ describe('варианты команд бота', () => {
   });
 
   it('подхватывает фиктивные тип войск и постройку из definitions', () => {
+    const { state, context } = fixture();
     const options = COMMAND_OPTIONS.flatMap((entry) =>
       entry.options(state, 0, context, definitions),
     );
@@ -66,6 +68,7 @@ describe('варианты команд бота', () => {
   });
 
   it('возвращает эффекты fixed-point, а не пустой каталог', () => {
+    const { state, context } = fixture();
     const options = COMMAND_OPTIONS.flatMap((entry) =>
       entry.options(state, 0, context, definitions),
     );
@@ -74,5 +77,24 @@ describe('варианты команд бота', () => {
     expect(
       options.some((option) => Object.values(option.effects).some((value) => value !== 0)),
     ).toBe(true);
+  });
+
+  it('нормализует цену относительно текущей казны игрока', () => {
+    const { state, context } = fixture();
+    const recruit = COMMAND_OPTIONS.flatMap((entry) =>
+      entry.options(state, 0, context, definitions),
+    ).find((candidate) => candidate.command.t === 'recruit');
+
+    expect(recruit?.effects.cost).toBe(fp(0.01));
+  });
+
+  it('отбрасывает варианты для неполного состояния', () => {
+    const state = {} as MatchState;
+    const context = {} as never;
+    const options = COMMAND_OPTIONS.flatMap((entry) =>
+      entry.options(state, 0, context, definitions),
+    );
+
+    expect(options).toEqual([]);
   });
 });

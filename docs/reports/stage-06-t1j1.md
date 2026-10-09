@@ -2,23 +2,22 @@
 
 ## Сделано
 
-- Добавлен реестр `COMMAND_OPTIONS` и типы вариантов в `packages/sim/src/bots/options/index.ts` и `types.ts`.
-- Варианты recruit, build, city, rebuild-supply, tax и offensive разделены по файлам.
-- Эффекты считают цены и изменения экономики, силы, обороны и снабжения через функции `sim`.
-- `BUILDING_DEFS` получил `supplyRadius`; `incomePerSecond` экспортирован без изменения формулы.
-- Фиктивные тип войск и постройка подхватываются через `definitions` без изменения реестра.
+- Исправлены замечания ревью в `packages/sim/src/bots/options/helpers.ts:51-130`: эффекты `cost`, `upkeep`, `income`, `strength`, `defense`, `supply` нормализуются относительно текущих показателей игрока; нулевой знаменатель даёт нулевой эффект.
+- Генераторы `recruit.ts:23-65` и `build.ts:23-72` больше не создают варианты на неполном состоянии; штатные типы проходят `checkRecruit`/`checkConstruction`, фиктивные definitions проходят полную структурную проверку.
+- `city.ts:10-76`, `rebuild-supply.ts:10-48`, `tax.ts:15-65` используют общую нормализацию; `offensive.ts:15-57` считает контакт только по гексам текущего фронта.
+- Тесты `packages/sim/test/bot-options.test.ts:22-99` используют реальный матч, проверяют расширяемость фиктивными definitions, нормализацию цены и отбрасывание неполного состояния.
 
 ## Подтверждение
 
-- Реестр девяти видов команд: `packages/sim/test/bot-options.test.ts:42` — 1/1.
-- Расширяемость definitions: `packages/sim/test/bot-options.test.ts:55` — 1/1.
-- Ненулевые fixed-point эффекты: `packages/sim/test/bot-options.test.ts:68` — 1/1.
+- Реестр девяти видов команд: `packages/sim/test/bot-options.test.ts:31` — 1/1.
+- Расширяемость definitions: `packages/sim/test/bot-options.test.ts:43` — 1/1.
+- Ненулевые эффекты, нормализация цены и защита неполного состояния: `packages/sim/test/bot-options.test.ts:56-99` — 3/3.
 - `pnpm --filter @hexfront/sim typecheck` — OK.
-- `pnpm verify --changed` — `verify: OK`.
-- Полный `pnpm verify` — `verify: OK (286 с)`.
+- `pnpm ai-check --changed` — OK (12 с).
+- Полный `pnpm verify` — `verify: OK (274 с)`; лог `.ai-logs/verify-2026-10-09T04-35-50.log`.
 
-Следующая задача: 06/T1j2.
+Следующая задача: `$review 06/T1j1` в новой сессии.
 
 ## Ревью
 
-ВОЗВРАТ: эффекты не нормализованы относительно показателей игрока, а тесты допускают команды без существующих проверок валидности.
+Исправлено: эффекты нормализованы, неполное состояние отбрасывается, известные команды проходят штатные проверки, фиктивные definitions покрыты полной структурной проверкой.

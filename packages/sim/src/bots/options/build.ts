@@ -4,7 +4,14 @@ import { checkConstruction } from '../../commands/construction.ts';
 import { distance, hexFromId } from '../../math/hex.ts';
 import type { MatchState } from '../../state/types.ts';
 import type { BotTickContext } from '../context.ts';
-import { option, ZERO } from './helpers.ts';
+import {
+  customBuildingIsValid,
+  hasOptionState,
+  option,
+  playerOptionMetrics,
+  relativeEffects,
+  ZERO,
+} from './helpers.ts';
 import { FP, fpMul } from '../../math/int.ts';
 
 export function buildOptions(
@@ -13,6 +20,7 @@ export function buildOptions(
   context: BotTickContext,
   definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
+  if (!hasOptionState(state)) return [];
   const result: CommandOption[] = [];
   const hexes = [
     ...new Set([...(context.borderHexes[playerId] ?? []), ...(context.ownedHexes[playerId] ?? [])]),
@@ -20,10 +28,10 @@ export function buildOptions(
   for (const hex of hexes) {
     for (const [kind, definition] of Object.entries(definitions.buildings)) {
       const command = { t: 'build', hex, kind: kind as keyof typeof BUILDING_DEFS } as const;
-      const check = state.hexes
+      const check = Object.hasOwn(BUILDING_DEFS, kind)
         ? checkConstruction(state, playerId, command)
-        : { ok: true as const, cost: definition.costGold };
-      if (kind in BUILDING_DEFS && !check.ok) continue;
+        : null;
+      if (check ? !check.ok : !customBuildingIsValid(state, playerId, hex, definition)) continue;
       const soldiers = (context.unitsByHex[hex] ?? [])
         .filter((unit) => unit.owner === playerId)
         .reduce((sum, unit) => (sum + unit.soldiers) as typeof ZERO, ZERO);
@@ -38,14 +46,21 @@ export function buildOptions(
         .filter((unit) => unit.owner === playerId)
         .reduce((sum, unit) => (sum - unit.soldiers) as typeof ZERO, ZERO);
       result.push(
-        option(command, `hex:${hex}`, {
-          cost: definition.costGold,
-          defense: fpMul((definition.defenseMult - FP) as typeof ZERO, soldiers),
-          supply:
-            supply === 0
-              ? ZERO
-              : fpMul((FP - definition.supplyLossMult) as typeof ZERO, -supply as typeof ZERO),
-        }),
+        option(
+          command,
+          `hex:${hex}`,
+          relativeEffects(
+            {
+              cost: definition.costGold,
+              defense: fpMul((definition.defenseMult - FP) as typeof ZERO, soldiers),
+              supply:
+                supply === 0
+                  ? ZERO
+                  : fpMul((FP - definition.supplyLossMult) as typeof ZERO, -supply as typeof ZERO),
+            },
+            playerOptionMetrics(state, playerId, context, definitions),
+          ),
+        ),
       );
     }
   }

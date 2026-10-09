@@ -1,9 +1,17 @@
-import { RECRUIT_MIN, RECRUIT_STEP, type UnitType } from '../../balance.ts';
+import { COST_GOLD_PER_SOLDIER, RECRUIT_MIN, RECRUIT_STEP, type UnitType } from '../../balance.ts';
 import { checkRecruit, recruitCapacity } from '../../commands/recruit.ts';
-import { fp, intDiv, type Fp } from '../../math/int.ts';
+import { intDiv, type Fp } from '../../math/int.ts';
 import type { MatchState } from '../../state/types.ts';
 import type { BotTickContext } from '../context.ts';
-import { option, playerGold, unitEffects } from './helpers.ts';
+import {
+  customRecruitIsValid,
+  hasOptionState,
+  option,
+  playerGold,
+  playerOptionMetrics,
+  relativeEffects,
+  unitEffects,
+} from './helpers.ts';
 import type { BotOptionDefinitions, CommandOption } from './types.ts';
 
 export function recruitOptions(
@@ -12,10 +20,11 @@ export function recruitOptions(
   context: BotTickContext,
   definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
+  if (!hasOptionState(state)) return [];
   const result: CommandOption[] = [];
   for (const city of context.citiesByPlayer[playerId] ?? []) {
     if (state.recruits?.some((recruitment) => recruitment.cityId === city.id)) continue;
-    const capacity = state.map ? recruitCapacity(state, city.id) : fp(500);
+    const capacity = recruitCapacity(state, city.id);
     for (const [type, definition] of Object.entries(definitions.units)) {
       const byGold =
         definition.costGoldPerSoldier === 0
@@ -27,10 +36,20 @@ export function recruitOptions(
       ) as Fp;
       if (soldiers > capacity) continue;
       const command = { t: 'recruit', cityId: city.id, type: type as UnitType, soldiers } as const;
-      if (type in definitions.units && ['infantry', 'armor', 'artillery'].includes(type)) {
-        if (!checkRecruit(state, playerId, city.id, type as UnitType, soldiers).ok) continue;
-      }
-      result.push(option(command, `city:${city.id}`, unitEffects(soldiers, definition)));
+      const valid = Object.hasOwn(COST_GOLD_PER_SOLDIER, type)
+        ? checkRecruit(state, playerId, city.id, type as UnitType, soldiers).ok
+        : customRecruitIsValid(state, playerId, city.id, soldiers, definition);
+      if (!valid) continue;
+      result.push(
+        option(
+          command,
+          `city:${city.id}`,
+          relativeEffects(
+            unitEffects(soldiers, definition),
+            playerOptionMetrics(state, playerId, context, definitions),
+          ),
+        ),
+      );
     }
   }
   return result;

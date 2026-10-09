@@ -8,12 +8,16 @@ import {
   SUPPLY_PER_SOLDIER,
   UPKEEP_GOLD_PER_SOLDIER_S,
   UPKEEP_GOLD_PER_UNIT_S,
+  RECRUIT_MIN,
+  RECRUIT_STEP,
   type UnitType,
 } from '../../balance.ts';
+import { recruitCapacity } from '../../commands/recruit.ts';
 import type { Command } from '../../commands/types.ts';
 import { fpDiv, fpMul, type Fp } from '../../math/int.ts';
 import { cityGold } from '../../state/city-output.ts';
 import type { MatchState } from '../../state/types.ts';
+import { BUILDING } from '../../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../../systems/economy.ts';
 import type { BotTickContext } from '../context.ts';
 
@@ -33,6 +37,99 @@ export function playerIncome(state: MatchState, playerId: number, context: BotTi
 
 export function playerUpkeep(state: MatchState, playerId: number): Fp {
   return playerUpkeepPerSecond(state, playerId) as Fp;
+}
+
+export interface PlayerOptionMetrics {
+  readonly gold: Fp;
+  readonly upkeep: Fp;
+  readonly income: Fp;
+  readonly strength: Fp;
+  readonly defense: Fp;
+  readonly supply: Fp;
+}
+
+export function playerOptionMetrics(
+  state: MatchState,
+  playerId: number,
+  context: BotTickContext,
+  definitions: BotOptionDefinitions,
+): PlayerOptionMetrics {
+  let strength = ZERO;
+  let defense = ZERO;
+  let supply = ZERO;
+  for (const unit of context.unitsByPlayer[playerId] ?? []) {
+    const definition = definitions.units[unit.type];
+    if (!definition) continue;
+    strength = (strength +
+      fpMul(unit.soldiers, (definition.attack + definition.defense) as Fp)) as Fp;
+    defense = (defense + fpMul(unit.soldiers, definition.defense)) as Fp;
+    supply = (supply + fpMul(unit.soldiers, definition.supplyPerSoldier)) as Fp;
+  }
+  return {
+    gold: playerGold(state, playerId),
+    upkeep: playerUpkeep(state, playerId),
+    income: playerIncome(state, playerId, context),
+    strength,
+    defense,
+    supply,
+  };
+}
+
+export function relativeEffects(
+  effects: Readonly<Record<string, Fp>>,
+  metrics: PlayerOptionMetrics,
+): Record<string, Fp> {
+  const denominators: Readonly<Record<string, Fp>> = {
+    cost: metrics.gold,
+    upkeep: metrics.upkeep,
+    income: metrics.income,
+    strength: metrics.strength,
+    defense: metrics.defense,
+    supply: metrics.supply,
+  };
+  return Object.fromEntries(
+    Object.entries(effects).map(([key, value]) => [
+      key,
+      key in denominators ? valueRatio(value, denominators[key] ?? ZERO) : value,
+    ]),
+  );
+}
+
+export function hasOptionState(state: MatchState): boolean {
+  return Boolean(state.map && state.hexes && state.players && state.cities && state.recruits);
+}
+
+export function customRecruitIsValid(
+  state: MatchState,
+  playerId: number,
+  cityId: number,
+  soldiers: Fp,
+  definition: BotOptionDefinitions['units'][string],
+): boolean {
+  const city = state.cities.find((candidate) => candidate.id === cityId);
+  if (!city || city.owner !== playerId || state.players[playerId]?.bankrupt) return false;
+  if (state.recruits.some((recruitment) => recruitment.cityId === cityId)) return false;
+  if (soldiers < RECRUIT_MIN || soldiers % RECRUIT_STEP !== 0) return false;
+  return (
+    recruitCapacity(state, cityId) >= soldiers &&
+    playerGold(state, playerId) >= fpMul(definition.costGoldPerSoldier, soldiers)
+  );
+}
+
+export function customBuildingIsValid(
+  state: MatchState,
+  playerId: number,
+  hex: number,
+  definition: BotOptionDefinitions['buildings'][string],
+): boolean {
+  return (
+    state.hexes.owner[hex] === playerId &&
+    state.hexes.building[hex] === BUILDING.none &&
+    !state.constructions.some(
+      (construction) => construction.hex === hex && construction.kind !== 'road',
+    ) &&
+    playerGold(state, playerId) >= definition.costGold
+  );
 }
 
 export function defaultDefinitions(): BotOptionDefinitions {

@@ -5,7 +5,7 @@ import type { Fp } from '../../math/int.ts';
 import { cityPopCap, hexPopCap } from '../../state/pop-cap.ts';
 import type { MatchState } from '../../state/types.ts';
 import type { BotTickContext } from '../context.ts';
-import { option, ZERO } from './helpers.ts';
+import { hasOptionState, option, playerOptionMetrics, relativeEffects, ZERO } from './helpers.ts';
 import type { BotOptionDefinitions, CommandOption } from './types.ts';
 import { incomePerSecond } from '../../systems/economy.ts';
 
@@ -15,10 +15,12 @@ function constructionOption(
   command: Parameters<typeof checkConstruction>[2],
   group: string,
   effects: Readonly<Record<string, Fp>>,
+  metrics: ReturnType<typeof playerOptionMetrics>,
 ): CommandOption | null {
-  if (!state.hexes) return option(command, group, effects);
   const check = checkConstruction(state, playerId, command);
-  return check.ok ? option(command, group, { cost: check.cost, ...effects }) : null;
+  return check.ok
+    ? option(command, group, relativeEffects({ cost: check.cost, ...effects }, metrics))
+    : null;
 }
 
 export function cityOptions(
@@ -27,7 +29,9 @@ export function cityOptions(
   context: BotTickContext,
   _definitions: BotOptionDefinitions,
 ): readonly CommandOption[] {
+  if (!hasOptionState(state)) return [];
   const result: CommandOption[] = [];
+  const metrics = playerOptionMetrics(state, playerId, context, _definitions);
   for (const city of context.citiesByPlayer[playerId] ?? []) {
     const upgrade = constructionOption(
       state,
@@ -45,24 +49,39 @@ export function cityOptions(
                 )) as Fp)
             : ZERO,
       },
+      metrics,
     );
     if (upgrade) result.push(upgrade);
   }
   if (!state.map || !state.hexes) return result;
   for (const hex of context.ownedHexes[playerId] ?? []) {
     const improvedCap = fpMul(hexPopCap(state, hex), IMPROVEMENT_CAP_STEP);
-    const improve = constructionOption(state, playerId, { t: 'improve', hex }, `hex:${hex}`, {
-      income: incomePerSecond(improvedCap, state.players[playerId]?.taxTarget ?? ZERO, 0) as Fp,
-    });
+    const improve = constructionOption(
+      state,
+      playerId,
+      { t: 'improve', hex },
+      `hex:${hex}`,
+      {
+        income: incomePerSecond(improvedCap, state.players[playerId]?.taxTarget ?? ZERO, 0) as Fp,
+      },
+      metrics,
+    );
     if (improve) result.push(improve);
-    const found = constructionOption(state, playerId, { t: 'foundCity', hex }, `hex:${hex}`, {
-      income: (CITY_GOLD_PER_LEVEL +
-        incomePerSecond(
-          cityPopCap(1) - hexPopCap(state, hex),
-          state.players[playerId]?.taxTarget ?? ZERO,
-          0,
-        )) as Fp,
-    });
+    const found = constructionOption(
+      state,
+      playerId,
+      { t: 'foundCity', hex },
+      `hex:${hex}`,
+      {
+        income: (CITY_GOLD_PER_LEVEL +
+          incomePerSecond(
+            cityPopCap(1) - hexPopCap(state, hex),
+            state.players[playerId]?.taxTarget ?? ZERO,
+            0,
+          )) as Fp,
+      },
+      metrics,
+    );
     if (found) result.push(found);
   }
   return result;
