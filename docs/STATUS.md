@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j2 |
+| Текущая задача | 06/T1j1 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
-Очередь: 06/T1j2 → 06/T1j3 → 06/T1j4 → 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
+Очередь: 06/T1j1 → 06/T1j2 → 06/T1j3 → 06/T1j4 → 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
@@ -49,9 +49,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1h завершена:** добавлен `(μ,λ)-ES` с seeded RNG, worker_threads, resume и сохранением весов/отчётов; `brainDecide` принимает обучаемые веса.
 - **Проверки T1h:** тесты 2/2, включая 300 тиков при 1 и 4 worker_threads и resume; typecheck evolve — OK; полный `pnpm verify` — `verify: OK (285 с)`; отчёт — `docs/reports/stage-06-t1h.md`.
 - **06/T1j1 начата в предыдущей сессии:** доделка каталога действий и эффектов.
-- **06/T1j1 завершена:** добавлены реестр `COMMAND_OPTIONS`, варианты команд по файлам, fixed-point эффекты и расширяемые `definitions`; `BUILDING_DEFS` получил радиус снабжения, `incomePerSecond` экспортирован без изменения формулы.
-- **Проверки T1j1:** `bot-options.test.ts` — 3/3; typecheck sim — OK; `pnpm verify --changed` — `verify: OK (183 с)`; полный `pnpm verify` — `verify: OK (286 с)`; отчёт — `docs/reports/stage-06-t1j1.md`.
-- **Следующая задача:** 06/T1j2 — мозг без знания команд.
+- **06/T1j1 возвращена ревью:** эффекты вариантов не нормализованы относительно показателей игрока; генераторы создают команды в обход существующих проверок, а тесты не проверяют допустимость и все виды эффектов. Отчёт — `docs/reports/stage-06-t1j1.md`.
+- **Следующая задача:** 06/T1j1 — исправить замечания ревью.
 - **CI:** начальный `pnpm ci:wait` завершился инфраструктурной ошибкой `fetch failed`; повторная проверка выполняется в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1h.md`, `tools/evolve`, `packages/sim/src/bots/weights.json`.
