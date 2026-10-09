@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1gb |
+| Текущая задача | 06/T1gc |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -38,7 +38,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1g разбита:** T1ga — веса и выбор, T1gb — траты, T1gc — ограничения армий и easy, T1gd — удаление старого мозга и бюджеты, T1ge — проверка родителя.
 - **06/T1ga завершена:** добавлены целочисленная оценка `Σ вес × признак`, выбор положительных действий и стабильный порядок равных оценок; веса хранятся в `packages/sim/src/bots/weights.json`.
 - **Проверки T1ga:** профильный тест — 5/5; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (286 с)`.
-- **Следующая задача:** 06/T1gb — траты до `BOT_GOLD_RESERVE` и одно действие на цель.
+- **06/T1gb завершена:** brain строит каталог действий, проверяет фактическую цену через валидаторы команд, удерживает `BOT_GOLD_RESERVE` с учётом накопленных трат и выполняет одну трату на физический город/гекс.
+- **Проверки T1gb:** профильные тесты — 15/15; локальный движок — 16/16; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (92 с); полный `pnpm verify` — `verify: OK (279 с)`.
+- **Следующая задача:** 06/T1gc — ограничения армий и easy.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/actions.ts`, `packages/sim/src/bots/features.ts`.
 
