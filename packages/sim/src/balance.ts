@@ -196,6 +196,12 @@ export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */
 export const ROAD_PATH_EXISTING_COST: Fp = fp(0.01);
 
+/** Определения построек для каталога действий бота. */
+export const BUILDING_DEFS = {
+  fort: { costGold: FORT_COST, defenseMult: FORT_DEF_MULT, supplyLossMult: fp(1) },
+  depot: { costGold: DEPOT_COST, defenseMult: fp(1), supplyLossMult: DEPOT_LOSS_MULT },
+} as const;
+
 // Армии
 
 export const COST_POP_PER_SOLDIER: ByUnit<Fp> = {
