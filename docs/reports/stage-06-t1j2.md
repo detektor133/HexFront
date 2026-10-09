@@ -20,3 +20,11 @@
 - CI исходного HEAD — success; CI после push ожидает следующую сессию.
 
 Следующая задача: `$review 06/T1j2` в новой сессии.
+
+## Возврат ревью
+
+- Пункт 4 приёмки не подтверждён: `packages/sim/test/bot-brain-dynamic.test.ts:34-57` проверяет фиктивную запись и динамические эффекты, но не передаёт definitions с фиктивным типом юнита, не создаёт угрозу больше нуля и не проверяет `strength*threat`.
+- Тест-страж, который читает `brain.ts`, `actions.ts`, `features.ts` и запрещает литералы видов команд, типов юнитов/построек и импорт `balance.ts`, отсутствует.
+- Профильный прогон `pnpm vitest run packages/sim/test/bot-options.test.ts packages/sim/test/bot-actions-features.test.ts packages/sim/test/bot-brain-dynamic.test.ts packages/sim/test/bot-brain.test.ts packages/sim/test/bot-brain-regressions.test.ts` — 20/20; зелёный прогон не заменяет отсутствующие проверки приёмки.
+
+Следующее действие: добавить полный интеграционный тест и тест-страж, затем повторить `$review 06/T1j2`.
