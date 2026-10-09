@@ -5,13 +5,15 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1e4 |
+| Текущая задача | 06/T1f |
 | Ветка | `stage-06` |
-| Последнее обновление | 2026-10-08 |
+| Последнее обновление | 2026-10-09 |
 
-Очередь: 06/T1e4 → 06/T2
+Очередь: 06/T1f → 06/T1g → 06/T1h → 06/T1i → 06/T1e → 06/T2
 
-Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`. Константы `BOT_*` новой системы добавляет 06/T1a одним коммитом в `10-balance.md` и `balance.ts`.
+Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
+
+Решение владельца 2026-10-09: 06/T1 переделана на каталог действий и обучаемые веса; ручные коэффициенты и пороги CR-008 отменены. `tools/evolve` принято в этап 06. Следующая работа — T1f.
 
 Этап 05 закрыт и смержен в `main` (PR #6): `pnpm verify` — `verify: OK (271 с)`, `pnpm report:match --seeds 3` — 0/3 побед или выбываний. Отчёт: `docs/reports/stage-05.md`.
 
@@ -28,45 +30,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1e3 завершена:** удалены `packages/sim/src/bots/economy.ts`, экспорт `economyDecide` и актуальная архитектурная ссылка; проверки налогов, дороги, easy и автопополнения перенесены на `brainDecide`.
-- **Проверки:** профильный тест `bot-brain-regressions.test.ts` — 5/5; `pnpm verify --changed` — `verify: OK (117 с)`; полный `pnpm verify` — `verify: OK (286 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1e3.md`.
-- **06/T1e4:** таблица трассировки T1 подготовлена в `docs/reports/stage-06-t1e4.md`; задачи T1e и T1 остаются `[ ]` до отдельного `$accept 06/T1`.
-- **Ожидается:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **$accept 06/T1, раунд 1:** не пройден — 0/3 побед до 25:00, 0/3 по золоту, 1/3 по малым отрядам; детали в `docs/reports/stage-06.md`.
-- **Следующая задача:** `$next` может изменить только `BOT_*` по метрикам раунда; после третьего неудачного раунда нужен вопрос владельцу.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1e1.md`, `docs/reports/stage-06-t1e2.md`, `docs/reports/stage-06-t1e3.md`, `docs/reports/stage-06-t1e4.md`.
-
-- **06/T1e2 завершена:** полный benchmark 30 ботов на 5 минуте показал `4,156 / 3,935 / 3,864 / 3,794 / 5,003 мс` на минутах 1–5 при лимите `15 мс`.
-- **Проверки:** `pnpm --filter @hexfront/bench full-match --players=30 --minutes=5` — `budgetExceeded: false`; `pnpm verify --changed` — `verify: OK (10 с)`; полный `pnpm verify` — `verify: OK (283 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1e2.md`.
-- **Следующая задача:** 06/T1e3 — удаление старой цепочки экономики.
-- **Читать:** `packages/sim/src/bots`, `packages/sim/test`, `docs/stages/stage-06-bots-balance.md`.
-
-- **06/T1e1 завершена:** добавлен Vitest-тест двух прогонов по 1200 тиков на `small`, seed 42, шесть ботов; команды каждого тика и итоговый `hashState` совпадают.
-- **Проверки:** профильный тест 1/1; `pnpm verify --changed` — `verify: OK (102 с)`; полный `pnpm verify` — `verify: OK (279 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1e1.md`.
-- **Следующая задача:** 06/T1e2 — бюджет полного тика на 30 ботах за 5 минут.
-- **Читать:** `tools/bench/src/full-match-bench.ts`, `docs/stages/stage-06-bots-balance.md`, `docs/architecture/sim-core.md`.
-
-- **06/T1d завершена:** commander для ботов направляет резерв и новые отряды в армию активной цели, малые однотипные отряды сближаются и сливаются; человеческий режим и golden сохранены.
-- **Проверки:** `commander.test.ts` — 16/16; bot-тесты — 24/24; benchmark commander — 0,077 мс/бот/ход для 30 и 0,293 для 100 при лимите 0,348; полный `pnpm verify` — `verify: OK (285 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1d.md`.
-- **Следующая задача:** 06/T1e — два детерминированных прогона, бюджет полного тика и удаление старого `economy.ts`.
-- **Читать:** `docs/gdd/09-bots.md`, `docs/architecture/sim-core.md`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `docs/stages/stage-06-bots-balance.md`.
-
-- **06/T1e разбита:** T1e1 проверяет детерминизм, T1e2 — бюджет полного тика, T1e3 — удаление старой цепочки экономики, T1e4 — сквозная проверка родителя и `$accept 06/T1`.
-- **Следующая задача:** 06/T1e1.
-- **Читать:** `packages/sim/test`, `packages/sim/src/bots`, `tools/bench`, `docs/stages/stage-06-bots-balance.md`.
-
-- **06/T1b завершена:** добавлен `bots/snapshot.ts`; снимок использует индекс `гекс → отряды`, базы дохода контекста и пограничные гексы, без `playerView` и полного обхода карты.
-- **Проверки:** `bot-snapshot.test.ts` — 3/3, включая 30 игроков на тиках 600 и 3000; `bot-context.test.ts` — 2/2; `pnpm --filter @hexfront/sim typecheck` — OK; полный `pnpm verify` — `verify: OK (292 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1b.md`.
-- **06/T1c завершена:** добавлен `bots/brain.ts`; `botCommands` использует снимок и общий контекст, выдаёт несколько трат, управляет ▶/■ и сохраняет поведение easy.
-- **Проверки:** `bot-brain.test.ts` — 3/3, старые проверки экономики — 24/24; минутный стенд 30 ботов — 1,644 мс полного тика и 0,05 мс экономики; полный `pnpm verify` — `verify: OK (287 с)`.
-- **Отчёт:** `docs/reports/stage-06-t1c.md`.
-- **Следующая задача:** 06/T1d — путь ботов в commander: резерв, слияние малых отрядов и сохранение golden.
-- **Читать:** `docs/gdd/09-bots.md`, `docs/architecture/sim-core.md`, `packages/sim/src/bots/snapshot.ts`, `packages/sim/src/bots/goals.ts`, `docs/stages/stage-06-bots-balance.md`.
+- **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
+- **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
+- **06/T1e4:** заменена новой T1e; таблица трассировки будет обновлена после T1f/T1g/T1h/T1i.
+- **Следующая задача:** 06/T1f — каталог действий и признаки.
+- **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`.
 
 ## Архив сессий
 

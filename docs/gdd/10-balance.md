@@ -21,37 +21,14 @@
 
 ## Боты
 
-Пороги utility AI бота (`09-bots.md`, «Utility AI»; 04/T23).
+Веса бота — `bots/weights.json`, подбирает `tools/evolve` (ADR 0010).
 
 | Константа | Значение |
 | --- | --- |
-| `BOT_TAX_PEACE` (FP) | 0,15 |
-| `BOT_TAX_WAR` (FP) | 0,30 |
 | `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
 | `BOT_EASY_TAX` (FP) | 0,20 `[ТЮНИНГ]` |
 | `BOT_GOLD_RESERVE` (FP) | 50 |
-| `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
-| `BOT_ARMY_RATIO` (FP) | 0,8 |
-| `BOT_ARMY_INCOME_SHARE` (FP) | 0,5 |
 | `BOT_LINE_MAX_DEPTH` | 6 |
-| `BOT_W_ROAD` (FP) | 1,0 `[ТЮНИНГ]` |
-| `BOT_W_DEFEND` (FP) | 0,9 `[ТЮНИНГ]` |
-| `BOT_W_ATTACK` (FP) | 0,8 `[ТЮНИНГ]` |
-| `BOT_W_RECRUIT` (FP) | 0,7 `[ТЮНИНГ]` |
-| `BOT_W_FOUND` (FP) | 0,6 `[ТЮНИНГ]` |
-| `BOT_W_UPGRADE` (FP) | 0,4 `[ТЮНИНГ]` |
-| `BOT_W_IMPROVE` (FP) | 0,3 `[ТЮНИНГ]` |
-| `BOT_W_FORT` (FP) | 0,3 `[ТЮНИНГ]` |
-| `BOT_MIN_UTILITY` (FP) | 0,1 `[ТЮНИНГ]` |
-| `BOT_MAX_SPENDS` | 3 `[ТЮНИНГ]` |
-| `BOT_ATTACK_MIN_RATIO` (FP) | 1,2 `[ТЮНИНГ]` |
-| `BOT_ATTACK_STOP_RATIO` (FP) | 0,8 `[ТЮНИНГ]` |
-| `BOT_RATIO_CAP` (FP) | 3,0 `[ТЮНИНГ]` |
-| `BOT_TARGET_STICKY` (FP) | 0,25 `[ТЮНИНГ]` |
-| `BOT_ELIM_CITIES` | 2 `[ТЮНИНГ]` |
-| `BOT_ELIM_BONUS` (FP) | 0,5 `[ТЮНИНГ]` |
-| `BOT_GOLD_TARGET` (FP) | 1 500 `[ТЮНИНГ]` |
-| `BOT_GOLD_RUNWAY_S` (FP) | 300 `[ТЮНИНГ]` |
 | `BOT_MERGE_BELOW` (FP) | 25 `[ТЮНИНГ]` |
 | `BOT_MERGE_RADIUS` | 3 `[ТЮНИНГ]` |
 
