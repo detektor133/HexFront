@@ -54,77 +54,86 @@
 - [x] **T1h. `tools/evolve`** (подсистема инструменты, без новых зависимостей; команда `pnpm evolve`). Запреты T1 действуют.
   *Приёмка:* реализована (μ,λ)-ES с целочисленными весами, seeded RNG, worker_threads и параметрами `--population`, `--seeds`, `--generations`, `--workers`, `--resume`; короткий Vitest-прогон на 300 тиках даёт одинаковый `weights.json` при 1 и 4 worker_threads; после поколения сохраняются `weights.json`, состояние resume и отчёт `docs/reports/evolve/`; полный `pnpm evolve` в задаче не запускается.
 
-- [ ] **T1j. Доделка обучаемых весов** (решение 2026-10-09), не задача владельца. Запреты T1 действуют в каждой подзадаче. Дополнительные запреты T1j, тоже в каждой подзадаче:
+- [ ] **T1j. Доделка обучаемых весов** (решение 2026-10-09), не задача владельца. Цель: новая механика, юнит или постройка подхватывается ботом без правки кода бота, а всё, что решает бот, — обучаемые веса, а не ручные числа. Запреты T1 действуют в каждой подзадаче. Дополнительные запреты T1j, тоже в каждой подзадаче:
   - новых констант BOT_* и чисел, которых нет в тексте T1j или в 10-balance.md, не вводить; нужен новый — вопрос в QUESTIONS.md и стоп;
-  - в packages/sim/src/bots/brain.ts, actions.ts, features.ts — ни одного строкового литерала типа юнита или постройки ('infantry', 'armor', 'artillery', 'fort', 'depot') и ни одного порога решения, кроме сравнения оценки с 0;
-  - тесты мозга передают свои веса явно; от weights.json зависит только тест его формата. Существующие тесты мозга, которые берут веса по умолчанию, разрешено дополнить явными весами, не меняя их проверок (expect);
+  - в packages/sim/src/bots/brain.ts, actions.ts, features.ts нет: строковых литералов видов команд ('recruit', 'build', 'upgradeCity', 'improve', 'foundCity', 'rebuildSupply', 'setTax', 'startOffensive', 'stopOffensive'), типов юнитов ('infantry', 'armor', 'artillery') и построек ('fort', 'depot'); импорта balance.ts; порогов решения, кроме сравнения оценки с 0;
+  - после T1j у ботов остаются только числа, которые не решают «что делать»: BOT_THINK_TICKS и BOT_EASY_THINK_TICKS (как часто бот думает) и BOT_LINE_MAX_DEPTH (предел вычислений линии наступления);
+  - тесты мозга и commander передают свои веса явно; от weights.json и weights-easy.json зависит только тест их формата. Существующие тесты мозга, которые берут веса по умолчанию, разрешено дополнить явными весами, не меняя их проверок (expect);
   - владелец разрешает заменить новыми тестами T1j только эти тесты, другие чужие тесты не ослаблять:
     · packages/sim/test/bot-brain-regressions.test.ts:40-51 (налог мира и налог войны);
+    · packages/sim/test/bot-brain-regressions.test.ts:71-93 (easy-налог 20 % и резерв золота);
     · packages/sim/test/bot-brain.test.ts:26 («не превышает BOT_MAX_SPENDS»);
     · packages/sim/test/bot-brain.test.ts:45 («запускает и останавливает наступление по отношению сил»);
+    · packages/sim/test/bot-brain.test.ts:75 и :105 (easy-налог и easy без ▶/■);
     · packages/sim/test/bot-actions-features.test.ts:71 (старые эффекты и признаки);
     · tools/evolve/src/index.test.ts:10 (разбор параметров и --resume с путём).
-  *Приёмка:* T1j1–T1j4 отмечены [x].
+  *Приёмка:* T1j1–T1j6 отмечены [x].
 
-- [ ] **T1j1. Каталог из определений и эффекты** (bots/actions.ts, bots/features.ts, сборка каталога в bots/brain.ts, BUILDING_DEFS в balance.ts, экспорт incomePerSecond из systems/economy.ts без изменения формулы — это часть подсистемы бот, не отдельная подсистема; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
-  1) Типы юнитов — ключи таблиц ByUnit баланса; COST_GOLD_PER_SOLDIER, UPKEEP_GOLD_PER_SOLDIER_S, ATK, DEF, SUPPLY_PER_SOLDIER берутся из этих таблиц, списка юнитов в мозге нет. Постройки — ключи BUILDING_DEFS. В BUILDING_DEFS добавляется поле supplyRadius: у fort — 0, у depot — DEPOT_RADIUS. Тип команды build — `keyof typeof BUILDING_DEFS`. Тест-страж читает исходники brain.ts, actions.ts, features.ts и падает на литерале типа юнита или постройки.
-  2) Эффекты действий — функциями sim, без копирования формул. Табличный тест на сценарии с 2 своими городами (один из них изолирован), своими солдатами на граничном гексе и контактом с врагом: у каждого вида действия хотя бы один эффект ≠ 0.
-     - Набор N солдат типа T: сила = N × (ATK + DEF), содержание = N × UPKEEP_GOLD_PER_SOLDIER_S + UPKEEP_GOLD_PER_UNIT_S типа, снабжение = −N × SUPPLY_PER_SOLDIER, цена — checkRecruit.
-     - Постройка K на гексе H: оборона = (defenseMult − 1) × свои солдаты на H; снабжение = (1 − supplyLossMult) × свои солдаты на гексах в радиусе supplyRadius от H (по context.unitsByHex); цена — checkConstruction.
-     - upgradeCity: Δдохода = cityGold на уровне +1 − cityGold сейчас (state/city-output.ts) + incomePerSecond(cityPopCap(уровень+1) − cityPopCap(уровень), taxTarget, 0); цена — checkConstruction.
-     - improve на гексе H: Δдохода = incomePerSecond(hexPopCap с improvement+1 − hexPopCap сейчас, taxTarget, 0); цена — checkConstruction.
-     - foundCity на гексе H: Δдохода = CITY_GOLD_PER_LEVEL + incomePerSecond(cityPopCap(1) − hexPopCap(H), taxTarget, 0); цена — checkConstruction.
-     - rebuildSupply изолированного города C: Δдохода = cityGold(C) / ISOLATED_INCOME_MULT − cityGold(C) (fpDiv); цена — rebuildSupplyPlan.
-     - setTax (ставки TAX_MIN…TAX_MAX шагом TAX_STEP): Δдохода = playerIncomePerSecond(state, id, ставка, context.incomeBases) − то же при taxTarget; новый эффект «рост» = taxGrowthMult(ставка) − taxGrowthMult(taxTarget) (systems/tax.ts).
-     - ▶/■ армии: признаки фронта из п. 3.
-  3) Контексты и признаки:
-     - угроза — max по врагам theirs / (mine + theirs) из снимка; запас золота — золото / (золото + доход × 60 с) (09-bots.md); сами контексты тоже признаки;
-     - neutralBorderShare — доля своих граничных гексов (context.borderHexes) с соседом без владельца;
-     - frontRatio — mine / (mine + theirs) контакта с врагом именно этого фронта;
-     - enemyCities — 1 / (1 + число городов этого врага по context.citiesByPlayer);
-     - activeOffensive — 1, если наступление армии активно, иначе 0;
-     - frontRatio, enemyCities, activeOffensive у действий не ▶/■ равны 0;
-     - для каждого эффекта (цена, содержание, доход, сила, оборона, снабжение, рост) — сам эффект и эффект × каждый контекст (угроза, запас золота, neutralBorderShare).
-     Каждый признак — fixed-point, табличный тест на каждый.
-  4) Экспортируемая planBotActions(state, playerId, context, level, weights, definitions) — единственный путь, которым brainDecide строит и ранжирует действия. Интеграционный тест:
-     - с определениями, где добавлен фиктивный тип юнита с ATK больше всех, при весе силы × угроза > 0 и угрозе > 0 первым действием идёт набор фиктивного типа;
-     - на определениях по умолчанию brainDecide возвращает команды ровно из planBotActions.
+- [ ] **T1j1. Варианты команд с эффектами** (реестр packages/sim/src/bots/options/index.ts; варианты и эффекты каждого вида команды — в своём файле packages/sim/src/bots/options/<вид>.ts, например recruit.ts, build.ts, city.ts, rebuild-supply.ts, tax.ts, offensive.ts; BUILDING_DEFS в balance.ts; экспорт incomePerSecond из systems/economy.ts без изменения формулы; всё это — подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+  1) Реестр COMMAND_OPTIONS — список записей { kind, options(state, playerId, context, definitions) → варианты }. Вариант — { command, group, effects }, где effects — Record<string, Fp>: изменение показателя игрока относительно его текущего значения (доля, fixed-point), знаменатели: cost — золото игрока; upkeep — его содержание/с; income — его доход/с; strength, defense, supply — его сила Σ солдаты × (ATK + DEF) по context.unitsByPlayer; growth, frontRatio, enemyCities, activeOffensive — уже доли; знаменатель 0 → эффект 0. Новая механика добавляется новым файлом в bots/options и одной строкой регистрации в реестре; мозг (brain.ts, actions.ts, features.ts) при этом не меняется. Файлы bots/options импортируют только sim (commands, state, systems, balance) и тип контекста бота; циклических импортов нет (dependency-cruiser). definitions по умолчанию — таблицы balance.ts.
+  2) Варианты, все — только допустимые по существующим check-функциям (checkRecruit, checkConstruction, rebuildSupplyPlan, validateSetTax, validatePlanCommand):
+     - recruit — каждый свой свободный город × каждый тип юнита из ключей таблиц ByUnit; солдат — наибольшее число по золоту игрока и recruitCapacity, вниз до шага RECRUIT_STEP, не меньше RECRUIT_MIN; group — город;
+     - build — свои граничные гексы (context.borderHexes) и гексы своих городов × ключи BUILDING_DEFS; group — гекс;
+     - upgradeCity — свои города; improve и foundCity — свои гексы (context.ownedHexes); group — гекс;
+     - rebuildSupply — свои изолированные города; group — город;
+     - setTax — ставки TAX_MIN…TAX_MAX шагом TAX_STEP, кроме taxTarget; group — налог;
+     - startOffensive — своя армия с фронтом у врага без активного наступления; stopOffensive — с активным; group — армия.
+  3) Эффекты — функциями sim, без копирования формул. Табличный тест на сценарии с 2 своими городами (один изолирован), своими солдатами на граничном гексе и контактом с врагом: у каждого вида хотя бы один эффект ≠ 0.
+     - recruit N солдат типа T: cost; upkeep = N × UPKEEP_GOLD_PER_SOLDIER_S + UPKEEP_GOLD_PER_UNIT_S типа; strength = N × (ATK + DEF); supply = −N × SUPPLY_PER_SOLDIER.
+     - build K на гексе H: cost; defense = (defenseMult − 1) × свои солдаты на H; supply = (1 − supplyLossMult) × свои солдаты на гексах в радиусе supplyRadius от H (context.unitsByHex). В BUILDING_DEFS добавляется supplyRadius: fort — 0, depot — DEPOT_RADIUS; тип команды build — `keyof typeof BUILDING_DEFS`.
+     - upgradeCity: cost; income = cityGold на уровне +1 − cityGold сейчас (state/city-output.ts) + incomePerSecond(cityPopCap(уровень+1) − cityPopCap(уровень), taxTarget, 0).
+     - improve на H: cost; income = incomePerSecond(hexPopCap с improvement+1 − hexPopCap сейчас, taxTarget, 0).
+     - foundCity на H: cost; income = CITY_GOLD_PER_LEVEL + incomePerSecond(cityPopCap(1) − hexPopCap(H), taxTarget, 0).
+     - rebuildSupply города C: cost; income = cityGold(C) / ISOLATED_INCOME_MULT − cityGold(C) (fpDiv).
+     - setTax: income = playerIncomePerSecond(state, id, ставка, context.incomeBases) − то же при taxTarget; growth = taxGrowthMult(ставка) − taxGrowthMult(taxTarget) (systems/tax.ts).
+     - startOffensive и stopOffensive: frontRatio = mine / (mine + theirs) контакта с врагом этого фронта; enemyCities = 1 / (1 + число городов этого врага по context.citiesByPlayer); activeOffensive = 1 у stopOffensive, 0 у startOffensive.
+  4) Тест расширяемости реестра: definitions с фиктивным типом юнита (ATK больше всех) и фиктивной постройкой дают их варианты и эффекты без изменения кода bots/options и мозга.
 
-- [ ] **T1j2. Выбор и команды по весам** (bots/brain.ts, bots/run.ts, bots/weights.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
-  1) brainDecide и botCommands принимают веса по id игрока (массив, по умолчанию weights.json у всех); тест — два бота с разными весами в одном тике выбирают по своим весам. Налог — одна ставка с наибольшей оценкой; команда setTax — если она отличается от taxTarget. ▶ — если оценка фронта > 0 и наступление не активно; ■ — если оценка ≤ 0 и наступление активно. Easy: без ▶ и ■, налог BOT_EASY_TAX. Тест на явных весах: изменение одного веса меняет выбранную ставку, и изменение одного веса меняет решение ▶.
-  2) Набор — наибольшее число солдат по золоту сверх BOT_GOLD_RESERVE и по вместимости города (recruitCapacity), вниз до шага RECRUIT_STEP, не меньше RECRUIT_MIN; эффекты считаются для этого числа. Траты:
-     - без лимита по числу, пока золото ≥ цена + BOT_GOLD_RESERVE;
-     - одна на город или гекс;
-     - rebuildSupply оценивается вместе со всеми, без приоритета.
-  3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j.
-     weights.json — ключ на каждый признак T1j1 п. 3, все значения 0.
-  4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Каталог и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
+- [ ] **T1j2. Мозг без знания команд** (bots/brain.ts, bots/actions.ts, bots/features.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+  1) Экспортируемая planBotActions(state, playerId, context, weights, options = COMMAND_OPTIONS) — единственный путь, которым brainDecide строит, оценивает и выбирает команды; brainDecide возвращает ровно её команды (тест).
+  2) Признаки строятся из ключей effects автоматически, списка эффектов в боте нет. Контексты из снимка: threat — max по врагам theirs / (mine + theirs); goldSeconds — золото / доход (0 при доходе 0); neutralBorderShare — доля своих граничных гексов с соседом без владельца. Признаки варианта: каждый контекст; каждый эффект k; k × каждый контекст. Имя признака — `k`, `k*threat`, `k*goldSeconds`, `k*neutralBorderShare`, `threat`, `goldSeconds`, `neutralBorderShare`. Признака нет в весах — его вес 0. Оценка = Σ вес × признак, целые числа. Табличный тест на каждый вид признака.
+  3) Выбор: в каждой group — один вариант с наибольшей оценкой > 0 (при равенстве — порядок реестра, затем порядок вариантов). Выбранные варианты исполняются по убыванию оценки; вариант с cost > 0 — пока золото ≥ его цены. Лимита числа действий нет.
+  4) Интеграционный тест: реестр, дополненный в тесте фиктивной записью с эффектом { testEffect: 1000 }, и definitions с фиктивным типом юнита — при весах testEffect > 0 и strength*threat > 0 и угрозе > 0 бот выбирает фиктивные варианты без изменения кода бота. Тест-страж читает исходники brain.ts, actions.ts, features.ts и падает на запрещённых литералах и импорте balance.ts (запрет T1j).
 
-- [ ] **T1j3. Обучение в tools/evolve по критериям T1** (tools/evolve, tools/replay; подсистема инструменты, без новых зависимостей). Запреты T1 и T1j действуют. Приёмка:
+- [ ] **T1j3. Веса по игроку, уровни и удаление констант мозга** (bots/brain.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+  1) brainDecide и botCommands принимают веса по id игрока (массив); по умолчанию medium — weights.json, easy — weights-easy.json. Тест: два бота с разными весами в одном тике выбирают каждый по своим. Тест на явных весах: изменение одного веса меняет выбранную ставку налога, и изменение одного веса меняет решение ▶.
+  2) Уровни различаются только весами и частотой решения: easy — weights-easy.json и раз в BOT_EASY_THINK_TICKS; отдельных правил easy (налог, запрет ▶/■) нет.
+  3) Удалить из balance.ts и всего packages/sim/src: BOT_TAX_PEACE, BOT_TAX_WAR, BOT_ATTACK_MIN_RATIO, BOT_ATTACK_STOP_RATIO, BOT_MAX_SPENDS, BOT_GOLD_RESERVE, BOT_EASY_TAX. Тест-страж: таких экспортов в balance.ts и таких имён в исходниках packages/sim/src нет. Заменяемые тесты — список в T1j. weights.json и weights-easy.json — ключ на каждый признак вариантов реестра по умолчанию, все значения 0.
+  4) Минутный замер по $task: полный тик 30 ботов ≤ 15 мс, экономика ≤ 0,508 мс/бот/ход (база 05/T15d). Варианты и оценка считаются при любых весах, поэтому замер на нулевых весах валиден. Golden commander не меняются.
+
+- [ ] **T1j4. Параметры commander из весов** (bots/commander.ts, bots/run.ts, bots/weights.json, bots/weights-easy.json, balance.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+  1) Путь ботов в commander берёт порог слияния малых отрядов и радиус слияния из весов своего игрока: ключи commander.mergeBelowSoldiers и commander.mergeRadius в weights.json и weights-easy.json, начальные значения 25 и 3 (прежние BOT_MERGE_BELOW и BOT_MERGE_RADIUS, дальше их подбирает обучение); значения < 0 считаются 0. commanderCommands принимает веса по id игрока.
+  2) BOT_MERGE_BELOW и BOT_MERGE_RADIUS удалены из balance.ts и packages/sim/src; тест-страж.
+  3) Для игроков без бота и для армий людей команды commander не меняются: golden-хэши и тест «для игрока без ботов сохраняет прежнюю выдачу команд» (packages/sim/test/scenarios/commander.test.ts:307) без изменений.
+  4) Минутный замер по $task: commander ≤ 0,348 мс/бот/ход, полный тик 30 ботов ≤ 15 мс.
+
+- [ ] **T1j5. Обучение в tools/evolve по критериям T1** (tools/evolve, tools/replay; подсистема инструменты, без новых зависимостей). Запреты T1 и T1j действуют. Приёмка:
   1) Подсчёт критериев T1 — одна чистая функция в tools/replay:
      - по каждому игроку: самое долгое время подряд с золотом > 5 000 и самое долгое время подряд его отряда < 10 солдат, в секундах;
      - по матчу: победа, причина, тик.
      tools/replay/src/bot-match.ts считает acceptance (maxGoldOver5000S, maxUnitUnder10S — максимум по игрокам) через неё, tools/evolve — тоже. Тест: на 600 тиках сида 42 значения функции равны значениям, посчитанным в тесте прямым перебором по тикам.
-  2) Матч:
-     - 6 мест: оцениваемая особь и 5 соперников из текущего поколения и зала славы (лучшая особь каждого прошлого поколения), выбор по seeded rng, место особи на карте меняется по сидам; веса передаются botCommands по id игрока (T1j2 п. 1);
+  2) Матч и особь:
+     - особь — все ключи weights.json, включая commander.*; веса целые в [−1000, 1000]; мутация ±sigma, параметр --sigma, по умолчанию 100;
+     - 6 мест: оцениваемая особь и 5 соперников из текущего поколения и зала славы (лучшая особь каждого прошлого поколения), выбор по seeded rng, место особи на карте меняется по сидам; веса передаются botCommands и commanderCommands по id игрока;
      - по умолчанию до победы или 15 000 тиков (25:00);
-     - лучшая особь переходит в следующее поколение без мутации;
-     - веса целые в [−1000, 1000], мутация ±sigma, параметр --sigma, по умолчанию 100.
+     - лучшая особь переходит в следующее поколение без мутации.
   3) Фитнес особи — целое число, сумма по её матчам: 1000 × (6 − её место по playerPlaces) + 3000, если она победила захватом или выбыванием до 25:00, − 1000 × (её время золота > 5 000, с) / 120 − 1000 × (её время отряда < 10, с) / 30; деление — intDiv. Табличный тест на синтетических метриках.
   4) Запуск и отчёт:
+     - после каждого поколения пишет weights.json (лучшая особь) и weights-easy.json (лучшая особь поколения --easy-generation, по умолчанию треть последнего поколения вниз, не меньше 1);
      - `pnpm evolve --resume` без пути продолжает с последнего состояния (номер поколения, вся популяция, зал славы, сиды, sigma);
      - --workers по умолчанию — os.availableParallelism() − 1;
-     - vitest с --ticks=300 --population=4 --seeds=2 --generations=2 (это тест, не ботоматч): одинаковый weights.json при --workers=1 и --workers=4;
+     - vitest с --ticks=300 --population=4 --seeds=2 --generations=2 (это тест, не ботоматч): одинаковые weights.json и weights-easy.json при --workers=1 и --workers=4;
      - отчёт поколения в docs/reports/evolve/: лучший и средний фитнес, три метрики лучшей особи, время поколения.
      Полный `pnpm evolve` в задаче не запускать.
 
-- [ ] **T1j4. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
-  1) В отчёте docs/reports/stage-06-t1j.md по каждому пункту T1j1–T1j3 указаны file:line кода и имя теста.
-  2) Пусты оба поиска, вывод — в отчёте:
-     - `rg -n "'(infantry|armor|artillery|fort|depot)'" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts packages/sim/src/bots/features.ts`;
-     - `rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS" packages/sim/src`.
+- [ ] **T1j6. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
+  1) В отчёте docs/reports/stage-06-t1j.md по каждому пункту T1j1–T1j5 указаны file:line кода и имя теста.
+  2) Пусты все три поиска, вывод — в отчёте:
+     - `rg -n "'(recruit|build|upgradeCity|improve|foundCity|rebuildSupply|setTax|startOffensive|stopOffensive|infantry|armor|artillery|fort|depot)'" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts packages/sim/src/bots/features.ts`;
+     - `rg -n "balance" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts packages/sim/src/bots/features.ts`;
+     - `rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX|BOT_MERGE_" packages/sim/src`.
   3) Полный `pnpm verify` зелёный.
-  4) Только после этого T1j4 и T1j отмечаются [x].
+  4) Только после этого T1j6 и T1j отмечаются [x].
 
 - [ ] **T1i. Обучение весов**, задача владельца. Владелец запускает `pnpm evolve --population=12 --seeds=6 --generations=30`, продолжает через `pnpm evolve --resume` без пути, затем пишет `$next`.
 
@@ -141,7 +150,11 @@
 | Запреты T1 и сохранение easy/автопополнения | T1ga–T1ge |
 | Удаление старого мозга и бюджеты | T1gd |
 | Проверка всех критериев T1g | T1ge |
-| Офлайн-подбор весов | T1j3 |
+| Варианты команд с эффектами, мозг без знания команд | T1j1, T1j2 |
+| Веса по игроку, уровни, удаление констант мозга | T1j3 |
+| Параметры commander из весов | T1j4 |
+| Офлайн-подбор весов | T1j5 |
+| Проверка T1j по коду | T1j6 |
 | Запуск обучения владельцем | T1i |
 | Таблица трассировки и итоговая проверка | T1e |
 
@@ -150,7 +163,7 @@
 
 ## Порядок
 
-T1j1 → T1j2 → T1j3 → T1j4 → T1i → T1e → T2.
+T1j1 → T1j2 → T1j3 → T1j4 → T1j5 → T1j6 → T1i → T1e → T2.
 
 ## Вне объёма
 

@@ -21,16 +21,12 @@
 
 ## Боты
 
-Веса бота — `bots/weights.json`, подбирает `tools/evolve` (ADR 0010).
+Веса бота — `bots/weights.json` и `bots/weights-easy.json` (включая порог и радиус слияния малых отрядов commander), подбирает `tools/evolve` (ADR 0010).
 
 | Константа | Значение |
 | --- | --- |
 | `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
-| `BOT_EASY_TAX` (FP) | 0,20 `[ТЮНИНГ]` |
-| `BOT_GOLD_RESERVE` (FP) | 50 |
 | `BOT_LINE_MAX_DEPTH` | 6 |
-| `BOT_MERGE_BELOW` (FP) | 25 `[ТЮНИНГ]` |
-| `BOT_MERGE_RADIUS` | 3 `[ТЮНИНГ]` |
 
 ## Местность
 
