@@ -33,3 +33,11 @@
 - `pnpm ai-check --changed` — OK (10 с).
 - Исправлено в `packages/sim/src/bots/options/build.ts`: внутренние негородские гексы исключены из каталога.
 - Регрессионный тест `не предлагает строить на внутреннем негородском гексе` — 1/1.
+
+## Итоговое ревью
+
+- **OK.** Все 4 пункта приёмки подтверждены: реестр — `bot-options.test.ts:56-67`, допустимость вариантов — генераторы в `bots/options/*.ts` и `bot-options.test.ts:84-108`, эффекты — `bot-options.test.ts:110-220`, расширяемость — `bot-options.test.ts:70-81`.
+- `pnpm exec vitest run packages/sim/test/bot-options.test.ts` — 9/9.
+- `pnpm --filter @hexfront/sim typecheck` — OK.
+- `pnpm exec depcruise packages/sim/src packages/sim/test --config .dependency-cruiser.cjs` — 160 модулей, 861 зависимость, нарушений нет.
+- Стражи ограничений по изменённым файлам не нашли `playerView`, случайность, float-арифметику, запрещённые импорты или обходы карты; внутренние негородские гексы покрыты регрессионным тестом.

@@ -50,7 +50,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки T1h:** тесты 2/2, включая 300 тиков при 1 и 4 worker_threads и resume; typecheck evolve — OK; полный `pnpm verify` — `verify: OK (285 с)`; отчёт — `docs/reports/stage-06-t1h.md`.
 - **06/T1j1 исправлено после ревью:** `buildOptions` больше не добавляет внутренние негородские гексы; добавлен регрессионный тест на это ограничение.
 - **Проверки T1j1:** профильный тест — 9/9; `pnpm verify --changed` — `verify: OK (102 с)`; полный `pnpm verify` — `verify: OK (290 с)`; отчёт — `docs/reports/stage-06-t1j1.md`.
-- **Следующая задача:** `$review 06/T1j1` в новой сессии.
+- **06/T1j1 принята ревью:** критерии реестра, допустимости вариантов, fixed-point эффектов и расширяемости подтверждены тестами; typecheck и dependency-cruiser зелёные. Отчёт — `docs/reports/stage-06-t1j1.md`.
+- **Следующая задача:** `$task 06/T1j2`.
 - **CI:** начальный `pnpm ci:wait` завершился инфраструктурной ошибкой `fetch failed`; повторная проверка выполняется в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1h.md`, `tools/evolve`, `packages/sim/src/bots/weights.json`.
