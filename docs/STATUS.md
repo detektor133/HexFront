@@ -5,7 +5,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j2 |
+| Текущая задача | 06/T1j3 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-09 |
 
@@ -53,7 +53,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1j1 принята ревью:** критерии реестра, допустимости вариантов, fixed-point эффектов и расширяемости подтверждены тестами; typecheck и dependency-cruiser зелёные. Отчёт — `docs/reports/stage-06-t1j1.md`.
 - **06/T1j2 исправлена после ревью:** `planBotActions` передаёт definitions в реестр; добавлены интеграционный тест с фиктивным юнитом, `threat > 0`, `strength*threat` и тест-страж исходников мозга.
 - **Проверки T1j2:** профильный прогон — 22/22; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (281 с)`; отчёт — `docs/reports/stage-06-t1j2.md`.
-- **Следующая задача:** `$review 06/T1j2` в новой сессии.
+- **06/T1j2 принята ревью:** все четыре критерия подтверждены 22/22 профильными тестами; тест-страж запретов, typecheck и замер 30/100 ботов прошли. Отчёт — `docs/reports/stage-06-t1j2.md`.
+- **Следующая задача:** `$task 06/T1j3`.
 - **CI:** `pnpm ci:wait` для исходного HEAD — success; после push проверится в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`.

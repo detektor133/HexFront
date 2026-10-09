@@ -89,7 +89,7 @@
      - startOffensive и stopOffensive: frontRatio = mine / (mine + theirs) контакта с врагом этого фронта; enemyCities = 1 / (1 + число городов этого врага по context.citiesByPlayer); activeOffensive = 1 у stopOffensive, 0 у startOffensive.
   4) Тест расширяемости реестра: definitions с фиктивным типом юнита (ATK больше всех) и фиктивной постройкой дают их варианты и эффекты без изменения кода bots/options и мозга.
 
-- [~] **T1j2. Мозг без знания команд** (bots/brain.ts, bots/actions.ts, bots/features.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
+- [x] **T1j2. Мозг без знания команд** (bots/brain.ts, bots/actions.ts, bots/features.ts; подсистема бот). Запреты T1 и T1j действуют. Приёмка:
   1) Экспортируемая planBotActions(state, playerId, context, weights, options = COMMAND_OPTIONS) — единственный путь, которым brainDecide строит, оценивает и выбирает команды; brainDecide возвращает ровно её команды (тест).
   2) Признаки строятся из ключей effects автоматически, списка эффектов в боте нет. Контексты из снимка: threat — max по врагам theirs / (mine + theirs); goldSeconds — золото / доход (0 при доходе 0); neutralBorderShare — доля своих граничных гексов с соседом без владельца. Признаки варианта: каждый контекст; каждый эффект k; k × каждый контекст. Имя признака — `k`, `k*threat`, `k*goldSeconds`, `k*neutralBorderShare`, `threat`, `goldSeconds`, `neutralBorderShare`. Признака нет в весах — его вес 0. Оценка = Σ вес × признак, целые числа. Табличный тест на каждый вид признака.
   3) Выбор: в каждой group — один вариант с наибольшей оценкой > 0 (при равенстве — порядок реестра, затем порядок вариантов). Выбранные варианты исполняются по убыванию оценки; вариант с cost > 0 — пока золото ≥ его цены. Лимита числа действий нет.
