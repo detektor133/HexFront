@@ -30,8 +30,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j4 выполнена:** commander получает `commander.mergeBelowSoldiers` и `commander.mergeRadius` из весов игрока; отрицательные значения обнуляются, `BOT_MERGE_*` удалены. Профильные тесты 23/23, typecheck и `pnpm ai-check --changed` зелёные. Benchmark: 30 ботов — полный тик 1,757 мс, commander 0,084 мс/бот/ход; 100 ботов — 10,930 мс и 0,299 мс/бот/ход. Полный `pnpm verify` — `verify: OK (296 с)`. Отчёт — `docs/reports/stage-06-t1j4.md`.
-- **Следующая задача:** 06/T1j5.
+- **06/T1j4 возвращена ревью:** `packages/sim/src/bots/run.ts:86,89` содержит балансные fallback-значения `25` и `3`, дублирующие веса. Повторный benchmark: 30 ботов — полный тик 1,705 мс, commander 0,081 мс/бот/ход; 100 ботов — 10,751 мс и 0,300 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
+- **Следующая работа:** убрать балансный хардкод в T1j4 и повторить `$review 06/T1j4`.
 - **Изменённые файлы T1j4:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/scenarios/commander.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `docs/reports/stage-06-t1j4.md`.
 - **Проверки T1j4:** профильные тесты — 23/23; `pnpm --filter @hexfront/sim typecheck` и `pnpm ai-check --changed` — OK; benchmark 30/100 ботов — commander 0,084/0,299 мс на бот/ход; полный `pnpm verify` — `verify: OK (296 с)`.
 
