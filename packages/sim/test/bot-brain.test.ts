@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BOT_EASY_TAX, BOT_GOLD_TARGET } from '../src/balance.ts';
+import { BOT_EASY_TAX } from '../src/balance.ts';
 import { assignFront, assignUnits, at, city, createArmy, own, scenario } from './scenario/dsl.ts';
 import { brainDecide } from '../src/bots/brain.ts';
 import { createBotTickContext } from '../src/bots/context.ts';
@@ -31,7 +31,7 @@ describe('мозг бота', () => {
       `,
       { legend, fog: false },
     );
-    match.player('A').gold = (BOT_GOLD_TARGET + 3000 * FP) as Fp;
+    match.player('A').gold = (5000 * FP) as Fp;
     const context = createBotTickContext(match.state);
     const commands = brainDecide(match.state, 0, context, 'medium');
     const spends = commands.filter((command) =>

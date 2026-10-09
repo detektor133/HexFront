@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { at, city, own, scenario } from './scenario/dsl.ts';
-import {
-  BOT_EASY_TAX,
-  BOT_GOLD_RESERVE,
-  BOT_GOLD_TARGET,
-  BOT_TAX_PEACE,
-  BOT_TAX_WAR,
-} from '../src/balance.ts';
+import { BOT_EASY_TAX, BOT_GOLD_RESERVE, BOT_TAX_PEACE, BOT_TAX_WAR } from '../src/balance.ts';
 import { brainDecide } from '../src/bots/brain.ts';
 import { createBotTickContext } from '../src/bots/context.ts';
 import { FP, type Fp } from '../src/math/int.ts';
@@ -83,13 +77,6 @@ describe('регрессии мозга бота после удаления с�
     });
   });
 
-  it('не тратит золото ниже целевого порога', () => {
-    const match = scenario(PEACE, { legend, fog: false });
-    match.player('A').gold = (BOT_GOLD_TARGET - 1) as Fp;
-
-    expect(commandsFor(match).filter((command) => command.t === 'rebuildSupply')).toEqual([]);
-  });
-
   it('не начинает трату, если цена опустит золото ниже резерва', () => {
     const match = scenario(
       `
@@ -115,7 +102,7 @@ describe('регрессии мозга бота после удаления с�
       `,
       { legend, fog: false },
     );
-    match.player('A').gold = (BOT_GOLD_TARGET + 5000 * FP) as Fp;
+    match.player('A').gold = (5000 * FP) as Fp;
     const spends = commandsFor(match).filter((command) =>
       ['rebuildSupply', 'recruit', 'upgradeCity'].includes(command.t),
     );

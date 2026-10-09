@@ -42,32 +42,11 @@ export const BOT_TAX_WAR: Fp = fp(0.3);
 export const BOT_EASY_TAX: Fp = fp(0.2);
 /** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
 export const BOT_GOLD_RESERVE: Fp = fp(50);
-/** Благоустройство — гексам с населением не ниже этой доли лимита. */
-export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
-/** Желаемая сила армии относительно сильнейшего соседа. */
-export const BOT_ARMY_RATIO: Fp = fp(0.8);
-/** Максимальная доля дохода на содержание армии. */
-export const BOT_ARMY_INCOME_SHARE: Fp = fp(0.5);
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
-export const BOT_W_ROAD: Fp = fp(1.0);
-export const BOT_W_DEFEND: Fp = fp(0.9);
-export const BOT_W_ATTACK: Fp = fp(0.8);
-export const BOT_W_RECRUIT: Fp = fp(0.7);
-export const BOT_W_FOUND: Fp = fp(0.6);
-export const BOT_W_UPGRADE: Fp = fp(0.4);
-export const BOT_W_IMPROVE: Fp = fp(0.3);
-export const BOT_W_FORT: Fp = fp(0.3);
-export const BOT_MIN_UTILITY: Fp = fp(0.1);
 export const BOT_MAX_SPENDS = 3;
 export const BOT_ATTACK_MIN_RATIO: Fp = fp(1.2);
 export const BOT_ATTACK_STOP_RATIO: Fp = fp(0.8);
-export const BOT_RATIO_CAP: Fp = fp(3.0);
-export const BOT_TARGET_STICKY: Fp = fp(0.25);
-export const BOT_ELIM_CITIES = 2;
-export const BOT_ELIM_BONUS: Fp = fp(0.5);
-export const BOT_GOLD_TARGET: Fp = fp(1500);
-export const BOT_GOLD_RUNWAY_S: Fp = fp(300);
 export const BOT_MERGE_BELOW: Fp = fp(25);
 export const BOT_MERGE_RADIUS = 3;
 
