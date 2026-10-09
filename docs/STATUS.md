@@ -51,11 +51,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **06/T1j1 исправлено после ревью:** `buildOptions` больше не добавляет внутренние негородские гексы; добавлен регрессионный тест на это ограничение.
 - **Проверки T1j1:** профильный тест — 9/9; `pnpm verify --changed` — `verify: OK (102 с)`; полный `pnpm verify` — `verify: OK (290 с)`; отчёт — `docs/reports/stage-06-t1j1.md`.
 - **06/T1j1 принята ревью:** критерии реестра, допустимости вариантов, fixed-point эффектов и расширяемости подтверждены тестами; typecheck и dependency-cruiser зелёные. Отчёт — `docs/reports/stage-06-t1j1.md`.
-- **06/T1j2 возвращена ревью:** профильные тесты — 20/20; не подтверждён интеграционный тест с фиктивными definitions, угрозой и `strength*threat`; отсутствует тест-страж исходников мозга. Причины записаны в `docs/reports/stage-06-t1j2.md`.
-- **Следующая задача:** исправить замечания T1j2 и повторить `$review 06/T1j2`.
+- **06/T1j2 исправлена после ревью:** `planBotActions` передаёт definitions в реестр; добавлены интеграционный тест с фиктивным юнитом, `threat > 0`, `strength*threat` и тест-страж исходников мозга.
+- **Проверки T1j2:** профильный прогон — 22/22; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (281 с)`; отчёт — `docs/reports/stage-06-t1j2.md`.
+- **Следующая задача:** `$review 06/T1j2` в новой сессии.
 - **CI:** `pnpm ci:wait` для исходного HEAD — success; после push проверится в начале следующей сессии.
 - **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/gdd/09-bots.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/options/index.ts`, `packages/sim/src/bots/weights.json`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`.
 
 ## Архив сессий
 

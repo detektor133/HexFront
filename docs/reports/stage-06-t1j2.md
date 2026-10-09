@@ -10,21 +10,16 @@
 
 ## Подтверждение
 
-- `packages/sim/test/bot-brain-dynamic.test.ts` — 2/2: фиктивный эффект и фиктивная команда выбираются без изменения мозга.
+- `packages/sim/test/bot-brain-dynamic.test.ts` — 3/3: фиктивный эффект, динамические эффекты и интеграция с фиктивным definitions при `threat > 0` и `strength*threat`.
+- `packages/sim/test/guards/bot-brain-source.test.ts` — тест-страж запрещённых литералов видов команд, юнитов, построек и импорта `balance.ts`.
 - `packages/sim/test/bot-actions-features.test.ts` — 4/4: три контекста, эффекты и произведения в fixed-point.
 - `packages/sim/test/bot-brain.test.ts` — 3/3: равенство `brainDecide` и `planBotActions`, выбор группы и цена.
-- `pnpm vitest run` профильных тестов — 20/20.
+- Профильный прогон `pnpm vitest run packages/sim/test/bot-options.test.ts packages/sim/test/bot-actions-features.test.ts packages/sim/test/bot-brain-dynamic.test.ts packages/sim/test/bot-brain.test.ts packages/sim/test/bot-brain-regressions.test.ts packages/sim/test/guards/bot-brain-source.test.ts` — 22/22.
 - `pnpm --filter @hexfront/sim typecheck` — OK.
-- `pnpm ai-check --changed` — OK (95 с).
-- Полный `pnpm verify` — `verify: OK (286 с)`; лог `.ai-logs/verify-2026-10-09T05-50-04.log`.
+- `pnpm ai-check --changed` — OK (91 с).
+- Полный `pnpm verify` — `verify: OK (281 с)`; лог `.ai-logs/verify-2026-10-09T07-08-19.log`.
 - CI исходного HEAD — success; CI после push ожидает следующую сессию.
 
-Следующая задача: `$review 06/T1j2` в новой сессии.
+`planBotActions` принимает definitions и передаёт их в стандартный и расширенный реестр; `brainDecide` возвращает результат планировщика.
 
-## Возврат ревью
-
-- Пункт 4 приёмки не подтверждён: `packages/sim/test/bot-brain-dynamic.test.ts:34-57` проверяет фиктивную запись и динамические эффекты, но не передаёт definitions с фиктивным типом юнита, не создаёт угрозу больше нуля и не проверяет `strength*threat`.
-- Тест-страж, который читает `brain.ts`, `actions.ts`, `features.ts` и запрещает литералы видов команд, типов юнитов/построек и импорт `balance.ts`, отсутствует.
-- Профильный прогон `pnpm vitest run packages/sim/test/bot-options.test.ts packages/sim/test/bot-actions-features.test.ts packages/sim/test/bot-brain-dynamic.test.ts packages/sim/test/bot-brain.test.ts packages/sim/test/bot-brain-regressions.test.ts` — 20/20; зелёный прогон не заменяет отсутствующие проверки приёмки.
-
-Следующее действие: добавить полный интеграционный тест и тест-страж, затем повторить `$review 06/T1j2`.
+Следующее действие: `$review 06/T1j2` в новой сессии.

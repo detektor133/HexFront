@@ -6,6 +6,7 @@ import {
   DEFAULT_BOT_OPTION_DEFINITIONS,
 } from './options/index.ts';
 import type { CommandOption, CommandOptionEntry } from './options/types.ts';
+import type { BotOptionDefinitions } from './options/types.ts';
 import { createBotSnapshot } from './snapshot.ts';
 import type { Command } from '../commands/types.ts';
 import { fpMul, type Fp } from '../math/int.ts';
@@ -88,6 +89,7 @@ export function planBotActions(
   context: BotTickContext,
   weights: BotWeights = BOT_WEIGHTS,
   options: readonly CommandOptionEntry[] = COMMAND_OPTIONS,
+  definitions: BotOptionDefinitions = DEFAULT_BOT_OPTION_DEFINITIONS,
 ): Command[] {
   const player = state.players[playerId];
   if (!player) return [];
@@ -97,10 +99,8 @@ export function planBotActions(
   const snapshot = createBotSnapshot(state, playerId, context);
   const candidates =
     options === COMMAND_OPTIONS
-      ? commandOptions(state, playerId, context, DEFAULT_BOT_OPTION_DEFINITIONS)
-      : options.flatMap((entry) =>
-          entry.options(state, playerId, context, DEFAULT_BOT_OPTION_DEFINITIONS),
-        );
+      ? commandOptions(state, playerId, context, definitions)
+      : options.flatMap((entry) => entry.options(state, playerId, context, definitions));
   const commands = [...selectOptions(candidates, optionContext(snapshot), weights, player.gold)];
   return player.autoReinforce
     ? commands
