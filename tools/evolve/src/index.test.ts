@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { calculateCandidateFitness, candidateSlotForSeed } from './evaluate.ts';
+import { calculateCandidateFitness, candidateSlotForSeed, loadEvolutionMap } from './evaluate.ts';
 import { parseOptions, runEvolution } from './index.ts';
 
 describe('эволюция весов бота', () => {
@@ -20,6 +20,13 @@ describe('эволюция весов бота', () => {
 
   it('меняет место особи между сидами', () => {
     expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
+  });
+
+  it('выбирает карту small по умолчанию и gen по параметру', () => {
+    expect(loadEvolutionMap(42).width).toBe(40);
+    expect(loadEvolutionMap(42, 'gen').width).toBe(80);
+    expect(parseOptions([]).map).toBe('small');
+    expect(parseOptions(['--map=gen']).map).toBe('gen');
   });
 
   it('штрафует особь только по её собственным метрикам', () => {
@@ -38,7 +45,7 @@ describe('эволюция весов бота', () => {
         unitUnder10S: 30,
         won: false,
       }),
-    ).toBe(2000);
+    ).toBe(4000);
   });
 
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {
@@ -73,6 +80,9 @@ describe('эволюция весов бота', () => {
       expect(JSON.parse(await readFile(join(directory, 'weights-1-easy.json'), 'utf8'))).toEqual(
         JSON.parse(await readFile(join(directory, 'weights-4-easy.json'), 'utf8')),
       );
+      const report = await readFile(join(directory, 'report-4', 'generation-2.md'), 'utf8');
+      expect(report).toContain('Места лучшей особи:');
+      expect(report).toContain('Победы популяции:');
       expect(JSON.parse(await readFile(join(directory, 'resume-4.json'), 'utf8'))).toMatchObject({
         generation: 2,
         weights: single.weights,

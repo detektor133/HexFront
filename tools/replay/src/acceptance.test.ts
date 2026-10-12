@@ -70,6 +70,31 @@ describe('критерии обучения ботов', () => {
   });
 
   it('считает целочисленный fitness по таблице критериев', () => {
+    const penalties = [
+      [0, 0],
+      [120, 0],
+      [180, 500],
+      [240, 1000],
+      [1200, 1000],
+    ] as const;
+    for (const [seconds, expectedPenalty] of penalties) {
+      expect(
+        calculateFitness({
+          place: 6,
+          maxGoldOver5000S: seconds,
+          maxUnitUnder10S: 0,
+          won: false,
+        }),
+      ).toBe(expectedPenalty === 0 ? 0 : -expectedPenalty);
+      expect(
+        calculateFitness({
+          place: 6,
+          maxGoldOver5000S: 0,
+          maxUnitUnder10S: seconds / 4,
+          won: false,
+        }),
+      ).toBe(expectedPenalty === 0 ? 0 : -expectedPenalty);
+    }
     expect(
       calculateFitness({
         place: 1,
@@ -77,7 +102,7 @@ describe('критерии обучения ботов', () => {
         maxUnitUnder10S: 30,
         won: true,
       }),
-    ).toBe(6000);
+    ).toBe(8000);
     expect(
       calculateFitness({
         place: 6,
@@ -86,5 +111,21 @@ describe('критерии обучения ботов', () => {
         won: false,
       }),
     ).toBe(0);
+    expect(
+      calculateFitness({
+        place: 1,
+        maxGoldOver5000S: 1800,
+        maxUnitUnder10S: 450,
+        won: false,
+      }),
+    ).toBe(3000);
+    expect(
+      calculateFitness({
+        place: 6,
+        maxGoldOver5000S: 180,
+        maxUnitUnder10S: 45,
+        won: true,
+      }),
+    ).toBe(2000);
   });
 });

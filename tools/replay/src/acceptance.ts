@@ -58,10 +58,10 @@ export function calculateBotAcceptance(
 
 /** Считает целочисленный fitness одной особи в одном матче. */
 export function calculateFitness(metrics: FitnessMetrics): number {
-  return (
-    1000 * (6 - metrics.place) +
-    (metrics.won ? 3000 : 0) -
-    intDiv(1000 * metrics.maxGoldOver5000S, 120) -
-    intDiv(1000 * metrics.maxUnitUnder10S, 30)
+  const goldPenalty = Math.min(
+    1000,
+    intDiv(1000 * Math.max(0, metrics.maxGoldOver5000S - 120), 120),
   );
+  const unitPenalty = Math.min(1000, intDiv(1000 * Math.max(0, metrics.maxUnitUnder10S - 30), 30));
+  return 1000 * (6 - metrics.place) + (metrics.won ? 3000 : 0) - goldPenalty - unitPenalty;
 }

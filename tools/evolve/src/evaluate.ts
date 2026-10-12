@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+
 import type { EvolutionWeights } from './types.ts';
+import type { EvolutionMap } from './types.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   botCommands,
@@ -12,6 +15,7 @@ import {
   type MatchState,
   type WinReason,
 } from '../../../packages/sim/src/index.ts';
+import type { MapStatic } from '../../../packages/sim/src/map/types.ts';
 import {
   calculateBotAcceptance,
   calculateFitness,
@@ -27,6 +31,20 @@ export function candidateSlotForSeed(baseSlot: number, seed: number): number {
 export interface MatchOpponent {
   readonly weights: EvolutionWeights;
   readonly slot: number;
+}
+
+export function loadEvolutionMap(seed: number, map: EvolutionMap = 'small'): MapStatic {
+  if (map === 'gen') {
+    const loaded = loadMap(generateMap(seed, { width: 80, height: 60, players: PLAYERS }));
+    if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+    return loaded.map;
+  }
+  const source = JSON.parse(
+    readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
+  ) as unknown;
+  const loaded = loadMap(source);
+  if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+  return loaded.map;
 }
 
 function acceptanceTrace(state: MatchState): AcceptanceTick {
@@ -59,19 +77,21 @@ export interface MatchEvaluation {
   readonly maxGoldOver5000S: number;
   readonly maxUnitUnder10S: number;
   readonly endTick: number;
+  readonly place: number;
+  readonly won: boolean;
 }
 
-function evaluateMatch(
+export function evaluateMatch(
   weights: EvolutionWeights,
   opponents: readonly MatchOpponent[],
   seed: number,
   ticks: number,
   candidateSlot: number,
+  map: EvolutionMap = 'small',
 ): MatchEvaluation {
-  const loaded = loadMap(generateMap(seed, { width: 80, height: 60, players: PLAYERS }));
-  if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+  const evolutionMap = loadEvolutionMap(seed, map);
   const state = createMatch(
-    loaded.map,
+    evolutionMap,
     Array.from({ length: PLAYERS }, (_, id) => ({ name: `P${id}` })),
     seed,
     { fog: false },
@@ -117,6 +137,10 @@ function evaluateMatch(
     maxGoldOver5000S: acceptance.goldOver5000SByPlayer[actualCandidateSlot] ?? 0,
     maxUnitUnder10S: acceptance.unitUnder10SByPlayer[actualCandidateSlot] ?? 0,
     endTick: acceptance.endTick,
+    place: places[actualCandidateSlot] ?? PLAYERS,
+    won:
+      state.winner === actualCandidateSlot &&
+      (winReason === 'cities' || winReason === 'lastStanding'),
   };
 }
 
@@ -126,18 +150,23 @@ export function evaluateWeightsDetailed(
   ticks: number,
   opponents: readonly MatchOpponent[] = [],
   candidateSlot = 0,
+  map: EvolutionMap = 'small',
 ): MatchEvaluation {
-  return seeds.reduce(
-    (total, seed) => {
-      const result = evaluateMatch(weights, opponents, seed, ticks, candidateSlot);
+  const matches = seeds.map((seed) =>
+    evaluateMatch(weights, opponents, seed, ticks, candidateSlot, map),
+  );
+  return matches.reduce(
+    (total, result) => {
       return {
         fitness: total.fitness + result.fitness,
         maxGoldOver5000S: Math.max(total.maxGoldOver5000S, result.maxGoldOver5000S),
         maxUnitUnder10S: Math.max(total.maxUnitUnder10S, result.maxUnitUnder10S),
         endTick: Math.max(total.endTick, result.endTick),
+        place: Math.max(total.place, result.place),
+        won: total.won || result.won,
       };
     },
-    { fitness: 0, maxGoldOver5000S: 0, maxUnitUnder10S: 0, endTick: 0 },
+    { fitness: 0, maxGoldOver5000S: 0, maxUnitUnder10S: 0, endTick: 0, place: 0, won: false },
   );
 }
 

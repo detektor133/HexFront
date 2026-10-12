@@ -1,24 +1,33 @@
 import { parentPort, workerData } from 'node:worker_threads';
 
-import { evaluateWeightsDetailed } from './evaluate.ts';
-import type { CandidateEvaluation, EvolutionWeights } from './types.ts';
+import { evaluateMatch } from './evaluate.ts';
+import type { CandidateMatch, EvolutionMap, EvolutionWeights } from './types.ts';
 
 interface WorkerData {
   readonly index: number;
   readonly weights: EvolutionWeights;
   readonly opponents: readonly { readonly weights: EvolutionWeights; readonly slot: number }[];
   readonly candidateSlot: number;
-  readonly seeds: readonly number[];
+  readonly seed: number;
   readonly ticks: number;
+  readonly map: EvolutionMap;
 }
 
 const data = workerData as WorkerData;
-const evaluation = evaluateWeightsDetailed(
+const evaluation = evaluateMatch(
   data.weights,
-  data.seeds,
-  data.ticks,
   data.opponents,
+  data.seed,
+  data.ticks,
   data.candidateSlot,
+  data.map,
 );
-const result: CandidateEvaluation = { index: data.index, ...evaluation };
-parentPort?.postMessage(result);
+const match: CandidateMatch = {
+  fitness: evaluation.fitness,
+  place: evaluation.place,
+  goldOver5000S: evaluation.maxGoldOver5000S,
+  unitUnder10S: evaluation.maxUnitUnder10S,
+  won: evaluation.won,
+  endTick: evaluation.endTick,
+};
+parentPort?.postMessage({ index: data.index, seed: data.seed, match });

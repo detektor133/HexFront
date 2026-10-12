@@ -7,6 +7,8 @@ import { Worker } from 'node:worker_threads';
 import type { MatchOpponent } from './evaluate.ts';
 import type {
   CandidateEvaluation,
+  CandidateMatch,
+  EvolutionMap,
   EvolutionOptions,
   EvolutionResult,
   EvolutionWeights,
@@ -35,8 +37,9 @@ interface WorkerData {
   readonly weights: EvolutionWeights;
   readonly opponents: readonly MatchOpponent[];
   readonly candidateSlot: number;
-  readonly seeds: readonly number[];
+  readonly seed: number;
   readonly ticks: number;
+  readonly map: EvolutionMap;
 }
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -57,6 +60,11 @@ function positiveInteger(value: string, name: string, minimum = 1): number {
 
 function optionValue(arguments_: readonly string[], name: string): string | undefined {
   return arguments_.find((argument) => argument.startsWith(`${name}=`))?.slice(name.length + 1);
+}
+
+function parseMap(value: string | undefined): EvolutionMap {
+  if (value === undefined || value === 'small' || value === 'gen') return value ?? 'small';
+  throw new Error('map должен быть small или gen');
 }
 
 export function parseOptions(arguments_: readonly string[]): EvolutionOptions {
@@ -89,6 +97,7 @@ export function parseOptions(arguments_: readonly string[]): EvolutionOptions {
     generations,
     workers,
     ticks,
+    map: parseMap(optionValue(arguments_, '--map')),
     sigma,
     weightsPath: optionValue(arguments_, '--weights') ?? DEFAULT_OPTIONS.weightsPath,
     easyWeightsPath: optionValue(arguments_, '--easy-weights') ?? DEFAULT_OPTIONS.easyWeightsPath,
@@ -167,7 +176,7 @@ function matchup(
 function evaluateCandidate(
   candidate: Candidate,
   data: Omit<WorkerData, 'index' | 'weights'>,
-): Promise<CandidateEvaluation> {
+): Promise<{ index: number; seed: number; match: CandidateMatch }> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
       workerData: { ...data, index: candidate.index, weights: candidate.weights },
@@ -187,26 +196,52 @@ async function evaluatePopulation(
   generation: number,
   options: EvolutionOptions,
 ): Promise<readonly CandidateEvaluation[]> {
-  const results: CandidateEvaluation[] = [];
+  const jobs: Array<{ candidate: Candidate; data: Omit<WorkerData, 'index' | 'weights'> }> = [];
+  for (const candidate of population) {
+    const match = matchup(population, hallOfFame, candidate, generation);
+    for (const seed of seedsFor(options.seeds)) {
+      jobs.push({
+        candidate,
+        data: {
+          opponents: match.opponents,
+          candidateSlot: match.candidateSlot,
+          seed,
+          ticks: options.ticks,
+          map: options.map ?? 'small',
+        },
+      });
+    }
+  }
+  const results: Array<{ index: number; seed: number; match: CandidateMatch }> = [];
   let nextIndex = 0;
   const runNext = async (): Promise<void> => {
     const index = nextIndex;
     nextIndex += 1;
-    const candidate = population[index];
-    if (candidate === undefined) return;
-    const match = matchup(population, hallOfFame, candidate, generation);
-    results.push(
-      await evaluateCandidate(candidate, {
-        opponents: match.opponents,
-        candidateSlot: match.candidateSlot,
-        seeds: seedsFor(options.seeds),
-        ticks: options.ticks,
-      }),
-    );
+    const job = jobs[index];
+    if (job === undefined) return;
+    results.push(await evaluateCandidate(job.candidate, job.data));
     await runNext();
   };
   await Promise.all(Array.from({ length: Math.min(options.workers, population.length) }, runNext));
-  return results.sort((left, right) => left.index - right.index);
+  const grouped = new Map<number, typeof results>();
+  for (const result of results) {
+    const group = grouped.get(result.index) ?? [];
+    group.push(result);
+    grouped.set(result.index, group);
+  }
+  return population.map((candidate) => {
+    const matches = (grouped.get(candidate.index) ?? [])
+      .sort((left, right) => left.seed - right.seed)
+      .map((result) => result.match);
+    return {
+      index: candidate.index,
+      fitness: matches.reduce((sum, match) => sum + match.fitness, 0),
+      maxGoldOver5000S: Math.max(...matches.map((match) => match.goldOver5000S), 0),
+      maxUnitUnder10S: Math.max(...matches.map((match) => match.unitUnder10S), 0),
+      endTick: Math.max(...matches.map((match) => match.endTick), 0),
+      matches,
+    };
+  });
 }
 
 async function loadResume(path: string): Promise<ResumeState> {
@@ -263,6 +298,10 @@ async function writeGeneration(
       `Золото > 5 000 с: ${result.metrics?.maxGoldOver5000S ?? 0}`,
       `Отряд < 10 с: ${result.metrics?.maxUnitUnder10S ?? 0}`,
       `Тик завершения: ${result.metrics?.endTick ?? options.ticks}`,
+      `Места лучшей особи: ${(result.metrics?.places ?? []).join(', ')}`,
+      `Победы лучшей особи: ${result.metrics?.wins ?? 0}`,
+      `Победы популяции: ${result.metrics?.populationWins ?? 0}`,
+      `Среднее место популяции: ${result.metrics?.averagePlace ?? 0}`,
       `Время поколения: ${durationMs} мс`,
       '',
       '```json',
@@ -311,6 +350,14 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
     if (best === undefined) throw new Error('пустая популяция');
     const bestCandidate = population[best.index];
     if (bestCandidate === undefined) throw new Error(`нет кандидата ${best.index}`);
+    const populationWins = evaluations.reduce(
+      (sum, item) => sum + item.matches.filter((match) => match.won).length,
+      0,
+    );
+    const populationPlaces = evaluations.flatMap((item) =>
+      item.matches.map((match) => match.place),
+    );
+    const bestMatches = best.matches;
     hallOfFame = [copyWeights(bestCandidate.weights), ...hallOfFame];
     result = {
       generation: startGeneration + generation,
@@ -323,6 +370,13 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
         maxGoldOver5000S: best.maxGoldOver5000S ?? 0,
         maxUnitUnder10S: best.maxUnitUnder10S ?? 0,
         endTick: best.endTick ?? evolutionOptions.ticks,
+        places: bestMatches.map((match) => match.place),
+        wins: bestMatches.filter((match) => match.won).length,
+        populationWins,
+        averagePlace:
+          populationPlaces.length === 0
+            ? 0
+            : populationPlaces.reduce((sum, place) => sum + place, 0) / populationPlaces.length,
       },
     };
     if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
