@@ -30,9 +30,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j5-Б1:** исправлено: `calculateBotAcceptance` возвращает метрики по игрокам, `evaluateMatch` считает fitness по `actualCandidateSlot`, `CandidateEvaluation` хранит обязательные метрики. Отчёт: `docs/reports/stage-06-t1j5-b1.md`.
+- **06/T1j5-Б1:** принята ревью: `calculateBotAcceptance` возвращает метрики по игрокам, `evaluateMatch` считает fitness по `actualCandidateSlot`, `CandidateEvaluation` хранит обязательные метрики. Отчёт: `docs/reports/stage-06-t1j5-b1.md`.
 - **Проверки:** профильные тесты 6/6; `pnpm verify --changed` — `verify: OK (40 с)`; полный `pnpm verify` — `verify: OK (296 с)`.
-- **Статус:** T1j5-Б1 отмечена `[~]` и ждёт ревью. После `$review 06/T1j5-Б1` владелец запускает T1i заново с весов из репозитория.
+- **Статус:** T1j5-Б1 отмечена `[x]`. Владелец запускает T1i заново с весов из репозитория.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5-b1.md`, `tools/replay/src/acceptance.ts`, `tools/evolve/src/evaluate.ts`.
 
 ## Архив сессий
