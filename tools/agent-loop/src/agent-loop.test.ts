@@ -210,10 +210,12 @@ describe('цикл $next → CI → $review', () => {
 
   it('передаёт модель только если она задана, и усилие medium', async () => {
     const run = await runScenario({ sessions: [NEXT_DONE, REVIEW_OK] });
-    expect(run.codexArguments[0]).toEqual(
+    // На Windows аргументы приходят в кавычках для cmd, поэтому сравнение — без них.
+    const plain = run.codexArguments.map((args) => args.map((arg) => arg.replace(/^"|"$/g, '')));
+    expect(plain[0]).toEqual(
       expect.arrayContaining(['--model', 'luna', 'model_reasoning_effort=medium']),
     );
-    expect(run.codexArguments[1]).not.toContain('--model');
+    expect(plain[1]).not.toContain('--model');
   });
 
   it('после ВОЗВРАТ снова запускает $next и затем $review', async () => {
@@ -348,8 +350,9 @@ describe('цикл $next → CI → $review', () => {
 describe('запуск процесса', () => {
   it('передаёт спецсимволы stdin подменённому процессу без изменений', async () => {
     const input = 'строка "кавычки" $next & | > <\nвторая строка';
+    // Команда без пути: на Windows cmd разрезал бы `C:\Program Files\…\node.exe` по пробелу.
     const result = await defaultRunCommand(
-      process.execPath,
+      'node',
       prepareProcessArguments(['-e', 'process.stdin.pipe(process.stdout)']),
       { input },
     );
