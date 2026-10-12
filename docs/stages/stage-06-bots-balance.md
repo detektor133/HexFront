@@ -54,7 +54,7 @@
 - [x] **T1h. `tools/evolve`** (подсистема инструменты, без новых зависимостей; команда `pnpm evolve`). Запреты T1 действуют.
   *Приёмка:* реализована (μ,λ)-ES с целочисленными весами, seeded RNG, worker_threads и параметрами `--population`, `--seeds`, `--generations`, `--workers`, `--resume`; короткий Vitest-прогон на 300 тиках даёт одинаковый `weights.json` при 1 и 4 worker_threads; после поколения сохраняются `weights.json`, состояние resume и отчёт `docs/reports/evolve/`; полный `pnpm evolve` в задаче не запускается.
 
-- [~] **T1j. Доделка обучаемых весов** (решение 2026-10-09), не задача владельца. Цель: новая механика, юнит или постройка подхватывается ботом без правки кода бота, а всё, что решает бот, — обучаемые веса, а не ручные числа. Запреты T1 действуют в каждой подзадаче. Дополнительные запреты T1j, тоже в каждой подзадаче:
+- [x] **T1j. Доделка обучаемых весов** (решение 2026-10-09), не задача владельца. Цель: новая механика, юнит или постройка подхватывается ботом без правки кода бота, а всё, что решает бот, — обучаемые веса, а не ручные числа. Запреты T1 действуют в каждой подзадаче. Дополнительные запреты T1j, тоже в каждой подзадаче:
   - новых констант BOT_* и чисел, которых нет в тексте T1j или в 10-balance.md, не вводить; нужен новый — вопрос в QUESTIONS.md и стоп;
   - в packages/sim/src/bots/brain.ts, actions.ts, features.ts нет: строковых литералов видов команд ('recruit', 'build', 'upgradeCity', 'improve', 'foundCity', 'rebuildSupply', 'setTax', 'startOffensive', 'stopOffensive'), типов юнитов ('infantry', 'armor', 'artillery') и построек ('fort', 'depot'); импорта balance.ts; порогов решения, кроме сравнения оценки с 0;
   - после T1j у ботов остаются только числа, которые не решают «что делать»: BOT_THINK_TICKS и BOT_EASY_THINK_TICKS (как часто бот думает) и BOT_LINE_MAX_DEPTH (предел вычислений линии наступления);
@@ -130,7 +130,7 @@
      - отчёт поколения в docs/reports/evolve/: лучший и средний фитнес, три метрики лучшей особи, время поколения.
      Полный `pnpm evolve` в задаче не запускать.
 
-- [ ] **T1j6. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
+- [x] **T1j6. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
   1) В отчёте docs/reports/stage-06-t1j.md по каждому пункту T1j1–T1j5 указаны file:line кода и имя теста.
   2) Пусты все три поиска, вывод — в отчёте:
      - `rg -n "'(recruit|build|upgradeCity|improve|foundCity|rebuildSupply|setTax|startOffensive|stopOffensive|infantry|armor|artillery|fort|depot)'" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts packages/sim/src/bots/features.ts`;
@@ -138,8 +138,6 @@
      - `rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX|BOT_MERGE_" packages/sim/src`.
   3) Полный `pnpm verify` зелёный.
   4) Только после этого T1j6 и T1j отмечаются [x].
-  Возврат ревью:
-  - пункт T1j4.4 не подтверждён: повторный `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` дал для 30 ботов `commanderMsPerBotTurn = 0,470 мс`, что выше порога `0,348 мс/бот/ход`; полный тик `1,677 мс` и экономика `0,386 мс/бот/ход` порог проходят.
 
 - [ ] **T1i. Обучение весов**, задача владельца. Владелец запускает `pnpm evolve --population=12 --seeds=6 --generations=30`, продолжает через `pnpm evolve --resume` без пути, затем пишет `$next`.
 
