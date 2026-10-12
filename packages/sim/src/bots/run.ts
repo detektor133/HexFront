@@ -81,12 +81,10 @@ export function commanderCommands(
         ? resolveBotWeights(weights, p.id, levels[p.id] ?? 'medium')
         : undefined;
       const mergeBelow = fp(
-        botWeights === undefined
-          ? 25
-          : Math.max(0, botWeights['commander.mergeBelowSoldiers'] ?? 25),
+        botWeights === undefined ? 0 : Math.max(0, botWeights['commander.mergeBelowSoldiers'] ?? 0),
       );
       const mergeRadius =
-        botWeights === undefined ? 3 : Math.max(0, botWeights['commander.mergeRadius'] ?? 3);
+        botWeights === undefined ? 0 : Math.max(0, botWeights['commander.mergeRadius'] ?? 0);
       for (const cmd of decide(
         state.map,
         view,

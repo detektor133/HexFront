@@ -10,16 +10,19 @@
 
 ## Подтверждение
 
-- `packages/sim/test/scenarios/commander.test.ts` — 18/18: отрицательные параметры дают нулевой порог и радиус; существующие сценарии commander и human-путь сохранены.
+- `packages/sim/test/scenarios/commander.test.ts` — 19/19: отрицательные параметры дают нулевой порог и радиус; отсутствующие параметры не получают fallback; существующие сценарии commander и human-путь сохранены.
+- Регрессионный тест на пустые веса подтверждает, что отсутствующие `commander.*` не получают балансный fallback и дают нулевые параметры.
 - `packages/sim/test/guards/bot-brain-source.test.ts` — 2/2: удалённых `BOT_MERGE_*` в исходниках нет.
 - `pnpm --filter @hexfront/sim typecheck` — OK.
 - `pnpm ai-check --changed` — OK (100 с).
-- `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1`: 30 ботов — полный тик 1,757 мс, commander 0,084 мс/бот/ход; 100 ботов — полный тик 10,930 мс, commander 0,299 мс/бот/ход. Оба показателя ниже порогов T1j4.
-- Полный `pnpm verify` — `verify: OK (296 с)`; лог `.ai-logs/verify-2026-10-09T10-29-43.log`.
+- Профильные тесты после исправления — 20/20.
+- `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1`: 30 ботов — полный тик 1,720 мс, commander 0,082 мс/бот/ход; 100 ботов — полный тик 10,958 мс, commander 0,301 мс/бот/ход. Оба показателя ниже порогов T1j4.
+- `pnpm verify --changed` — `verify: OK (186 с)`; лог `.ai-logs/verify-2026-10-12T01-26-51.log`.
+- Полный `pnpm verify` — `verify: OK (283 с)`; лог `.ai-logs/verify-2026-10-12T01-31-03.log`.
 
-## Возврат ревью
+## Исправление после ревью
 
-- Пункт 1 не подтверждён: `packages/sim/src/bots/run.ts:86,89` дублирует балансные fallback-значения `25` и `3`. Эти числа должны быть только в `weights.json` и `weights-easy.json`; fallback не должен обходить источник баланса.
-- Повторный benchmark `$review`: 30 ботов — полный тик 1,705 мс, commander 0,081 мс/бот/ход; 100 ботов — полный тик 10,751 мс, commander 0,300 мс/бот/ход.
+- `packages/sim/src/bots/run.ts:86-89` больше не дублирует значения 25 и 3: отсутствующие ключи весов получают нулевые параметры, а штатные начальные значения остаются только в JSON-весах.
+- `packages/sim/test/scenarios/commander.test.ts:281-298` добавляет регрессионную проверку пустых весов.
 
 Следующая задача: 06/T1j5.

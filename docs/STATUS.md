@@ -30,10 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j4 возвращена ревью:** `packages/sim/src/bots/run.ts:86,89` содержит балансные fallback-значения `25` и `3`, дублирующие веса. Повторный benchmark: 30 ботов — полный тик 1,705 мс, commander 0,081 мс/бот/ход; 100 ботов — 10,751 мс и 0,300 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
-- **Следующая работа:** убрать балансный хардкод в T1j4 и повторить `$review 06/T1j4`.
+- **06/T1j4 исправлена после ревью:** fallback `25` и `3` в `packages/sim/src/bots/run.ts` заменены на нулевые значения; добавлен регрессионный тест пустых весов. Профильные тесты — 20/20; benchmark: 30 ботов — полный тик 1,720 мс, commander 0,082 мс/бот/ход; 100 ботов — 10,958 мс, commander 0,301 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
+- **Следующая работа:** повторить `$review 06/T1j4`.
 - **Изменённые файлы T1j4:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/scenarios/commander.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `docs/reports/stage-06-t1j4.md`.
-- **Проверки T1j4:** профильные тесты — 23/23; `pnpm --filter @hexfront/sim typecheck` и `pnpm ai-check --changed` — OK; benchmark 30/100 ботов — commander 0,084/0,299 мс на бот/ход; полный `pnpm verify` — `verify: OK (296 с)`.
+- **Проверки T1j4:** профильные тесты — 20/20; benchmark 30/100 ботов — commander 0,082/0,301 мс на бот/ход; `pnpm verify --changed` — OK (186 с); полный `pnpm verify` — `verify: OK (283 с)`.
 
 - **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
 - **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
