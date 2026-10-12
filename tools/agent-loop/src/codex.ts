@@ -26,9 +26,13 @@ export interface Session {
   readonly result: CommandResult;
   readonly message: string;
   readonly log: string;
+  /** Сбой codex: ненулевой код или кончился лимит; undefined — сессия отработала. */
+  readonly failure?: string;
 }
 
 /** Как часто печатать «сессия ещё идёт», мс. */
+// Codex при исчерпанном лимите может выйти с кодом 0, поэтому лимит ищется и в тексте.
+const USAGE_LIMIT_RE = /hit your usage limit|usage limit reached/i;
 const HEARTBEAT_MS = 60_000;
 
 export const minutes = (ms: number): string => `${Math.max(0, Math.round(ms / 60_000))} мин`;
@@ -107,5 +111,11 @@ export async function runCodex(
     (error: unknown) => `${result.stdout}\n(последний ответ не записан: ${String(error)})`,
   );
   await rm(outputDir, { recursive: true, force: true });
-  return { result, message, log: await saveSessionLog(settings, prompt, result) };
+  const log = await saveSessionLog(settings, prompt, result);
+  const failure = USAGE_LIMIT_RE.test(`${message}\n${result.stdout}\n${result.stderr}`)
+    ? 'кончился лимит Codex'
+    : result.code !== 0
+      ? `codex завершился с кодом ${result.code}`
+      : undefined;
+  return { result, message, log, ...(failure === undefined ? {} : { failure }) };
 }

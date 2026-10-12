@@ -117,8 +117,14 @@ async function runTaskIssue(
       `выполнено: ${task} [x], HEAD ${(await head(context.git)).slice(0, 7)}`,
     );
   if ((context.state.retryAfter ?? 0) > context.config.now())
-    return issueCrashed(context, issue, 'codex завершился с ошибкой', '');
-  return stopIssue(context, issue, context.state.parked?.reason ?? `${task} не закрыта`);
+    return issueCrashed(context, issue, 'сбой codex', '');
+  const { parked } = context.state;
+  const current = await head(context.git);
+  return stopIssue(
+    context,
+    issue,
+    parked?.head === current ? parked.reason : `${task} не закрыта, см. консоль цикла`,
+  );
 }
 
 async function runIssue(

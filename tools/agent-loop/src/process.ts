@@ -1,5 +1,5 @@
 // Запуск внешних команд (codex, git, pnpm) с stdin и таймаутом; на Windows — через cmd с кавычками.
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 
 export interface CommandResult {
   readonly code: number;
@@ -22,6 +22,16 @@ export const quoteWindowsArgument = (argument: string): string =>
 export const prepareProcessArguments = (args: readonly string[]): readonly string[] =>
   process.platform === 'win32' ? args.map(quoteWindowsArgument) : args;
 
+/**
+ * На Windows команда идёт через cmd, и `kill` остановил бы только cmd, а codex продолжил бы
+ * писать в дерево параллельно со следующей сессией. Поэтому дерево процессов — через taskkill.
+ */
+function killTree(child: ChildProcess): void {
+  if (process.platform === 'win32' && child.pid !== undefined)
+    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F']);
+  else child.kill();
+}
+
 const runProcess: RunCommand = (command, args, options = {}) =>
   new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -41,7 +51,7 @@ const runProcess: RunCommand = (command, args, options = {}) =>
     const timer =
       options.timeoutMs === undefined
         ? undefined
-        : setTimeout(() => child.kill(), options.timeoutMs);
+        : setTimeout(() => killTree(child), options.timeoutMs);
     child.on('close', (code) => {
       if (timer !== undefined) clearTimeout(timer);
       resolve({ code: code ?? 1, stdout, stderr });

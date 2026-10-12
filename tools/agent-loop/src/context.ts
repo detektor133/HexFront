@@ -171,8 +171,7 @@ export async function runSkill(
     message: done.message,
     ...extra,
   });
-  if (done.result.code !== 0)
-    return fail(`codex завершился с кодом ${done.result.code}`, { codexFailed: true });
+  if (done.failure !== undefined) return fail(done.failure, { codexFailed: true });
   if ((await dirtyFiles(git)) !== '') return fail('после сессии рабочее дерево не чистое');
   if ((await head(git)) === base) return fail('коммита нет — скилл остановился сам (см. ответ)');
   const unsynced = await syncWithOrigin(git, true);

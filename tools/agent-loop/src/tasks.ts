@@ -95,12 +95,12 @@ async function runWork(
   const base = await head(git);
   const work = await session(context, 'next', prompt);
   const dirty = (await dirtyFiles(git)) !== '';
-  if (work.result.code !== 0) {
+  if (work.failure !== undefined) {
     if (dirty) state.resume = task;
     return step(
       await backoff(
         context,
-        `${firstLine(prompt)}: codex завершился с кодом ${work.result.code}`,
+        `${firstLine(prompt)}: ${work.failure}`,
         work.message + work.result.stderr,
       ),
     );
@@ -143,12 +143,8 @@ async function runReview(context: LoopContext, task: string): Promise<'x' | ' ' 
   const { git } = context;
   const base = await head(git);
   const review = await session(context, 'review', `$review ${task}`);
-  if (review.result.code !== 0)
-    return backoff(
-      context,
-      `$review ${task}: codex завершился с кодом ${review.result.code}`,
-      review.message,
-    );
+  if (review.failure !== undefined)
+    return backoff(context, `$review ${task}: ${review.failure}`, review.message);
   // Ревью уже запушило коммит, поэтому откат здесь только развёл бы локальную и удалённую ветку.
   if (!(await checkPermissions(context, base, context.definitions.reviewerPaths)))
     return park(

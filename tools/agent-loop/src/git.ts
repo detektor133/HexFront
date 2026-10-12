@@ -36,7 +36,10 @@ const isAncestor = async (git: Git, ancestor: string, descendant: string): Promi
  */
 export async function syncWithOrigin(git: Git, push: boolean): Promise<string | undefined> {
   const branch = await currentBranch(git);
-  await git.run(['fetch', 'origin', branch]);
+  const fetched = await git.attempt(['fetch', 'origin', branch]);
+  // Ветки ещё (или уже) нет в origin: сводить не с чем, свою ветку скилл пушит сам с -u.
+  if (fetched.code !== 0 && /couldn't find remote ref/i.test(fetched.stderr)) return undefined;
+  if (fetched.code !== 0) throw new Error(fetched.stderr.trim() || `git fetch origin ${branch}`);
   const local = await head(git);
   const remote = await git.run(['rev-parse', `origin/${branch}`]);
   if (local === remote) return undefined;
@@ -56,8 +59,8 @@ export async function syncWithOrigin(git: Git, push: boolean): Promise<string | 
   return pushed.code === 0 ? undefined : `push в origin/${branch} не прошёл: ${pushed.stderr}`;
 }
 
-/** @returns true, если коммит ветки уже лежит в origin/main (PR этапа смёржен). */
-export async function mergedIntoMain(git: Git, branch: string): Promise<boolean> {
-  await git.run(['fetch', 'origin', 'main', branch]);
-  return isAncestor(git, `origin/${branch}`, 'origin/main');
+/** @returns true, если HEAD ветки этапа уже лежит в origin/main (PR этапа смёржен). */
+export async function mergedIntoMain(git: Git): Promise<boolean> {
+  await git.run(['fetch', 'origin', 'main']);
+  return isAncestor(git, 'HEAD', 'origin/main');
 }

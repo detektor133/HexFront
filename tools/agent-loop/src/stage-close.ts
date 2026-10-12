@@ -61,7 +61,7 @@ async function pullRequestLink(context: LoopContext, branch: string): Promise<st
  * свой шаг 7 (ветка следующего этапа от main и поле «Ветка»).
  */
 export async function closedStage(context: LoopContext, branch: string): Promise<Step> {
-  if (!(await mergedIntoMain(context.git, branch)))
+  if (!(await mergedIntoMain(context.git)))
     return park(
       context,
       `merge:${branch}`,

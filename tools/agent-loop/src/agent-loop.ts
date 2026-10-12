@@ -55,7 +55,7 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   return park(
     context,
     'dirty',
-    `рабочее дерево не чистое (${list}). Работа владельца — Issue «$done NN/Tn»; недоделка задачи — pnpm agent:run --resume NN/Tn`,
+    `рабочее дерево не чистое (${list}). Работа владельца — Issue «$done NN/Tn»; недоделка задачи — pnpm agent:run --resume NN/Tn. Остальные Issues ждут чистого дерева`,
   );
 }
 
@@ -70,6 +70,12 @@ async function tick(context: LoopContext): Promise<Step> {
     return park(context, 'branch', `ожидалась ветка ${expected} из STATUS, сейчас ${branch}`);
   const files = await dirtyFiles(git);
   if (files !== '') return dirtyTree(context, files);
+  // Доделка имеет смысл только для незакоммиченной работы: в чистом дереве её не продолжать
+  // позже на чужих файлах (например, весах, которые пишет evolve владельца).
+  if (state.resume !== undefined) {
+    delete state.resume;
+    await save(context);
+  }
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
   const issue = await processIssues(context, false);
@@ -130,10 +136,11 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     await describe(context);
     return 0;
   }
-  if (config.resume !== undefined) {
-    context.state.resume = config.resume;
-    await save(context);
-  }
+  // Перезапуск цикла владельцем — повторить ожидание и паузу после сбоя сразу, а не ждать коммита.
+  delete context.state.parked;
+  delete context.state.retryAfter;
+  if (config.resume !== undefined) context.state.resume = config.resume;
+  await save(context);
   await context.say(
     `старт: кругов на задачу ≤ ${config.maxRounds}, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
   );

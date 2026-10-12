@@ -148,11 +148,26 @@ describe('круги $next → CI → $review', () => {
   });
 
   it('при сбое codex делает паузу и больше сессий не запускает', async () => {
-    const run = await runWorld({ sessions: [{ answer: 'usage limit reached', code: 1 }] });
+    const run = await runWorld({ sessions: [{ answer: 'процесс упал', code: 1 }] });
     expect(run.prompts).toEqual(['$next']);
     expect(run.lines).toContain(
       'сбой: $next: codex завершился с кодом 1 — следующая попытка через 30 мин',
     );
+  });
+
+  it('считает сбоем исчерпанный лимит Codex даже при коде 0', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: "You've hit your usage limit. Try again in 3 hours." }],
+    });
+    expect(run.prompts).toEqual(['$next']);
+    expect(run.lines).toContain(
+      'сбой: $next: кончился лимит Codex — следующая попытка через 30 мин',
+    );
+  });
+
+  it('--resume в чистом дереве забывается и не продолжает чужую работу', async () => {
+    const run = await runWorld({ resume: '06/T1j5-Б1', sessions: [NEXT_DONE, REVIEW_OK] });
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
   });
 
   it('ждёт, если ветка не совпадает с «Ветка» в STATUS', async () => {
