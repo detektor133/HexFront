@@ -8,7 +8,7 @@ import {
   type StageState,
   type Step,
 } from './context.ts';
-import { currentBranch, mergedIntoMain } from './git.ts';
+import { currentBranch, head, mergedIntoMain } from './git.ts';
 import { parseGithubRepo } from './github.ts';
 import { closedStageBranch, openTasks, statusBranch } from './stage-file.ts';
 import { skillFailed } from './tasks.ts';
@@ -24,7 +24,16 @@ export async function closeStage(context: LoopContext, stage: StageState): Promi
     );
   await context.say(`этап ${stage.stage}: все задачи закрыты — $stage-close`);
   const result = await runSkill(context, 'next', '$stage-close');
-  return result.ok ? 'worked' : skillFailed(context, '$stage-close', result);
+  if (!result.ok) return skillFailed(context, '$stage-close', result);
+  // Без смены «Текущего этапа» следующий шаг снова закрыл бы тот же этап.
+  if (closedStageBranch((await readStage(context.config.root)).status) === undefined)
+    return park(
+      context,
+      `close:${stage.stage}`,
+      `$stage-close не перевёл «Текущий этап» в STATUS на следующий — проверь`,
+      result.message,
+    );
+  return 'worked';
 }
 
 async function pullRequestLink(context: LoopContext, branch: string): Promise<string> {
@@ -61,6 +70,14 @@ async function pullRequestLink(context: LoopContext, branch: string): Promise<st
  * свой шаг 7 (ветка следующего этапа от main и поле «Ветка»).
  */
 export async function closedStage(context: LoopContext, branch: string): Promise<Step> {
+  const { parked } = context.state;
+  // После неудачного шага 7 не запускать $stage-close заново, пока не появится новый коммит.
+  if (
+    parked !== undefined &&
+    /^(skill:\$stage-close|next-branch:)/.test(parked.key) &&
+    parked.head === (await head(context.git))
+  )
+    return 'idle';
   if (!(await mergedIntoMain(context.git)))
     return park(
       context,

@@ -62,7 +62,12 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
 /** Один шаг: Issue, закрытый этап или задача очереди. */
 async function tick(context: LoopContext): Promise<Step> {
   const { config, git, state } = context;
-  if ((state.retryAfter ?? 0) > config.now()) return 'idle';
+  if (state.retryAfter !== undefined) {
+    if (state.retryAfter > config.now()) return 'idle';
+    // Пауза кончилась: без удаления каждое ожидание считало бы её снова истёкшей и сразу будило цикл.
+    delete state.retryAfter;
+    await save(context);
+  }
   const { status } = await readStage(config.root);
   const branch = await currentBranch(git);
   const expected = statusBranch(status);
@@ -109,17 +114,22 @@ async function waitForWork(context: LoopContext): Promise<void> {
   const { config, state } = context;
   const deadline = config.now() + config.pollMinutes * 60_000;
   const github = config.github;
+  // Сбой сети или токена повторяется каждые pollSeconds: в протокол — только новый текст ошибки.
+  let lastError = '';
   const check = async (): Promise<boolean> => {
     try {
-      return github !== undefined && (await github.changed());
+      const changed = github !== undefined && (await github.changed());
+      lastError = '';
+      return changed;
     } catch (error) {
-      await context.say(
-        `GitHub: проверка не удалась — ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const text = error instanceof Error ? error.message : String(error);
+      if (text !== lastError) await context.say(`GitHub: проверка не удалась — ${text}`);
+      lastError = text;
       return false;
     }
   };
-  await check();
+  // Первая проверка тоже будит: Issue могла появиться между шагом и началом ожидания.
+  if (await check()) return;
   while (config.now() < deadline) {
     if ((await config.sleep(config.pollSeconds * 1000)) === 'wake') return;
     if (state.retryAfter !== undefined && state.retryAfter <= config.now()) return;
@@ -133,9 +143,18 @@ async function waitForWork(context: LoopContext): Promise<void> {
 /** План без запуска codex: что цикл сделал бы сейчас. */
 async function describe(context: LoopContext): Promise<void> {
   const { config } = context;
-  const issues = config.github ? await config.github.listIssues() : [];
+  const issues = config.github
+    ? await config.github.listIssues().catch((error: unknown) => {
+        config.writeLine(`GitHub: Issues не прочитаны — ${String(error)}`);
+        return [];
+      })
+    : [];
   for (const issue of issues) {
-    if (issue.labels.includes(STOP_LABEL) || issue.author !== config.github?.owner) continue;
+    if (
+      issue.labels.includes(STOP_LABEL) ||
+      issue.author.toLowerCase() !== config.github?.owner.toLowerCase()
+    )
+      continue;
     const command = parseIssueCommand(issue.body);
     config.writeLine(
       `Issue #${issue.number}: ${'error' in command ? `ошибка — ${command.error}` : firstLine(command.prompt)}`,

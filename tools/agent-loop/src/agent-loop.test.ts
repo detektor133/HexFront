@@ -149,6 +149,23 @@ describe('круги $next → CI → $review', () => {
     expect(run.lines).toContain('жду: ревью изменило файлы вне permissions.json — проверь коммит');
   });
 
+  it('принимает вердикт ревью в оформлении `OK` и **OK**', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, { ...REVIEW_OK, answer: '**OK** — всё подтверждено' }],
+    });
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('доделка начинается с работы, даже если в незакоммиченном файле уже [~]', async () => {
+    const run = await runWorld({
+      dirty: true,
+      resume: '06/T1j5-Б1',
+      stage: setMark(fixtureStage, 'T1j5-Б1', '~'),
+      sessions: [{ ...NEXT_DONE, commit: true }, REVIEW_OK],
+    });
+    expect(run.prompts).toEqual(['$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
+  });
+
   it('ждёт владельца, если ответ ревью не совпадает с отметкой', async () => {
     const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: '~' }] });
     expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [~]');

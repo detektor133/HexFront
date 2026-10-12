@@ -32,6 +32,7 @@ export interface Session {
 
 /** Как часто печатать «сессия ещё идёт», мс. */
 // Codex при исчерпанном лимите может выйти с кодом 0, поэтому лимит ищется и в тексте.
+export const USAGE_LIMIT = 'кончился лимит Codex';
 const USAGE_LIMIT_RE = /hit your usage limit|usage limit reached/i;
 const HEARTBEAT_MS = 60_000;
 
@@ -112,8 +113,10 @@ export async function runCodex(
   );
   await rm(outputDir, { recursive: true, force: true });
   const log = await saveSessionLog(settings, prompt, result);
-  const failure = USAGE_LIMIT_RE.test(`${message}\n${result.stdout}\n${result.stderr}`)
-    ? 'кончился лимит Codex'
+  // Только итог и хвост stderr: в stdout сессии лимит может встретиться в читаемых файлах.
+  const tail = result.stderr.trim().split(/\r?\n/).slice(-20).join('\n');
+  const failure = USAGE_LIMIT_RE.test(`${message}\n${tail}`)
+    ? USAGE_LIMIT
     : result.code !== 0
       ? `codex завершился с кодом ${result.code}`
       : undefined;

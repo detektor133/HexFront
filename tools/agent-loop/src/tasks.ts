@@ -158,8 +158,9 @@ async function runReview(context: LoopContext, task: string): Promise<'x' | ' ' 
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   const mark = taskMark((await readStage(context.config.root)).stageText, task);
-  const verdict = firstLine(review.message);
-  if (mark === 'x' && verdict === 'OK') return 'x';
+  // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
+  const verdict = firstLine(review.message).replace(/[`*_]/g, '').trim();
+  if (mark === 'x' && /^OK(?![\p{L}\d])/u.test(verdict)) return 'x';
   if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return ' ';
   return park(
     context,
@@ -181,7 +182,8 @@ export async function processTask(
   const { config, say } = context;
   const accepted = new Set<string>();
   let current = task;
-  let needsWork = options.mark !== '~';
+  // Доделка всегда начинается с работы: `[~]` в незакоммиченном файле этапа ещё не проверен.
+  let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
   for (let round = 1; round <= config.maxRounds;) {

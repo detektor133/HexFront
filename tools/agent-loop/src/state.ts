@@ -1,5 +1,5 @@
 // Память цикла между запусками: `.ai-logs/agent-loop/state.json`, вне git, только на этом ПК.
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export interface LoopState {
@@ -34,5 +34,7 @@ export async function loadState(root: string): Promise<LoopState> {
 export async function saveState(root: string, state: LoopState): Promise<void> {
   const path = statePath(root);
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  // Через временный файл: оборванная запись не должна ломать каждый следующий запуск.
+  await writeFile(`${path}.tmp`, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  await rename(`${path}.tmp`, path);
 }

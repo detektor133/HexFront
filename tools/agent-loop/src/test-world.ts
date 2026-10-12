@@ -63,6 +63,8 @@ export interface World {
   readonly polls?: number;
   /** Issue, которая появится во время ожидания: её увидит дешёвая проверка `changed`. */
   readonly arrival?: AgentIssue;
+  /** Каждая пауза кончается Enter владельца: следующий полный шаг сразу. */
+  readonly wake?: boolean;
 }
 
 export interface Outcome {
@@ -171,6 +173,8 @@ export async function runWorld(world: World): Promise<Outcome> {
     }
     if (sub === 'remote') return ok('https://github.com/detektor133/HexFront.git');
     if (sub === 'rev-parse') return ok(`c${first?.startsWith('origin/') ? origin : head}`);
+    if (sub === 'diff' && first === '--quiet')
+      return { ...ok(), code: world.merged === true ? 0 : 1 };
     if (sub === 'diff') return ok(files.join('\n'));
     if (sub === 'push') {
       pushes += 1;
@@ -246,7 +250,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         polls -= 1;
         if (polls < 0) throw new Error('конец теста');
         out.sleeps += 1;
-        return Promise.resolve('timer' as const);
+        return Promise.resolve(world.wake === true ? ('wake' as const) : ('timer' as const));
       },
       writeLine: (line) => out.lines.push(line),
     });

@@ -42,11 +42,14 @@ const runProcess: RunCommand = (command, args, options = {}) =>
     if (options.input !== undefined) child.stdin.end(options.input);
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
+    // Кириллица может разрезаться между кусками вывода: декодирование потоком, а не по куску.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
     });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
     });
     const timer =
       options.timeoutMs === undefined

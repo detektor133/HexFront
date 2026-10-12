@@ -62,5 +62,7 @@ export async function syncWithOrigin(git: Git, push: boolean): Promise<string | 
 /** @returns true, если HEAD ветки этапа уже лежит в origin/main (PR этапа смёржен). */
 export async function mergedIntoMain(git: Git): Promise<boolean> {
   await git.run(['fetch', 'origin', 'main']);
-  return isAncestor(git, 'HEAD', 'origin/main');
+  if (await isAncestor(git, 'HEAD', 'origin/main')) return true;
+  // Squash-мерж не оставляет коммитов ветки в main, но дерево main совпадает с HEAD.
+  return (await git.attempt(['diff', '--quiet', 'HEAD', 'origin/main'])).code === 0;
 }

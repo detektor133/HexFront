@@ -1,4 +1,5 @@
 // Issue с меткой `agent` от владельца репозитория — конверт команды: первая строка — скилл, дальше текст дословно.
+import { USAGE_LIMIT } from './codex.ts';
 import {
   backoff,
   firstLine,
@@ -65,6 +66,9 @@ async function stopIssue(
   answer = '',
 ): Promise<Step> {
   const github = context.config.github;
+  // Снятая владельцем agent-stop даёт Issue снова две попытки.
+  context.state.issueFailures[String(issue.number)] = 0;
+  await save(context);
   await context.say(`Issue #${issue.number}: стоп — ${reason}`);
   const tail = answer.trim() === '' ? '' : `\n\n\`\`\`\n${lastLines(answer, 15)}\n\`\`\``;
   const delivered =
@@ -87,6 +91,8 @@ async function issueCrashed(
   reason: string,
   answer: string,
 ): Promise<Step> {
+  // Кончившийся лимит — не вина Issue: только пауза, попытка не тратится.
+  if (reason === USAGE_LIMIT) return backoff(context, `Issue #${issue.number}: ${reason}`, answer);
   const key = String(issue.number);
   const failures = (context.state.issueFailures[key] ?? 0) + 1;
   context.state.issueFailures[key] = failures;
@@ -164,7 +170,7 @@ export async function processIssues(
   for (const issue of issues) {
     if (
       issue.labels.includes(STOP_LABEL) ||
-      issue.author !== github.owner ||
+      issue.author.toLowerCase() !== github.owner.toLowerCase() ||
       context.state.answeredIssues.includes(issue.number)
     )
       continue;

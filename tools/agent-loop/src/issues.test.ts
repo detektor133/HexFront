@@ -137,6 +137,31 @@ describe('закрытие этапа', () => {
     expect(run.lines).toContain('новый этап: ветка stage-07');
   });
 
+  it('если $stage-close не сменил этап, ждёт и не закрывает этап по кругу', async () => {
+    const run = await runWorld({
+      status: lastQueue,
+      stage: closeAll(fixtureStage),
+      sessions: [{ answer: 'Этап закрыт', commit: true }],
+    });
+    expect(run.prompts).toEqual(['$stage-close']);
+    expect(run.lines).toContain(
+      'жду: $stage-close не перевёл «Текущий этап» в STATUS на следующий — проверь',
+    );
+  });
+
+  it('после неудачного шага 7 не запускает $stage-close снова без нового коммита', async () => {
+    const closedStatus = lastQueue.replace('| 06 —', '| 07 —');
+    const run = await runWorld({
+      status: closedStatus,
+      stage: closeAll(fixtureStage),
+      merged: true,
+      polls: 2,
+      wake: true,
+      sessions: [{ answer: 'Ветка stage-07 уже есть' }],
+    });
+    expect(run.prompts).toEqual(['$stage-close']);
+  });
+
   it('пустая очередь при открытых задачах этапа — ожидание, а не $stage-close', async () => {
     const run = await runWorld({
       status: lastQueue,
