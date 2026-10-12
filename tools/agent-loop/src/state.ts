@@ -1,0 +1,38 @@
+// Память цикла между запусками: `.ai-logs/agent-loop/state.json`, вне git, только на этом ПК.
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+
+export interface LoopState {
+  /** Недоделка: сессия этой задачи оборвалась с незакоммиченной работой. */
+  resume?: string;
+  /** Ожидание: та же причина при том же HEAD повторно сессий не запускает. */
+  parked?: { readonly key: string; readonly head: string; readonly reason: string };
+  /** До этого времени (мс) codex не запускается: сбой или кончился лимит. */
+  retryAfter?: number;
+  /** Задачи, уже разбитые `$split`: повторная просьба разбить — к владельцу. */
+  split: string[];
+  /** Число сбоев codex по Issue; второй сбой ставит `agent-stop`. */
+  issueFailures: Record<string, number>;
+  /** Issues, на которые цикл уже ответил: не исполняются повторно, даже если GitHub не принял закрытие или метку. */
+  answeredIssues: number[];
+  /** PR закрытого этапа по ветке. */
+  pullRequests: Record<string, string>;
+}
+
+export const statePath = (root: string): string =>
+  join(root, '.ai-logs', 'agent-loop', 'state.json');
+
+export async function loadState(root: string): Promise<LoopState> {
+  const empty: LoopState = { split: [], issueFailures: {}, answeredIssues: [], pullRequests: {} };
+  const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+    throw error;
+  });
+  return text === '' ? empty : { ...empty, ...(JSON.parse(text) as Partial<LoopState>) };
+}
+
+export async function saveState(root: string, state: LoopState): Promise<void> {
+  const path = statePath(root);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+}

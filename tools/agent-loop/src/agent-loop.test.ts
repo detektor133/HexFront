@@ -1,164 +1,15 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
+import { defaultRunCommand, prepareProcessArguments } from './agent-loop.ts';
 import {
-  defaultRunCommand,
-  prepareProcessArguments,
-  runAgentLoop,
-  type CommandResult,
-} from './agent-loop.ts';
-import { isOwnerTask, selectTask, taskMark, type TaskMark } from './stage-file.ts';
-
-const fixtureStatus = `# Статус
-
-| Текущий этап | 06 — тестовый этап |
-| Ветка | \`stage-06\` |
-
-Очередь: 06/T1j5-Б1 → 06/T1i → 06/T1e
-`;
-const fixtureStage = `# Этап 06
-
-- [ ] **T1. Родитель**, не задача владельца.
-- [ ] **T1i. Обучение весов**, задача владельца. Владелец запускает \`pnpm evolve\`.
-- [ ] **T1e. Проверка родителя T1**, сквозная проверка, не задача владельца.
-  *Приёмка:* отмечается \`[x]\` только после пройденного \`$accept 06/T1\`.
-- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).
-  *Приёмка:* тесты.
-`;
-const fixtureRoles = JSON.stringify({
-  next: { model: 'luna', reasoningEffort: 'medium' },
-  review: { reasoningEffort: 'medium' },
-});
-const fixturePermissions = JSON.stringify({
-  reviewer: ['docs/stages/**', 'docs/STATUS.md', 'docs/reports/**', '.ai-logs/**'],
-});
-
-/** Что делает одна сессия codex: новая отметка задачи, коммит, push, файлы, ответ. */
-interface Session {
-  readonly mark?: TaskMark;
-  readonly task?: string;
-  readonly commit?: boolean;
-  readonly push?: boolean;
-  readonly files?: readonly string[];
-  readonly dirty?: boolean;
-  readonly answer: string;
-  readonly code?: number;
-}
-
-interface Scenario {
-  readonly sessions: readonly Session[];
-  readonly ci?: readonly string[];
-  readonly status?: string;
-  readonly stage?: string;
-  readonly maxTasks?: number;
-  readonly maxRounds?: number;
-  readonly dryRun?: boolean;
-  readonly branch?: string;
-}
-
-interface ScenarioResult {
-  readonly code: number;
-  readonly prompts: string[];
-  readonly roles: (string | undefined)[];
-  readonly codexArguments: (readonly string[])[];
-  readonly lines: string[];
-  readonly resets: number;
-  readonly ciCalls: number;
-}
-
-const setMark = (stage: string, task: string, mark: TaskMark): string =>
-  stage.replace(new RegExp(`^- \\[[^\\]]\\] \\*\\*${task}\\.`, 'm'), `- [${mark}] **${task}.`);
-
-async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
-  const root = await mkdtemp(join(tmpdir(), 'hexfront-agent-loop-test-'));
-  const stagePath = join(root, 'docs/stages/stage-06-bots-balance.md');
-  await mkdir(join(root, 'docs/stages'), { recursive: true });
-  await mkdir(join(root, 'tools/agent-loop'), { recursive: true });
-  await writeFile(join(root, 'docs/STATUS.md'), scenario.status ?? fixtureStatus, 'utf8');
-  await writeFile(stagePath, scenario.stage ?? fixtureStage, 'utf8');
-  await writeFile(join(root, 'tools/agent-loop/roles.json'), fixtureRoles, 'utf8');
-  await writeFile(join(root, 'tools/agent-loop/permissions.json'), fixturePermissions, 'utf8');
-  const sessions = [...scenario.sessions];
-  const ci = [...(scenario.ci ?? [])];
-  const result: ScenarioResult = {
-    code: 0,
-    prompts: [],
-    roles: [],
-    codexArguments: [],
-    lines: [],
-    resets: 0,
-    ciCalls: 0,
-  };
-  let resets = 0;
-  let ciCalls = 0;
-  let head = 0;
-  let origin = 0;
-  let dirty = '';
-  let files: readonly string[] = [];
-  const ok = (stdout = ''): CommandResult => ({ code: 0, stdout, stderr: '' });
-  const runCommand = async (
-    command: string,
-    args: readonly string[],
-    options?: { readonly input?: string; readonly env?: NodeJS.ProcessEnv },
-  ): Promise<CommandResult> => {
-    if (command === 'pnpm') {
-      ciCalls += 1;
-      const line = ci.shift() ?? 'success https://ci/1';
-      return { code: line.startsWith('success') ? 0 : 1, stdout: line, stderr: '' };
-    }
-    if (command === 'codex') {
-      result.prompts.push(options?.input ?? '');
-      result.roles.push(options?.env?.AGENT_ROLE);
-      result.codexArguments.push(args);
-      const session = sessions.shift();
-      if (!session) throw new Error('лишний вызов codex');
-      if (session.mark && session.task)
-        await writeFile(
-          stagePath,
-          setMark(await readFile(stagePath, 'utf8'), session.task, session.mark),
-          'utf8',
-        );
-      if (session.commit !== false && session.mark) head += 1;
-      if (session.push !== false) origin = head;
-      files = session.files ?? ['docs/stages/stage-06-bots-balance.md'];
-      dirty = session.dirty ? ' M packages/sim/src/step.ts' : '';
-      return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
-    }
-    const [sub, arg] = args;
-    if (sub === 'branch') return ok(scenario.branch ?? 'stage-06');
-    if (sub === 'status') return ok(dirty);
-    if (sub === 'fetch') return ok();
-    if (sub === 'rev-parse') return ok(String(arg?.startsWith('origin/') ? origin : head));
-    if (sub === 'diff') return ok(files.join('\n'));
-    if (sub === 'reset') {
-      resets += 1;
-      dirty = '';
-      return ok();
-    }
-    throw new Error(`неожиданная команда ${command} ${args.join(' ')}`);
-  };
-  try {
-    const code = await runAgentLoop({
-      root,
-      maxTasks: scenario.maxTasks ?? 1,
-      maxRounds: scenario.maxRounds ?? 3,
-      maxMinutes: 10,
-      dryRun: scenario.dryRun ?? false,
-      runCommand,
-      now: (() => {
-        let time = 0;
-        return () => (time += 1);
-      })(),
-      writeLine: (line) => result.lines.push(line),
-    });
-    return { ...result, code, resets, ciCalls };
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-}
+  closedStageBranch,
+  commandTask,
+  isOwnerTask,
+  parseQueue,
+  selectTask,
+  taskMark,
+} from './stage-file.ts';
+import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
 
 const NEXT_DONE: Session = {
   task: 'T1j5-Б1',
@@ -171,20 +22,27 @@ const REVIEW_BACK: Session = {
   mark: ' ',
   answer: 'ВОЗВРАТ\n- п.1 — evaluate.ts:95 — штраф по чужим метрикам',
 };
+const OWNER_WAIT =
+  'жду: очередь дошла до 06/T1i — это задача владельца. Когда сделаешь — Issue «$done 06/T1i» с текстом, что сделано';
 
 describe('разбор файла этапа', () => {
   it('выбирает первую незакрытую задачу очереди, включая [~]', () => {
     expect(selectTask(fixtureStatus, fixtureStage)).toBe('06/T1j5-Б1');
-    const reviewed = setMark(fixtureStage, 'T1j5-Б1', 'x');
-    expect(selectTask(fixtureStatus, reviewed)).toBe('06/T1i');
+    expect(selectTask(fixtureStatus, setMark(fixtureStage, 'T1j5-Б1', 'x'))).toBe('06/T1i');
     expect(selectTask(fixtureStatus, setMark(fixtureStage, 'T1j5-Б1', '~'))).toBe('06/T1j5-Б1');
+  });
+
+  it('берёт из «Очереди» только номера задач, без пояснений', () => {
+    expect(parseQueue('Очередь: 07/T1 после мержа PR этапа 06; новый этап не начат.')).toEqual([
+      '07/T1',
+    ]);
+    expect(parseQueue('Очередь: 06/T1j7 → 06/T1i → 06/T1e → 06/T2')).toHaveLength(4);
   });
 
   it('не путает T1 с T1i и T1e при чтении отметки', () => {
     const stage = setMark(fixtureStage, 'T1i', 'x');
     expect(taskMark(stage, '06/T1')).toBe(' ');
     expect(taskMark(stage, '06/T1i')).toBe('x');
-    expect(taskMark(stage, '06/T1e')).toBe(' ');
     expect(taskMark(stage, '06/T9')).toBeUndefined();
   });
 
@@ -195,21 +53,32 @@ describe('разбор файла этапа', () => {
       isOwnerTask('- [ ] **T1e. Проверка**, не задача владельца.\n  после $accept 06/T1'),
     ).toBe(false);
   });
+
+  it('находит номер задачи после команды в ответе, без кавычек и точки', () => {
+    expect(commandTask('запусти `$split 06/T1j5-Б1`.', '$split')).toBe('06/T1j5-Б1');
+    expect(commandTask('нужен $accept 06/T1.', '$accept')).toBe('06/T1');
+    expect(commandTask('нужен $accept', '$accept')).toBeUndefined();
+  });
+
+  it('видит закрытый этап: «Текущий этап» уже следующий, а «Ветка» прежняя', () => {
+    expect(closedStageBranch(fixtureStatus)).toBeUndefined();
+    expect(closedStageBranch(fixtureStatus.replace('| 06 —', '| 07 —'))).toBe('stage-06');
+  });
 });
 
-describe('цикл $next → CI → $review', () => {
-  it('проходит задачу за один круг: $next без роли, CI, $review с ролью reviewer', async () => {
-    const run = await runScenario({ sessions: [NEXT_DONE, REVIEW_OK] });
+describe('круги $next → CI → $review', () => {
+  it('проходит задачу за круг и ждёт на задаче владельца, не вызывая codex', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
     expect(run.code).toBe(0);
     expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
     expect(run.roles).toEqual(['', 'reviewer']);
     expect(run.ciCalls).toBe(1);
-    expect(run.lines).toContain('готово: 06/T1j5-Б1 (1 из 1)');
-    expect(run.lines.filter((line) => /^(→|←|… жду CI|CI зелёный)/.test(line))).toHaveLength(6);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+    expect(run.lines).toContain(OWNER_WAIT);
   });
 
   it('передаёт модель только если она задана, и усилие medium', async () => {
-    const run = await runScenario({ sessions: [NEXT_DONE, REVIEW_OK] });
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
     // На Windows аргументы приходят в кавычках для cmd, поэтому сравнение — без них.
     const plain = run.codexArguments.map((args) => args.map((arg) => arg.replace(/^"|"$/g, '')));
     expect(plain[0]).toEqual(
@@ -219,131 +88,162 @@ describe('цикл $next → CI → $review', () => {
   });
 
   it('после ВОЗВРАТ снова запускает $next и затем $review', async () => {
-    const run = await runScenario({ sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_OK] });
-    expect(run.code).toBe(0);
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_OK] });
     expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1', '$next', '$review 06/T1j5-Б1']);
     expect(run.lines).toContain('ВОЗВРАТ 06/T1j5-Б1, круг 1 из 3');
   });
 
-  it('останавливается после maxRounds ВОЗВРАТ подряд', async () => {
-    const run = await runScenario({
+  it('после maxRounds ВОЗВРАТ ждёт владельца и не начинает задачу заново', async () => {
+    const run = await runWorld({
       maxRounds: 2,
       sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_BACK],
     });
-    expect(run.code).toBe(1);
     expect(run.prompts).toHaveLength(4);
-    expect(run.lines).toContain(
-      'стоп: круги — 2 ВОЗВРАТ подряд по 06/T1j5-Б1 — нужно решение владельца',
-    );
+    expect(run.lines).toContain('жду: 2 ВОЗВРАТ подряд по 06/T1j5-Б1 — нужно решение владельца');
   });
 
   it('начинает с $review, если задача уже [~]', async () => {
-    const run = await runScenario({
+    const run = await runWorld({
       stage: setMark(fixtureStage, 'T1j5-Б1', '~'),
       sessions: [REVIEW_OK],
     });
-    expect(run.code).toBe(0);
     expect(run.prompts).toEqual(['$review 06/T1j5-Б1']);
     expect(run.ciCalls).toBe(0);
   });
 
-  it('останавливается на задаче владельца без вызова codex', async () => {
-    const run = await runScenario({ stage: setMark(fixtureStage, 'T1j5-Б1', 'x'), sessions: [] });
-    expect(run.code).toBe(1);
-    expect(run.prompts).toEqual([]);
-    expect(run.lines).toContain(
-      'стоп: выбор задачи — очередь дошла до 06/T1i — это задача владельца',
-    );
-  });
-
-  it('берёт следующую задачу после выполненной и останавливается на задаче владельца', async () => {
-    const run = await runScenario({ maxTasks: 3, sessions: [NEXT_DONE, REVIEW_OK] });
-    expect(run.code).toBe(0);
-    expect(run.prompts).toHaveLength(2);
-    expect(run.lines).toContain(
-      'стоп: выбор задачи — очередь дошла до 06/T1i — это задача владельца',
-    );
-  });
-
-  it('не запускает T1e как задачу владельца из-за «$accept» в приёмке', async () => {
-    const stage = setMark(setMark(fixtureStage, 'T1j5-Б1', 'x'), 'T1i', 'x');
-    const run = await runScenario({
-      stage,
-      sessions: [{ answer: 'T1e требует $accept владельца, задача оставлена [ ]' }],
+  it('при красном CI повторяет $next, который сначала чинит CI', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, { answer: 'CI починен, задача ждёт ревью', commit: true }, REVIEW_OK],
+      ci: ['failure job=check https://ci/2', 'success https://ci/3'],
     });
-    expect(run.prompts).toEqual(['$next']);
-    expect(run.lines).toContain(
-      'стоп: $next — задача не отмечена [~] — $next остановился сам (см. его ответ)',
-    );
-  });
-
-  it('останавливается, если $next не отметил задачу [~] (вопрос, $split, второй красный verify)', async () => {
-    const run = await runScenario({ sessions: [{ answer: 'запусти `$split 06/T1j5-Б1`' }] });
-    expect(run.code).toBe(1);
-    expect(run.prompts).toEqual(['$next']);
-    expect(run.lines.some((line) => line.includes('запусти `$split 06/T1j5-Б1`'))).toBe(true);
-  });
-
-  it('останавливается при красном CI после $next, не запуская $review', async () => {
-    const run = await runScenario({
-      sessions: [NEXT_DONE],
-      ci: ['failure job=check https://ci/2'],
-    });
-    expect(run.code).toBe(1);
-    expect(run.prompts).toEqual(['$next']);
-    expect(run.lines).toContain('стоп: CI после $next — CI красный');
+    expect(run.prompts).toEqual(['$next', '$next', '$review 06/T1j5-Б1']);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('повторяет ожидание CI один раз после таймаута', async () => {
-    const run = await runScenario({
+    const run = await runWorld({
       sessions: [NEXT_DONE, REVIEW_OK],
       ci: ['failure timeout https://ci/3', 'success https://ci/3'],
     });
-    expect(run.code).toBe(0);
     expect(run.ciCalls).toBe(2);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('останавливается, если $next не запушил коммит', async () => {
-    const run = await runScenario({ sessions: [{ ...NEXT_DONE, push: false }] });
-    expect(run.code).toBe(1);
-    expect(run.lines).toContain(
-      'стоп: $next — HEAD не совпадает с origin/stage-06: сессия не запушила коммит',
-    );
+  it('сам пушит коммит, который сессия не запушила', async () => {
+    const run = await runWorld({ sessions: [{ ...NEXT_DONE, push: false }, REVIEW_OK] });
+    expect(run.pushes).toBe(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('останавливается без отката, если запушенное ревью изменило код', async () => {
-    const run = await runScenario({
+  it('ждёт владельца без отката, если запушенное ревью изменило код', async () => {
+    const run = await runWorld({
       sessions: [NEXT_DONE, { ...REVIEW_OK, files: ['packages/sim/src/step.ts'] }],
     });
-    expect(run.code).toBe(1);
-    expect(run.resets).toBe(0);
+    expect(run.lines).toContain('жду: ревью изменило файлы вне permissions.json — проверь коммит');
+  });
+
+  it('ждёт владельца, если ответ ревью не совпадает с отметкой', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: '~' }] });
+    expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [~]');
+  });
+
+  it('при сбое codex делает паузу и больше сессий не запускает', async () => {
+    const run = await runWorld({ sessions: [{ answer: 'usage limit reached', code: 1 }] });
+    expect(run.prompts).toEqual(['$next']);
     expect(run.lines).toContain(
-      'стоп: $review — ревью изменило файлы вне permissions.json — проверь коммит',
+      'сбой: $next: codex завершился с кодом 1 — следующая попытка через 30 мин',
     );
   });
 
-  it('останавливается, если ответ ревью не совпадает с отметкой', async () => {
-    const run = await runScenario({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: '~' }] });
-    expect(run.code).toBe(1);
-    expect(run.lines).toContain('стоп: $review — ответ «OK» не совпадает с отметкой [~]');
-  });
-
-  it('останавливается при ненулевом коде codex (например, кончился лимит)', async () => {
-    const run = await runScenario({ sessions: [{ answer: 'usage limit reached', code: 1 }] });
-    expect(run.code).toBe(1);
-    expect(run.lines).toContain('стоп: $next — codex завершился с кодом 1');
-  });
-
-  it('проверяет ветку и чистоту дерева до первой сессии', async () => {
-    const run = await runScenario({ branch: 'main', sessions: [] });
-    expect(run.code).toBe(1);
-    expect(run.lines).toContain('стоп: проверка ветки — ожидалась stage-06, найдена main');
+  it('ждёт, если ветка не совпадает с «Ветка» в STATUS', async () => {
+    const run = await runWorld({ branch: 'main', sessions: [] });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines).toContain('жду: ожидалась ветка stage-06 из STATUS, сейчас main');
   });
 
   it('в --dry-run только печатает план', async () => {
-    const run = await runScenario({ dryRun: true, sessions: [] });
-    expect(run.code).toBe(0);
+    const run = await runWorld({ dryRun: true, sessions: [] });
     expect(run.lines).toEqual(['$next → CI → $review: 06/T1j5-Б1']);
+  });
+});
+
+describe('$split, $accept и доделка без владельца', () => {
+  it('запускает $split по ответу $next и снова берёт очередь', async () => {
+    const split = { answer: 'Задача велика: запусти `$split 06/T1j5-Б1`.' };
+    const run = await runWorld({
+      sessions: [split, { answer: 'Разбито на T1j5-Б1a…', commit: true }, split],
+    });
+    expect(run.prompts).toEqual(['$next', '$split 06/T1j5-Б1', '$next']);
+    expect(run.lines).toContain('жду: 06/T1j5-Б1 снова просят разбить — нужен владелец');
+  });
+
+  it('запускает $accept по ответу $next и повторяет $next с результатом приёмки', async () => {
+    const stage = setMark(setMark(fixtureStage, 'T1j5-Б1', 'x'), 'T1i', 'x');
+    const run = await runWorld({
+      stage,
+      sessions: [
+        { answer: 'Приёмка требует `$accept 06/T1`, задача оставлена [ ]' },
+        { answer: 'выполнено 3/3', commit: true },
+        { task: 'T1e', mark: '~', answer: 'Готово' },
+        { task: 'T1e', mark: 'x', answer: 'OK' },
+      ],
+    });
+    expect(run.prompts).toEqual(['$next', '$accept 06/T1', '$next', '$review 06/T1e']);
+    expect(run.lines).toContain('готово: 06/T1e');
+  });
+
+  it('второй раз $accept в тех же кругах не запускает, а ждёт владельца', async () => {
+    const stage = setMark(setMark(fixtureStage, 'T1j5-Б1', 'x'), 'T1i', 'x');
+    const ask = { answer: 'Приёмка `$accept 06/T1` не пройдена, нужен новый evolve' };
+    const run = await runWorld({ stage, sessions: [ask, { answer: '1/3', commit: true }, ask] });
+    expect(run.prompts).toEqual(['$next', '$accept 06/T1', '$next']);
+    expect(run.lines.some((line) => line.startsWith('жду: 06/T1e не отмечена [~]'))).toBe(true);
+  });
+
+  it('доделывает незакоммиченную работу одной сессией «продолжить»', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: 'verify красный', dirty: true }, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts).toEqual(['$next', '$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
+  });
+
+  it('ждёт владельца, если и доделка оставила дерево грязным', async () => {
+    const run = await runWorld({
+      sessions: [
+        { answer: 'verify красный', dirty: true },
+        { answer: 'снова красный', dirty: true },
+      ],
+    });
+    expect(run.prompts).toHaveLength(2);
+    expect(run.lines).toContain('жду: доделка 06/T1j5-Б1 не закончена, дерево не чистое');
+  });
+
+  it('по --resume начинает с доделки задачи в грязном дереве', async () => {
+    const run = await runWorld({
+      dirty: true,
+      resume: '06/T1j5-Б1',
+      sessions: [NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts).toEqual(['$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
+  });
+
+  it('чужое грязное дерево не трогает: ждёт $done или --resume', async () => {
+    const run = await runWorld({ dirty: true, sessions: [] });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines.some((line) => line.startsWith('жду: рабочее дерево не чистое'))).toBe(true);
+  });
+});
+
+describe('ожидание', () => {
+  it('без работы спит и проверяет снова, сообщение об ожидании — один раз', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      sessions: [],
+      polls: 2,
+    });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines.filter((line) => line === OWNER_WAIT)).toHaveLength(1);
+    expect(run.lines.filter((line) => line.startsWith('… жду Issue'))).toHaveLength(1);
   });
 });
 

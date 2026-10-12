@@ -6,6 +6,9 @@ const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const shortId = (task: string): string => task.match(/\/(T[^/\s]+)$/)?.[1] ?? task;
 
+/** Номер задачи `NN/Tn` в тексте; хвостовая пунктуация и кавычки в номер не входят. */
+export const TASK_ID_SOURCE = String.raw`\d{2}\/T[^\s\`'"«»,;:()→]*[^\s\`'"«»,;:()→.]`;
+
 /**
  * Задача владельца по первой строке блока: «задача владельца» или «плейтест».
  * «не задача владельца» и упоминания `$accept` в приёмке задачей владельца не считаются:
@@ -30,14 +33,18 @@ export function taskMark(stageText: string, task: string): TaskMark | undefined 
   return mark === ' ' || mark === '~' || mark === 'x' || mark === '—' ? mark : undefined;
 }
 
+/**
+ * @returns номера задач из строки «Очередь» по порядку. Пояснения в строке
+ * («после мержа PR…») номерами не считаются.
+ */
+export const parseQueue = (status: string): string[] =>
+  [
+    ...(status.match(/Очередь:\s*([^\r\n]+)/)?.[1] ?? '').matchAll(new RegExp(TASK_ID_SOURCE, 'g')),
+  ].map((match) => match[0]);
+
 /** @returns первая задача очереди STATUS, не закрытая в файле этапа (`[ ]` или `[~]`). */
 export function selectTask(status: string, stageText: string): string | undefined {
-  const queue = status
-    .match(/Очередь:\s*([^\r\n]+)/)?.[1]
-    ?.split('→')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return queue?.find((task) => {
+  return parseQueue(status).find((task) => {
     const mark = taskMark(stageText, task);
     return mark === ' ' || mark === '~';
   });
@@ -46,3 +53,33 @@ export function selectTask(status: string, stageText: string): string | undefine
 /** @returns задачи этапа с отметкой `[~]`, в порядке файла. */
 export const reviewTasks = (stageText: string, stage: string): string[] =>
   [...stageText.matchAll(/^- \[~\] \*\*(T[^.\s*]+)\./gm)].map((match) => `${stage}/${match[1]}`);
+
+/** @returns все задачи этапа с отметкой `[ ]` или `[~]`, в порядке файла. */
+export const openTasks = (stageText: string, stage: string): string[] =>
+  [...stageText.matchAll(/^- \[[ ~]\] \*\*(T[^.\s*]+)\./gm)].map((match) => `${stage}/${match[1]}`);
+
+/** @returns номер текущего этапа из таблицы STATUS, например `06`. */
+export const statusStage = (status: string): string | undefined =>
+  status.match(/Текущий этап\s*\|\s*(\d+)/)?.[1];
+
+/** @returns ветка из поля «Ветка» таблицы STATUS. */
+export const statusBranch = (status: string): string | undefined =>
+  status.match(/Ветка\s*\|\s*`([^`]+)`/)?.[1];
+
+/**
+ * Этап закрыт `$stage-close`, но ветка следующего ещё не создана: «Текущий этап»
+ * уже следующий, а «Ветка» — прежняя `stage-NN`.
+ */
+export function closedStageBranch(status: string): string | undefined {
+  const stage = statusStage(status);
+  const branch = statusBranch(status);
+  const branchStage = branch?.match(/^stage-(\d+)$/)?.[1];
+  return stage !== undefined && branchStage !== undefined && branchStage !== stage
+    ? branch
+    : undefined;
+}
+
+/** @returns номер задачи после команды (`$split 06/T1` → `06/T1`) в ответе сессии. */
+export function commandTask(text: string, command: string): string | undefined {
+  return text.match(new RegExp(`${escapeRegExp(command)}\\s+(${TASK_ID_SOURCE})`))?.[1];
+}
