@@ -10,7 +10,7 @@
 
 ## Подтверждение
 
-- `packages/sim/test/scenarios/commander.test.ts` — 19/19: отрицательные параметры дают нулевой порог и радиус; отсутствующие параметры не получают fallback; существующие сценарии commander и human-путь сохранены.
+- `packages/sim/test/scenarios/commander.test.ts` — 18/18: отрицательные параметры дают нулевой порог и радиус; отсутствующие параметры не получают fallback; существующие сценарии commander и human-путь сохранены.
 - Регрессионный тест на пустые веса подтверждает, что отсутствующие `commander.*` не получают балансный fallback и дают нулевые параметры.
 - `packages/sim/test/guards/bot-brain-source.test.ts` — 2/2: удалённых `BOT_MERGE_*` в исходниках нет.
 - `pnpm --filter @hexfront/sim typecheck` — OK.
