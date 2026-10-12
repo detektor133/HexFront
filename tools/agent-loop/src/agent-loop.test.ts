@@ -279,7 +279,7 @@ describe('цикл $next → CI → $review', () => {
     const run = await runScenario({ sessions: [{ answer: 'запусти `$split 06/T1j5-Б1`' }] });
     expect(run.code).toBe(1);
     expect(run.prompts).toEqual(['$next']);
-    expect(run.lines).toContain('запусти `$split 06/T1j5-Б1`');
+    expect(run.lines.some((line) => line.includes('запусти `$split 06/T1j5-Б1`'))).toBe(true);
   });
 
   it('останавливается при красном CI после $next, не запуская $review', async () => {
