@@ -30,11 +30,12 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j5 принята:** ревью подтвердило матч на сиде 42 с прямым перебором, смену места особи по сидам, бонус fitness только за `cities`/`lastStanding` и восстановление `seeds/sigma` при resume.
-- **Следующая работа:** `$task 06/T1j6`.
-- **Отчёт:** `docs/reports/stage-06-t1j5.md`.
-- **Проверки:** профильные тесты — 5/5; `pnpm verify --changed` — `verify: OK (41 с)`; полный `pnpm verify` — `verify: OK (300 с)`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/replay/src/acceptance.ts`.
+- **06/T1j6 выполнена:** добавлен сквозной отчёт по T1j1–T1j5 с file:line и именами тестов; три обязательных поиска запрещённых литералов, `balance` и старых `BOT_*` дали пустой вывод.
+- **Проверки:** `pnpm verify --changed` — `verify: OK (11 с)`; полный `pnpm verify` — `verify: OK (296 с)`.
+- **CI:** `pnpm ci:wait` перед задачей выявил таймаут `front-follow.test.ts:199`; локальный полный verify зелёный, повторить CI в следующей сессии.
+- **Отчёт:** `docs/reports/stage-06-t1j.md`.
+- **Следующая работа:** задача владельца `06/T1i`; запусти `$review 06/T1j6` в новой сессии.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j.md`, `docs/reports/stage-06-t1j5.md`.
 
 ## Архив сессий
 
