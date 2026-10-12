@@ -30,8 +30,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **Текущий результат 06/T1j7:** код и тесты выполнены, отчёт `docs/reports/stage-06-t1j7.md`; задача отмечена `[~]` и ждёт ревью. После ревью следующая задача — 06/T1i с весами из репозитория; старые результаты T1i не использовать.
-- **Проверки T1j7:** профильный `pnpm exec vitest run --changed HEAD` — 2 файла, 7 тестов; `pnpm verify --changed` — сборка, типы, lint и Prettier зелёные. Перед коммитом нужен полный `pnpm verify`.
+- **Текущий результат 06/T1j7:** код и тесты выполнены, ревью принято, отчёт `docs/reports/stage-06-t1j7.md`; следующая задача — 06/T1i с весами из репозитория, старые результаты T1i не использовать.
+- **Проверки T1j7:** профильный `pnpm exec vitest run tools/replay/src/acceptance.test.ts tools/evolve/src/index.test.ts` — 2 файла, 7 тестов; `pnpm verify --changed` — сборка, типы, lint и Prettier зелёные.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j7.md`, `tools/replay/src/acceptance.ts`, `tools/evolve/src/evaluate.ts`, `tools/evolve/src/index.ts`.
 
 - **06/T1j7 (решение владельца 2026-10-12):** прогон T1i после T1j5-Б1 остановлен — штраф без потолка перевешивал место и победу (лучшая особь — в среднем 4–5 место), а обучение шло не на карте `$accept` (`small`). Сначала T1j7, затем T1i заново с весов из репозитория.
