@@ -1,98 +1,53 @@
-import { spawn } from 'node:child_process';
 import { appendFile, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
-export interface CommandResult {
-  readonly code: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-export type RunCommand = (
-  command: string,
-  args: readonly string[],
-  options?: {
-    readonly cwd?: string;
-    readonly env?: NodeJS.ProcessEnv;
-    readonly input?: string;
-    readonly timeoutMs?: number;
-  },
-) => Promise<CommandResult>;
-export interface GithubIssue {
-  readonly number: number;
-  readonly title: string;
-  readonly body: string | null;
-  readonly labels: readonly { readonly name?: string }[];
-  readonly state: string;
-}
-export interface GithubClient {
-  ensureAgentLabel(): Promise<void>;
-  listAgentIssues(): Promise<readonly GithubIssue[]>;
-  comment(issueNumber: number, body: string): Promise<void>;
-  close(issueNumber: number): Promise<void>;
-}
+import { prepareProcessArguments, type CommandResult, type RunCommand } from './process.ts';
+import {
+  isOwnerTask,
+  reviewTasks,
+  selectTask,
+  taskBlock,
+  taskMark,
+  type TaskMark,
+} from './stage-file.ts';
+
+export {
+  defaultRunCommand,
+  prepareProcessArguments,
+  quoteWindowsArgument,
+  type CommandResult,
+  type RunCommand,
+} from './process.ts';
+
 export interface AgentConfig {
   readonly root: string;
   readonly maxTasks: number;
+  readonly maxRounds: number;
   readonly maxMinutes: number;
   readonly dryRun: boolean;
   readonly runCommand: RunCommand;
-  readonly github: GithubClient;
   readonly now: () => number;
   readonly writeLine: (line: string) => void;
 }
 interface RoleConfig {
-  readonly model: string;
+  readonly model?: string;
   readonly reasoningEffort: string;
-  readonly skill: string;
 }
-interface PermissionConfig {
-  readonly [role: string]: readonly string[];
-}
+type Role = 'next' | 'review';
 interface AgentDefinitions {
-  readonly roles: Record<string, RoleConfig>;
-  readonly permissions: PermissionConfig;
+  readonly roles: Readonly<Record<Role, RoleConfig>>;
+  readonly reviewerPaths: readonly string[];
 }
-type Role = 'planner' | 'tester' | 'coder' | 'reviewer';
-type TaskSelection = {
-  readonly issue?: GithubIssue;
-  readonly task: string;
-  readonly number?: number;
-};
+/** Строка в консоль и в протокол `.ai-logs/agent-loop-<дата>.md`. */
+type Say = (line: string) => Promise<void>;
+type Stopped = { readonly ok: false; readonly code: number };
+type Outcome = { readonly ok: true } | Stopped;
 
-const ROLE_NAMES: readonly Role[] = ['planner', 'tester', 'coder', 'reviewer'];
-
-export const quoteWindowsArgument = (argument: string): string =>
-  `"${argument.replaceAll('"', '\\"')}"`;
-
-export const prepareProcessArguments = (args: readonly string[]): readonly string[] =>
-  process.platform === 'win32' ? args.map(quoteWindowsArgument) : args;
-
-const runProcess: RunCommand = (command, args, options = {}) =>
-  new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      shell: process.platform === 'win32',
-    });
-    if (options.input !== undefined) child.stdin.end(options.input);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    const timer =
-      options.timeoutMs === undefined
-        ? undefined
-        : setTimeout(() => child.kill(), options.timeoutMs);
-    child.on('close', (code) => {
-      if (timer !== undefined) clearTimeout(timer);
-      resolve({ code: code ?? 1, stdout, stderr });
-    });
-  });
+const CI_TIMEOUT_MS = 660_000;
+/** Как часто печатать «сессия ещё идёт», мс. */
+const HEARTBEAT_MS = 60_000;
+const OK: Outcome = { ok: true };
 
 const git = async (config: AgentConfig, args: readonly string[]): Promise<string> => {
   const result = await config.runCommand('git', args, { cwd: config.root });
@@ -104,18 +59,18 @@ const git = async (config: AgentConfig, args: readonly string[]): Promise<string
 const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';
 const lastLines = (text: string, count = 15): string =>
   text.trim().split(/\r?\n/).slice(-count).join('\n');
-const isOwnerTask = (text: string): boolean => /задача владельца|плейтест|\$accept/i.test(text);
-const isTestReply = (text: string): boolean => /^ТЕСТ:/im.test(text);
-const isReturnReply = (text: string): boolean => /^ВОЗВРАТ(?:\s|$)/im.test(text);
-
+const minutes = (ms: number): string => `${Math.max(0, Math.round(ms / 60_000))} мин`;
 export async function loadAgentDefinitions(root: string): Promise<AgentDefinitions> {
   const [rolesText, permissionsText] = await Promise.all([
     readFile(join(root, 'tools/agent-loop/roles.json'), 'utf8'),
     readFile(join(root, 'tools/agent-loop/permissions.json'), 'utf8'),
   ]);
+  const roles = JSON.parse(rolesText) as Partial<Record<Role, RoleConfig>>;
+  const permissions = JSON.parse(permissionsText) as { readonly reviewer?: readonly string[] };
+  if (!roles.next || !roles.review) throw new Error('В roles.json нужны роли next и review');
   return {
-    roles: JSON.parse(rolesText) as Record<string, RoleConfig>,
-    permissions: JSON.parse(permissionsText) as PermissionConfig,
+    roles: { next: roles.next, review: roles.review },
+    reviewerPaths: permissions.reviewer ?? [],
   };
 }
 
@@ -129,461 +84,308 @@ const globToRegExp = (glob: string): RegExp =>
     'i',
   );
 
+/** @returns true, если коммиты и незакоммиченные файлы после base лежат в разрешённых путях. */
 export async function checkPermissions(
   config: AgentConfig,
   base: string,
-  role: Role,
-  definitions: AgentDefinitions,
+  allowed: readonly string[],
 ): Promise<boolean> {
   const names = await git(config, ['diff', '--name-only', `${base}..HEAD`]);
   const dirty = await git(config, ['status', '--porcelain']);
   const changed = [...names.split(/\r?\n/), ...dirty.split(/\r?\n/).map((line) => line.slice(3))]
     .map((name) => relative(config.root, join(config.root, name.trim())).replaceAll('\\', '/'))
     .filter(Boolean);
-  return changed.every(
-    (name) => definitions.permissions[role]?.some((glob) => globToRegExp(glob).test(name)) ?? false,
-  );
+  return changed.every((name) => allowed.some((glob) => globToRegExp(glob).test(name)));
 }
 
-async function resolveStageFile(root: string, status: string): Promise<string> {
+interface StageState {
+  readonly stage: string;
+  readonly status: string;
+  readonly stageText: string;
+}
+
+async function readStage(root: string): Promise<StageState> {
+  const status = await readFile(join(root, 'docs/STATUS.md'), 'utf8');
   const stage = status.match(/Текущий этап\s*\|\s*(\d+)/)?.[1];
   if (!stage) throw new Error('В docs/STATUS.md не найден текущий этап');
   const name = (await readdir(join(root, 'docs/stages'))).find((file) =>
     file.startsWith(`stage-${stage}-`),
   );
   if (!name) throw new Error(`Файл этапа ${stage} не найден`);
-  return join(root, 'docs/stages', name);
+  return { stage, status, stageText: await readFile(join(root, 'docs/stages', name), 'utf8') };
 }
 
-function taskBlock(stageText: string, task: string): string {
-  const short = task.match(/\d+\/(T[\da-z]+)/i)?.[1] ?? task.match(/\bT[\da-z]+\b/i)?.[0] ?? task;
-  const escapedShort = short.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const start = stageText.search(new RegExp(`^[-*].*\\*?${escapedShort}\\b`, 'im'));
-  if (start < 0) return '';
-  const next = stageText.slice(start + 1).search(/^[-*].*\*?T[\da-z]+\b/im);
-  return stageText.slice(start, next < 0 ? undefined : start + 1 + next);
+/** Полный вывод сессии — в `.ai-logs/agent-loop/`, вне git: в консоль и протокол идут только итоги. */
+async function saveSessionLog(
+  config: AgentConfig,
+  prompt: string,
+  result: CommandResult,
+): Promise<string> {
+  const directory = join(config.root, '.ai-logs', 'agent-loop');
+  await mkdir(directory, { recursive: true });
+  const name = `${new Date(config.now()).toISOString().replace(/[:.]/g, '-').slice(0, 19)}.log`;
+  const text = `$ codex exec: ${prompt}\nкод: ${result.code}\n\n${result.stdout}\n\n--- stderr ---\n${result.stderr}\n`;
+  await appendFile(join(directory, name), text, 'utf8');
+  return `.ai-logs/agent-loop/${name}`;
 }
 
-const hasPlan = (block: string): boolean => /(^|\n)\s*\*?План\*?\s*:/i.test(block);
-const hasIssueReference = (block: string, issueNumber: number): boolean =>
-  new RegExp(`#${issueNumber}\\b`).test(block);
-const isCompletedTask = (block: string): boolean => /^\s*[-*]\s*\[(?:x|—)\]/i.test(block);
-const taskReference = (text: string, stageFile: string): string | undefined => {
-  const full = text.match(/\b(\d+\/T[\da-z]+)\b/i)?.[1];
-  if (full) return full;
-  const short = text.match(/\b(T[\da-z]+)\b/i)?.[1];
-  const stage = stageFile.match(/stage-(\d+)-/)?.[1];
-  return short && stage ? `${stage}/${short}` : undefined;
-};
-const plannerTask = (text: string): string | undefined =>
-  firstLine(text).match(/^ЗАДАЧА:\s*(\d+\/T[\da-z0-9]+)\s*$/i)?.[1];
-
-export function selectIssueOrQueue(
-  issues: readonly GithubIssue[],
-  status: string,
-  usedIssues: ReadonlySet<number> = new Set(),
-  usedTasks: ReadonlySet<string> = new Set(),
-  stageText = '',
-): TaskSelection | undefined {
-  const issue = [...issues]
-    .filter(
-      (item) =>
-        item.state === 'open' &&
-        !usedIssues.has(item.number) &&
-        item.labels.some((label) => label.name === 'agent'),
-    )
-    .sort((a, b) => a.number - b.number)[0];
-  if (issue)
-    return {
-      issue,
-      number: issue.number,
-      task: `Issue #${issue.number}: ${issue.title}\n${issue.body ?? ''}`,
-    };
-  const queue = status
-    .match(/Очередь:\s*([^\r\n]+)/)?.[1]
-    ?.split('→')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  const task = queue?.find(
-    (item) => !usedTasks.has(item) && !isCompletedTask(taskBlock(stageText, item)),
-  );
-  return task ? { task } : undefined;
-}
-
-async function runAgent(
+async function runCodex(
   config: AgentConfig,
   definitions: AgentDefinitions,
   role: Role,
-  task: string,
-  feedback = '',
-): Promise<{ readonly result: CommandResult; readonly message: string; readonly tokens?: number }> {
+  prompt: string,
+): Promise<{ readonly result: CommandResult; readonly message: string; readonly log: string }> {
   const roleConfig = definitions.roles[role];
-  if (!roleConfig || !ROLE_NAMES.includes(role)) throw new Error(`Конфиг роли ${role} не найден`);
   const outputDir = await mkdtemp(join(tmpdir(), 'hexfront-agent-'));
   const outputFile = join(outputDir, 'last-message.txt');
-  const prompt = `Роль: ${role}. Скилл: $${roleConfig.skill}. Задача: ${task}${feedback ? `\nОбратная связь:\n${feedback}` : ''}`;
-  const result = await config.runCommand(
-    'codex',
-    prepareProcessArguments([
-      'exec',
-      '--dangerously-bypass-approvals-and-sandbox',
-      '--model',
-      roleConfig.model,
-      '-c',
-      `model_reasoning_effort=${roleConfig.reasoningEffort}`,
-      '--output-last-message',
-      outputFile,
-      '--json',
-      '--cd',
-      config.root,
-      '-',
-    ]),
-    {
-      cwd: config.root,
-      env: { ...process.env, AGENT_ROLE: role },
-      input: prompt,
-      timeoutMs: config.maxMinutes * 60_000,
-    },
-  );
-  let message = result.stdout;
-  try {
-    message = await readFile(outputFile, 'utf8');
-  } catch {
-    /* stdout — резерв, если CLI не записал файл. */
-  }
-  const usage = result.stdout.match(/(?:total_tokens|tokens)[^\d]*(\d+)/i);
-  await rm(outputDir, { recursive: true, force: true });
-  return { result, message, ...(usage?.[1] ? { tokens: Number(usage[1]) } : {}) };
-}
-
-async function stop(
-  config: AgentConfig,
-  selected: TaskSelection,
-  log: (line: string) => Promise<void>,
-  step: string,
-  reason: string,
-  answer: string,
-  stderr = '',
-): Promise<number> {
-  const detail =
-    `Стоп: шаг ${step}; причина: ${reason}; последние строки ответа:\n${lastLines(answer)}` +
-    `\nПоследние строки stderr:\n${lastLines(stderr)}`;
-  if (selected.issue) await config.github.comment(selected.issue.number, detail);
-  await log(
-    `- стоп: шаг ${step}; причина: ${reason}; ответ: ${lastLines(answer)}; stderr: ${lastLines(stderr)}`,
-  );
-  config.writeLine(`стоп: ${step} — ${reason}`);
-  return 1;
-}
-
-async function callRole(
-  config: AgentConfig,
-  definitions: AgentDefinitions,
-  selected: TaskSelection,
-  log: (line: string) => Promise<void>,
-  role: Role,
-  task: string,
-  feedback = '',
-): Promise<
-  { readonly ok: true; readonly message: string } | { readonly ok: false; readonly code: number }
-> {
-  const base = await git(config, ['rev-parse', 'HEAD']);
   const started = config.now();
-  const agent = await runAgent(config, definitions, role, task, feedback);
-  await log(
-    `- роль: ${role}; длительность: ${config.now() - started} мс; коммит до: ${base}; токены: ${agent.tokens ?? 'нет'}; итог: ${firstLine(agent.message)}`,
+  const heartbeat = setInterval(
+    () => config.writeLine(`  … ${prompt} идёт ${minutes(config.now() - started)}`),
+    HEARTBEAT_MS,
   );
-  if (agent.result.code !== 0)
-    return {
-      ok: false,
-      code: await stop(
-        config,
-        selected,
-        log,
-        role,
-        `codex завершился с кодом ${agent.result.code}`,
-        agent.message,
-        agent.result.stderr,
-      ),
-    };
-  if (!(await checkPermissions(config, base, role, definitions))) {
-    await git(config, ['reset', '--hard', base]);
-    return {
-      ok: false,
-      code: await stop(
-        config,
-        selected,
-        log,
-        role,
-        'нарушены права записи роли; выполнен откат',
-        agent.message,
-      ),
-    };
+  let result: CommandResult;
+  try {
+    result = await config.runCommand(
+      'codex',
+      prepareProcessArguments([
+        'exec',
+        '--dangerously-bypass-approvals-and-sandbox',
+        ...(roleConfig.model ? ['--model', roleConfig.model] : []),
+        '-c',
+        `model_reasoning_effort=${roleConfig.reasoningEffort}`,
+        '--output-last-message',
+        outputFile,
+        '--cd',
+        config.root,
+        '-',
+      ]),
+      {
+        cwd: config.root,
+        // $next пишет код, тесты и docs, поэтому роль у него пустая: хук прав его не ограничивает.
+        env: { ...process.env, AGENT_ROLE: role === 'review' ? 'reviewer' : '' },
+        input: prompt,
+        timeoutMs: config.maxMinutes * 60_000,
+      },
+    );
+  } finally {
+    clearInterval(heartbeat);
   }
-  return { ok: true, message: agent.message };
+  const message = await readFile(outputFile, 'utf8').catch(
+    (error: unknown) => `${result.stdout}\n(последний ответ не записан: ${String(error)})`,
+  );
+  await rm(outputDir, { recursive: true, force: true });
+  return { result, message, log: await saveSessionLog(config, prompt, result) };
 }
 
-type RoleResult =
-  { readonly ok: true; readonly message: string } | { readonly ok: false; readonly code: number };
-
-async function callCoder(
-  config: AgentConfig,
-  definitions: AgentDefinitions,
-  selected: TaskSelection,
-  log: (line: string) => Promise<void>,
-  task: string,
-  feedback = '',
-): Promise<RoleResult> {
-  const base = await git(config, ['rev-parse', 'HEAD']);
-  const result = await callRole(config, definitions, selected, log, 'coder', task, feedback);
-  if (!result.ok) return result;
-  const head = await git(config, ['rev-parse', 'HEAD']);
-  const dirty = await git(config, ['status', '--porcelain']);
-  if (head !== base && dirty === '') return result;
-  return {
-    ok: false,
-    code: await stop(
-      config,
-      selected,
-      log,
-      'coder',
-      head === base ? 'coder не добавил коммит' : 'после coder рабочее дерево не чистое',
-      result.message,
-    ),
+function makeStop(say: Say) {
+  return async (step: string, reason: string, answer = ''): Promise<Stopped> => {
+    await say(`стоп: ${step} — ${reason}`);
+    if (answer.trim() !== '') await say(lastLines(answer, 10));
+    return { ok: false, code: 1 };
   };
 }
 
-async function pushAndCi(
-  config: AgentConfig,
-  selected: TaskSelection,
-  log: (line: string) => Promise<void>,
-  step: string,
-): Promise<{ readonly ok: true } | { readonly ok: false; readonly output: string }> {
-  const push = await config.runCommand(
-    'git',
-    ['push', 'origin', await git(config, ['branch', '--show-current'])],
-    { cwd: config.root },
+/** Ждёт CI на HEAD силами скрипта; обрыв по таймауту повторяется один раз, как в $next. */
+async function waitCi(config: AgentConfig, say: Say, step: string): Promise<CommandResult> {
+  const started = config.now();
+  await say(`… жду CI ${step}`);
+  let ci = await config.runCommand('pnpm', ['ci:wait'], {
+    cwd: config.root,
+    timeoutMs: CI_TIMEOUT_MS,
+  });
+  if (ci.code !== 0 && /failure timeout|run=not-found/.test(ci.stdout))
+    ci = await config.runCommand('pnpm', ['ci:wait'], {
+      cwd: config.root,
+      timeoutMs: CI_TIMEOUT_MS,
+    });
+  await say(
+    `CI ${ci.code === 0 ? 'зелёный' : 'красный'} за ${minutes(config.now() - started)}: ${firstLine(lastLines(ci.stdout, 1))}`,
   );
-  if (push.code !== 0) {
-    await stop(config, selected, log, step, 'git push завершился с ошибкой', push.stderr);
-    return { ok: false, output: push.stderr };
-  }
-  const ci = await config.runCommand('pnpm', ['ci:wait'], { cwd: config.root, timeoutMs: 660_000 });
-  await log(`- CI: шаг ${step}; код: ${ci.code}; вывод: ${lastLines(ci.stdout + ci.stderr)}`);
-  if (ci.code !== 0) return { ok: false, output: ci.stdout + ci.stderr };
-  return { ok: true };
+  return ci;
 }
 
-async function processTask(
-  config: AgentConfig,
-  definitions: AgentDefinitions,
-  selected: TaskSelection,
-  stageFile: string,
-  log: (line: string) => Promise<void>,
-): Promise<number> {
-  const stageText = await readFile(stageFile, 'utf8');
-  const block = taskBlock(stageText, selected.task);
-  if (isOwnerTask(block))
-    return stop(config, selected, log, 'выбор задачи', 'задача владельца', block);
-  const questionsFile = join(config.root, 'docs/QUESTIONS.md');
-  const beforeQuestions = await readFile(questionsFile, 'utf8');
-  const issueHasPlan =
-    selected.issue !== undefined &&
-    hasIssueReference(block, selected.issue.number) &&
-    hasPlan(block);
-  let roleTask = selected.task;
-  if (!issueHasPlan) {
-    const planner = await callRole(config, definitions, selected, log, 'planner', selected.task);
-    if (!planner.ok) return planner.code;
-    if ((await readFile(questionsFile, 'utf8')) !== beforeQuestions)
-      return stop(
-        config,
-        selected,
-        log,
-        'planner',
-        'planner изменил docs/QUESTIONS.md',
-        planner.message,
-      );
-    if (selected.issue) {
-      const plannedTask = plannerTask(planner.message);
-      if (!plannedTask)
-        return stop(
-          config,
-          selected,
-          log,
-          'planner',
-          'planner не указал задачу первой строкой',
-          planner.message,
-        );
-      roleTask = `${plannedTask} (Issue #${selected.issue.number})`;
-    }
-  } else if (selected.issue) {
-    const existingTask = taskReference(block, stageFile);
-    if (!existingTask)
-      return stop(
-        config,
-        selected,
-        log,
-        'выбор задачи',
-        'в блоке Issue не найден номер задачи',
-        block,
-      );
-    roleTask = `${existingTask} (Issue #${selected.issue.number})`;
-  }
-  const tester = await callRole(config, definitions, selected, log, 'tester', roleTask);
-  if (!tester.ok) return tester.code;
-  let coder = await callCoder(config, definitions, selected, log, roleTask);
-  if (!coder.ok) return coder.code;
-  if (isTestReply(coder.message)) {
-    const retryTester = await callRole(
-      config,
-      definitions,
-      selected,
-      log,
-      'tester',
-      roleTask,
-      lastLines(coder.message),
-    );
-    if (!retryTester.ok) return retryTester.code;
-    coder = await callCoder(
-      config,
-      definitions,
-      selected,
-      log,
-      roleTask,
-      lastLines(retryTester.message),
-    );
-    if (!coder.ok) return coder.code;
-    if (isTestReply(coder.message))
-      return stop(config, selected, log, 'coder', 'второй ответ ТЕСТ:', coder.message);
-  }
-  let ci = await pushAndCi(config, selected, log, 'CI после coder');
-  if (!ci.ok) {
-    const repair = await callCoder(
-      config,
-      definitions,
-      selected,
-      log,
-      roleTask,
-      lastLines(ci.output),
-    );
-    if (!repair.ok) return repair.code;
-    ci = await pushAndCi(config, selected, log, 'CI после ремонта coder');
-    if (!ci.ok) return stop(config, selected, log, 'CI', 'второй красный CI', ci.output);
-  }
-  let reviewer = await callRole(config, definitions, selected, log, 'reviewer', roleTask);
-  if (!reviewer.ok) return reviewer.code;
-  if (isReturnReply(reviewer.message)) {
-    const repair = await callCoder(
-      config,
-      definitions,
-      selected,
-      log,
-      roleTask,
-      lastLines(reviewer.message),
-    );
-    if (!repair.ok) return repair.code;
-    ci = await pushAndCi(config, selected, log, 'CI после ВОЗВРАТ');
-    if (!ci.ok)
-      return stop(config, selected, log, 'ВОЗВРАТ/CI', 'красный CI после возврата', ci.output);
-    reviewer = await callRole(config, definitions, selected, log, 'reviewer', roleTask);
-    if (!reviewer.ok) return reviewer.code;
-    if (isReturnReply(reviewer.message))
-      return stop(config, selected, log, 'reviewer', 'второй ВОЗВРАТ', reviewer.message);
-  }
-  if (firstLine(reviewer.message) !== 'OK')
-    return stop(config, selected, log, 'reviewer', 'неизвестный ответ reviewer', reviewer.message);
-  const push = await config.runCommand(
-    'git',
-    ['push', 'origin', await git(config, ['branch', '--show-current'])],
-    { cwd: config.root },
+/** Проверяет, что после роли дерево чистое, а ветка запушена (скиллы пушат сами). */
+async function checkPushed(config: AgentConfig, stop: ReturnType<typeof makeStop>, step: string) {
+  if ((await git(config, ['status', '--porcelain'])) !== '')
+    return stop(step, 'после сессии рабочее дерево не чистое');
+  const branch = await git(config, ['branch', '--show-current']);
+  await git(config, ['fetch', 'origin', branch]);
+  if (
+    (await git(config, ['rev-parse', 'HEAD'])) !==
+    (await git(config, ['rev-parse', `origin/${branch}`]))
+  )
+    return stop(step, `HEAD не совпадает с origin/${branch}: сессия не запушила коммит`);
+  return OK;
+}
+
+interface LoopContext {
+  readonly config: AgentConfig;
+  readonly definitions: AgentDefinitions;
+  readonly say: Say;
+  readonly stop: ReturnType<typeof makeStop>;
+}
+
+/** `$next` в новой сессии; успех — ровно одна задача стала `[~]`, коммит запушен, CI зелёный. */
+async function runNext(context: LoopContext, expected: string): Promise<string | Outcome> {
+  const { config, definitions, say, stop } = context;
+  const base = await git(config, ['rev-parse', 'HEAD']);
+  const started = config.now();
+  await say(`→ $next (новая сессия codex)`);
+  const next = await runCodex(config, definitions, 'next', '$next');
+  await say(
+    `← $next за ${minutes(config.now() - started)}: ${firstLine(next.message)} (лог ${next.log})`,
   );
-  if (push.code !== 0)
+  if (next.result.code !== 0)
     return stop(
-      config,
-      selected,
-      log,
-      'push reviewer',
-      'git push завершился с ошибкой',
-      push.stderr,
+      '$next',
+      `codex завершился с кодом ${next.result.code}`,
+      next.message + next.result.stderr,
     );
-  if (selected.issue) {
-    await config.github.comment(
-      selected.issue.number,
-      'OK: verify и критерии задачи подтверждены reviewer.',
+  const state = await readStage(config.root);
+  const waiting = reviewTasks(state.stageText, state.stage);
+  if (waiting.length !== 1 || (await git(config, ['rev-parse', 'HEAD'])) === base)
+    return stop(
+      '$next',
+      'задача не отмечена [~] — $next остановился сам (см. его ответ)',
+      next.message,
     );
-    await config.github.close(selected.issue.number);
+  if (waiting[0] !== expected) await say(`$next взял ${waiting[0]} вместо ${expected}`);
+  const pushed = await checkPushed(config, stop, '$next');
+  if (!pushed.ok) return pushed;
+  const ci = await waitCi(config, say, `после $next ${waiting[0] ?? ''}`);
+  if (ci.code !== 0) return stop('CI после $next', 'CI красный', ci.stdout + ci.stderr);
+  return waiting[0] ?? expected;
+}
+
+/** `$review` в новой сессии; возвращает новую отметку задачи. */
+async function runReview(context: LoopContext, task: string): Promise<TaskMark | Outcome> {
+  const { config, definitions, say, stop } = context;
+  const base = await git(config, ['rev-parse', 'HEAD']);
+  const started = config.now();
+  await say(`→ $review ${task} (новая сессия codex)`);
+  const review = await runCodex(config, definitions, 'review', `$review ${task}`);
+  await say(
+    `← $review за ${minutes(config.now() - started)}: ${firstLine(review.message)} (лог ${review.log})`,
+  );
+  if (review.result.code !== 0)
+    return stop(
+      '$review',
+      `codex завершился с кодом ${review.result.code}`,
+      review.message + review.result.stderr,
+    );
+  // Ревью уже запушило коммит, поэтому откат здесь только развёл бы локальную и удалённую ветку.
+  if (!(await checkPermissions(config, base, definitions.reviewerPaths)))
+    return stop(
+      '$review',
+      'ревью изменило файлы вне permissions.json — проверь коммит',
+      review.message,
+    );
+  const pushed = await checkPushed(config, stop, '$review');
+  if (!pushed.ok) return pushed;
+  const mark = taskMark((await readStage(config.root)).stageText, task);
+  const verdict = firstLine(review.message);
+  if (mark === 'x' && verdict === 'OK') return mark;
+  if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return mark;
+  return stop(
+    '$review',
+    `ответ «${verdict}» не совпадает с отметкой [${mark ?? '?'}]`,
+    review.message,
+  );
+}
+
+/** Круги $next → CI → $review по одной задаче, не больше maxRounds. */
+async function processTask(
+  context: LoopContext,
+  selected: string,
+  mark: TaskMark,
+): Promise<Outcome> {
+  const { config, say, stop } = context;
+  let task = selected;
+  let needsNext = mark === ' ';
+  for (let round = 1; round <= config.maxRounds; round += 1) {
+    if (needsNext) {
+      const next = await runNext(context, task);
+      if (typeof next !== 'string') return next;
+      task = next;
+    }
+    const verdict = await runReview(context, task);
+    if (typeof verdict !== 'string') return verdict;
+    if (verdict === 'x') return OK;
+    await say(`ВОЗВРАТ ${task}, круг ${round} из ${config.maxRounds}`);
+    needsNext = true;
   }
-  return 0;
+  return stop('круги', `${config.maxRounds} ВОЗВРАТ подряд по ${task} — нужно решение владельца`);
+}
+
+async function preflight(context: LoopContext): Promise<Outcome> {
+  const { config, stop } = context;
+  const { status } = await readStage(config.root);
+  const branch = await git(config, ['branch', '--show-current']);
+  const expected = status.match(/Ветка\s*\|\s*`([^`]+)`/)?.[1];
+  if (expected !== undefined && branch !== expected)
+    return stop('проверка ветки', `ожидалась ${expected}, найдена ${branch}`);
+  if ((await git(config, ['status', '--porcelain'])) !== '')
+    return stop('проверка дерева', 'рабочее дерево не чистое');
+  return OK;
+}
+
+/** Выбирает задачу очереди; задача владельца или пустая очередь — остановка. */
+async function nextTask(
+  context: LoopContext,
+): Promise<{ readonly task: string; readonly mark: TaskMark } | Stopped> {
+  const { config, stop } = context;
+  const state = await readStage(config.root);
+  const task = selectTask(state.status, state.stageText);
+  if (!task) return stop('выбор задачи', 'в очереди нет открытых задач — запусти $stage-close');
+  const block = taskBlock(state.stageText, task);
+  if (isOwnerTask(block))
+    return stop(
+      'выбор задачи',
+      `очередь дошла до ${task} — это задача владельца`,
+      firstLine(block),
+    );
+  return { task, mark: taskMark(state.stageText, task) ?? ' ' };
 }
 
 export async function runAgentLoop(config: AgentConfig): Promise<number> {
+  await mkdir(join(config.root, '.ai-logs'), { recursive: true });
   const logPath = join(
     config.root,
     '.ai-logs',
     `agent-loop-${new Date(config.now()).toISOString().slice(0, 10)}.md`,
   );
-  await mkdir(join(config.root, '.ai-logs'), { recursive: true });
-  const log = async (line: string): Promise<void> => appendFile(logPath, `${line}\n`, 'utf8');
-  const status = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
-  const definitions = await loadAgentDefinitions(config.root);
-  await config.github.ensureAgentLabel();
-  const usedIssues = new Set<number>();
-  const usedTasks = new Set<string>();
-  let taskCount = 0;
-  const started = config.now();
-  const summary: string[] = [];
-  const select = async (): Promise<TaskSelection | undefined> => {
-    const freshStatus = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
-    const freshStageFile = await resolveStageFile(config.root, freshStatus);
-    const freshStageText = await readFile(freshStageFile, 'utf8');
-    return selectIssueOrQueue(
-      await config.github.listAgentIssues(),
-      freshStatus,
-      usedIssues,
-      usedTasks,
-      freshStageText,
-    );
+  const say: Say = async (line) => {
+    config.writeLine(line);
+    await appendFile(logPath, `- ${new Date(config.now()).toISOString()} ${line}\n`, 'utf8');
+  };
+  const context: LoopContext = {
+    config,
+    definitions: await loadAgentDefinitions(config.root),
+    say,
+    stop: makeStop(say),
   };
   if (config.dryRun) {
-    const selected = await select();
+    const selected = await nextTask(context);
+    if (!('task' in selected)) return 1;
     config.writeLine(
-      selected ? `planner → tester → coder → reviewer: ${selected.task}` : 'задачи не найдены',
+      `${selected.mark === '~' ? '$review' : '$next → CI → $review'}: ${selected.task}`,
     );
-    return selected ? 0 : 1;
+    return 0;
   }
-  const branch = await git(config, ['branch', '--show-current']);
-  const expectedBranch = status.match(/Ветка\s*\|\s*`([^`]+)`/)?.[1];
-  const preflightTask: TaskSelection = { task: 'проверка репозитория' };
-  if (expectedBranch !== undefined && branch !== expectedBranch)
-    return stop(
-      config,
-      preflightTask,
-      log,
-      'проверка ветки',
-      `ожидалась ${expectedBranch}, найдена ${branch}`,
-      '',
-    );
-  if ((await git(config, ['status', '--porcelain'])) !== '')
-    return stop(config, preflightTask, log, 'проверка дерева', 'рабочее дерево не чистое', '');
-  while (taskCount < config.maxTasks && config.now() - started <= config.maxMinutes * 60_000) {
-    const selected = await select();
-    if (!selected) break;
-    if (selected.number !== undefined) usedIssues.add(selected.number);
-    usedTasks.add(selected.task);
-    const freshStatus = await readFile(join(config.root, 'docs/STATUS.md'), 'utf8');
-    const stageFile = await resolveStageFile(config.root, freshStatus);
-    const result = await processTask(config, definitions, selected, stageFile, log);
-    if (result !== 0) return result;
-    taskCount += 1;
-    summary.push(`готова задача ${taskCount}: ${selected.task}`);
-    config.writeLine(summary.at(-1) ?? 'задача готова');
+  const ready = await preflight(context);
+  if (!ready.ok) return ready.code;
+  const started = config.now();
+  await say(`старт: задач ≤ ${config.maxTasks}, кругов на задачу ≤ ${config.maxRounds}`);
+  let done = 0;
+  while (done < config.maxTasks && config.now() - started <= config.maxMinutes * 60_000) {
+    const selected = await nextTask(context);
+    if (!('task' in selected)) return done > 0 ? 0 : selected.code;
+    await say(`задача ${selected.task} [${selected.mark}]`);
+    const outcome = await processTask(context, selected.task, selected.mark);
+    if (!outcome.ok) return outcome.code;
+    done += 1;
+    await say(`готово: ${selected.task} (${done} из ${config.maxTasks})`);
   }
-  await log(
-    `- итог: задач=${taskCount}; лимит=${config.maxTasks}; время=${config.now() - started} мс`,
-  );
-  config.writeLine(`итог: задач=${taskCount}; лимит=${config.maxTasks}; ${summary.join('; ')}`);
-  return taskCount > 0 ? 0 : 1;
+  await say(`итог: задач ${done}, ${minutes(config.now() - started)}`);
+  return 0;
 }
-
-export const defaultRunCommand = runProcess;

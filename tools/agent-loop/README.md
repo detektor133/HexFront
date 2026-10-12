@@ -1,13 +1,11 @@
 # Agent loop
 
-`pnpm agent:run [--max-tasks=3] [--max-minutes=N] [--dry-run]` запускает planner, tester, coder и reviewer отдельными сессиями `codex exec`. Текущий этап и файл этапа берутся из `docs/STATUS.md`.
+`pnpm agent:run [--max-tasks 1] [--max-rounds 3] [--max-minutes 120] [--dry-run]` берёт первую незакрытую задачу из строки «Очередь» в `docs/STATUS.md` и гоняет круги:
 
-Скиллы ролей находятся в `.agents/skills/plan`, `tests`, `code` и `review`. Оркестратор читает модели и усилие из `roles.json`, а разрешённые пути — из `permissions.json`; hook использует тот же файл.
+1. `$next` в новой сессии `codex exec` (без `AGENT_ROLE`, как при ручном запуске). Успех — ровно одна задача этапа стала `- [~]`, появился коммит, дерево чистое, HEAD запушен.
+2. Скрипт сам ждёт CI на HEAD (`pnpm ci:wait`, повтор один раз при таймауте). Токены на ожидание не тратятся.
+3. `$review NN/Tn` в новой сессии с `AGENT_ROLE=reviewer`. Изменения вне `permissions.json` → откат и стоп. `OK` + `- [x]` — задача готова; `ВОЗВРАТ` + `- [ ]` — снова шаг 1.
 
-Проверено командой `codex exec --help`: `--dangerously-bypass-approvals-and-sandbox` отключает подтверждения и sandbox, `--model` выбирает модель, `-c model_reasoning_effort="high|medium"` задаёт усилие, `--output-last-message <file>` сохраняет последний ответ, а `--json` выдаёт JSONL-события. Отдельного флага расхода токенов нет; оркестратор ищет `total_tokens`/`tokens` в stdout JSONL, если текущая версия CLI их возвращает.
+Задача `- [~]` в начале очереди сразу идёт на шаг 3. Задача владельца (первая строка блока содержит «задача владельца» без «не» или «плейтест») останавливает цикл до запуска codex. Остальные остановки: `$next` не поставил `- [~]` (вопрос, `$split`, приёмка требует владельца, красный verify), красный CI, ненулевой код codex (например, кончился лимит), `--max-rounds` возвратов подряд, неожиданный ответ ревью. Консоль: каждый шаг с временем (`→ $next`, `← $next за N мин: …`, `… жду CI`, `CI зелёный`, `→ $review`, `ВОЗВРАТ`, `стоп: …`) и строка «… идёт N мин» раз в минуту, пока работает сессия codex. Те же строки — в протоколе `.ai-logs/agent-loop-<дата>.md`; полный вывод каждой сессии — в `.ai-logs/agent-loop/<время>.log`. `.ai-logs/` вне git; отчёты задач в `docs/reports/` пишут сами `$next` и `$review`, как при ручном запуске.
 
-Codex пишет через `Bash`/`exec_command` и `apply_patch`. Официальный `PreToolUse` получает `tool_name` и `tool_input`; `.codex/hooks.json` подключает `agent-permissions.mjs` для `Bash`, `apply_patch`, `Edit` и `Write`. Хук блокирует распознаваемые записи вне `permissions.json` через `permissionDecision=deny`.
-
-Произвольный shell-скрипт может скрыть путь, поэтому после каждого вызова оркестратор проверяет diff и незакоммиченные файлы относительно исходного коммита. Это покрывает записи, которые hook не распознал. Без `AGENT_ROLE` hook ничего не блокирует, поэтому ручной режим сохраняет текущие права владельца.
-
-Issues читаются через `GITHUB_TOKEN`. Ответ `403` при комментарии или закрытии Issue означает, что токену нужно право `Issues: write`; `pnpm ci:wait` использует тот же токен для Actions.
+`roles.json`: `model` необязателен — без него берётся модель из конфига Codex; `reasoningEffort` передаётся как `-c model_reasoning_effort=…`. Флаги `codex exec`: `--dangerously-bypass-approvals-and-sandbox`, `--model`, `-c`, `--output-last-message`, `--cd`, промпт через stdin (`-`).

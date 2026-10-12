@@ -8,17 +8,33 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      # Пуш только служебных docs (отметки этапа, STATUS, отчёты) наследует CI предыдущего пуша.
+      - id: scope
+        run: node --experimental-strip-types tools/ci-wait/src/docs-only.ts
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: steps.scope.outputs.mode == 'full'
+        uses: pnpm/action-setup@v4
+      - if: steps.scope.outputs.mode == 'full'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      - if: steps.scope.outputs.mode == 'full'
+        run: pnpm install --frozen-lockfile
+      - if: steps.scope.outputs.mode == 'full'
+        run: pnpm check
 
   commit-messages:
     if: github.event_name == 'pull_request'
