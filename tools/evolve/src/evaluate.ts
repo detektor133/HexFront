@@ -10,6 +10,7 @@ import {
   playerScores,
   step,
   type MatchState,
+  type WinReason,
 } from '../../../packages/sim/src/index.ts';
 import {
   calculateBotAcceptance,
@@ -18,6 +19,10 @@ import {
 } from '../../replay/src/acceptance.ts';
 
 const PLAYERS = 6;
+
+export function candidateSlotForSeed(baseSlot: number, seed: number): number {
+  return (baseSlot + seed) % PLAYERS;
+}
 
 export interface MatchOpponent {
   readonly weights: EvolutionWeights;
@@ -55,12 +60,19 @@ function evaluateMatch(
     seed,
     { fog: false },
   );
+  const actualCandidateSlot = candidateSlotForSeed(candidateSlot, seed);
   const slots = Array.from({ length: PLAYERS }, () => weights);
-  for (const opponent of opponents) slots[opponent.slot] = opponent.weights;
-  slots[candidateSlot] = weights;
+  const opponentSlots = Array.from({ length: PLAYERS }, (_, slot) => slot).filter(
+    (slot) => slot !== actualCandidateSlot,
+  );
+  opponents.forEach((opponent, index) => {
+    const slot = opponentSlots[index];
+    if (slot !== undefined) slots[slot] = opponent.weights;
+  });
+  slots[actualCandidateSlot] = weights;
   const traces: AcceptanceTick[] = [];
   const bots = state.players.map((player) => player.id);
-  let winReason: 'cities' | 'lastStanding' | 'score' | null = null;
+  let winReason: WinReason | null = null;
   for (let tick = 0; tick < ticks && state.winner < 0; tick += 1) {
     const context = createBotTickContext(state);
     step(state, [
@@ -79,10 +91,12 @@ function evaluateMatch(
   const places = playerPlaces(state, playerScores(state));
   return {
     fitness: calculateFitness({
-      place: places[candidateSlot] ?? PLAYERS,
+      place: places[actualCandidateSlot] ?? PLAYERS,
       maxGoldOver5000S: acceptance.maxGoldOver5000S,
       maxUnitUnder10S: acceptance.maxUnitUnder10S,
-      won: state.winner === candidateSlot && winReason !== null,
+      won:
+        state.winner === actualCandidateSlot &&
+        (winReason === 'cities' || winReason === 'lastStanding'),
     }),
     maxGoldOver5000S: acceptance.maxGoldOver5000S,
     maxUnitUnder10S: acceptance.maxUnitUnder10S,

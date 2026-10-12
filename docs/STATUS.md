@@ -30,10 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j5 возвращена ревью:** не подтверждены матч на сиде 42 с прямым перебором, смена места по сидам, фильтр причин победы для бонуса fitness и применение `seeds/sigma` из resume.
-- **Следующая работа:** исправить 06/T1j5, затем повторить `$review 06/T1j5`.
+- **06/T1j5 исправлена и ждёт ревью:** добавлен матч на сиде 42 с прямым перебором, место особи меняется по сидам, бонус fitness ограничен `cities`/`lastStanding`, resume восстанавливает `seeds/sigma`.
+- **Следующая работа:** `$review 06/T1j5` в новой сессии.
 - **Отчёт:** `docs/reports/stage-06-t1j5.md`.
-- **Проверки:** профильные тесты — 4/4; `pnpm verify --changed` — OK (39 с); полный `pnpm verify` — `verify: OK (289 с)`.
+- **Проверки:** профильные тесты — 5/5; `pnpm verify --changed` — `verify: OK (41 с)`; полный `pnpm verify` — `verify: OK (300 с)`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/replay/src/acceptance.ts`.
 
 ## Архив сессий

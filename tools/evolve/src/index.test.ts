@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { candidateSlotForSeed } from './evaluate.ts';
 import { parseOptions, runEvolution } from './index.ts';
 
 describe('эволюция весов бота', () => {
@@ -17,6 +18,10 @@ describe('эволюция весов бота', () => {
     );
   });
 
+  it('меняет место особи между сидами', () => {
+    expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
+  });
+
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'hexfront-evolve-'));
     try {
@@ -25,6 +30,7 @@ describe('эволюция весов бота', () => {
         seeds: 2,
         generations: 2,
         workers: 1,
+        sigma: 77,
         ticks: 300,
         weightsPath: join(directory, 'weights-1.json'),
         easyWeightsPath: join(directory, 'weights-1-easy.json'),
@@ -36,6 +42,7 @@ describe('эволюция весов бота', () => {
         seeds: 2,
         generations: 2,
         workers: 4,
+        sigma: 77,
         ticks: 300,
         weightsPath: join(directory, 'weights-4.json'),
         easyWeightsPath: join(directory, 'weights-4-easy.json'),
@@ -56,9 +63,10 @@ describe('эволюция весов бота', () => {
       ).resolves.toContain('Время поколения:');
       const resumed = await runEvolution({
         population: 4,
-        seeds: 2,
+        seeds: 1,
         generations: 1,
         workers: 2,
+        sigma: 3,
         ticks: 300,
         resumePath: join(directory, 'resume-4.json'),
         weightsPath: join(directory, 'weights-resume.json'),
@@ -66,6 +74,10 @@ describe('эволюция весов бота', () => {
         reportDirectory: join(directory, 'report-resume'),
       });
       expect(resumed.generation).toBe(3);
+      expect(JSON.parse(await readFile(join(directory, 'resume-2.json'), 'utf8'))).toMatchObject({
+        seeds: [1, 2],
+        sigma: 77,
+      });
       await expect(
         readFile(join(directory, 'report-resume', 'generation-3.md'), 'utf8'),
       ).resolves.toContain('Поколение: 3');

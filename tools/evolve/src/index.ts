@@ -276,13 +276,16 @@ async function writeGeneration(
 
 export async function runEvolution(options: EvolutionOptions): Promise<EvolutionResult> {
   const resume = options.resumePath === undefined ? null : await loadResume(options.resumePath);
+  const evolutionOptions = resume
+    ? { ...options, seeds: resume.seeds.length, sigma: resume.sigma }
+    : options;
   const startGeneration = resume?.generation ?? 0;
   let population = resume
     ? resume.population.map((weights, index) => ({ index, weights: copyWeights(weights) }))
     : initialPopulation(
         copyWeights(baseWeights as Record<string, number>),
-        options.population,
-        options.sigma ?? 100,
+        evolutionOptions.population,
+        evolutionOptions.sigma ?? 100,
       );
   let hallOfFame = resume?.hallOfFame.map(copyWeights) ?? [];
   let result: EvolutionResult = {
@@ -291,14 +294,15 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
     weights: copyWeights(population[0]?.weights ?? {}),
   };
   let easyWeights = copyWeights(result.weights);
-  const easyGeneration = options.easyGeneration ?? Math.max(1, Math.floor(options.generations / 3));
+  const easyGeneration =
+    evolutionOptions.easyGeneration ?? Math.max(1, Math.floor(evolutionOptions.generations / 3));
   for (let generation = 1; generation <= options.generations; generation += 1) {
     const started = Date.now();
     const evaluations = await evaluatePopulation(
       population,
       hallOfFame,
       startGeneration + generation,
-      options,
+      evolutionOptions,
     );
     const ranked = [...evaluations].sort(
       (left, right) => right.fitness - left.fitness || left.index - right.index,
@@ -318,7 +322,7 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
       metrics: {
         maxGoldOver5000S: best.maxGoldOver5000S ?? 0,
         maxUnitUnder10S: best.maxUnitUnder10S ?? 0,
-        endTick: best.endTick ?? options.ticks,
+        endTick: best.endTick ?? evolutionOptions.ticks,
       },
     };
     if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
@@ -328,11 +332,11 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
       easyWeights,
       population,
       hallOfFame,
-      options,
+      evolutionOptions,
       Date.now() - started,
     );
-    const parentCount = Math.max(1, Math.floor(options.population / 2));
-    population = Array.from({ length: options.population }, (_, index) => {
+    const parentCount = Math.max(1, Math.floor(population.length / 2));
+    population = Array.from({ length: population.length }, (_, index) => {
       const parent = population[ranked[index % parentCount]?.index ?? best.index];
       return {
         index,
@@ -342,7 +346,7 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
             : mutateWeights(
                 parent?.weights ?? bestCandidate.weights,
                 result.generation * 100_000 + index,
-                options.sigma ?? 100,
+                evolutionOptions.sigma ?? 100,
               ),
       };
     });
