@@ -6,53 +6,118 @@ import {
   createBotTickContext,
   createMatch,
   loadMap,
+  playerPlaces,
+  playerScores,
   step,
   type MatchState,
 } from '../../../packages/sim/src/index.ts';
+import {
+  calculateBotAcceptance,
+  calculateFitness,
+  type AcceptanceTick,
+} from '../../replay/src/acceptance.ts';
 
 const PLAYERS = 6;
 
-function scoreState(state: MatchState): number {
-  const ownedHexes = state.hexes.owner.reduce((sum, owner) => sum + (owner >= 0 ? 1 : 0), 0);
-  const gold = state.players.reduce((sum, player) => sum + Math.trunc(player.gold / 1000), 0);
-  const winnerBonus = state.winner >= 0 ? 100_000 : 0;
-  return winnerBonus + ownedHexes * 100 + gold;
+export interface MatchOpponent {
+  readonly weights: EvolutionWeights;
+  readonly slot: number;
 }
 
-/**
- * Оценивает набор весов на детерминированных матчах.
- * @returns целочисленный fitness, одинаковый для одинаковых весов и сидов
- */
+function acceptanceTrace(state: MatchState): AcceptanceTick {
+  return {
+    gold: state.players.map((player) => player.gold),
+    unitSoldiers: state.players.map((player) =>
+      state.units.filter((unit) => unit.owner === player.id).map((unit) => unit.soldiers),
+    ),
+  };
+}
+
+interface MatchEvaluation {
+  readonly fitness: number;
+  readonly maxGoldOver5000S: number;
+  readonly maxUnitUnder10S: number;
+  readonly endTick: number;
+}
+
+function evaluateMatch(
+  weights: EvolutionWeights,
+  opponents: readonly MatchOpponent[],
+  seed: number,
+  ticks: number,
+  candidateSlot: number,
+): MatchEvaluation {
+  const loaded = loadMap(generateMap(seed, { width: 80, height: 60, players: PLAYERS }));
+  if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+  const state = createMatch(
+    loaded.map,
+    Array.from({ length: PLAYERS }, (_, id) => ({ name: `P${id}` })),
+    seed,
+    { fog: false },
+  );
+  const slots = Array.from({ length: PLAYERS }, () => weights);
+  for (const opponent of opponents) slots[opponent.slot] = opponent.weights;
+  slots[candidateSlot] = weights;
+  const traces: AcceptanceTick[] = [];
+  const bots = state.players.map((player) => player.id);
+  let winReason: 'cities' | 'lastStanding' | 'score' | null = null;
+  for (let tick = 0; tick < ticks && state.winner < 0; tick += 1) {
+    const context = createBotTickContext(state);
+    step(state, [
+      ...commanderCommands(state, bots, context, undefined, slots),
+      ...botCommands(state, bots, context, undefined, slots),
+    ]);
+    traces.push(acceptanceTrace(state));
+    const event = state.events.find((item) => item.t === 'matchWon');
+    if (event?.t === 'matchWon') winReason = event.reason;
+  }
+  const acceptance = calculateBotAcceptance(traces, {
+    winner: state.winner,
+    winReason,
+    endTick: state.tick,
+  });
+  const places = playerPlaces(state, playerScores(state));
+  return {
+    fitness: calculateFitness({
+      place: places[candidateSlot] ?? PLAYERS,
+      maxGoldOver5000S: acceptance.maxGoldOver5000S,
+      maxUnitUnder10S: acceptance.maxUnitUnder10S,
+      won: state.winner === candidateSlot && winReason !== null,
+    }),
+    maxGoldOver5000S: acceptance.maxGoldOver5000S,
+    maxUnitUnder10S: acceptance.maxUnitUnder10S,
+    endTick: acceptance.endTick,
+  };
+}
+
+export function evaluateWeightsDetailed(
+  weights: EvolutionWeights,
+  seeds: readonly number[],
+  ticks: number,
+  opponents: readonly MatchOpponent[] = [],
+  candidateSlot = 0,
+): MatchEvaluation {
+  return seeds.reduce(
+    (total, seed) => {
+      const result = evaluateMatch(weights, opponents, seed, ticks, candidateSlot);
+      return {
+        fitness: total.fitness + result.fitness,
+        maxGoldOver5000S: Math.max(total.maxGoldOver5000S, result.maxGoldOver5000S),
+        maxUnitUnder10S: Math.max(total.maxUnitUnder10S, result.maxUnitUnder10S),
+        endTick: Math.max(total.endTick, result.endTick),
+      };
+    },
+    { fitness: 0, maxGoldOver5000S: 0, maxUnitUnder10S: 0, endTick: 0 },
+  );
+}
+
+/** Оценивает особь на детерминированных шестиместных матчах. */
 export function evaluateWeights(
   weights: EvolutionWeights,
   seeds: readonly number[],
   ticks: number,
+  opponents: readonly MatchOpponent[] = [],
+  candidateSlot = 0,
 ): number {
-  let fitness = 0;
-  for (const seed of seeds) {
-    const loaded = loadMap(generateMap(seed, { players: PLAYERS }));
-    if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
-    const state = createMatch(
-      loaded.map,
-      Array.from({ length: PLAYERS }, (_, id) => ({ name: `P${id}` })),
-      seed,
-      { fog: false },
-    );
-    const bots = state.players.map((player) => player.id);
-    for (let tick = 0; tick < ticks && state.winner < 0; tick += 1) {
-      const context = createBotTickContext(state);
-      step(state, [
-        ...commanderCommands(state, bots, context),
-        ...botCommands(
-          state,
-          bots,
-          context,
-          undefined,
-          state.players.map(() => weights),
-        ),
-      ]);
-    }
-    fitness += scoreState(state);
-  }
-  return fitness;
+  return evaluateWeightsDetailed(weights, seeds, ticks, opponents, candidateSlot).fitness;
 }

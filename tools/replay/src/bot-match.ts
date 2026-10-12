@@ -4,6 +4,7 @@
 // Запуск: pnpm --filter @hexfront/replay bot-match [игроков] [сид] [out.json]
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { calculateBotAcceptance, type AcceptanceTick } from './acceptance.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   botCommands,
@@ -16,6 +17,7 @@ import {
   step,
   TICKS_PER_S,
   type MatchState,
+  type WinReason,
 } from '../../../packages/sim/src/index.ts';
 
 const root = new URL('../../../', import.meta.url);
@@ -26,7 +28,7 @@ const MAP_KIND = process.argv[5] ?? 'small';
 const SAMPLE_EVERY_S = 10;
 const FRAME_EVERY_S = 60;
 /** Предохранитель: таймер матча — 25:00, дальше победа по очкам; с запасом. */
-const MAX_TICKS = 30 * 60 * TICKS_PER_S;
+const MAX_TICKS = 25 * 60 * TICKS_PER_S;
 
 /** Срез игрока во времени. */
 export interface PlayerSample {
@@ -73,13 +75,10 @@ const count = (m: Map<string, number>, k: string): void => void m.set(k, (m.get(
 const roadLog: { t: number; playerId: number; cityId: number; reason: string }[] = [];
 const knownRoads = new Set<number>();
 const roadCause = new Map<number, string>();
-const goldTicks = state.players.map(() => 0);
-let maxGoldTicks = 0;
-const smallTicks = new Map<number, number>();
-let maxSmallTicks = 0;
+const acceptanceTicks: AcceptanceTick[] = [];
 let centralNeutralAt10 = 1;
 let firstEliminationS: number | null = null;
-let winReason: string | null = null;
+let winReason: WinReason | null = null;
 
 function unitsAt25Minutes(): { maxSize: number; averageSize: number } {
   if (state.tick < 25 * 60 * TICKS_PER_S) return { maxSize: 0, averageSize: 0 };
@@ -106,21 +105,6 @@ function centralNeutralRatio(): number {
   return passable === 0 ? 0 : neutral / passable;
 }
 
-function updateDurations(): void {
-  state.players.forEach((p, i) => {
-    goldTicks[i] = p.gold > 5000 * FP ? (goldTicks[i] ?? 0) + 1 : 0;
-    maxGoldTicks = Math.max(maxGoldTicks, goldTicks[i] ?? 0);
-  });
-  const current = new Set<number>();
-  for (const unit of state.units) {
-    current.add(unit.id);
-    const ticks = unit.soldiers < 10 * FP ? (smallTicks.get(unit.id) ?? 0) + 1 : 0;
-    smallTicks.set(unit.id, ticks);
-    maxSmallTicks = Math.max(maxSmallTicks, ticks);
-  }
-  for (const id of smallTicks.keys()) if (!current.has(id)) smallTicks.delete(id);
-}
-
 const started = Date.now();
 while (state.winner < 0 && state.tick < MAX_TICKS) {
   if (state.tick % (SAMPLE_EVERY_S * TICKS_PER_S) === 0) {
@@ -133,7 +117,12 @@ while (state.winner < 0 && state.tick < MAX_TICKS) {
   const cmds = [...commanderCommands(state, bots, context), ...botCommands(state, bots, context)];
   for (const c of cmds) count(commands, `${c.source ?? 'bot'}:${c.cmd.t}`);
   step(state, cmds);
-  updateDurations();
+  acceptanceTicks.push({
+    gold: state.players.map((player) => player.gold),
+    unitSoldiers: state.players.map((player) =>
+      state.units.filter((unit) => unit.owner === player.id).map((unit) => unit.soldiers),
+    ),
+  });
   if (state.tick === 10 * 60 * TICKS_PER_S) centralNeutralAt10 = centralNeutralRatio();
   const captured = new Set<number>();
   const moved = new Set<number>();
@@ -192,9 +181,11 @@ const result = {
   events: Object.fromEntries([...events].sort()),
   acceptance: {
     firstEliminationS,
-    winReason,
-    maxGoldOver5000S: maxGoldTicks / TICKS_PER_S,
-    maxUnitUnder10S: maxSmallTicks / TICKS_PER_S,
+    ...calculateBotAcceptance(acceptanceTicks, {
+      winner: state.winner,
+      winReason,
+      endTick: state.tick,
+    }),
     centralNeutralAt10,
     ...(() => {
       const units = unitsAt25Minutes();

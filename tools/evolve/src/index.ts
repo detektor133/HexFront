@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { availableParallelism } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 
+import type { MatchOpponent } from './evaluate.ts';
 import type {
   CandidateEvaluation,
   EvolutionOptions,
@@ -10,7 +12,7 @@ import type {
   EvolutionWeights,
 } from './types.ts';
 import baseWeights from '../../../packages/sim/src/bots/weights.json' with { type: 'json' };
-import { fork, nextRange } from '../../../packages/sim/src/rng.ts';
+import { fork, nextInt, nextRange, shuffle } from '../../../packages/sim/src/rng.ts';
 
 export type { EvolutionOptions, EvolutionResult, EvolutionWeights } from './types.ts';
 
@@ -21,29 +23,35 @@ interface Candidate {
 
 interface ResumeState {
   readonly generation: number;
-  readonly weights: EvolutionWeights;
+  readonly population: readonly EvolutionWeights[];
+  readonly hallOfFame: readonly EvolutionWeights[];
+  readonly seeds: readonly number[];
+  readonly sigma: number;
+  readonly weights?: EvolutionWeights;
 }
 
 interface WorkerData {
   readonly index: number;
   readonly weights: EvolutionWeights;
+  readonly opponents: readonly MatchOpponent[];
+  readonly candidateSlot: number;
   readonly seeds: readonly number[];
   readonly ticks: number;
 }
 
 const ROOT = new URL('../../../', import.meta.url);
 const DEFAULT_OPTIONS = {
-  ticks: 300,
+  ticks: 15_000,
   weightsPath: fileURLToPath(new URL('packages/sim/src/bots/weights.json', ROOT)),
+  easyWeightsPath: fileURLToPath(new URL('packages/sim/src/bots/weights-easy.json', ROOT)),
   statePath: fileURLToPath(new URL('tools/evolve/results/resume.json', ROOT)),
   reportDirectory: fileURLToPath(new URL('docs/reports/evolve/', ROOT)),
 } as const;
 
 function positiveInteger(value: string, name: string, minimum = 1): number {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < minimum) {
+  if (!Number.isInteger(parsed) || parsed < minimum)
     throw new Error(`${name} должно быть целым числом не меньше ${minimum}`);
-  }
   return parsed;
 }
 
@@ -52,8 +60,6 @@ function optionValue(arguments_: readonly string[], name: string): string | unde
 }
 
 export function parseOptions(arguments_: readonly string[]): EvolutionOptions {
-  const resumeArgument = arguments_.find((argument) => argument === '--resume');
-  if (resumeArgument !== undefined) throw new Error('resume должен иметь путь: --resume=...');
   const population = positiveInteger(
     optionValue(arguments_, '--population') ?? '12',
     'population',
@@ -64,22 +70,39 @@ export function parseOptions(arguments_: readonly string[]): EvolutionOptions {
     optionValue(arguments_, '--generations') ?? '30',
     'generations',
   );
-  const workers = positiveInteger(optionValue(arguments_, '--workers') ?? '1', 'workers');
+  const workers = positiveInteger(
+    optionValue(arguments_, '--workers') ?? String(Math.max(1, availableParallelism() - 1)),
+    'workers',
+  );
   const ticks = positiveInteger(
     optionValue(arguments_, '--ticks') ?? String(DEFAULT_OPTIONS.ticks),
     'ticks',
   );
-  const resumePath = optionValue(arguments_, '--resume');
+  const sigma = positiveInteger(optionValue(arguments_, '--sigma') ?? '100', 'sigma');
+  const resumeArgument = arguments_.find((argument) => argument === '--resume');
+  const resumePath =
+    optionValue(arguments_, '--resume') ??
+    (resumeArgument === undefined ? undefined : DEFAULT_OPTIONS.statePath);
   return {
     population,
     seeds,
     generations,
     workers,
     ticks,
+    sigma,
     weightsPath: optionValue(arguments_, '--weights') ?? DEFAULT_OPTIONS.weightsPath,
+    easyWeightsPath: optionValue(arguments_, '--easy-weights') ?? DEFAULT_OPTIONS.easyWeightsPath,
     statePath: optionValue(arguments_, '--state') ?? DEFAULT_OPTIONS.statePath,
     reportDirectory: optionValue(arguments_, '--report-dir') ?? DEFAULT_OPTIONS.reportDirectory,
     ...(resumePath === undefined ? {} : { resumePath }),
+    ...(optionValue(arguments_, '--easy-generation') === undefined
+      ? {}
+      : {
+          easyGeneration: positiveInteger(
+            optionValue(arguments_, '--easy-generation') ?? '1',
+            'easy-generation',
+          ),
+        }),
   };
 }
 
@@ -89,48 +112,65 @@ function copyWeights(weights: Readonly<Record<string, number>>): EvolutionWeight
   );
 }
 
-function mutateWeights(parent: EvolutionWeights, seed: number): EvolutionWeights {
+function mutateWeights(parent: EvolutionWeights, seed: number, sigma: number): EvolutionWeights {
   const rng = fork(seed, 0x6576_6f6c);
   return Object.fromEntries(
-    Object.entries(parent).map(([name, value]) => [name, value + nextRange(rng, -20, 20)]),
+    Object.entries(parent).map(([name, value]) => [
+      name,
+      Math.max(-1000, Math.min(1000, value + nextRange(rng, -sigma, sigma))),
+    ]),
   );
 }
 
-function initialPopulation(weights: EvolutionWeights, population: number): Candidate[] {
+function initialPopulation(
+  weights: EvolutionWeights,
+  population: number,
+  sigma: number,
+): Candidate[] {
   return Array.from({ length: population }, (_, index) => ({
     index,
-    weights: index === 0 ? copyWeights(weights) : mutateWeights(weights, index),
+    weights: index === 0 ? copyWeights(weights) : mutateWeights(weights, index, sigma),
   }));
-}
-
-function offspring(
-  parents: readonly Candidate[],
-  population: number,
-  generation: number,
-): Candidate[] {
-  return Array.from({ length: population }, (_, index) => {
-    const parent = parents[index % parents.length];
-    if (parent === undefined) throw new Error('нет родителей для потомков');
-    return {
-      index,
-      weights: mutateWeights(parent.weights, generation * 100_000 + index + 1),
-    };
-  });
 }
 
 function seedsFor(count: number): number[] {
   return Array.from({ length: count }, (_, index) => index + 1);
 }
 
+function matchup(
+  population: readonly Candidate[],
+  hallOfFame: readonly EvolutionWeights[],
+  candidate: Candidate,
+  generation: number,
+): { opponents: MatchOpponent[]; candidateSlot: number } {
+  const pool = [
+    ...population.filter((item) => item.index !== candidate.index).map((item) => item.weights),
+    ...hallOfFame,
+  ];
+  const rng = fork(generation * 100_000 + candidate.index, 0x6d617463);
+  const shuffled = shuffle(rng, pool.slice());
+  while (shuffled.length > 0 && shuffled.length < 5) {
+    const opponent = pool[shuffled.length % pool.length];
+    if (opponent !== undefined) shuffled.push(opponent);
+  }
+  const selected = shuffled.slice(0, 5);
+  const candidateSlot = nextInt(rng, 6);
+  const slots = Array.from({ length: 6 }, (_, slot) => slot).filter(
+    (slot) => slot !== candidateSlot,
+  );
+  return {
+    candidateSlot,
+    opponents: selected.map((weights, index) => ({ weights, slot: slots[index] ?? slots[0] ?? 0 })),
+  };
+}
+
 function evaluateCandidate(
   candidate: Candidate,
-  seeds: readonly number[],
-  ticks: number,
+  data: Omit<WorkerData, 'index' | 'weights'>,
 ): Promise<CandidateEvaluation> {
   return new Promise((resolve, reject) => {
-    const data: WorkerData = { index: candidate.index, weights: candidate.weights, seeds, ticks };
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
-      workerData: data,
+      workerData: { ...data, index: candidate.index, weights: candidate.weights },
       execArgv: [...process.execArgv, '--experimental-strip-types'],
     });
     worker.once('message', resolve);
@@ -143,6 +183,8 @@ function evaluateCandidate(
 
 async function evaluatePopulation(
   population: readonly Candidate[],
+  hallOfFame: readonly EvolutionWeights[],
+  generation: number,
   options: EvolutionOptions,
 ): Promise<readonly CandidateEvaluation[]> {
   const results: CandidateEvaluation[] = [];
@@ -150,10 +192,17 @@ async function evaluatePopulation(
   const runNext = async (): Promise<void> => {
     const index = nextIndex;
     nextIndex += 1;
-    if (index >= population.length) return;
     const candidate = population[index];
-    if (candidate === undefined) throw new Error(`нет кандидата ${index}`);
-    results.push(await evaluateCandidate(candidate, seedsFor(options.seeds), options.ticks));
+    if (candidate === undefined) return;
+    const match = matchup(population, hallOfFame, candidate, generation);
+    results.push(
+      await evaluateCandidate(candidate, {
+        opponents: match.opponents,
+        candidateSlot: match.candidateSlot,
+        seeds: seedsFor(options.seeds),
+        ticks: options.ticks,
+      }),
+    );
     await runNext();
   };
   await Promise.all(Array.from({ length: Math.min(options.workers, population.length) }, runNext));
@@ -166,31 +215,41 @@ async function loadResume(path: string): Promise<ResumeState> {
     typeof parsed !== 'object' ||
     parsed === null ||
     !('generation' in parsed) ||
-    !('weights' in parsed) ||
-    typeof parsed.generation !== 'number' ||
-    typeof parsed.weights !== 'object' ||
-    parsed.weights === null
-  ) {
+    !('population' in parsed) ||
+    !('hallOfFame' in parsed)
+  )
     throw new Error('resume имеет неверный формат');
-  }
+  const state = parsed as ResumeState;
   return {
-    generation: parsed.generation,
-    weights: copyWeights(parsed.weights as Record<string, number>),
+    generation: state.generation,
+    population: state.population,
+    hallOfFame: state.hallOfFame,
+    seeds: state.seeds,
+    sigma: state.sigma,
   };
 }
 
 async function writeGeneration(
   generation: number,
   result: EvolutionResult,
+  easyWeights: EvolutionWeights,
+  population: readonly Candidate[],
+  hallOfFame: readonly EvolutionWeights[],
   options: EvolutionOptions,
+  durationMs: number,
 ): Promise<void> {
   await mkdir(options.reportDirectory, { recursive: true });
   await mkdir(dirname(options.weightsPath), { recursive: true });
   await mkdir(dirname(options.statePath), { recursive: true });
   await writeFile(options.weightsPath, `${JSON.stringify(result.weights, null, 2)}\n`, 'utf8');
   await writeFile(
+    options.easyWeightsPath ?? join(dirname(options.weightsPath), 'weights-easy.json'),
+    `${JSON.stringify(easyWeights, null, 2)}\n`,
+    'utf8',
+  );
+  await writeFile(
     options.statePath,
-    `${JSON.stringify({ generation, weights: result.weights }, null, 2)}\n`,
+    `${JSON.stringify({ generation, weights: result.weights, population: population.map((item) => item.weights), hallOfFame, seeds: seedsFor(options.seeds), sigma: options.sigma ?? 100 }, null, 2)}\n`,
     'utf8',
   );
   await writeFile(
@@ -199,10 +258,12 @@ async function writeGeneration(
       `# Эволюция весов, поколение ${generation}`,
       '',
       `Поколение: ${generation}`,
-      `Fitness: ${result.fitness}`,
-      `Размер популяции: ${options.population}`,
-      `Сиды: ${options.seeds}`,
-      `Тиков оценки: ${options.ticks}`,
+      `Лучший fitness: ${result.fitness}`,
+      `Средний fitness: ${result.averageFitness ?? 0}`,
+      `Золото > 5 000 с: ${result.metrics?.maxGoldOver5000S ?? 0}`,
+      `Отряд < 10 с: ${result.metrics?.maxUnitUnder10S ?? 0}`,
+      `Тик завершения: ${result.metrics?.endTick ?? options.ticks}`,
+      `Время поколения: ${durationMs} мс`,
       '',
       '```json',
       JSON.stringify(result.weights, null, 2),
@@ -216,17 +277,29 @@ async function writeGeneration(
 export async function runEvolution(options: EvolutionOptions): Promise<EvolutionResult> {
   const resume = options.resumePath === undefined ? null : await loadResume(options.resumePath);
   const startGeneration = resume?.generation ?? 0;
-  let population = initialPopulation(
-    resume?.weights ?? copyWeights(baseWeights as Record<string, number>),
-    options.population,
-  );
+  let population = resume
+    ? resume.population.map((weights, index) => ({ index, weights: copyWeights(weights) }))
+    : initialPopulation(
+        copyWeights(baseWeights as Record<string, number>),
+        options.population,
+        options.sigma ?? 100,
+      );
+  let hallOfFame = resume?.hallOfFame.map(copyWeights) ?? [];
   let result: EvolutionResult = {
     generation: startGeneration,
     fitness: 0,
     weights: copyWeights(population[0]?.weights ?? {}),
   };
+  let easyWeights = copyWeights(result.weights);
+  const easyGeneration = options.easyGeneration ?? Math.max(1, Math.floor(options.generations / 3));
   for (let generation = 1; generation <= options.generations; generation += 1) {
-    const evaluations = await evaluatePopulation(population, options);
+    const started = Date.now();
+    const evaluations = await evaluatePopulation(
+      population,
+      hallOfFame,
+      startGeneration + generation,
+      options,
+    );
     const ranked = [...evaluations].sort(
       (left, right) => right.fitness - left.fitness || left.index - right.index,
     );
@@ -234,21 +307,45 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
     if (best === undefined) throw new Error('пустая популяция');
     const bestCandidate = population[best.index];
     if (bestCandidate === undefined) throw new Error(`нет кандидата ${best.index}`);
+    hallOfFame = [copyWeights(bestCandidate.weights), ...hallOfFame];
     result = {
       generation: startGeneration + generation,
       fitness: best.fitness,
+      averageFitness: Math.trunc(
+        evaluations.reduce((sum, item) => sum + item.fitness, 0) / evaluations.length,
+      ),
       weights: copyWeights(bestCandidate.weights),
+      metrics: {
+        maxGoldOver5000S: best.maxGoldOver5000S ?? 0,
+        maxUnitUnder10S: best.maxUnitUnder10S ?? 0,
+        endTick: best.endTick ?? options.ticks,
+      },
     };
-    await writeGeneration(result.generation, result, options);
-    const parentCount = Math.max(1, Math.floor(options.population / 2));
-    population = offspring(
-      ranked
-        .slice(0, parentCount)
-        .map((evaluation) => population[evaluation.index])
-        .filter((candidate): candidate is Candidate => candidate !== undefined),
-      options.population,
+    if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
+    await writeGeneration(
       result.generation,
+      result,
+      easyWeights,
+      population,
+      hallOfFame,
+      options,
+      Date.now() - started,
     );
+    const parentCount = Math.max(1, Math.floor(options.population / 2));
+    population = Array.from({ length: options.population }, (_, index) => {
+      const parent = population[ranked[index % parentCount]?.index ?? best.index];
+      return {
+        index,
+        weights:
+          index === 0
+            ? copyWeights(bestCandidate.weights)
+            : mutateWeights(
+                parent?.weights ?? bestCandidate.weights,
+                result.generation * 100_000 + index,
+                options.sigma ?? 100,
+              ),
+      };
+    });
   }
   return result;
 }

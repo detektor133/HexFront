@@ -30,39 +30,11 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j4 принята ревью:** fallback `25` и `3` в `packages/sim/src/bots/run.ts` заменены на нулевые значения; профильные тесты — 20/20; benchmark: 30 ботов — полный тик 1,69 мс, commander 0,080 мс/бот/ход; 100 ботов — 10,782 мс, commander 0,297 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
-- **Следующая работа:** 06/T1j5 — обучение в `tools/evolve`.
-- **Изменённые файлы T1j4:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/scenarios/commander.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `docs/reports/stage-06-t1j4.md`.
-- **Проверки T1j4:** профильные тесты — 20/20; benchmark 30/100 ботов — commander 0,082/0,301 мс на бот/ход; `pnpm verify --changed` — OK (186 с); полный `pnpm verify` — `verify: OK (283 с)`.
-
-- **06/T1e3 завершена:** старая цепочка экономики удалена, проверки easy и автопополнения сохранены.
-- **06/T1e1 и T1e2 завершены:** детерминизм подтверждён; предыдущий benchmark зафиксирован в отчётах T1e2.
-- **06/T1e4:** заменена новой T1e; таблица трассировки будет обновлена после T1j1–T1j4/T1i.
-- **06/T1f завершена:** добавлены расширяемые каталог действий и признаки; `BUILDING_DEFS` собирается из существующих констант.
-- **Проверки T1f:** профильный тест — 3/3; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (278 с)`.
-- **06/T1g разбита:** T1ga — веса и выбор, T1gb — траты, T1gc — ограничения армий и easy, T1gd — удаление старого мозга и бюджеты, T1ge — проверка родителя.
-- **06/T1ga завершена:** добавлены целочисленная оценка `Σ вес × признак`, выбор положительных действий и стабильный порядок равных оценок; веса хранятся в `packages/sim/src/bots/weights.json`.
-- **Проверки T1ga:** профильный тест — 5/5; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (286 с)`.
-- **06/T1gb завершена:** brain строит каталог действий, проверяет фактическую цену через валидаторы команд, удерживает `BOT_GOLD_RESERVE` с учётом накопленных трат и выполняет одну трату на физический город/гекс.
-- **Проверки T1gb:** профильные тесты — 15/15; локальный движок — 16/16; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (92 с); полный `pnpm verify` — `verify: OK (279 с)`.
-- **06/T1gc завершена:** brain создаёт `▶/■` только для армий игрока; easy не создаёт военные команды и удерживает `BOT_EASY_TAX`.
-- **Проверки T1gc:** тесты мозга и детерминизма — 18/18; `pnpm ai-check --changed` — OK (89 с); полный `pnpm verify` — `verify: OK (279 с)`.
-- **06/T1gd завершена:** удалены `goals.ts`, его тест, экспорт legacy-целей и неиспользуемые ручные коэффициенты; easy, автопополнение и золотой резерв сохранены.
-- **Проверки T1gd:** профильные тесты — 23/23; typecheck sim — OK; замер 30 ботов: полный тик 5,527 мс, экономика 0,347 мс/бот/ход; полный `pnpm verify` — `verify: OK (281 с)`.
-- **06/T1ge завершена:** сверены T1ga–T1gd, удалён legacy-код, golden commander не изменились, оба бюджетных критерия повторно подтверждены.
-- **Проверки T1ge:** профильные тесты — 23/23; typecheck sim — OK; замер 30 ботов: полный тик 5,536 мс, экономика 0,347 мс/бот/ход; отчёт — `docs/reports/stage-06-t1ge.md`.
-- **06/T1h завершена:** добавлен `(μ,λ)-ES` с seeded RNG, worker_threads, resume и сохранением весов/отчётов; `brainDecide` принимает обучаемые веса.
-- **Проверки T1h:** тесты 2/2, включая 300 тиков при 1 и 4 worker_threads и resume; typecheck evolve — OK; полный `pnpm verify` — `verify: OK (285 с)`; отчёт — `docs/reports/stage-06-t1h.md`.
-- **06/T1j1 исправлено после ревью:** `buildOptions` больше не добавляет внутренние негородские гексы; добавлен регрессионный тест на это ограничение.
-- **Проверки T1j1:** профильный тест — 9/9; `pnpm verify --changed` — `verify: OK (102 с)`; полный `pnpm verify` — `verify: OK (290 с)`; отчёт — `docs/reports/stage-06-t1j1.md`.
-- **06/T1j1 принята ревью:** критерии реестра, допустимости вариантов, fixed-point эффектов и расширяемости подтверждены тестами; typecheck и dependency-cruiser зелёные. Отчёт — `docs/reports/stage-06-t1j1.md`.
-- **06/T1j2 исправлена после ревью:** `planBotActions` передаёт definitions в реестр; добавлены интеграционный тест с фиктивным юнитом, `threat > 0`, `strength*threat` и тест-страж исходников мозга.
-- **Проверки T1j2:** профильный прогон — 22/22; `pnpm --filter @hexfront/sim typecheck` — OK; `pnpm ai-check --changed` — OK (91 с); полный `pnpm verify` — `verify: OK (281 с)`; отчёт — `docs/reports/stage-06-t1j2.md`.
-- **06/T1j2 принята ревью:** все четыре критерия подтверждены 22/22 профильными тестами; тест-страж запретов, typecheck и замер 30/100 ботов прошли. Отчёт — `docs/reports/stage-06-t1j2.md`.
-- **CI T1j3:** run `37914771059` завершился ошибкой `ENOTDIR` в тесте-стражe.
-- **CI:** `pnpm ci:wait` для исходного HEAD — success; после push проверится в начале следующей сессии.
-- **Ожидается после T1e:** команда владельца `$accept 06/T1`, включая `pnpm report:match --seeds 3`.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j2.md`, `packages/sim/src/bots/brain.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`.
+- **06/T1j5 выполнена:** добавлены общие критерии acceptance, шестиместные seeded-матчи эволюции, sigma-мутация, зал славы, resume и отчёты поколений.
+- **Следующая работа:** 06/T1j5 ждёт ревью; после `$review 06/T1j5` — 06/T1j6.
+- **Отчёт:** `docs/reports/stage-06-t1j5.md`.
+- **Проверки:** профильные тесты — 4/4; `pnpm verify --changed` — OK (39 с); полный `pnpm verify` — `verify: OK (289 с)`.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/replay/src/acceptance.ts`.
 
 ## Архив сессий
 
