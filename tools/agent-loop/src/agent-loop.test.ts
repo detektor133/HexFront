@@ -9,7 +9,14 @@ import {
   selectTask,
   taskMark,
 } from './stage-file.ts';
-import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
+import {
+  fixtureStage,
+  fixtureStatus,
+  issue,
+  runWorld,
+  setMark,
+  type Session,
+} from './test-world.ts';
 
 const NEXT_DONE: Session = {
   task: 'T1j5-Б1',
@@ -258,7 +265,20 @@ describe('ожидание', () => {
     });
     expect(run.prompts).toEqual([]);
     expect(run.lines.filter((line) => line === OWNER_WAIT)).toHaveLength(1);
-    expect(run.lines.filter((line) => line.startsWith('… жду Issue'))).toHaveLength(1);
+    expect(run.lines.filter((line) => line.startsWith('… жду:'))).toHaveLength(1);
+    expect(run.checks).toBe(run.sleeps + 1);
+  });
+
+  it('новую Issue берёт на следующей дешёвой проверке, а не через полный интервал', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      polls: 3,
+      arrival: issue(12, '$done 06/T1i плейтест пройден'),
+      sessions: [{ task: 'T1i', mark: 'x', answer: 'T1i [x]' }, { answer: 'T1e ждёт $accept' }],
+    });
+    expect(run.sleepsAtPrompt[0]).toBe(1);
+    expect(run.lines).toContain('изменения в Issues или main — проверяю');
+    expect(run.prompts.slice(0, 2)).toEqual(['$done 06/T1i плейтест пройден', '$next']);
   });
 });
 

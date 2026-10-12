@@ -13,7 +13,9 @@ export interface AgentConfig {
   readonly maxRounds: number;
   /** Предел одной сессии codex, мин. */
   readonly maxMinutes: number;
-  /** Как часто проверять Issues, когда работы нет, мин. */
+  /** Как часто без работы проверять Issues и `main` условным запросом к GitHub, с. */
+  readonly pollSeconds: number;
+  /** Как часто без работы делать полный шаг (git fetch, очередь), мин. */
   readonly pollMinutes: number;
   /** Выйти, когда работы нет, вместо ожидания. */
   readonly once: boolean;
@@ -22,7 +24,8 @@ export interface AgentConfig {
   readonly resume?: string;
   readonly runCommand: RunCommand;
   readonly now: () => number;
-  readonly sleep: (ms: number) => Promise<void>;
+  /** Пауза; `wake` — владелец нажал Enter в консоли цикла. */
+  readonly sleep: (ms: number) => Promise<'timer' | 'wake'>;
   readonly writeLine: (line: string) => void;
   readonly github?: GithubClient;
 }

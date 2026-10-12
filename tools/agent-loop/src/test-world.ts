@@ -61,6 +61,8 @@ export interface World {
   readonly merged?: boolean;
   /** Сколько раз дать циклу поспать до выхода; без значения — режим `--once`. */
   readonly polls?: number;
+  /** Issue, которая появится во время ожидания: её увидит дешёвая проверка `changed`. */
+  readonly arrival?: AgentIssue;
 }
 
 export interface Outcome {
@@ -75,6 +77,10 @@ export interface Outcome {
   readonly pulls: string[];
   pushes: number;
   ciCalls: number;
+  sleeps: number;
+  checks: number;
+  /** Сколько пауз прошло к началу каждой сессии codex. */
+  readonly sleepsAtPrompt: number[];
 }
 
 const ok = (stdout = ''): CommandResult => ({ code: 0, stdout, stderr: '' });
@@ -117,6 +123,9 @@ export async function runWorld(world: World): Promise<Outcome> {
     pulls: [],
     pushes: 0,
     ciCalls: 0,
+    sleeps: 0,
+    checks: 0,
+    sleepsAtPrompt: [],
   };
   let branch = world.branch ?? 'stage-06';
   let head = 0;
@@ -131,6 +140,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     args: readonly string[],
   ) => {
     out.prompts.push(input);
+    out.sleepsAtPrompt.push(out.sleeps);
     out.roles.push(env?.AGENT_ROLE);
     out.codexArguments.push(args);
     const session = sessions.shift();
@@ -194,6 +204,14 @@ export async function runWorld(world: World): Promise<Outcome> {
       if (item) issues[found] = { ...item, labels: [...item.labels, label] };
       return Promise.resolve();
     },
+    changed: () => {
+      out.checks += 1;
+      // Первый вызов в ожидании только запоминает состояние; Issue приходит ко второй проверке.
+      if (world.arrival === undefined || out.checks < 2 || issues.includes(world.arrival))
+        return Promise.resolve(false);
+      issues.push(world.arrival);
+      return Promise.resolve(true);
+    },
     openPullRequest: (head_, base) => {
       out.pulls.push(`${head_} → ${base}`);
       return Promise.resolve('https://github.com/detektor133/HexFront/pull/7');
@@ -205,7 +223,8 @@ export async function runWorld(world: World): Promise<Outcome> {
       root,
       maxRounds: world.maxRounds ?? 3,
       maxMinutes: 10,
-      pollMinutes: 5,
+      pollSeconds: 30,
+      pollMinutes: 10,
       once: world.polls === undefined,
       dryRun: world.dryRun ?? false,
       ...(world.resume === undefined ? {} : { resume: world.resume }),
@@ -226,7 +245,8 @@ export async function runWorld(world: World): Promise<Outcome> {
       sleep: () => {
         polls -= 1;
         if (polls < 0) throw new Error('конец теста');
-        return Promise.resolve();
+        out.sleeps += 1;
+        return Promise.resolve('timer' as const);
       },
       writeLine: (line) => out.lines.push(line),
     });

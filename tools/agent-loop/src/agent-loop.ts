@@ -100,6 +100,36 @@ async function tick(context: LoopContext): Promise<Step> {
   return (await processTask(context, task, { mark, workPrompt: '$next' })).step;
 }
 
+/**
+ * Ожидание работы без нагрузки: раз в pollSeconds — условный запрос к GitHub (ответ 304
+ * не тратит лимит API, git и codex не запускаются), полный шаг — при изменении Issues
+ * или `main`, по Enter в консоли, по окончании паузы после сбоя или раз в pollMinutes.
+ */
+async function waitForWork(context: LoopContext): Promise<void> {
+  const { config, state } = context;
+  const deadline = config.now() + config.pollMinutes * 60_000;
+  const github = config.github;
+  const check = async (): Promise<boolean> => {
+    try {
+      return github !== undefined && (await github.changed());
+    } catch (error) {
+      await context.say(
+        `GitHub: проверка не удалась — ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  };
+  await check();
+  while (config.now() < deadline) {
+    if ((await config.sleep(config.pollSeconds * 1000)) === 'wake') return;
+    if (state.retryAfter !== undefined && state.retryAfter <= config.now()) return;
+    if (await check()) {
+      await context.say('изменения в Issues или main — проверяю');
+      return;
+    }
+  }
+}
+
 /** План без запуска codex: что цикл сделал бы сейчас. */
 async function describe(context: LoopContext): Promise<void> {
   const { config } = context;
@@ -163,8 +193,10 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
       return 0;
     }
     if (!waiting)
-      await context.say(`… жду Issue или новый коммит, проверка раз в ${config.pollMinutes} мин`);
+      await context.say(
+        `… жду: Issues и main проверяю раз в ${config.pollSeconds} с, Enter — проверить сейчас`,
+      );
     waiting = true;
-    await config.sleep(config.pollMinutes * 60_000);
+    await waitForWork(context);
   }
 }

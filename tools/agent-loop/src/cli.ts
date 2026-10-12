@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { setTimeout as sleep } from 'node:timers/promises';
 
 import { defaultRunCommand, runAgentLoop } from './agent-loop.ts';
 import { httpGithubClient, parseGithubRepo } from './github.ts';
@@ -19,6 +18,23 @@ const positive = (name: string, fallback: number): number => {
   return value;
 };
 
+/** Пауза, которую прерывает Enter в консоли: владелец просит проверить сейчас. */
+const sleepOrEnter = (ms: number): Promise<'timer' | 'wake'> =>
+  new Promise((resolve) => {
+    const finish = (result: 'timer' | 'wake') => {
+      clearTimeout(timer);
+      process.stdin.off('data', onData);
+      process.stdin.pause();
+      resolve(result);
+    };
+    const onData = () => finish('wake');
+    const timer = setTimeout(() => finish('timer'), ms);
+    if (process.stdin.isTTY) {
+      process.stdin.once('data', onData);
+      process.stdin.resume();
+    }
+  });
+
 const resume = flag('--resume');
 if (resume !== undefined && !new RegExp(`^${TASK_ID_SOURCE}$`).test(resume))
   throw new Error('--resume ждёт номер задачи, например 06/T1j7');
@@ -31,13 +47,14 @@ process.exitCode = await runAgentLoop({
   root: process.cwd(),
   maxRounds: positive('--max-rounds', 3),
   maxMinutes: positive('--max-minutes', 120),
-  pollMinutes: positive('--poll-minutes', 5),
+  pollSeconds: positive('--poll-seconds', 30),
+  pollMinutes: positive('--poll-minutes', 10),
   once: process.argv.includes('--once'),
   dryRun: process.argv.includes('--dry-run'),
   ...(resume === undefined ? {} : { resume }),
   runCommand: defaultRunCommand,
   now: Date.now,
-  sleep: (ms) => sleep(ms),
+  sleep: sleepOrEnter,
   writeLine: (line) => console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${line}`),
   ...(token ? { github: httpGithubClient(repo, token) } : {}),
 });
