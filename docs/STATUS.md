@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j5 |
+| Текущая задача | 06/T1j6 |
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-12 |
 
-Очередь: 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
+Очередь: 06/T1j6 → 06/T1i → 06/T1e → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
@@ -30,8 +30,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j5 исправлена и ждёт ревью:** добавлен матч на сиде 42 с прямым перебором, место особи меняется по сидам, бонус fitness ограничен `cities`/`lastStanding`, resume восстанавливает `seeds/sigma`.
-- **Следующая работа:** `$review 06/T1j5` в новой сессии.
+- **06/T1j5 принята:** ревью подтвердило матч на сиде 42 с прямым перебором, смену места особи по сидам, бонус fitness только за `cities`/`lastStanding` и восстановление `seeds/sigma` при resume.
+- **Следующая работа:** `$task 06/T1j6`.
 - **Отчёт:** `docs/reports/stage-06-t1j5.md`.
 - **Проверки:** профильные тесты — 5/5; `pnpm verify --changed` — `verify: OK (41 с)`; полный `pnpm verify` — `verify: OK (300 с)`.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/replay/src/acceptance.ts`.
