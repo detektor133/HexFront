@@ -5,11 +5,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 06 — Боты и баланс |
-| Текущая задача | 06/T1j4 |
+| Текущая задача | 06/T1j5 |
 | Ветка | `stage-06` |
-| Последнее обновление | 2026-10-09 |
+| Последнее обновление | 2026-10-12 |
 
-Очередь: 06/T1j4 → 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
+Очередь: 06/T1j5 → 06/T1j6 → 06/T1i → 06/T1e → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
@@ -30,8 +30,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j4 исправлена после ревью:** fallback `25` и `3` в `packages/sim/src/bots/run.ts` заменены на нулевые значения; добавлен регрессионный тест пустых весов. Профильные тесты — 20/20; benchmark: 30 ботов — полный тик 1,720 мс, commander 0,082 мс/бот/ход; 100 ботов — 10,958 мс, commander 0,301 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
-- **Следующая работа:** повторить `$review 06/T1j4`.
+- **06/T1j4 принята ревью:** fallback `25` и `3` в `packages/sim/src/bots/run.ts` заменены на нулевые значения; профильные тесты — 20/20; benchmark: 30 ботов — полный тик 1,69 мс, commander 0,080 мс/бот/ход; 100 ботов — 10,782 мс, commander 0,297 мс/бот/ход. Отчёт — `docs/reports/stage-06-t1j4.md`.
+- **Следующая работа:** 06/T1j5 — обучение в `tools/evolve`.
 - **Изменённые файлы T1j4:** `packages/sim/src/balance.ts`, `packages/sim/src/bots/brain.ts`, `packages/sim/src/bots/commander.ts`, `packages/sim/src/bots/run.ts`, `packages/sim/src/bots/weights.json`, `packages/sim/src/bots/weights-easy.json`, `packages/sim/test/scenarios/commander.test.ts`, `packages/sim/test/guards/bot-brain-source.test.ts`, `docs/reports/stage-06-t1j4.md`.
 - **Проверки T1j4:** профильные тесты — 20/20; benchmark 30/100 ботов — commander 0,082/0,301 мс на бот/ход; `pnpm verify --changed` — OK (186 с); полный `pnpm verify` — `verify: OK (283 с)`.
 
