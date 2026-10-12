@@ -130,7 +130,7 @@
      - отчёт поколения в docs/reports/evolve/: лучший и средний фитнес, три метрики лучшей особи, время поколения.
      Полный `pnpm evolve` в задаче не запускать.
 
-- [~] **T1j6. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
+- [ ] **T1j6. Проверка T1j по коду**, сквозная проверка, не задача владельца. Запреты T1 и T1j действуют. Приёмка:
   1) В отчёте docs/reports/stage-06-t1j.md по каждому пункту T1j1–T1j5 указаны file:line кода и имя теста.
   2) Пусты все три поиска, вывод — в отчёте:
      - `rg -n "'(recruit|build|upgradeCity|improve|foundCity|rebuildSupply|setTax|startOffensive|stopOffensive|infantry|armor|artillery|fort|depot)'" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts packages/sim/src/bots/features.ts`;
@@ -138,6 +138,8 @@
      - `rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX|BOT_MERGE_" packages/sim/src`.
   3) Полный `pnpm verify` зелёный.
   4) Только после этого T1j6 и T1j отмечаются [x].
+  Возврат ревью:
+  - пункт T1j4.4 не подтверждён: повторный `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` дал для 30 ботов `commanderMsPerBotTurn = 0,470 мс`, что выше порога `0,348 мс/бот/ход`; полный тик `1,677 мс` и экономика `0,386 мс/бот/ход` порог проходят.
 
 - [ ] **T1i. Обучение весов**, задача владельца. Владелец запускает `pnpm evolve --population=12 --seeds=6 --generations=30`, продолжает через `pnpm evolve --resume` без пути, затем пишет `$next`.
 

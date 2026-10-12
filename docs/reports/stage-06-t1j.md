@@ -24,4 +24,8 @@ rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT
 - `pnpm verify` — `verify: OK (296 с)`; build, types, lint, prettier, tests и visual зелёные.
 - `pnpm ci:wait` до начала задачи: CI красный из-за таймаута `front-follow.test.ts:199`; локальный полный verify этот тест прошёл.
 
+## Возврат ревью 2026-10-12
+
+- T1j4.4 не подтверждён: `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` дал для 30 ботов `commanderMsPerBotTurn = 0,470 мс/бот/ход` при пороге `0,348`; полный тик `1,677 мс` и экономика `0,386 мс/бот/ход` проходят.
+
 Изменений кода нет. Следующая задача — задача владельца `06/T1i`.
