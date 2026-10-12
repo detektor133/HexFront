@@ -20,12 +20,12 @@ rg -n "balance" packages/sim/src/bots/brain.ts packages/sim/src/bots/actions.ts 
 rg -n "BOT_TAX_PEACE|BOT_TAX_WAR|BOT_ATTACK_|BOT_MAX_SPENDS|BOT_GOLD_RESERVE|BOT_EASY_TAX|BOT_MERGE_" packages/sim/src
 ```
 
-- `pnpm verify --changed` — `verify: OK (11 с)`.
-- `pnpm verify` — `verify: OK (296 с)`; build, types, lint, prettier, tests и visual зелёные.
-- `pnpm ci:wait` до начала задачи: CI красный из-за таймаута `front-follow.test.ts:199`; локальный полный verify этот тест прошёл.
+- `pnpm verify --changed` — `verify: OK (10 с)`.
+- `pnpm verify` — `verify: OK (290 с)`; build, types, lint, prettier, tests и visual зелёные.
+- `pnpm ci:wait` до начала задачи: CI зелёный для текущего `HEAD`.
 
 ## Возврат ревью 2026-10-12
 
 - T1j4.4 не подтверждён: `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` дал для 30 ботов `commanderMsPerBotTurn = 0,470 мс/бот/ход` при пороге `0,348`; полный тик `1,677 мс` и экономика `0,386 мс/бот/ход` проходят.
 
-Изменений кода нет. Следующая задача — задача владельца `06/T1i`.
+Изменений кода нет. T1j6 остаётся `[ ]`: T1j4.4 не подтверждён из-за превышения бюджета commander. Следующее действие — устранить превышение `0,470 → ≤ 0,348 мс/бот/ход`, затем повторить сквозную проверку и `$review 06/T1j6`.
