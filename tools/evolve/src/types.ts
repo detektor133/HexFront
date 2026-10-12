@@ -30,7 +30,7 @@ export interface EvolutionResult {
 export interface CandidateEvaluation {
   readonly index: number;
   readonly fitness: number;
-  readonly maxGoldOver5000S?: number;
-  readonly maxUnitUnder10S?: number;
-  readonly endTick?: number;
+  readonly maxGoldOver5000S: number;
+  readonly maxUnitUnder10S: number;
+  readonly endTick: number;
 }

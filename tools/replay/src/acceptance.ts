@@ -9,6 +9,8 @@ export interface AcceptanceTick {
 export interface MatchAcceptance {
   readonly maxGoldOver5000S: number;
   readonly maxUnitUnder10S: number;
+  readonly goldOver5000SByPlayer: readonly number[];
+  readonly unitUnder10SByPlayer: readonly number[];
   readonly winner: number;
   readonly winReason: WinReason | null;
   readonly endTick: number;
@@ -24,7 +26,10 @@ export interface FitnessMetrics {
 /** Считает непрерывные интервалы критериев T1 по снимкам тиков матча. */
 export function calculateBotAcceptance(
   ticks: readonly AcceptanceTick[],
-  outcome: Omit<MatchAcceptance, 'maxGoldOver5000S' | 'maxUnitUnder10S'>,
+  outcome: Omit<
+    MatchAcceptance,
+    'maxGoldOver5000S' | 'maxUnitUnder10S' | 'goldOver5000SByPlayer' | 'unitUnder10SByPlayer'
+  >,
 ): MatchAcceptance {
   const goldRuns = new Array<number>(ticks[0]?.gold.length ?? 0).fill(0);
   const unitRuns = new Array<number>(goldRuns.length).fill(0);
@@ -46,6 +51,8 @@ export function calculateBotAcceptance(
     ...outcome,
     maxGoldOver5000S: Math.max(...maxGoldRuns, 0) / TICKS_PER_S,
     maxUnitUnder10S: Math.max(...maxUnitRuns, 0) / TICKS_PER_S,
+    goldOver5000SByPlayer: maxGoldRuns.map((ticks) => ticks / TICKS_PER_S),
+    unitUnder10SByPlayer: maxUnitRuns.map((ticks) => ticks / TICKS_PER_S),
   };
 }
 

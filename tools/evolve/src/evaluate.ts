@@ -38,7 +38,23 @@ function acceptanceTrace(state: MatchState): AcceptanceTick {
   };
 }
 
-interface MatchEvaluation {
+export interface CandidateFitnessMetrics {
+  readonly place: number;
+  readonly goldOver5000S: number;
+  readonly unitUnder10S: number;
+  readonly won: boolean;
+}
+
+export function calculateCandidateFitness(metrics: CandidateFitnessMetrics): number {
+  return calculateFitness({
+    place: metrics.place,
+    maxGoldOver5000S: metrics.goldOver5000S,
+    maxUnitUnder10S: metrics.unitUnder10S,
+    won: metrics.won,
+  });
+}
+
+export interface MatchEvaluation {
   readonly fitness: number;
   readonly maxGoldOver5000S: number;
   readonly maxUnitUnder10S: number;
@@ -90,16 +106,16 @@ function evaluateMatch(
   });
   const places = playerPlaces(state, playerScores(state));
   return {
-    fitness: calculateFitness({
+    fitness: calculateCandidateFitness({
       place: places[actualCandidateSlot] ?? PLAYERS,
-      maxGoldOver5000S: acceptance.maxGoldOver5000S,
-      maxUnitUnder10S: acceptance.maxUnitUnder10S,
+      goldOver5000S: acceptance.goldOver5000SByPlayer[actualCandidateSlot] ?? 0,
+      unitUnder10S: acceptance.unitUnder10SByPlayer[actualCandidateSlot] ?? 0,
       won:
         state.winner === actualCandidateSlot &&
         (winReason === 'cities' || winReason === 'lastStanding'),
     }),
-    maxGoldOver5000S: acceptance.maxGoldOver5000S,
-    maxUnitUnder10S: acceptance.maxUnitUnder10S,
+    maxGoldOver5000S: acceptance.goldOver5000SByPlayer[actualCandidateSlot] ?? 0,
+    maxUnitUnder10S: acceptance.unitUnder10SByPlayer[actualCandidateSlot] ?? 0,
     endTick: acceptance.endTick,
   };
 }

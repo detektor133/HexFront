@@ -64,6 +64,8 @@ describe('критерии обучения ботов', () => {
     });
     expect(actual.maxGoldOver5000S).toBe(Math.max(...maxGoldRuns) / 10);
     expect(actual.maxUnitUnder10S).toBe(Math.max(...maxUnitRuns) / 10);
+    expect(actual.goldOver5000SByPlayer).toEqual(maxGoldRuns.map((ticks) => ticks / 10));
+    expect(actual.unitUnder10SByPlayer).toEqual(maxUnitRuns.map((ticks) => ticks / 10));
     expect(actual.endTick).toBe(600);
   });
 

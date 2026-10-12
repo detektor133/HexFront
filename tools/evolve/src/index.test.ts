@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { candidateSlotForSeed } from './evaluate.ts';
+import { calculateCandidateFitness, candidateSlotForSeed } from './evaluate.ts';
 import { parseOptions, runEvolution } from './index.ts';
 
 describe('эволюция весов бота', () => {
@@ -20,6 +20,25 @@ describe('эволюция весов бота', () => {
 
   it('меняет место особи между сидами', () => {
     expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
+  });
+
+  it('штрафует особь только по её собственным метрикам', () => {
+    expect(
+      calculateCandidateFitness({
+        place: 2,
+        goldOver5000S: 0,
+        unitUnder10S: 0,
+        won: false,
+      }),
+    ).toBe(4000);
+    expect(
+      calculateCandidateFitness({
+        place: 2,
+        goldOver5000S: 120,
+        unitUnder10S: 30,
+        won: false,
+      }),
+    ).toBe(2000);
   });
 
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {

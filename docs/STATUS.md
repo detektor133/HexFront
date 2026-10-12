@@ -30,14 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j5-Б1 (решение владельца 2026-10-12):** прогон T1i на 7 поколений остановлен — фитнес штрафовал особь по худшему из 6 игроков (`tools/replay/src/acceptance.ts:47-48`, `tools/evolve/src/evaluate.ts:95-96`). Сначала T1j5-Б1, затем T1i заново с весов из репозитория; результаты прогона 2026-10-12 не используются.
-- **06/T1j6 принята:** три обязательных поиска дали пустой вывод; трассировка T1j1–T1j5 есть в `docs/reports/stage-06-t1j.md`.
-- **Проверки:** benchmark 30 ботов — полный тик `1,715` мс, commander `0,080` мс/бот/ход, экономика `0,389` мс/бот/ход; полный `pnpm verify` ранее дал `verify: OK (290 с)` на том же коде.
-- **Статус:** T1j6 и T1j отмечены `[x]`; код не менялся.
-- **CI:** `pnpm ci:wait` перед задачей — зелёный для текущего `HEAD`.
-- **Отчёт:** `docs/reports/stage-06-t1j.md`.
-- **Следующая работа:** владелец запускает T1i по инструкции этапа.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j.md`, `docs/reports/stage-06-t1j5.md`.
+- **06/T1j5-Б1:** исправлено: `calculateBotAcceptance` возвращает метрики по игрокам, `evaluateMatch` считает fitness по `actualCandidateSlot`, `CandidateEvaluation` хранит обязательные метрики. Отчёт: `docs/reports/stage-06-t1j5-b1.md`.
+- **Проверки:** профильные тесты 6/6; `pnpm verify --changed` — `verify: OK (40 с)`; полный `pnpm verify` — `verify: OK (296 с)`.
+- **Статус:** T1j5-Б1 отмечена `[~]` и ждёт ревью. После `$review 06/T1j5-Б1` владелец запускает T1i заново с весов из репозитория.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j5-b1.md`, `tools/replay/src/acceptance.ts`, `tools/evolve/src/evaluate.ts`.
 
 ## Архив сессий
 
