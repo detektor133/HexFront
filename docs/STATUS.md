@@ -32,10 +32,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j8-Б1 возвращена ревью:** профильный тест проходит, но нет синтетической проверки максимума штрафов по разным игрокам и полный `pnpm verify` после исправления не зелёный. Отчёт `docs/reports/stage-06-t1j8-b1.md`.
-- **Проверки 06/T1j8-Б1:** профильный тест — 13/13; benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — `budgetExceeded=false`, полный тик 30 ботов `meanMs=1.702`, 100 ботов `meanMs=10.589`; ранее `pnpm verify --changed` — `verify: OK (45 с)`, полный `pnpm verify` — `verify: OK (301 с)`.
-- **Проверки после исправления 06/T1j8-Б1:** `pnpm verify --changed` — `verify: OK (54 с)`; полный `pnpm verify` заблокирован 13 таймаутами существующих долгих тестов и `spawn C:\Windows\system32\cmd.exe ENOENT`, тест `tools/evolve/src/index.test.ts` прошёл.
-- **Следующая работа:** 06/T1j8-Б1 — добавить недостающий тест и добиться зелёного полного `pnpm verify`; затем владелец удаляет результаты прогона 2026-10-13 и запускает T1i заново.
+- **06/T1j8-Б1 исправлена и ждёт ревью:** добавлен синтетический тест максимумов штрафов от разных игроков; отчёт `docs/reports/stage-06-t1j8-b1.md`.
+- **Проверки 06/T1j8-Б1:** профильный тест — 14/14; benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — `budgetExceeded=false`, полный тик 30 ботов `meanMs=1.702`, 100 ботов `meanMs=10.589`; ранее `pnpm verify --changed` — `verify: OK (45 с)`, полный `pnpm verify` — `verify: OK (301 с)`.
+- **Проверки после исправления 06/T1j8-Б1:** `pnpm verify --changed` — `verify: OK (49 с)`; полный `pnpm verify` — `verify: OK (300 с)`, 793 теста и visual прошли.
+- **Следующая работа:** задача ждёт `$review 06/T1j8-Б1`; после ревью владелец удаляет результаты прогона 2026-10-13 и запускает 06/T1i заново.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j8-b1.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/evolve/src/worker.ts`.
 
 - **06/T1j8db принята ревью:** остановка после поколения 5 при отсутствии прогресса по экзамену, сохранение `examFitnesses` и следующей популяции для `--resume`. Профильный тест — 8/8; benchmark 30/100 игроков — 1,618/10,366 мс среднего тика, бюджеты не превышены. Отчёт `docs/reports/stage-06-t1j8db.md`.

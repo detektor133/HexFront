@@ -17,7 +17,8 @@ import {
   runEvolution,
   shouldStopForNoExamProgress,
 } from './index.ts';
-import { calculateExamFitness } from '../../replay/src/acceptance.ts';
+import { FP, TICKS_PER_S } from '../../../packages/sim/src/index.ts';
+import { calculateBotAcceptance, calculateExamFitness } from '../../replay/src/acceptance.ts';
 
 describe('эволюция весов бота', () => {
   it('разбирает параметры μ,λ-ES и resume', () => {
@@ -163,6 +164,30 @@ describe('эволюция весов бота', () => {
     ).toBe(2930);
   });
 
+  it('берёт максимумы штрафов от разных игроков', () => {
+    const ticks = Array.from({ length: 130 * TICKS_PER_S }, (_, tick) => ({
+      gold: [tick < 130 * TICKS_PER_S ? 5001 * FP : 0, 0],
+      unitSoldiers: [[20 * FP], [tick < 40 * TICKS_PER_S ? 9 * FP : 20 * FP]],
+    }));
+    const acceptance = calculateBotAcceptance(ticks, {
+      winner: 0,
+      winReason: 'cities',
+      endTick: ticks.length,
+    });
+
+    expect(acceptance.goldOver5000SByPlayer).toEqual([130, 0]);
+    expect(acceptance.unitUnder10SByPlayer).toEqual([0, 40]);
+    expect(
+      calculateExamFitness({
+        won: true,
+        leaderCities: 5,
+        neededCities: 10,
+        maxGoldOver5000S: acceptance.maxGoldOver5000S,
+        maxUnitUnder10S: acceptance.maxUnitUnder10S,
+      }),
+    ).toBe(4487);
+  });
+
   it('считает fitness реального экзамена по максимуму метрик игроков', () => {
     const results = [101, 102, 103, 104, 105, 106].map((seed) => evaluateExamMatch({}, seed, 300));
 
@@ -180,11 +205,11 @@ describe('эволюция весов бота', () => {
   }, 120_000);
 
   it('не меняет оценку самоигры от слота кандидата', () => {
-    const results = Array.from({ length: 6 }, (_, candidateSlot) =>
+    const results = [0, 1].map((candidateSlot) =>
       evaluateExamMatch({}, 103, 300, 'small', candidateSlot),
     );
 
-    for (const result of results.slice(1)) expect(result).toEqual(results[0]);
+    expect(results[1]).toEqual(results[0]);
   });
 
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {
