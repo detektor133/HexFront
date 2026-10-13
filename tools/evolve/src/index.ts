@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 
-import type { MatchOpponent } from './evaluate.ts';
+import { evaluateMatch, type MatchOpponent } from './evaluate.ts';
 import type {
   CandidateEvaluation,
   CandidateMatch,
@@ -30,6 +30,16 @@ interface ResumeState {
   readonly seeds: readonly number[];
   readonly sigma: number;
   readonly weights?: EvolutionWeights;
+}
+
+interface ExamMatch extends CandidateMatch {
+  readonly seed: number;
+}
+
+interface GenerationExam {
+  readonly fitness: number;
+  readonly wins: number;
+  readonly matches: readonly ExamMatch[];
 }
 
 interface WorkerData {
@@ -146,6 +156,34 @@ function seedsFor(count: number): number[] {
   return Array.from({ length: count }, (_, index) => index + 1);
 }
 
+function examSeeds(): number[] {
+  return [101, 102, 103, 104, 105, 106];
+}
+
+export function evaluateExam(
+  weights: EvolutionWeights,
+  ticks: number,
+  map: EvolutionMap = 'small',
+): GenerationExam {
+  const matches = examSeeds().map((seed) => {
+    const match = evaluateMatch(weights, [], seed, ticks, 0, map);
+    return {
+      seed,
+      fitness: match.fitness,
+      place: match.place,
+      goldOver5000S: match.maxGoldOver5000S,
+      unitUnder10S: match.maxUnitUnder10S,
+      won: match.won,
+      endTick: match.endTick,
+    };
+  });
+  return {
+    fitness: matches.reduce((sum, match) => sum + match.fitness, 0),
+    wins: matches.filter((match) => match.won).length,
+    matches,
+  };
+}
+
 export function createMatchup(
   hallOfFame: readonly EvolutionWeights[],
   fallbackWeights: EvolutionWeights,
@@ -257,6 +295,7 @@ async function writeGeneration(
   hallOfFame: readonly EvolutionWeights[],
   options: EvolutionOptions,
   durationMs: number,
+  exam: GenerationExam,
 ): Promise<void> {
   await mkdir(options.reportDirectory, { recursive: true });
   await mkdir(dirname(options.weightsPath), { recursive: true });
@@ -289,8 +328,42 @@ async function writeGeneration(
       `Среднее место популяции: ${result.metrics?.averagePlace ?? 0}`,
       `Время поколения: ${durationMs} мс`,
       '',
+      `Экзамен: fitness ${exam.fitness}, победы ${exam.wins}`,
+      ...exam.matches.map(
+        (match) =>
+          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
+      ),
+      '',
       '```json',
       JSON.stringify(result.weights, null, 2),
+      '```',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+}
+
+async function writeExamReport(
+  generation: number,
+  weights: EvolutionWeights,
+  exam: GenerationExam,
+  options: EvolutionOptions,
+): Promise<void> {
+  await mkdir(options.reportDirectory, { recursive: true });
+  await writeFile(
+    `${options.reportDirectory}/generation-${generation}.md`,
+    [
+      `# Экзамен весов, поколение ${generation}`,
+      '',
+      `Поколение: ${generation}`,
+      `Экзамен: fitness ${exam.fitness}, победы ${exam.wins}`,
+      ...exam.matches.map(
+        (match) =>
+          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
+      ),
+      '',
+      '```json',
+      JSON.stringify(weights, null, 2),
       '```',
       '',
     ].join('\n'),
@@ -320,6 +393,14 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
   let easyWeights = copyWeights(result.weights);
   const easyGeneration =
     evolutionOptions.easyGeneration ?? Math.max(1, Math.floor(evolutionOptions.generations / 3));
+  if (startGeneration === 0) {
+    await writeExamReport(
+      startGeneration,
+      result.weights,
+      evaluateExam(result.weights, evolutionOptions.ticks, evolutionOptions.map ?? 'small'),
+      evolutionOptions,
+    );
+  }
   for (let generation = 1; generation <= options.generations; generation += 1) {
     const started = Date.now();
     const evaluations = await evaluatePopulation(
@@ -365,6 +446,11 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
       },
     };
     if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
+    const exam = evaluateExam(
+      result.weights,
+      evolutionOptions.ticks,
+      evolutionOptions.map ?? 'small',
+    );
     await writeGeneration(
       result.generation,
       result,
@@ -373,6 +459,7 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
       hallOfFame,
       evolutionOptions,
       Date.now() - started,
+      exam,
     );
     const parentCount = Math.max(1, Math.floor(population.length / 2));
     population = Array.from({ length: population.length }, (_, index) => {

@@ -95,6 +95,10 @@ describe('эволюция весов бота', () => {
         JSON.parse(await readFile(join(directory, 'weights-4-easy.json'), 'utf8')),
       );
       const report = await readFile(join(directory, 'report-4', 'generation-2.md'), 'utf8');
+      const initialExam = await readFile(join(directory, 'report-4', 'generation-0.md'), 'utf8');
+      expect(initialExam.match(/Экзамен, сид /g)).toHaveLength(6);
+      expect(report.match(/Экзамен, сид /g)).toHaveLength(6);
+      expect(report).toContain('Экзамен: fitness');
       expect(report).toContain('Места лучшей особи:');
       expect(report).toContain('Победы популяции:');
       expect(JSON.parse(await readFile(join(directory, 'resume-4.json'), 'utf8'))).toMatchObject({
