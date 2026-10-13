@@ -33,7 +33,7 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 ## Следующая сессия
 
 - **06/T1j8-Б1 возвращена ревью:** профильный тест проходит, но нет синтетической проверки максимума штрафов по разным игрокам и полный `pnpm verify` после исправления не зелёный. Отчёт `docs/reports/stage-06-t1j8-b1.md`.
-- **Проверки 06/T1j8-Б1:** профильный тест — 11/11; benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — `budgetExceeded=false`, полный тик 30 ботов `meanMs=1.702`, 100 ботов `meanMs=10.492`; ранее `pnpm verify --changed` — `verify: OK (45 с)`, полный `pnpm verify` — `verify: OK (301 с)`.
+- **Проверки 06/T1j8-Б1:** профильный тест — 13/13; benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — `budgetExceeded=false`, полный тик 30 ботов `meanMs=1.702`, 100 ботов `meanMs=10.589`; ранее `pnpm verify --changed` — `verify: OK (45 с)`, полный `pnpm verify` — `verify: OK (301 с)`.
 - **Проверки после исправления 06/T1j8-Б1:** `pnpm verify --changed` — `verify: OK (54 с)`; полный `pnpm verify` заблокирован 13 таймаутами существующих долгих тестов и `spawn C:\Windows\system32\cmd.exe ENOENT`, тест `tools/evolve/src/index.test.ts` прошёл.
 - **Следующая работа:** 06/T1j8-Б1 — добавить недостающий тест и добиться зелёного полного `pnpm verify`; затем владелец удаляет результаты прогона 2026-10-13 и запускает T1i заново.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j8-b1.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/evolve/src/worker.ts`.
