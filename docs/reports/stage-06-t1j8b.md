@@ -7,3 +7,5 @@
 Проверки: профильный тест — 2/2; `pnpm verify --changed` — `verify: OK (27 с)`; `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — средний тик 1,671 мс для 30 игроков и 10,503 мс для 100 игроков, `budgetExceeded: false`; полный `pnpm verify` — `verify: OK (286 с)`.
 
 Полный `pnpm evolve` и ботоматчи не запускались: задача проверяет расчёт fitness и benchmark.
+
+Ревью: OK. Профильный тест — 2/2; `pnpm ai-check --changed` — OK; повторный benchmark — 1,662 мс для 30 игроков и 10,544 мс для 100 игроков, `budgetExceeded: false`; реальный путь `evaluateMatch` передаёт города кандидата в `calculateFitness`.
