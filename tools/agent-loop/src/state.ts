@@ -26,6 +26,8 @@ export interface LoopState {
   slowGreen?: string;
   /** Задачи, которые уже чинили по красному `slow`: второй красный — к владельцу. */
   slowFixes: string[];
+  /** Приёмочные тесты `$spec` по задаче: путь → содержимое; исполнитель коммитит их без изменений. */
+  spec: Record<string, Record<string, string>>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
 }
@@ -40,6 +42,7 @@ export async function loadState(root: string): Promise<LoopState> {
     answeredIssues: [],
     recentIssues: {},
     slowFixes: [],
+    spec: {},
     pullRequests: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {

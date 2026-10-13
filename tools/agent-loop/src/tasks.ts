@@ -14,6 +14,16 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import {
+  forgetSpec,
+  placeSpec,
+  setSpecAside,
+  specEnabled,
+  specFiles,
+  specViolation,
+  withSpec,
+  writeSpec,
+} from './spec.ts';
 import { commandTask, reviewTasks, taskMark } from './stage-file.ts';
 
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
@@ -95,8 +105,10 @@ async function runWork(
   accepted: Set<string>,
 ): Promise<Work> {
   const { git, state } = context;
-  const work = await session(context, 'next', prompt);
-  const dirty = (await dirtyFiles(git)) !== '';
+  const locked = specFiles(context, task);
+  const work = await session(context, 'next', withSpec(prompt, task, locked), locked);
+  // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
+  const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
   if (work.failure !== undefined) {
     if (dirty) state.resume = task;
     return step(
@@ -135,14 +147,27 @@ async function runWork(
   const [review] = waiting;
   if (review === undefined) return followUp(context, task, work.message, accepted);
   if (review !== task) await context.say(`${firstLine(prompt)} взял ${review} вместо ${task}`);
+  const violation = await specViolation(context, review);
+  if (violation !== undefined) return step(await park(context, `spec:${review}`, violation));
   return { kind: 'review', task: review };
 }
 
-/** `$review` в новой сессии; возвращает новую отметку задачи или шаг цикла. */
-async function runReview(context: LoopContext, task: string): Promise<'x' | ' ' | Step> {
+/** Вердикт `$review`: новая отметка задачи и ответ ревью (замечания к приёмочным тестам). */
+interface Verdict {
+  readonly mark: 'x' | ' ';
+  readonly message: string;
+}
+
+/** `$review` в новой сессии; возвращает вердикт или шаг цикла. */
+async function runReview(context: LoopContext, task: string): Promise<Verdict | Step> {
   const { git } = context;
   const base = await head(git);
-  const review = await session(context, 'review', `$review ${task}`);
+  const files = specFiles(context, task);
+  const prompt =
+    files.length === 0
+      ? `$review ${task}`
+      : `$review ${task}\nПриёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`;
+  const review = await session(context, 'review', prompt);
   if (review.failure !== undefined)
     return backoff(context, `$review ${task}: ${review.failure}`, review.message);
   // Ревью уже запушило коммит, поэтому откат здесь только развёл бы локальную и удалённую ветку.
@@ -160,8 +185,9 @@ async function runReview(context: LoopContext, task: string): Promise<'x' | ' ' 
   const mark = taskMark((await readStage(context.config.root)).stageText, task);
   // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
   const verdict = firstLine(review.message).replace(/[`*_]/g, '').trim();
-  if (mark === 'x' && /^OK(?![\p{L}\d])/u.test(verdict)) return 'x';
-  if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return ' ';
+  if (mark === 'x' && /^OK(?![\p{L}\d])/u.test(verdict))
+    return { mark: 'x', message: review.message };
+  if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return { mark: ' ', message: review.message };
   return park(
     context,
     `review:${task}`,
@@ -182,6 +208,29 @@ async function ciBeforeReview(context: LoopContext, task: string): Promise<Work 
   return step(await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''));
 }
 
+/** Замечание ревью к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ`. */
+const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
+
+/**
+ * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу
+ * или заново после замечаний ревью) и лежат в дереве. Доделка новых тестов не пишет.
+ * @returns шаг цикла при остановке или undefined.
+ */
+async function prepareSpec(
+  context: LoopContext,
+  task: string,
+  fresh: boolean,
+  remarks: string,
+): Promise<Step | undefined> {
+  if (!specEnabled(context)) return undefined;
+  if (fresh && !(task in context.state.spec)) {
+    const stop = await writeSpec(context, task, remarks);
+    if (stop !== undefined) return stop;
+  }
+  await placeSpec(context, task);
+  return undefined;
+}
+
 /**
  * Круги одной задачи, не больше maxRounds ВОЗВРАТ. `workPrompt` — `$next` для очереди
  * или `$task NN/Tn` для Issue; `resume` — начать с доделки незакоммиченной работы.
@@ -198,7 +247,12 @@ export async function processTask(
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
+  let remarks = '';
   for (let round = 1; round <= config.maxRounds;) {
+    if (needsWork && options.workPrompt === '$next') {
+      const stop = await prepareSpec(context, current, prompt === '$next', remarks);
+      if (stop !== undefined) return { step: stop, done: false };
+    }
     const work = needsWork
       ? await runWork(context, current, prompt, accepted)
       : { kind: 'review' as const, task: current };
@@ -222,11 +276,15 @@ export async function processTask(
       continue;
     }
     const verdict = await runReview(context, current);
-    if (verdict === 'x') {
+    if (typeof verdict === 'string') return { step: verdict, done: false };
+    if (verdict.mark === 'x') {
+      await forgetSpec(context, current);
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
     }
-    if (verdict !== ' ') return { step: verdict, done: false };
+    // Ревью нашло, что приёмочные тесты не совпадают с задачей: они пишутся заново.
+    remarks = SPEC_REMARK_RE.test(verdict.message) ? verdict.message : '';
+    if (remarks !== '') await forgetSpec(context, current);
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;
     round += 1;

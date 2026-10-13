@@ -2,10 +2,15 @@ import { execFileSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 
-function runHook(role: string | undefined, command: string, toolName = 'Bash'): string {
+function runHook(
+  role: string | undefined,
+  command: string,
+  toolName = 'Bash',
+  locked = '',
+): string {
   return execFileSync('node', ['.codex/hooks/agent-permissions.mjs'], {
     cwd: process.cwd(),
-    env: { ...process.env, AGENT_ROLE: role ?? '' },
+    env: { ...process.env, AGENT_ROLE: role ?? '', AGENT_LOCKED: locked },
     input: JSON.stringify({ tool_name: toolName, tool_input: { command } }),
     encoding: 'utf8',
   });
@@ -58,5 +63,27 @@ describe('права агентной роли', () => {
 
   it('пропускает stop-хук для reviewer', () => {
     expect(runStopHook('reviewer')).toBe(0);
+  });
+
+  it('пропускает stop-хук для spec: его приёмочные тесты нарочно красные', () => {
+    expect(runStopHook('spec')).toBe(0);
+  });
+
+  it('spec пишет только тесты, не код', () => {
+    expect(runHook('spec', 'echo x > packages/sim/test/new-rule.test.ts')).toBe('');
+    expect(runHook('spec', 'echo x > tools/evolve/src/exam.test.ts')).toBe('');
+    const output = runHook('spec', 'echo x > packages/sim/src/step.ts');
+    expect(JSON.parse(output).hookSpecificOutput.permissionDecision).toBe('deny');
+  });
+
+  it('исполнитель не может менять приёмочные тесты из AGENT_LOCKED, остальное — может', () => {
+    const locked = 'packages/sim/test/new-rule.test.ts\ntools/evolve/src/exam.test.ts';
+    const patch = '*** Begin Patch\n*** Update File: tools/evolve/src/exam.test.ts';
+    const output = runHook(undefined, patch, 'apply_patch', locked);
+    expect(JSON.parse(output).hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(JSON.parse(output).hookSpecificOutput.permissionDecisionReason).toContain(
+      'приёмочные тесты задачи менять нельзя',
+    );
+    expect(runHook(undefined, 'echo x > packages/sim/src/step.ts', 'Bash', locked)).toBe('');
   });
 });

@@ -1,7 +1,7 @@
 // Подменный мир для тестов цикла: git, codex, ci:wait и GitHub в памяти, файлы этапа во временной папке.
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { runAgentLoop, type CommandResult } from './agent-loop.ts';
 import type { AgentIssue, GithubClient } from './github.ts';
@@ -38,6 +38,8 @@ export interface Session {
   /** Файлы последнего коммита (для проверки прав ревью). */
   readonly files?: readonly string[];
   readonly dirty?: boolean;
+  /** Файлы, которые сессия пишет на диск (путь → текст); при коммите они уходят в HEAD. */
+  readonly writes?: Readonly<Record<string, string>>;
   readonly status?: string;
   readonly stage?: string;
   /** Сессия переключила ветку (шаг 7 `$stage-close`). */
@@ -51,6 +53,8 @@ export interface World {
   readonly ci?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
   readonly slow?: readonly string[];
+  /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
+  readonly spec?: boolean;
   /** Трейлер `Этап:` коммита HEAD. */
   readonly headTrailer?: string;
   readonly status?: string;
@@ -77,6 +81,8 @@ export interface Outcome {
   code: number;
   readonly prompts: string[];
   readonly roles: (string | undefined)[];
+  /** `AGENT_LOCKED` каждой сессии codex. */
+  readonly locked: string[];
   readonly codexArguments: (readonly string[])[];
   readonly lines: string[];
   readonly comments: string[];
@@ -112,11 +118,15 @@ export async function runWorld(world: World): Promise<Outcome> {
     JSON.stringify({
       next: { model: 'luna', reasoningEffort: 'medium' },
       review: { reasoningEffort: 'medium' },
+      ...(world.spec === true ? { spec: { reasoningEffort: 'medium' } } : {}),
     }),
   );
   await writeFile(
     join(root, 'tools/agent-loop/permissions.json'),
-    JSON.stringify({ reviewer: ['docs/stages/**', 'docs/STATUS.md', 'docs/reports/**'] }),
+    JSON.stringify({
+      reviewer: ['docs/stages/**', 'docs/STATUS.md', 'docs/reports/**'],
+      spec: ['**/*.test.ts', '**/test/**'],
+    }),
   );
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
@@ -126,6 +136,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     code: 0,
     prompts: [],
     roles: [],
+    locked: [],
     codexArguments: [],
     lines: [],
     comments: [],
@@ -145,6 +156,19 @@ export async function runWorld(world: World): Promise<Outcome> {
   let dirty = world.dirty === true ? ' M packages/sim/src/bots/weights.json' : '';
   let files: readonly string[] = [];
   let pushes = 0;
+  // Файлы сессий вне файлов этапа: что лежит на диске и что закоммичено в HEAD.
+  const tracked = new Set<string>();
+  const committed = new Map<string, string>();
+  const fileStatus = async (): Promise<string[]> => {
+    const lines: string[] = [];
+    for (const path of tracked) {
+      const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
+      const saved = committed.get(path);
+      if (text === saved) continue;
+      lines.push(`${saved === undefined ? '??' : text === undefined ? ' D' : ' M'} ${path}`);
+    }
+    return lines;
+  };
   const commit = (number: string): number => Number(number.replace(/^c/, ''));
   const codex = async (
     input: string,
@@ -154,6 +178,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     out.prompts.push(input);
     out.sleepsAtPrompt.push(out.sleeps);
     out.roles.push(env?.AGENT_ROLE);
+    out.locked.push(env?.AGENT_LOCKED ?? '');
     out.codexArguments.push(args);
     const session = sessions.shift();
     if (!session) throw new Error(`лишний вызов codex: ${input}`);
@@ -165,18 +190,34 @@ export async function runWorld(world: World): Promise<Outcome> {
     if (session.stage !== undefined) await writeFile(stagePath, session.stage);
     if (session.status !== undefined) await writeFile(statusPath, session.status);
     if (session.branch !== undefined) branch = session.branch;
+    for (const [path, text] of Object.entries(session.writes ?? {})) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+      tracked.add(path);
+    }
     const changed =
       session.mark !== undefined || session.stage !== undefined || session.status !== undefined;
-    if (session.commit ?? changed) head += 1;
+    if (session.commit ?? changed) {
+      head += 1;
+      for (const path of tracked) {
+        const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
+        if (text === undefined) committed.delete(path);
+        else committed.set(path, text);
+      }
+    }
     if (session.push !== false) origin = head;
     files = session.files ?? ['docs/stages/stage-06-bots-balance.md'];
     dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
-  const git = (args: readonly string[]): CommandResult => {
+  const git = async (args: readonly string[]): Promise<CommandResult> => {
     const [sub, first] = args;
     if (sub === 'branch') return ok(branch);
-    if (sub === 'status') return ok(dirty);
+    if (sub === 'status') return ok([dirty, ...(await fileStatus())].filter(Boolean).join('\n'));
+    if (sub === 'show') {
+      const text = committed.get(first?.replace(/^HEAD:/, '') ?? '');
+      return text === undefined ? { code: 128, stdout: '', stderr: 'нет в HEAD' } : ok(text);
+    }
     if (sub === 'fetch' || sub === 'merge' || sub === 'rebase') {
       if (sub !== 'fetch') head = Math.max(head, origin);
       return ok();

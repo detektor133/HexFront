@@ -3,7 +3,7 @@ import { appendFile, mkdir, readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import { minutes, runCodex, type AgentDefinitions, type Role, type Session } from './codex.ts';
-import { dirtyFiles, head, syncWithOrigin, type Git } from './git.ts';
+import { changedPaths, dirtyFiles, head, syncWithOrigin, type Git } from './git.ts';
 import type { GithubClient } from './github.ts';
 import type { RunCommand } from './process.ts';
 import { saveState, type LoopState } from './state.ts';
@@ -79,11 +79,16 @@ export async function backoff(context: LoopContext, reason: string, answer: stri
   return 'idle';
 }
 
-export async function session(context: LoopContext, role: Role, prompt: string): Promise<Session> {
+export async function session(
+  context: LoopContext,
+  role: Role,
+  prompt: string,
+  locked: readonly string[] = [],
+): Promise<Session> {
   const title = firstLine(prompt);
   const started = context.config.now();
   await context.say(`→ ${title} (новая сессия codex)`);
-  const result = await runCodex(context.config, context.definitions, role, prompt);
+  const result = await runCodex(context.config, context.definitions, role, prompt, locked);
   await context.say(
     `← ${title} за ${minutes(context.config.now() - started)}: ${firstLine(result.message)} (лог ${result.log})`,
   );
@@ -192,12 +197,15 @@ export async function readStage(root: string): Promise<StageState> {
   return { stage, status, stageText: await readFile(join(root, 'docs/stages', name), 'utf8') };
 }
 
-const globToRegExp = (glob: string): RegExp =>
+// Glob путей прав: `*` — внутри каталога, `**` — через каталоги, `**` со слешем — и без каталога.
+export const globToRegExp = (glob: string): RegExp =>
   new RegExp(
     `^${glob
       .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*\//g, '__ANY_DIRS__')
       .replace(/\*\*/g, '__DOUBLE_STAR__')
       .replace(/\*/g, '[^/]*')
+      .replace(/__ANY_DIRS__/g, '(?:.*/)?')
       .replace(/__DOUBLE_STAR__/g, '.*')}$`,
     'i',
   );
@@ -210,8 +218,8 @@ export async function checkPermissions(
 ): Promise<boolean> {
   const { git, config } = context;
   const names = await git.run(['diff', '--name-only', `${base}..HEAD`]);
-  const dirty = await dirtyFiles(git);
-  const changed = [...names.split(/\r?\n/), ...dirty.split(/\r?\n/).map((line) => line.slice(3))]
+  // Пути по одному на файл: `git run` обрезает пробел первой строки porcelain, slice(3) там врал.
+  const changed = [...names.split(/\r?\n/), ...(await changedPaths(git))]
     .map((name) => relative(config.root, join(config.root, name.trim())).replaceAll('\\', '/'))
     .filter(Boolean);
   return changed.every((name) => allowed.some((glob) => globToRegExp(glob).test(name)));

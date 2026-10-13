@@ -9,11 +9,16 @@ interface RoleConfig {
   readonly model?: string;
   readonly reasoningEffort: string;
 }
-/** `next` — сессии, которые пишут код и docs; `review` — только `$review`, с правами reviewer. */
-export type Role = 'next' | 'review';
+/**
+ * `next` — сессии, которые пишут код и docs; `review` — только `$review`, с правами reviewer;
+ * `spec` — `$spec`, только приёмочные тесты до кода.
+ */
+export type Role = 'next' | 'review' | 'spec';
 export interface AgentDefinitions {
-  readonly roles: Readonly<Record<Role, RoleConfig>>;
+  /** Роль `spec` необязательна: без неё в roles.json цикл не пишет приёмочные тесты до кода. */
+  readonly roles: Readonly<Record<'next' | 'review', RoleConfig>> & { readonly spec?: RoleConfig };
   readonly reviewerPaths: readonly string[];
+  readonly specPaths: readonly string[];
 }
 export interface CodexSettings {
   readonly root: string;
@@ -44,11 +49,15 @@ export async function loadAgentDefinitions(root: string): Promise<AgentDefinitio
     readFile(join(root, 'tools/agent-loop/permissions.json'), 'utf8'),
   ]);
   const roles = JSON.parse(rolesText) as Partial<Record<Role, RoleConfig>>;
-  const permissions = JSON.parse(permissionsText) as { readonly reviewer?: readonly string[] };
+  const permissions = JSON.parse(permissionsText) as {
+    readonly reviewer?: readonly string[];
+    readonly spec?: readonly string[];
+  };
   if (!roles.next || !roles.review) throw new Error('В roles.json нужны роли next и review');
   return {
-    roles: { next: roles.next, review: roles.review },
+    roles: { next: roles.next, review: roles.review, ...(roles.spec ? { spec: roles.spec } : {}) },
     reviewerPaths: permissions.reviewer ?? [],
+    specPaths: permissions.spec ?? [],
   };
 }
 
@@ -71,8 +80,11 @@ export async function runCodex(
   definitions: AgentDefinitions,
   role: Role,
   prompt: string,
+  /** Приёмочные тесты, которые сессия не может менять (`AGENT_LOCKED` для хука прав). */
+  locked: readonly string[] = [],
 ): Promise<Session> {
-  const roleConfig = definitions.roles[role];
+  const roleConfig = role === 'spec' ? definitions.roles.spec : definitions.roles[role];
+  if (roleConfig === undefined) throw new Error('В roles.json нет роли spec');
   const outputDir = await mkdtemp(join(tmpdir(), 'hexfront-agent-'));
   const outputFile = join(outputDir, 'last-message.txt');
   const started = settings.now();
@@ -100,7 +112,11 @@ export async function runCodex(
       {
         cwd: settings.root,
         // Роль задаётся явно: унаследованный AGENT_ROLE не должен ограничить или расширить сессию.
-        env: { ...process.env, AGENT_ROLE: role === 'review' ? 'reviewer' : '' },
+        env: {
+          ...process.env,
+          AGENT_ROLE: role === 'review' ? 'reviewer' : role === 'spec' ? 'spec' : '',
+          AGENT_LOCKED: locked.join('\n'),
+        },
         input: prompt,
         timeoutMs: settings.maxMinutes * 60_000,
       },

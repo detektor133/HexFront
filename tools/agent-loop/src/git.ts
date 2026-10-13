@@ -26,6 +26,16 @@ export const head = (git: Git): Promise<string> => git.run(['rev-parse', 'HEAD']
 /** @returns вывод `git status --porcelain`; пустая строка — дерево чистое. */
 export const dirtyFiles = (git: Git): Promise<string> => git.run(['status', '--porcelain']);
 
+/** @returns пути из `git status --porcelain`, по одному на файл (без слияния каталогов). */
+export async function changedPaths(git: Git): Promise<string[]> {
+  const status = await git.run(['status', '--porcelain', '--untracked-files=all']);
+  return status
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[ MADRCU?!]{1,2}\s+/, '').replace(/^.* -> /, ''))
+    .map((line) => line.trim().replace(/^"|"$/g, ''))
+    .filter(Boolean);
+}
+
 const isAncestor = async (git: Git, ancestor: string, descendant: string): Promise<boolean> =>
   (await git.attempt(['merge-base', '--is-ancestor', ancestor, descendant])).code === 0;
 

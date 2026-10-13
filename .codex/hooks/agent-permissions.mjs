@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 const role = process.env.AGENT_ROLE;
-if (!role) process.exit(0);
+// Приёмочные тесты задачи: агентный цикл передаёт их исполнителю, менять их нельзя никакой роли.
+const locked = (process.env.AGENT_LOCKED ?? '')
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+if (!role && locked.length === 0) process.exit(0);
 
 function readJson(path) {
   try {
@@ -13,7 +18,9 @@ function readJson(path) {
   }
 }
 
-const permissions = readJson(resolve(process.cwd(), 'tools/agent-loop/permissions.json'));
+const permissions = role
+  ? readJson(resolve(process.cwd(), 'tools/agent-loop/permissions.json'))
+  : {};
 function matches(glob, name) {
   const escaped = glob
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -22,8 +29,13 @@ function matches(glob, name) {
     .replaceAll('__DOUBLE_STAR__', '.*');
   return new RegExp(`^${escaped}$`, 'i').test(name);
 }
+const normalize = (name) =>
+  relative(process.cwd(), resolve(process.cwd(), name)).replaceAll('\\', '/');
 function allowed(name) {
-  const normalized = relative(process.cwd(), resolve(process.cwd(), name)).replaceAll('\\', '/');
+  const normalized = normalize(name);
+  if (locked.some((file) => normalize(file).toLowerCase() === normalized.toLowerCase()))
+    return false;
+  if (!role) return true;
   return permissions[role]?.some((glob) => matches(glob, normalized)) ?? false;
 }
 function deny(reason) {
@@ -84,5 +96,10 @@ const targets =
   event.tool_name === 'Bash'
     ? bashTargets(typeof input.command === 'string' ? input.command : '')
     : patchTargets(input);
-if (targets.some((target) => !allowed(target)))
-  deny(`AGENT_ROLE=${role} не может изменять: ${targets.join(', ')}`);
+const denied = targets.filter((target) => !allowed(target));
+if (denied.length > 0)
+  deny(
+    role
+      ? `AGENT_ROLE=${role} не может изменять: ${denied.join(', ')}`
+      : `приёмочные тесты задачи менять нельзя: ${denied.join(', ')}. Тест противоречит задаче — остановись и запиши вопрос`,
+  );
