@@ -25,5 +25,7 @@ describe('уровни тестов', () => {
     const all = testProjects(true).find((project) => project.test.root === 'packages/sim');
     expect(fast?.test.exclude).toContain('test/invariants/random-match.test.ts');
     expect(all?.test.exclude).not.toContain('test/invariants/random-match.test.ts');
+    expect(all?.test.testTimeout).toBe(120_000);
+    expect(fast?.test).not.toHaveProperty('testTimeout');
   });
 });

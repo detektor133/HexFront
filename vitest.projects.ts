@@ -39,6 +39,8 @@ export const SLOW_TESTS = [
   'tools/replay/src/acceptance.test.ts',
 ] as const;
 
+const SLOW_TEST_TIMEOUT_MS = 120_000;
+
 /** @returns проекты Vitest; `withSlow` — вместе с тяжёлыми файлами (`pnpm test:all`). */
 export function testProjects(withSlow: boolean) {
   return PROJECTS.map((root) => {
@@ -51,6 +53,10 @@ export function testProjects(withSlow: boolean) {
         root,
         include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
         exclude: ['test/fixtures/**', 'node_modules/**', ...(withSlow ? [] : slow)],
+        // Полный уровень: 5 с по умолчанию проверяли бы скорость раннера, а не код (replay
+        // acceptance шёл 4,5 с и падал по таймауту). Здесь таймаут — только защита от зависания,
+        // скорость меряет tools/bench. Проекты не наследуют корневой testTimeout.
+        ...(withSlow ? { testTimeout: SLOW_TEST_TIMEOUT_MS } : {}),
       },
     };
   });
