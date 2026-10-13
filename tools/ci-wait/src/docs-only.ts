@@ -44,6 +44,11 @@ const gitDiff = (before: string, sha: string): readonly string[] | undefined => 
   }
 };
 
+/** @returns файл workflow из `GITHUB_WORKFLOW_REF` (`owner/repo/.github/workflows/ci.yml@ref`). */
+export function workflowFile(ref: string | undefined): string | undefined {
+  return ref?.split('@', 1)[0]?.split('/').at(-1) || undefined;
+}
+
 async function main(): Promise<number> {
   const sha = process.env.GITHUB_SHA ?? '';
   const before = process.env.BEFORE_SHA;
@@ -51,10 +56,13 @@ async function main(): Promise<number> {
   console.log(`mode=${mode}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\n`);
   if (mode === 'full' || before === undefined) return 0;
-  console.log(`только служебные docs: результат берётся из CI ${before}`);
+  // Результат своего workflow: `ci` наследует быстрый прогон, `slow` — прогон всех тестов.
+  const workflow = workflowFile(process.env.GITHUB_WORKFLOW_REF);
+  console.log(`только служебные docs: результат берётся из ${workflow ?? 'CI'} ${before}`);
   return waitForCi({
     repo: process.env.GITHUB_REPOSITORY ?? '',
     sha: before,
+    ...(workflow === undefined ? {} : { workflow }),
     ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}),
   });
 }

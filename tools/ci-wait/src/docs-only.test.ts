@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyFiles, decideMode } from './docs-only.ts';
+import { classifyFiles, decideMode, workflowFile } from './docs-only.ts';
 
 const push = (files: readonly string[] | undefined, before = 'abc') =>
   decideMode({ event: 'push', before, sha: 'def', diff: () => files });
@@ -53,5 +53,16 @@ describe('режим CI для docs-пуша', () => {
     expect(push(['tools/evolve/src/evaluate.ts', 'docs/stages/stage-06-bots-balance.md'])).toBe(
       'full',
     );
+  });
+});
+
+describe('workflow docs-пуша', () => {
+  it.each([
+    ['detektor133/HexFront/.github/workflows/ci.yml@refs/heads/stage-06', 'ci.yml'],
+    ['detektor133/HexFront/.github/workflows/slow.yml@refs/heads/stage-06', 'slow.yml'],
+    [undefined, undefined],
+    ['', undefined],
+  ])('%s → %s: наследует результат своего workflow', (ref, expected) => {
+    expect(workflowFile(ref)).toBe(expected);
   });
 });

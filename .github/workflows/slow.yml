@@ -1,0 +1,41 @@
+name: slow
+
+# Все тесты, включая тяжёлые (SLOW_TESTS в vitest.projects.ts), и покрытие sim.
+# Идёт параллельно с ci.yml на каждый push; агентный цикл его не ждёт перед ревью,
+# красный прогон ставит исправление первым, `$stage-close` требует его зелёным.
+on:
+  push:
+    branches: [main, 'stage-*']
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # Пуш только служебных docs наследует результат предыдущего прогона slow.
+      - id: scope
+        run: node --experimental-strip-types tools/ci-wait/src/docs-only.ts
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: steps.scope.outputs.mode == 'full'
+        uses: pnpm/action-setup@v4
+      - if: steps.scope.outputs.mode == 'full'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.scope.outputs.mode == 'full'
+        run: pnpm install --frozen-lockfile
+      - if: steps.scope.outputs.mode == 'full'
+        run: pnpm test:all

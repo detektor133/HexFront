@@ -42,7 +42,7 @@ CMD ["dist/main.js"]
 
 1. `pnpm install --frozen-lockfile`
 2. `pnpm typecheck` · `pnpm lint` · `pnpm depcheck` (dependency-cruiser)
-3. `pnpm test` (Vitest, включая property- и golden-тесты)
+3. `pnpm test` — быстрый уровень (workflow `ci`); `pnpm test:all` — все тесты с property-, golden- и покрытием (workflow `slow`, параллельно), см. `docs/testing.md`, «Уровни тестов»
 4. `pnpm test:visual` (Playwright, скриншоты) — начиная с этапа 04
 5. `pnpm bench:sim` — провал, если `step` p99 > 10 мс на эталонном сценарии
 6. Сборка Docker-образа (этап 09+), пуш в GHCR по тегу

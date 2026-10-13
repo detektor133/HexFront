@@ -157,9 +157,9 @@ describe('ожидание GitHub Actions', () => {
     expect(code).toBe(1);
     expect(delays).toEqual([30_000, 30_000]);
     expect(output).toEqual([
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 0',
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 30',
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 60',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 0',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 30',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 60',
       'failure run=not-found sha=abc123',
     ]);
   });
@@ -252,5 +252,27 @@ describe('ожидание GitHub Actions', () => {
       'лог упавшего job не получен: сеть: TypeError: fetch failed',
       'failure job=tests https://github.com/acme/game/actions/runs/42',
     ]);
+  });
+});
+
+describe('выбор workflow', () => {
+  it.each([
+    [undefined, '/actions/workflows/ci.yml/runs?head_sha=abc123'],
+    ['slow.yml', '/actions/workflows/slow.yml/runs?head_sha=abc123'],
+  ])('workflow %s опрашивает только свои прогоны', async (workflow, path) => {
+    const urls: string[] = [];
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      ...(workflow === undefined ? {} : { workflow }),
+      fetchFn: async (url: string): Promise<HttpResponse> => {
+        urls.push(url);
+        return jsonResponse({ workflow_runs: [run('completed', 'success')] });
+      },
+      writeLine: () => undefined,
+    });
+
+    expect(code).toBe(0);
+    expect(urls).toEqual([`https://api.github.com/repos/acme/game${path}&per_page=10`]);
   });
 });

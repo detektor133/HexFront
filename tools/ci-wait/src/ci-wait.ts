@@ -35,6 +35,8 @@ interface WorkflowJobsPayload {
 export interface WaitForCiOptions {
   readonly repo: string;
   readonly sha: string;
+  /** Файл workflow: `ci.yml` — быстрые проверки (по умолчанию), `slow.yml` — все тесты. */
+  readonly workflow?: string;
   readonly token?: string;
   readonly fetchFn?: FetchFn;
   readonly sleep?: (ms: number) => Promise<void>;
@@ -46,6 +48,7 @@ export interface WaitForCiOptions {
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
+export const DEFAULT_WORKFLOW = 'ci.yml';
 const SUCCESSFUL_JOB_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
 
 /** @returns GitHub-репозиторий в формате owner/repo. */
@@ -144,6 +147,8 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const apiBase = `https://api.github.com/repos/${options.repo}`;
+  // Прогоны только своего workflow: иначе ожидание быстрого CI взяло бы прогон `slow`.
+  const runsUrl = `${apiBase}/actions/workflows/${options.workflow ?? DEFAULT_WORKFLOW}/runs?head_sha=${encodeURIComponent(options.sha)}`;
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'hexfront-ci-wait',
@@ -156,11 +161,7 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   while (true) {
     let lastError: string | undefined;
     try {
-      const response = await request(
-        fetchFn,
-        `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}&per_page=10`,
-        headers,
-      );
+      const response = await request(fetchFn, `${runsUrl}&per_page=10`, headers);
       const payload = (await response.json()) as WorkflowRunsPayload;
       lastRun = findRun(payload.workflow_runs ?? [], options.sha) ?? lastRun;
     } catch (error) {
@@ -176,8 +177,7 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
     }
 
     const elapsedMs = now() - startedAt;
-    const pendingUrl =
-      lastRun?.html_url ?? `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}`;
+    const pendingUrl = lastRun?.html_url ?? runsUrl;
     const error = lastError === undefined ? '' : ` error=${lastError}`;
     writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}${error}`);
     if (elapsedMs >= timeoutMs) {

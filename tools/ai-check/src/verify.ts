@@ -1,7 +1,8 @@
 // Единая проверка для AI-агента: build → типы → lint → тесты → visual.
 // Полный вывод шагов — в .ai-logs/verify-<время>.log, в консоль — итог до 20 строк и путь к логу.
 // Запуск: pnpm verify [--changed]
-//   (без флага)  — весь репозиторий, все тесты, visual;
+//   (без флага)  — весь репозиторий, быстрые тесты (без SLOW_TESTS из vitest.projects.ts), visual;
+//                  тяжёлые тесты идут только в CI, workflow `slow`;
 //   --changed    — lint только изменённых файлов, тесты, затронутые изменениями, visual — если
 //                  менялся код клиента или пакетов (иначе кадры не могли измениться).
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -63,7 +64,7 @@ function buildSteps(): Step[] {
   steps.push({
     name: 'tests',
     cmd: 'pnpm',
-    args: ['exec', 'vitest', 'run', ...(changedOnly ? ['--changed', 'HEAD'] : ['--coverage'])],
+    args: ['exec', 'vitest', 'run', ...(changedOnly ? ['--changed', 'HEAD'] : [])],
   });
   if (files === null || files.some((f) => VISUAL_RE.test(f))) {
     steps.push({ name: 'visual', cmd: 'pnpm', args: ['-s', 'visual'] });
