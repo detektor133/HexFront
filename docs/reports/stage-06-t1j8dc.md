@@ -14,3 +14,9 @@
 
 - `pnpm verify --changed`: `verify: OK (46 с)`.
 - `pnpm verify`: `verify: OK (289 с)`.
+
+## Ревью
+
+- Принято: профильный `tools/evolve/src/index.test.ts` — 9/9.
+- Benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1`: 30 игроков — `step.meanMs = 1.609`, `step.p95Ms = 2.654`; 100 игроков — `step.meanMs = 10.421`, `step.p95Ms = 15.844`; бюджеты не превышены.
+- Запреты проверены по изменённым файлам: новых зависимостей, изменения sigma/μ,λ-отбора, элиты, параметров T1i и критериев `$accept 06/T1` нет; полный `pnpm evolve` не запускался.
