@@ -171,13 +171,17 @@ function examSeeds(): number[] {
   return [101, 102, 103, 104, 105, 106];
 }
 
+export function examCandidateSlotForSeed(seed: number): number {
+  return examSeeds().indexOf(seed);
+}
+
 export function evaluateExam(
   weights: EvolutionWeights,
   ticks: number,
   map: EvolutionMap = 'small',
 ): GenerationExam {
   const matches = examSeeds().map((seed) => {
-    const match = evaluateMatch(weights, [], seed, ticks, 0, map);
+    const match = evaluateMatch(weights, [], seed, ticks, examCandidateSlotForSeed(seed), map);
     return {
       seed,
       fitness: match.fitness,

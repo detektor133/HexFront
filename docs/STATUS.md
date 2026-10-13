@@ -34,8 +34,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки 06/T1j8db:** `pnpm verify --changed` — код 0; полный `pnpm verify` — код 0, типы и lint прошли; `pnpm exec vitest run tools/evolve/src/index.test.ts` — 8/8.
 - **06/T1j8dc принята ревью:** `weights.json` сохраняет лучшую по экзамену особь за весь прогон; `weights-easy.json` сохраняется по прежнему правилу; состояние resume содержит лучшую экзаменационную оценку и веса. Отчёт `docs/reports/stage-06-t1j8dc.md`.
 - **Проверки 06/T1j8dc:** профильный тест — 9/9; benchmark 30/100 игроков — `step.meanMs = 1.609/10.421`, `step.p95Ms = 2.654/15.844`, бюджеты не превышены; ранее записанный `pnpm verify` — `verify: OK (289 с)`.
-- **06/T1j8dd возвращена ревью:** `tools/evolve/src/index.ts:180` передаёт `candidateSlot = 0` для всех экзаменационных сидов; критерий T1j8d о шести слотах не выполнен. Профильный тест — 9/9; новый минутный замер 30/100 игроков — `step.meanMs = 1.659/10.588`, `step.p95Ms = 2.759/16.489`, `budgetExceeded = false`.
-- **Следующее действие:** исправить распределение экзаменационных матчей по слотам и повторить `$review 06/T1j8dd`.
+- **06/T1j8dd исправлена и ждёт ревью:** экзаменационные сиды `101–106` распределяются по слотам `0–5`; добавлен регрессионный тест. Отчёт `docs/reports/stage-06-t1j8dd.md`.
+- **Проверки 06/T1j8dd:** `pnpm verify --changed` — `verify: OK (46 с)`; benchmark 30 игроков — `step.meanMs = 1.721`, `step.p95Ms = 2.866`, `budgetExceeded = false`; полный `pnpm verify` — `verify: OK (291 с)`.
+- **Следующее действие:** запусти `$review 06/T1j8dd` в новой сессии.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/index.test.ts`, `docs/reports/stage-06-t1j8db.md`.
 - **06/T1j8d разбита:** T1j8da — экзамен и отчёты, T1j8db — остановка без прогресса и `--resume`, T1j8dc — лучшие веса, T1j8dd — проверка родителя; T1j8dd ждёт ревью.
 - **06/T1j8c принята ревью:** `goldSeconds` заменён на fixed-point `goldShare` относительно стоимости армии; положительный `effects.cost` ограничивает суммарные расходы действий. Профильные тесты — 15/15; benchmark 30/100 игроков — 1,603/10,228 мс среднего тика, бюджеты не превышены. Отчёт `docs/reports/stage-06-t1j8c.md`. Следующая задача — 06/T1j8d.

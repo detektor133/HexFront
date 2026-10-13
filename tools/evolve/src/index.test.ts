@@ -5,7 +5,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calculateCandidateFitness, candidateSlotForSeed, loadEvolutionMap } from './evaluate.ts';
-import { createMatchup, parseOptions, runEvolution, shouldStopForNoExamProgress } from './index.ts';
+import {
+  createMatchup,
+  examCandidateSlotForSeed,
+  parseOptions,
+  runEvolution,
+  shouldStopForNoExamProgress,
+} from './index.ts';
 
 describe('эволюция весов бота', () => {
   it('разбирает параметры μ,λ-ES и resume', () => {
@@ -64,6 +70,12 @@ describe('эволюция весов бота', () => {
 
   it('меняет место особи между сидами', () => {
     expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
+  });
+
+  it('распределяет экзаменационные сиды по шести слотам', () => {
+    expect([101, 102, 103, 104, 105, 106].map(examCandidateSlotForSeed)).toEqual([
+      0, 1, 2, 3, 4, 5,
+    ]);
   });
 
   it('использует один набор соперников для всех особей поколения', () => {
