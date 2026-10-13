@@ -49,6 +49,10 @@ export interface Session {
 export interface World {
   readonly sessions: readonly Session[];
   readonly ci?: readonly string[];
+  /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
+  readonly slow?: readonly string[];
+  /** Трейлер `Этап:` коммита HEAD. */
+  readonly headTrailer?: string;
   readonly status?: string;
   readonly stage?: string;
   readonly maxRounds?: number;
@@ -81,6 +85,8 @@ export interface Outcome {
   readonly pulls: string[];
   pushes: number;
   ciCalls: number;
+  /** Вызовы `ci:wait` для workflow `slow` с аргументами. */
+  readonly slowCalls: string[];
   sleeps: number;
   checks: number;
   /** Сколько пауз прошло к началу каждой сессии codex. */
@@ -114,6 +120,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   );
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
+  const slow = [...(world.slow ?? [])];
   const issues = [...(world.issues ?? [])];
   const out: Outcome = {
     code: 0,
@@ -127,6 +134,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     pulls: [],
     pushes: 0,
     ciCalls: 0,
+    slowCalls: [],
     sleeps: 0,
     checks: 0,
     sleepsAtPrompt: [],
@@ -174,6 +182,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       return ok();
     }
     if (sub === 'remote') return ok('https://github.com/detektor133/HexFront.git');
+    if (sub === 'log') return ok(world.headTrailer ?? '');
     if (sub === 'rev-parse') return ok(`c${first?.startsWith('origin/') ? origin : head}`);
     if (sub === 'diff' && first === '--quiet')
       return { ...ok(), code: world.merged === true ? 0 : 1 };
@@ -241,6 +250,12 @@ export async function runWorld(world: World): Promise<Outcome> {
       ...(world.resume === undefined ? {} : { resume: world.resume }),
       github,
       runCommand: async (command, args, options) => {
+        if (command === 'pnpm' && args.includes('--workflow=slow.yml')) {
+          out.slowCalls.push(args.slice(1).join(' '));
+          const line = slow.shift() ?? 'success https://slow/1';
+          const code = line.startsWith('success') ? 0 : line.startsWith('pending') ? 3 : 1;
+          return { code, stdout: line, stderr: '' };
+        }
         if (command === 'pnpm') {
           out.ciCalls += 1;
           const line = ci.shift() ?? 'success https://ci/1';

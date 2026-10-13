@@ -44,6 +44,8 @@ export interface WaitForCiOptions {
   readonly writeLine?: (line: string) => void;
   readonly pollIntervalMs?: number;
   readonly timeoutMs?: number;
+  /** Один опрос без ожидания: незавершённый прогон — строка `pending` и код 3. */
+  readonly once?: boolean;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
@@ -137,7 +139,8 @@ const printFailedRun = async (
 
 /**
  * Ожидает GitHub Actions для SHA не дольше заданного таймаута, миллисекунды.
- * @returns 0 — CI зелёный, 1 — CI красный или не дождались, 2 — GitHub недоступен (CI не проверен).
+ * @returns 0 — CI зелёный, 1 — CI красный или не дождались, 2 — GitHub недоступен (CI не проверен),
+ *   3 — при `once` прогон ещё идёт или не создан.
  */
 export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   const fetchFn = options.fetchFn ?? defaultFetch;
@@ -180,6 +183,11 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
     const pendingUrl = lastRun?.html_url ?? runsUrl;
     const error = lastError === undefined ? '' : ` error=${lastError}`;
     writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}${error}`);
+    if (options.once === true) {
+      if (lastError === undefined) return 3;
+      writeLine(`error ${lastError}`);
+      return 2;
+    }
     if (elapsedMs >= timeoutMs) {
       if (lastError !== undefined) {
         writeLine(`error ${lastError}`);

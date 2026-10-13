@@ -13,6 +13,7 @@ import {
 import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
+import { slowGate } from './slow.ts';
 import { closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
@@ -90,6 +91,8 @@ async function tick(context: LoopContext): Promise<Step> {
   if (closed !== undefined) return closedStage(context, closed);
   const { parked } = state;
   if (parked && !SELF_CLEARING.test(parked.key) && parked.head === (await head(git))) return 'idle';
+  const slow = await slowGate(context);
+  if (slow !== undefined) return slow;
   const task = selectTask(stage.status, stage.stageText);
   if (task === undefined) return closeStage(context, stage);
   const block = taskBlock(stage.stageText, task);

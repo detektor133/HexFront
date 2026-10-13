@@ -276,3 +276,45 @@ describe('выбор workflow', () => {
     expect(urls).toEqual([`https://api.github.com/repos/acme/game${path}&per_page=10`]);
   });
 });
+
+describe('один опрос', () => {
+  const once = (response: HttpResponse | Error) => {
+    const output: string[] = [];
+    const result = waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      once: true,
+      fetchFn: async (): Promise<HttpResponse> => {
+        if (response instanceof Error) throw response;
+        return response;
+      },
+      sleep: async (): Promise<void> => {
+        throw new Error('один опрос не ждёт');
+      },
+      writeLine: (line: string) => output.push(line),
+    });
+    return { result, output };
+  };
+
+  it('идущий прогон — код 3 и строка pending, без ожидания', async () => {
+    const { result, output } = once(jsonResponse({ workflow_runs: [run('in_progress')] }));
+    expect(await result).toBe(3);
+    expect(output).toEqual(['pending https://github.com/acme/game/actions/runs/42 0']);
+  });
+
+  it('ещё не созданный прогон — тоже код 3, а не красный CI', async () => {
+    const { result } = once(jsonResponse({ workflow_runs: [] }));
+    expect(await result).toBe(3);
+  });
+
+  it('завершённый зелёный — код 0', async () => {
+    const { result } = once(jsonResponse({ workflow_runs: [run('completed', 'success')] }));
+    expect(await result).toBe(0);
+  });
+
+  it('сбой сети — код 2 и строка error', async () => {
+    const { result, output } = once(new TypeError('fetch failed'));
+    expect(await result).toBe(2);
+    expect(output.at(-1)).toBe('error сеть: TypeError: fetch failed');
+  });
+});

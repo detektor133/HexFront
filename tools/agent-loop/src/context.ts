@@ -113,24 +113,66 @@ export async function waitCi(context: LoopContext, label: string): Promise<CiRes
   const { config, say, state } = context;
   const started = config.now();
   await say(`… жду CI ${label}`);
-  const wait = async (): Promise<CiResult> => {
-    const ci = await config.runCommand('pnpm', ['ci:wait'], {
-      cwd: config.root,
-      timeoutMs: CI_TIMEOUT_MS,
-    });
-    const line = ciLine(ci.stdout);
-    if (ci.code === 0) return { verdict: 'green', line };
-    return { verdict: line.startsWith('failure job=') ? 'red' : 'unknown', line };
-  };
-  let ci = await wait();
-  if (ci.verdict === 'unknown') ci = await wait();
-  const words = { green: 'зелёный', red: 'красный', unknown: 'не проверен' } as const;
-  await say(`CI ${words[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
+  let ci = await ciWait(context, [], CI_TIMEOUT_MS);
+  if (ci.verdict === 'unknown') ci = await ciWait(context, [], CI_TIMEOUT_MS);
+  await say(`CI ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
   if (ci.verdict === 'green') {
     state.greenHead = await head(context.git);
     await save(context);
   }
   return ci;
+}
+
+const CI_WORDS = { green: 'зелёный', red: 'красный', unknown: 'не проверен' } as const;
+/** Прогон всех тестов идёт дольше быстрого CI: random-match один — 4–5 мин. */
+const SLOW_TIMEOUT_MS = 25 * 60_000;
+const SLOW_ARGS = ['--workflow=slow.yml'];
+
+async function ciWait(
+  context: LoopContext,
+  args: readonly string[],
+  timeoutMs: number,
+): Promise<CiResult & { readonly pending: boolean }> {
+  const { config } = context;
+  const ci = await config.runCommand('pnpm', ['ci:wait', ...args], { cwd: config.root, timeoutMs });
+  const line = ciLine(ci.stdout);
+  if (ci.code === 0) return { verdict: 'green', line, pending: false };
+  // Код 3 — `--once`: прогон ещё идёт. Это не красный CI и не сбой.
+  if (ci.code === 3) return { verdict: 'unknown', line, pending: true };
+  return { verdict: line.startsWith('failure job=') ? 'red' : 'unknown', line, pending: false };
+}
+
+/**
+ * Workflow `slow` (все тесты) на HEAD одним опросом, без ожидания: цикл его не ждёт перед
+ * ревью. Зелёный HEAD запоминается, чтобы не спрашивать GitHub на каждом шаге.
+ */
+export async function pollSlow(context: LoopContext): Promise<CiResult> {
+  const current = await head(context.git);
+  if (context.state.slowGreen === current) return { verdict: 'green', line: '' };
+  const ci = await ciWait(context, [...SLOW_ARGS, '--once'], CI_TIMEOUT_MS);
+  if (ci.verdict === 'green') {
+    context.state.slowGreen = current;
+    await save(context);
+  }
+  return { verdict: ci.verdict, line: ci.line };
+}
+
+/** Ждёт `slow` на HEAD до конца: перед `$stage-close` этап закрывается только на зелёном. */
+export async function waitSlow(context: LoopContext, label: string): Promise<CiResult> {
+  const { config, say } = context;
+  const started = config.now();
+  await say(`… жду slow ${label}`);
+  const ci = await ciWait(
+    context,
+    [...SLOW_ARGS, `--timeout-minutes=${SLOW_TIMEOUT_MS / 60_000}`],
+    SLOW_TIMEOUT_MS + 60_000,
+  );
+  await say(`slow ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
+  if (ci.verdict === 'green') {
+    context.state.slowGreen = await head(context.git);
+    await save(context);
+  }
+  return { verdict: ci.verdict, line: ci.line };
 }
 
 export interface StageState {

@@ -10,6 +10,7 @@ import {
 } from './context.ts';
 import { currentBranch, head, mergedIntoMain } from './git.ts';
 import { parseGithubRepo } from './github.ts';
+import { slowBeforeClose } from './slow.ts';
 import { closedStageBranch, openTasks, statusBranch } from './stage-file.ts';
 import { skillFailed } from './tasks.ts';
 
@@ -22,6 +23,8 @@ export async function closeStage(context: LoopContext, stage: StageState): Promi
       `queue:${stage.stage}`,
       `в очереди нет открытых задач, а в этапе ${stage.stage} открыты ${open.join(', ')} — нужна Issue $decide с очередью`,
     );
+  const slow = await slowBeforeClose(context);
+  if (slow !== undefined) return slow;
   await context.say(`этап ${stage.stage}: все задачи закрыты — $stage-close`);
   const result = await runSkill(context, 'next', '$stage-close');
   if (!result.ok) return skillFailed(context, '$stage-close', result);

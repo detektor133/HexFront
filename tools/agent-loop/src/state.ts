@@ -22,6 +22,10 @@ export interface LoopState {
   recentIssues: Record<string, { readonly updatedAt: string; readonly at: number }>;
   /** HEAD, для которого цикл сам видел зелёный CI: ревью этого HEAD CI не ждёт. */
   greenHead?: string;
+  /** HEAD, для которого цикл видел зелёный workflow `slow` (все тесты). */
+  slowGreen?: string;
+  /** Задачи, которые уже чинили по красному `slow`: второй красный — к владельцу. */
+  slowFixes: string[];
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
 }
@@ -35,6 +39,7 @@ export async function loadState(root: string): Promise<LoopState> {
     issueFailures: {},
     answeredIssues: [],
     recentIssues: {},
+    slowFixes: [],
     pullRequests: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
