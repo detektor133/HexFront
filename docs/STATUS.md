@@ -9,7 +9,7 @@
 | Ветка | `stage-06` |
 | Последнее обновление | 2026-10-13 |
 
-Очередь: 06/T1j8 → 06/T1i → 06/T1e → 06/T2
+Очередь: 06/T1j8a → 06/T1j8b → 06/T1j8c → 06/T1j8d → 06/T1j8e → 06/T1i → 06/T1e → 06/T2
 
 Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер → 10 веб-запуск → 11 мета. Этап 06: `docs/stages/stage-06-bots-balance.md`. Читать: `docs/gdd/09-bots.md` («Utility AI»), `docs/gdd/10-balance.md`, `docs/gdd/00-overview.md`, `docs/architecture/sim-core.md`.
 
