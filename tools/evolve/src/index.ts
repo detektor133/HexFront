@@ -29,6 +29,7 @@ interface ResumeState {
   readonly hallOfFame: readonly EvolutionWeights[];
   readonly seeds: readonly number[];
   readonly sigma: number;
+  readonly examFitnesses: readonly number[];
   readonly weights?: EvolutionWeights;
 }
 
@@ -40,6 +41,14 @@ interface GenerationExam {
   readonly fitness: number;
   readonly wins: number;
   readonly matches: readonly ExamMatch[];
+}
+
+export interface EvolutionDependencies {
+  readonly evaluateExam?: (
+    weights: EvolutionWeights,
+    ticks: number,
+    map: EvolutionMap,
+  ) => GenerationExam;
 }
 
 interface WorkerData {
@@ -184,6 +193,12 @@ export function evaluateExam(
   };
 }
 
+export function shouldStopForNoExamProgress(examFitnesses: readonly number[]): boolean {
+  const baseline = examFitnesses[1];
+  if (baseline === undefined || examFitnesses.length < 6) return false;
+  return examFitnesses.slice(2, 6).every((fitness) => fitness <= baseline);
+}
+
 export function createMatchup(
   hallOfFame: readonly EvolutionWeights[],
   fallbackWeights: EvolutionWeights,
@@ -284,6 +299,7 @@ async function loadResume(path: string): Promise<ResumeState> {
     hallOfFame: state.hallOfFame,
     seeds: state.seeds,
     sigma: state.sigma,
+    examFitnesses: state.examFitnesses ?? [],
   };
 }
 
@@ -296,6 +312,7 @@ async function writeGeneration(
   options: EvolutionOptions,
   durationMs: number,
   exam: GenerationExam,
+  examFitnesses: readonly number[],
 ): Promise<void> {
   await mkdir(options.reportDirectory, { recursive: true });
   await mkdir(dirname(options.weightsPath), { recursive: true });
@@ -308,7 +325,7 @@ async function writeGeneration(
   );
   await writeFile(
     options.statePath,
-    `${JSON.stringify({ generation, weights: result.weights, population: population.map((item) => item.weights), hallOfFame, seeds: seedsFor(options.seeds), sigma: options.sigma ?? 100 }, null, 2)}\n`,
+    `${JSON.stringify({ generation, weights: result.weights, population: population.map((item) => item.weights), hallOfFame, seeds: seedsFor(options.seeds), sigma: options.sigma ?? 100, examFitnesses }, null, 2)}\n`,
     'utf8',
   );
   await writeFile(
@@ -371,7 +388,11 @@ async function writeExamReport(
   );
 }
 
-export async function runEvolution(options: EvolutionOptions): Promise<EvolutionResult> {
+export async function runEvolution(
+  options: EvolutionOptions,
+  dependencies: EvolutionDependencies = {},
+): Promise<EvolutionResult> {
+  const examEvaluator = dependencies.evaluateExam ?? evaluateExam;
   const resume = options.resumePath === undefined ? null : await loadResume(options.resumePath);
   const evolutionOptions = resume
     ? { ...options, seeds: resume.seeds.length, sigma: resume.sigma }
@@ -391,15 +412,17 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
     weights: copyWeights(population[0]?.weights ?? {}),
   };
   let easyWeights = copyWeights(result.weights);
+  const examFitnesses = [...(resume?.examFitnesses ?? [])];
   const easyGeneration =
     evolutionOptions.easyGeneration ?? Math.max(1, Math.floor(evolutionOptions.generations / 3));
   if (startGeneration === 0) {
-    await writeExamReport(
-      startGeneration,
+    const initialExam = examEvaluator(
       result.weights,
-      evaluateExam(result.weights, evolutionOptions.ticks, evolutionOptions.map ?? 'small'),
-      evolutionOptions,
+      evolutionOptions.ticks,
+      evolutionOptions.map ?? 'small',
     );
+    examFitnesses.push(initialExam.fitness);
+    await writeExamReport(startGeneration, result.weights, initialExam, evolutionOptions);
   }
   for (let generation = 1; generation <= options.generations; generation += 1) {
     const started = Date.now();
@@ -446,23 +469,14 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
       },
     };
     if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
-    const exam = evaluateExam(
+    const exam = examEvaluator(
       result.weights,
       evolutionOptions.ticks,
       evolutionOptions.map ?? 'small',
     );
-    await writeGeneration(
-      result.generation,
-      result,
-      easyWeights,
-      population,
-      hallOfFame,
-      evolutionOptions,
-      Date.now() - started,
-      exam,
-    );
+    examFitnesses.push(exam.fitness);
     const parentCount = Math.max(1, Math.floor(population.length / 2));
-    population = Array.from({ length: population.length }, (_, index) => {
+    const nextPopulation = Array.from({ length: population.length }, (_, index) => {
       const parent = population[ranked[index % parentCount]?.index ?? best.index];
       return {
         index,
@@ -476,6 +490,21 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
               ),
       };
     });
+    await writeGeneration(
+      result.generation,
+      result,
+      easyWeights,
+      nextPopulation,
+      hallOfFame,
+      evolutionOptions,
+      Date.now() - started,
+      exam,
+      examFitnesses,
+    );
+    if (result.generation === 5 && shouldStopForNoExamProgress(examFitnesses)) {
+      throw new Error('нет прогресса по экзамену');
+    }
+    population = nextPopulation;
   }
   return result;
 }

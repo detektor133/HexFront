@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calculateCandidateFitness, candidateSlotForSeed, loadEvolutionMap } from './evaluate.ts';
-import { createMatchup, parseOptions, runEvolution } from './index.ts';
+import { createMatchup, parseOptions, runEvolution, shouldStopForNoExamProgress } from './index.ts';
 
 describe('эволюция весов бота', () => {
   it('разбирает параметры μ,λ-ES и resume', () => {
@@ -17,6 +17,50 @@ describe('эволюция весов бота', () => {
       expect.objectContaining({ resumePath: expect.stringContaining('resume.json') }),
     );
   });
+
+  it('останавливает прогон без улучшения экзамена после пятого поколения', () => {
+    expect(shouldStopForNoExamProgress([100, 100, 100, 100, 99, 100])).toBe(true);
+    expect(shouldStopForNoExamProgress([100, 100, 101, 100, 99, 100])).toBe(false);
+    expect(shouldStopForNoExamProgress([100, 100, 100, 100, 99])).toBe(false);
+  });
+
+  it('сохраняет состояние остановки и продолжает его с resume', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hexfront-evolve-stop-'));
+    let examCall = 0;
+    const exam = () => ({
+      fitness: [100, 90, 90, 90, 90, 90, 80][examCall++] ?? 80,
+      wins: 0,
+      matches: [],
+    });
+    const options = {
+      population: 2,
+      seeds: 1,
+      generations: 5,
+      workers: 1,
+      sigma: 3,
+      ticks: 1,
+      weightsPath: join(directory, 'weights.json'),
+      easyWeightsPath: join(directory, 'weights-easy.json'),
+      statePath: join(directory, 'resume.json'),
+      reportDirectory: join(directory, 'reports'),
+    };
+    try {
+      await expect(runEvolution(options, { evaluateExam: exam })).rejects.toThrow(
+        'нет прогресса по экзамену',
+      );
+      expect(JSON.parse(await readFile(options.statePath, 'utf8'))).toMatchObject({
+        generation: 5,
+        examFitnesses: [100, 90, 90, 90, 90, 90],
+      });
+      const resumed = await runEvolution(
+        { ...options, generations: 1, resumePath: options.statePath },
+        { evaluateExam: exam },
+      );
+      expect(resumed.generation).toBe(6);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   it('меняет место особи между сидами', () => {
     expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
