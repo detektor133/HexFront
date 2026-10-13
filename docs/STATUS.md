@@ -36,8 +36,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 - **Проверки 06/T1j8dc:** профильный тест — 9/9; benchmark 30/100 игроков — `step.meanMs = 1.609/10.421`, `step.p95Ms = 2.654/15.844`, бюджеты не превышены; ранее записанный `pnpm verify` — `verify: OK (289 с)`.
 - **06/T1j8dd принята ревью:** экзаменационные сиды `101–106` распределяются по слотам `0–5`; профильный тест подтверждает отображение на реальном пути `evaluateExam → evaluateMatch`.
 - **Проверки 06/T1j8dd:** ранее `pnpm verify --changed` и полный `pnpm verify` зелёные; повторный benchmark 30/100 игроков — `step.meanMs = 1.613/10.246`, `step.p95Ms = 2.639/15.446`, `budgetExceeded = false`.
-- **06/T1j8e ожидает ревью:** трассировка T1j8a–T1j8d сверена, полный `pnpm verify` и минутный benchmark зелёные. Отчёт `docs/reports/stage-06-t1j8e.md`.
-- **Проверки 06/T1j8e:** `pnpm verify` — `verify: OK (286 с)`; benchmark 30 игроков — `step.meanMs = 1.615`, `step.p95Ms = 2.716`, `budgetExceeded = false`; исходный CI зелёный.
+- **06/T1j8e принята ревью:** трассировка T1j8a–T1j8d сверена, полный `pnpm verify` и минутный benchmark зелёные. Отчёт `docs/reports/stage-06-t1j8e.md`.
+- **Проверки 06/T1j8e:** `pnpm verify` — `verify: OK (286 с)`; профильные тесты — 32/32; benchmark 30/100 игроков — `step.meanMs = 1.631/10.416`, `step.p95Ms = 2.656/15.623`, `budgetExceeded = false`; исходный CI зелёный.
 - **Следующая задача:** 06/T1i — запуск обучения владельцем с весами из репозитория.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/index.test.ts`, `docs/reports/stage-06-t1j8e.md`.
 - **06/T1j8d разбита:** T1j8da — экзамен и отчёты, T1j8db — остановка без прогресса и `--resume`, T1j8dc — лучшие веса, T1j8dd — проверка родителя; T1j8dd принята.

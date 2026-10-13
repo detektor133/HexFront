@@ -16,4 +16,11 @@
 - `pnpm verify`: `verify: OK (286 с)`; build, types, lint, prettier, tests и visual прошли.
 - `pnpm ci:wait` для исходного `HEAD`: зелёный CI.
 
+## Результат ревью
+
+- `pnpm exec vitest run` по тестам evolve, replay и бота: 6 файлов, 32 теста пройдены.
+- Повторный benchmark 30/100 игроков: `step.meanMs = 1.631/10.416`, `step.p95Ms = 2.656/15.623`, `budgetExceeded = false`.
+- Запреты и неизменяемые критерии проверены чтением diff и `rg`; нарушений не найдено.
+- T1j8 и T1j8e отмечены `[x]`.
+
 Этап: 06/T1j8e
