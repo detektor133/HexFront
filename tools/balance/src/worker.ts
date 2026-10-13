@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
 
 import type { BalanceMetrics, BalanceStartPositionResult, BalanceTimelinePoint } from './index.ts';
+import { neutralHexMetrics, shouldContinueMatch } from './metrics.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   botCommands,
@@ -67,16 +68,16 @@ function recordMetrics(): void {
     timeline.push({ tick: state.tick, populationMean: meanPopulation(), goldMean: meanGold() });
   }
   if (state.tick === 1800) {
-    const neutralHexes = state.hexes.owner.reduce((sum, owner) => sum + (owner === -1 ? 1 : 0), 0);
+    const { neutralHexes, totalHexes } = neutralHexMetrics(state.hexes.owner, state.map.terrain);
     neutralHexShareAt3Min = {
       tick: state.tick,
       neutralHexes,
-      totalHexes: state.hexes.owner.length,
+      totalHexes,
     };
   }
 }
 
-for (let tick = 0; tick < data.ticks; tick += 1) {
+while (shouldContinueMatch(state.tick, state.winner, data.ticks)) {
   const context = createBotTickContext(state);
   step(state, [...commanderCommands(state, bots, context), ...botCommands(state, bots, context)]);
   recordMetrics();
