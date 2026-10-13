@@ -61,16 +61,14 @@ function rankOptions(
 function optionContext(snapshot: ReturnType<typeof createBotSnapshot>): ActionFeatureContext {
   return {
     threat: snapshot.threat,
-    goldSeconds: snapshot.goldSeconds,
+    goldShare: snapshot.goldShare,
     neutralBorderShare: snapshot.neutralBorderShare,
   };
 }
 
 function optionCost(option: CommandOption, gold: Fp): Fp {
   const relativeCost = option.effects.cost;
-  return relativeCost === undefined || relativeCost >= 0
-    ? (0 as Fp)
-    : fpMul(-relativeCost as Fp, gold);
+  return relativeCost === undefined || relativeCost <= 0 ? (0 as Fp) : fpMul(relativeCost, gold);
 }
 
 function selectOptions(

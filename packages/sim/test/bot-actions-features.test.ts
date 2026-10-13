@@ -6,22 +6,27 @@ import { fp, fpMul } from '../src/math/int.ts';
 describe('признаки вариантов команд бота', () => {
   it.each([
     ['threat', fp(0.25), fp(0.5)],
-    ['goldSeconds', fp(2), fp(0.5)],
+    ['goldShare', fp(0.5), fp(0.5)],
     ['neutralBorderShare', fp(0.4), fp(0.5)],
   ] as const)('строит контекст %s и произведение эффекта', (name, value, _expected) => {
     const features = actionFeatures(
       { command: { t: 'setTax', rate: fp(0.2) }, group: 'tax', effects: { strength: fp(2) } },
-      { threat: fp(0.25), goldSeconds: fp(2), neutralBorderShare: fp(0.4) },
+      { threat: fp(0.25), goldShare: fp(0.5), neutralBorderShare: fp(0.4) },
     );
 
     expect(features[name]).toBe(value);
     expect(features[`strength*${name}`]).toBe(fpMul(fp(2), value));
+    expect(
+      [features.threat ?? 0, features.goldShare ?? 0, features.neutralBorderShare ?? 0].every(
+        (item) => item >= 0 && item <= 1000,
+      ),
+    ).toBe(true);
   });
 
   it('добавляет любой эффект без изменения кода признаков', () => {
     const features = actionFeatures(
       { command: { t: 'setTax', rate: fp(0.2) }, group: 'tax', effects: { testEffect: fp(3) } },
-      { threat: fp(0), goldSeconds: fp(0), neutralBorderShare: fp(0) },
+      { threat: fp(0), goldShare: fp(0), neutralBorderShare: fp(0) },
     );
 
     expect(features.testEffect).toBe(fp(3));

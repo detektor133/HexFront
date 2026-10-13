@@ -57,7 +57,7 @@ describe('динамический мозг бота', () => {
         ],
       },
     ];
-    const weights: BotWeights = { 'testEffect*threat': 1, 'strength*goldSeconds': 1 };
+    const weights: BotWeights = { 'testEffect*threat': 1, 'strength*goldShare': 1 };
 
     expect(
       planBotActions(match.state, 0, createBotTickContext(match.state), weights, options),

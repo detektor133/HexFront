@@ -59,10 +59,33 @@ describe('мозг бота', () => {
     if (!player) throw new Error('игрок не создан');
     player.autoReinforce = true;
     player.gold = fp(10);
-    const options = [entry({ cost: fp(-2), testEffect: fp(1) })];
+    const options = [entry({ cost: fp(2), testEffect: fp(1) })];
 
     expect(
       planBotActions(match.state, 0, createBotTickContext(match.state), { testEffect: 1 }, options),
     ).toEqual([]);
+  });
+
+  it('выбирает только один из двух вариантов стоимостью 60 процентов золота', () => {
+    const match = scenario('A1 a', { legend, fog: false });
+    const player = match.state.players[0];
+    if (!player) throw new Error('игрок не создан');
+    player.autoReinforce = true;
+    player.gold = fp(10);
+    const first = { t: 'setTax', rate: fp(0.1) } as const;
+    const second = { t: 'setTax', rate: fp(0.2) } as const;
+    const options: readonly CommandOptionEntry[] = [
+      {
+        kind: 'setTax',
+        options: () => [
+          { command: first, group: 'first', effects: { cost: fp(0.6), score: fp(2) } },
+          { command: second, group: 'second', effects: { cost: fp(0.6), score: fp(1) } },
+        ],
+      },
+    ];
+
+    expect(
+      planBotActions(match.state, 0, createBotTickContext(match.state), { score: 1 }, options),
+    ).toEqual([first]);
   });
 });

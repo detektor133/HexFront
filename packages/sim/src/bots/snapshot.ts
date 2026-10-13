@@ -1,8 +1,8 @@
-import { RECRUIT_STEP } from '../balance.ts';
+import { COST_GOLD_PER_SOLDIER, RECRUIT_STEP } from '../balance.ts';
 import type { BotTickContext } from './context.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import { neighbors, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
-import { fpDiv, type Fp } from '../math/int.ts';
+import { fpDiv, fpMul, type Fp } from '../math/int.ts';
 import type { MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
 
@@ -20,7 +20,7 @@ export interface BotSnapshot {
   readonly contacts: readonly BotContact[];
   readonly freeCities: readonly number[];
   readonly threat: Fp;
-  readonly goldSeconds: Fp;
+  readonly goldShare: Fp;
   readonly neutralBorderShare: Fp;
 }
 
@@ -121,6 +121,13 @@ export function createBotSnapshot(
     return threat > strongest ? threat : strongest;
   }, 0 as Fp);
   const incomePerS = playerIncomePerSecond(state, playerId, undefined, context.incomeBases) as Fp;
+  const gold = player?.gold ?? (0 as Fp);
+  const armyCost = (context.unitsByPlayer[playerId] ?? []).reduce(
+    (total, unit) =>
+      (total + fpMul(unit.soldiers, COST_GOLD_PER_SOLDIER[unit.type] ?? (0 as Fp))) as Fp,
+    0 as Fp,
+  );
+  const resources = (gold + armyCost) as Fp;
   return {
     playerId,
     gold: player?.gold ?? (0 as Fp),
@@ -129,7 +136,7 @@ export function createBotSnapshot(
     contacts,
     freeCities: freeCities(state, context, playerId),
     threat: strongestContact,
-    goldSeconds: incomePerS === 0 ? (0 as Fp) : fpDiv(player?.gold ?? (0 as Fp), incomePerS),
+    goldShare: resources === 0 ? (0 as Fp) : fpDiv(gold, resources),
     neutralBorderShare: neutralBorderShare(state, context, playerId),
   };
 }

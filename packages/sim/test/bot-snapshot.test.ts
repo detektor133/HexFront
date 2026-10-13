@@ -5,6 +5,7 @@ import europe from '../../mapgen/maps/europe.json' with { type: 'json' };
 import { createBotTickContext } from '../src/bots/context.ts';
 import { createBotSnapshot } from '../src/bots/snapshot.ts';
 import { loadMap } from '../src/map/load.ts';
+import { fp } from '../src/math/int.ts';
 import { playerView } from '../src/queries/player-view.ts';
 import { createMatch } from '../src/state/create-match.ts';
 
@@ -16,6 +17,32 @@ const legend = {
 };
 
 describe('снимок бота', () => {
+  it('считает долю золота относительно стоимости своей армии', () => {
+    const match = scenario('A1 a', {
+      legend: { A1: city('A', 1, { capital: true }), a: own('A') },
+      fog: false,
+    });
+    const player = match.state.players[0];
+    if (!player) throw new Error('игрок не создан');
+
+    player.gold = 0 as typeof player.gold;
+    expect(createBotSnapshot(match.state, 0, createBotTickContext(match.state)).goldShare).toBe(0);
+    player.gold = fp(10) as typeof player.gold;
+    expect(createBotSnapshot(match.state, 0, createBotTickContext(match.state)).goldShare).toBe(
+      1000,
+    );
+    match.unit('A', 'infantry', 100, { col: 1, row: 0 });
+    expect(createBotSnapshot(match.state, 0, createBotTickContext(match.state)).goldShare).toBe(
+      500,
+    );
+    expect(
+      createBotSnapshot(match.state, 0, createBotTickContext(match.state)).goldShare,
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      createBotSnapshot(match.state, 0, createBotTickContext(match.state)).goldShare,
+    ).toBeLessThanOrEqual(1000);
+  });
+
   it('совпадает с расчётами playerView для экономики и свободных городов', () => {
     const match = scenario(
       `

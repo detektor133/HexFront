@@ -1,11 +1,11 @@
 import type { BotAction } from './actions.ts';
 import { fpMul, type Fp } from '../math/int.ts';
 
-export type BotContextName = 'threat' | 'goldSeconds' | 'neutralBorderShare';
+export type BotContextName = 'threat' | 'goldShare' | 'neutralBorderShare';
 
 export interface ActionFeatureContext {
   readonly threat: Fp;
-  readonly goldSeconds: Fp;
+  readonly goldShare: Fp;
   readonly neutralBorderShare: Fp;
 }
 
@@ -18,12 +18,12 @@ export type ActionFeatures = Readonly<Record<string, Fp>>;
 export function actionFeatures(action: BotAction, context: ActionFeatureContext): ActionFeatures {
   const features: Record<string, Fp> = {
     threat: context.threat,
-    goldSeconds: context.goldSeconds,
+    goldShare: context.goldShare,
     neutralBorderShare: context.neutralBorderShare,
   };
   const contexts: readonly [BotContextName, Fp][] = [
     ['threat', context.threat],
-    ['goldSeconds', context.goldSeconds],
+    ['goldShare', context.goldShare],
     ['neutralBorderShare', context.neutralBorderShare],
   ];
   for (const [effect, value] of Object.entries(action.effects)) {
