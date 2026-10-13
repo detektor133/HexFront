@@ -2,6 +2,8 @@
 
 Одна строка на решение, новые сверху. Формат: дата · решение · затронутые файлы · CR (если был).
 
+- 2026-10-13 · 06/T1j8 — финальная переделка обучения: честное сравнение, неплоский фитнес, прогресс к победе, ограниченный контекст, бюджет и экзамен; после неё T1i запускается заново, а при провале `$accept 06/T1` этап идёт к T2 · `docs/stages/stage-06-bots-balance.md`, `docs/STATUS.md`, `docs/DECISIONS.md` · Этап: 06/T1j8
+
 - 2026-10-08 · Звука в игре на веб-запуске нет; требование порталов «заглушать звук при рекламе» применяется, когда звук появится · `docs/stages/stage-10-web-launch.md` · CR-008
 - 2026-10-08 · Порядок этапов после 05 (CR-008): 06 боты и баланс → 07 производительность → 08 плейтест и доводка → 09 мультиплеер (бывший 06) → 10 веб-запуск (бывший 07) → 11 мета (бывший 08); бывшая 08/T7 «Командный режим» — в бэклог вместе с CR-007; Б2 и Б3 перенаправлены в новые этапы, 100 ботов не планируются · `docs/changes/CR-008-stages-after-05.md`, `docs/stages/*`, `docs/PROCESS.md`, `docs/BUGS.md`, `docs/CHANGELOG-proposals.md`, `docs/architecture/*`, `docs/QUESTIONS.md`, `docs/STATUS.md` · CR-008
 - 2026-10-09 · 06/T1 переделана на обучаемые веса: ручные коэффициенты и пороги CR-008 отменены; каталог действий строится из определений игры, признаки считаются в fixed-point, веса хранятся в `bots/weights.json` и подбираются офлайн через `tools/evolve`; очередь T1 изменена на T1f → T1g → T1h → T1i → T1e; отменено правило «следующий `$next` меняет только константы `BOT_*`» · `docs/gdd/09-bots.md`, `docs/gdd/10-balance.md`, `docs/architecture/adr/0010-bot-weights-offline-evolution.md`, `docs/architecture/sim-core.md`, `docs/stages/stage-06-bots-balance.md`, `docs/CHANGELOG-proposals.md`, `docs/QUESTIONS.md`, `docs/STATUS.md`
