@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calculateCandidateFitness, candidateSlotForSeed, loadEvolutionMap } from './evaluate.ts';
-import { parseOptions, runEvolution } from './index.ts';
+import { createMatchup, parseOptions, runEvolution } from './index.ts';
 
 describe('эволюция весов бота', () => {
   it('разбирает параметры μ,λ-ES и resume', () => {
@@ -20,6 +20,20 @@ describe('эволюция весов бота', () => {
 
   it('меняет место особи между сидами', () => {
     expect(candidateSlotForSeed(2, 41)).not.toBe(candidateSlotForSeed(2, 42));
+  });
+
+  it('использует один набор соперников для всех особей поколения', () => {
+    const fallback = { alpha: 1 };
+    const matchup = createMatchup([{ alpha: 2 }, { alpha: 3 }], fallback);
+
+    expect(matchup.candidateSlot).toBe(0);
+    expect(matchup.opponents).toEqual([
+      { weights: { alpha: 2 }, slot: 1 },
+      { weights: { alpha: 3 }, slot: 2 },
+      { weights: fallback, slot: 3 },
+      { weights: fallback, slot: 4 },
+      { weights: fallback, slot: 5 },
+    ]);
   });
 
   it('выбирает карту small по умолчанию и gen по параметру', () => {

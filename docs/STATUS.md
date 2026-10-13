@@ -30,9 +30,10 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **Текущий результат 06/T1j7:** код и тесты выполнены, ревью принято, отчёт `docs/reports/stage-06-t1j7.md`; следующая задача — 06/T1i с весами из репозитория, старые результаты T1i не использовать.
-- **Проверки T1j7:** профильный `pnpm exec vitest run tools/replay/src/acceptance.test.ts tools/evolve/src/index.test.ts` — 2 файла, 7 тестов; `pnpm verify --changed` — сборка, типы, lint и Prettier зелёные.
-- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j7.md`, `tools/replay/src/acceptance.ts`, `tools/evolve/src/evaluate.ts`, `tools/evolve/src/index.ts`.
+- **Текущий результат 06/T1j8a:** общий набор из пяти соперников и общий слот кандидата создаются один раз на поколение; отчёт `docs/reports/stage-06-t1j8a.md`; задача отмечена `[~]` и ждёт ревью.
+- **Проверки T1j8a:** `pnpm verify --changed` — `verify: OK (27 с)`; полный `pnpm verify` — `verify: OK (286 с)`.
+- **Следующая задача:** 06/T1j8b — неплоский штраф и прогресс к победе.
+- **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j8a.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/worker.ts`, `tools/replay/src/acceptance.ts`.
 
 - **06/T1j7 (решение владельца 2026-10-12):** прогон T1i после T1j5-Б1 остановлен — штраф без потолка перевешивал место и победу (лучшая особь — в среднем 4–5 место), а обучение шло не на карте `$accept` (`small`). Сначала T1j7, затем T1i заново с весов из репозитория.
 - **06/T1j5-Б1:** принята ревью: `calculateBotAcceptance` возвращает метрики по игрокам, `evaluateMatch` считает fitness по `actualCandidateSlot`, `CandidateEvaluation` хранит обязательные метрики. Отчёт: `docs/reports/stage-06-t1j5-b1.md`.

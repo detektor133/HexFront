@@ -14,7 +14,7 @@ import type {
   EvolutionWeights,
 } from './types.ts';
 import baseWeights from '../../../packages/sim/src/bots/weights.json' with { type: 'json' };
-import { fork, nextInt, nextRange, shuffle } from '../../../packages/sim/src/rng.ts';
+import { fork, nextRange } from '../../../packages/sim/src/rng.ts';
 
 export type { EvolutionOptions, EvolutionResult, EvolutionWeights } from './types.ts';
 
@@ -146,30 +146,15 @@ function seedsFor(count: number): number[] {
   return Array.from({ length: count }, (_, index) => index + 1);
 }
 
-function matchup(
-  population: readonly Candidate[],
+export function createMatchup(
   hallOfFame: readonly EvolutionWeights[],
-  candidate: Candidate,
-  generation: number,
+  fallbackWeights: EvolutionWeights,
 ): { opponents: MatchOpponent[]; candidateSlot: number } {
-  const pool = [
-    ...population.filter((item) => item.index !== candidate.index).map((item) => item.weights),
-    ...hallOfFame,
-  ];
-  const rng = fork(generation * 100_000 + candidate.index, 0x6d617463);
-  const shuffled = shuffle(rng, pool.slice());
-  while (shuffled.length > 0 && shuffled.length < 5) {
-    const opponent = pool[shuffled.length % pool.length];
-    if (opponent !== undefined) shuffled.push(opponent);
-  }
-  const selected = shuffled.slice(0, 5);
-  const candidateSlot = nextInt(rng, 6);
-  const slots = Array.from({ length: 6 }, (_, slot) => slot).filter(
-    (slot) => slot !== candidateSlot,
-  );
+  const selected = hallOfFame.slice(0, 5);
+  while (selected.length < 5) selected.push(fallbackWeights);
   return {
-    candidateSlot,
-    opponents: selected.map((weights, index) => ({ weights, slot: slots[index] ?? slots[0] ?? 0 })),
+    candidateSlot: 0,
+    opponents: selected.map((weights, index) => ({ weights, slot: index + 1 })),
   };
 }
 
@@ -193,12 +178,12 @@ function evaluateCandidate(
 async function evaluatePopulation(
   population: readonly Candidate[],
   hallOfFame: readonly EvolutionWeights[],
-  generation: number,
+  fallbackWeights: EvolutionWeights,
   options: EvolutionOptions,
 ): Promise<readonly CandidateEvaluation[]> {
   const jobs: Array<{ candidate: Candidate; data: Omit<WorkerData, 'index' | 'weights'> }> = [];
+  const match = createMatchup(hallOfFame, fallbackWeights);
   for (const candidate of population) {
-    const match = matchup(population, hallOfFame, candidate, generation);
     for (const seed of seedsFor(options.seeds)) {
       jobs.push({
         candidate,
@@ -340,7 +325,7 @@ export async function runEvolution(options: EvolutionOptions): Promise<Evolution
     const evaluations = await evaluatePopulation(
       population,
       hallOfFame,
-      startGeneration + generation,
+      copyWeights(baseWeights as Record<string, number>),
       evolutionOptions,
     );
     const ranked = [...evaluations].sort(
