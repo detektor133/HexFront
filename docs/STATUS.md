@@ -30,8 +30,8 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j8db ждёт ревью:** остановка после поколения 5 при отсутствии прогресса по экзамену, сохранение `examFitnesses` и следующей популяции для `--resume`. Отчёт `docs/reports/stage-06-t1j8db.md`.
-- **Проверки 06/T1j8db:** `pnpm verify --changed` — код 0; полный `pnpm verify` — код 0, типы и lint прошли.
+- **06/T1j8db принята ревью:** остановка после поколения 5 при отсутствии прогресса по экзамену, сохранение `examFitnesses` и следующей популяции для `--resume`. Профильный тест — 8/8; benchmark 30/100 игроков — 1,618/10,366 мс среднего тика, бюджеты не превышены. Отчёт `docs/reports/stage-06-t1j8db.md`.
+- **Проверки 06/T1j8db:** `pnpm verify --changed` — код 0; полный `pnpm verify` — код 0, типы и lint прошли; `pnpm exec vitest run tools/evolve/src/index.test.ts` — 8/8.
 - **Следующая задача:** 06/T1j8dc — сохранение лучших весов по экзамену.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/index.test.ts`, `docs/reports/stage-06-t1j8db.md`.
 - **06/T1j8d разбита:** T1j8da — экзамен и отчёты, T1j8db — остановка без прогресса и `--resume`, T1j8dc — лучшие веса, T1j8dd — проверка родителя.
