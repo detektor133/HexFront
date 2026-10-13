@@ -109,22 +109,42 @@ describe('круги $next → CI → $review', () => {
     expect(run.lines).toContain('жду: 2 ВОЗВРАТ подряд по 06/T1j5-Б1 — нужно решение владельца');
   });
 
-  it('начинает с $review, если задача уже [~]', async () => {
+  it('начинает с $review, если задача уже [~], но сначала проверяет CI её HEAD', async () => {
     const run = await runWorld({
       stage: setMark(fixtureStage, 'T1j5-Б1', '~'),
       sessions: [REVIEW_OK],
     });
     expect(run.prompts).toEqual(['$review 06/T1j5-Б1']);
-    expect(run.ciCalls).toBe(0);
+    expect(run.ciCalls).toBe(1);
   });
 
-  it('при красном CI повторяет $next, который сначала чинит CI', async () => {
+  it('при красном CI запускает $task с причиной, а не $next', async () => {
     const run = await runWorld({
       sessions: [NEXT_DONE, { answer: 'CI починен, задача ждёт ревью', commit: true }, REVIEW_OK],
-      ci: ['failure job=check https://ci/2', 'success https://ci/3'],
+      ci: [
+        'failure job=check https://ci/2\n ELIFECYCLE  Command failed with exit code 1.',
+        'success https://ci/3',
+      ],
     });
-    expect(run.prompts).toEqual(['$next', '$next', '$review 06/T1j5-Б1']);
+    expect(run.prompts).toEqual([
+      '$next',
+      '$task 06/T1j5-Б1 CI красный: failure job=check https://ci/2',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain('CI красный за 0 мин: failure job=check https://ci/2');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('недоступный GitHub не считает красным CI: пауза без ревью и без новой работы', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE],
+      ci: ['error сеть: TypeError: fetch failed', 'error сеть: TypeError: fetch failed'],
+    });
+    expect(run.prompts).toEqual(['$next']);
+    expect(run.ciCalls).toBe(2);
+    expect(run.lines).toContain(
+      'сбой: CI 06/T1j5-Б1 не проверен: error сеть: TypeError: fetch failed — следующая попытка через 30 мин',
+    );
   });
 
   it('повторяет ожидание CI один раз после таймаута', async () => {

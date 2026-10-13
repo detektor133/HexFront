@@ -17,6 +17,8 @@ import { processTask } from './tasks.ts';
 
 /** Второй сбой codex на одной Issue снимает её с очереди меткой `agent-stop`. */
 const MAX_ISSUE_FAILURES = 2;
+/** Сколько исполненная Issue не берётся снова в прежнем виде, мс: дольше список GitHub не отстаёт. */
+const RECENT_MS = 10 * 60_000;
 
 /** GitHub недоступен — цикл не падает: строка в протокол, работа по очереди продолжается. */
 async function safely(
@@ -35,16 +37,36 @@ async function safely(
   }
 }
 
-/** GitHub не принял закрытие или метку: Issue запоминается, чтобы не исполнить её второй раз. */
+/**
+ * Ответ на Issue дан. Список GitHub ещё секунды показывает её открытой и без метки, поэтому
+ * Issue в том же виде (`updated_at`) не берётся снова; не принятые GitHub закрытие или метка
+ * запоминают её насовсем.
+ */
 async function answered(
   context: LoopContext,
   issue: AgentIssue,
   delivered: boolean,
 ): Promise<void> {
-  if (delivered) return;
-  context.state.answeredIssues.push(issue.number);
+  const { state, config } = context;
+  const now = config.now();
+  state.recentIssues = {
+    ...Object.fromEntries(
+      Object.entries(state.recentIssues).filter(([, recent]) => now - recent.at < RECENT_MS),
+    ),
+    [String(issue.number)]: { updatedAt: issue.updatedAt, at: now },
+  };
+  if (!delivered) state.answeredIssues.push(issue.number);
   await save(context);
 }
+
+const recentlyAnswered = (context: LoopContext, issue: AgentIssue): boolean => {
+  const recent = context.state.recentIssues[String(issue.number)];
+  return (
+    recent !== undefined &&
+    recent.updatedAt === issue.updatedAt &&
+    context.config.now() - recent.at < RECENT_MS
+  );
+};
 
 async function finish(context: LoopContext, issue: AgentIssue, text: string): Promise<Step> {
   const github = context.config.github;
@@ -52,8 +74,9 @@ async function finish(context: LoopContext, issue: AgentIssue, text: string): Pr
   const delivered =
     github !== undefined &&
     (await safely(context, `закрыть Issue #${issue.number}`, async () => {
-      await github.comment(issue.number, text);
+      // Сначала закрытие: снимок списка с новым updated_at уже не покажет Issue открытой.
       await github.close(issue.number);
+      await github.comment(issue.number, text);
     }));
   await answered(context, issue, delivered);
   return 'worked';
@@ -74,11 +97,11 @@ async function stopIssue(
   const delivered =
     github !== undefined &&
     (await safely(context, `ответить в Issue #${issue.number}`, async () => {
+      await github.addLabel(issue.number, STOP_LABEL);
       await github.comment(
         issue.number,
         `стоп: ${reason}${tail}\n\nСними метку \`${STOP_LABEL}\`, чтобы цикл взял Issue снова.`,
       );
-      await github.addLabel(issue.number, STOP_LABEL);
     }));
   await answered(context, issue, delivered);
   return 'worked';
@@ -171,7 +194,8 @@ export async function processIssues(
     if (
       issue.labels.includes(STOP_LABEL) ||
       issue.author.toLowerCase() !== github.owner.toLowerCase() ||
-      context.state.answeredIssues.includes(issue.number)
+      context.state.answeredIssues.includes(issue.number) ||
+      recentlyAnswered(context, issue)
     )
       continue;
     const command = parseIssueCommand(issue.body);

@@ -65,6 +65,8 @@ export interface World {
   readonly arrival?: AgentIssue;
   /** Каждая пауза кончается Enter владельца: следующий полный шаг сразу. */
   readonly wake?: boolean;
+  /** Список Issues GitHub отстаёт: отдаёт Issues такими, какими они были до ответа цикла. */
+  readonly staleList?: boolean;
 }
 
 export interface Outcome {
@@ -192,7 +194,12 @@ export async function runWorld(world: World): Promise<Outcome> {
   const github: GithubClient = {
     repo: 'detektor133/HexFront',
     owner: 'detektor133',
-    listIssues: () => Promise.resolve(issues.filter((issue) => !out.closed.includes(issue.number))),
+    listIssues: () =>
+      Promise.resolve(
+        world.staleList === true
+          ? [...(world.issues ?? [])]
+          : issues.filter((issue) => !out.closed.includes(issue.number)),
+      ),
     comment: (issue, body) => {
       out.comments.push(`#${issue}: ${body}`);
       return Promise.resolve();
@@ -269,4 +276,5 @@ export const issue = (number: number, body: string, author = 'detektor133'): Age
   body,
   author,
   labels: ['agent'],
+  updatedAt: '2026-10-13T01:00:00Z',
 });

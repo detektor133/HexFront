@@ -62,10 +62,35 @@ const defaultFetch: FetchFn = async (url, init) => fetch(url, init);
 const defaultSleep = async (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Запрос к GitHub не удался: это не результат CI. `transient` — сеть, 5xx или 429, стоит повторить. */
+export class GithubRequestError extends Error {
+  readonly transient: boolean;
+
+  constructor(message: string, transient: boolean) {
+    super(message);
+    this.transient = transient;
+  }
+}
+
 const request = async (fetchFn: FetchFn, url: string, headers: Record<string, string>) => {
-  const response = await fetchFn(url, { headers });
-  if (!response.ok) throw new Error(`GitHub API ${response.status}: ${url}`);
+  let response: HttpResponse;
+  try {
+    response = await fetchFn(url, { headers });
+  } catch (error) {
+    throw new GithubRequestError(`сеть: ${String(error)}`, true);
+  }
+  if (!response.ok)
+    throw new GithubRequestError(
+      `GitHub API ${response.status}: ${url}`,
+      response.status >= 500 || response.status === 429,
+    );
   return response;
+};
+
+/** Сбой одного опроса: временный пишется в строку ожидания, постоянный (401, 403, 404) — сразу наружу. */
+const transientMessage = (error: unknown): string => {
+  if (error instanceof GithubRequestError && !error.transient) throw error;
+  return error instanceof Error ? error.message : String(error);
 };
 
 const findFailedJob = (jobs: readonly WorkflowJob[]): WorkflowJob | undefined =>
@@ -83,26 +108,34 @@ const printFailedRun = async (
   run: WorkflowRun,
   writeLine: (line: string) => void,
 ): Promise<number> => {
-  const jobsResponse = await request(
-    fetchFn,
-    `${apiBase}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
-    headers,
-  );
-  const jobsPayload = (await jobsResponse.json()) as WorkflowJobsPayload;
-  const job = findFailedJob(jobsPayload.jobs ?? []);
-  if (!job) {
-    writeLine(`failure job=unknown ${run.html_url}`);
-    return 1;
+  // Run уже красный: сбой при чтении job или лога не должен превращать его в «не проверено».
+  let job: WorkflowJob | undefined;
+  try {
+    const jobsResponse = await request(
+      fetchFn,
+      `${apiBase}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
+      headers,
+    );
+    job = findFailedJob(((await jobsResponse.json()) as WorkflowJobsPayload).jobs ?? []);
+    if (job) {
+      const logResponse = await request(fetchFn, `${apiBase}/actions/jobs/${job.id}/logs`, headers);
+      const text = await logResponse.text();
+      for (const line of text.replace(/\r\n/g, '\n').trimEnd().split('\n').slice(-30))
+        writeLine(line);
+    }
+  } catch (error) {
+    writeLine(
+      `лог упавшего job не получен: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-
-  const logResponse = await request(fetchFn, `${apiBase}/actions/jobs/${job.id}/logs`, headers);
-  const lines = (await logResponse.text()).replace(/\r\n/g, '\n').trimEnd().split('\n').slice(-30);
-  for (const line of lines) writeLine(line);
-  writeLine(`failure job=${job.name} ${run.html_url}`);
+  writeLine(`failure job=${job?.name ?? 'unknown'} ${run.html_url}`);
   return 1;
 };
 
-/** Ожидает GitHub Actions для SHA не дольше заданного таймаута, миллисекунды. */
+/**
+ * Ожидает GitHub Actions для SHA не дольше заданного таймаута, миллисекунды.
+ * @returns 0 — CI зелёный, 1 — CI красный или не дождались, 2 — GitHub недоступен (CI не проверен).
+ */
 export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   const fetchFn = options.fetchFn ?? defaultFetch;
   const sleep = options.sleep ?? defaultSleep;
@@ -121,13 +154,18 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   const startedAt = now();
   let lastRun: WorkflowRun | undefined;
   while (true) {
-    const response = await request(
-      fetchFn,
-      `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}&per_page=10`,
-      headers,
-    );
-    const payload = (await response.json()) as WorkflowRunsPayload;
-    lastRun = findRun(payload.workflow_runs ?? [], options.sha) ?? lastRun;
+    let lastError: string | undefined;
+    try {
+      const response = await request(
+        fetchFn,
+        `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}&per_page=10`,
+        headers,
+      );
+      const payload = (await response.json()) as WorkflowRunsPayload;
+      lastRun = findRun(payload.workflow_runs ?? [], options.sha) ?? lastRun;
+    } catch (error) {
+      lastError = transientMessage(error);
+    }
 
     if (lastRun?.status === 'completed') {
       if (lastRun.conclusion === 'success') {
@@ -140,8 +178,13 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
     const elapsedMs = now() - startedAt;
     const pendingUrl =
       lastRun?.html_url ?? `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}`;
-    writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}`);
+    const error = lastError === undefined ? '' : ` error=${lastError}`;
+    writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}${error}`);
     if (elapsedMs >= timeoutMs) {
+      if (lastError !== undefined) {
+        writeLine(`error ${lastError}`);
+        return 2;
+      }
       writeLine(
         lastRun
           ? `failure timeout ${lastRun.html_url}`

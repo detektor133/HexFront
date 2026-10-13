@@ -7,6 +7,8 @@ export interface AgentIssue {
   readonly body: string;
   readonly author: string;
   readonly labels: readonly string[];
+  /** `updated_at` GitHub: меняется с каждой правкой, меткой, комментарием. */
+  readonly updatedAt: string;
 }
 export interface GithubClient {
   /** owner/repo. */
@@ -88,6 +90,7 @@ interface IssuePayload {
   readonly body: string | null;
   readonly user: { readonly login: string } | null;
   readonly labels: readonly { readonly name: string }[];
+  readonly updated_at: string;
   readonly pull_request?: unknown;
 }
 
@@ -149,6 +152,7 @@ export function httpGithubClient(repo: string, token: string): GithubClient {
           body: issue.body ?? '',
           author: issue.user?.login ?? '',
           labels: issue.labels.map((label) => label.name),
+          updatedAt: issue.updated_at,
         }));
     },
     async comment(issue, body) {

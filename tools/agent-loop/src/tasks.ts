@@ -19,7 +19,7 @@ import { commandTask, reviewTasks, taskMark } from './stage-file.ts';
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
 type Work =
   | { readonly kind: 'review'; readonly task: string }
-  | { readonly kind: 'again' }
+  | { readonly kind: 'again'; readonly prompt?: string }
   | { readonly kind: 'step'; readonly step: Step };
 export interface TaskRun {
   readonly step: Step;
@@ -31,6 +31,9 @@ export interface TaskRun {
 const MAX_FOLLOW_UPS = 2;
 
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
+/** Работа над задачей после красного CI: сессия начинает с причины, а не с поиска задачи в очереди. */
+export const ciFixPrompt = (task: string, line: string): string =>
+  `$task ${task} CI красный: ${line}`;
 const step = (value: Step): Work => ({ kind: 'step', step: value });
 
 /** Скилл не выполнился: сбой codex — пауза, иначе ожидание владельца с ответом скилла. */
@@ -92,7 +95,6 @@ async function runWork(
   accepted: Set<string>,
 ): Promise<Work> {
   const { git, state } = context;
-  const base = await head(git);
   const work = await session(context, 'next', prompt);
   const dirty = (await dirtyFiles(git)) !== '';
   if (work.failure !== undefined) {
@@ -126,8 +128,6 @@ async function runWork(
   await save(context);
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return step(await park(context, `sync:${task}`, unsynced));
-  if ((await head(git)) !== base && !(await waitCi(context, `после ${firstLine(prompt)}`)))
-    return { kind: 'again' };
   const { stage, stageText } = await readStage(context.config.root);
   const waiting = reviewTasks(stageText, stage);
   if (waiting.length > 1)
@@ -171,6 +171,18 @@ async function runReview(context: LoopContext, task: string): Promise<'x' | ' ' 
 }
 
 /**
+ * CI перед ревью: HEAD, чей зелёный CI цикл уже видел, не ждёт. Красный — работа с причиной,
+ * не проверенный (сеть, таймаут) — пауза, а не ревью кода, который CI ещё не прошёл.
+ */
+async function ciBeforeReview(context: LoopContext, task: string): Promise<Work | undefined> {
+  if (context.state.greenHead === (await head(context.git))) return undefined;
+  const ci = await waitCi(context, `перед $review ${task}`);
+  if (ci.verdict === 'green') return undefined;
+  if (ci.verdict === 'red') return { kind: 'again', prompt: ciFixPrompt(task, ci.line) };
+  return step(await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''));
+}
+
+/**
  * Круги одной задачи, не больше maxRounds ВОЗВРАТ. `workPrompt` — `$next` для очереди
  * или `$task NN/Tn` для Issue; `resume` — начать с доделки незакоммиченной работы.
  */
@@ -187,24 +199,27 @@ export async function processTask(
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
   for (let round = 1; round <= config.maxRounds;) {
-    if (needsWork) {
-      const work = await runWork(context, current, prompt, accepted);
-      prompt = options.workPrompt;
-      if (work.kind === 'step') return { step: work.step, done: false };
-      if (work.kind === 'again') {
-        followUps += 1;
-        if (followUps > MAX_FOLLOW_UPS)
-          return {
-            step: await park(
-              context,
-              `again:${current}`,
-              `CI или приёмка ${current} снова не прошли`,
-            ),
-            done: false,
-          };
-        continue;
-      }
-      current = work.task;
+    const work = needsWork
+      ? await runWork(context, current, prompt, accepted)
+      : { kind: 'review' as const, task: current };
+    const checked = work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
+    if (work.kind === 'review') current = work.task;
+    prompt = options.workPrompt;
+    if (checked?.kind === 'step') return { step: checked.step, done: false };
+    if (checked?.kind === 'again') {
+      followUps += 1;
+      if (followUps > MAX_FOLLOW_UPS)
+        return {
+          step: await park(
+            context,
+            `again:${current}`,
+            `CI или приёмка ${current} снова не прошли`,
+          ),
+          done: false,
+        };
+      if (checked.prompt !== undefined) prompt = checked.prompt;
+      needsWork = true;
+      continue;
     }
     const verdict = await runReview(context, current);
     if (verdict === 'x') {

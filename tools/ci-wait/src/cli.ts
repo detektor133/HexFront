@@ -18,6 +18,7 @@ async function main(): Promise<number> {
 try {
   process.exitCode = await main();
 } catch (error) {
-  console.log(`failure run=unknown error=${String(error)}`);
-  process.exitCode = 1;
+  // Не результат CI, а сбой запроса (401, сеть): цикл не должен считать его красным CI.
+  console.log(`error ${error instanceof Error ? error.message : String(error)}`);
+  process.exitCode = 2;
 }

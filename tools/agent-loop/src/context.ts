@@ -90,19 +90,47 @@ export async function session(context: LoopContext, role: Role, prompt: string):
   return result;
 }
 
-/** Ждёт CI на HEAD силами скрипта; обрыв по таймауту повторяется один раз, как в $next. */
-export async function waitCi(context: LoopContext, label: string): Promise<boolean> {
-  const { config, say } = context;
+/** Итог CI на HEAD: `unknown` — дождаться не удалось (сеть, таймаут), это не красный CI. */
+export interface CiResult {
+  readonly verdict: 'green' | 'red' | 'unknown';
+  /** Итоговая строка `ci:wait`: ссылка на прогон или причина. */
+  readonly line: string;
+}
+
+/** Последняя строка итога `ci:wait`; строки pnpm вроде ELIFECYCLE её не заслоняют. */
+const ciLine = (stdout: string): string =>
+  stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^(success|failure|error)\b/.test(line))
+    .at(-1) ?? lastLines(stdout, 1);
+
+/**
+ * Ждёт CI на HEAD силами скрипта. Красный — только упавший job; таймаут и недоступный
+ * GitHub повторяются один раз и дают `unknown`. Зелёный HEAD запоминается: ревью его не ждёт.
+ */
+export async function waitCi(context: LoopContext, label: string): Promise<CiResult> {
+  const { config, say, state } = context;
   const started = config.now();
   await say(`… жду CI ${label}`);
-  const wait = () =>
-    config.runCommand('pnpm', ['ci:wait'], { cwd: config.root, timeoutMs: CI_TIMEOUT_MS });
+  const wait = async (): Promise<CiResult> => {
+    const ci = await config.runCommand('pnpm', ['ci:wait'], {
+      cwd: config.root,
+      timeoutMs: CI_TIMEOUT_MS,
+    });
+    const line = ciLine(ci.stdout);
+    if (ci.code === 0) return { verdict: 'green', line };
+    return { verdict: line.startsWith('failure job=') ? 'red' : 'unknown', line };
+  };
   let ci = await wait();
-  if (ci.code !== 0 && /failure timeout|run=not-found/.test(ci.stdout)) ci = await wait();
-  await say(
-    `CI ${ci.code === 0 ? 'зелёный' : 'красный'} за ${minutes(config.now() - started)}: ${firstLine(lastLines(ci.stdout, 1))}`,
-  );
-  return ci.code === 0;
+  if (ci.verdict === 'unknown') ci = await wait();
+  const words = { green: 'зелёный', red: 'красный', unknown: 'не проверен' } as const;
+  await say(`CI ${words[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
+  if (ci.verdict === 'green') {
+    state.greenHead = await head(context.git);
+    await save(context);
+  }
+  return ci;
 }
 
 export interface StageState {
@@ -179,8 +207,9 @@ export async function runSkill(
   if ((await head(git)) === base) return fail('коммита нет — скилл остановился сам (см. ответ)');
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return fail(unsynced);
-  if (!(await waitCi(context, `после ${firstLine(prompt).split(/\s/, 1)[0] ?? ''}`)))
-    return fail('CI красный');
+  // Коммит скилла уже запушен: CI, который не удалось проверить, проверит ревью следующей задачи.
+  const ci = await waitCi(context, `после ${firstLine(prompt).split(/\s/, 1)[0] ?? ''}`);
+  if (ci.verdict === 'red') return fail(`CI красный: ${ci.line}`);
   return { ok: true, sha: await head(git), message: done.message };
 }
 

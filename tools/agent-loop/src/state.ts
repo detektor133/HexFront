@@ -15,6 +15,13 @@ export interface LoopState {
   issueFailures: Record<string, number>;
   /** Issues, на которые цикл уже ответил: не исполняются повторно, даже если GitHub не принял закрытие или метку. */
   answeredIssues: number[];
+  /**
+   * Только что исполненные Issues: `updated_at` на момент взятия и время ответа, мс. Список Issues
+   * GitHub отстаёт на секунды и ещё показывает закрытую Issue открытой — её нельзя взять снова.
+   */
+  recentIssues: Record<string, { readonly updatedAt: string; readonly at: number }>;
+  /** HEAD, для которого цикл сам видел зелёный CI: ревью этого HEAD CI не ждёт. */
+  greenHead?: string;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
 }
@@ -23,7 +30,13 @@ export const statePath = (root: string): string =>
   join(root, '.ai-logs', 'agent-loop', 'state.json');
 
 export async function loadState(root: string): Promise<LoopState> {
-  const empty: LoopState = { split: [], issueFailures: {}, answeredIssues: [], pullRequests: {} };
+  const empty: LoopState = {
+    split: [],
+    issueFailures: {},
+    answeredIssues: [],
+    recentIssues: {},
+    pullRequests: {},
+  };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
     throw error;
