@@ -61,6 +61,8 @@ export interface CandidateFitnessMetrics {
   readonly goldOver5000S: number;
   readonly unitUnder10S: number;
   readonly won: boolean;
+  readonly cities?: number;
+  readonly totalCities?: number;
 }
 
 export function calculateCandidateFitness(metrics: CandidateFitnessMetrics): number {
@@ -69,6 +71,8 @@ export function calculateCandidateFitness(metrics: CandidateFitnessMetrics): num
     maxGoldOver5000S: metrics.goldOver5000S,
     maxUnitUnder10S: metrics.unitUnder10S,
     won: metrics.won,
+    cities: metrics.cities ?? 0,
+    totalCities: metrics.totalCities ?? 0,
   });
 }
 
@@ -79,6 +83,7 @@ export interface MatchEvaluation {
   readonly endTick: number;
   readonly place: number;
   readonly won: boolean;
+  readonly cities: number;
 }
 
 export function evaluateMatch(
@@ -133,11 +138,14 @@ export function evaluateMatch(
       won:
         state.winner === actualCandidateSlot &&
         (winReason === 'cities' || winReason === 'lastStanding'),
+      cities: state.cities.filter((city) => city.owner === actualCandidateSlot).length,
+      totalCities: state.cities.length,
     }),
     maxGoldOver5000S: acceptance.goldOver5000SByPlayer[actualCandidateSlot] ?? 0,
     maxUnitUnder10S: acceptance.unitUnder10SByPlayer[actualCandidateSlot] ?? 0,
     endTick: acceptance.endTick,
     place: places[actualCandidateSlot] ?? PLAYERS,
+    cities: state.cities.filter((city) => city.owner === actualCandidateSlot).length,
     won:
       state.winner === actualCandidateSlot &&
       (winReason === 'cities' || winReason === 'lastStanding'),
@@ -164,9 +172,18 @@ export function evaluateWeightsDetailed(
         endTick: Math.max(total.endTick, result.endTick),
         place: Math.max(total.place, result.place),
         won: total.won || result.won,
+        cities: Math.max(total.cities, result.cities),
       };
     },
-    { fitness: 0, maxGoldOver5000S: 0, maxUnitUnder10S: 0, endTick: 0, place: 0, won: false },
+    {
+      fitness: 0,
+      maxGoldOver5000S: 0,
+      maxUnitUnder10S: 0,
+      endTick: 0,
+      place: 0,
+      won: false,
+      cities: 0,
+    },
   );
 }
 

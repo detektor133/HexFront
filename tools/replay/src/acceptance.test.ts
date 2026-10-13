@@ -71,29 +71,33 @@ describe('критерии обучения ботов', () => {
 
   it('считает целочисленный fitness по таблице критериев', () => {
     const penalties = [
-      [0, 0],
-      [120, 0],
-      [180, 500],
-      [240, 1000],
-      [1200, 1000],
+      [0, 0, 0, 0],
+      [120, 0, 30, 0],
+      [220, 72, 130, 68],
+      [700, 420, 700, 455],
+      [1500, 1000, 1500, 1000],
     ] as const;
-    for (const [seconds, expectedPenalty] of penalties) {
+    for (const [goldSeconds, expectedGoldPenalty, unitSeconds, expectedUnitPenalty] of penalties) {
       expect(
         calculateFitness({
           place: 6,
-          maxGoldOver5000S: seconds,
+          maxGoldOver5000S: goldSeconds,
           maxUnitUnder10S: 0,
           won: false,
+          cities: 0,
+          totalCities: 10,
         }),
-      ).toBe(expectedPenalty === 0 ? 0 : -expectedPenalty);
+      ).toBe(expectedGoldPenalty === 0 ? 0 : -expectedGoldPenalty);
       expect(
         calculateFitness({
           place: 6,
           maxGoldOver5000S: 0,
-          maxUnitUnder10S: seconds / 4,
+          maxUnitUnder10S: unitSeconds,
           won: false,
+          cities: 0,
+          totalCities: 10,
         }),
-      ).toBe(expectedPenalty === 0 ? 0 : -expectedPenalty);
+      ).toBe(expectedUnitPenalty === 0 ? 0 : -expectedUnitPenalty);
     }
     expect(
       calculateFitness({
@@ -101,6 +105,8 @@ describe('критерии обучения ботов', () => {
         maxGoldOver5000S: 120,
         maxUnitUnder10S: 30,
         won: true,
+        cities: 0,
+        totalCities: 10,
       }),
     ).toBe(8000);
     expect(
@@ -109,23 +115,41 @@ describe('критерии обучения ботов', () => {
         maxGoldOver5000S: 0,
         maxUnitUnder10S: 0,
         won: false,
+        cities: 0,
+        totalCities: 10,
       }),
     ).toBe(0);
     expect(
       calculateFitness({
         place: 1,
-        maxGoldOver5000S: 1800,
-        maxUnitUnder10S: 450,
+        maxGoldOver5000S: 1500,
+        maxUnitUnder10S: 1500,
         won: false,
+        cities: 0,
+        totalCities: 10,
       }),
     ).toBe(3000);
     expect(
       calculateFitness({
         place: 6,
-        maxGoldOver5000S: 180,
-        maxUnitUnder10S: 45,
+        maxGoldOver5000S: 1500,
+        maxUnitUnder10S: 0,
         won: true,
+        cities: 0,
+        totalCities: 10,
       }),
     ).toBe(2000);
+
+    const progress = {
+      place: 6,
+      maxGoldOver5000S: 0,
+      maxUnitUnder10S: 0,
+      won: false,
+      totalCities: 20,
+    };
+    expect(calculateFitness({ ...progress, cities: 0 })).toBe(0);
+    expect(calculateFitness({ ...progress, cities: 7 })).toBe(1500);
+    expect(calculateFitness({ ...progress, cities: 14 })).toBe(3000);
+    expect(calculateFitness({ ...progress, cities: 20 })).toBe(3000);
   });
 });

@@ -1,4 +1,9 @@
-import { FP, TICKS_PER_S, type WinReason } from '../../../packages/sim/src/index.ts';
+import {
+  FP,
+  TICKS_PER_S,
+  VICTORY_CITY_SHARE,
+  type WinReason,
+} from '../../../packages/sim/src/index.ts';
 import { intDiv } from '../../../packages/sim/src/math/int.ts';
 
 export interface AcceptanceTick {
@@ -21,6 +26,8 @@ export interface FitnessMetrics {
   readonly maxGoldOver5000S: number;
   readonly maxUnitUnder10S: number;
   readonly won: boolean;
+  readonly cities: number;
+  readonly totalCities: number;
 }
 
 /** Считает непрерывные интервалы критериев T1 по снимкам тиков матча. */
@@ -58,10 +65,16 @@ export function calculateBotAcceptance(
 
 /** Считает целочисленный fitness одной особи в одном матче. */
 export function calculateFitness(metrics: FitnessMetrics): number {
-  const goldPenalty = Math.min(
-    1000,
-    intDiv(1000 * Math.max(0, metrics.maxGoldOver5000S - 120), 120),
+  const goldPenalty = calculatePenalty(metrics.maxGoldOver5000S, 120);
+  const unitPenalty = calculatePenalty(metrics.maxUnitUnder10S, 30);
+  const neededCities = Math.ceil((VICTORY_CITY_SHARE * metrics.totalCities) / FP);
+  const progress =
+    neededCities > 0 ? intDiv(3000 * Math.min(metrics.cities, neededCities), neededCities) : 0;
+  return (
+    1000 * (6 - metrics.place) + progress + (metrics.won ? 3000 : 0) - goldPenalty - unitPenalty
   );
-  const unitPenalty = Math.min(1000, intDiv(1000 * Math.max(0, metrics.maxUnitUnder10S - 30), 30));
-  return 1000 * (6 - metrics.place) + (metrics.won ? 3000 : 0) - goldPenalty - unitPenalty;
+}
+
+function calculatePenalty(seconds: number, limit: number): number {
+  return Math.min(1000, intDiv(1000 * Math.max(0, seconds - limit), 1500 - limit));
 }
