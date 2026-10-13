@@ -8,3 +8,5 @@
 
 Минутный benchmark полного тика 30 ботов не запускался: в критериях он указан как замер для всех подзадач T1j8, а отдельный запуск относится к отчёту T1j8e.
 Полный `pnpm evolve` не запускался.
+
+Ревью принято: `pnpm exec vitest run tools/evolve/src/index.test.ts tools/bench/src/full-match-bench.test.ts` — 6/6; `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — 30 игроков 1,607 мс, 100 игроков 10,222 мс; запреты T1/T1j и зависимости не нарушены.
