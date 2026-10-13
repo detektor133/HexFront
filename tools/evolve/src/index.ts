@@ -31,6 +31,8 @@ interface ResumeState {
   readonly sigma: number;
   readonly examFitnesses: readonly number[];
   readonly weights?: EvolutionWeights;
+  readonly bestExamFitness?: number;
+  readonly bestExamWeights?: EvolutionWeights;
 }
 
 interface ExamMatch extends CandidateMatch {
@@ -300,6 +302,8 @@ async function loadResume(path: string): Promise<ResumeState> {
     seeds: state.seeds,
     sigma: state.sigma,
     examFitnesses: state.examFitnesses ?? [],
+    ...(state.bestExamFitness === undefined ? {} : { bestExamFitness: state.bestExamFitness }),
+    ...(state.bestExamWeights === undefined ? {} : { bestExamWeights: state.bestExamWeights }),
   };
 }
 
@@ -313,11 +317,13 @@ async function writeGeneration(
   durationMs: number,
   exam: GenerationExam,
   examFitnesses: readonly number[],
+  bestExamWeights: EvolutionWeights,
+  bestExamFitness: number,
 ): Promise<void> {
   await mkdir(options.reportDirectory, { recursive: true });
   await mkdir(dirname(options.weightsPath), { recursive: true });
   await mkdir(dirname(options.statePath), { recursive: true });
-  await writeFile(options.weightsPath, `${JSON.stringify(result.weights, null, 2)}\n`, 'utf8');
+  await writeFile(options.weightsPath, `${JSON.stringify(bestExamWeights, null, 2)}\n`, 'utf8');
   await writeFile(
     options.easyWeightsPath ?? join(dirname(options.weightsPath), 'weights-easy.json'),
     `${JSON.stringify(easyWeights, null, 2)}\n`,
@@ -325,7 +331,7 @@ async function writeGeneration(
   );
   await writeFile(
     options.statePath,
-    `${JSON.stringify({ generation, weights: result.weights, population: population.map((item) => item.weights), hallOfFame, seeds: seedsFor(options.seeds), sigma: options.sigma ?? 100, examFitnesses }, null, 2)}\n`,
+    `${JSON.stringify({ generation, weights: result.weights, bestExamWeights, bestExamFitness, population: population.map((item) => item.weights), hallOfFame, seeds: seedsFor(options.seeds), sigma: options.sigma ?? 100, examFitnesses }, null, 2)}\n`,
     'utf8',
   );
   await writeFile(
@@ -413,6 +419,8 @@ export async function runEvolution(
   };
   let easyWeights = copyWeights(result.weights);
   const examFitnesses = [...(resume?.examFitnesses ?? [])];
+  let bestExamFitness = resume?.bestExamFitness ?? Number.NEGATIVE_INFINITY;
+  let bestExamWeights = copyWeights(resume?.bestExamWeights ?? result.weights);
   const easyGeneration =
     evolutionOptions.easyGeneration ?? Math.max(1, Math.floor(evolutionOptions.generations / 3));
   if (startGeneration === 0) {
@@ -422,6 +430,10 @@ export async function runEvolution(
       evolutionOptions.map ?? 'small',
     );
     examFitnesses.push(initialExam.fitness);
+    if (initialExam.fitness > bestExamFitness) {
+      bestExamFitness = initialExam.fitness;
+      bestExamWeights = copyWeights(result.weights);
+    }
     await writeExamReport(startGeneration, result.weights, initialExam, evolutionOptions);
   }
   for (let generation = 1; generation <= options.generations; generation += 1) {
@@ -475,6 +487,10 @@ export async function runEvolution(
       evolutionOptions.map ?? 'small',
     );
     examFitnesses.push(exam.fitness);
+    if (exam.fitness > bestExamFitness) {
+      bestExamFitness = exam.fitness;
+      bestExamWeights = copyWeights(result.weights);
+    }
     const parentCount = Math.max(1, Math.floor(population.length / 2));
     const nextPopulation = Array.from({ length: population.length }, (_, index) => {
       const parent = population[ranked[index % parentCount]?.index ?? best.index];
@@ -500,6 +516,8 @@ export async function runEvolution(
       Date.now() - started,
       exam,
       examFitnesses,
+      bestExamWeights,
+      bestExamFitness,
     );
     if (result.generation === 5 && shouldStopForNoExamProgress(examFitnesses)) {
       throw new Error('нет прогресса по экзамену');

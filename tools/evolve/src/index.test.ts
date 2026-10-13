@@ -176,4 +176,40 @@ describe('эволюция весов бота', () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 120_000);
+  it('сохраняет лучшую особь по экзамену за весь прогон', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hexfront-evolve-best-exam-'));
+    const examinedWeights: Array<Record<string, number>> = [];
+    let examCall = 0;
+    const options = {
+      population: 2,
+      seeds: 1,
+      generations: 2,
+      workers: 1,
+      sigma: 3,
+      ticks: 1,
+      weightsPath: join(directory, 'weights.json'),
+      easyWeightsPath: join(directory, 'weights-easy.json'),
+      statePath: join(directory, 'resume.json'),
+      reportDirectory: join(directory, 'reports'),
+    };
+    try {
+      await runEvolution(options, {
+        evaluateExam: (weights) => {
+          examinedWeights.push({ ...weights });
+          return { fitness: [10, 20, 15][examCall++] ?? 0, wins: 0, matches: [] };
+        },
+      });
+
+      expect(JSON.parse(await readFile(options.weightsPath, 'utf8'))).toEqual(examinedWeights[1]);
+      expect(JSON.parse(await readFile(options.easyWeightsPath, 'utf8'))).toEqual(
+        examinedWeights[1],
+      );
+      expect(JSON.parse(await readFile(options.statePath, 'utf8'))).toMatchObject({
+        bestExamFitness: 20,
+        bestExamWeights: examinedWeights[1],
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 120_000);
 });
