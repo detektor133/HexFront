@@ -30,6 +30,14 @@ export interface FitnessMetrics {
   readonly totalCities: number;
 }
 
+export interface ExamFitnessMetrics {
+  readonly won: boolean;
+  readonly leaderCities: number;
+  readonly neededCities: number;
+  readonly maxGoldOver5000S: number;
+  readonly maxUnitUnder10S: number;
+}
+
 /** Считает непрерывные интервалы критериев T1 по снимкам тиков матча. */
 export function calculateBotAcceptance(
   ticks: readonly AcceptanceTick[],
@@ -75,6 +83,20 @@ export function calculateFitness(metrics: FitnessMetrics): number {
   );
 }
 
-function calculatePenalty(seconds: number, limit: number): number {
+/** Считает экзаменационный fitness без места особи в матче. */
+export function calculateExamFitness(metrics: ExamFitnessMetrics): number {
+  const progress =
+    metrics.neededCities > 0
+      ? intDiv(3000 * Math.min(metrics.leaderCities, metrics.neededCities), metrics.neededCities)
+      : 0;
+  return (
+    (metrics.won ? 3000 : 0) +
+    progress -
+    calculatePenalty(metrics.maxGoldOver5000S, 120) -
+    calculatePenalty(metrics.maxUnitUnder10S, 30)
+  );
+}
+
+export function calculatePenalty(seconds: number, limit: number): number {
   return Math.min(1000, intDiv(1000 * Math.max(0, seconds - limit), 1500 - limit));
 }

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 
-import { evaluateMatch, type MatchOpponent } from './evaluate.ts';
+import { type MatchOpponent } from './evaluate.ts';
 import type {
   CandidateEvaluation,
   CandidateMatch,
@@ -37,6 +37,8 @@ interface ResumeState {
 
 interface ExamMatch extends CandidateMatch {
   readonly seed: number;
+  readonly leaderCities: number;
+  readonly neededCities: number;
 }
 
 interface GenerationExam {
@@ -50,14 +52,24 @@ export interface EvolutionDependencies {
     weights: EvolutionWeights,
     ticks: number,
     map: EvolutionMap,
-  ) => GenerationExam;
+    workers: number,
+  ) => GenerationExam | Promise<GenerationExam>;
 }
 
-interface WorkerData {
+interface CandidateWorkerData {
+  readonly kind: 'candidate';
   readonly index: number;
   readonly weights: EvolutionWeights;
   readonly opponents: readonly MatchOpponent[];
   readonly candidateSlot: number;
+  readonly seed: number;
+  readonly ticks: number;
+  readonly map: EvolutionMap;
+}
+
+interface ExamWorkerData {
+  readonly kind: 'exam';
+  readonly weights: EvolutionWeights;
   readonly seed: number;
   readonly ticks: number;
   readonly map: EvolutionMap;
@@ -179,24 +191,46 @@ export function evaluateExam(
   weights: EvolutionWeights,
   ticks: number,
   map: EvolutionMap = 'small',
-): GenerationExam {
-  const matches = examSeeds().map((seed) => {
-    const match = evaluateMatch(weights, [], seed, ticks, examCandidateSlotForSeed(seed), map);
+  workers = Math.max(1, availableParallelism() - 1),
+): Promise<GenerationExam> {
+  const jobs = examSeeds();
+  const matches: ExamMatch[] = [];
+  let nextIndex = 0;
+  const runNext = async (): Promise<void> => {
+    const index = nextIndex;
+    nextIndex += 1;
+    const seed = jobs[index];
+    if (seed === undefined) return;
+    matches.push(await evaluateExamWorker(weights, seed, ticks, map));
+    await runNext();
+  };
+  return Promise.all(Array.from({ length: Math.min(workers, jobs.length) }, runNext)).then(() => {
+    matches.sort((left, right) => left.seed - right.seed);
     return {
-      seed,
-      fitness: match.fitness,
-      place: match.place,
-      goldOver5000S: match.maxGoldOver5000S,
-      unitUnder10S: match.maxUnitUnder10S,
-      won: match.won,
-      endTick: match.endTick,
+      fitness: matches.reduce((sum, match) => sum + match.fitness, 0),
+      wins: matches.filter((match) => match.won).length,
+      matches,
     };
   });
-  return {
-    fitness: matches.reduce((sum, match) => sum + match.fitness, 0),
-    wins: matches.filter((match) => match.won).length,
-    matches,
-  };
+}
+
+function evaluateExamWorker(
+  weights: EvolutionWeights,
+  seed: number,
+  ticks: number,
+  map: EvolutionMap,
+): Promise<ExamMatch> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./worker.ts', import.meta.url), {
+      workerData: { kind: 'exam', weights, seed, ticks, map } satisfies ExamWorkerData,
+      execArgv: [...process.execArgv, '--experimental-strip-types'],
+    });
+    worker.once('message', resolve);
+    worker.once('error', reject);
+    worker.once('exit', (code) => {
+      if (code !== 0) reject(new Error(`worker завершился с кодом ${code}`));
+    });
+  });
 }
 
 export function shouldStopForNoExamProgress(examFitnesses: readonly number[]): boolean {
@@ -219,11 +253,16 @@ export function createMatchup(
 
 function evaluateCandidate(
   candidate: Candidate,
-  data: Omit<WorkerData, 'index' | 'weights'>,
+  data: Omit<CandidateWorkerData, 'index' | 'weights'>,
 ): Promise<{ index: number; seed: number; match: CandidateMatch }> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
-      workerData: { ...data, index: candidate.index, weights: candidate.weights },
+      workerData: {
+        ...data,
+        kind: 'candidate',
+        index: candidate.index,
+        weights: candidate.weights,
+      } satisfies CandidateWorkerData,
       execArgv: [...process.execArgv, '--experimental-strip-types'],
     });
     worker.once('message', resolve);
@@ -240,13 +279,17 @@ async function evaluatePopulation(
   fallbackWeights: EvolutionWeights,
   options: EvolutionOptions,
 ): Promise<readonly CandidateEvaluation[]> {
-  const jobs: Array<{ candidate: Candidate; data: Omit<WorkerData, 'index' | 'weights'> }> = [];
+  const jobs: Array<{
+    candidate: Candidate;
+    data: Omit<CandidateWorkerData, 'index' | 'weights'>;
+  }> = [];
   const match = createMatchup(hallOfFame, fallbackWeights);
   for (const candidate of population) {
     for (const seed of seedsFor(options.seeds)) {
       jobs.push({
         candidate,
         data: {
+          kind: 'candidate',
           opponents: match.opponents,
           candidateSlot: match.candidateSlot,
           seed,
@@ -358,7 +401,7 @@ async function writeGeneration(
       `Экзамен: fitness ${exam.fitness}, победы ${exam.wins}`,
       ...exam.matches.map(
         (match) =>
-          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
+          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, города лидера ${match.leaderCities}/${match.neededCities}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
       ),
       '',
       '```json',
@@ -386,7 +429,7 @@ async function writeExamReport(
       `Экзамен: fitness ${exam.fitness}, победы ${exam.wins}`,
       ...exam.matches.map(
         (match) =>
-          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
+          `Экзамен, сид ${match.seed}: fitness ${match.fitness}, победа ${match.won ? 'да' : 'нет'}, тик ${match.endTick}, города лидера ${match.leaderCities}/${match.neededCities}, золото > 5 000 с ${match.goldOver5000S}, отряд < 10 с ${match.unitUnder10S}`,
       ),
       '',
       '```json',
@@ -428,10 +471,11 @@ export async function runEvolution(
   const easyGeneration =
     evolutionOptions.easyGeneration ?? Math.max(1, Math.floor(evolutionOptions.generations / 3));
   if (startGeneration === 0) {
-    const initialExam = examEvaluator(
+    const initialExam = await examEvaluator(
       result.weights,
       evolutionOptions.ticks,
       evolutionOptions.map ?? 'small',
+      evolutionOptions.workers,
     );
     examFitnesses.push(initialExam.fitness);
     if (initialExam.fitness > bestExamFitness) {
@@ -485,10 +529,11 @@ export async function runEvolution(
       },
     };
     if (generation === easyGeneration) easyWeights = copyWeights(result.weights);
-    const exam = examEvaluator(
+    const exam = await examEvaluator(
       result.weights,
       evolutionOptions.ticks,
       evolutionOptions.map ?? 'small',
+      evolutionOptions.workers,
     );
     examFitnesses.push(exam.fitness);
     if (exam.fitness > bestExamFitness) {

@@ -8,16 +8,19 @@ import {
   commanderCommands,
   createBotTickContext,
   createMatch,
+  FP,
   loadMap,
   playerPlaces,
   playerScores,
   step,
+  VICTORY_CITY_SHARE,
   type MatchState,
   type WinReason,
 } from '../../../packages/sim/src/index.ts';
 import type { MapStatic } from '../../../packages/sim/src/map/types.ts';
 import {
   calculateBotAcceptance,
+  calculateExamFitness,
   calculateFitness,
   type AcceptanceTick,
 } from '../../replay/src/acceptance.ts';
@@ -86,14 +89,30 @@ export interface MatchEvaluation {
   readonly cities: number;
 }
 
-export function evaluateMatch(
+export interface ExamMatchEvaluation {
+  readonly fitness: number;
+  readonly endTick: number;
+  readonly won: boolean;
+  readonly leaderCities: number;
+  readonly neededCities: number;
+  readonly maxGoldOver5000S: number;
+  readonly maxUnitUnder10S: number;
+}
+
+interface SimulatedMatch {
+  readonly state: MatchState;
+  readonly acceptance: ReturnType<typeof calculateBotAcceptance>;
+  readonly winReason: WinReason | null;
+}
+
+function simulateMatch(
   weights: EvolutionWeights,
   opponents: readonly MatchOpponent[],
   seed: number,
   ticks: number,
   candidateSlot: number,
-  map: EvolutionMap = 'small',
-): MatchEvaluation {
+  map: EvolutionMap,
+): SimulatedMatch {
   const evolutionMap = loadEvolutionMap(seed, map);
   const state = createMatch(
     evolutionMap,
@@ -124,11 +143,28 @@ export function evaluateMatch(
     const event = state.events.find((item) => item.t === 'matchWon');
     if (event?.t === 'matchWon') winReason = event.reason;
   }
-  const acceptance = calculateBotAcceptance(traces, {
-    winner: state.winner,
+  return {
+    state,
+    acceptance: calculateBotAcceptance(traces, {
+      winner: state.winner,
+      winReason,
+      endTick: state.tick,
+    }),
     winReason,
-    endTick: state.tick,
-  });
+  };
+}
+
+export function evaluateMatch(
+  weights: EvolutionWeights,
+  opponents: readonly MatchOpponent[],
+  seed: number,
+  ticks: number,
+  candidateSlot: number,
+  map: EvolutionMap = 'small',
+): MatchEvaluation {
+  const simulated = simulateMatch(weights, opponents, seed, ticks, candidateSlot, map);
+  const { state, acceptance, winReason } = simulated;
+  const actualCandidateSlot = candidateSlotForSeed(candidateSlot, seed);
   const places = playerPlaces(state, playerScores(state));
   return {
     fitness: calculateCandidateFitness({
@@ -149,6 +185,38 @@ export function evaluateMatch(
     won:
       state.winner === actualCandidateSlot &&
       (winReason === 'cities' || winReason === 'lastStanding'),
+  };
+}
+
+export function evaluateExamMatch(
+  weights: EvolutionWeights,
+  seed: number,
+  ticks: number,
+  map: EvolutionMap = 'small',
+): ExamMatchEvaluation {
+  const { state, acceptance, winReason } = simulateMatch(weights, [], seed, ticks, 0, map);
+  const leaderCities = Math.max(
+    ...state.players.map(
+      (player) => state.cities.filter((city) => city.owner === player.id).length,
+    ),
+    0,
+  );
+  const neededCities = Math.ceil((VICTORY_CITY_SHARE * state.cities.length) / FP);
+  const won = state.winner >= 0 && (winReason === 'cities' || winReason === 'lastStanding');
+  return {
+    fitness: calculateExamFitness({
+      won,
+      leaderCities,
+      neededCities,
+      maxGoldOver5000S: acceptance.maxGoldOver5000S,
+      maxUnitUnder10S: acceptance.maxUnitUnder10S,
+    }),
+    endTick: acceptance.endTick,
+    won,
+    leaderCities,
+    neededCities,
+    maxGoldOver5000S: acceptance.maxGoldOver5000S,
+    maxUnitUnder10S: acceptance.maxUnitUnder10S,
   };
 }
 

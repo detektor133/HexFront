@@ -12,6 +12,7 @@ import {
   runEvolution,
   shouldStopForNoExamProgress,
 } from './index.ts';
+import { calculateExamFitness } from '../../replay/src/acceptance.ts';
 
 describe('эволюция весов бота', () => {
   it('разбирает параметры μ,λ-ES и resume', () => {
@@ -116,6 +117,45 @@ describe('эволюция весов бота', () => {
         won: false,
       }),
     ).toBe(4000);
+  });
+
+  it('считает экзамен без места и ограничивает прогресс лидера', () => {
+    expect(
+      calculateExamFitness({
+        won: false,
+        leaderCities: 0,
+        neededCities: 10,
+        maxGoldOver5000S: 0,
+        maxUnitUnder10S: 0,
+      }),
+    ).toBe(0);
+    expect(
+      calculateExamFitness({
+        won: true,
+        leaderCities: 5,
+        neededCities: 10,
+        maxGoldOver5000S: 120,
+        maxUnitUnder10S: 30,
+      }),
+    ).toBe(4500);
+    expect(
+      calculateExamFitness({
+        won: false,
+        leaderCities: 20,
+        neededCities: 10,
+        maxGoldOver5000S: 120,
+        maxUnitUnder10S: 30,
+      }),
+    ).toBe(3000);
+    expect(
+      calculateExamFitness({
+        won: false,
+        leaderCities: 10,
+        neededCities: 10,
+        maxGoldOver5000S: 200,
+        maxUnitUnder10S: 50,
+      }),
+    ).toBe(2930);
   });
 
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {
