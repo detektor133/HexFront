@@ -4,7 +4,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { calculateCandidateFitness, candidateSlotForSeed, loadEvolutionMap } from './evaluate.ts';
+import {
+  calculateCandidateFitness,
+  candidateSlotForSeed,
+  evaluateExamMatch,
+  loadEvolutionMap,
+} from './evaluate.ts';
 import {
   createMatchup,
   examCandidateSlotForSeed,
@@ -158,6 +163,30 @@ describe('эволюция весов бота', () => {
     ).toBe(2930);
   });
 
+  it('считает fitness реального экзамена по максимуму метрик игроков', () => {
+    const results = [101, 102, 103, 104, 105, 106].map((seed) => evaluateExamMatch({}, seed, 300));
+
+    for (const result of results) {
+      expect(result.fitness).toBe(
+        calculateExamFitness({
+          won: result.won,
+          leaderCities: result.leaderCities,
+          neededCities: result.neededCities,
+          maxGoldOver5000S: result.maxGoldOver5000S,
+          maxUnitUnder10S: result.maxUnitUnder10S,
+        }),
+      );
+    }
+  }, 120_000);
+
+  it('не меняет оценку самоигры от слота кандидата', () => {
+    const results = Array.from({ length: 6 }, (_, candidateSlot) =>
+      evaluateExamMatch({}, 103, 300, 'small', candidateSlot),
+    );
+
+    for (const result of results.slice(1)) expect(result).toEqual(results[0]);
+  });
+
   it('сохраняет одинаковые веса при одном и четырёх worker_threads', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'hexfront-evolve-'));
     try {
@@ -197,6 +226,16 @@ describe('эволюция весов бота', () => {
       expect(report).toContain('Экзамен: fitness');
       expect(report).toContain('Места лучшей особи:');
       expect(report).toContain('Победы популяции:');
+      const examLines = (content: string): string[] =>
+        content
+          .split('\n')
+          .filter((line) => line.startsWith('Экзамен:') || line.startsWith('Экзамен, сид '));
+      expect(examLines(report)).toEqual(
+        examLines(await readFile(join(directory, 'report-1', 'generation-2.md'), 'utf8')),
+      );
+      expect(examLines(initialExam)).toEqual(
+        examLines(await readFile(join(directory, 'report-1', 'generation-0.md'), 'utf8')),
+      );
       expect(JSON.parse(await readFile(join(directory, 'resume-4.json'), 'utf8'))).toMatchObject({
         generation: 2,
         weights: single.weights,

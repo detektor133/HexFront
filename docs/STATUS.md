@@ -32,8 +32,9 @@ T15b и T15c откатаны по решению владельца 2026-10-08.
 
 ## Следующая сессия
 
-- **06/T1j8-Б1 возвращена ревью:** не хватает теста реального экзаменационного пути с независимостью от слота и максимума метрик по игрокам, а также сравнения экзаменационных оценок и отчётов при `workers=1` и `workers=4`. Отчёт `docs/reports/stage-06-t1j8-b1.md`.
+- **06/T1j8-Б1 исправлена:** добавлены проверки реального `evaluateExamMatch` по шести экзаменационным сидам и сравнение экзаменационных оценок и строк отчётов при `workers=1/4`. Отчёт `docs/reports/stage-06-t1j8-b1.md`.
 - **Проверки 06/T1j8-Б1:** профильный тест — 11/11; benchmark `pnpm --filter @hexfront/bench full-match --players=30,100 --minutes=1` — `budgetExceeded=false`, полный тик 30 ботов `meanMs=1.702`, 100 ботов `meanMs=10.492`; ранее `pnpm verify --changed` — `verify: OK (45 с)`, полный `pnpm verify` — `verify: OK (301 с)`.
+- **Проверки после исправления 06/T1j8-Б1:** `pnpm verify --changed` — `verify: OK (54 с)`; полный `pnpm verify` заблокирован 13 таймаутами существующих долгих тестов и `spawn C:\Windows\system32\cmd.exe ENOENT`, тест `tools/evolve/src/index.test.ts` прошёл.
 - **Следующая задача:** 06/T1i — задача владельца, повторный запуск обучения после удаления результатов прогона 2026-10-13.
 - **Читать:** `docs/stages/stage-06-bots-balance.md`, `docs/reports/stage-06-t1j8-b1.md`, `tools/evolve/src/index.ts`, `tools/evolve/src/evaluate.ts`, `tools/evolve/src/worker.ts`.
 

@@ -193,8 +193,16 @@ export function evaluateExamMatch(
   seed: number,
   ticks: number,
   map: EvolutionMap = 'small',
+  candidateSlot = 0,
 ): ExamMatchEvaluation {
-  const { state, acceptance, winReason } = simulateMatch(weights, [], seed, ticks, 0, map);
+  const { state, acceptance, winReason } = simulateMatch(
+    weights,
+    [],
+    seed,
+    ticks,
+    candidateSlot,
+    map,
+  );
   const leaderCities = Math.max(
     ...state.players.map(
       (player) => state.cities.filter((city) => city.owner === player.id).length,
