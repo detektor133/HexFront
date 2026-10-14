@@ -89,11 +89,13 @@ describe('экран матча игрока', () => {
     const markup = renderToStaticMarkup(
       createElement(MatchSurface, { debug: false, showOnboarding: true }),
     );
+    const { messages } = await import('../src/i18n/dict.ts');
+    const observer = messages.en;
 
-    expect(markup).not.toContain('aria-label="Наблюдатель"');
-    expect(markup).not.toContain('Вся карта');
-    expect(markup).not.toContain('Скачать телеметрию');
-    expect(markup).not.toContain('Последний отказ');
+    expect(markup).not.toContain(`aria-label="${observer['observer.title']}"`);
+    expect(markup).not.toContain(observer['observer.allMap']);
+    expect(markup).not.toContain(observer['observer.downloadTelemetry']);
+    expect(markup).not.toContain(observer['dev.economy.lastRejection']);
   });
 
   it('/match?debug=1 рендерит реальную панель наблюдателя', async () => {
@@ -107,15 +109,17 @@ describe('экран матча игрока', () => {
     const markup = renderToStaticMarkup(
       createElement(MatchSurface, { debug: true, showOnboarding: true }),
     );
+    const { messages } = await import('../src/i18n/dict.ts');
+    const observer = messages.en;
 
-    expect(markup).toContain('aria-label="Наблюдатель"');
-    expect(markup).toContain('Пауза');
-    expect(markup).toContain('Шаг');
+    expect(markup).toContain(`aria-label="${observer['observer.title']}"`);
+    expect(markup).toContain(observer['observer.pause']);
+    expect(markup).toContain(observer['observer.step']);
     expect(markup).toContain('1×');
     expect(markup).toContain('5×');
     expect(markup).toContain('20×');
-    expect(markup).toContain('Вся карта');
-    expect(markup).toContain('Скачать телеметрию');
+    expect(markup).toContain(observer['observer.allMap']);
+    expect(markup).toContain(observer['observer.downloadTelemetry']);
   });
 
   it('в production маршрут /dev/sandbox возвращает «Страница не найдена»', async () => {
