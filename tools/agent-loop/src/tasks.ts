@@ -24,7 +24,7 @@ import {
   withSpec,
   writeSpec,
 } from './spec.ts';
-import { commandTask, reviewTasks, taskMark } from './stage-file.ts';
+import { commandTask, reviewTasks, taskBlock, taskMark } from './stage-file.ts';
 
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
 type Work =
@@ -110,6 +110,17 @@ async function followUp(
   );
 }
 
+/** Текст ссылается на файл приёмочного теста (путь или имя файла). */
+const mentionsSpec = (text: string, files: readonly string[]): boolean =>
+  files.some((path) => text.includes(path) || text.includes(path.split('/').at(-1) ?? path));
+
+/** Строки возврата ревью в блоке задачи, которые говорят о приёмочных тестах. */
+const returnedForSpec = (block: string, files: readonly string[]): string =>
+  block
+    .split(/\r?\n/)
+    .filter((line) => /возврат/iu.test(line) && mentionsSpec(line, files))
+    .join('\n');
+
 /** Строки `СПЕК: …` ответа: замечания к приёмочным тестам. */
 const specRemarks = (message: string): string =>
   message
@@ -159,15 +170,14 @@ async function runWork(
   const locked = specFiles(context, task);
   const base = await head(git);
   const work = await session(context, 'next', withSpec(prompt, task, locked), locked);
-  const broken = specRemarks(work.message);
-  // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) чинит $spec.
-  if (
-    work.failure === undefined &&
-    broken !== '' &&
-    locked.length > 0 &&
-    (await head(git)) === base
-  )
-    return repairSpec(context, task, broken, accepted);
+  // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) или нехватку,
+  // о которой сказало ревью, чинит $spec. Признак — строка `СПЕК:` исполнителя или возврат ревью
+  // в блоке задачи, который ссылается на файл приёмочного теста.
+  if (work.failure === undefined && locked.length > 0 && (await head(git)) === base) {
+    const { stageText } = await readStage(context.config.root);
+    const broken = specRemarks(work.message) || returnedForSpec(taskBlock(stageText, task), locked);
+    if (broken !== '') return repairSpec(context, task, broken, accepted);
+  }
   // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
   const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
   if (work.failure !== undefined) {
@@ -358,7 +368,13 @@ export async function processTask(
       return { step: 'worked', done: true };
     }
     // Ревью нашло, что приёмочные тесты не совпадают с задачей: они пишутся заново.
-    remarks = SPEC_REMARK_RE.test(verdict.message) ? verdict.message : '';
+    // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
+    // которому тест менять нельзя, встал. Ссылка на файл теста — тоже замечание к тестам.
+    remarks =
+      SPEC_REMARK_RE.test(verdict.message) ||
+      mentionsSpec(verdict.message, specFiles(context, current))
+        ? verdict.message
+        : '';
     if (remarks !== '') await forgetSpec(context, current);
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;

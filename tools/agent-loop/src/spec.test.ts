@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runWorld, type Session } from './test-world.ts';
+import { fixtureStage, runWorld, type Session } from './test-world.ts';
 
 const TEST = 'packages/sim/test/fitness-own.test.ts';
 const LOCKED_LINE = `Приёмочные тесты 06/T1j5-Б1 уже в рабочем дереве, менять их нельзя: ${TEST}`;
@@ -132,6 +132,47 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines).toContain(
       'жду: приёмочные тесты 06/T1j5-Б1 снова мешают исполнителю — нужен владелец',
     );
+  });
+
+  it('ВОЗВРАТ ревью, который ссылается на файл приёмочного теста без «СПЕК:», — тесты переписывает $spec', async () => {
+    const back: Session = {
+      task: 'T1j5-Б1',
+      mark: ' ',
+      answer: `ВОЗВРАТ\n- геометрия не подтверждена: ${TEST}:31-51 не записывает точки пути`,
+    };
+    const run = await runWorld({
+      spec: true,
+      sessions: [SPEC, NEXT_DONE, back, SPEC, NEXT_DONE, REVIEW_OK],
+    });
+    expect(
+      run.prompts[3]?.startsWith(
+        `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- геометрия не подтверждена: ${TEST}:31-51 не записывает точки пути`,
+      ),
+    ).toBe(true);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('исполнитель встал на возврате ревью про приёмочный тест — $spec чинит тест, работа продолжается', async () => {
+    // 2026-10-14, 07/T1 после перезапуска цикла: возврат лежит в блоке задачи, исполнитель
+    // ответил «нельзя без изменения теста» без строки «СПЕК:».
+    const stage = fixtureStage.replace(
+      '  *Приёмка:* тесты.',
+      '  *Приёмка:* тесты.\n  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
+    );
+    const stuck: Session = {
+      answer: 'T1 выполнить без изменения теста нельзя. Нужно разрешить дополнить тест.',
+      commit: false,
+    };
+    const run = await runWorld({
+      spec: true,
+      stage,
+      sessions: [SPEC, stuck, SPEC_FIX, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[2]).toBe(
+      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nИсполнитель задачи:\n  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
+    );
+    expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('тесты $spec с ошибкой lint — цикл сам правит формат, остальное возвращает $spec один раз', async () => {
