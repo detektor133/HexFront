@@ -113,10 +113,17 @@ export async function park(
 export async function backoff(context: LoopContext, reason: string, answer: string): Promise<Step> {
   context.state.retryAfter = context.config.now() + RETRY_MS;
   await save(context);
-  context.config.board?.wait(agentName(context), `пауза ${minutes(RETRY_MS)}: ${reason}`);
+  context.config.board?.pause(agentName(context), `${reason} — повтор через ${minutes(RETRY_MS)}`);
   await context.say(`сбой: ${reason} — следующая попытка через ${minutes(RETRY_MS)}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
   return 'idle';
+}
+
+/** Пауза после сбоя кончилась: шаг повторяется, а экран больше не показывает паузу. */
+export async function endPause(context: LoopContext): Promise<void> {
+  delete context.state.retryAfter;
+  await save(context);
+  context.config.board?.end(agentName(context), 'пауза кончилась — повторяю');
 }
 
 export async function session(

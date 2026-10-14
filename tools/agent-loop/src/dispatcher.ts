@@ -1,6 +1,7 @@
 // Диспетчер параллельных потоков (`--streams N`): главный каталог ведёт Issues, `slow` и закрытие
 // этапа, потоки — задачи «Очереди» без пересечений по `Файлы:` и `После:`.
 import {
+  endPause,
   firstLine,
   park,
   readStage,
@@ -88,8 +89,7 @@ async function mainStep(context: LoopContext, slots: readonly Slot[]): Promise<S
   if (state.retryAfter !== undefined) {
     if (state.retryAfter > config.now()) return 'idle';
     // Пауза кончилась: без удаления новые задачи потокам не выдавались бы никогда (fill).
-    delete state.retryAfter;
-    await save(context);
+    await endPause(context);
   }
   const status = await readStatus(config.root);
   const expected = statusBranch(status);

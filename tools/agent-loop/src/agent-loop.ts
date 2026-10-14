@@ -2,6 +2,7 @@
 import { MAIN_AGENT } from './board.ts';
 import { loadAgentDefinitions } from './codex.ts';
 import {
+  endPause,
   firstLine,
   openLog,
   park,
@@ -82,8 +83,7 @@ async function tick(context: LoopContext): Promise<Step> {
   if (state.retryAfter !== undefined) {
     if (state.retryAfter > config.now()) return 'idle';
     // Пауза кончилась: без удаления каждое ожидание считало бы её снова истёкшей и сразу будило цикл.
-    delete state.retryAfter;
-    await save(context);
+    await endPause(context);
   }
   const status = await readStatus(config.root);
   const branch = await currentBranch(git);

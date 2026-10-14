@@ -1,5 +1,5 @@
 // Запуск внешних команд (codex, git, pnpm) с stdin и таймаутом; на Windows — через cmd с кавычками.
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 
 export interface CommandResult {
   readonly code: number;
@@ -32,6 +32,22 @@ function killTree(child: ChildProcess): void {
   else child.kill();
 }
 
+/** Запущенные команды: выход из консоли останавливает их, а не оставляет codex писать в дерево. */
+const running = new Set<ChildProcess>();
+
+/**
+ * Остановить все запущенные команды сразу, до выхода процесса цикла. В raw-режиме консоли
+ * Ctrl+C не доходит до дочерних процессов сигналом, поэтому их останавливает цикл.
+ */
+export function stopAllCommands(): void {
+  for (const child of running) {
+    if (process.platform === 'win32' && child.pid !== undefined)
+      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else child.kill();
+  }
+  running.clear();
+}
+
 const runProcess: RunCommand = (command, args, options = {}) =>
   new Promise((resolve) => {
     // cmd получает одну строку: так node и делал со списком аргументов, но список с shell
@@ -40,6 +56,7 @@ const runProcess: RunCommand = (command, args, options = {}) =>
       process.platform === 'win32'
         ? spawn([command, ...args].join(' '), { cwd: options.cwd, env: options.env, shell: true })
         : spawn(command, args, { cwd: options.cwd, env: options.env });
+    running.add(child);
     if (options.input !== undefined) child.stdin.end(options.input);
     let stdout = '';
     let stderr = '';
@@ -57,6 +74,7 @@ const runProcess: RunCommand = (command, args, options = {}) =>
         ? undefined
         : setTimeout(() => killTree(child), options.timeoutMs);
     child.on('close', (code) => {
+      running.delete(child);
       if (timer !== undefined) clearTimeout(timer);
       resolve({ code: code ?? 1, stdout, stderr });
     });
