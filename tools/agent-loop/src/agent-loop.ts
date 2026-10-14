@@ -53,8 +53,9 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
     const paths = Object.keys(spec);
     return paths.length > 0 && paths.every((path) => changed.has(path));
   });
-  const [only] = placed;
-  if (state.resume === undefined && placed.length === 1 && only !== undefined)
+  const [only, ...others] = placed;
+  // Ожидание владельца тоже оставляет тесты в дереве: доделка — только после перезапуска цикла.
+  if (state.resume === undefined && state.parked === undefined && only && others.length === 0)
     state.resume = only[0];
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';

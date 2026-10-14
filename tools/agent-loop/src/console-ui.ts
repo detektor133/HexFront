@@ -71,7 +71,9 @@ export function createConsoleUi(board: Board, root: string): ConsoleUi {
     drawn = lines.length + 1;
     typed = false;
   };
+  let closed = false;
   const redraw = (): void => {
+    if (closed) return;
     clear();
     draw();
   };
@@ -85,7 +87,7 @@ export function createConsoleUi(board: Board, root: string): ConsoleUi {
         : STREAM_COLORS[(Number(stream) - 1) % STREAM_COLORS.length]);
     clear();
     out.write(`${paint(color, `[${stamp()}] ${line}`)}\n`);
-    draw();
+    if (!closed) draw();
   };
 
   const refreshStage = async (): Promise<void> => {
@@ -136,6 +138,7 @@ export function createConsoleUi(board: Board, root: string): ConsoleUi {
     writeLine,
     sleep,
     close: () => {
+      closed = true;
       clearInterval(timer);
       input.close();
       clear();

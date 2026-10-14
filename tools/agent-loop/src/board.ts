@@ -80,7 +80,8 @@ export class Board {
     const log = extra.log ?? before?.log;
     this.rows.set(agent, {
       phase,
-      text,
+      // Строка панели — одна строка экрана: причина ожидания бывает выводом git на много строк.
+      text: text.trim().split(/\r?\n/u, 1)[0] ?? '',
       since: this.now(),
       ...(task === undefined ? {} : { task }),
       ...(log === undefined ? {} : { log }),
@@ -91,7 +92,9 @@ export class Board {
   /** Агент взял задачу: она видна в строке, пока он её не отпустит. */
   task(agent: string, task: string): void {
     const row = this.rows.get(agent);
-    this.set(agent, row?.phase ?? 'idle', row?.text ?? '', { task });
+    // Время текущего состояния не сбрасывается: агент продолжает то же дело.
+    this.rows.set(agent, { phase: 'idle', text: '', since: this.now(), ...row, task });
+    this.onChange();
   }
 
   begin(agent: string, text: string): void {
@@ -148,8 +151,7 @@ export class Board {
     const header = [
       'agent:run',
       ...(stage === undefined ? [] : [`этап ${stage.stage}`, stage.branch]),
-      `работают ${this.working} · предел ${limit}${this.requested === undefined ? '' : ' (применится после шага)'}`,
-      `запущен ${minutes(now - this.startedAt)} назад`,
+      `работают ${this.working} · предел ${limit}${this.requested === undefined ? '' : ' после шага'}`,
     ].join(' · ');
     const rows = [...this.rows.entries()]
       .sort(([a], [b]) => agentOrder(a) - agentOrder(b))
@@ -168,7 +170,7 @@ export class Board {
         `этап: готово ${stage.done} из ${stage.total} · на ревью ${stage.review} · дальше ${stage.next.join(', ') || '—'}`,
       );
     lines.push(
-      `за запуск: задач ${totals.done} · ВОЗВРАТ ${totals.returns} · сессий codex ${totals.sessions} (${minutes(totals.sessionMs)}) · CI зелёных ${totals.ciGreen}, красных ${totals.ciRed}`,
+      `за ${minutes(now - this.startedAt)}: задач ${totals.done} · ВОЗВРАТ ${totals.returns} · сессий codex ${totals.sessions} (${minutes(totals.sessionMs)}) · CI зелёных ${totals.ciGreen}, красных ${totals.ciRed}`,
     );
     const logs = [...this.rows.entries()]
       .filter(([, row]) => row.log !== undefined)

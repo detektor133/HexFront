@@ -25,12 +25,28 @@ describe('панель агентов', () => {
     expect(second).toMatch(/^w2\s+работает\s+07\/T4\s+\$task 07\/T4 · 5 мин$/u);
   });
 
+  it('смена задачи агента не сбрасывает время текущего дела', () => {
+    const time = clock();
+    const board = new Board(time.now);
+    board.begin('w1', '$task 07/T1');
+    time.advance(7 * 60_000);
+    board.task('w1', '07/T2');
+    expect(board.render()[1]).toMatch(/07\/T2\s+\$task 07\/T1 · 7 мин$/u);
+  });
+
   it('ожидание владельца и свободный агент не считаются работающими', () => {
     const board = new Board(clock().now);
     board.wait('w1', 'вопрос владельцу по 07/T3');
     board.end(MAIN_AGENT, 'нет работы — жду Issues и main');
     expect(board.working).toBe(0);
     expect(board.render().join('\n')).toContain('w1       ждёт');
+  });
+
+  it('многострочная причина ожидания занимает одну строку панели', () => {
+    const board = new Board(clock().now);
+    board.wait('w1', 'push не прошёл: error: failed\nhint: Updates were rejected');
+    expect(board.render()).toHaveLength(4);
+    expect(board.render()[1]).toContain('push не прошёл: error: failed');
   });
 
   it('поток, отпустивший задачу, исчезает с панели', () => {
@@ -43,7 +59,7 @@ describe('панель агентов', () => {
   it('число агентов с клавиатуры — от 1 до 4, видно до применения и читается циклом один раз', () => {
     const board = new Board(clock().now);
     expect(board.requestLimit(9)).toBe(4);
-    expect(board.render()[0]).toContain('предел 4 (применится после шага)');
+    expect(board.render()[0]).toContain('предел 4 после шага');
     expect(board.takeLimit()).toBe(4);
     expect(board.takeLimit()).toBeUndefined();
     expect(board.requestLimit(0)).toBe(1);

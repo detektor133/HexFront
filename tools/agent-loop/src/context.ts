@@ -94,7 +94,14 @@ export async function park(
 ): Promise<Step> {
   const current = await head(context.git);
   const { parked } = context.state;
-  if (parked?.key === key && parked.head === current) return 'idle';
+  // Ожидание владельца — не оборванная сессия: незакоммиченное дерево ждёт его, а не доделки
+  // на каждом шаге цикла.
+  const resumed = context.state.resume !== undefined;
+  delete context.state.resume;
+  if (parked?.key === key && parked.head === current) {
+    if (resumed) await save(context);
+    return 'idle';
+  }
   context.state.parked = { key, head: current, reason };
   await save(context);
   context.config.board?.wait(agentName(context), reason);

@@ -134,6 +134,21 @@ describe('приёмочные тесты до кода ($spec)', () => {
     );
   });
 
+  it('ожидание владельца с работой в дереве не запускает доделку на следующих шагах цикла', async () => {
+    // Задача пишется в память до сессии (на случай Ctrl+C): ожидание обязано её стереть,
+    // иначе каждый шаг цикла снова запускал бы codex на том же дереве.
+    const run = await runWorld({
+      spec: true,
+      polls: 3,
+      wake: true,
+      sessions: [SPEC, BROKEN, SPEC_FIX, BROKEN],
+    });
+    expect(run.prompts).toHaveLength(4);
+    expect(
+      run.lines.filter((line) => line.startsWith('жду: $spec не исправил приёмочные тесты')),
+    ).toHaveLength(1);
+  });
+
   it('разные замечания исполнителя чинятся по очереди: сначала окружение, потом нехватка проверки', async () => {
     // 2026-10-14, 07/T1: после починки `window` ревью нашло нехватку проверки геометрии,
     // а цикл счёл это повтором и встал.
@@ -248,6 +263,29 @@ describe('приёмочные тесты до кода ($spec)', () => {
       sessions: [NEXT_DONE],
     });
     expect(run.prompts[0]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
+  });
+
+  it('просьба переписать тесты переживает паузу codex: замечания и прежний тест не теряются', async () => {
+    // Ревью вернуло задачу, а сессия $spec упала на лимите: после паузы замечания те же,
+    // а прежний тест, которого $spec не коснулся, по-прежнему закрыт.
+    const OTHER = 'packages/sim/test/fitness-other.test.ts';
+    const run = await runWorld({
+      spec: true,
+      state: {
+        specRewrite: {
+          '06/T1j5-Б1': {
+            remarks: 'ВОЗВРАТ\n- нет проверки штрафа чужого игрока',
+            files: { [TEST]: "it('старый', () => {});\n", [OTHER]: "it('другой', () => {});\n" },
+          },
+        },
+      },
+      sessions: [SPEC, NEXT_DONE],
+    });
+    expect(run.prompts[0]).toBe(
+      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- нет проверки штрафа чужого игрока',
+    );
+    expect(run.prompts[1]).toContain(OTHER);
+    expect(run.prompts[1]).toContain(TEST);
   });
 
   it('ВОЗВРАТ без имени файла, но с возвратом о приёмочном тесте в блоке — тесты переписывает $spec', async () => {

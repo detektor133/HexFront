@@ -84,8 +84,18 @@ async function specSession(
       ),
     };
   const files: Record<string, string> = {};
-  for (const path of new Set([...Object.keys(state.spec[task] ?? {}), ...touched])) {
-    const text = await readFile(join(config.root, path), 'utf8').catch(() => undefined);
+  const previous = state.specRewrite[task]?.files ?? {};
+  const kept = [...Object.keys(state.spec[task] ?? {}), ...Object.keys(previous)];
+  for (const path of new Set([...kept, ...touched])) {
+    const file = join(config.root, path);
+    let text = await readFile(file, 'utf8').catch(() => undefined);
+    // Прежний тест, убранный из дерева при остановке, возвращается: он тоже закрыт.
+    const restored = text === undefined && !touched.includes(path) ? previous[path] : undefined;
+    if (restored !== undefined) {
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, restored, 'utf8');
+      text = restored;
+    }
     if (text === undefined)
       return {
         step: await park(
@@ -200,10 +210,25 @@ export async function specViolation(
 /** Задача закрыта или тесты пишутся заново: записанные тесты больше не нужны. */
 export async function forgetSpec(context: LoopContext, task: string): Promise<void> {
   const { state } = context;
-  if (!(task in state.spec) && !(task in state.specRepairNotes)) return;
+  if (!(task in state.spec) && !(task in state.specRepairNotes) && !(task in state.specRewrite))
+    return;
   const other = ([key]: [string, unknown]): boolean => key !== task;
   state.spec = Object.fromEntries(Object.entries(state.spec).filter(other));
   state.specRepairNotes = Object.fromEntries(Object.entries(state.specRepairNotes).filter(other));
+  state.specRewrite = Object.fromEntries(Object.entries(state.specRewrite).filter(other));
+  await save(context);
+}
+
+/** Тесты задачи переписываются по замечаниям: просьба хранится до удачной сессии `$spec`. */
+export async function requestRespec(
+  context: LoopContext,
+  task: string,
+  remarks: string,
+): Promise<void> {
+  const { state } = context;
+  const files = { ...state.specRewrite[task]?.files, ...state.spec[task] };
+  await forgetSpec(context, task);
+  state.specRewrite = { ...state.specRewrite, [task]: { remarks, files } };
   await save(context);
 }
 
@@ -237,12 +262,16 @@ export async function prepareSpec(
   context: LoopContext,
   task: string,
   fresh: boolean,
-  remarks: string,
 ): Promise<Step | undefined> {
   if (!specEnabled(context)) return undefined;
-  if (fresh && !(task in context.state.spec)) {
-    const stop = await writeSpec(context, task, remarks);
+  const { state } = context;
+  if (fresh && !(task in state.spec)) {
+    const stop = await writeSpec(context, task, state.specRewrite[task]?.remarks ?? '');
     if (stop !== undefined) return stop;
+    state.specRewrite = Object.fromEntries(
+      Object.entries(state.specRewrite).filter(([key]) => key !== task),
+    );
+    await save(context);
   }
   await placeSpec(context, task);
   return undefined;
@@ -254,15 +283,14 @@ export async function prepareSpec(
  * в памяти не живёт. 2026-10-14, 07/T1: после перезапуска исполнитель не мог выполнить возврат
  * со старым тестом и взял 07/T2.
  */
-export async function pendingSpecReturn(context: LoopContext, task: string): Promise<string> {
+export async function pendingSpecReturn(context: LoopContext, task: string): Promise<void> {
   const files = specFiles(context, task);
-  if (files.length === 0) return '';
+  if (files.length === 0) return;
   const { stageText } = await readStage(context.config.root);
   const returned = returnedForSpec(taskBlock(stageText, task), files).trim();
-  if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return '';
-  await forgetSpec(context, task);
+  if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return;
+  await requestRespec(context, task, returned);
   context.state.specRepairNotes = { ...context.state.specRepairNotes, [task]: [returned] };
   await save(context);
   await context.say(`возврат ревью ${task} о приёмочных тестах — их переписывает $spec`);
-  return returned;
 }

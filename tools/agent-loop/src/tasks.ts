@@ -21,6 +21,7 @@ import {
   pendingSpecReturn,
   placeSpec,
   prepareSpec,
+  requestRespec,
   returnedForSpec,
   SPEC_REMARK_RE,
   specRemarks,
@@ -162,8 +163,11 @@ async function runWork(
   // исполнитель с тестами 07/T1 взял 07/T2. Задача с тестами идёт по номеру.
   const pinned = prompt === '$next' && locked.length > 0 ? `$task ${task}` : prompt;
   // Оборванная сессия (Ctrl+C, сбой ПК) оставляет работу в дереве: перезапуск её доделает.
-  state.resume = task;
-  await save(context);
+  // Только когда задача известна заранее: `$next` без тестов выбирает её сам.
+  if (pinned !== '$next') {
+    state.resume = task;
+    await save(context);
+  }
   const work = await session(context, 'next', withSpec(pinned, task, locked), locked);
   // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) или нехватку,
   // о которой сказало ревью, чинит $spec. Признак — строка `СПЕК:` исполнителя или возврат ревью
@@ -179,7 +183,8 @@ async function runWork(
   // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
   const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
   if (work.failure !== undefined) {
-    if (!dirty) delete state.resume;
+    if (dirty) state.resume = task;
+    else delete state.resume;
     return step(
       await backoff(
         context,
@@ -315,12 +320,11 @@ export async function processTask(
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
   const writesSpec = options.spec ?? options.workPrompt === '$next';
-  let remarks = '';
   for (let round = 1; round <= config.maxRounds;) {
     if (needsWork && writesSpec) {
       if (round === 1 && prompt === options.workPrompt && specEnabled(context))
-        remarks = await pendingSpecReturn(context, current);
-      const stop = await prepareSpec(context, current, prompt === options.workPrompt, remarks);
+        await pendingSpecReturn(context, current);
+      const stop = await prepareSpec(context, current, prompt === options.workPrompt);
       if (stop !== undefined) return { step: stop, done: false };
     }
     const work = needsWork
@@ -359,10 +363,9 @@ export async function processTask(
     if (
       SPEC_REMARK_RE.test(verdict.message) ||
       mentionsSpec(verdict.message, specFiles(context, current))
-    ) {
-      remarks = verdict.message;
-      await forgetSpec(context, current);
-    } else remarks = specEnabled(context) ? await pendingSpecReturn(context, current) : '';
+    )
+      await requestRespec(context, current, verdict.message);
+    else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;
