@@ -1,3 +1,5 @@
+import { QUICK_MATCH_SEEDS } from '../routes.ts';
+
 export interface MapRequest {
   readonly id: 'small' | 'gen';
   readonly seed: number;
@@ -32,6 +34,12 @@ export function readMapRequest(search: string): MapRequest {
 /** Возвращает URL карты, которую отдаёт dev-сервер или production-сборка. */
 export function mapUrl(request: MapRequest): string {
   if (request.id === 'small') return '/maps/small.json';
+  if (
+    request.players === 30 &&
+    QUICK_MATCH_SEEDS.includes(request.seed as (typeof QUICK_MATCH_SEEDS)[number])
+  ) {
+    return `/maps/gen-${request.seed}-30.json`;
+  }
   const params = new URLSearchParams({
     seed: String(request.seed),
     players: String(request.players),

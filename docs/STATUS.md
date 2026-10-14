@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T2: исправлены приёмочные тесты экрана и удалён скрытый fallback телеметрии. Тесты рендерят реальный `MatchSurface` с загруженным видом и ненулевым отказом, проверяют русский словарь, вызывают production `App` для `/dev/sandbox`; worker-тесты проходят через реальный обработчик.
-Следующая сессия: `$review 07/T2`.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`, `apps/client/src/match/MatchSurface.tsx`.
+07/T3: добавлены двадцать статических карт `gen` для 30 игроков, быстрый матч выбирает случайный seed из набора, `mapUrl` использует статический путь, сборка генерирует карты через существующий mapgen-скрипт. Приёмочный тест `apps/client/test/static-maps-build.test.ts` не изменялся; устаревшее ожидание seed 42 в `apps/client/test/main-menu.test.ts` заменено проверкой набора.
+Следующая задача: 07/T4.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/vite.config.ts`, `apps/client/src/routes.ts`, `apps/client/src/local/map-request.ts`, `apps/client/test/static-maps-build.test.ts`.
