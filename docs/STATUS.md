@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T4: исправлены тесты по возврату СПЕК и добавлен шаг `pnpm lint` в workflow.
+07/T4: повторное ревью вернуло задачу: требуется обосновать изменение существующего теста `static-maps-build.test.ts` строкой `Заменён тест:` и исправить неподтверждённое утверждение отчёта о HTTP-ответах `/` и `/match`.
 `apps/client/test/deployment.test.ts` запускает реальную сборку клиента, проверяет workflow и артефакт `index.html` без `404.html`; самописный HTTP-fallback удалён.
 `apps/client/test/static-maps-build.test.ts` сам запускает сборку, поэтому проверка карт не зависит от порядка запуска файлов Vitest.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Задача отмечена `- [~]`; следующая сессия — `$review 07/T4`.
+Задача отмечена `- [ ]`; следующая сессия — `$review 07/T4` после исправлений.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `.github/workflows/pages.yml`, `docs/reports/stage-07-t4.md`.
