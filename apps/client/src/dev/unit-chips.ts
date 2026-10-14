@@ -76,7 +76,9 @@ function glyph(g: Graphics, type: UnitType, x: number, y: number, color: string)
   } else if (type === 'armor') {
     g.poly([x + 7, y + 2, x + 12, y + 7, x + 7, y + 12, x + 2, y + 7]).stroke(stroke);
   } else {
-    g.arc(x + 7, y + 10, 5, Math.PI, 0).stroke(stroke);
+    g.moveTo(x + 2, y + 10)
+      .arc(x + 7, y + 10, 5, Math.PI, 0)
+      .stroke(stroke);
     g.circle(x + 7, y + 10, 1.75).fill(color);
   }
 }
@@ -228,8 +230,9 @@ export function createChip(): Chip {
   const count = new Text({ text: '', style: { ...font, fontSize: COUNT_PX } });
   label.anchor.set(0.5, 0.5);
   count.anchor.set(0.5, 0.5);
-  label.resolution = window.devicePixelRatio * 2;
-  count.resolution = window.devicePixelRatio * 2;
+  const textResolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
+  label.resolution = textResolution;
+  count.resolution = textResolution;
   content.addChild(g, label, count);
   const parts: Parts = { g, label, count };
   return {

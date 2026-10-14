@@ -251,7 +251,7 @@ export function createPlanLayer(
         stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
       },
     });
-    tx.resolution = window.devicePixelRatio * 2;
+    tx.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
     tx.anchor.set(0.5, 1);
     tx.scale.set(k);
     tx.position.set(at.x, at.y - LABEL_LIFT * k);
@@ -281,11 +281,13 @@ export function createPlanLayer(
     g.circle(c.x, c.y, ring).stroke({ color: tokens.ui.surface, width: 8 * k, alpha: 0.95 });
     const start = -Math.PI / 2;
     const end = start + Math.PI * 2 * o.share;
-    g.arc(c.x, c.y, ring, start, end).stroke({
-      color: tokens.relation.own,
-      width: 5 * k,
-      cap: 'round',
-    });
+    g.moveTo(c.x, c.y - ring)
+      .arc(c.x, c.y, ring, start, end)
+      .stroke({
+        color: tokens.relation.own,
+        width: 5 * k,
+        cap: 'round',
+      });
     const kx = c.x + Math.cos(end) * ring;
     const ky = c.y + Math.sin(end) * ring;
     g.circle(kx, ky, 6 * k)
@@ -309,7 +311,8 @@ export function createPlanLayer(
     }
   }
 
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const tweens = createFrontTweens(reduced);
   let last: Parameters<PlanLayer['setView']> | null = null;
   let animating = false;

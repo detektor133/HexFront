@@ -379,6 +379,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       } else {
         const share = c.totalTicks > 0 ? c.progressTicks / c.totalTicks : 0;
         constructionEffects
+          .moveTo(p.x, p.y - radius * ARC_RADIUS)
           .arc(p.x, p.y, radius * ARC_RADIUS, -Math.PI / 2, -Math.PI / 2 + share * Math.PI * 2)
           .stroke({ color: playerLine(c.owner), width: MARK_WIDTH_PX * k, cap: 'round' });
       }
@@ -595,7 +596,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         previousRoadSignature = nextRoadSignature;
       }
       previousVisible = v.hexes.visible.slice();
-      unitLayer.setView(v, sel, performance.now());
+      if (typeof document !== 'undefined') unitLayer.setView(v, sel, performance.now());
     },
     cacheTelemetry() {
       return {

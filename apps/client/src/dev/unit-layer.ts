@@ -138,7 +138,7 @@ export function createUnitLayer(
   let picked: Picked = { hex: null, units: [], target: null };
   let snapAt = 0;
   let k = 1;
-  let textRes = window.devicePixelRatio;
+  let textRes = globalThis.window?.devicePixelRatio ?? 1;
   let lastFrame = 0;
   const reducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -110,7 +110,7 @@ export function drawCityLabels(
         stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
       },
     });
-    text.resolution = window.devicePixelRatio * 2;
+    text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
     text.anchor.set(0.5, 0);
     text.scale.set(1 / scale);
     text.position.set(city.at.x, city.at.y + hexRadius * 0.68);

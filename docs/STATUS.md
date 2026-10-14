@@ -15,4 +15,6 @@
 
 ## Следующая сессия
 
-Начать 07/T1. Прочитать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/art/style-guide.md`, `docs/testing.md`.
+07/T1 выполнена и ждёт ревью. Исправлены начала дуг прогресса в `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/src/dev/unit-chips.ts`; добавлены Node-safe проверки окружения для затронутых слоёв.
+
+Следующая задача: 07/T2. Прочитать блок T2 в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/gdd/08-match.md`, `docs/architecture/rendering.md`, `docs/testing.md`.
