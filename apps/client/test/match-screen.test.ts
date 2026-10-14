@@ -72,9 +72,14 @@ function setWindow(search: string, pathname = '/match'): void {
   });
 }
 
+function setLanguage(language: string): void {
+  vi.stubGlobal('navigator', { language });
+}
+
 afterEach(() => {
   vi.resetModules();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('экран матча игрока', () => {
@@ -83,6 +88,7 @@ describe('экран матча игрока', () => {
       useMapJson: () => ({ json: tinyMap, map: loaded.map }),
       useSandbox: () => sandbox,
     }));
+    setLanguage('ru-RU');
     setWindow('');
 
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
@@ -101,6 +107,7 @@ describe('экран матча игрока', () => {
       useMapJson: () => ({ json: tinyMap, map: loaded.map }),
       useSandbox: () => sandbox,
     }));
+    setLanguage('ru-RU');
     setWindow('?debug=1');
 
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
