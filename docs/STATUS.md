@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T2: исправлен красный CI в production-маршруте `/dev/*`: текст берётся из русского словаря, поэтому приёмочный тест не зависит от локали CI.
+07/T2: возврат ревью — `apps/client/test/match-screen.test.ts` не рендерит `MatchSurface` с загруженным `view`; debug-тест проходит по скрытому тексту, а не по `ObserverPanel`.
 
-Подтверждение: `apps/client/test/match-screen.test.ts` — 3 теста, `pnpm verify --changed` — зелёный; приёмочные тесты не изменялись.
+Подтверждение: `pnpm exec vitest run apps/client/test/match-screen.test.ts apps/client/test/sim-worker-telemetry.test.ts` — 5 тестов зелёные; задача возвращена на исправление приёмочного теста.
 
 Следующая сессия: запустить `$review 07/T2` в новой сессии.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/main.tsx`.
