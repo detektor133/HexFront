@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T4 выполнена: добавлены workflow Cloudflare Pages и ADR 0012; сборка публикует `apps/client/dist`, а шаг публикации пропускается без секретов.
+07/T4 возвращена ревью: приёмочный тест `apps/client/test/deployment.test.ts` не закрывает проект/ветки Cloudflare, реальную сборку перед проверкой `dist`, маршруты `/` и `/match` и точную логику условий секретов.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Следующая задача: `$review 07/T4` в новой сессии, затем `$next`.
+Следующая сессия: исправить приёмочный тест по замечаниям `СПЕК:` и повторить `$review 07/T4`.
 Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/pages.yml`, `docs/architecture/adr/0012-cloudflare-pages-deployment.md`, `docs/reports/stage-07-t4.md`.
