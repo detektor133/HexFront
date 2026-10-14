@@ -2,7 +2,12 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+/** Больше потоков не даёт выигрыша: упор в общие файлы, зависимости задач и лимит codex. */
+export const MAX_STREAMS = 4;
+
 export interface LoopState {
+  /** Сколько задач может идти одновременно (Issue `$streams N` или `--streams N`); нет — 1. */
+  streams?: number;
   /** Недоделка: сессия этой задачи оборвалась с незакоммиченной работой. */
   resume?: string;
   /** Ожидание: та же причина при том же HEAD повторно сессий не запускает. */

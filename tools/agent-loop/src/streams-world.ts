@@ -42,6 +42,8 @@ export interface StreamsWorld {
   readonly ci?: readonly ('success' | 'failure')[];
   /** Issue, которая появится на N-м чтении списка Issues, и что её `$decide` пишет в файл этапа. */
   readonly decide?: { readonly atList: number; readonly stage: (text: string) => string };
+  /** Issues-настройки (`$streams N`), каждая появляется на своём N-м чтении списка Issues. */
+  readonly commands?: readonly { readonly atList: number; readonly body: string }[];
 }
 
 export interface StreamsRun {
@@ -134,6 +136,17 @@ export async function createWorld(world: StreamsWorld): Promise<WorldHandle> {
 
 type Git = (cwd: string, ...args: string[]) => Promise<string>;
 
+async function nextTask(cwd: string): Promise<string> {
+  const status = await readFile(join(cwd, 'docs/STATUS.md'), 'utf8');
+  const stage = await readFile(join(cwd, STAGE_FILE), 'utf8');
+  const queue = status.match(/Очередь:\s*([^\n]+)/)?.[1]?.split(' → ') ?? [];
+  return (
+    queue.find((task) =>
+      new RegExp(`^- \\[[ ~]\\] \\*\\*${task.split('/')[1]}\\.`, 'm').test(stage),
+    ) ?? ''
+  );
+}
+
 /** Поддельный codex: работает настоящим git в каталоге сессии, как работал бы скилл. */
 function fakeCodex(git: Git, world: StreamsWorld) {
   const reviews = new Map(Object.entries(world.tasks).map(([t, b]) => [t, [...(b.reviews ?? [])]]));
@@ -150,7 +163,10 @@ function fakeCodex(git: Git, world: StreamsWorld) {
   };
   return async (prompt: string, cwd: string): Promise<{ code: number; answer: string }> => {
     const first = prompt.split('\n', 1)[0] ?? '';
-    const task = first.match(/(\d{2}\/T\w+)/)?.[1] ?? '';
+    // `$next` цикла по одной задаче: первая открытая задача очереди, как её нашёл бы скилл.
+    const task = first.startsWith('$next')
+      ? await nextTask(cwd)
+      : (first.match(/(\d{2}\/T\w+)/)?.[1] ?? '');
     const short = task.split('/')[1] ?? '';
     const behaviour = world.tasks[short] ?? {};
     if (first.startsWith('$decide')) {
@@ -218,29 +234,35 @@ function fakeCodex(git: Git, world: StreamsWorld) {
 }
 
 function fakeGithub(world: StreamsWorld): GithubClient | undefined {
-  const decide = world.decide;
-  if (decide === undefined) return undefined;
+  const { decide } = world;
+  const planned = [
+    ...(decide === undefined ? [] : [{ atList: decide.atList, body: '$decide\nизменить задачу' }]),
+    ...(world.commands ?? []),
+  ];
+  if (planned.length === 0) return undefined;
   let lists = 0;
-  let closed = false;
-  const issue: AgentIssue = {
-    number: 1,
-    title: 'решение',
-    body: '$decide\nизменить задачу',
+  const closed = new Set<number>();
+  const issues: AgentIssue[] = planned.map((plan, index) => ({
+    number: index + 1,
+    title: plan.body.split('\n', 1)[0] ?? '',
+    body: plan.body,
     author: 'owner',
     labels: ['agent'],
     updatedAt: '2026-10-14T00:00:00Z',
-  };
+  }));
+  const visible = (issue: AgentIssue): boolean =>
+    lists >= (planned[issue.number - 1]?.atList ?? 0) && !closed.has(issue.number);
   return {
     repo: 'owner/game',
     owner: 'owner',
     listIssues: () => {
       lists += 1;
-      return Promise.resolve(lists >= decide.atList && !closed ? [issue] : []);
+      return Promise.resolve(issues.filter(visible));
     },
-    openIssue: () => Promise.resolve(closed ? undefined : issue),
+    openIssue: (number) => Promise.resolve(issues.find((i) => i.number === number && visible(i))),
     comment: () => Promise.resolve(),
-    close: () => {
-      closed = true;
+    close: (number) => {
+      closed.add(number);
       return Promise.resolve();
     },
     addLabel: () => Promise.resolve(),

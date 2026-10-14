@@ -11,7 +11,10 @@ import { saveState, type LoopState } from './state.ts';
 export interface AgentConfig {
   readonly root: string;
   readonly maxRounds: number;
-  /** Параллельных потоков задач; 1 — прежний цикл по одной задаче в главном каталоге. */
+  /**
+   * `--streams N`: предел параллельных задач, запоминается в памяти цикла. Не задан — прежний
+   * предел из памяти (Issue `$streams N`), по умолчанию 1 — цикл по одной задаче в главном каталоге.
+   */
   readonly streams?: number;
   /** Предел одной сессии codex, мин. */
   readonly maxMinutes: number;
@@ -212,10 +215,17 @@ export interface StageState {
   readonly stageText: string;
 }
 
+/** Чем цикл читает STATUS: строки таблицы из шаблона скилла `$stage-close`. */
+export const STATUS_FORMAT =
+  'в docs/STATUS.md нужны строки таблицы «| Текущий этап | NN — название |» и «| Ветка | `stage-NN` |» (шаблон — скилл $stage-close)';
+
+export const readStatus = (root: string): Promise<string> =>
+  readFile(join(root, 'docs/STATUS.md'), 'utf8');
+
 export async function readStage(root: string): Promise<StageState> {
-  const status = await readFile(join(root, 'docs/STATUS.md'), 'utf8');
+  const status = await readStatus(root);
   const stage = status.match(/Текущий этап\s*\|\s*(\d+)/)?.[1];
-  if (!stage) throw new Error('В docs/STATUS.md не найден текущий этап');
+  if (!stage) throw new Error(`не найден текущий этап: ${STATUS_FORMAT}`);
   const name = (await readdir(join(root, 'docs/stages'))).find((file) =>
     file.startsWith(`stage-${stage}-`),
   );

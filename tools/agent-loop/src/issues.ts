@@ -156,12 +156,28 @@ async function runTaskIssue(
   );
 }
 
+/** `$streams N`: предел одновременных задач; режим цикла меняется в ближайшей свободной точке. */
+async function setStreams(context: LoopContext, issue: AgentIssue, count: number): Promise<Step> {
+  const before = context.state.streams ?? 1;
+  context.state.streams = count;
+  await save(context);
+  return finish(
+    context,
+    issue,
+    count === 1
+      ? `один агент (было ${before}): новые задачи — по одной в главном каталоге; задачи, уже начатые в потоках, доделываются там`
+      : `до ${count} задач одновременно (было ${before}): цикл сам берёт рядом только задачи без пересечений по «Файлы:» и «После:», остальные идут по одной`,
+  );
+}
+
 async function runIssue(
   context: LoopContext,
   issue: AgentIssue,
   command: IssueCommand,
 ): Promise<Step> {
   await context.say(`Issue #${issue.number} «${issue.title}»: ${firstLine(command.prompt)}`);
+  if (command.skill === 'streams' && command.count !== undefined)
+    return setStreams(context, issue, command.count);
   if ((command.skill === 'task' || command.skill === 'review') && command.task !== undefined)
     return runTaskIssue(context, issue, command, command.task);
   const result = await runSkill(context, 'next', command.prompt);
@@ -199,7 +215,9 @@ export async function processIssues(
     )
       continue;
     const command = parseIssueCommand(issue.body);
-    if (dirty && !('error' in command) && command.skill !== 'done') continue;
+    // `$done` коммитит работу владельца, `$streams` — настройка цикла: обоим чистое дерево не нужно.
+    if (dirty && !('error' in command) && command.skill !== 'done' && command.skill !== 'streams')
+      continue;
     // Перед исполнением — состояние Issue прямым запросом: отстающий список мог отдать уже
     // закрытую или остановленную Issue (2026-10-14: #12 исполнилась второй раз через 4 с).
     let fresh: AgentIssue | undefined;

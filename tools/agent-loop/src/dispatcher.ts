@@ -1,20 +1,30 @@
 // Диспетчер параллельных потоков (`--streams N`): главный каталог ведёт Issues, `slow` и закрытие
 // этапа, потоки — задачи «Очереди» без пересечений по `Файлы:` и `После:`.
-import { firstLine, park, readStage, save, type LoopContext, type Step } from './context.ts';
+import {
+  firstLine,
+  park,
+  readStage,
+  readStatus,
+  save,
+  type LoopContext,
+  type Step,
+} from './context.ts';
 import { currentBranch, dirtyFiles, head, syncWithOrigin } from './git.ts';
 import type { StageTarget } from './integrate.ts';
 import { processIssues } from './issues.ts';
 import { selectStreamTask } from './scope.ts';
 import { slowGate } from './slow.ts';
-import { closedStage, closeStage } from './stage-close.ts';
+import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
   isOwnerTask,
   selectTask,
   statusBranch,
+  statusStage,
   taskBlock,
   taskMark,
 } from './stage-file.ts';
+import { MAX_STREAMS } from './state.ts';
 import { runStream, type StreamOutcome } from './stream.ts';
 import { branchTask, createLock, releaseSlot, slotGit } from './worktree.ts';
 
@@ -81,7 +91,7 @@ async function mainStep(context: LoopContext, slots: readonly Slot[]): Promise<S
     delete state.retryAfter;
     await save(context);
   }
-  const { status } = await readStage(config.root);
+  const status = await readStatus(config.root);
   const expected = statusBranch(status);
   const branch = await currentBranch(git);
   if (expected !== undefined && branch !== expected)
@@ -91,13 +101,18 @@ async function mainStep(context: LoopContext, slots: readonly Slot[]): Promise<S
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
   const busy = busyTasks(slots);
-  const { stageText } = await readStage(config.root);
-  const before = new Map(busy.map((task) => [task, taskBlock(stageText, task)]));
+  const before = new Map<string, string>();
+  if (busy.length > 0) {
+    const { stageText } = await readStage(config.root);
+    for (const task of busy) before.set(task, taskBlock(stageText, task));
+  }
   const issue = await processIssues(context, false);
   if (issue !== undefined) {
     await cancelChanged(context, slots, before);
     return issue;
   }
+  const broken = await brokenStatus(context);
+  if (broken !== undefined) return broken;
   const stage = await readStage(config.root);
   const closed = closedStageBranch(stage.status);
   if (closed !== undefined) return busy.length === 0 ? closedStage(context, closed) : 'idle';
@@ -174,11 +189,20 @@ async function fill(target: StageTarget, slots: readonly Slot[]): Promise<number
       started += 1;
     }
   }
-  const { status, stageText } = await readStage(context.config.root);
-  if (closedStageBranch(status) !== undefined || context.state.retryAfter !== undefined)
+  const status = await readStatus(context.config.root);
+  // Предел 1 — прежний цикл в главном каталоге: потоки только доделывают начатое, потом 'switch'.
+  if (
+    streamLimit(context) === 1 ||
+    statusStage(status) === undefined ||
+    closedStageBranch(status) !== undefined ||
+    context.state.retryAfter !== undefined
+  )
     return started;
+  const { stageText } = await readStage(context.config.root);
   for (const slot of slots) {
-    if (slot.task !== undefined) continue;
+    // Предел уменьшен Issue `$streams`: начатое доделывается, новое — только когда задач меньше предела.
+    if (busyTasks(slots).length >= streamLimit(context)) break;
+    if (slot.task !== undefined || slot.index > streamLimit(context)) continue;
     const task = selectStreamTask(status, stageText, busyTasks(slots));
     if (task === undefined) break;
     slot.task = task;
@@ -189,21 +213,28 @@ async function fill(target: StageTarget, slots: readonly Slot[]): Promise<number
   return started;
 }
 
-/** Потоки, начатые до перезапуска цикла: каталог на ветке `agent/NN-Tn` — задача продолжается. */
-async function recover(target: StageTarget, slots: readonly Slot[]): Promise<void> {
+/**
+ * Потоки, начатые до перезапуска цикла или смены режима: каталог на ветке `agent/NN-Tn` —
+ * задача продолжается, даже если предел потоков с тех пор уменьшен.
+ * @returns false, если STATUS не читается и восстановление нужно повторить позже.
+ */
+async function recover(target: StageTarget, slots: Slot[]): Promise<boolean> {
   const { context } = target;
+  if (statusStage(await readStatus(context.config.root)) === undefined) return false;
   const { stageText } = await readStage(context.config.root);
-  for (const slot of slots) {
-    const git = await slotGit(context.config.runCommand, context.config.root, slot.index);
+  for (let index = 1; index <= MAX_STREAMS; index += 1) {
+    const git = await slotGit(context.config.runCommand, context.config.root, index);
     if (git === undefined) continue;
     const task = branchTask(await currentBranch(git));
     if (task === undefined) continue;
     const mark = taskMark(stageText, task);
     if (mark === ' ' || mark === '~') {
+      const slot = slotAt(slots, index);
       slot.task = task;
-      await context.say(`поток w${slot.index}: продолжаю ${task} после перезапуска`);
+      await context.say(`поток w${index}: продолжаю ${task}`);
     } else await target.lock.run(() => releaseSlot(context.git, git, task, false));
   }
+  return true;
 }
 
 /**
@@ -229,34 +260,54 @@ async function waitStreams(context: LoopContext, running: readonly Promise<void>
   }
 }
 
-/** Цикл с N потоками; `--once` — выход, когда потоки свободны и работы без владельца нет. */
-export async function runStreams(context: LoopContext, count: number): Promise<number> {
+/** Поток с номером index; недостающие потоки до него создаются. */
+function slotAt(slots: Slot[], index: number): Slot {
+  while (slots.length < index) slots.push({ index: slots.length + 1 });
+  const slot = slots[index - 1];
+  if (slot === undefined) throw new Error(`нет потока w${index}`);
+  return slot;
+}
+
+/** Предел одновременных задач из памяти цикла (Issue `$streams N`, `--streams N`). */
+export const streamLimit = (context: LoopContext): number => context.state.streams ?? 1;
+
+/**
+ * Цикл с потоками; предел читается на каждом шаге. `--once` — выход, когда потоки свободны и
+ * работы без владельца нет.
+ * @returns код выхода или 'switch' — предел стал 1 и потоки свободны: дальше цикл по одной задаче.
+ */
+export async function runStreams(context: LoopContext): Promise<number | 'switch'> {
   const { config } = context;
   const lock = createLock();
   const stageBranch = async (): Promise<string> =>
-    statusBranch((await readStage(config.root)).status) ?? (await currentBranch(context.git));
-  const slots: Slot[] = Array.from({ length: count }, (_, index) => ({ index: index + 1 }));
+    statusBranch(await readStatus(config.root)) ?? (await currentBranch(context.git));
+  const slots: Slot[] = [];
   // Слияние другого потока — не ответ владельца: ждущие потоки продолжают ждать.
   const onMerged = (sha: string): void => {
     for (const slot of slots) if (slot.waitHead !== undefined) slot.waitHead = sha;
   };
   let target: StageTarget = { context, branch: await stageBranch(), lock, onMerged };
-  await recover(target, slots);
-  await context.say(`потоков: ${count}, ветка этапа ${target.branch}`);
+  let recovered = false;
+  await context.say(`потоков до ${streamLimit(context)}, ветка этапа ${target.branch}`);
   for (;;) {
+    slotAt(slots, streamLimit(context));
     // После `$stage-close` ветка этапа новая: потоки, начатые дальше, ветвятся от неё.
     if (busyTasks(slots).length === 0)
       target = { context, branch: await stageBranch(), lock, onMerged };
     let step: Step;
+    let started = 0;
     try {
+      if (!recovered) recovered = await recover(target, slots);
       step = await target.lock.run(() => mainStep(context, slots));
+      started = await fill(target, slots);
     } catch (error) {
       await context.say(`ошибка: ${error instanceof Error ? error.message : String(error)}`);
       if (config.once) return 1;
       step = 'idle';
     }
-    const started = await fill(target, slots);
     await save(context);
+    // До восстановления потоков (STATUS не читается) их работа неизвестна: режим не меняется.
+    if (recovered && streamLimit(context) === 1 && busyTasks(slots).length === 0) return 'switch';
     if (step === 'worked' || started > 0) continue;
     const running = slots.flatMap((slot) => (slot.running === undefined ? [] : [slot.running]));
     if (config.once && running.length === 0) {

@@ -4,6 +4,7 @@ import { basename, dirname, join } from 'node:path';
 
 import { currentBranch, dirtyFiles, makeGit, type Git } from './git.ts';
 import type { RunCommand } from './process.ts';
+import { MAX_STREAMS } from './state.ts';
 
 /**
  * Каталог потока: `<репозиторий>-streams/wN` рядом с репозиторием. Короткий путь — из-за
@@ -105,4 +106,13 @@ export async function releaseSlot(
   await git.run(['checkout', '--detach']);
   await main.attempt(['branch', '-D', branch]);
   await main.attempt(['push', 'origin', '--delete', branch]);
+}
+
+/** @returns есть ли каталог потока на ветке задачи: начатую в потоке работу доделывают потоки. */
+export async function streamWorkLeft(runCommand: RunCommand, root: string): Promise<boolean> {
+  for (let slot = 1; slot <= MAX_STREAMS; slot += 1) {
+    const git = await slotGit(runCommand, root, slot);
+    if (git !== undefined && branchTask(await currentBranch(git)) !== undefined) return true;
+  }
+  return false;
 }

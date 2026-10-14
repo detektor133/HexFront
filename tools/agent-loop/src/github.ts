@@ -1,5 +1,6 @@
 // Issues как конверт команды владельца и PR закрытого этапа: REST API GitHub через fetch.
 import { commandTask } from './stage-file.ts';
+import { MAX_STREAMS } from './state.ts';
 
 export interface AgentIssue {
   readonly number: number;
@@ -47,11 +48,15 @@ const SKILLS = {
   review: 'task',
   done: 'task',
   'stage-close': 'none',
+  // Не скилл codex: настройку исполняет сам цикл.
+  streams: 'count',
 } as const;
 export type Skill = keyof typeof SKILLS;
 export interface IssueCommand {
   readonly skill: Skill;
   readonly task?: string;
+  /** `$streams N`: предел одновременных задач. */
+  readonly count?: number;
   /** Тело Issue дословно: первая строка — команда, дальше текст владельца. */
   readonly prompt: string;
 }
@@ -73,6 +78,12 @@ export function parseIssueCommand(body: string): IssueCommand | { readonly error
   const task = commandTask(first, `$${name}`);
   if (kind === 'task' && task === undefined)
     return { error: `после $${name} нужен номер задачи, например $${name} 06/T2` };
+  if (kind === 'count') {
+    const count = Number(first.slice(name.length + 1).trim());
+    return Number.isInteger(count) && count >= 1 && count <= MAX_STREAMS
+      ? { skill: name, count, prompt }
+      : { error: `после $${name} нужно число задач одновременно от 1 до ${MAX_STREAMS}` };
+  }
   if (kind === 'text' && prompt.slice(name.length + 1).trim() === '')
     return { error: `после $${name} нужен текст владельца` };
   return kind === 'task' && task !== undefined

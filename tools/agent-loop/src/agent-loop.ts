@@ -5,17 +5,18 @@ import {
   openLog,
   park,
   readStage,
+  readStatus,
   save,
   type AgentConfig,
   type LoopContext,
   type Step,
 } from './context.ts';
-import { runStreams } from './dispatcher.ts';
+import { runStreams, streamLimit } from './dispatcher.ts';
 import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { slowGate } from './slow.ts';
-import { closedStage, closeStage } from './stage-close.ts';
+import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
   isOwnerTask,
@@ -26,6 +27,7 @@ import {
 } from './stage-file.ts';
 import { loadState } from './state.ts';
 import { processTask } from './tasks.ts';
+import { streamWorkLeft } from './worktree.ts';
 
 export { type AgentConfig } from './context.ts';
 export {
@@ -70,7 +72,7 @@ async function tick(context: LoopContext): Promise<Step> {
     delete state.retryAfter;
     await save(context);
   }
-  const { status } = await readStage(config.root);
+  const status = await readStatus(config.root);
   const branch = await currentBranch(git);
   const expected = statusBranch(status);
   if (expected !== undefined && branch !== expected)
@@ -87,6 +89,8 @@ async function tick(context: LoopContext): Promise<Step> {
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
   const issue = await processIssues(context, false);
   if (issue !== undefined) return issue;
+  const broken = await brokenStatus(context);
+  if (broken !== undefined) return broken;
   const stage = await readStage(config.root);
   const closed = closedStageBranch(stage.status);
   if (closed !== undefined) return closedStage(context, closed);
@@ -194,10 +198,39 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   delete context.state.retryAfter;
   if (config.resume !== undefined) context.state.resume = config.resume;
   await save(context);
+  if (config.streams !== undefined && config.streams !== context.state.streams) {
+    context.state.streams = config.streams;
+    await save(context);
+  }
   await context.say(
-    `старт: кругов на задачу ≤ ${config.maxRounds}, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
+    `старт: кругов на задачу ≤ ${config.maxRounds}, потоков до ${streamLimit(context)}, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
   );
-  if ((config.streams ?? 1) > 1) return runStreams(context, config.streams ?? 1);
+  for (;;) {
+    // Начатая в потоке работа доделывается потоками, даже если предел уже 1.
+    const streams =
+      streamLimit(context) > 1 || (await streamWorkLeft(config.runCommand, config.root));
+    const result = streams ? await runStreams(context) : await runSingle(context);
+    if (result !== 'switch') return result;
+    await context.say(
+      streamLimit(context) > 1
+        ? `режим: до ${streamLimit(context)} задач одновременно`
+        : 'режим: одна задача в главном каталоге',
+    );
+  }
+}
+
+/** Предел вырос, а своей незаконченной работы в главном каталоге нет — пора в потоки. */
+async function switchToStreams(context: LoopContext): Promise<boolean> {
+  return (
+    streamLimit(context) > 1 &&
+    context.state.resume === undefined &&
+    (await dirtyFiles(context.git)) === ''
+  );
+}
+
+/** Цикл по одной задаче в главном каталоге. @returns код выхода или 'switch' в потоки. */
+async function runSingle(context: LoopContext): Promise<number | 'switch'> {
+  const { config } = context;
   let waiting = false;
   for (;;) {
     let step: Step;
@@ -208,6 +241,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
       if (config.once) return 1;
       step = 'idle';
     }
+    if (await switchToStreams(context)) return 'switch';
     if (step === 'worked') {
       waiting = false;
       continue;

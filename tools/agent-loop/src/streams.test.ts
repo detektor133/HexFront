@@ -337,4 +337,50 @@ describe('параллельные потоки на настоящем git', { 
     await expectMerged(handle, ['T1', 'T2']);
     expect(await handle.originFile(STAGE_FILE)).toContain('(решение владельца)');
   });
+
+  it('Issue $streams 2 в режиме одного агента — цикл сам переходит на потоки', async () => {
+    const spec: StreamsWorld = {
+      queue: '07/T1 → 07/T2',
+      stage: stageOf(
+        task('T1', '\n  *Файлы:* `src/T1.txt`\n  *После:* —'),
+        task('T2', '\n  *Файлы:* `src/T2.txt`\n  *После:* —'),
+      ),
+      tasks: { T1: { workMs: 300 }, T2: { workMs: 300 } },
+      streams: 1,
+      commands: [{ atList: 1, body: '$streams 2' }],
+    };
+    const handle = await world(spec);
+    const run = await handle.run(spec);
+    expect(run.lines).toContain('режим: до 2 задач одновременно');
+    expect(index(run.events, `start:${workPrompt('T2')}`)).toBeLessThan(
+      index(run.events, `end:${workPrompt('T1')}`),
+    );
+    expect(run.prompts.some((p) => p.prompt.startsWith('$next'))).toBe(false);
+    await expectMerged(handle, ['T1', 'T2']);
+  });
+
+  it('Issue $streams 1 посреди работы — начатые задачи доделываются, следующая идёт одна в главном каталоге', async () => {
+    const spec: StreamsWorld = {
+      queue: '07/T1 → 07/T2 → 07/T3',
+      stage: stageOf(
+        task('T1', '\n  *Файлы:* `src/T1.txt`\n  *После:* —'),
+        task('T2', '\n  *Файлы:* `src/T2.txt`\n  *После:* —'),
+        task('T3', '\n  *Файлы:* `src/T3.txt`\n  *После:* —'),
+      ),
+      tasks: { T1: { workMs: 300 }, T2: { workMs: 500 }, T3: {} },
+      commands: [{ atList: 2, body: '$streams 1' }],
+    };
+    const handle = await world(spec);
+    const run = await handle.run(spec);
+    // T3 свободна, но предел уже 1: она ждёт, пока доделаются T1 и T2, и идёт без потоков.
+    const third = run.prompts.find((p) => p.prompt.startsWith('$next'));
+    expect(third?.cwd).toBe(handle.root);
+    expect(run.events.indexOf('start:$next')).toBeGreaterThan(
+      index(run.events, 'end:$review 07/T2'),
+    );
+    expect(run.prompts.some((p) => p.prompt.startsWith(workPrompt('T3')))).toBe(false);
+    expect(run.lines).toContain('режим: одна задача в главном каталоге');
+    await expectMerged(handle, ['T1', 'T2', 'T3']);
+    expect(await handle.originFile('src/T3.txt')).toBe('T3\n');
+  });
 });

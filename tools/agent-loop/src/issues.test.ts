@@ -1,6 +1,9 @@
+import { readFile } from 'node:fs/promises';
+
 import { describe, expect, it } from 'vitest';
 
 import { parseIssueCommand } from './github.ts';
+import { closedStageBranch, statusStage } from './stage-file.ts';
 import { closeAll, fixtureStage, fixtureStatus, issue, runWorld, setMark } from './test-world.ts';
 
 const ownerParked = setMark(fixtureStage, 'T1j5-Б1', 'x');
@@ -18,6 +21,16 @@ describe('команда в теле Issue', () => {
       skill: 'stage-close',
       prompt: '$stage-close',
     });
+  });
+
+  it('$streams N — число задач одновременно от 1 до 4', () => {
+    expect(parseIssueCommand('$streams 2')).toEqual({
+      skill: 'streams',
+      count: 2,
+      prompt: '$streams 2',
+    });
+    for (const body of ['$streams', '$streams 0', '$streams 5', '$streams два', '$streams 1.5'])
+      expect(parseIssueCommand(body)).toHaveProperty('error');
   });
 
   it('отклоняет тело без команды, без номера задачи или без текста', () => {
@@ -132,6 +145,20 @@ describe('Issues в цикле', () => {
   });
 });
 
+describe('$streams в цикле', () => {
+  it('исполняется и при грязном дереве: это настройка цикла, а не работа в дереве', async () => {
+    const run = await runWorld({
+      stage: ownerParked,
+      dirty: true,
+      issues: [issue(7, '$streams 1')],
+      sessions: [],
+    });
+    expect(run.prompts).toEqual([]);
+    expect(run.closed).toEqual([7]);
+    expect(run.comments.some((text) => text.includes('один агент'))).toBe(true);
+  });
+});
+
 describe('закрытие этапа', () => {
   const lastQueue = fixtureStatus.replace(/Очередь:.*/, 'Очередь: 06/T2');
 
@@ -188,6 +215,39 @@ describe('закрытие этапа', () => {
       sessions: [{ answer: 'Ветка stage-07 уже есть' }],
     });
     expect(run.prompts).toEqual(['$stage-close']);
+  });
+
+  it('$stage-close записал STATUS своей таблицей — ожидание с причиной, а не ошибка на каждом шаге', async () => {
+    // Таблица из коммита 6dcccf2 (2026-10-14): цикл не находил «Текущий этап» и сыпал ошибками.
+    const own = lastQueue.replace(
+      /\| Текущий этап[^\n]*\n\| Ветка[^\n]*\n/,
+      '| Этап | Ветка | Дата |\n| --- | --- | --- |\n| 06 закрыт — Боты и баланс | `stage-06` | 2026-10-14 |\n',
+    );
+    const run = await runWorld({
+      status: lastQueue,
+      stage: closeAll(fixtureStage),
+      polls: 2,
+      sessions: [{ answer: 'Этап 06 закрыт', status: own }],
+    });
+    expect(run.prompts).toEqual(['$stage-close']);
+    expect(
+      run.lines.filter((line) => line.startsWith('жду: $stage-close записал STATUS')),
+    ).toHaveLength(1);
+    expect(run.lines.some((line) => line.startsWith('ошибка'))).toBe(false);
+  });
+
+  it('шаблон таблицы STATUS в скилле $stage-close цикл читает как закрытый этап', async () => {
+    const skill = await readFile(
+      new URL('../../../.agents/skills/stage-close/SKILL.md', import.meta.url),
+      'utf8',
+    );
+    const template = skill.match(/```\n(\| Поле[\s\S]*?)```/)?.[1] ?? '';
+    const status = template
+      .replace('<NN+1>', '07')
+      .replace('<NN>', '06')
+      .replace(/<[^>]+>/g, 'текст');
+    expect(statusStage(status)).toBe('07');
+    expect(closedStageBranch(status)).toBe('stage-06');
   });
 
   it('пустая очередь при открытых задачах этапа — ожидание, а не $stage-close', async () => {

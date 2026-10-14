@@ -2,7 +2,9 @@
 import {
   park,
   readStage,
+  readStatus,
   runSkill,
+  STATUS_FORMAT,
   save,
   type LoopContext,
   type StageState,
@@ -11,8 +13,17 @@ import {
 import { currentBranch, head, mergedIntoMain } from './git.ts';
 import { parseGithubRepo } from './github.ts';
 import { slowBeforeClose } from './slow.ts';
-import { closedStageBranch, openTasks, statusBranch } from './stage-file.ts';
+import { closedStageBranch, openTasks, statusBranch, statusStage } from './stage-file.ts';
 import { skillFailed } from './tasks.ts';
+
+/**
+ * STATUS без строки «Текущий этап»: ожидание с понятной причиной до коммита, который его
+ * исправит (Issue `$decide` или правка владельца), вместо ошибки на каждом шаге.
+ */
+export async function brokenStatus(context: LoopContext): Promise<Step | undefined> {
+  if (statusStage(await readStatus(context.config.root)) !== undefined) return undefined;
+  return park(context, 'status', `STATUS не читается: ${STATUS_FORMAT}`);
+}
 
 /** Очередь пуста: этап закрывается, только если в файле этапа не осталось `[ ]` и `[~]`. */
 export async function closeStage(context: LoopContext, stage: StageState): Promise<Step> {
@@ -28,8 +39,17 @@ export async function closeStage(context: LoopContext, stage: StageState): Promi
   await context.say(`этап ${stage.stage}: все задачи закрыты — $stage-close`);
   const result = await runSkill(context, 'next', '$stage-close');
   if (!result.ok) return skillFailed(context, '$stage-close', result);
+  const status = await readStatus(context.config.root);
+  // 2026-10-14: сессия переписала таблицу STATUS по-своему, и цикл больше не находил этап.
+  if (statusStage(status) === undefined || statusBranch(status) === undefined)
+    return park(
+      context,
+      `close:${stage.stage}`,
+      `$stage-close записал STATUS не по шаблону: ${STATUS_FORMAT}`,
+      result.message,
+    );
   // Без смены «Текущего этапа» следующий шаг снова закрыл бы тот же этап.
-  if (closedStageBranch((await readStage(context.config.root)).status) === undefined)
+  if (closedStageBranch(status) === undefined)
     return park(
       context,
       `close:${stage.stage}`,
