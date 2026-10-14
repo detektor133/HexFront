@@ -16,7 +16,11 @@ import {
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
 import {
   forgetSpec,
+  mentionsSpec,
   placeSpec,
+  returnedForSpec,
+  SPEC_REMARK_RE,
+  specRemarks,
   setSpecAside,
   specEnabled,
   specFiles,
@@ -40,8 +44,6 @@ export interface TaskRun {
 /** Сколько раз за круги одной задачи цикл сам повторяет работу после `$accept` или красного CI. */
 const MAX_FOLLOW_UPS = 2;
 
-/** Замечание к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ` ревью или исполнителя. */
-const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
 /** Сколько раз за задачу `$spec` чинит тесты по разным замечаниям исполнителя. */
 const MAX_SPEC_REPAIRS = 3;
 
@@ -111,24 +113,6 @@ async function followUp(
     ),
   );
 }
-
-/** Текст ссылается на файл приёмочного теста (путь или имя файла). */
-const mentionsSpec = (text: string, files: readonly string[]): boolean =>
-  files.some((path) => text.includes(path) || text.includes(path.split('/').at(-1) ?? path));
-
-/** Строки возврата ревью в блоке задачи, которые говорят о приёмочных тестах. */
-const returnedForSpec = (block: string, files: readonly string[]): string =>
-  block
-    .split(/\r?\n/)
-    .filter((line) => /возврат/iu.test(line) && mentionsSpec(line, files))
-    .join('\n');
-
-/** Строки `СПЕК: …` ответа: замечания к приёмочным тестам. */
-const specRemarks = (message: string): string =>
-  message
-    .split(/\r?\n/)
-    .filter((line) => SPEC_REMARK_RE.test(line))
-    .join('\n');
 
 /**
  * Исполнитель остановился на сломанном приёмочном тесте: `$spec` чинит тест по его замечанию,
@@ -313,6 +297,25 @@ async function prepareSpec(
 }
 
 /**
+ * Возврат ревью в блоке задачи о приёмочных тестах, который ещё не уходил в `$spec`: замечания
+ * для новых тестов. Ответ ревью может не назвать файл, а замечание прошлого запуска цикла
+ * в памяти не живёт. 2026-10-14, 07/T1: после перезапуска исполнитель не мог выполнить возврат
+ * со старым тестом и взял 07/T2.
+ */
+async function pendingSpecReturn(context: LoopContext, task: string): Promise<string> {
+  const files = specFiles(context, task);
+  if (files.length === 0) return '';
+  const { stageText } = await readStage(context.config.root);
+  const returned = returnedForSpec(taskBlock(stageText, task), files).trim();
+  if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return '';
+  await forgetSpec(context, task);
+  context.state.specRepairNotes = { ...context.state.specRepairNotes, [task]: [returned] };
+  await save(context);
+  await context.say(`возврат ревью ${task} о приёмочных тестах — их переписывает $spec`);
+  return returned;
+}
+
+/**
  * Круги одной задачи, не больше maxRounds ВОЗВРАТ. `workPrompt` — `$next` для очереди
  * или `$task NN/Tn` для Issue; `resume` — начать с доделки незакоммиченной работы.
  */
@@ -334,9 +337,12 @@ export async function processTask(
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
+  const writesSpec = options.spec ?? options.workPrompt === '$next';
   let remarks = '';
   for (let round = 1; round <= config.maxRounds;) {
-    if (needsWork && (options.spec ?? options.workPrompt === '$next')) {
+    if (needsWork && writesSpec) {
+      if (round === 1 && prompt === options.workPrompt && specEnabled(context))
+        remarks = await pendingSpecReturn(context, current);
       const stop = await prepareSpec(context, current, prompt === options.workPrompt, remarks);
       if (stop !== undefined) return { step: stop, done: false };
     }
@@ -372,12 +378,13 @@ export async function processTask(
     // Ревью нашло, что приёмочные тесты не совпадают с задачей: они пишутся заново.
     // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
     // которому тест менять нельзя, встал. Ссылка на файл теста — тоже замечание к тестам.
-    remarks =
+    if (
       SPEC_REMARK_RE.test(verdict.message) ||
       mentionsSpec(verdict.message, specFiles(context, current))
-        ? verdict.message
-        : '';
-    if (remarks !== '') await forgetSpec(context, current);
+    ) {
+      remarks = verdict.message;
+      await forgetSpec(context, current);
+    } else remarks = specEnabled(context) ? await pendingSpecReturn(context, current) : '';
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;
     round += 1;

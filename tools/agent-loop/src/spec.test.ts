@@ -190,6 +190,50 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  // 2026-10-14, 07/T1: ревью вернуло задачу из-за приёмочного теста, цикл перезапустили —
+  // замечание осталось только в блоке задачи, а `$next` со старым тестом взял 07/T2.
+  const RETURN = '  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.';
+  const returned = fixtureStage.replace('  *Приёмка:* тесты.', `  *Приёмка:* тесты.\n${RETURN}`);
+  const LOCKED = { spec: { '06/T1j5-Б1': { [TEST]: "it('старый тест', () => {});\n" } } };
+
+  it('после перезапуска возврат ревью о приёмочном тесте в блоке задачи — тесты переписывает $spec', async () => {
+    const run = await runWorld({
+      spec: true,
+      stage: returned,
+      state: LOCKED,
+      sessions: [SPEC, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[0]).toBe(
+      `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\n${RETURN.trim()}`,
+    );
+    expect(run.lines).toContain(
+      'возврат ревью 06/T1j5-Б1 о приёмочных тестах — их переписывает $spec',
+    );
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('возврат, по которому $spec уже переписал тесты, не переписывает их снова', async () => {
+    const run = await runWorld({
+      spec: true,
+      stage: returned,
+      state: { ...LOCKED, specRepairNotes: { '06/T1j5-Б1': [RETURN.trim()] } },
+      sessions: [NEXT_DONE],
+    });
+    expect(run.prompts).toEqual([`$next\n${LOCKED_LINE}`]);
+  });
+
+  it('ВОЗВРАТ без имени файла, но с возвратом о приёмочном тесте в блоке — тесты переписывает $spec', async () => {
+    const back: Session = { stage: returned, answer: 'ВОЗВРАТ\n- геометрия не подтверждена' };
+    const run = await runWorld({
+      spec: true,
+      sessions: [SPEC, NEXT_DONE, back, SPEC, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[3]).toBe(
+      `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\n${RETURN.trim()}`,
+    );
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('тесты $spec с ошибкой lint — цикл сам правит формат, остальное возвращает $spec один раз', async () => {
     const error = `${TEST}\n  3:1  error  'x' is assigned a value but never used  no-unused-vars`;
     const run = await runWorld({

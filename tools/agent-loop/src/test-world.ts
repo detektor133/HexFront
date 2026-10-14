@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { runAgentLoop, type CommandResult } from './agent-loop.ts';
 import type { AgentIssue, GithubClient } from './github.ts';
 import type { TaskMark } from './stage-file.ts';
+import { loadState, saveState, type LoopState } from './state.ts';
 
 export const fixtureStatus = `# Статус
 
@@ -57,6 +58,8 @@ export interface World {
   readonly lint?: readonly string[];
   /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
   readonly spec?: boolean;
+  /** Память прошлого запуска цикла (`state.json`). */
+  readonly state?: Partial<LoopState>;
   /** Трейлер `Этап:` коммита HEAD. */
   readonly headTrailer?: string;
   readonly status?: string;
@@ -116,6 +119,8 @@ export async function runWorld(world: World): Promise<Outcome> {
   await mkdir(join(root, 'tools/agent-loop'), { recursive: true });
   await writeFile(statusPath, world.status ?? fixtureStatus, 'utf8');
   await writeFile(stagePath, world.stage ?? fixtureStage, 'utf8');
+  if (world.state !== undefined)
+    await saveState(root, { ...(await loadState(root)), ...world.state });
   await writeFile(
     join(root, 'docs/stages/stage-07-next.md'),
     '# Этап 07\n\n- [ ] **T1. Первая**\n',

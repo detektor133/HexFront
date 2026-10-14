@@ -204,3 +204,24 @@ export async function forgetSpec(context: LoopContext, task: string): Promise<vo
   state.specRepairNotes = Object.fromEntries(Object.entries(state.specRepairNotes).filter(other));
   await save(context);
 }
+
+/** Замечание к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ` ревью или исполнителя. */
+export const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
+
+/** Текст ссылается на файл приёмочного теста (путь или имя файла). */
+export const mentionsSpec = (text: string, files: readonly string[]): boolean =>
+  files.some((path) => text.includes(path) || text.includes(path.split('/').at(-1) ?? path));
+
+/** Строки возврата ревью в блоке задачи, которые говорят о приёмочных тестах. */
+export const returnedForSpec = (block: string, files: readonly string[]): string =>
+  block
+    .split(/\r?\n/)
+    .filter((line) => /возврат/iu.test(line) && mentionsSpec(line, files))
+    .join('\n');
+
+/** Строки `СПЕК: …` ответа: замечания к приёмочным тестам. */
+export const specRemarks = (message: string): string =>
+  message
+    .split(/\r?\n/)
+    .filter((line) => SPEC_REMARK_RE.test(line))
+    .join('\n');
