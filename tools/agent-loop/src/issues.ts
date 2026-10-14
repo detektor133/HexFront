@@ -199,8 +199,18 @@ export async function processIssues(
     )
       continue;
     const command = parseIssueCommand(issue.body);
+    if (dirty && !('error' in command) && command.skill !== 'done') continue;
+    // Перед исполнением — состояние Issue прямым запросом: отстающий список мог отдать уже
+    // закрытую или остановленную Issue (2026-10-14: #12 исполнилась второй раз через 4 с).
+    let fresh: AgentIssue | undefined;
+    if (
+      !(await safely(context, `проверить Issue #${issue.number}`, async () => {
+        fresh = await github.openIssue(issue.number);
+      }))
+    )
+      return undefined;
+    if (fresh === undefined || fresh.labels.includes(STOP_LABEL)) continue;
     if ('error' in command) return stopIssue(context, issue, command.error);
-    if (dirty && command.skill !== 'done') continue;
     return runIssue(context, issue, command);
   }
   return undefined;

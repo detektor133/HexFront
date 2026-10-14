@@ -53,10 +53,18 @@ async function commitFile(git: Git, dir: string, file: string, text: string): Pr
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  // На Windows только что завершённый git ещё секунды держит файлы: без повторов rm падает EBUSY.
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  );
 });
 
-describe('сведение ветки с origin на настоящем git', () => {
+// Тест запускает 15–20 настоящих процессов git; на Windows каждый идёт через cmd и стоит
+// сотни миллисекунд, поэтому 5 с по умолчанию проверяли бы скорость ПК, а не код
+// (2026-10-14: $stage-close 06 остановился на таймауте). Предел — защита от зависания.
+describe('сведение ветки с origin на настоящем git', { timeout: 60_000 }, () => {
   it('отставшую ветку подтягивает, ушедшую вперёд пушит', async () => {
     const { mine, other, dirs } = await repos();
     await commitFile(other, dirs[1] ?? '', 'a.txt', 'a');

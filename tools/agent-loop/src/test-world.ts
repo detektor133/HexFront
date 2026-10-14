@@ -73,8 +73,11 @@ export interface World {
   readonly arrival?: AgentIssue;
   /** Каждая пауза кончается Enter владельца: следующий полный шаг сразу. */
   readonly wake?: boolean;
-  /** Список Issues GitHub отстаёт: отдаёт Issues такими, какими они были до ответа цикла. */
-  readonly staleList?: boolean;
+  /**
+   * Список Issues GitHub отстаёт: отдаёт Issues открытыми и без новых меток. `true` — в прежнем
+   * виде; `bumped` — с новым `updated_at` от ответа цикла, как список GitHub 2026-10-14.
+   */
+  readonly staleList?: boolean | 'bumped';
 }
 
 export interface Outcome {
@@ -246,9 +249,18 @@ export async function runWorld(world: World): Promise<Outcome> {
     owner: 'detektor133',
     listIssues: () =>
       Promise.resolve(
-        world.staleList === true
-          ? [...(world.issues ?? [])]
-          : issues.filter((issue) => !out.closed.includes(issue.number)),
+        world.staleList === undefined || world.staleList === false
+          ? issues.filter((issue) => !out.closed.includes(issue.number))
+          : (world.issues ?? []).map((issue) =>
+              world.staleList === 'bumped' &&
+              out.comments.some((c) => c.startsWith(`#${issue.number}:`))
+                ? { ...issue, updatedAt: '2026-10-13T02:00:00Z' }
+                : issue,
+            ),
+      ),
+    openIssue: (number) =>
+      Promise.resolve(
+        out.closed.includes(number) ? undefined : issues.find((item) => item.number === number),
       ),
     comment: (issue, body) => {
       out.comments.push(`#${issue}: ${body}`);

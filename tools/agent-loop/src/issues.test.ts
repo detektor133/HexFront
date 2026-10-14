@@ -87,6 +87,21 @@ describe('Issues в цикле', () => {
     expect(run.comments).toHaveLength(2);
   });
 
+  it('список с новым updated_at от ответа цикла не исполняет закрытую Issue второй раз', async () => {
+    // 2026-10-14: #12 закрыта и прокомментирована, а список через 4 с отдал её открытой
+    // с новым updated_at — $decide запустился второй раз.
+    const run = await runWorld({
+      stage: ownerParked,
+      staleList: 'bumped',
+      issues: [issue(5, DECIDE), issue(7, 'боты тупые')],
+      sessions: [{ answer: 'Изменены STATUS и файл этапа', status: fixtureStatus }],
+    });
+    expect(run.prompts).toEqual([DECIDE]);
+    expect(run.closed).toEqual([5]);
+    expect(run.labels).toEqual(['#7: agent-stop']);
+    expect(run.comments).toHaveLength(2);
+  });
+
   it('$task из Issue идёт кругами до [x] и закрывает Issue', async () => {
     const run = await runWorld({
       stage: ownerParked,

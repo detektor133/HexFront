@@ -16,6 +16,12 @@ export interface GithubClient {
   /** Владелец репозитория: цикл исполняет только его Issues. */
   readonly owner: string;
   readonly listIssues: () => Promise<readonly AgentIssue[]>;
+  /**
+   * Issue по номеру, прямым запросом: список Issues GitHub отстаёт на секунды (Issue уже
+   * закрыта, а список отдаёт её открытой, с новым `updated_at` от ответа цикла), запрос по
+   * номеру — нет. @returns undefined, если Issue закрыта.
+   */
+  readonly openIssue: (issue: number) => Promise<AgentIssue | undefined>;
   readonly comment: (issue: number, body: string) => Promise<void>;
   readonly close: (issue: number) => Promise<void>;
   readonly addLabel: (issue: number, label: string) => Promise<void>;
@@ -91,8 +97,18 @@ interface IssuePayload {
   readonly user: { readonly login: string } | null;
   readonly labels: readonly { readonly name: string }[];
   readonly updated_at: string;
+  readonly state?: string;
   readonly pull_request?: unknown;
 }
+
+const toAgentIssue = (issue: IssuePayload): AgentIssue => ({
+  number: issue.number,
+  title: issue.title,
+  body: issue.body ?? '',
+  author: issue.user?.login ?? '',
+  labels: issue.labels.map((label) => label.name),
+  updatedAt: issue.updated_at,
+});
 
 export function httpGithubClient(repo: string, token: string): GithubClient {
   const base = `https://api.github.com/repos/${repo}`;
@@ -146,14 +162,12 @@ export function httpGithubClient(repo: string, token: string): GithubClient {
       const response = await expectOk(await request(issuesPath), 'список Issues');
       return ((await response.json()) as IssuePayload[])
         .filter((issue) => issue.pull_request === undefined)
-        .map((issue) => ({
-          number: issue.number,
-          title: issue.title,
-          body: issue.body ?? '',
-          author: issue.user?.login ?? '',
-          labels: issue.labels.map((label) => label.name),
-          updatedAt: issue.updated_at,
-        }));
+        .map(toAgentIssue);
+    },
+    async openIssue(issue) {
+      const response = await expectOk(await request(`/issues/${issue}`), `Issue #${issue}`);
+      const payload = (await response.json()) as IssuePayload;
+      return payload.state === 'open' ? toAgentIssue(payload) : undefined;
     },
     async comment(issue, body) {
       await expectOk(await request(`/issues/${issue}/comments`, 'POST', { body }), 'комментарий');
