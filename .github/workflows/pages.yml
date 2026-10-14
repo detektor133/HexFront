@@ -34,6 +34,12 @@ jobs:
       - name: Собрать клиент
         run: pnpm --filter @hexfront/client build
 
+      # wrangler-action в pnpm-монорепозитории ставит wrangler через `pnpm add` в корень
+      # и падает без -w; готовый wrangler в PATH action находит и свою установку пропускает.
+      - name: Установить wrangler
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: npm install -g wrangler@4
+
       - name: Опубликовать в Cloudflare Pages
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         uses: cloudflare/wrangler-action@v3
