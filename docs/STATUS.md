@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T1 |
+| Текущая задача | 07/T2 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-14 |
 
@@ -15,6 +15,7 @@
 
 ## Следующая сессия
 
-07/T2 возвращена ревью: нет приёмочных тестов для debug-режима, worker-телеметрии и production-маршрута; visual-сцена `match` всё ещё использует `/dev/sandbox`. Исправления остаются в коммите 76bc2d1.
+07/T2: экран `/match` отделён от маршрута песочницы через `MatchSurface`, debug-панель и worker-телеметрия включаются только с `?debug=1`, production скрывает `/dev/*`, visual-сцена `match` снимается с `/match`.
 
-Следующая сессия: повторить `$review 07/T2` после добавления тестов и перевода visual-сцены на `/match`.
+Следующая сессия: проверить задачу `$review 07/T2`; после ревью взять 07/T3.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchPage.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/local/sim-worker.ts`, `apps/client/tests/visual/visual-check.ts`.

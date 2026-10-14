@@ -41,7 +41,7 @@ const PAGES = [
   { name: 'units', url: '/dev/units' },
   { name: 'map', url: '/dev/map?map=small&territories=1&scale=1' },
   { name: 'ui', url: '/dev/ui?map=small&select=0&scale=1&freezeTime=1' },
-  { name: 'match', url: '/dev/sandbox?map=small&select=0&speed=1&freezeTime=1' },
+  { name: 'match', url: '/match?map=small&select=0&freezeTime=1' },
 ] as const;
 
 const SCENES: readonly Scene[] = VIEWPORTS.flatMap((viewport) =>

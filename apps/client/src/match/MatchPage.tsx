@@ -1,4 +1,4 @@
-import { MatchSurface } from '../dev/DevSandboxPage.tsx';
+import { MatchSurface } from './MatchSurface.tsx';
 
 export function MatchPage(): React.JSX.Element {
   const debug = new URLSearchParams(window.location.search).get('debug') === '1';
