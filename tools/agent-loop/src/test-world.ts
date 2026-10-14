@@ -107,6 +107,8 @@ export interface Outcome {
   readonly execs: string[];
   /** Вызовы `ci:wait` для workflow `slow` с аргументами. */
   readonly slowCalls: string[];
+  /** Прогоны, перезапущенные циклом через GitHub. */
+  readonly reruns: number[];
   sleeps: number;
   checks: number;
   /** Сколько пауз прошло к началу каждой сессии codex. */
@@ -165,6 +167,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     pushes: 0,
     ciCalls: 0,
     slowCalls: [],
+    reruns: [],
     execs: [],
     sleeps: 0,
     checks: 0,
@@ -333,7 +336,10 @@ export async function runWorld(world: World): Promise<Outcome> {
       out.pulls.push(`${head_} → ${base}`);
       return Promise.resolve('https://github.com/detektor133/HexFront/pull/7');
     },
-    rerunFailedJobs: () => Promise.resolve(),
+    rerunFailedJobs: (runId) => {
+      out.reruns.push(runId);
+      return Promise.resolve();
+    },
   };
   let polls = world.polls ?? 0;
   try {

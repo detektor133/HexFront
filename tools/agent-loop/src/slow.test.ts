@@ -11,6 +11,7 @@ const NEXT_DONE: Session = {
 const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё подтверждено' };
 const FIXED: Session = { answer: 'slow починен', commit: true };
 const RED = 'failure job=tests https://slow/2';
+const RED_RUN = 'failure job=tests https://github.com/detektor133/HexFront/actions/runs/77/job/1';
 
 describe('workflow slow (все тесты)', () => {
   it('не ждёт идущий slow: задача и ревью идут сразу', async () => {
@@ -36,14 +37,49 @@ describe('workflow slow (все тесты)', () => {
     expect(run.lines).toContain(`красный slow (все тесты): ${RED} — исправляет 06/T1e`);
   });
 
-  it('служебный коммит без задачи в трейлере — к владельцу, без сессий', async () => {
-    const run = await runWorld({ sessions: [], slow: [RED], headTrailer: '06/infra\n' });
-    expect(run.prompts).toEqual([]);
-    const waiting = run.lines.find((line) => line.startsWith('жду: красный slow'));
-    expect(waiting).toContain('на служебном коммите');
-    expect(waiting).toContain('«Re-run failed jobs»');
-    expect(waiting).toContain('перешли ссылку Claude');
-    expect(waiting).toContain(RED);
+  it('служебный коммит: красный slow цикл один раз перезапускает сам и работает дальше', async () => {
+    // 2026-10-14: раньше цикл ждал владельца со словами «перешли ссылку Claude».
+    const run = await runWorld({
+      sessions: [NEXT_DONE, REVIEW_OK],
+      slow: [RED_RUN],
+      headTrailer: '06/infra\n',
+    });
+    expect(run.reruns).toEqual([77]);
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(run.lines.some((line) => line.includes('Claude'))).toBe(false);
+  });
+
+  it('служебный коммит: после перезапуска снова красный — баг через $bug, без владельца', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: 'баг записан', commit: true }],
+      slow: [RED_RUN],
+      headTrailer: '06/infra\n',
+      state: { slowRerun: 'c0' },
+    });
+    expect(run.reruns).toEqual([]);
+    expect(run.prompts[0]).toMatch(
+      /^\$bug красный slow \(все тесты\) на служебном коммите c0, перезапуск прогона не помог: failure job=tests .*runs\/77.*Класс Б1/u,
+    );
+  });
+
+  it('служебный коммит: прогон без номера не перезапустить — сразу $bug', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: 'баг записан', commit: true }],
+      slow: [RED],
+      headTrailer: '06/infra\n',
+    });
+    expect(run.reruns).toEqual([]);
+    expect(run.prompts[0]).toMatch(/^\$bug красный slow/u);
+  });
+
+  it('баг уже записан — красный slow на служебном коммите пропускает очередь к его задаче', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, REVIEW_OK],
+      slow: [RED],
+      headTrailer: '06\n',
+      state: { slowBug: 'abc' },
+    });
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
   });
 
   it('красный slow, перезапущенный на GitHub, зеленеет на том же HEAD — цикл продолжает сам', async () => {
@@ -52,7 +88,8 @@ describe('workflow slow (все тесты)', () => {
     const run = await runWorld({
       sessions: [NEXT_DONE, REVIEW_OK],
       slow: [RED, 'success https://slow/3'],
-      headTrailer: '06/infra\n',
+      headTrailer: '06/T1e\n',
+      state: { slowFixes: ['06/T1e'], slowBug: 'abc' },
       polls: 1,
       wake: true,
     });
@@ -65,7 +102,8 @@ describe('workflow slow (все тесты)', () => {
       board,
       sessions: [NEXT_DONE, REVIEW_OK],
       slow: [RED, 'pending https://slow/2 1'],
-      headTrailer: '06/infra\n',
+      headTrailer: '06/T1e\n',
+      state: { slowFixes: ['06/T1e'], slowBug: 'abc' },
       polls: 1,
       wake: true,
     });
@@ -77,18 +115,27 @@ describe('workflow slow (все тесты)', () => {
     );
   });
 
-  it('второй красный slow после исправления той же задачи — к владельцу', async () => {
+  it('второй красный slow после исправления той же задачи — после перезапуска $bug', async () => {
     const run = await runWorld({
-      sessions: [FIXED],
-      slow: [RED, RED],
+      sessions: [{ answer: 'баг записан', commit: true }],
+      slow: [RED_RUN],
       headTrailer: '06/T1e',
+      state: { slowFixes: ['06/T1e'], slowRerun: 'c0' },
     });
-    expect(run.prompts).toEqual([`$task 06/T1e CI красный: slow ${RED}`]);
-    expect(
-      run.lines.some((line) =>
-        line.startsWith('жду: slow снова красный после исправления 06/T1e. Открой ссылку'),
-      ),
-    ).toBe(true);
+    expect(run.prompts[0]).toMatch(/^\$bug красный slow .*после исправления 06\/T1e/u);
+  });
+
+  it('не помогли ни исправление, ни перезапуск, ни записанный баг — к владельцу за «$decide»', async () => {
+    const run = await runWorld({
+      sessions: [],
+      slow: [RED],
+      headTrailer: '06/T1e',
+      state: { slowFixes: ['06/T1e'], slowBug: 'abc' },
+    });
+    expect(run.prompts).toEqual([]);
+    const waiting = run.lines.find((line) => line.startsWith('жду: slow всё ещё красный'));
+    expect(waiting).toContain('Issue «$decide»');
+    expect(waiting).not.toContain('Claude');
   });
 
   it('непроверенный slow (сеть) работу не держит', async () => {
@@ -127,5 +174,17 @@ describe('slow перед $stage-close', () => {
     });
     expect(run.prompts[0]).toBe(`$task 06/T2 CI красный: slow ${RED}`);
     expect(run.prompts).not.toContain('$stage-close');
+  });
+
+  it('красный slow перед закрытием на служебном коммите — перезапуск, $stage-close после зелёного', async () => {
+    const run = await runWorld({
+      status: lastQueue,
+      stage: closeAll(fixtureStage),
+      slow: ['pending https://slow/3 10', RED_RUN, RED_RUN, 'success https://slow/4'],
+      headTrailer: '06/infra\n',
+      sessions: [{ answer: 'Этап 06 закрыт', status: lastQueue.replace('| 06 —', '| 07 —') }],
+    });
+    expect(run.reruns).toEqual([77]);
+    expect(run.prompts).toEqual(['$stage-close']);
   });
 });
