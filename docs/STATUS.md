@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T1 выполнена и ждёт ревью. Исправлены начала дуг прогресса в `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/src/dev/unit-chips.ts`; добавлены Node-safe проверки окружения для затронутых слоёв.
+07/T1 возвращена ревью: `apps/client/test/construction-arc.test.ts` не проверяет фактические точки пути дуг и предел `радиус + толщина линии`. Исправления начала дуг в `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/src/dev/unit-chips.ts` остаются в коммите.
 
 Следующая задача: 07/T2. Прочитать блок T2 в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/gdd/08-match.md`, `docs/architecture/rendering.md`, `docs/testing.md`.
