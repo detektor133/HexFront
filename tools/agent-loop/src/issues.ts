@@ -4,6 +4,7 @@ import {
   backoff,
   firstLine,
   lastLines,
+  park,
   readStage,
   runSkill,
   save,
@@ -12,6 +13,7 @@ import {
 } from './context.ts';
 import { head } from './git.ts';
 import { parseIssueCommand, STOP_LABEL, type AgentIssue, type IssueCommand } from './github.ts';
+import { shelveWork, unshelveWork } from './shelve.ts';
 import { taskMark } from './stage-file.ts';
 import { processTask } from './tasks.ts';
 
@@ -191,15 +193,56 @@ async function runIssue(
   return stopIssue(context, issue, result.reason, result.message);
 }
 
+/** Ответы владельца на вопрос исполнителя: правят доки, а не код задачи. */
+const ANSWERS: ReadonlySet<string> = new Set(['decide', 'bug']);
+
+/**
+ * Ответ владельца на вопрос исполнителя, пока работа задачи в дереве: работа откладывается,
+ * Issue исполняется в чистом дереве, работа возвращается, задача продолжается с ответом.
+ */
+async function answerIssue(
+  context: LoopContext,
+  issue: AgentIssue,
+  command: IssueCommand,
+  task: string,
+): Promise<Step> {
+  if (!(await shelveWork(context, task)))
+    return stopIssue(context, issue, `работу ${task} не удалось отложить, см. журнал цикла`);
+  const before = await head(context.git);
+  const step = await runIssue(context, issue, command);
+  const back = await unshelveWork(context);
+  if (back.kind === 'refused')
+    return park(
+      context,
+      `shelf:${task}`,
+      `работа ${task} не вернулась из git stash («${firstLine(back.reason)}») — она цела в git stash list, нужен владелец`,
+    );
+  // Ответа нет (сбой codex, стоп Issue): работа вернулась и по-прежнему ждёт владельца.
+  if ((await head(context.git)) === before) return step;
+  const { state } = context;
+  delete state.waitingAnswer;
+  delete state.parked;
+  state.resume = task;
+  state.resumeNote = `Пока работа ждала, владелец ответил Issue #${issue.number} (${firstLine(command.prompt)}): перечитай блок задачи и ответ.${
+    back.kind === 'conflict'
+      ? ` Работа вернулась с конфликтом слияния в ${back.files.join(', ')} — объедини изменения ответа и свои, затем git add.`
+      : ''
+  }`;
+  await save(context);
+  return step;
+}
+
 /**
  * Берёт самую старую Issue владельца с меткой `agent` без `agent-stop`. При грязном дереве
- * (идёт работа владельца) исполняется только `$done`: он и коммитит эту работу.
+ * (идёт работа владельца) исполняется только `$done`: он и коммитит эту работу. Работа задачи,
+ * которая ждёт ответа владельца (`waitingAnswer`), не мешает его ответу `$decide` или `$bug`.
  * @returns шаг цикла или undefined, если Issue для исполнения нет.
  */
 export async function processIssues(
   context: LoopContext,
   dirty: boolean,
 ): Promise<Step | undefined> {
+  const waiting = dirty ? context.state.waitingAnswer?.task : undefined;
   const github = context.config.github;
   if (!github) return undefined;
   let issues: readonly AgentIssue[] = [];
@@ -216,7 +259,14 @@ export async function processIssues(
       continue;
     const command = parseIssueCommand(issue.body);
     // `$done` коммитит работу владельца, `$streams` — настройка цикла: обоим чистое дерево не нужно.
-    if (dirty && !('error' in command) && command.skill !== 'done' && command.skill !== 'streams')
+    const answer = !('error' in command) && waiting !== undefined && ANSWERS.has(command.skill);
+    if (
+      dirty &&
+      !answer &&
+      !('error' in command) &&
+      command.skill !== 'done' &&
+      command.skill !== 'streams'
+    )
       continue;
     // Перед исполнением — состояние Issue прямым запросом: отстающий список мог отдать уже
     // закрытую или остановленную Issue (2026-10-14: #12 исполнилась второй раз через 4 с).
@@ -229,7 +279,9 @@ export async function processIssues(
       return undefined;
     if (fresh === undefined || fresh.labels.includes(STOP_LABEL)) continue;
     if ('error' in command) return stopIssue(context, issue, command.error);
-    return runIssue(context, issue, command);
+    return answer && waiting !== undefined
+      ? answerIssue(context, issue, command, waiting)
+      : runIssue(context, issue, command);
   }
   return undefined;
 }

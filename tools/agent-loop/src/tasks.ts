@@ -15,6 +15,7 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
   forgetSpec,
   mentionsSpec,
@@ -172,7 +173,11 @@ async function runWork(
     state.resume = task;
     await save(context);
   }
-  const full = withUnlocked(withSpec(pinned, task, locked), task, unlocked);
+  const full = withUnlocked(
+    withSpec(await withAnswer(context, pinned, resumePrompt(task)), task, locked),
+    task,
+    unlocked,
+  );
   const work = await session(context, 'next', full, locked);
   // Исполнитель не может менять закрытые приёмочные тесты. Их поломку (lint, окружение) по строке
   // `СПЕК:` исполнителя чинит $spec; возврат ревью о тесте в блоке задачи их открывает
@@ -203,16 +208,9 @@ async function runWork(
     );
   }
   if (dirty) {
-    if (prompt === resumePrompt(task)) {
+    if (prompt.startsWith(resumePrompt(task))) {
       delete state.resume;
-      return step(
-        await park(
-          context,
-          `resume:${task}`,
-          `доделка ${task} не закончена, дерево не чистое`,
-          work.message,
-        ),
-      );
+      return step(await waitForAnswer(context, task, work.message));
     }
     state.resume = task;
     await save(context);

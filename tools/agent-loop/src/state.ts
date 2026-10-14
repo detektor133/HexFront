@@ -10,6 +10,15 @@ export interface LoopState {
   streams?: number;
   /** Недоделка: сессия этой задачи оборвалась с незакоммиченной работой. */
   resume?: string;
+  /**
+   * Незакоммиченная работа задачи ждёт ответа владельца (вопрос исполнителя): ответ — Issue
+   * `$decide` или `$bug`, на время которой работа откладывается (shelve.ts), потом продолжается.
+   */
+  waitingAnswer?: { readonly task: string; readonly reason: string };
+  /** Работа этой задачи лежит в git stash на время Issue владельца. */
+  shelved?: string;
+  /** Строка для следующей сессии `продолжить`: что изменилось, пока работа ждала. */
+  resumeNote?: string;
   /** Ожидание: та же причина при том же HEAD повторно сессий не запускает. */
   parked?: { readonly key: string; readonly head: string; readonly reason: string };
   /** До этого времени (мс) codex не запускается: сбой или кончился лимит. */

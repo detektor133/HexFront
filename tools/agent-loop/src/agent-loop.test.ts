@@ -274,7 +274,9 @@ describe('$split, $accept и доделка без владельца', () => {
       ],
     });
     expect(run.prompts).toHaveLength(2);
-    expect(run.lines).toContain('жду: доделка 06/T1j5-Б1 не закончена, дерево не чистое');
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1 ждёт твоего ответа: «снова красный». Ответ — Issue «$decide» с решением; работа задачи останется и продолжится сама',
+    );
   });
 
   it('по --resume начинает с доделки задачи в грязном дереве', async () => {

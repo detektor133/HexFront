@@ -19,6 +19,7 @@ import { applyLimitRequest, applyRetries, runStreams, streamLimit } from './disp
 import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
+import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
 import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
@@ -55,7 +56,13 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   });
   const [only, ...others] = placed;
   // Ожидание владельца тоже оставляет тесты в дереве: доделка — только после перезапуска цикла.
-  if (state.resume === undefined && state.parked === undefined && only && others.length === 0)
+  if (
+    state.resume === undefined &&
+    state.parked === undefined &&
+    state.waitingAnswer === undefined &&
+    only &&
+    others.length === 0
+  )
     state.resume = only[0];
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
@@ -64,6 +71,9 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   }
   const issue = await processIssues(context, true);
   if (issue !== undefined) return issue;
+  // Вопрос исполнителя переживает перезапуск цикла: ждём ответа, а не доделки по кругу.
+  const waiting = state.waitingAnswer;
+  if (waiting !== undefined) return park(context, `resume:${waiting.task}`, waiting.reason);
   const list = files
     .split(/\r?\n/)
     .slice(0, 5)
@@ -93,8 +103,9 @@ async function tick(context: LoopContext): Promise<Step> {
   if (files !== '') return dirtyTree(context, files);
   // Доделка имеет смысл только для незакоммиченной работы: в чистом дереве её не продолжать
   // позже на чужих файлах (например, весах, которые пишет evolve владельца).
-  if (state.resume !== undefined) {
+  if (state.resume !== undefined || state.waitingAnswer !== undefined) {
     delete state.resume;
+    delete state.waitingAnswer;
     await save(context);
   }
   const unsynced = await syncWithOrigin(git, true);
@@ -213,6 +224,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   delete context.state.retryAfter;
   if (config.resume !== undefined) context.state.resume = config.resume;
   await save(context);
+  await recoverShelved(context);
   if (config.streams !== undefined && config.streams !== context.state.streams) {
     context.state.streams = config.streams;
     await save(context);
@@ -232,6 +244,17 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
         : 'режим: одна задача в главном каталоге',
     );
   }
+}
+
+/** Цикл оборвался, пока работа задачи была отложена на время Issue: она возвращается в дерево. */
+async function recoverShelved(context: LoopContext): Promise<void> {
+  const back = await unshelveWork(context);
+  if (back.kind === 'none') return;
+  if (back.kind === 'refused') {
+    await context.say(`работа ${back.task} не вернулась из git stash: ${back.reason}`);
+    return;
+  }
+  await context.say(`работа ${back.task} возвращена из git stash после обрыва цикла`);
 }
 
 /** Предел вырос, а своей незаконченной работы в главном каталоге нет — пора в потоки. */

@@ -322,6 +322,7 @@ export async function applyRetries(
 function forgetWait(state: LoopState): void {
   const task = /^resume:(.+)$/u.exec(state.parked?.key ?? '')?.[1];
   if (task !== undefined) state.resume = task;
+  delete state.waitingAnswer;
   delete state.parked;
 }
 

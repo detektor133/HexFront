@@ -111,6 +111,8 @@ export interface Outcome {
   checks: number;
   /** Сколько пауз прошло к началу каждой сессии codex. */
   readonly sleepsAtPrompt: number[];
+  /** `push` и `pop` git stash по порядку. */
+  readonly stashes: string[];
 }
 
 const ok = (stdout = ''): CommandResult => ({ code: 0, stdout, stderr: '' });
@@ -167,6 +169,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     sleeps: 0,
     checks: 0,
     sleepsAtPrompt: [],
+    stashes: [],
   };
   let branch = world.branch ?? 'stage-06';
   let head = 0;
@@ -233,8 +236,29 @@ export async function runWorld(world: World): Promise<Outcome> {
     dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
+  // git stash: отложенная на время Issue владельца работа (только незакоммиченные строки `dirty`).
+  let shelf: { readonly dirty: string; readonly message: string } | undefined;
+  const stash = (args: readonly string[]): CommandResult => {
+    const [, action] = args;
+    if (action === 'push') {
+      shelf = { dirty, message: args.at(-1) ?? '' };
+      dirty = '';
+      out.stashes.push('push');
+      return ok();
+    }
+    if (action === 'list') return ok(shelf ? `stash@{0}\tOn ${branch}: ${shelf.message}` : '');
+    if (action === 'pop' && shelf) {
+      dirty = shelf.dirty;
+      shelf = undefined;
+      out.stashes.push('pop');
+      return ok();
+    }
+    throw new Error(`неожиданная команда git ${args.join(' ')}`);
+  };
   const git = async (args: readonly string[]): Promise<CommandResult> => {
     const [sub, first] = args;
+    if (sub === 'stash') return stash(args);
+    if (sub === 'diff' && args.includes('--diff-filter=U')) return ok();
     if (sub === 'branch') return ok(branch);
     if (sub === 'status') return ok([dirty, ...(await fileStatus())].filter(Boolean).join('\n'));
     if (sub === 'show') {

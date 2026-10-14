@@ -1,9 +1,18 @@
 // Один поток: задача в своём каталоге и ветке — работа, CI, `$review` и очередь слияния.
 import { rm } from 'node:fs/promises';
 
-import { agentName, readStage, StreamCancelled, type LoopContext, type Step } from './context.ts';
+import {
+  agentName,
+  readStage,
+  park,
+  save,
+  StreamCancelled,
+  type LoopContext,
+  type Step,
+} from './context.ts';
 import { dirtyFiles, head, isAncestor, syncWithOrigin } from './git.ts';
 import { integrate, mergeMessage, type StageTarget } from './integrate.ts';
+import { shelveWork, unshelveWork } from './shelve.ts';
 import { taskMark } from './stage-file.ts';
 import { loadState, statePath } from './state.ts';
 import { processTask } from './tasks.ts';
@@ -66,6 +75,9 @@ async function work(context: LoopContext, task: string): Promise<Step | 'done'> 
   const mark = taskMark(stageText, task) ?? ' ';
   if (mark === 'x') return 'done';
   const resume = (await dirtyFiles(context.git)) !== '' && context.state.resume === task;
+  // Вопрос без ответа: новые коммиты ветки этапа ответа не принесли — снова ждать, а не спрашивать.
+  const waiting = context.state.waitingAnswer;
+  if (!resume && waiting?.task === task) return park(context, `resume:${task}`, waiting.reason);
   const run = await processTask(context, task, {
     mark,
     workPrompt: `$task ${task}`,
@@ -80,10 +92,41 @@ async function work(context: LoopContext, task: string): Promise<Step | 'done'> 
  * вливаются в ветку задачи. Конфликт здесь не разрешается — его разберёт очередь слияния.
  */
 async function refreshBase(context: LoopContext, target: StageTarget): Promise<void> {
+  const { git, state } = context;
+  const base = `origin/${target.branch}`;
+  if (await isAncestor(git, base, 'HEAD')) return;
+  const task = context.stream?.task ?? '';
+  // Работа ждёт ответа владельца: ответ пришёл новыми коммитами ветки этапа. Без них доделка
+  // спросила бы снова — работа откладывается на время слияния.
+  const answer = (await dirtyFiles(git)) !== '' && state.waitingAnswer?.task === task;
+  if (answer && !(await shelveWork(context, task))) return;
+  if ((await dirtyFiles(git)) !== '') return;
+  const merged = await mergeBase(context, target, task);
+  if (!answer) return;
+  const back = await unshelveWork(context);
+  if (back.kind === 'refused') {
+    await context.say(`работа ${task} не вернулась из git stash: ${back.reason}`);
+    return;
+  }
+  if (!merged) return;
+  delete state.waitingAnswer;
+  state.resume = task;
+  state.resumeNote = `Пока работа ждала, владелец ответил коммитами ${target.branch}: перечитай блок задачи.${
+    back.kind === 'conflict'
+      ? ` Работа вернулась с конфликтом слияния в ${back.files.join(', ')} — объедини обе стороны, затем git add.`
+      : ''
+  }`;
+  await save(context);
+}
+
+/** Влить ветку этапа в ветку задачи; конфликт откатывается — его разберёт очередь слияния. */
+async function mergeBase(
+  context: LoopContext,
+  target: StageTarget,
+  task: string,
+): Promise<boolean> {
   const { git } = context;
   const base = `origin/${target.branch}`;
-  if ((await dirtyFiles(git)) !== '' || (await isAncestor(git, base, 'HEAD'))) return;
-  const task = context.stream?.task ?? '';
   const merged = await git.attempt([
     'merge',
     '--no-ff',
@@ -93,12 +136,13 @@ async function refreshBase(context: LoopContext, target: StageTarget): Promise<v
   ]);
   if (merged.code !== 0) {
     await git.attempt(['merge', '--abort']);
-    return;
+    return false;
   }
   await context.say(`влиты новые коммиты ${target.branch}`);
   // `$task` начинает с `pnpm ci:wait` на HEAD: незапушенный коммит слияния ждал бы CI вечно.
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) await context.say(unsynced);
+  return true;
 }
 
 /** Поток свободен: ветка задачи удалена, память потока стёрта. */
