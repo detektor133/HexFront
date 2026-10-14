@@ -22,6 +22,13 @@
 
 Этап: 07/T2
 
+## Ревью 2026-10-14
+
+- Приёмка подтверждена: `pnpm exec vitest run apps/client/test/match-screen.test.ts apps/client/test/sim-worker-telemetry.test.ts` — 5/5 тестов.
+- `pnpm verify --changed`: `verify: OK (11 с)`.
+
+Этап: 07/T2
+
 ## Возврат ревью 2026-10-14 (повторная проверка после СПЕК)
 
 - `apps/client/test/match-screen.test.ts:22-40,86-103` задаёт `lastReject: null`, а меню настроек не открывается перед SSR-рендером.
