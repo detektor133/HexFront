@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium, type Page } from '@playwright/test';
 
-const PORT = 5199;
+// Свой порт у каждого потока агентного цикла: два `pnpm visual` одновременно не делят один vite.
+const PORT = Number(process.env.VISUAL_PORT ?? 5199);
 const THRESHOLD_PERCENT = 0.1;
 /** Допуск на канал: сглаживание шрифтов расходится на единицы, настоящая правка — на десятки. */
 const CHANNEL_TOLERANCE = 16;

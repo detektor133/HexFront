@@ -64,6 +64,16 @@ async function followUp(
   accepted: Set<string>,
 ): Promise<Work> {
   const split = commandTask(message, '$split');
+  // В потоке разбиение меняло бы «Очередь» в ветке задачи: только Issue владельца на ветке этапа.
+  if (split !== undefined && context.stream !== undefined)
+    return step(
+      await park(
+        context,
+        `split:${split}`,
+        `${split} просят разбить — нужна Issue «$split ${split}»`,
+        message,
+      ),
+    );
   if (split !== undefined) {
     if (context.state.split.includes(split))
       return step(
@@ -153,20 +163,31 @@ async function runWork(
 }
 
 /** Вердикт `$review`: новая отметка задачи и ответ ревью (замечания к приёмочным тестам). */
-interface Verdict {
+export interface Verdict {
   readonly mark: 'x' | ' ';
   readonly message: string;
 }
 
-/** `$review` в новой сессии; возвращает вердикт или шаг цикла. */
-async function runReview(context: LoopContext, task: string): Promise<Verdict | Step> {
+/**
+ * `$review` в новой сессии; возвращает вердикт или шаг цикла.
+ * @param note строка запроса сверх команды (повторное ревью после слияния ветки этапа).
+ */
+export async function runReview(
+  context: LoopContext,
+  task: string,
+  note = '',
+): Promise<Verdict | Step> {
   const { git } = context;
   const base = await head(git);
   const files = specFiles(context, task);
-  const prompt =
-    files.length === 0
-      ? `$review ${task}`
-      : `$review ${task}\nПриёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`;
+  const lines = [
+    `$review ${task}`,
+    ...(note === '' ? [] : [note]),
+    ...(files.length === 0
+      ? []
+      : [`Приёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`]),
+  ];
+  const prompt = lines.join('\n');
   const review = await session(context, 'review', prompt);
   if (review.failure !== undefined)
     return backoff(context, `$review ${task}: ${review.failure}`, review.message);
@@ -238,7 +259,13 @@ async function prepareSpec(
 export async function processTask(
   context: LoopContext,
   task: string,
-  options: { readonly mark: string; readonly workPrompt: string; readonly resume?: boolean },
+  options: {
+    readonly mark: string;
+    readonly workPrompt: string;
+    readonly resume?: boolean;
+    /** Писать приёмочные тесты `$spec` до работы; по умолчанию — только для `$next` очереди. */
+    readonly spec?: boolean;
+  },
 ): Promise<TaskRun> {
   const { config, say } = context;
   const accepted = new Set<string>();
@@ -249,8 +276,8 @@ export async function processTask(
   let followUps = 0;
   let remarks = '';
   for (let round = 1; round <= config.maxRounds;) {
-    if (needsWork && options.workPrompt === '$next') {
-      const stop = await prepareSpec(context, current, prompt === '$next', remarks);
+    if (needsWork && (options.spec ?? options.workPrompt === '$next')) {
+      const stop = await prepareSpec(context, current, prompt === options.workPrompt, remarks);
       if (stop !== undefined) return { step: stop, done: false };
     }
     const work = needsWork

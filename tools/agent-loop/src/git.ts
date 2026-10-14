@@ -36,7 +36,11 @@ export async function changedPaths(git: Git): Promise<string[]> {
     .filter(Boolean);
 }
 
-const isAncestor = async (git: Git, ancestor: string, descendant: string): Promise<boolean> =>
+export const isAncestor = async (
+  git: Git,
+  ancestor: string,
+  descendant: string,
+): Promise<boolean> =>
   (await git.attempt(['merge-base', '--is-ancestor', ancestor, descendant])).code === 0;
 
 /**
@@ -47,8 +51,14 @@ const isAncestor = async (git: Git, ancestor: string, descendant: string): Promi
 export async function syncWithOrigin(git: Git, push: boolean): Promise<string | undefined> {
   const branch = await currentBranch(git);
   const fetched = await git.attempt(['fetch', 'origin', branch]);
-  // Ветки ещё (или уже) нет в origin: сводить не с чем, свою ветку скилл пушит сам с -u.
-  if (fetched.code !== 0 && /couldn't find remote ref/i.test(fetched.stderr)) return undefined;
+  // Ветки ещё нет в origin (новая ветка потока или этапа): сводить не с чем — опубликовать.
+  if (fetched.code !== 0 && /couldn't find remote ref/i.test(fetched.stderr)) {
+    if (!push) return undefined;
+    const published = await git.attempt(['push', '-u', 'origin', branch]);
+    return published.code === 0
+      ? undefined
+      : `push новой ветки ${branch} не прошёл: ${published.stderr}`;
+  }
   if (fetched.code !== 0) throw new Error(fetched.stderr.trim() || `git fetch origin ${branch}`);
   const local = await head(git);
   const remote = await git.run(['rev-parse', `origin/${branch}`]);

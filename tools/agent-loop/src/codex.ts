@@ -26,6 +26,7 @@ export interface CodexSettings {
   readonly runCommand: RunCommand;
   readonly now: () => number;
   readonly writeLine: (line: string) => void;
+  readonly env?: Readonly<Record<string, string>>;
 }
 export interface Session {
   readonly result: CommandResult;
@@ -114,6 +115,7 @@ export async function runCodex(
         // Роль задаётся явно: унаследованный AGENT_ROLE не должен ограничить или расширить сессию.
         env: {
           ...process.env,
+          ...settings.env,
           AGENT_ROLE: role === 'review' ? 'reviewer' : role === 'spec' ? 'spec' : '',
           AGENT_LOCKED: locked.join('\n'),
         },

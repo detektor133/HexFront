@@ -46,6 +46,7 @@ const repo = parseGithubRepo(
 process.exitCode = await runAgentLoop({
   root: process.cwd(),
   maxRounds: positive('--max-rounds', 3),
+  streams: positive('--streams', 1),
   maxMinutes: positive('--max-minutes', 120),
   pollSeconds: positive('--poll-seconds', 30),
   pollMinutes: positive('--poll-minutes', 10),

@@ -11,6 +11,8 @@ import { saveState, type LoopState } from './state.ts';
 export interface AgentConfig {
   readonly root: string;
   readonly maxRounds: number;
+  /** Параллельных потоков задач; 1 — прежний цикл по одной задаче в главном каталоге. */
+  readonly streams?: number;
   /** Предел одной сессии codex, мин. */
   readonly maxMinutes: number;
   /** Как часто без работы проверять Issues и `main` условным запросом к GitHub, с. */
@@ -28,6 +30,8 @@ export interface AgentConfig {
   readonly sleep: (ms: number) => Promise<'timer' | 'wake'>;
   readonly writeLine: (line: string) => void;
   readonly github?: GithubClient;
+  /** Переменные окружения сессий codex сверх process.env (порт visual потока). */
+  readonly env?: Readonly<Record<string, string>>;
 }
 /** `worked` — что-то сделано, сразу следующий шаг; `idle` — ждать Issue или нового коммита. */
 export type Step = 'worked' | 'idle';
@@ -38,7 +42,25 @@ export interface LoopContext {
   readonly state: LoopState;
   /** Строка в консоль и в протокол `.ai-logs/agent-loop-<дата>.md`. */
   readonly say: (line: string) => Promise<void>;
+  /** Задача идёт в параллельном потоке: свой каталог (worktree) и своя ветка. */
+  readonly stream?: StreamInfo;
 }
+export interface StreamInfo {
+  /** Имя потока в протоколе: `w1`. */
+  readonly name: string;
+  readonly task: string;
+  /** Ветка задачи: `agent/07-T2`. */
+  readonly branch: string;
+  /** Причина отмены (текст задачи изменился); undefined — работать дальше. */
+  readonly cancelled: () => string | undefined;
+}
+
+/** Поток отменён между сессиями: его ветка отбрасывается, задача начнётся заново. */
+export class StreamCancelled extends Error {}
+
+/** Строка запроса сессии потока: скиллы сверяют ветку с ней, а не с «Веткой» STATUS. */
+export const streamNote = (stream: StreamInfo): string =>
+  `Поток ${stream.name}: ветка ${stream.branch} вместо ветки этапа из STATUS. docs/STATUS.md не меняй; push — ветки ${stream.branch}.`;
 
 const CI_TIMEOUT_MS = 660_000;
 /** Пауза после сбоя codex (обычно кончился лимит), мс. */
@@ -86,9 +108,13 @@ export async function session(
   locked: readonly string[] = [],
 ): Promise<Session> {
   const title = firstLine(prompt);
+  const { stream } = context;
+  const cancelled = stream?.cancelled();
+  if (cancelled !== undefined) throw new StreamCancelled(cancelled);
   const started = context.config.now();
   await context.say(`→ ${title} (новая сессия codex)`);
-  const result = await runCodex(context.config, context.definitions, role, prompt, locked);
+  const full = stream === undefined ? prompt : `${prompt}\n${streamNote(stream)}`;
+  const result = await runCodex(context.config, context.definitions, role, full, locked);
   await context.say(
     `← ${title} за ${minutes(context.config.now() - started)}: ${firstLine(result.message)} (лог ${result.log})`,
   );

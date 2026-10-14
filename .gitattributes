@@ -1,3 +1,9 @@
 * text=auto eol=lf
 *.png binary
+# Файлы, куда только дописывают строки: при слиянии веток потоков агентного цикла берутся строки
+# обеих сторон, без конфликта (tools/agent-loop, потоки).
+docs/BUGS.md merge=union
+docs/DECISIONS.md merge=union
+docs/QUESTIONS.md merge=union
+docs/reports/*.md merge=union
 *.woff2 binary

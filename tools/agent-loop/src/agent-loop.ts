@@ -10,6 +10,7 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
+import { runStreams } from './dispatcher.ts';
 import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
@@ -196,6 +197,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   await context.say(
     `старт: кругов на задачу ≤ ${config.maxRounds}, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
   );
+  if ((config.streams ?? 1) > 1) return runStreams(context, config.streams ?? 1);
   let waiting = false;
   for (;;) {
     let step: Step;
