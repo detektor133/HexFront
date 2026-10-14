@@ -16,6 +16,7 @@ export interface UnitView {
   readonly org: Fp;
   readonly hex: HexId;
   readonly order: UnitOrder;
+  readonly inBattle?: boolean | null;
   /** Цель атаки или -1. */
   readonly target: HexId;
   /** Прогресс перехода для интерполяции, тики. */
@@ -55,6 +56,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         org: u.org,
         hex: u.hex,
         order: u.order,
+        inBattle: mine ? u.inBattle : null,
         target: u.target,
         moveTicks: u.moveTicks,
         moveTotal: u.moveTotal,

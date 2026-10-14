@@ -4,8 +4,10 @@ import type { Army, ArmyPlan, City, MatchState, Unit } from '../state/types.ts';
 
 export interface BotTickContext {
   readonly playerView: PlayerViewContext;
+  readonly incomeBases: PlayerViewContext['incomeBases'];
   readonly ownedHexes: readonly (readonly HexId[])[];
   readonly borderHexes: readonly (readonly HexId[])[];
+  readonly unitsByHex: readonly (readonly Unit[])[];
   readonly unitsByPlayer: readonly (readonly Unit[])[];
   readonly armiesByPlayer: readonly (readonly Army[])[];
   readonly citiesByPlayer: readonly (readonly City[])[];
@@ -37,12 +39,16 @@ function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][]
  * @returns списки сущностей по игрокам и общие агрегаты тика
  */
 export function createBotTickContext(state: MatchState): BotTickContext {
+  const unitsByHex = Array.from({ length: state.hexes.owner.length }, () => [] as Unit[]);
   const unitsByPlayer = playerLists<Unit>(state.players.length);
   const armiesByPlayer = playerLists<Army>(state.players.length);
   const citiesByPlayer = playerLists<City>(state.players.length);
   const plansByPlayer = playerLists<ArmyPlan>(state.players.length);
   const armyOwners = new Map<number, number>();
-  for (const unit of state.units) unitsByPlayer[unit.owner]?.push(unit);
+  for (const unit of state.units) {
+    unitsByPlayer[unit.owner]?.push(unit);
+    unitsByHex[unit.hex]?.push(unit);
+  }
   for (const army of state.armies) {
     armiesByPlayer[army.owner]?.push(army);
     armyOwners.set(army.id, army.owner);
@@ -53,10 +59,13 @@ export function createBotTickContext(state: MatchState): BotTickContext {
     if (owner !== undefined) plansByPlayer[owner]?.push(plan);
   }
   const hexes = mapOwnedHexes(state);
+  const playerView = createPlayerViewContext(state);
   return {
-    playerView: createPlayerViewContext(state),
+    playerView,
+    incomeBases: playerView.incomeBases,
     ownedHexes: hexes.owned,
     borderHexes: hexes.border,
+    unitsByHex,
     unitsByPlayer,
     armiesByPlayer,
     citiesByPlayer,

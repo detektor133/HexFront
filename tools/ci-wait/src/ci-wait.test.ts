@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseGithubRepo, waitForCi, type HttpResponse } from './ci-wait.ts';
+import { GithubRequestError, parseGithubRepo, waitForCi, type HttpResponse } from './ci-wait.ts';
 
 const jsonResponse = (value: unknown): HttpResponse => ({
   ok: true,
@@ -157,10 +157,164 @@ describe('ожидание GitHub Actions', () => {
     expect(code).toBe(1);
     expect(delays).toEqual([30_000, 30_000]);
     expect(output).toEqual([
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 0',
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 30',
-      'pending https://api.github.com/repos/acme/game/actions/runs?head_sha=abc123 60',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 0',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 30',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 60',
       'failure run=not-found sha=abc123',
     ]);
+  });
+
+  it('сетевой сбой опроса не считает красным CI и ждёт дальше', async () => {
+    const responses: (HttpResponse | Error)[] = [
+      new TypeError('fetch failed'),
+      { ...jsonResponse({}), ok: false, status: 502 },
+      jsonResponse({ workflow_runs: [run('completed', 'success')] }),
+    ];
+    const output: string[] = [];
+    let now = 0;
+
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => {
+        const next = responses.shift() ?? jsonResponse({});
+        if (next instanceof Error) throw next;
+        return next;
+      },
+      sleep: async (ms: number): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
+      writeLine: (line: string) => output.push(line),
+    });
+
+    expect(code).toBe(0);
+    expect(output[0]).toMatch(/ 0 error=сеть: TypeError: fetch failed$/);
+    expect(output[1]).toMatch(/ 30 error=GitHub API 502: /);
+    expect(output.at(-1)).toBe('success https://github.com/acme/game/actions/runs/42');
+  });
+
+  it('если GitHub недоступен до конца ожидания, пишет error и код 2, а не failure', async () => {
+    const output: string[] = [];
+    let now = 0;
+
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => {
+        throw new TypeError('fetch failed');
+      },
+      sleep: async (ms: number): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
+      writeLine: (line: string) => output.push(line),
+      timeoutMs: 30_000,
+    });
+
+    expect(code).toBe(2);
+    expect(output.at(-1)).toBe('error сеть: TypeError: fetch failed');
+    expect(output.some((line) => line.startsWith('failure'))).toBe(false);
+  });
+
+  it('401 не ждёт таймаута: ошибка доступа сразу уходит наружу', async () => {
+    const attempt = waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => ({ ...jsonResponse({}), ok: false, status: 401 }),
+      writeLine: () => undefined,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(GithubRequestError);
+  });
+
+  it('красный run остаётся красным, даже если лог job получить не удалось', async () => {
+    const responses: (HttpResponse | Error)[] = [
+      jsonResponse({ workflow_runs: [run('completed', 'failure')] }),
+      jsonResponse({ jobs: [{ id: 7, name: 'tests', conclusion: 'failure' }] }),
+      new TypeError('fetch failed'),
+    ];
+    const output: string[] = [];
+
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => {
+        const next = responses.shift() ?? jsonResponse({});
+        if (next instanceof Error) throw next;
+        return next;
+      },
+      writeLine: (line: string) => output.push(line),
+    });
+
+    expect(code).toBe(1);
+    expect(output).toEqual([
+      'лог упавшего job не получен: сеть: TypeError: fetch failed',
+      'failure job=tests https://github.com/acme/game/actions/runs/42',
+    ]);
+  });
+});
+
+describe('выбор workflow', () => {
+  it.each([
+    [undefined, '/actions/workflows/ci.yml/runs?head_sha=abc123'],
+    ['slow.yml', '/actions/workflows/slow.yml/runs?head_sha=abc123'],
+  ])('workflow %s опрашивает только свои прогоны', async (workflow, path) => {
+    const urls: string[] = [];
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      ...(workflow === undefined ? {} : { workflow }),
+      fetchFn: async (url: string): Promise<HttpResponse> => {
+        urls.push(url);
+        return jsonResponse({ workflow_runs: [run('completed', 'success')] });
+      },
+      writeLine: () => undefined,
+    });
+
+    expect(code).toBe(0);
+    expect(urls).toEqual([`https://api.github.com/repos/acme/game${path}&per_page=10`]);
+  });
+});
+
+describe('один опрос', () => {
+  const once = (response: HttpResponse | Error) => {
+    const output: string[] = [];
+    const result = waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      once: true,
+      fetchFn: async (): Promise<HttpResponse> => {
+        if (response instanceof Error) throw response;
+        return response;
+      },
+      sleep: async (): Promise<void> => {
+        throw new Error('один опрос не ждёт');
+      },
+      writeLine: (line: string) => output.push(line),
+    });
+    return { result, output };
+  };
+
+  it('идущий прогон — код 3 и строка pending, без ожидания', async () => {
+    const { result, output } = once(jsonResponse({ workflow_runs: [run('in_progress')] }));
+    expect(await result).toBe(3);
+    expect(output).toEqual(['pending https://github.com/acme/game/actions/runs/42 0']);
+  });
+
+  it('ещё не созданный прогон — тоже код 3, а не красный CI', async () => {
+    const { result } = once(jsonResponse({ workflow_runs: [] }));
+    expect(await result).toBe(3);
+  });
+
+  it('завершённый зелёный — код 0', async () => {
+    const { result } = once(jsonResponse({ workflow_runs: [run('completed', 'success')] }));
+    expect(await result).toBe(0);
+  });
+
+  it('сбой сети — код 2 и строка error', async () => {
+    const { result, output } = once(new TypeError('fetch failed'));
+    expect(await result).toBe(2);
+    expect(output.at(-1)).toBe('error сеть: TypeError: fetch failed');
   });
 });

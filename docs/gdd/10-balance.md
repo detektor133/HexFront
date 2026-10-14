@@ -21,18 +21,11 @@
 
 ## Боты
 
-Пороги utility AI бота (`09-bots.md`, «Utility AI»; 04/T23).
+Веса бота — `bots/weights.json` и `bots/weights-easy.json` (включая порог и радиус слияния малых отрядов commander), подбирает `tools/evolve` (ADR 0010).
 
 | Константа | Значение |
 | --- | --- |
-| `BOT_TAX_PEACE` (FP) | 0,15 |
-| `BOT_TAX_WAR` (FP) | 0,30 |
 | `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
-| `BOT_EASY_TAX` (FP) | 0,20 `[ТЮНИНГ]` |
-| `BOT_GOLD_RESERVE` (FP) | 50 |
-| `BOT_IMPROVE_POP_RATIO` (FP) | 0,8 |
-| `BOT_ARMY_RATIO` (FP) | 0,8 |
-| `BOT_ARMY_INCOME_SHARE` (FP) | 0,5 |
 | `BOT_LINE_MAX_DEPTH` | 6 |
 
 ## Местность

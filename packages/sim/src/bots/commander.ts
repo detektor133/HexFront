@@ -4,10 +4,12 @@
 // земля — занять без плана, нейтральный город — штурм при прогнозе «успех», в приоритете; ▶ без
 // линии — построить линию; лишние отряды резерва — в самую слабую армию. Сам на игроков не наступает.
 import { commanderLine } from './commander-line.ts';
+import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { fp, type Fp } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
@@ -123,9 +125,18 @@ const idle = (u: UnitView): boolean =>
   u.order === 'idle' && u.type !== 'artillery' && u.moveTotal === 0 && u.path.length === 0;
 
 // Лишние отряды резерва — в самую слабую армию с auto (делает армия с auto с меньшим id).
-function reinforce(view: PlayerView, armyId: number): Command[] {
+function targetArmy(view: PlayerView): number | null {
+  const plans = view.plans
+    .filter((plan) => plan.kind === 'front' && (plan.startWanted || plan.offensive?.active))
+    .map((plan) => plan.armyId)
+    .sort((a, b) => a - b);
+  return plans[0] ?? null;
+}
+
+function reinforce(view: PlayerView, armyId: number, bot: boolean): Command[] {
   const auto = view.armies.filter((a) => a.auto);
-  if (auto[0]?.id !== armyId) return [];
+  const target = bot ? targetArmy(view) : null;
+  if ((target ?? auto[0]?.id) !== armyId) return [];
   const soldiers = new Map(auto.map((a) => [a.id, 0]));
   for (const u of view.units) {
     if (u.owner === view.playerId && u.armyId !== null && soldiers.has(u.armyId)) {
@@ -133,14 +144,51 @@ function reinforce(view: PlayerView, armyId: number): Command[] {
     }
   }
   const out: Command[] = [];
+  const destination = target ?? [...soldiers].sort((a, b) => a[1] - b[1] || a[0] - b[0])[0]?.[0];
+  if (destination === undefined) return out;
   const reserve = view.units.filter(
     (u) => u.owner === view.playerId && u.armyId === null && u.order !== 'retreat',
   );
   for (const u of reserve) {
-    const [weakest] = [...soldiers].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
-    if (!weakest) break;
-    out.push({ t: 'assignUnits', unitIds: [u.id], armyId: weakest[0] });
-    soldiers.set(weakest[0], weakest[1] + u.soldiers);
+    out.push({ t: 'assignUnits', unitIds: [u.id], armyId: destination });
+  }
+  return out;
+}
+
+function mergeSmall(
+  map: MapStatic,
+  view: PlayerView,
+  armyId: number,
+  mergeBelow: Fp,
+  mergeRadius: number,
+): Command[] {
+  const own = view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId);
+  const out: Command[] = [];
+  for (const small of own) {
+    if (
+      small.soldiers >= mergeBelow ||
+      small.order !== 'idle' ||
+      small.moveTotal !== 0 ||
+      small.path.length > 0 ||
+      small.inBattle
+    ) {
+      continue;
+    }
+    const target = own
+      .filter((unit) => unit.id !== small.id && unit.type === small.type && !unit.inBattle)
+      .map((unit) => ({ unit, distance: distance(hexOf(map, small.hex), hexOf(map, unit.hex)) }))
+      .filter(({ distance: distanceTo }) => distanceTo <= mergeRadius && distanceTo > 0)
+      .sort((a, b) => a.distance - b.distance || a.unit.id - b.unit.id)[0]?.unit;
+    if (!target) continue;
+    const atTarget = view.units.filter(
+      (unit) => unit.owner === view.playerId && unit.hex === target.hex,
+    );
+    if (atTarget.length >= MAX_UNITS_PER_HEX) continue;
+    out.push(
+      small.hex === target.hex
+        ? { t: 'merge', unitIds: [small.id, target.id] }
+        : { t: 'move', unitIds: [small.id], to: target.hex },
+    );
   }
   return out;
 }
@@ -278,11 +326,18 @@ export function decide(
   armyId: number,
   lineDepth?: number,
   context?: CommanderContext,
+  bot = false,
+  mergeBelow: Fp = fp(25),
+  mergeRadius = 3,
 ): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
   const commanderContext = context ?? createCommanderContext(map, view);
-  const out = [...reinforce(view, armyId), ...seedExpansion(view, armyId, commanderContext)];
+  const out = [
+    ...reinforce(view, armyId, bot),
+    ...(bot ? mergeSmall(map, view, armyId, mergeBelow, mergeRadius) : []),
+    ...seedExpansion(view, armyId, commanderContext),
+  ];
   const units = armyUnits(view, armyId);
   const expansion =
     lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1

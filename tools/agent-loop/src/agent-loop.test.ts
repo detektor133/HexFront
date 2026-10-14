@@ -1,418 +1,333 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
+import { defaultRunCommand, prepareProcessArguments } from './agent-loop.ts';
 import {
-  runAgentLoop,
-  defaultRunCommand,
-  prepareProcessArguments,
-  selectIssueOrQueue,
-  type AgentConfig,
-  type CommandResult,
-  type GithubClient,
-  type GithubIssue,
-} from './agent-loop.ts';
+  closedStageBranch,
+  commandTask,
+  isOwnerTask,
+  parseQueue,
+  selectTask,
+  taskMark,
+} from './stage-file.ts';
+import {
+  fixtureStage,
+  fixtureStatus,
+  issue,
+  runWorld,
+  setMark,
+  type Session,
+} from './test-world.ts';
 
-const fixtureStatus = `# Статус
+const NEXT_DONE: Session = {
+  task: 'T1j5-Б1',
+  mark: '~',
+  answer: 'Готово.\nЗапусти `$review 06/T1j5-Б1` в новой сессии',
+};
+const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё подтверждено' };
+const REVIEW_BACK: Session = {
+  task: 'T1j5-Б1',
+  mark: ' ',
+  answer: 'ВОЗВРАТ\n- п.1 — evaluate.ts:95 — штраф по чужим метрикам',
+};
+const OWNER_WAIT =
+  'жду: очередь дошла до 06/T1i — это задача владельца. Когда сделаешь — Issue «$done 06/T1i» с текстом, что сделано';
 
-| Текущий этап | 05 — тестовый этап |
-
-Очередь: 05/T15c → 05/T15d
-`;
-const fixtureStage = `# Этап 05
-
-- [ ] **T15c. Тестовая задача**
-  *Приёмка:* тесты подтверждают, что ход бота не строит playerView.
-- [ ] **T15d. Задача владельца**
-  *Приёмка:* $accept запускает проверку.
-- [ ] **T1a5. Плейтест** — задача владельца
-`;
-const fixtureRoles = JSON.stringify({
-  planner: { model: 'planner', reasoningEffort: 'high', skill: 'plan' },
-  tester: { model: 'tester', reasoningEffort: 'medium', skill: 'tests' },
-  coder: { model: 'coder', reasoningEffort: 'medium', skill: 'code' },
-  reviewer: { model: 'reviewer', reasoningEffort: 'high', skill: 'review' },
-});
-const fixturePermissions = JSON.stringify({
-  planner: ['docs/**', '.ai-logs/**'],
-  tester: ['**/test/**', '**/*.test.ts', '.ai-logs/**'],
-  coder: ['packages/*/src/**', 'tools/*/src/**', '.ai-logs/**'],
-  reviewer: ['docs/**', 'docs/reports/**', '.ai-logs/**'],
-});
-const issue = (number: number, title = `задача ${number}`): GithubIssue => ({
-  number,
-  title,
-  body: 'T15c',
-  labels: [{ name: 'agent' }],
-  state: 'open',
-});
-
-interface Scenario {
-  readonly outputs: string[];
-  readonly ci: number[];
-  readonly issues?: readonly GithubIssue[];
-  readonly changedRole?: string;
-  readonly changeQuestions?: boolean;
-  readonly coderCommit?: boolean;
-  readonly dirtyAfterCoder?: boolean;
-  readonly queue?: string;
-  readonly plannedIssue?: number;
-  readonly maxTasks?: number;
-  readonly codexCode?: number;
-  readonly codexStderr?: string;
-}
-
-async function runScenario(scenario: Scenario): Promise<{
-  readonly code: number;
-  readonly roles: string[];
-  readonly comments: string[];
-  readonly resets: number;
-  readonly tasks: string[];
-  readonly codexInputs: string[];
-  readonly codexArguments: readonly (readonly string[])[];
-}> {
-  const fixtureRoot = await mkdtemp(join(tmpdir(), 'hexfront-agent-loop-test-'));
-  const outputs = [...scenario.outputs];
-  const ci = [...scenario.ci];
-  const roles: string[] = [];
-  const tasks: string[] = [];
-  const codexInputs: string[] = [];
-  const codexArguments: string[][] = [];
-  const comments: string[] = [];
-  let resets = 0;
-  let listCalls = 0;
-  let dirtyRole = '';
-  let head = 'base';
-  const runCommand = async (
-    command: string,
-    args: readonly string[],
-    options?: { readonly input?: string },
-  ): Promise<CommandResult> => {
-    if (command === 'git' && args[0] === 'branch')
-      return { code: 0, stdout: 'stage-05', stderr: '' };
-    if (command === 'git' && args[0] === 'rev-parse') return { code: 0, stdout: head, stderr: '' };
-    if (command === 'git' && args[0] === 'status')
-      return {
-        code: 0,
-        stdout:
-          scenario.dirtyAfterCoder && roles.at(-1) === 'coder'
-            ? ' M tools/agent-loop/src/agent-loop.ts'
-            : '',
-        stderr: '',
-      };
-    if (command === 'git' && args[0] === 'diff')
-      return {
-        code: 0,
-        stdout:
-          dirtyRole === 'coder'
-            ? 'docs/not-allowed.md'
-            : dirtyRole
-              ? 'packages/sim/src/not-allowed.ts'
-              : '',
-        stderr: '',
-      };
-    if (command === 'git' && args[0] === 'reset') {
-      resets += 1;
-      return { code: 0, stdout: '', stderr: '' };
-    }
-    if (command === 'git' && args[0] === 'push') return { code: 0, stdout: '', stderr: '' };
-    if (command === 'pnpm') return { code: ci.shift() ?? 0, stdout: 'ci', stderr: '' };
-    if (command === 'codex') {
-      const prompt = options?.input ?? '';
-      codexInputs.push(prompt);
-      codexArguments.push([...args]);
-      const role = prompt.match(/Роль: (\w+)/)?.[1] ?? '';
-      roles.push(role);
-      tasks.push(prompt.match(/Задача: ([^\n]+)/)?.[1] ?? '');
-      dirtyRole = scenario.changedRole === role ? role : '';
-      if (role === 'coder' && scenario.coderCommit !== false) head = `commit-${roles.length}`;
-      if (scenario.changeQuestions && role === 'planner')
-        await writeFile(
-          `${fixtureRoot}/docs/QUESTIONS.md`,
-          `${await readFile(`${fixtureRoot}/docs/QUESTIONS.md`, 'utf8')}\nизменение теста`,
-          'utf8',
-        );
-      return {
-        code: scenario.codexCode ?? 0,
-        stdout: outputs.shift() ?? 'OK',
-        stderr: scenario.codexStderr ?? '',
-      };
-    }
-    return { code: 0, stdout: '', stderr: '' };
-  };
-  const github: GithubClient = {
-    ensureAgentLabel: async () => undefined,
-    listAgentIssues: async () => {
-      listCalls += 1;
-      return scenario.issues ?? [];
-    },
-    comment: async (_number, body) => {
-      comments.push(body);
-    },
-    close: async () => undefined,
-  };
-  const config: AgentConfig = {
-    root: fixtureRoot,
-    maxTasks: scenario.maxTasks ?? 1,
-    maxMinutes: 10,
-    dryRun: false,
-    runCommand,
-    github,
-    now: (() => {
-      let time = 0;
-      return () => (time += 1);
-    })(),
-    writeLine: () => undefined,
-  };
-  const questionsPath = `${fixtureRoot}/docs/QUESTIONS.md`;
-  const statusPath = `${fixtureRoot}/docs/STATUS.md`;
-  const stagePath = `${fixtureRoot}/docs/stages/stage-05-bots-maps-balance.md`;
-  await mkdir(`${fixtureRoot}/docs/stages`, { recursive: true });
-  await mkdir(`${fixtureRoot}/tools/agent-loop`, { recursive: true });
-  const questions = '# Вопросы\n';
-  await writeFile(questionsPath, questions, 'utf8');
-  await writeFile(statusPath, fixtureStatus, 'utf8');
-  await writeFile(stagePath, fixtureStage, 'utf8');
-  await writeFile(`${fixtureRoot}/tools/agent-loop/roles.json`, fixtureRoles, 'utf8');
-  await writeFile(`${fixtureRoot}/tools/agent-loop/permissions.json`, fixturePermissions, 'utf8');
-  const status = fixtureStatus;
-  const stage = fixtureStage;
-  try {
-    if (scenario.queue)
-      await writeFile(
-        statusPath,
-        status.replace(/^Очередь:.*$/m, `Очередь: ${scenario.queue}`),
-        'utf8',
-      );
-    if (scenario.plannedIssue)
-      await writeFile(
-        stagePath,
-        stage.replace(
-          '  *Приёмка:* тесты подтверждают, что ход бота',
-          `  Issue #${scenario.plannedIssue}\n  План: существующий план\n  *Приёмка:* тесты подтверждают, что ход бота`,
-        ),
-        'utf8',
-      );
-    return {
-      code: await runAgentLoop(config),
-      roles,
-      comments,
-      resets,
-      tasks,
-      codexInputs,
-      codexArguments,
-    };
-  } finally {
-    if (scenario.changeQuestions) await writeFile(questionsPath, questions, 'utf8');
-    if (scenario.queue) await writeFile(statusPath, status, 'utf8');
-    if (scenario.plannedIssue) await writeFile(stagePath, stage, 'utf8');
-    await rm(fixtureRoot, { recursive: true, force: true });
-    void listCalls;
-  }
-}
-
-describe('выбор задач', () => {
-  it('выбирает Issue по возрастанию и затем очередь', () => {
-    expect(selectIssueOrQueue([issue(4), issue(2)], 'Очередь: 05/T15c → 05/T15d')?.number).toBe(2);
-    expect(selectIssueOrQueue([], 'Очередь: 05/T15c → 05/T15d')?.task).toBe('05/T15c');
+describe('разбор файла этапа', () => {
+  it('выбирает первую незакрытую задачу очереди, включая [~]', () => {
+    expect(selectTask(fixtureStatus, fixtureStage)).toBe('06/T1j5-Б1');
+    expect(selectTask(fixtureStatus, setMark(fixtureStage, 'T1j5-Б1', 'x'))).toBe('06/T1i');
+    expect(selectTask(fixtureStatus, setMark(fixtureStage, 'T1j5-Б1', '~'))).toBe('06/T1j5-Б1');
   });
 
-  it('пропускает выполненные и отменённые задачи очереди', () => {
-    const stage = '- [x] **T10. Готово**\n- [—] **T9a. Отменено**\n- [ ] **T15c. Открыто**';
+  it('берёт из «Очереди» только номера задач, без пояснений', () => {
+    expect(parseQueue('Очередь: 07/T1 после мержа PR этапа 06; новый этап не начат.')).toEqual([
+      '07/T1',
+    ]);
+    expect(parseQueue('Очередь: 06/T1j7 → 06/T1i → 06/T1e → 06/T2')).toHaveLength(4);
+  });
+
+  it('не путает T1 с T1i и T1e при чтении отметки', () => {
+    const stage = setMark(fixtureStage, 'T1i', 'x');
+    expect(taskMark(stage, '06/T1')).toBe(' ');
+    expect(taskMark(stage, '06/T1i')).toBe('x');
+    expect(taskMark(stage, '06/T9')).toBeUndefined();
+  });
+
+  it('считает задачей владельца только первую строку без «не задача владельца»', () => {
+    expect(isOwnerTask('- [ ] **T1i. Обучение весов**, задача владельца.')).toBe(true);
+    expect(isOwnerTask('- [ ] **T8. Плейтест**')).toBe(true);
     expect(
-      selectIssueOrQueue([], 'Очередь: 05/T10 → 05/T9a → 05/T15c', new Set(), new Set(), stage)
-        ?.task,
-    ).toBe('05/T15c');
+      isOwnerTask('- [ ] **T1e. Проверка**, не задача владельца.\n  после $accept 06/T1'),
+    ).toBe(false);
+  });
+
+  it('находит номер задачи после команды в ответе, без кавычек и точки', () => {
+    expect(commandTask('запусти `$split 06/T1j5-Б1`.', '$split')).toBe('06/T1j5-Б1');
+    expect(commandTask('нужен $accept 06/T1.', '$accept')).toBe('06/T1');
+    expect(commandTask('нужен $accept', '$accept')).toBeUndefined();
+  });
+
+  it('видит закрытый этап: «Текущий этап» уже следующий, а «Ветка» прежняя', () => {
+    expect(closedStageBranch(fixtureStatus)).toBeUndefined();
+    expect(closedStageBranch(fixtureStatus.replace('| 06 —', '| 07 —'))).toBe('stage-06');
   });
 });
 
-describe('runAgentLoop', () => {
-  it('передаёт спецсимволы stdin подмененному процессу без изменений', async () => {
-    const input = 'строка 1 с пробелами и "кавычками"\n& | < > кириллица';
-    const script = 'process.stdin.pipe(process.stdout)';
-    const result = await defaultRunCommand('node', prepareProcessArguments(['-e', script]), {
-      input,
-    });
-    expect(result.code).toBe(0);
-    expect(result.stdout).toBe(input);
+describe('круги $next → CI → $review', () => {
+  it('проходит задачу за круг и ждёт на задаче владельца, не вызывая codex', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
+    expect(run.code).toBe(0);
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(run.roles).toEqual(['', 'reviewer']);
+    expect(run.ciCalls).toBe(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+    expect(run.lines).toContain(OWNER_WAIT);
   });
 
-  it('проходит успешную задачу в точной последовательности', async () => {
-    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0], issues: [] });
-    expect(result.code).toBe(0);
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer']);
+  it('передаёт модель только если она задана, и усилие medium', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
+    // На Windows аргументы приходят в кавычках для cmd, поэтому сравнение — без них.
+    const plain = run.codexArguments.map((args) => args.map((arg) => arg.replace(/^"|"$/g, '')));
+    expect(plain[0]).toEqual(
+      expect.arrayContaining(['--model', 'luna', 'model_reasoning_effort=medium']),
+    );
+    expect(plain[1]).not.toContain('--model');
   });
 
-  it('передаёт многострочный промпт через stdin без изменений', async () => {
-    const task = 'строка 1\nстрока 2 с пробелами, "кавычками", & | < > и кириллицей';
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK', 'OK'],
-      ci: [0],
-      issues: [{ ...issue(1), body: task }],
+  it('после ВОЗВРАТ снова запускает $next и затем $review', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_OK] });
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1', '$next', '$review 06/T1j5-Б1']);
+    expect(run.lines).toContain('ВОЗВРАТ 06/T1j5-Б1, круг 1 из 3');
+  });
+
+  it('после maxRounds ВОЗВРАТ ждёт владельца и не начинает задачу заново', async () => {
+    const run = await runWorld({
+      maxRounds: 2,
+      sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_BACK],
     });
-    expect(result.codexInputs[0]).toContain(`Задача: Issue #1: задача 1\n${task}`);
-    expect(result.codexArguments[0]?.at(-1)).toBe(process.platform === 'win32' ? '"-"' : '-');
-    expect(result.codexArguments[0]).toContain(
-      process.platform === 'win32'
-        ? '"model_reasoning_effort=high"'
-        : 'model_reasoning_effort=high',
+    expect(run.prompts).toHaveLength(4);
+    expect(run.lines).toContain('жду: 2 ВОЗВРАТ подряд по 06/T1j5-Б1 — нужно решение владельца');
+  });
+
+  it('начинает с $review, если задача уже [~], но сначала проверяет CI её HEAD', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', '~'),
+      sessions: [REVIEW_OK],
+    });
+    expect(run.prompts).toEqual(['$review 06/T1j5-Б1']);
+    expect(run.ciCalls).toBe(1);
+  });
+
+  it('при красном CI запускает $task с причиной, а не $next', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, { answer: 'CI починен, задача ждёт ревью', commit: true }, REVIEW_OK],
+      ci: [
+        'failure job=check https://ci/2\n ELIFECYCLE  Command failed with exit code 1.',
+        'success https://ci/3',
+      ],
+    });
+    expect(run.prompts).toEqual([
+      '$next',
+      '$task 06/T1j5-Б1 CI красный: failure job=check https://ci/2',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain('CI красный за 0 мин: failure job=check https://ci/2');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('недоступный GitHub не считает красным CI: пауза без ревью и без новой работы', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE],
+      ci: ['error сеть: TypeError: fetch failed', 'error сеть: TypeError: fetch failed'],
+    });
+    expect(run.prompts).toEqual(['$next']);
+    expect(run.ciCalls).toBe(2);
+    expect(run.lines).toContain(
+      'сбой: CI 06/T1j5-Б1 не проверен: error сеть: TypeError: fetch failed — следующая попытка через 30 мин',
     );
   });
 
-  it('добавляет stderr codex в комментарий при ненулевом коде', async () => {
-    const result = await runScenario({
-      outputs: [],
-      ci: [],
-      issues: [issue(1)],
-      codexCode: 7,
-      codexStderr: 'ошибка 1\nошибка 2',
+  it('повторяет ожидание CI один раз после таймаута', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, REVIEW_OK],
+      ci: ['failure timeout https://ci/3', 'success https://ci/3'],
     });
-    expect(result.code).toBe(1);
-    expect(result.comments[0]).toContain('Последние строки stderr:\nошибка 1\nошибка 2');
+    expect(run.ciCalls).toBe(2);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('повторяет tester и coder после ответа ТЕСТ:', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'ТЕСТ: неверный тест', 'OK', 'OK', 'OK'],
-      ci: [0],
+  it('сам пушит коммит, который сессия не запушила', async () => {
+    const run = await runWorld({ sessions: [{ ...NEXT_DONE, push: false }, REVIEW_OK] });
+    expect(run.pushes).toBe(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('ждёт владельца без отката, если запушенное ревью изменило код', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, { ...REVIEW_OK, files: ['packages/sim/src/step.ts'] }],
     });
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'tester', 'coder', 'reviewer']);
+    expect(run.lines).toContain('жду: ревью изменило файлы вне permissions.json — проверь коммит');
   });
 
-  it('ремонтирует coder один раз после красного CI', async () => {
-    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK', 'OK'], ci: [1, 0] });
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'coder', 'reviewer']);
-  });
-
-  it('останавливается после второго красного CI', async () => {
-    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [1, 1] });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'coder']);
-    expect(result.comments).toHaveLength(0);
-  });
-
-  it('ремонтирует coder после ВОЗВРАТ и вызывает reviewer повторно', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK', 'ВОЗВРАТ причина', 'OK', 'OK'],
-      ci: [0, 0],
+  it('принимает вердикт ревью в оформлении `OK` и **OK**', async () => {
+    const run = await runWorld({
+      sessions: [NEXT_DONE, { ...REVIEW_OK, answer: '**OK** — всё подтверждено' }],
     });
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer', 'coder', 'reviewer']);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('останавливается после второго ВОЗВРАТ', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK', 'ВОЗВРАТ причина', 'OK', 'ВОЗВРАТ снова'],
-      ci: [0, 0],
+  it('доделка начинается с работы, даже если в незакоммиченном файле уже [~]', async () => {
+    const run = await runWorld({
+      dirty: true,
+      resume: '06/T1j5-Б1',
+      stage: setMark(fixtureStage, 'T1j5-Б1', '~'),
+      sessions: [{ ...NEXT_DONE, commit: true }, REVIEW_OK],
     });
-    expect(result.code).toBe(1);
-    expect(result.comments).toHaveLength(0);
+    expect(run.prompts).toEqual(['$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
   });
 
-  it.each(['planner', 'tester', 'coder', 'reviewer'])(
-    'откатывает нарушение прав роли %s',
-    async (role) => {
-      const result = await runScenario({
-        outputs: ['OK', 'OK', 'OK', 'OK'],
-        ci: [0],
-        changedRole: role,
-      });
-      expect(result.code).toBe(1);
-      expect(result.resets).toBe(1);
-      expect(result.comments).toHaveLength(0);
-    },
-  );
+  it('ждёт владельца, если ответ ревью не совпадает с отметкой', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: '~' }] });
+    expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [~]');
+  });
 
-  it('останавливает задачу владельца с комментарием без вызова роли', async () => {
-    const result = await runScenario({
-      outputs: [],
-      ci: [],
-      issues: [{ ...issue(1), body: 'T1a5' }],
+  it('при сбое codex делает паузу и больше сессий не запускает', async () => {
+    const run = await runWorld({ sessions: [{ answer: 'процесс упал', code: 1 }] });
+    expect(run.prompts).toEqual(['$next']);
+    expect(run.lines).toContain(
+      'сбой: $next: codex завершился с кодом 1 — следующая попытка через 30 мин',
+    );
+  });
+
+  it('считает сбоем исчерпанный лимит Codex даже при коде 0', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: "You've hit your usage limit. Try again in 3 hours." }],
     });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual([]);
-    expect(result.comments).toHaveLength(1);
+    expect(run.prompts).toEqual(['$next']);
+    expect(run.lines).toContain(
+      'сбой: $next: кончился лимит Codex — следующая попытка через 30 мин',
+    );
   });
 
-  it('не считает строку Приёмка задачей владельца', async () => {
-    const result = await runScenario({ outputs: ['OK', 'OK', 'OK', 'OK'], ci: [0], issues: [] });
-    expect(result.roles).toEqual(['planner', 'tester', 'coder', 'reviewer']);
+  it('--resume в чистом дереве забывается и не продолжает чужую работу', async () => {
+    const run = await runWorld({ resume: '06/T1j5-Б1', sessions: [NEXT_DONE, REVIEW_OK] });
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
   });
 
-  it.each(['05/T1a5', '05/T15d'])('останавливает задачу владельца из очереди %s', async (task) => {
-    const result = await runScenario({ outputs: [], ci: [], issues: [], queue: task });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual([]);
+  it('ждёт, если ветка не совпадает с «Ветка» в STATUS', async () => {
+    const run = await runWorld({ branch: 'main', sessions: [] });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines).toContain('жду: ожидалась ветка stage-06 из STATUS, сейчас main');
   });
 
-  it('требует номер задачи в ответе planner для Issue и передаёт его ролям', async () => {
-    const result = await runScenario({
-      outputs: ['ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK'],
-      ci: [0],
-      issues: [issue(7)],
+  it('в --dry-run только печатает план', async () => {
+    const run = await runWorld({ dryRun: true, sessions: [] });
+    expect(run.lines).toEqual(['$next → CI → $review: 06/T1j5-Б1']);
+  });
+});
+
+describe('$split, $accept и доделка без владельца', () => {
+  it('запускает $split по ответу $next и снова берёт очередь', async () => {
+    const split = { answer: 'Задача велика: запусти `$split 06/T1j5-Б1`.' };
+    const run = await runWorld({
+      sessions: [split, { answer: 'Разбито на T1j5-Б1a…', commit: true }, split],
     });
-    expect(result.code).toBe(0);
-    expect(result.tasks.slice(1)).toEqual([
-      '05/T15c (Issue #7)',
-      '05/T15c (Issue #7)',
-      '05/T15c (Issue #7)',
-    ]);
+    expect(run.prompts).toEqual(['$next', '$split 06/T1j5-Б1', '$next']);
+    expect(run.lines).toContain('жду: 06/T1j5-Б1 снова просят разбить — нужен владелец');
   });
 
-  it('останавливается для Issue без номера задачи от planner', async () => {
-    const result = await runScenario({ outputs: ['OK'], ci: [], issues: [issue(7)] });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual(['planner']);
-  });
-
-  it('не вызывает planner для Issue с уже записанным планом и ссылкой', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK'],
-      ci: [0],
-      issues: [issue(7)],
-      plannedIssue: 7,
+  it('запускает $accept по ответу $next и повторяет $next с результатом приёмки', async () => {
+    const stage = setMark(setMark(fixtureStage, 'T1j5-Б1', 'x'), 'T1i', 'x');
+    const run = await runWorld({
+      stage,
+      sessions: [
+        { answer: 'Приёмка требует `$accept 06/T1`, задача оставлена [ ]' },
+        { answer: 'выполнено 3/3', commit: true },
+        { task: 'T1e', mark: '~', answer: 'Готово' },
+        { task: 'T1e', mark: 'x', answer: 'OK' },
+      ],
     });
-    expect(result.code).toBe(0);
-    expect(result.roles).toEqual(['tester', 'coder', 'reviewer']);
+    expect(run.prompts).toEqual(['$next', '$accept 06/T1', '$next', '$review 06/T1e']);
+    expect(run.lines).toContain('готово: 06/T1e');
   });
 
-  it('останавливается перед push, если coder не создал коммит', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK'],
-      ci: [],
-      issues: [],
-      coderCommit: false,
+  it('второй раз $accept в тех же кругах не запускает, а ждёт владельца', async () => {
+    const stage = setMark(setMark(fixtureStage, 'T1j5-Б1', 'x'), 'T1i', 'x');
+    const ask = { answer: 'Приёмка `$accept 06/T1` не пройдена, нужен новый evolve' };
+    const run = await runWorld({ stage, sessions: [ask, { answer: '1/3', commit: true }, ask] });
+    expect(run.prompts).toEqual(['$next', '$accept 06/T1', '$next']);
+    expect(run.lines.some((line) => line.startsWith('жду: 06/T1e не отмечена [~]'))).toBe(true);
+  });
+
+  it('доделывает незакоммиченную работу одной сессией «продолжить»', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: 'verify красный', dirty: true }, NEXT_DONE, REVIEW_OK],
     });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual(['planner', 'tester', 'coder']);
+    expect(run.prompts).toEqual(['$next', '$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
   });
 
-  it('останавливается перед push при грязном дереве после coder', async () => {
-    const result = await runScenario({
-      outputs: ['OK', 'OK', 'OK'],
-      ci: [],
-      issues: [],
-      dirtyAfterCoder: true,
+  it('ждёт владельца, если и доделка оставила дерево грязным', async () => {
+    const run = await runWorld({
+      sessions: [
+        { answer: 'verify красный', dirty: true },
+        { answer: 'снова красный', dirty: true },
+      ],
     });
-    expect(result.code).toBe(1);
-    expect(result.roles).toEqual(['planner', 'tester', 'coder']);
+    expect(run.prompts).toHaveLength(2);
+    expect(run.lines).toContain('жду: доделка 06/T1j5-Б1 не закончена, дерево не чистое');
   });
 
-  it('останавливается при изменении QUESTIONS после planner', async () => {
-    const result = await runScenario({ outputs: ['OK'], ci: [], changeQuestions: true });
-    expect(result.code).toBe(1);
-    expect(result.comments).toHaveLength(0);
-  });
-
-  it('берёт две задачи при maxTasks=2', async () => {
-    const result = await runScenario({
-      outputs: ['ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK', 'ЗАДАЧА: 05/T15c', 'OK', 'OK', 'OK'],
-      ci: [0, 0],
-      issues: [issue(1), issue(2)],
-      maxTasks: 2,
+  it('по --resume начинает с доделки задачи в грязном дереве', async () => {
+    const run = await runWorld({
+      dirty: true,
+      resume: '06/T1j5-Б1',
+      sessions: [NEXT_DONE, REVIEW_OK],
     });
-    expect(result.code).toBe(0);
-    expect(result.roles).toHaveLength(8);
+    expect(run.prompts).toEqual(['$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
+  });
+
+  it('чужое грязное дерево не трогает: ждёт $done или --resume', async () => {
+    const run = await runWorld({ dirty: true, sessions: [] });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines.some((line) => line.startsWith('жду: рабочее дерево не чистое'))).toBe(true);
+  });
+});
+
+describe('ожидание', () => {
+  it('без работы спит и проверяет снова, сообщение об ожидании — один раз', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      sessions: [],
+      polls: 2,
+    });
+    expect(run.prompts).toEqual([]);
+    expect(run.lines.filter((line) => line === OWNER_WAIT)).toHaveLength(1);
+    expect(run.lines.filter((line) => line.startsWith('… жду:'))).toHaveLength(1);
+    expect(run.checks).toBe(run.sleeps + 1);
+  });
+
+  it('новую Issue берёт на следующей дешёвой проверке, а не через полный интервал', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      polls: 3,
+      arrival: issue(12, '$done 06/T1i плейтест пройден'),
+      sessions: [{ task: 'T1i', mark: 'x', answer: 'T1i [x]' }, { answer: 'T1e ждёт $accept' }],
+    });
+    expect(run.sleepsAtPrompt[0]).toBe(1);
+    expect(run.lines).toContain('изменения в Issues или main — проверяю');
+    expect(run.prompts.slice(0, 2)).toEqual(['$done 06/T1i плейтест пройден', '$next']);
+  });
+});
+
+describe('запуск процесса', () => {
+  it('передаёт спецсимволы stdin подменённому процессу без изменений', async () => {
+    const input = 'строка "кавычки" $next & | > <\nвторая строка';
+    // Команда без пути: на Windows cmd разрезал бы `C:\Program Files\…\node.exe` по пробелу.
+    const result = await defaultRunCommand(
+      'node',
+      prepareProcessArguments(['-e', 'process.stdin.pipe(process.stdout)']),
+      { input },
+    );
+    expect(result.stdout).toBe(input);
   });
 });

@@ -25,6 +25,13 @@ describe('проверка сообщений коммитов', () => {
     expect(checkCommitMessage(message, ctx)).toEqual([]);
   });
 
+  it('принимает трейлер закрытия этапа из скилла $stage-close', () => {
+    // 2026-10-14: скилл велит «Этап: NN/close», а проверка его отклоняла — CI PR этапа 06 красный.
+    const message = 'docs(docs): закрыт этап 06\n\nЭтап: 06/close';
+    expect(checkCommitMessage(message, STAGE)).toEqual([]);
+    expect(checkCommitMessage(message.replace('/close', '/closed'), STAGE)).not.toEqual([]);
+  });
+
   it.each(['T26b1', 'T26b2', 'T12c'])('принимает трейлер подзадачи %s', (task) => {
     const message = `feat(sim): добавлена подсистема\n\nЭтап: 04/${task}`;
     expect(checkCommitMessage(message, STAGE)).toEqual([]);

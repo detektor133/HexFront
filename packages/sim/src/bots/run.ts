@@ -2,22 +2,21 @@
 // COMMANDER_TICKS для каждого живого игрока — все его армии с auto в один тик, по одному снимку;
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
+import { brainDecide, resolveBotWeights, type BotWeightsByPlayer } from './brain.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
-import { economyDecide } from './economy.ts';
 import {
-  BOT_EASY_TAX,
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
   BOT_THINK_TICKS,
   COMMANDER_TICKS,
 } from '../balance.ts';
+import type { BotLevel } from './types.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import type { Fp } from '../math/int.ts';
-import { commanderView, playerView } from '../queries/player-view.ts';
+import { fp, type Fp } from '../math/int.ts';
+import { commanderView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
-
-export type BotLevel = 'easy' | 'medium';
+export type { BotLevel } from './types.ts';
 
 function isBotTickContext(
   value: readonly (BotLevel | undefined)[] | BotTickContext | undefined,
@@ -42,9 +41,10 @@ export function commanderCommands(
   bots: readonly number[] = [],
   levelsOrContext?: readonly (BotLevel | undefined)[] | BotTickContext,
   shared?: BotTickContext,
+  weights?: BotWeightsByPlayer,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
-  const { context } = botArguments(levelsOrContext, shared);
+  const { levels, context } = botArguments(levelsOrContext, shared);
   const tickContext = context ?? createBotTickContext(state);
   const viewContext = tickContext.playerView;
   const armiesByOwner = new Map<number, number[]>();
@@ -77,7 +77,24 @@ export function commanderCommands(
     const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
-      for (const cmd of decide(state.map, view, armyId, depth, commanderContext)) {
+      const botWeights = botIds.has(p.id)
+        ? resolveBotWeights(weights, p.id, levels[p.id] ?? 'medium')
+        : undefined;
+      const mergeBelow = fp(
+        botWeights === undefined ? 0 : Math.max(0, botWeights['commander.mergeBelowSoldiers'] ?? 0),
+      );
+      const mergeRadius =
+        botWeights === undefined ? 0 : Math.max(0, botWeights['commander.mergeRadius'] ?? 0);
+      for (const cmd of decide(
+        state.map,
+        view,
+        armyId,
+        depth,
+        commanderContext,
+        botIds.has(p.id),
+        mergeBelow,
+        mergeRadius,
+      )) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
     }
@@ -95,19 +112,18 @@ export function botCommands(
   bots: readonly number[],
   levelsOrContext?: readonly (BotLevel | undefined)[] | BotTickContext,
   shared?: BotTickContext,
+  weights?: BotWeightsByPlayer,
 ): PlayerCommand[] {
   const out: PlayerCommand[] = [];
   const { levels, context } = botArguments(levelsOrContext, shared);
-  const viewContext = (context ?? createBotTickContext(state)).playerView;
+  const tickContext = context ?? createBotTickContext(state);
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id)) continue;
     const level = levels[p.id] ?? 'medium';
     const thinkTicks = level === 'easy' ? BOT_EASY_THINK_TICKS : BOT_THINK_TICKS;
     if (p.id % thinkTicks !== state.tick % thinkTicks) continue;
-    const commands = economyDecide(state.map, playerView(state, p.id, viewContext));
-    if (level === 'easy') out.push({ playerId: p.id, cmd: { t: 'setTax', rate: BOT_EASY_TAX } });
+    const commands = brainDecide(state, p.id, tickContext, level, weights);
     for (const cmd of commands) {
-      if (level === 'easy' && (cmd.t === 'setTax' || cmd.t === 'startOffensive')) continue;
       out.push({ playerId: p.id, cmd });
     }
   }

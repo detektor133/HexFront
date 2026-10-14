@@ -95,6 +95,8 @@ importers:
 
   packages/sim: {}
 
+  tools/agent-loop: {}
+
   tools/ai-check: {}
 
   tools/balance: {}

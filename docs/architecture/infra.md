@@ -16,7 +16,7 @@
 `apps/server/Dockerfile` — multi-stage:
 
 ```dockerfile
-# draft — финальная версия в этапе 06
+# draft — финальная версия в этапе 09
 FROM node:22-slim AS build
 WORKDIR /app
 RUN corepack enable
@@ -42,13 +42,13 @@ CMD ["dist/main.js"]
 
 1. `pnpm install --frozen-lockfile`
 2. `pnpm typecheck` · `pnpm lint` · `pnpm depcheck` (dependency-cruiser)
-3. `pnpm test` (Vitest, включая property- и golden-тесты)
+3. `pnpm test` — быстрый уровень (workflow `ci`); `pnpm test:all` — все тесты с property-, golden- и покрытием (workflow `slow`, параллельно), см. `docs/testing.md`, «Уровни тестов»
 4. `pnpm test:visual` (Playwright, скриншоты) — начиная с этапа 04
 5. `pnpm bench:sim` — провал, если `step` p99 > 10 мс на эталонном сценарии
-6. Сборка Docker-образа (этап 06+), пуш в GHCR по тегу
+6. Сборка Docker-образа (этап 09+), пуш в GHCR по тегу
 
 ## Наблюдаемость
 
-- Логи сервера — JSON в stdout (pino разрешён в ADR этапа 06).
+- Логи сервера — JSON в stdout (pino разрешён в ADR этапа 09).
 - Метрики комнаты: игроков, длительность тика p50/p99, трафик на игрока, отклонённые команды.
-- Ошибки клиента — собственный лёгкий эндпоинт `/client-errors` (без сторонних SDK до этапа 07).
+- Ошибки клиента — собственный лёгкий эндпоинт `/client-errors` (без сторонних SDK до этапа 10).

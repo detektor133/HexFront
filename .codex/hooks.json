@@ -1,5 +1,5 @@
 {
-  "description": "Hexfront: проверка перед завершением хода и запрет ручного браузера.",
+  "description": "Hexfront: проверка перед завершением хода, запрет ручного браузера и остановки процессов.",
   "hooks": {
     "Stop": [
       {
@@ -20,6 +20,12 @@
           {
             "type": "command",
             "command": "node .codex/hooks/block-browser.mjs",
+            "timeout": 10,
+            "statusMessage": "Проверка команды"
+          },
+          {
+            "type": "command",
+            "command": "node .codex/hooks/block-kill.mjs",
             "timeout": 10,
             "statusMessage": "Проверка команды"
           }

@@ -6,6 +6,22 @@ import {
   parseOptions,
   runBalanceMatches,
 } from './index.ts';
+import { neutralHexMetrics, shouldContinueMatch } from './metrics.ts';
+
+describe('метрики остановки и нейтральной земли', () => {
+  it('останавливает матч сразу после фиксации победителя', () => {
+    expect(shouldContinueMatch(120, -1, 15000)).toBe(true);
+    expect(shouldContinueMatch(120, 3, 15000)).toBe(false);
+    expect(shouldContinueMatch(15000, -1, 15000)).toBe(false);
+  });
+
+  it('исключает воду из знаменателя доли нейтральной земли', () => {
+    expect(neutralHexMetrics([-1, -1, 0, -1], [0, 1, 2, 3])).toEqual({
+      neutralHexes: 2,
+      totalHexes: 3,
+    });
+  });
+});
 
 describe('запуск балансировочных матчей', () => {
   it('отклоняет нулевое число матчей и параллельность вне диапазона', () => {

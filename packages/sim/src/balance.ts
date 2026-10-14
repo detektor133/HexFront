@@ -34,20 +34,6 @@ export const BOT_EASY_THINK_TICKS = 30;
 
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
 
-/** Налог бота в мире (без врага у границы); 09-bots.md: 10–15 %. */
-export const BOT_TAX_PEACE: Fp = fp(0.15);
-/** Налог бота, когда враг у границы; 09-bots.md: 25–35 %. */
-export const BOT_TAX_WAR: Fp = fp(0.3);
-/** Фиксированный налог easy-бота. */
-export const BOT_EASY_TAX: Fp = fp(0.2);
-/** Резерв золота бота сверх цены стройки; ниже него при минусовом балансе — налог TAX_MAX. */
-export const BOT_GOLD_RESERVE: Fp = fp(50);
-/** Благоустройство — гексам с населением не ниже этой доли лимита. */
-export const BOT_IMPROVE_POP_RATIO: Fp = fp(0.8);
-/** Желаемая сила армии относительно сильнейшего соседа. */
-export const BOT_ARMY_RATIO: Fp = fp(0.8);
-/** Максимальная доля дохода на содержание армии. */
-export const BOT_ARMY_INCOME_SHARE: Fp = fp(0.5);
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
 
@@ -175,6 +161,17 @@ export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */
 export const ROAD_PATH_EXISTING_COST: Fp = fp(0.01);
+
+/** Определения построек для каталога действий бота. */
+export const BUILDING_DEFS = {
+  fort: { costGold: FORT_COST, defenseMult: FORT_DEF_MULT, supplyLossMult: fp(1), supplyRadius: 0 },
+  depot: {
+    costGold: DEPOT_COST,
+    defenseMult: fp(1),
+    supplyLossMult: DEPOT_LOSS_MULT,
+    supplyRadius: DEPOT_RADIUS,
+  },
+} as const;
 
 // Армии
 

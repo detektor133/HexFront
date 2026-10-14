@@ -76,7 +76,7 @@ export function incomeBases(state: MatchState): IncomeBase[] {
   return bases;
 }
 
-function incomePerSecond(pop: number, tax: Fp, mines: number): number {
+export function incomePerSecond(pop: number, tax: Fp, mines: number): number {
   return fpMul(fpMul(pop as Fp, tax), GOLD_PER_POP_TAX) + MINE_GOLD_PER_S * mines;
 }
 

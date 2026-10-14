@@ -1,77 +1,66 @@
 import { execFileSync } from 'node:child_process';
 
-import { defaultRunCommand, runAgentLoop, type GithubClient } from './agent-loop.ts';
+import { defaultRunCommand, runAgentLoop } from './agent-loop.ts';
+import { httpGithubClient, parseGithubRepo } from './github.ts';
+import { TASK_ID_SOURCE } from './stage-file.ts';
+import { MAX_STREAMS } from './state.ts';
 
-const repo = (): string => {
-  const remote = execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim();
-  return remote.replace(/^.*github\.com[/:]/, '').replace(/\.git$/, '');
-};
-
-const githubClient = (): GithubClient => {
-  const token = process.env.GITHUB_TOKEN;
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'hexfront-agent-loop',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-  const base = `https://api.github.com/repos/${repo()}`;
-  const request = async (url: string, init: RequestInit = {}): Promise<Response> =>
-    fetch(`${base}${url}`, { ...init, headers: { ...headers, ...(init.headers ?? {}) } });
-  return {
-    async ensureAgentLabel() {
-      const response = await request('/labels/agent');
-      if (response.ok) return;
-      if (response.status !== 404) throw new Error(`GitHub label ${response.status}`);
-      const created = await request('/labels', {
-        method: 'POST',
-        body: JSON.stringify({ name: 'agent' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (created.status === 403) throw new Error('GitHub token не имеет права Issues: write');
-      if (!created.ok && created.status !== 422)
-        throw new Error(`GitHub label create ${created.status}`);
-    },
-    async listAgentIssues() {
-      const response = await request('/issues?state=open&labels=agent&per_page=100');
-      if (!response.ok) throw new Error(`GitHub Issues ${response.status}`);
-      return (await response.json()) as Awaited<ReturnType<GithubClient['listAgentIssues']>>;
-    },
-    async comment(issueNumber, body) {
-      const response = await request(`/issues/${issueNumber}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ body }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (response.status === 403) throw new Error('GitHub token не имеет права Issues: write');
-      if (!response.ok) throw new Error(`GitHub comment ${response.status}`);
-    },
-    async close(issueNumber) {
-      const response = await request(`/issues/${issueNumber}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ state: 'closed' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (response.status === 403) throw new Error('GitHub token не имеет права Issues: write');
-      if (!response.ok) throw new Error(`GitHub close ${response.status}`);
-    },
-  };
-};
-
+/** Значение флага в форме `--name N` или `--name=N`. */
 const flag = (name: string): string | undefined => {
+  const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
+  if (inline) return inline.slice(name.length + 1);
   const index = process.argv.indexOf(name);
   return index < 0 ? undefined : process.argv[index + 1];
 };
 
-const maxTasks = Number(flag('--max-tasks') ?? 3);
-const maxMinutes = Number(flag('--max-minutes') ?? 120);
-const root = process.cwd();
+const positive = (name: string, fallback: number): number => {
+  const value = Number(flag(name) ?? fallback);
+  if (!Number.isInteger(value) || value < 1) throw new Error(`${name} должен быть целым ≥ 1`);
+  return value;
+};
+
+/** Пауза, которую прерывает Enter в консоли: владелец просит проверить сейчас. */
+const sleepOrEnter = (ms: number): Promise<'timer' | 'wake'> =>
+  new Promise((resolve) => {
+    const finish = (result: 'timer' | 'wake') => {
+      clearTimeout(timer);
+      process.stdin.off('data', onData);
+      process.stdin.pause();
+      resolve(result);
+    };
+    const onData = () => finish('wake');
+    const timer = setTimeout(() => finish('timer'), ms);
+    if (process.stdin.isTTY) {
+      process.stdin.once('data', onData);
+      process.stdin.resume();
+    }
+  });
+
+const resume = flag('--resume');
+if (resume !== undefined && !new RegExp(`^${TASK_ID_SOURCE}$`).test(resume))
+  throw new Error('--resume ждёт номер задачи, например 06/T1j7');
+// Без флага — предел из памяти цикла (Issue `$streams N`); флаг его переписывает.
+const streams = flag('--streams') === undefined ? undefined : positive('--streams', 1);
+if (streams !== undefined && streams > MAX_STREAMS)
+  throw new Error(`--streams должен быть от 1 до ${MAX_STREAMS}`);
+const token = process.env.GITHUB_TOKEN;
+const repo = parseGithubRepo(
+  execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }),
+);
+
 process.exitCode = await runAgentLoop({
-  root,
-  maxTasks,
-  maxMinutes,
+  root: process.cwd(),
+  maxRounds: positive('--max-rounds', 3),
+  maxMinutes: positive('--max-minutes', 120),
+  pollSeconds: positive('--poll-seconds', 30),
+  pollMinutes: positive('--poll-minutes', 10),
+  once: process.argv.includes('--once'),
   dryRun: process.argv.includes('--dry-run'),
+  ...(resume === undefined ? {} : { resume }),
+  ...(streams === undefined ? {} : { streams }),
   runCommand: defaultRunCommand,
-  github: githubClient(),
   now: Date.now,
-  writeLine: console.log,
+  sleep: sleepOrEnter,
+  writeLine: (line) => console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${line}`),
+  ...(token ? { github: httpGithubClient(repo, token) } : {}),
 });
