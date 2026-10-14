@@ -11,6 +11,8 @@ const ADR_DIRECTORY = new URL('../../../docs/architecture/adr/', import.meta.url
 const DIST_DIRECTORY = new URL('../dist/', import.meta.url);
 const PROJECT_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const DIST_PATH = fileURLToPath(DIST_DIRECTORY);
+const DEPLOY_COMMAND =
+  'pages deploy apps/client/dist --project-name=hexfront --branch=${{ github.ref_name }}';
 
 let server: Server;
 let serverUrl: string;
@@ -85,8 +87,15 @@ describe('публикация сборки клиента', () => {
     expect(workflow).toMatch(/push:[\s\S]*branches:[\s\S]*main[\s\S]*stage-\*/);
     expect(workflow).toContain('pnpm --filter @hexfront/client build');
     expect(workflow).toMatch(/uses: cloudflare\/wrangler-action@v3/);
-    expect(workflow).toMatch(
-      /command: pages deploy apps\/client\/dist --project-name=hexfront --branch=\$\{\{ github\.ref_name \}\}/,
+    expect(workflow).toContain(`command: ${DEPLOY_COMMAND}`);
+
+    const mainDeployment = DEPLOY_COMMAND.replace('${{ github.ref_name }}', 'main');
+    const previewDeployment = DEPLOY_COMMAND.replace('${{ github.ref_name }}', 'stage-07');
+    expect(mainDeployment).toBe(
+      'pages deploy apps/client/dist --project-name=hexfront --branch=main',
+    );
+    expect(previewDeployment).toBe(
+      'pages deploy apps/client/dist --project-name=hexfront --branch=stage-07',
     );
   });
 

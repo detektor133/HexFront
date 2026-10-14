@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-07/T4: исправлен приёмочный тест `apps/client/test/deployment.test.ts` по замечанию `СПЕК:`.
-Тест запускает реальную сборку клиента, проверяет Cloudflare project/branch, точные условия секретов и прямые SPA-маршруты `/` и `/match`.
+07/T4: исправлены тесты публикации и причина красного CI `check`.
+`apps/client/test/deployment.test.ts` запускает реальную сборку клиента, проверяет проект `hexfront`, ref `main`/`stage-07`, условия секретов и SPA-маршруты `/` и `/match`.
+`apps/client/test/static-maps-build.test.ts` сам запускает сборку, поэтому проверка карт не зависит от порядка запуска файлов Vitest.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
 Задача отмечена `- [~]`; следующая сессия — `$review 07/T4`.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `.github/workflows/pages.yml`, `docs/reports/stage-07-t4.md`.
