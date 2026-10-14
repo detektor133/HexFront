@@ -35,15 +35,15 @@ jobs:
         run: pnpm --filter @hexfront/client build
 
       # wrangler-action в pnpm-монорепозитории ставит wrangler через `pnpm add` в корень
-      # и падает без -w; готовый wrangler в PATH action находит и свою установку пропускает.
-      - name: Установить wrangler
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
-        run: npm install -g wrangler@4
-
+      # и падает без -w; готовый wrangler в PATH action берёт без установки.
       # pages deploy не создаёт проект сам; повторное создание отвечает «already exists».
-      - name: Создать проект Pages, если его нет
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+      - name: Подготовить wrangler и проект Pages
         run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Подготовка пропущена: секреты Cloudflare не настроены"
+            exit 0
+          fi
+          npm install -g wrangler@4
           if ! out=$(wrangler pages project create hexfront --production-branch=main 2>&1); then
             echo "$out"
             echo "$out" | grep -qi "already exists" || exit 1
