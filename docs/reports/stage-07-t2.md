@@ -11,3 +11,11 @@
 Следующее действие: добавить приёмочные тесты, перевести visual-сцену `match` на `/match` и повторить `$review 07/T2`.
 
 Этап: 07/T2
+
+## Возврат ревью 2026-10-14 (повтор)
+
+- `pnpm verify --changed`: `verify: OK (13 с)`.
+- `apps/client/test/sim-worker-telemetry.test.ts`: оба условия сериализации проходят.
+- СПЕК: `apps/client/test/match-screen.test.ts:20-24,32-37` не рендерит `MatchSurface` и проверяет только props `MatchPage` и текст `MatchPage.tsx`, поэтому не подтверждает отсутствие элементов без debug и наличие панели с debug.
+
+Этап: 07/T2
