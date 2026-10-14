@@ -40,6 +40,9 @@ export interface TaskRun {
 /** Сколько раз за круги одной задачи цикл сам повторяет работу после `$accept` или красного CI. */
 const MAX_FOLLOW_UPS = 2;
 
+/** Замечание к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ` ревью или исполнителя. */
+const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
+
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
 /** Работа над задачей после красного CI: сессия начинает с причины, а не с поиска задачи в очереди. */
 export const ciFixPrompt = (task: string, line: string): string =>
@@ -107,6 +110,44 @@ async function followUp(
   );
 }
 
+/** Строки `СПЕК: …` ответа: замечания к приёмочным тестам. */
+const specRemarks = (message: string): string =>
+  message
+    .split(/\r?\n/)
+    .filter((line) => SPEC_REMARK_RE.test(line))
+    .join('\n');
+
+/**
+ * Исполнитель остановился на сломанном приёмочном тесте: `$spec` чинит тест по его замечанию,
+ * работа исполнителя остаётся в дереве и продолжается. Второе такое замечание — к владельцу.
+ */
+async function repairSpec(
+  context: LoopContext,
+  task: string,
+  remarks: string,
+  accepted: Set<string>,
+): Promise<Work> {
+  const { state } = context;
+  if (state.specRepairs.includes(task))
+    return step(
+      await park(
+        context,
+        `spec:${task}`,
+        `приёмочные тесты ${task} снова мешают исполнителю — нужен владелец`,
+        remarks,
+      ),
+    );
+  state.specRepairs.push(task);
+  await save(context);
+  await context.say(`исполнитель: приёмочные тесты ${task} сломаны — их чинит $spec`);
+  await placeSpec(context, task);
+  const stop = await writeSpec(context, task, `Исполнитель задачи:\n${remarks}`);
+  if (stop !== undefined) return step(stop);
+  state.resume = task;
+  await save(context);
+  return runWork(context, task, resumePrompt(task), accepted);
+}
+
 /** Сессия работы над задачей; незакоммиченная работа доделывается одной сессией `продолжить`. */
 async function runWork(
   context: LoopContext,
@@ -116,7 +157,17 @@ async function runWork(
 ): Promise<Work> {
   const { git, state } = context;
   const locked = specFiles(context, task);
+  const base = await head(git);
   const work = await session(context, 'next', withSpec(prompt, task, locked), locked);
+  const broken = specRemarks(work.message);
+  // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) чинит $spec.
+  if (
+    work.failure === undefined &&
+    broken !== '' &&
+    locked.length > 0 &&
+    (await head(git)) === base
+  )
+    return repairSpec(context, task, broken, accepted);
   // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
   const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
   if (work.failure !== undefined) {
@@ -228,9 +279,6 @@ async function ciBeforeReview(context: LoopContext, task: string): Promise<Work 
   if (ci.verdict === 'red') return { kind: 'again', prompt: ciFixPrompt(task, ci.line) };
   return step(await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''));
 }
-
-/** Замечание ревью к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ`. */
-const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
 
 /**
  * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу

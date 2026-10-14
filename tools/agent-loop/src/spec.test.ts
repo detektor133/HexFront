@@ -63,7 +63,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     });
     expect(
       run.prompts[3]?.startsWith(
-        '$spec 06/T1j5-Б1\nЗамечания ревью к приёмочным тестам:\nВОЗВРАТ\n- СПЕК: тест не проверяет штраф чужого игрока (п. 3)',
+        '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- СПЕК: тест не проверяет штраф чужого игрока (п. 3)',
       ),
     ).toBe(true);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
@@ -95,6 +95,64 @@ describe('приёмочные тесты до кода ($spec)', () => {
     });
     expect(run.prompts).toEqual(['$spec 06/T1j5-Б1', '$next', '$review 06/T1j5-Б1']);
     expect(run.lines).toContain('приёмочные тесты 06/T1j5-Б1: нет (критерии не для тестов)');
+  });
+
+  // 2026-10-14, 07/T1: тест $spec падал на `window is not defined` и на порядке импортов,
+  // исполнитель менять его не мог — задача встала.
+  const BROKEN: Session = {
+    answer:
+      'Задача не закоммичена.\nСПЕК: fitness-own.test.ts — ReferenceError: window is not defined',
+    writes: { 'packages/sim/src/fitness.ts': 'export const fitness = 1;\n' },
+    commit: false,
+  };
+  const SPEC_FIX: Session = {
+    answer: `Окружение заглушено.\nСПЕК: ${TEST}`,
+    writes: { [TEST]: "it('штраф по метрикам самой особи, с заглушкой window', () => {});\n" },
+    commit: false,
+  };
+
+  it('исполнитель сообщил о сломанном тесте — $spec чинит его, работа продолжается в том же дереве', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [SPEC, BROKEN, SPEC_FIX, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[2]).toBe(
+      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nИсполнитель задачи:\nСПЕК: fitness-own.test.ts — ReferenceError: window is not defined',
+    );
+    expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
+    expect(run.prompts[4]).toBe(
+      `$review 06/T1j5-Б1\nПриёмочные тесты задачи, написанные $spec до кода: ${TEST}`,
+    );
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('второе замечание исполнителя к тестам той же задачи — ожидание владельца', async () => {
+    const run = await runWorld({ spec: true, sessions: [SPEC, BROKEN, SPEC_FIX, BROKEN] });
+    expect(run.prompts).toHaveLength(4);
+    expect(run.lines).toContain(
+      'жду: приёмочные тесты 06/T1j5-Б1 снова мешают исполнителю — нужен владелец',
+    );
+  });
+
+  it('тесты $spec с ошибкой lint — цикл сам правит формат, остальное возвращает $spec один раз', async () => {
+    const error = `${TEST}\n  3:1  error  'x' is assigned a value but never used  no-unused-vars`;
+    const run = await runWorld({
+      spec: true,
+      lint: [error, 'ok'],
+      sessions: [SPEC, SPEC, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[1]).toBe(
+      `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nlint тестов (порядок импортов и формат цикл уже поправил):\n${error}`,
+    );
+    expect(run.execs).toContain(`eslint --fix ${TEST}`);
+    expect(run.execs).toContain(`prettier --write ${TEST}`);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('тесты $spec дважды не проходят lint — ожидание владельца, исполнитель не запускается', async () => {
+    const run = await runWorld({ spec: true, lint: ['ошибка', 'ошибка'], sessions: [SPEC, SPEC] });
+    expect(run.prompts.filter((p) => !p.startsWith('$spec'))).toEqual([]);
+    expect(run.lines).toContain('жду: приёмочные тесты 06/T1j5-Б1 не проходят lint');
   });
 
   it('без роли spec в roles.json цикл работает по-старому', async () => {

@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import {
   backoff,
   globToRegExp,
+  lastLines,
   park,
   save,
   session,
@@ -23,9 +24,7 @@ export const specFiles = (context: LoopContext, task: string): readonly string[]
   Object.keys(context.state.spec[task] ?? {});
 
 export const specPrompt = (task: string, remarks: string): string =>
-  remarks === ''
-    ? `$spec ${task}`
-    : `$spec ${task}\nЗамечания ревью к приёмочным тестам:\n${remarks}`;
+  remarks === '' ? `$spec ${task}` : `$spec ${task}\nЗамечания к приёмочным тестам:\n${remarks}`;
 
 /** Промпт работы с приёмочными тестами: исполнитель знает, что они уже в дереве и закрыты. */
 export const withSpec = (prompt: string, task: string, files: readonly string[]): string =>
@@ -35,9 +34,92 @@ export const withSpec = (prompt: string, task: string, files: readonly string[])
 
 const normalize = (text: string): string => text.replace(/\r\n/g, '\n').trimEnd();
 
+/** Сколько раз $spec переписывает тесты, которые не проходят lint, прежде чем звать владельца. */
+const LINT_ATTEMPTS = 2;
+/** Предел одного прогона eslint или prettier по тестам, мс. */
+const LINT_TIMEOUT_MS = 5 * 60_000;
+
+type Tree = ReadonlyMap<string, string | undefined>;
+
+/** Незакоммиченные файлы и их текст: в дереве может уже лежать работа исполнителя. */
+async function treeSnapshot(context: LoopContext): Promise<Tree> {
+  const tree = new Map<string, string | undefined>();
+  for (const path of await changedPaths(context.git))
+    tree.set(path, await readFile(join(context.config.root, path), 'utf8').catch(() => undefined));
+  return tree;
+}
+
 /**
- * Сессия `$spec` в чистом дереве. Тесты остаются незакоммиченными: до кода они красные,
- * а импорты ещё не существующего кода не прошли бы хук pre-commit.
+ * Одна сессия `$spec`. Сессия меняет только тесты: работу исполнителя в дереве (тесты чинятся по
+ * его замечанию) она не трогает.
+ * @returns тексты приёмочных тестов или шаг цикла при остановке.
+ */
+async function specSession(
+  context: LoopContext,
+  task: string,
+  remarks: string,
+): Promise<{ readonly files: Record<string, string> } | { readonly step: Step }> {
+  const { git, state, config, definitions } = context;
+  const base = await head(git);
+  const before = await treeSnapshot(context);
+  const result = await session(context, 'spec', specPrompt(task, remarks));
+  if (result.failure !== undefined)
+    return { step: await backoff(context, `$spec ${task}: ${result.failure}`, result.message) };
+  const after = await treeSnapshot(context);
+  const touched = [...new Set([...before.keys(), ...after.keys()])].filter(
+    (path) => before.get(path) !== after.get(path) || before.has(path) !== after.has(path),
+  );
+  const outside = touched.filter(
+    (path) => !definitions.specPaths.some((glob) => globToRegExp(glob).test(path)),
+  );
+  if ((await head(git)) !== base || outside.length > 0)
+    return {
+      step: await park(
+        context,
+        `spec:${task}`,
+        `$spec ${task} вышел за свои права (коммит или файлы вне тестов: ${outside.join(', ') || 'коммит'}) — проверь`,
+        result.message,
+      ),
+    };
+  const files: Record<string, string> = {};
+  for (const path of new Set([...Object.keys(state.spec[task] ?? {}), ...touched])) {
+    const text = await readFile(join(config.root, path), 'utf8').catch(() => undefined);
+    if (text === undefined)
+      return {
+        step: await park(
+          context,
+          `spec:${task}`,
+          `$spec ${task} удалил ${path} — проверь`,
+          result.message,
+        ),
+      };
+    files[path] = text;
+  }
+  return { files };
+}
+
+/**
+ * Порядок импортов и формат цикл чинит сам (смысл проверок не меняется); остальные ошибки lint
+ * возвращаются сессии `$spec`: исполнитель тесты менять не может, и сломанный тест его остановил бы.
+ * @returns вывод eslint или undefined, если тесты чистые.
+ */
+async function tidySpec(
+  context: LoopContext,
+  paths: readonly string[],
+): Promise<string | undefined> {
+  if (paths.length === 0) return undefined;
+  const { runCommand, root } = context.config;
+  const options = { cwd: root, timeoutMs: LINT_TIMEOUT_MS };
+  const lint = await runCommand('pnpm', ['exec', 'eslint', '--fix', ...paths], options);
+  await runCommand('pnpm', ['exec', 'prettier', '--write', ...paths], options);
+  if (lint.code === 0) return undefined;
+  return lastLines(`${lint.stdout}\n${lint.stderr}`.trim(), 30);
+}
+
+/**
+ * Сессия `$spec`: по тексту задачи в чистом дереве или по замечаниям ревью и исполнителя.
+ * Тесты остаются незакоммиченными: до кода они красные, а импорты ещё не существующего кода
+ * не прошли бы хук pre-commit.
  * @returns шаг цикла при остановке или undefined — тесты записаны в state.spec.
  */
 export async function writeSpec(
@@ -45,40 +127,28 @@ export async function writeSpec(
   task: string,
   remarks = '',
 ): Promise<Step | undefined> {
-  const { git, state, config, definitions } = context;
-  const base = await head(git);
-  const result = await session(context, 'spec', specPrompt(task, remarks));
-  if (result.failure !== undefined)
-    return backoff(context, `$spec ${task}: ${result.failure}`, result.message);
-  const paths = await changedPaths(git);
-  const outside = paths.filter(
-    (path) => !definitions.specPaths.some((glob) => globToRegExp(glob).test(path)),
-  );
-  if ((await head(git)) !== base || outside.length > 0)
-    return park(
-      context,
-      `spec:${task}`,
-      `$spec ${task} вышел за свои права (коммит или файлы вне тестов: ${outside.join(', ') || 'коммит'}) — проверь`,
-      result.message,
-    );
-  const files: Record<string, string> = {};
-  for (const path of paths) {
-    const text = await readFile(join(config.root, path), 'utf8').catch(() => undefined);
-    if (text === undefined)
-      return park(
-        context,
-        `spec:${task}`,
-        `$spec ${task} удалил ${path} — проверь`,
-        result.message,
+  const { state, config } = context;
+  let note = remarks;
+  for (let attempt = 1; ; attempt += 1) {
+    const written = await specSession(context, task, note);
+    if ('step' in written) return written.step;
+    const paths = Object.keys(written.files);
+    const errors = await tidySpec(context, paths);
+    const files: Record<string, string> = {};
+    for (const path of paths) files[path] = await readFile(join(config.root, path), 'utf8');
+    state.spec[task] = files;
+    await save(context);
+    if (errors === undefined) {
+      await context.say(
+        `приёмочные тесты ${task}: ${paths.join(', ') || 'нет (критерии не для тестов)'}`,
       );
-    files[path] = text;
+      return undefined;
+    }
+    if (attempt >= LINT_ATTEMPTS)
+      return park(context, `spec:${task}`, `приёмочные тесты ${task} не проходят lint`, errors);
+    await context.say(`приёмочные тесты ${task} не проходят lint — $spec исправляет`);
+    note = `lint тестов (порядок импортов и формат цикл уже поправил):\n${errors}`;
   }
-  state.spec[task] = files;
-  await save(context);
-  await context.say(
-    `приёмочные тесты ${task}: ${paths.join(', ') || 'нет (критерии не для тестов)'}`,
-  );
-  return undefined;
 }
 
 /** Перед работой: приёмочные тесты в дереве в записанном виде (после остановки их убирали). */
@@ -127,9 +197,9 @@ export async function specViolation(
 
 /** Задача закрыта или тесты пишутся заново: записанные тесты больше не нужны. */
 export async function forgetSpec(context: LoopContext, task: string): Promise<void> {
-  if (!(task in context.state.spec)) return;
-  context.state.spec = Object.fromEntries(
-    Object.entries(context.state.spec).filter(([key]) => key !== task),
-  );
+  const { state } = context;
+  if (!(task in state.spec) && !state.specRepairs.includes(task)) return;
+  state.spec = Object.fromEntries(Object.entries(state.spec).filter(([key]) => key !== task));
+  state.specRepairs = state.specRepairs.filter((key) => key !== task);
   await save(context);
 }

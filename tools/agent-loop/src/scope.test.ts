@@ -55,7 +55,7 @@ describe('объём задачи для потоков', () => {
     expect(selectStreamTask(status('07/T5 → 07/T8'), done, [])).toBe('07/T8');
   });
 
-  it('объём: служебные docs не в счёт, файлы вне «Файлы:» перечисляются', () => {
+  it('объём: служебные docs и эталоны скриншотов не в счёт, файлы вне «Файлы:» перечисляются', () => {
     const scope = { files: ['apps/client/src/match/**'] };
     expect(
       outsideScope(scope, [
@@ -63,6 +63,7 @@ describe('объём задачи для потоков', () => {
         'docs/stages/stage-07-playable-build.md',
         'docs/reports/stage-07.md',
         'apps/client/src/dev/Hud.tsx',
+        'apps/client/tests/visual/baseline/match-start-390x844.png',
       ]),
     ).toEqual(['apps/client/src/dev/Hud.tsx']);
     expect(outsideScope({}, ['любой/файл.ts'])).toEqual([]);

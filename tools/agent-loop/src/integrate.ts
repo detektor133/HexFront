@@ -129,7 +129,8 @@ async function scopeNote(
   stageBranch: string,
 ): Promise<string> {
   const fork = await git.run(['merge-base', 'HEAD', `origin/${stageBranch}`]);
-  const changed = names(await git.run(['diff', '--name-only', `${fork}..HEAD`]));
+  // Без добавленных файлов: новые тесты и модули задачи не могут задеть чужую работу.
+  const changed = names(await git.run(['diff', '--name-only', '--diff-filter=a', `${fork}..HEAD`]));
   const outside = outsideScope(taskScope(taskBlock(stageText, task)), changed);
   if (outside.length === 0) return '';
   await context.say(`${task}: файлы вне «Файлы:» — ${outside.join(', ')}`);

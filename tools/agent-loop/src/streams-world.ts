@@ -284,7 +284,8 @@ async function runWorld(
   const runCommand: RunCommand = async (command, args, options = {}): Promise<CommandResult> => {
     const cwd = options.cwd ?? root;
     if (command === 'git') return realRun(command, args, options);
-    if (command === 'pnpm' && args[0] === 'install') return { code: 0, stdout: '', stderr: '' };
+    if (command === 'pnpm' && (args[0] === 'install' || args[0] === 'exec'))
+      return { code: 0, stdout: '', stderr: '' };
     if (command === 'pnpm' && args.includes('--workflow=slow.yml'))
       return { code: 0, stdout: 'success https://slow/1', stderr: '' };
     if (command === 'pnpm') {

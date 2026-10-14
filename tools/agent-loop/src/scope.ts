@@ -98,11 +98,22 @@ export function selectStreamTask(
 const SERVICE_DOCS_RE =
   /^docs\/(stages\/.+|reports\/.+|STATUS\.md|BUGS\.md|QUESTIONS\.md|DECISIONS\.md|CHANGELOG-proposals\.md)$/;
 
-/** @returns пути без служебных docs. */
-export const workFiles = (paths: readonly string[]): string[] =>
-  paths.filter((path) => !SERVICE_DOCS_RE.test(path));
+/**
+ * Эталоны скриншотов обновляет каждая задача, меняющая вид. Их конфликт разрешает сессия
+ * слияния (`pnpm visual --update` на слитом дереве), а повторное ревью их не проверит: картинки
+ * агент не открывает.
+ */
+const VISUAL_BASELINE_RE = /^apps\/client\/tests\/visual\/baseline\//;
 
-/** @returns файлы, которые меняла задача, но которых нет в её `Файлы:` (пусто — объём соблюдён). */
+/** @returns пути без служебных docs и эталонов скриншотов. */
+export const workFiles = (paths: readonly string[]): string[] =>
+  paths.filter((path) => !SERVICE_DOCS_RE.test(path) && !VISUAL_BASELINE_RE.test(path));
+
+/**
+ * @param changed изменённые задачей файлы, которые уже были в ветке этапа: новый файл чужую
+ * работу не задевает, а одноимённый новый файл двух задач даст конфликт слияния.
+ * @returns файлы, которые меняла задача, но которых нет в её `Файлы:` (пусто — объём соблюдён).
+ */
 export function outsideScope(scope: TaskScope, changed: readonly string[]): string[] {
   if (scope.files === undefined) return [];
   const patterns = scope.files.map(globToRegExp);

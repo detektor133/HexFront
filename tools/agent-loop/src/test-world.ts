@@ -53,6 +53,8 @@ export interface World {
   readonly ci?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
   readonly slow?: readonly string[];
+  /** Ответы eslint по приёмочным тестам по порядку; без значения или `ok` — чисто. */
+  readonly lint?: readonly string[];
   /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
   readonly spec?: boolean;
   /** Трейлер `Этап:` коммита HEAD. */
@@ -94,6 +96,8 @@ export interface Outcome {
   readonly pulls: string[];
   pushes: number;
   ciCalls: number;
+  /** Вызовы `pnpm exec` (eslint, prettier) с аргументами. */
+  readonly execs: string[];
   /** Вызовы `ci:wait` для workflow `slow` с аргументами. */
   readonly slowCalls: string[];
   sleeps: number;
@@ -134,6 +138,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
   const slow = [...(world.slow ?? [])];
+  const lint = [...(world.lint ?? [])];
   const issues = [...(world.issues ?? [])];
   const out: Outcome = {
     code: 0,
@@ -149,6 +154,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     pushes: 0,
     ciCalls: 0,
     slowCalls: [],
+    execs: [],
     sleeps: 0,
     checks: 0,
     sleepsAtPrompt: [],
@@ -308,6 +314,11 @@ export async function runWorld(world: World): Promise<Outcome> {
           const line = slow.shift() ?? 'success https://slow/1';
           const code = line.startsWith('success') ? 0 : line.startsWith('pending') ? 3 : 1;
           return { code, stdout: line, stderr: '' };
+        }
+        if (command === 'pnpm' && args[0] === 'exec') {
+          out.execs.push(args.slice(1).join(' '));
+          const line = args[1] === 'eslint' ? (lint.shift() ?? 'ok') : 'ok';
+          return { code: line === 'ok' ? 0 : 1, stdout: line, stderr: '' };
         }
         if (command === 'pnpm') {
           out.ciCalls += 1;

@@ -383,4 +383,24 @@ describe('параллельные потоки на настоящем git', { 
     await expectMerged(handle, ['T1', 'T2', 'T3']);
     expect(await handle.originFile('src/T3.txt')).toBe('T3\n');
   });
+
+  it('новый файл вне «Файлы:» (тест задачи) — без повторного ревью, правка чужого — с ним', async () => {
+    const spec: StreamsWorld = {
+      queue: '07/T1 → 07/T2',
+      stage: stageOf(
+        task('T1', '\n  *Файлы:* `src/T1.txt`\n  *После:* —'),
+        task('T2', '\n  *Файлы:* `src/T2.txt`\n  *После:* —'),
+      ),
+      tasks: {
+        T1: { writes: { 'src/T1.txt': 'T1\n', 'test/T1-arc.test.txt': 'тест\n' } },
+        T2: { workMs: 200, writes: { 'src/T2.txt': 'T2\n', 'src/shared.txt': '+строка T2' } },
+      },
+    };
+    const handle = await world(spec);
+    const run = await handle.run(spec);
+    const reReviews = run.prompts.filter((p) => p.prompt.includes('Повторное ревью'));
+    expect(reReviews.map((p) => p.prompt.split('\n', 1)[0])).toEqual(['$review 07/T2']);
+    expect(reReviews[0]?.prompt).toContain('файлы вне «Файлы:» задачи: src/shared.txt');
+    await expectMerged(handle, ['T1', 'T2']);
+  });
 });
