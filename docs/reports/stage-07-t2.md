@@ -19,6 +19,13 @@
 
 Этап: 07/T2
 
+## Возврат ревью 2026-10-14 (текущий)
+
+- `pnpm exec vitest run apps/client/test/match-screen.test.ts apps/client/test/sim-worker-telemetry.test.ts`: 1 из 5 тестов падает.
+- СПЕК: `apps/client/test/match-screen.test.ts:115-122` ожидает английские строки `messages.en`, но реальный `MatchSurface` рендерит русский словарь; debug-приёмочный тест падает на `aria-label="Observer"` вместо `aria-label="Наблюдатель"`.
+
+Этап: 07/T2
+
 ## Возврат ревью 2026-10-14 (повтор)
 
 - `pnpm verify --changed`: `verify: OK (13 с)`.
