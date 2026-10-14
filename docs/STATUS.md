@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T2 исправлена после ревью: `/match` использует отдельный `MatchSurface`, debug-панель включается только с `?debug=1`, production-маршрутизатор закрывает `/dev/*`, worker сериализует пакет только при включённой телеметрии.
+07/T2: исправлен красный CI в production-маршруте `/dev/*`: текст берётся из русского словаря, поэтому приёмочный тест не зависит от локали CI.
 
-Подтверждение: `apps/client/test/match-screen.test.ts` — 3 теста, `apps/client/test/sim-worker-telemetry.test.ts` — 2 теста, `pnpm verify --changed` — зелёный.
+Подтверждение: `apps/client/test/match-screen.test.ts` — 3 теста, `pnpm verify --changed` — зелёный; приёмочные тесты не изменялись.
 
 Следующая сессия: запустить `$review 07/T2` в новой сессии.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/MatchSurfaceRuntime.tsx`, `apps/client/src/local/sim-worker.ts`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/main.tsx`.

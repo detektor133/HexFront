@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { DevMapPage } from './dev/DevMapPage.tsx';
 import { DevSandboxPage } from './dev/DevSandboxPage.tsx';
 import { DevUnitsPage } from './dev/DevUnitsPage.tsx';
-import { t } from './i18n/dict.ts';
+import { messages, t } from './i18n/dict.ts';
 import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
 import { isDevPath, isMatchPath } from './routes.ts';
@@ -16,7 +16,7 @@ function App(): React.JSX.Element {
   const path = window.location.pathname;
   if (path === '/' || path === '/menu') return <MainMenu />;
   if (isMatchPath(path)) return <MatchPage />;
-  if (import.meta.env.PROD && isDevPath(path)) return <p>{t('dev.notFound')}</p>;
+  if (import.meta.env.PROD && isDevPath(path)) return <p>{messages.ru['dev.notFound']}</p>;
   if (path === '/dev/map') return <DevMapPage />;
   if (path === '/dev/units') return <DevUnitsPage />;
   // /dev/economy — прежний адрес песочницы (этап 02), оставлен для старых ссылок.
