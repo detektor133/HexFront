@@ -198,8 +198,9 @@ export async function specViolation(
 /** Задача закрыта или тесты пишутся заново: записанные тесты больше не нужны. */
 export async function forgetSpec(context: LoopContext, task: string): Promise<void> {
   const { state } = context;
-  if (!(task in state.spec) && !state.specRepairs.includes(task)) return;
-  state.spec = Object.fromEntries(Object.entries(state.spec).filter(([key]) => key !== task));
-  state.specRepairs = state.specRepairs.filter((key) => key !== task);
+  if (!(task in state.spec) && !(task in state.specRepairNotes)) return;
+  const other = ([key]: [string, unknown]): boolean => key !== task;
+  state.spec = Object.fromEntries(Object.entries(state.spec).filter(other));
+  state.specRepairNotes = Object.fromEntries(Object.entries(state.specRepairNotes).filter(other));
   await save(context);
 }

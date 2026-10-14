@@ -126,12 +126,27 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('второе замечание исполнителя к тестам той же задачи — ожидание владельца', async () => {
+  it('то же замечание исполнителя к тестам после починки — ожидание владельца', async () => {
     const run = await runWorld({ spec: true, sessions: [SPEC, BROKEN, SPEC_FIX, BROKEN] });
     expect(run.prompts).toHaveLength(4);
     expect(run.lines).toContain(
-      'жду: приёмочные тесты 06/T1j5-Б1 снова мешают исполнителю — нужен владелец',
+      'жду: $spec не исправил приёмочные тесты 06/T1j5-Б1 по тому же замечанию — нужен владелец',
     );
+  });
+
+  it('разные замечания исполнителя чинятся по очереди: сначала окружение, потом нехватка проверки', async () => {
+    // 2026-10-14, 07/T1: после починки `window` ревью нашло нехватку проверки геометрии,
+    // а цикл счёл это повтором и встал.
+    const missing: Session = {
+      ...BROKEN,
+      answer: `Не закоммичено.\nСПЕК: ${TEST} — нет проверки предела радиус + толщина линии`,
+    };
+    const run = await runWorld({
+      spec: true,
+      sessions: [SPEC, BROKEN, SPEC_FIX, missing, SPEC_FIX, NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts.filter((p) => p.startsWith('$spec'))).toHaveLength(3);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('ВОЗВРАТ ревью, который ссылается на файл приёмочного теста без «СПЕК:», — тесты переписывает $spec', async () => {

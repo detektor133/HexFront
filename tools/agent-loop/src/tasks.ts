@@ -42,6 +42,8 @@ const MAX_FOLLOW_UPS = 2;
 
 /** Замечание к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ` ревью или исполнителя. */
 const SPEC_REMARK_RE = /^\s*[-*]?\s*СПЕК:/imu;
+/** Сколько раз за задачу `$spec` чинит тесты по разным замечаниям исполнителя. */
+const MAX_SPEC_REPAIRS = 3;
 
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
 /** Работа над задачей после красного CI: сессия начинает с причины, а не с поиска задачи в очереди. */
@@ -130,7 +132,8 @@ const specRemarks = (message: string): string =>
 
 /**
  * Исполнитель остановился на сломанном приёмочном тесте: `$spec` чинит тест по его замечанию,
- * работа исполнителя остаётся в дереве и продолжается. Второе такое замечание — к владельцу.
+ * работа исполнителя остаётся в дереве и продолжается. Разные замечания (окружение, потом
+ * нехватка проверки) чинятся по очереди; то же замечание снова — `$spec` его не исправил.
  */
 async function repairSpec(
   context: LoopContext,
@@ -139,16 +142,15 @@ async function repairSpec(
   accepted: Set<string>,
 ): Promise<Work> {
   const { state } = context;
-  if (state.specRepairs.includes(task))
-    return step(
-      await park(
-        context,
-        `spec:${task}`,
-        `приёмочные тесты ${task} снова мешают исполнителю — нужен владелец`,
-        remarks,
-      ),
-    );
-  state.specRepairs.push(task);
+  const notes = state.specRepairNotes[task] ?? [];
+  const note = remarks.trim();
+  const reason = notes.includes(note)
+    ? `$spec не исправил приёмочные тесты ${task} по тому же замечанию — нужен владелец`
+    : notes.length >= MAX_SPEC_REPAIRS
+      ? `приёмочные тесты ${task} чинились ${notes.length} раза и снова мешают — нужен владелец`
+      : undefined;
+  if (reason !== undefined) return step(await park(context, `spec:${task}`, reason, remarks));
+  state.specRepairNotes = { ...state.specRepairNotes, [task]: [...notes, note] };
   await save(context);
   await context.say(`исполнитель: приёмочные тесты ${task} сломаны — их чинит $spec`);
   await placeSpec(context, task);
