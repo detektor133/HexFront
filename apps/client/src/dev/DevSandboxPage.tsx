@@ -471,7 +471,7 @@ function useSandbox(
 }
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
-export function MatchSurface({
+export function SandboxSurface({
   showOnboarding = false,
   debug = false,
 }: { showOnboarding?: boolean; debug?: boolean } = {}): React.JSX.Element {
@@ -572,5 +572,5 @@ export function MatchSurface({
 
 /** Отладочная песочница с панелью наблюдателя и телеметрией. */
 export function DevSandboxPage(): React.JSX.Element {
-  return <MatchSurface debug showOnboarding={false} />;
+  return <SandboxSurface debug showOnboarding={false} />;
 }

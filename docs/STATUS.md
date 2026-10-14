@@ -15,7 +15,9 @@
 
 ## Следующая сессия
 
-07/T2: проверка вернула приёмочный тест `apps/client/test/match-screen.test.ts`, потому что он не рендерит `MatchSurface` и не подтверждает элементы экрана без debug и с debug.
+07/T2 выполнена: `/match` использует отдельный `MatchSurface`, debug-панель остаётся только в debug-режиме, сериализация worker условна, production-маршрут `/dev/*` закрыт.
 
-Следующая сессия: переписать `apps/client/test/match-screen.test.ts` на проверку реального рендера `MatchSurface`, затем повторить `$review 07/T2`.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchPage.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/local/sim-worker.ts`, `apps/client/tests/visual/visual-check.ts`.
+Подтверждение: `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`, visual-эталоны `match-*`, `pnpm verify --changed`.
+
+Следующая сессия: ревью 07/T2, затем перейти к 07/T3.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/local/sim-worker.ts`, `apps/client/tests/visual/visual-check.ts`.

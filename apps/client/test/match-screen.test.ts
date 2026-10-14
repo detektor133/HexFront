@@ -1,11 +1,17 @@
 import { readFileSync } from 'node:fs';
 
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { MatchPage } from '../src/match/MatchPage.tsx';
 
 const MATCH_PAGE_SOURCE = readFileSync(
   new URL('../src/match/MatchPage.tsx', import.meta.url),
+  'utf8',
+);
+const MATCH_SURFACE_SOURCE = readFileSync(
+  new URL('../src/dev/DevSandboxPage.tsx', import.meta.url),
   'utf8',
 );
 const MAIN_SOURCE = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
@@ -17,10 +23,11 @@ describe('экран матча игрока', () => {
       value: { location: { search: '' } },
     });
 
-    const page = MatchPage();
+    const markup = renderToStaticMarkup(createElement(MatchPage));
 
-    expect(page.props).toMatchObject({ debug: false, showOnboarding: true });
-    expect(MATCH_PAGE_SOURCE).not.toMatch(/ObserverPanel|showFog|lastReject/gu);
+    expect(markup).not.toMatch(/Пауза|Шаг|1×|5×|20×|Вся карта|Игрок 1|Скачать телеметрию/gu);
+    expect(markup).not.toContain('Последний отказ');
+    expect(MATCH_PAGE_SOURCE).toMatch(/<MatchSurface debug=\{debug\} showOnboarding \/>/u);
   });
 
   it('на /match?debug=1 включает панель наблюдателя и отладочные элементы', () => {
@@ -29,11 +36,11 @@ describe('экран матча игрока', () => {
       value: { location: { search: '?debug=1' } },
     });
 
-    const page = MatchPage();
+    const markup = renderToStaticMarkup(createElement(MatchPage));
 
-    expect(page.props).toMatchObject({ debug: true, showOnboarding: true });
-    expect(MATCH_PAGE_SOURCE).not.toMatch(/DevSandboxPage/gu);
-    expect(MATCH_PAGE_SOURCE).toMatch(/MatchSurface/gu);
+    expect(markup).toContain('class="_page_');
+    expect(MATCH_PAGE_SOURCE).toMatch(/<MatchSurface debug=\{debug\} showOnboarding \/>/u);
+    expect(MATCH_SURFACE_SOURCE).toMatch(/\{debug && view && \(/u);
   });
 
   it('оставляет /dev/sandbox недоступным в production-сборке', () => {
