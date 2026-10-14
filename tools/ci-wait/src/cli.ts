@@ -6,7 +6,8 @@ const git = (args: string[]): string => execFileSync('git', args, { encoding: 'u
 
 /**
  * `--workflow=slow.yml` — workflow всех тестов; `--sha=<sha>` — другой коммит, не HEAD;
- * `--once` — один опрос без ожидания; `--timeout-minutes=N` — предел ожидания.
+ * `--once` — один опрос без ожидания; `--timeout-minutes=N` — предел ожидания;
+ * `--all-workflows` — зелёный, только если зелёные и остальные workflow SHA, кроме `slow.yml`.
  */
 const option = (name: string): string | undefined =>
   process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -23,6 +24,7 @@ async function main(): Promise<number> {
     ...(workflow === undefined ? {} : { workflow }),
     ...(timeout > 0 ? { timeoutMs: timeout * 60_000 } : {}),
     ...(process.argv.includes('--once') ? { once: true } : {}),
+    ...(process.argv.includes('--all-workflows') ? { otherWorkflows: true } : {}),
     ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}),
   });
 }

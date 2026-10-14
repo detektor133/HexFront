@@ -303,7 +303,7 @@ export async function runReview(
  */
 async function ciBeforeReview(context: LoopContext, task: string): Promise<Work | undefined> {
   if (context.state.greenHead === (await head(context.git))) return undefined;
-  const ci = await waitCi(context, `перед $review ${task}`);
+  const ci = await waitCi(context, `перед $review ${task}`, true);
   if (ci.verdict === 'green') return undefined;
   if (ci.verdict === 'red') return { kind: 'again', prompt: ciFixPrompt(task, ci.line) };
   return step(await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''));

@@ -165,7 +165,7 @@ export async function integrate(
     if (unsynced !== undefined) return { step: await park(context, `sync:${task}`, unsynced) };
     const sha = await head(git);
     if (context.state.greenHead !== sha) {
-      const ci = await waitCi(context, `слияния ${task}`);
+      const ci = await waitCi(context, `слияния ${task}`, true);
       if (ci.verdict === 'unknown')
         return { step: await backoff(context, `CI ${task} не проверен: ${ci.line}`, '') };
       if (ci.verdict === 'red') {

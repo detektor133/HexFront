@@ -201,18 +201,26 @@ const ciLine = (stdout: string): string =>
 
 /**
  * Ждёт CI на HEAD силами скрипта. Красный — только упавший job; таймаут и недоступный
- * GitHub повторяются один раз и дают `unknown`. Зелёный HEAD запоминается: ревью его не ждёт.
+ * GitHub повторяются один раз и дают `unknown`.
+ * @param allWorkflows и остальные workflow HEAD, кроме `slow` (перед ревью и слиянием задачи):
+ *   только такой зелёный HEAD запоминается, и ревью его не ждёт. Коммит `$bug`/`$decide` их
+ *   не ждёт: workflow, сломанный задачей, не должен останавливать запись бага о нём.
  */
-export async function waitCi(context: LoopContext, label: string): Promise<CiResult> {
+export async function waitCi(
+  context: LoopContext,
+  label: string,
+  allWorkflows = false,
+): Promise<CiResult> {
   const { config, say, state } = context;
   const started = config.now();
   config.board?.begin(agentName(context), `CI ${label}`);
   await say(`… жду CI ${label}`);
-  let ci = await ciWait(context, [], CI_TIMEOUT_MS);
-  if (ci.verdict === 'unknown') ci = await ciWait(context, [], CI_TIMEOUT_MS);
+  const args = allWorkflows ? ['--all-workflows'] : [];
+  let ci = await ciWait(context, args, CI_TIMEOUT_MS);
+  if (ci.verdict === 'unknown') ci = await ciWait(context, args, CI_TIMEOUT_MS);
   countCi(context, `CI ${label}`, ci);
   await say(`CI ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
-  if (ci.verdict === 'green') {
+  if (ci.verdict === 'green' && allWorkflows) {
     state.greenHead = await head(context.git);
     await save(context);
   }

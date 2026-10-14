@@ -257,14 +257,23 @@ describe('ожидание GitHub Actions', () => {
 
 describe('выбор workflow', () => {
   it.each([
-    [undefined, '/actions/workflows/ci.yml/runs?head_sha=abc123'],
-    ['slow.yml', '/actions/workflows/slow.yml/runs?head_sha=abc123'],
-  ])('workflow %s опрашивает только свои прогоны', async (workflow, path) => {
+    [undefined, false, ['/actions/workflows/ci.yml/runs?head_sha=abc123&per_page=10']],
+    ['slow.yml', false, ['/actions/workflows/slow.yml/runs?head_sha=abc123&per_page=10']],
+    [
+      undefined,
+      true,
+      [
+        '/actions/workflows/ci.yml/runs?head_sha=abc123&per_page=10',
+        '/actions/runs?head_sha=abc123&per_page=50',
+      ],
+    ],
+  ])('workflow %s (остальные: %s) опрашивает свои прогоны', async (workflow, all, paths) => {
     const urls: string[] = [];
     const code = await waitForCi({
       repo: 'acme/game',
       sha: 'abc123',
       ...(workflow === undefined ? {} : { workflow }),
+      otherWorkflows: all,
       fetchFn: async (url: string): Promise<HttpResponse> => {
         urls.push(url);
         return jsonResponse({ workflow_runs: [run('completed', 'success')] });
@@ -273,7 +282,75 @@ describe('выбор workflow', () => {
     });
 
     expect(code).toBe(0);
-    expect(urls).toEqual([`https://api.github.com/repos/acme/game${path}&per_page=10`]);
+    expect(urls).toEqual(paths.map((path) => `https://api.github.com/repos/acme/game${path}`));
+  });
+});
+
+describe('остальные workflow того же SHA', () => {
+  const other = (id: number, path: string, status: string, conclusion: string | null = null) => ({
+    id,
+    head_sha: 'abc123',
+    status,
+    conclusion,
+    html_url: `https://github.com/acme/game/actions/runs/${id}`,
+    path,
+  });
+  const CI = other(42, '.github/workflows/ci.yml', 'completed', 'success');
+
+  const waitWith = async (all: unknown[][]) => {
+    const output: string[] = [];
+    let now = 0;
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      otherWorkflows: true,
+      timeoutMs: 120_000,
+      fetchFn: async (url: string): Promise<HttpResponse> => {
+        if (url.includes('/actions/workflows/')) return jsonResponse({ workflow_runs: [CI] });
+        if (url.includes('/jobs?')) return jsonResponse({ jobs: [] });
+        return jsonResponse({ workflow_runs: all.shift() ?? [] });
+      },
+      sleep: async (ms: number): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
+      writeLine: (line: string) => output.push(line),
+    });
+    return { code, output };
+  };
+
+  it('упавший за 0 с pages.yml (файл не принят, job нет) — красный CI с именем файла', async () => {
+    // 2026-10-14: все прогоны pages.yml 07/T4 падали, ci.yml был зелёным, ревью приняло.
+    const { code, output } = await waitWith([
+      [other(7, '.github/workflows/pages.yml', 'completed', 'failure'), CI],
+    ]);
+    expect(code).toBe(1);
+    expect(output.at(-1)).toBe('failure job=pages.yml https://github.com/acme/game/actions/runs/7');
+  });
+
+  it('идущий другой workflow ждётся, зелёный — успех', async () => {
+    const { code, output } = await waitWith([
+      [other(7, '.github/workflows/pages.yml', 'in_progress'), CI],
+      [other(7, '.github/workflows/pages.yml', 'completed', 'success'), CI],
+    ]);
+    expect(code).toBe(0);
+    expect(output).toEqual([
+      'pending https://github.com/acme/game/actions/runs/7 0',
+      'success https://github.com/acme/game/actions/runs/42',
+    ]);
+  });
+
+  it('slow.yml, отменённые и старые прогоны того же файла не решают', async () => {
+    const { code } = await waitWith([
+      [
+        other(9, '.github/workflows/slow.yml', 'in_progress'),
+        other(8, '.github/workflows/lint.yml', 'completed', 'cancelled'),
+        other(7, '.github/workflows/pages.yml', 'completed', 'success'),
+        other(6, '.github/workflows/pages.yml', 'completed', 'failure'),
+        CI,
+      ],
+    ]);
+    expect(code).toBe(0);
   });
 });
 

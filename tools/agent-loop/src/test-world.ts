@@ -109,6 +109,8 @@ export interface Outcome {
   readonly slowCalls: string[];
   /** Прогоны, перезапущенные циклом через GitHub. */
   readonly reruns: number[];
+  /** Аргументы `ci:wait` быстрого CI по вызовам: `--all-workflows` — с остальными workflow. */
+  readonly ciArgs: string[];
   sleeps: number;
   checks: number;
   /** Сколько пауз прошло к началу каждой сессии codex. */
@@ -168,6 +170,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     ciCalls: 0,
     slowCalls: [],
     reruns: [],
+    ciArgs: [],
     execs: [],
     sleeps: 0,
     checks: 0,
@@ -367,6 +370,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         }
         if (command === 'pnpm') {
           out.ciCalls += 1;
+          out.ciArgs.push(args.slice(1).join(' '));
           const line = ci.shift() ?? 'success https://ci/1';
           return { code: line.startsWith('success') ? 0 : 1, stdout: line, stderr: '' };
         }

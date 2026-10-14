@@ -80,6 +80,8 @@ describe('круги $next → CI → $review', () => {
     expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
     expect(run.roles).toEqual(['', 'reviewer']);
     expect(run.ciCalls).toBe(1);
+    // Перед ревью — и остальные workflow HEAD (2026-10-14: сломанный pages.yml 07/T4 прошёл ревью).
+    expect(run.ciArgs).toEqual(['--all-workflows']);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
     expect(run.lines).toContain(OWNER_WAIT);
   });

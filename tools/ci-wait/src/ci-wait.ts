@@ -16,6 +16,8 @@ interface WorkflowRun {
   readonly status: string;
   readonly conclusion: string | null;
   readonly html_url: string;
+  /** Путь файла workflow, `.github/workflows/pages.yml`. */
+  readonly path?: string;
 }
 
 interface WorkflowRunsPayload {
@@ -46,6 +48,12 @@ export interface WaitForCiOptions {
   readonly timeoutMs?: number;
   /** Один опрос без ожидания: незавершённый прогон — строка `pending` и код 3. */
   readonly once?: boolean;
+  /**
+   * Зелёный CI требует и остальные workflow этого SHA, кроме `slow.yml` (флаг `--all-workflows`;
+   * цикл — перед ревью и слиянием задачи). 2026-10-14: `pages.yml` 07/T4 падал на каждом push,
+   * а цикл смотрел только `ci.yml`, и ревью приняло сломанную публикацию.
+   */
+  readonly otherWorkflows?: boolean;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
@@ -102,6 +110,22 @@ const findFailedJob = (jobs: readonly WorkflowJob[]): WorkflowJob | undefined =>
   jobs.find((job) => job.conclusion === 'failure') ??
   jobs.find((job) => job.conclusion !== null && !SUCCESSFUL_JOB_CONCLUSIONS.has(job.conclusion));
 
+/** Workflow, который цикл ждёт отдельно и не дожидается в CI задачи: все тесты идут долго. */
+const SEPARATE_WORKFLOWS = ['slow.yml'];
+/** Отменённый прогон — не поломка: его заменил прогон нового push или его отменил человек. */
+const IGNORED_CONCLUSIONS = new Set(['cancelled']);
+
+/** Последние прогоны остальных workflow SHA: по одному на файл, без основного и отдельных. */
+const otherRuns = (runs: readonly WorkflowRun[], main: WorkflowRun): WorkflowRun[] => {
+  const seen = new Set<string>();
+  return runs.filter((run) => {
+    const path = run.path ?? String(run.id);
+    if (run.id === main.id || run.path === main.path || seen.has(path)) return false;
+    seen.add(path);
+    return !SEPARATE_WORKFLOWS.some((name) => path.endsWith(`/${name}`));
+  });
+};
+
 const findRun = (runs: readonly WorkflowRun[], sha: string): WorkflowRun | undefined =>
   runs.find((run) => run.head_sha === sha && run.status === 'completed') ??
   runs.find((run) => run.head_sha === sha);
@@ -133,7 +157,8 @@ const printFailedRun = async (
       `лог упавшего job не получен: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  writeLine(`failure job=${job?.name ?? 'unknown'} ${run.html_url}`);
+  // Прогон без job — сам файл workflow не принят GitHub: называем файл, а не «unknown».
+  writeLine(`failure job=${job?.name ?? run.path?.split('/').pop() ?? 'unknown'} ${run.html_url}`);
   return 1;
 };
 
@@ -157,6 +182,8 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
     'User-Agent': 'hexfront-ci-wait',
     'X-GitHub-Api-Version': '2022-11-28',
   };
+  const allRunsUrl = `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}`;
+  const checkOthers = options.otherWorkflows === true;
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
 
   const startedAt = now();
@@ -171,16 +198,40 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
       lastError = transientMessage(error);
     }
 
+    let pendingOther: WorkflowRun | undefined;
     if (lastRun?.status === 'completed') {
-      if (lastRun.conclusion === 'success') {
+      if (lastRun.conclusion !== 'success')
+        return printFailedRun(fetchFn, apiBase, headers, lastRun, writeLine);
+      if (!checkOthers) {
         writeLine(`success ${lastRun.html_url}`);
         return 0;
       }
-      return printFailedRun(fetchFn, apiBase, headers, lastRun, writeLine);
+      try {
+        const response = await request(fetchFn, `${allRunsUrl}&per_page=50`, headers);
+        const others = otherRuns(
+          ((await response.json()) as WorkflowRunsPayload).workflow_runs ?? [],
+          lastRun,
+        );
+        const failed = others.find(
+          (run) =>
+            run.status === 'completed' &&
+            run.conclusion !== null &&
+            !SUCCESSFUL_JOB_CONCLUSIONS.has(run.conclusion) &&
+            !IGNORED_CONCLUSIONS.has(run.conclusion),
+        );
+        if (failed) return printFailedRun(fetchFn, apiBase, headers, failed, writeLine);
+        pendingOther = others.find((run) => run.status !== 'completed');
+        if (pendingOther === undefined) {
+          writeLine(`success ${lastRun.html_url}`);
+          return 0;
+        }
+      } catch (error) {
+        lastError = transientMessage(error);
+      }
     }
 
     const elapsedMs = now() - startedAt;
-    const pendingUrl = lastRun?.html_url ?? runsUrl;
+    const pendingUrl = pendingOther?.html_url ?? lastRun?.html_url ?? runsUrl;
     const error = lastError === undefined ? '' : ` error=${lastError}`;
     writeLine(`pending ${pendingUrl} ${Math.floor(elapsedMs / 1000)}${error}`);
     if (options.once === true) {
