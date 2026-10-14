@@ -85,12 +85,10 @@ describe('экран матча игрока', () => {
     }));
     setWindow('');
 
-    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
-    const markup = renderToStaticMarkup(
-      createElement(MatchSurface, { debug: false, showOnboarding: true }),
-    );
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+    const markup = renderToStaticMarkup(createElement(MatchPage));
     const { messages } = await import('../src/i18n/dict.ts');
-    const observer = messages.en;
+    const observer = messages.ru;
 
     expect(markup).not.toContain(`aria-label="${observer['observer.title']}"`);
     expect(markup).not.toContain(observer['observer.allMap']);
@@ -105,12 +103,10 @@ describe('экран матча игрока', () => {
     }));
     setWindow('?debug=1');
 
-    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
-    const markup = renderToStaticMarkup(
-      createElement(MatchSurface, { debug: true, showOnboarding: true }),
-    );
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+    const markup = renderToStaticMarkup(createElement(MatchPage));
     const { messages } = await import('../src/i18n/dict.ts');
-    const observer = messages.en;
+    const observer = messages.ru;
 
     expect(markup).toContain(`aria-label="${observer['observer.title']}"`);
     expect(markup).toContain(observer['observer.pause']);

@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-07/T2 возвращена ревью: `match-screen.test.ts` ожидает английские строки `messages.en`, а реальный debug-рендер использует русский словарь; целевой прогон падает на `aria-label="Observer"`.
-
-Следующая сессия: исправить ожидания языка в `apps/client/test/match-screen.test.ts` и повторить `$review 07/T2`.
+07/T2: исправлены приёмочные тесты экрана матча.
+Тесты рендерят `MatchPage`, который вызывает `MatchSurface` через реальный маршрут `/match` и сам читает `debug` из URL.
+Ожидания панели наблюдателя используют русский словарь, который реально рендерит интерфейс.
+Следующая сессия: `$review 07/T2`.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`.
