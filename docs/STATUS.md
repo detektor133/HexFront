@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T19 |
+| Текущая задача | 07/T4 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-14 |
 
@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T19 принята ревью: секреты Cloudflare объявлены в `env` job-уровня, условия используют только `env.*`, тест запрещает `secrets.` в `if:`.
+07/T4 исправлена по возврату СПЕК: `deployment.test.ts` вызывает production-сервер `vite preview` и проверяет ответы `/` и `/match` против собранного `index.html`.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Следующая сессия — взять первую невыполненную задачу этапа через `$next`.
-Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/pages.yml`, `apps/client/test/deployment-env.test.ts`, `apps/client/test/deployment.test.ts`.
+Следующая сессия — запустить `$review 07/T4`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `docs/reports/stage-07-t4.md`.

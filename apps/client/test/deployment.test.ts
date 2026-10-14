@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +13,7 @@ const PROJECT_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const DIST_PATH = fileURLToPath(DIST_DIRECTORY);
 const DEPLOY_COMMAND =
   'pages deploy apps/client/dist --project-name=hexfront --branch=${{ github.ref_name }}';
+const VITE_PATH = fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url));
 
 execFileSync(
   process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
@@ -34,6 +36,62 @@ function readFirstMatchingFile(pattern: RegExp): string | null {
   }
 
   return null;
+}
+
+async function findFreePort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (address === null || typeof address === 'string') {
+        server.close();
+        reject(new Error('Не удалось получить порт preview-сервера'));
+        return;
+      }
+
+      const port = address.port;
+      server.close((error) => (error === undefined ? resolve(port) : reject(error)));
+    });
+  });
+}
+
+async function waitForPreview(baseUrl: string, process: ChildProcess): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (process.exitCode !== null) throw new Error('vite preview завершился до запуска');
+
+    try {
+      const response = await fetch(baseUrl);
+      if (response.ok) return;
+    } catch {
+      // Сервер ещё не начал слушать порт.
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  throw new Error('vite preview не запустился за 5 секунд');
+}
+
+async function readPreviewRoutes(): Promise<[string, string]> {
+  const port = await findFreePort();
+  const preview = spawn(
+    process.execPath,
+    [VITE_PATH, 'preview', '--host', '127.0.0.1', '--port', String(port)],
+    {
+      cwd: fileURLToPath(new URL('../', import.meta.url)),
+      stdio: 'ignore',
+    },
+  );
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    await waitForPreview(baseUrl, preview);
+    const responses = await Promise.all([fetch(`${baseUrl}/`), fetch(`${baseUrl}/match`)]);
+    return (await Promise.all(responses.map((response) => response.text()))) as [string, string];
+  } finally {
+    preview.kill();
+  }
 }
 
 describe('публикация сборки клиента', () => {
@@ -63,11 +121,16 @@ describe('публикация сборки клиента', () => {
     );
   });
 
-  it('критерий 3: сборка отдаёт index.html для прямых маршрутов / и /match', () => {
+  it('критерий 3: production-сервер отдаёт index.html для прямых маршрутов / и /match', async () => {
     expect(existsSync(new URL('index.html', DIST_DIRECTORY))).toBe(true);
     expect(existsSync(new URL('404.html', DIST_DIRECTORY))).toBe(false);
 
-    expect(readFileSync(join(DIST_PATH, 'index.html'), 'utf8')).toContain('<div id="root">');
+    const indexHtml = readFileSync(join(DIST_PATH, 'index.html'), 'utf8');
+    expect(indexHtml).toContain('<div id="root">');
+
+    const [rootHtml, matchHtml] = await readPreviewRoutes();
+    expect(rootHtml).toBe(indexHtml);
+    expect(matchHtml).toBe(indexHtml);
   });
 
   it('критерий 4: без CLOUDFLARE_API_TOKEN и CLOUDFLARE_ACCOUNT_ID публикация пропускается с сообщением', () => {
