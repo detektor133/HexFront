@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T2 исправлены возвращённые ревью приёмочные тесты: `match-screen.test.ts` рендерит реальный `MatchSurface` и `ObserverPanel` на рабочем снимке симуляции, а `sim-worker-telemetry.test.ts` запускает настоящий `createLocalEngine` на карте `tiny`.
+07/T2 исправлены возвращённые ревью приёмочные тесты: `match-screen.test.ts` рендерит реальный `MatchSurface` и `ObserverPanel` на рабочем снимке симуляции, а `sim-worker-telemetry.test.ts` запускает настоящий `createLocalEngine` на карте `tiny`. Импорт карты в тестах заменён на чтение fixture через `node:fs`, чтобы пройти правило client-boundaries.
 
 Подтверждение: `pnpm verify --changed` — build, types, lint, prettier и 5 тестов зелёные.
 

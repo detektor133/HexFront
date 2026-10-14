@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import tinyMap from '../../../packages/mapgen/maps/tiny.json';
+const tinyMap: unknown = JSON.parse(
+  readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
+);
 
 function setWorkerGlobals(): void {
   Object.assign(globalThis, {

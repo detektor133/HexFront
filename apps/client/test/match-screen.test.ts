@@ -1,11 +1,16 @@
+import { readFileSync } from 'node:fs';
+
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
 
-import tinyMap from '../../../packages/mapgen/maps/tiny.json';
 import { createLocalEngine } from '../src/local/engine.ts';
+
+const tinyMap: unknown = JSON.parse(
+  readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
+);
 
 const loaded = loadMap(tinyMap);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
