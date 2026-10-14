@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-07/T19: секреты Cloudflare перенесены в `env` job-уровня, условия публикации используют только `env.*`; устаревшие ожидания в `deployment.test.ts` синхронизированы с новым условием.
-Приёмочные проверки из `apps/client/test/deployment-env.test.ts` не изменялись.
+07/T19 принята ревью: секреты Cloudflare объявлены в `env` job-уровня, условия используют только `env.*`, тест запрещает `secrets.` в `if:`.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Задача отмечена `- [~]`; следующая сессия — `$review 07/T19`.
+Следующая сессия — взять первую невыполненную задачу этапа через `$next`.
 Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/pages.yml`, `apps/client/test/deployment-env.test.ts`, `apps/client/test/deployment.test.ts`.
