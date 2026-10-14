@@ -40,6 +40,15 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         run: npm install -g wrangler@4
 
+      # pages deploy не создаёт проект сам; повторное создание отвечает «already exists».
+      - name: Создать проект Pages, если его нет
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: |
+          if ! out=$(wrangler pages project create hexfront --production-branch=main 2>&1); then
+            echo "$out"
+            echo "$out" | grep -qi "already exists" || exit 1
+          fi
+
       - name: Опубликовать в Cloudflare Pages
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         uses: cloudflare/wrangler-action@v3
