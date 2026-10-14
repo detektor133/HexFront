@@ -25,6 +25,9 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
+      - name: Проверить проект
+        run: pnpm lint
+
       - name: Собрать клиент
         run: pnpm --filter @hexfront/client build
 
