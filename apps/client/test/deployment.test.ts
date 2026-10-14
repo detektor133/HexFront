@@ -76,10 +76,10 @@ describe('публикация сборки клиента', () => {
     expect(workflow).toMatch(/CLOUDFLARE_API_TOKEN/);
     expect(workflow).toMatch(/CLOUDFLARE_ACCOUNT_ID/);
     expect(workflow).toContain(
-      "if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}",
+      "if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}",
     );
     expect(workflow).toContain(
-      "if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' || secrets.CLOUDFLARE_ACCOUNT_ID == '' }}",
+      "if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' }}",
     );
     expect(workflow).toMatch(/Публикация пропущена: секреты Cloudflare не настроены/);
   });

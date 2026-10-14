@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T4 |
+| Текущая задача | 07/T19 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-14 |
 
@@ -15,9 +15,8 @@
 
 ## Следующая сессия
 
-07/T4: повторное ревью вернуло задачу: требуется обосновать изменение существующего теста `static-maps-build.test.ts` строкой `Заменён тест:` и исправить неподтверждённое утверждение отчёта о HTTP-ответах `/` и `/match`.
-`apps/client/test/deployment.test.ts` запускает реальную сборку клиента, проверяет workflow и артефакт `index.html` без `404.html`; самописный HTTP-fallback удалён.
-`apps/client/test/static-maps-build.test.ts` сам запускает сборку, поэтому проверка карт не зависит от порядка запуска файлов Vitest.
+07/T19: секреты Cloudflare перенесены в `env` job-уровня, условия публикации используют только `env.*`; устаревшие ожидания в `deployment.test.ts` синхронизированы с новым условием.
+Приёмочные проверки из `apps/client/test/deployment-env.test.ts` не изменялись.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Задача отмечена `- [ ]`; следующая сессия — `$review 07/T4` после исправлений.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `.github/workflows/pages.yml`, `docs/reports/stage-07-t4.md`.
+Задача отмечена `- [~]`; следующая сессия — `$review 07/T19`.
+Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/pages.yml`, `apps/client/test/deployment-env.test.ts`, `apps/client/test/deployment.test.ts`.
