@@ -2,6 +2,61 @@ import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { loadMap, type PlayerView } from '@hexfront/sim';
+
+import tinyMap from '../../../packages/mapgen/maps/tiny.json';
+import { createLocalEngine } from '../src/local/engine.ts';
+
+const loaded = loadMap(tinyMap);
+if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+
+const engine = createLocalEngine(tinyMap, 42, 2);
+if ('errors' in engine) throw new Error(engine.errors.join('; '));
+
+const view: PlayerView = engine.snapshot().view;
+const sandbox = {
+  msg: { ...engine.snapshot(), view },
+  replay: [],
+  error: null,
+  picked: { hex: null, units: [], target: null },
+  lastReject: null,
+  tool: null,
+  army: null,
+  fog: true,
+  paused: false,
+  speed: 1,
+  observerId: null,
+  events: [],
+  workerTelemetry: null,
+  snapshotTelemetry: () => ({ received: 0, collected: 0, live: 0 }),
+  cacheTelemetry: () => ({
+    unit: { shown: 0, drawnAt: 0, chips: 0, encircledSince: 0 },
+    economy: { capturesByHex: 0, cityFlashes: 0 },
+    frontTween: { byArmy: 0 },
+  }),
+  focusEvent: vi.fn(),
+  send: vi.fn(),
+  setFog: vi.fn(),
+  setPaused: vi.fn(),
+  step: vi.fn(),
+  setSpeed: vi.fn(),
+  setObserver: vi.fn(),
+  pick: vi.fn(),
+  setTool: vi.fn(),
+  setArmy: vi.fn(),
+  setRoadPreview: vi.fn(),
+  setDockHeight: vi.fn(),
+  pixiTelemetry: () => ({
+    objects: 0,
+    text: 0,
+    graphics: 0,
+    graphicsInstructions: [],
+    graphicsDetails: [],
+    textures: 0,
+    canvasTextTextures: null,
+  }),
+};
+
 function setWindow(search: string, pathname = '/match'): void {
   Object.assign(globalThis, {
     window: {
@@ -18,14 +73,10 @@ afterEach(() => {
 });
 
 describe('экран матча игрока', () => {
-  it('критерий 1: /match без debug рендерит только экран игрока без панели наблюдателя, переключателя тумана и отказа команды', async () => {
-    vi.doMock('../src/dev/DevSandboxPage.tsx', () => ({
-      SandboxSurface: ({ debug }: { debug: boolean }) =>
-        createElement(
-          'div',
-          { 'data-testid': 'legacy-sandbox' },
-          debug ? 'Пауза Вся карта Скачать телеметрию Последний отказ' : null,
-        ),
+  it('/match без debug рендерит экран игрока без панели наблюдателя, тумана и отказа команды', async () => {
+    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
+      useMapJson: () => ({ json: tinyMap, map: loaded.map }),
+      useSandbox: () => sandbox,
     }));
     setWindow('');
 
@@ -34,19 +85,16 @@ describe('экран матча игрока', () => {
       createElement(MatchSurface, { debug: false, showOnboarding: true }),
     );
 
-    expect(markup).not.toContain('legacy-sandbox');
-    expect(markup).not.toMatch(/Пауза|Шаг|1×|5×|20×|Вся карта|Игрок 1|Скачать телеметрию/gu);
+    expect(markup).not.toContain('aria-label="Наблюдатель"');
+    expect(markup).not.toContain('Вся карта');
+    expect(markup).not.toContain('Скачать телеметрию');
     expect(markup).not.toContain('Последний отказ');
   });
 
-  it('критерий 1: /match?debug=1 рендерит панель наблюдателя', async () => {
-    vi.doMock('../src/dev/DevSandboxPage.tsx', () => ({
-      SandboxSurface: ({ debug }: { debug: boolean }) =>
-        createElement(
-          'div',
-          { 'data-testid': 'legacy-sandbox' },
-          debug ? 'Пауза Вся карта Скачать телеметрию' : null,
-        ),
+  it('/match?debug=1 рендерит реальную панель наблюдателя', async () => {
+    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
+      useMapJson: () => ({ json: tinyMap, map: loaded.map }),
+      useSandbox: () => sandbox,
     }));
     setWindow('?debug=1');
 
@@ -55,11 +103,17 @@ describe('экран матча игрока', () => {
       createElement(MatchSurface, { debug: true, showOnboarding: true }),
     );
 
-    expect(markup).not.toContain('legacy-sandbox');
-    expect(markup).toMatch(/Пауза|Шаг|1×|5×|20×|Скачать телеметрию/u);
+    expect(markup).toContain('aria-label="Наблюдатель"');
+    expect(markup).toContain('Пауза');
+    expect(markup).toContain('Шаг');
+    expect(markup).toContain('1×');
+    expect(markup).toContain('5×');
+    expect(markup).toContain('20×');
+    expect(markup).toContain('Вся карта');
+    expect(markup).toContain('Скачать телеметрию');
   });
 
-  it('критерий 3: в production вызов маршрутизатора для /dev/sandbox возвращает «Страница не найдена»', async () => {
+  it('в production маршрут /dev/sandbox возвращает «Страница не найдена»', async () => {
     const render = vi.fn();
     vi.doMock('react-dom/client', () => ({
       createRoot: () => ({ render }),

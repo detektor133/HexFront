@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T1 принята ревью. Приёмочный тест `apps/client/test/construction-arc.test.ts` вызывает реальный `createEconomyLayer`, перехватывает сформированный Pixi `GraphicsContext`-путь после `stroke` и проверяет все точки дуг для двух и трёх строек с дорогой. Тест-сторож исходников сохранён.
+07/T2 исправлены возвращённые ревью приёмочные тесты: `match-screen.test.ts` рендерит реальный `MatchSurface` и `ObserverPanel` на рабочем снимке симуляции, а `sim-worker-telemetry.test.ts` запускает настоящий `createLocalEngine` на карте `tiny`.
 
-Подтверждение: `pnpm verify --changed` — build, types, lint, prettier, tests и visual зелёные.
+Подтверждение: `pnpm verify --changed` — build, types, lint, prettier и 5 тестов зелёные.
 
-Следующая сессия: продолжить 07/T2.
-Читать: `docs/stages/stage-07-playable-build.md`, `docs/reports/stage-07-t1.md`.
+Следующая сессия: запустить `$review 07/T2`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`.
