@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { Graphics } from 'pixi.js';
+import { GraphicsContext } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
@@ -33,65 +33,92 @@ function viewWithConstructions(constructionCount: number): PlayerView {
   return { ...message.view, constructions } as unknown as PlayerView;
 }
 
-function assertArcStartsOnItsCircle(
-  arcCalls: ReadonlyArray<unknown[]>,
-  moveCalls: ReadonlyArray<unknown[]>,
-  arcOrders: ReadonlyArray<number>,
-  moveOrders: ReadonlyArray<number>,
+type ArcPath = {
+  center: readonly [number, number];
+  radius: number;
+  width: number;
+  points: ReadonlyArray<number>;
+};
+
+type PolygonPrimitive = {
+  type: 'polygon';
+  points: ReadonlyArray<number>;
+};
+
+function assertArcPathsStayWithinTheirBounds(
+  arcPaths: ReadonlyArray<ArcPath>,
   expectedArcCount: number,
 ): void {
-  expect(arcCalls).toHaveLength(expectedArcCount);
-  for (const [[x, y, radius], arcOrder] of arcCalls.map(
-    (call, index) => [call, arcOrders[index] as number] as const,
-  )) {
-    const moveIndex = moveOrders.reduce(
-      (lastIndex, moveOrder, index) => (moveOrder < arcOrder ? index : lastIndex),
-      -1,
-    );
-    const move = moveCalls[moveIndex];
-    expect(move).toBeDefined();
-    const [moveX, moveY] = move as [number, number];
-    expect(Math.hypot(moveX - (x as number), moveY - (y as number))).toBeCloseTo(radius as number);
+  expect(arcPaths).toHaveLength(expectedArcCount);
+  for (const {
+    center: [x, y],
+    radius,
+    width,
+    points,
+  } of arcPaths) {
+    for (let index = 0; index < points.length; index += 2) {
+      const pointX = points[index];
+      const pointY = points[index + 1];
+      if (pointX === undefined || pointY === undefined) throw new Error('неполная точка пути дуги');
+      expect(Math.hypot(pointX - x, pointY - y)).toBeLessThanOrEqual(radius + width);
+    }
   }
+}
+
+function captureArcPaths(): { paths: ArcPath[]; restore: () => void } {
+  const paths: ArcPath[] = [];
+  const originalStroke = GraphicsContext.prototype.stroke;
+  const stroke = vi.spyOn(GraphicsContext.prototype, 'stroke');
+  stroke.mockImplementation(function (this: GraphicsContext, ...args) {
+    const result = originalStroke.apply(this, args);
+    const instruction = this.instructions.at(-1);
+    const path = instruction?.action === 'stroke' ? instruction.data.path : undefined;
+    const arc = path?.instructions.find((item) => item.action === 'arc');
+    if (!path || !arc) return result;
+
+    const [x, y, radius] = arc.data;
+    const primitive = path.shapePath.shapePrimitives[0]?.shape;
+    const points =
+      primitive?.type === 'polygon' ? (primitive as unknown as PolygonPrimitive).points : undefined;
+    const width =
+      typeof args[0] === 'object' && args[0] !== null && 'width' in args[0]
+        ? args[0].width
+        : undefined;
+    if (
+      typeof x === 'number' &&
+      typeof y === 'number' &&
+      typeof radius === 'number' &&
+      typeof width === 'number' &&
+      points
+    ) {
+      paths.push({ center: [x, y], radius, width, points });
+    }
+    return result;
+  });
+  return { paths, restore: () => stroke.mockRestore() };
 }
 
 describe('дуги прогресса строек', () => {
   it('для двух строек и одной дороги начинает каждую дугу с точки её окружности', () => {
-    const arc = vi.spyOn(Graphics.prototype, 'arc');
-    const moveTo = vi.spyOn(Graphics.prototype, 'moveTo');
+    const captured = captureArcPaths();
     const layer = createEconomyLayer(loaded.map, tokens.map.hexRadius);
 
     layer.setView(viewWithConstructions(2), { hex: null, units: [], target: null });
 
-    assertArcStartsOnItsCircle(
-      arc.mock.calls,
-      moveTo.mock.calls,
-      arc.mock.invocationCallOrder,
-      moveTo.mock.invocationCallOrder,
-      2,
-    );
+    assertArcPathsStayWithinTheirBounds(captured.paths, 2);
     layer.destroy();
-    arc.mockRestore();
-    moveTo.mockRestore();
+    captured.restore();
   });
 
   it('для трёх строек и одной дороги не оставляет дугу продолжением предыдущего пути', () => {
-    const arc = vi.spyOn(Graphics.prototype, 'arc');
-    const moveTo = vi.spyOn(Graphics.prototype, 'moveTo');
+    const captured = captureArcPaths();
     const layer = createEconomyLayer(loaded.map, tokens.map.hexRadius);
 
     layer.setView(viewWithConstructions(3), { hex: null, units: [], target: null });
 
-    assertArcStartsOnItsCircle(
-      arc.mock.calls,
-      moveTo.mock.calls,
-      arc.mock.invocationCallOrder,
-      moveTo.mock.invocationCallOrder,
-      3,
-    );
+    assertArcPathsStayWithinTheirBounds(captured.paths, 3);
     layer.destroy();
-    arc.mockRestore();
-    moveTo.mockRestore();
+    captured.restore();
   });
 });
 

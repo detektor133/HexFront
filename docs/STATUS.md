@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T2: возврат ревью — `apps/client/test/match-screen.test.ts` не рендерит `MatchSurface` с загруженным `view`; debug-тест проходит по скрытому тексту, а не по `ObserverPanel`.
+07/T1: исправлен приёмочный тест `apps/client/test/construction-arc.test.ts`. Тест вызывает реальный `createEconomyLayer`, перехватывает сформированный Pixi `GraphicsContext`-путь после `stroke` и проверяет все точки дуг для двух и трёх строек с дорогой. Тест-сторож исходников сохранён.
 
-Подтверждение: `pnpm exec vitest run apps/client/test/match-screen.test.ts apps/client/test/sim-worker-telemetry.test.ts` — 5 тестов зелёные; задача возвращена на исправление приёмочного теста.
+Подтверждение: `pnpm verify --changed` — build, types, lint, prettier, tests и visual зелёные.
 
-Следующая сессия: запустить `$review 07/T2` в новой сессии.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/main.tsx`.
+Следующая сессия: запустить `$review 07/T1` в новой сессии.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/construction-arc.test.ts`.
