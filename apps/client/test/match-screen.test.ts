@@ -1,51 +1,80 @@
-import { readFileSync } from 'node:fs';
-
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { MatchPage } from '../src/match/MatchPage.tsx';
+function setWindow(search: string, pathname = '/match'): void {
+  Object.assign(globalThis, {
+    window: {
+      location: { search, pathname },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    },
+  });
+}
 
-const MATCH_PAGE_SOURCE = readFileSync(
-  new URL('../src/match/MatchPage.tsx', import.meta.url),
-  'utf8',
-);
-const MATCH_SURFACE_SOURCE = readFileSync(
-  new URL('../src/dev/DevSandboxPage.tsx', import.meta.url),
-  'utf8',
-);
-const MAIN_SOURCE = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
+afterEach(() => {
+  vi.resetModules();
+  vi.unstubAllEnvs();
+});
 
 describe('экран матча игрока', () => {
-  it('на /match без debug отключает панель наблюдателя, туманный переключатель и отказ команды', () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: { location: { search: '' } },
-    });
+  it('критерий 1: /match без debug рендерит только экран игрока без панели наблюдателя, переключателя тумана и отказа команды', async () => {
+    vi.doMock('../src/dev/DevSandboxPage.tsx', () => ({
+      SandboxSurface: ({ debug }: { debug: boolean }) =>
+        createElement(
+          'div',
+          { 'data-testid': 'legacy-sandbox' },
+          debug ? 'Пауза Вся карта Скачать телеметрию Последний отказ' : null,
+        ),
+    }));
+    setWindow('');
 
-    const markup = renderToStaticMarkup(createElement(MatchPage));
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const markup = renderToStaticMarkup(
+      createElement(MatchSurface, { debug: false, showOnboarding: true }),
+    );
 
+    expect(markup).not.toContain('legacy-sandbox');
     expect(markup).not.toMatch(/Пауза|Шаг|1×|5×|20×|Вся карта|Игрок 1|Скачать телеметрию/gu);
     expect(markup).not.toContain('Последний отказ');
-    expect(MATCH_PAGE_SOURCE).toMatch(/<MatchSurface debug=\{debug\} showOnboarding \/>/u);
   });
 
-  it('на /match?debug=1 включает панель наблюдателя и отладочные элементы', () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: { location: { search: '?debug=1' } },
+  it('критерий 1: /match?debug=1 рендерит панель наблюдателя', async () => {
+    vi.doMock('../src/dev/DevSandboxPage.tsx', () => ({
+      SandboxSurface: ({ debug }: { debug: boolean }) =>
+        createElement(
+          'div',
+          { 'data-testid': 'legacy-sandbox' },
+          debug ? 'Пауза Вся карта Скачать телеметрию' : null,
+        ),
+    }));
+    setWindow('?debug=1');
+
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const markup = renderToStaticMarkup(
+      createElement(MatchSurface, { debug: true, showOnboarding: true }),
+    );
+
+    expect(markup).not.toContain('legacy-sandbox');
+    expect(markup).toMatch(/Пауза|Шаг|1×|5×|20×|Скачать телеметрию/u);
+  });
+
+  it('критерий 3: в production вызов маршрутизатора для /dev/sandbox возвращает «Страница не найдена»', async () => {
+    const render = vi.fn();
+    vi.doMock('react-dom/client', () => ({
+      createRoot: () => ({ render }),
+    }));
+    vi.stubEnv('PROD', true);
+    setWindow('', '/dev/sandbox');
+    Object.assign(globalThis, {
+      document: { getElementById: vi.fn(() => ({})) },
     });
 
-    const markup = renderToStaticMarkup(createElement(MatchPage));
+    await import('../src/main.tsx');
+    const strictMode = render.mock.calls[0]?.[0] as ReactElement<{ children: ReactElement }>;
+    const appElement = strictMode.props.children as ReactElement;
+    const routeElement = (appElement.type as () => ReactElement)();
 
-    expect(markup).toContain('class="_page_');
-    expect(MATCH_PAGE_SOURCE).toMatch(/<MatchSurface debug=\{debug\} showOnboarding \/>/u);
-    expect(MATCH_SURFACE_SOURCE).toMatch(/\{debug && view && \(/u);
-  });
-
-  it('оставляет /dev/sandbox недоступным в production-сборке', () => {
-    expect(MAIN_SOURCE).toMatch(
-      /if\s*\(import\.meta\.env\.PROD\s*&&\s*isDevPath\(path\)\)\s*return\s*<p>\{t\('dev\.notFound'\)\}<\/p>/su,
-    );
+    expect(renderToStaticMarkup(routeElement)).toContain('Страница не найдена');
   });
 });
