@@ -1,10 +1,62 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const WORKFLOW_PATH = new URL('../../../.github/workflows/pages.yml', import.meta.url);
 const ADR_DIRECTORY = new URL('../../../docs/architecture/adr/', import.meta.url);
 const DIST_DIRECTORY = new URL('../dist/', import.meta.url);
+const PROJECT_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const DIST_PATH = fileURLToPath(DIST_DIRECTORY);
+
+let server: Server;
+let serverUrl: string;
+
+execFileSync(
+  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+  ['--filter', '@hexfront/client', 'build'],
+  {
+    cwd: PROJECT_ROOT,
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  },
+);
+
+function startStaticSpaServer(): Promise<void> {
+  return new Promise((resolve) => {
+    server = createServer((request, response) => {
+      const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+      const requestedPath = pathname === '/' ? 'index.html' : pathname.slice(1);
+      const filePath = join(DIST_PATH, requestedPath);
+      const resolvedPath =
+        existsSync(filePath) && statSync(filePath).isFile()
+          ? filePath
+          : join(DIST_PATH, 'index.html');
+
+      response.statusCode = 200;
+      response.setHeader('Content-Type', 'text/html; charset=utf-8');
+      response.end(readFileSync(resolvedPath));
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string')
+        throw new Error('Не удалось получить адрес тестового сервера');
+      serverUrl = `http://127.0.0.1:${address.port}`;
+      resolve();
+    });
+  });
+}
+
+beforeAll(async () => {
+  await startStaticSpaServer();
+});
+
+afterAll(() => {
+  server?.close();
+});
 
 function readFirstMatchingFile(pattern: RegExp): string | null {
   if (!existsSync(ADR_DIRECTORY)) return null;
@@ -32,13 +84,22 @@ describe('публикация сборки клиента', () => {
 
     expect(workflow).toMatch(/push:[\s\S]*branches:[\s\S]*main[\s\S]*stage-\*/);
     expect(workflow).toContain('pnpm --filter @hexfront/client build');
-    expect(workflow).toContain('apps/client/dist');
-    expect(workflow).toContain('cloudflare/wrangler-action');
+    expect(workflow).toMatch(/uses: cloudflare\/wrangler-action@v3/);
+    expect(workflow).toMatch(
+      /command: pages deploy apps\/client\/dist --project-name=hexfront --branch=\$\{\{ github\.ref_name \}\}/,
+    );
   });
 
-  it('критерий 3: в dist есть index.html и нет 404.html', () => {
+  it('критерий 3: сборка отдаёт index.html для прямых маршрутов / и /match', async () => {
     expect(existsSync(new URL('index.html', DIST_DIRECTORY))).toBe(true);
     expect(existsSync(new URL('404.html', DIST_DIRECTORY))).toBe(false);
+
+    for (const route of ['/', '/match']) {
+      const response = await fetch(`${serverUrl}${route}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/html');
+      expect(await response.text()).toContain('<div id="root">');
+    }
   });
 
   it('критерий 4: без CLOUDFLARE_API_TOKEN и CLOUDFLARE_ACCOUNT_ID публикация пропускается с сообщением', () => {
@@ -46,7 +107,12 @@ describe('публикация сборки клиента', () => {
 
     expect(workflow).toMatch(/CLOUDFLARE_API_TOKEN/);
     expect(workflow).toMatch(/CLOUDFLARE_ACCOUNT_ID/);
-    expect(workflow).toMatch(/if:[\s\S]*(?:CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)/);
-    expect(workflow).toMatch(/(?:skip|пропуск|нет секрет|secrets)/i);
+    expect(workflow).toContain(
+      "if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}",
+    );
+    expect(workflow).toContain(
+      "if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' || secrets.CLOUDFLARE_ACCOUNT_ID == '' }}",
+    );
+    expect(workflow).toMatch(/Публикация пропущена: секреты Cloudflare не настроены/);
   });
 });
