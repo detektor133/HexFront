@@ -15,6 +15,7 @@
 
 ## Следующая сессия
 
-07/T3 принята: приёмка статических карт, сборка и маршрутизация проверены; `pnpm verify --changed` зелёный.
-Следующая сессия: `$next` или `$task 07/T4`.
-Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`.
+07/T4 выполнена: добавлены workflow Cloudflare Pages и ADR 0012; сборка публикует `apps/client/dist`, а шаг публикации пропускается без секретов.
+`pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
+Следующая задача: `$review 07/T4` в новой сессии, затем `$next`.
+Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/pages.yml`, `docs/architecture/adr/0012-cloudflare-pages-deployment.md`, `docs/reports/stage-07-t4.md`.
