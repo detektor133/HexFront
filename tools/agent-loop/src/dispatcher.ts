@@ -1,7 +1,9 @@
 // Диспетчер параллельных потоков (`--streams N`): главный каталог ведёт Issues, `slow` и закрытие
 // этапа, потоки — задачи «Очереди» без пересечений по `Файлы:` и `После:`.
+import { MAIN_AGENT } from './board.ts';
 import {
   endPause,
+  settleWait,
   selfClearing,
   firstLine,
   park,
@@ -26,9 +28,9 @@ import {
   taskBlock,
   taskMark,
 } from './stage-file.ts';
-import { MAX_STREAMS } from './state.ts';
+import { loadState, MAX_STREAMS, saveState, type LoopState } from './state.ts';
 import { runStream, type StreamOutcome } from './stream.ts';
-import { branchTask, createLock, releaseSlot, slotGit } from './worktree.ts';
+import { branchTask, createLock, releaseSlot, slotDir, slotGit } from './worktree.ts';
 
 /** Поток: задача, которую он держит, и почему он сейчас не работает. */
 interface Slot {
@@ -98,6 +100,8 @@ async function mainStep(context: LoopContext, slots: readonly Slot[]): Promise<S
   if (dirty !== '') return (await processIssues(context, true)) ?? 'idle';
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
+  // Ветка, дерево и синхронизация в порядке: их ожидание снято.
+  await settleWait(context, (key) => !key.startsWith('slow:'));
   const busy = busyTasks(slots);
   const before = new Map<string, string>();
   if (busy.length > 0) {
@@ -279,6 +283,49 @@ export async function applyLimitRequest(context: LoopContext): Promise<void> {
 }
 
 /**
+ * Владелец клавишей консоли просит повторить шаг, на котором агент ждёт, — как перезапуск цикла,
+ * но только для этого агента: ожидание в памяти забывается, шаг идёт заново.
+ */
+export async function applyRetries(
+  context: LoopContext,
+  slots: readonly Slot[] = [],
+): Promise<void> {
+  const board = context.config.board;
+  for (const agent of board?.takeRetries() ?? []) {
+    if (agent === MAIN_AGENT) {
+      forgetWait(context.state);
+      await save(context);
+      board?.end(agent, 'повторяю по просьбе владельца');
+      await context.say('консоль: владелец просит повторить шаг');
+      continue;
+    }
+    const slot = slots.find((candidate) => `w${candidate.index}` === agent);
+    if (slot?.task === undefined || slot.running !== undefined || slot.waitHead === undefined) {
+      await context.say(`консоль: ${agent} уже не ждёт — повторять нечего`);
+      continue;
+    }
+    delete slot.waitHead;
+    // Память потока лежит в его каталоге: без её ожидания тот же park снова промолчал бы.
+    const dir = slotDir(context.config.root, slot.index);
+    const state = await loadState(dir);
+    forgetWait(state);
+    await saveState(dir, state);
+    board?.end(agent, 'повторяю по просьбе владельца');
+    await context.say(`консоль: владелец просит повторить шаг потока ${agent} (${slot.task})`);
+  }
+}
+
+/**
+ * Забыть ожидание, как перезапуск цикла. Неудачная доделка (`resume:NN/Tn`) уже стёрла `resume`:
+ * повтор возвращает его, иначе грязное дерево ушло бы в другое ожидание вместо доделки.
+ */
+function forgetWait(state: LoopState): void {
+  const task = /^resume:(.+)$/u.exec(state.parked?.key ?? '')?.[1];
+  if (task !== undefined) state.resume = task;
+  delete state.parked;
+}
+
+/**
  * Цикл с потоками; предел читается на каждом шаге. `--once` — выход, когда потоки свободны и
  * работы без владельца нет.
  * @returns код выхода или 'switch' — предел стал 1 и потоки свободны: дальше цикл по одной задаче.
@@ -298,6 +345,7 @@ export async function runStreams(context: LoopContext): Promise<number | 'switch
   await context.say(`потоков до ${streamLimit(context)}, ветка этапа ${target.branch}`);
   for (;;) {
     await applyLimitRequest(context);
+    await applyRetries(context, slots);
     slotAt(slots, streamLimit(context));
     // После `$stage-close` ветка этапа новая: потоки, начатые дальше, ветвятся от неё.
     if (busyTasks(slots).length === 0)

@@ -1,7 +1,7 @@
 // Полноэкранный кадр консоли цикла: рамка, агенты, этап, счётчики, журнал и клавиши. Чистая
 // функция от модели Board и размера окна — терминал и клавиши в console-ui.ts.
 import { MAIN_AGENT, type AgentView, type Board, type LogLine } from './board.ts';
-import { chars, clean, clockText, duration, fit } from './screen-text.ts';
+import { chars, clean, clockText, duration, fit, wrap } from './screen-text.ts';
 import { MAX_STREAMS } from './state.ts';
 
 const STYLES = {
@@ -105,26 +105,55 @@ function rule(
   return `${spans(body, frame.width - 1, frame.paint)}${frame.paint(right, 'gray')}`;
 }
 
-/** Главное сверху: нужен ли владелец, пауза или всё идёт само. */
-function banner(board: Board, agents: readonly AgentView[]): readonly Span[] {
+/** Строк причины ожидания в баннере: длинная причина (ссылка, что нажать) не обрезается. */
+const REASON_LINES = 4;
+
+/**
+ * Главное сверху: нужен ли владелец, пауза или всё идёт само. Ожидание — с причиной целиком
+ * и клавишами ответа на него.
+ */
+function banner(
+  frame: Frame,
+  board: Board,
+  agents: readonly AgentView[],
+  reasonLines: number,
+): string[] {
   const waiting = agents.filter((agent) => agent.phase === 'wait');
-  const [first] = waiting;
+  const first = board.focus;
   if (first !== undefined) {
     const more = waiting.length > 1 ? ` (и ещё ${waiting.length - 1})` : '';
-    return [
+    const lead: Span[] = [
       ['◆ Нужен ты: ', 'yellow'],
       [`${first.name}${more} — `, 'bold'],
-      [first.text, 'yellow'],
+    ];
+    const indent = '  ';
+    const reason = wrap(
+      first.text,
+      frame.inner - spanWidth(lead),
+      frame.inner - indent.length,
+      reasonLines,
+    );
+    const actions = board.focusActions.flatMap((action): Span[] => [
+      [`${indent.slice(1)}[${action.key}]`, 'bold'],
+      [` ${action.label} `],
+    ]);
+    return [
+      line(frame, [...lead, [reason[0] ?? '', 'yellow']]),
+      ...reason.slice(1).map((text) => line(frame, [[indent], [text, 'yellow']])),
+      ...(actions.length === 0 ? [] : [line(frame, [[' '], ...actions])]),
     ];
   }
   const paused = agents.find((agent) => agent.phase === 'pause');
   if (paused !== undefined)
     return [
-      ['‖ Пауза после сбоя, снимется сама: ', 'magenta'],
-      [paused.text, 'magenta'],
+      line(frame, [
+        ['‖ Пауза после сбоя, снимется сама: ', 'magenta'],
+        [paused.text, 'magenta'],
+      ]),
     ];
-  if (board.working > 0) return [['✓ Всё идёт само — от тебя ничего не нужно', 'green']];
-  return [['○ Работы сейчас нет — жду новые Issues и изменения в main', 'dim']];
+  if (board.working > 0)
+    return [line(frame, [['✓ Всё идёт само — от тебя ничего не нужно', 'green']])];
+  return [line(frame, [['○ Работы сейчас нет — жду новые Issues и изменения в main', 'dim']])];
 }
 
 /** Ширины столбцов таблицы агентов; «что делает» забирает остаток. */
@@ -342,12 +371,14 @@ export function renderFrame(
       [clockText(board.time), 'bold'],
     ],
   );
-  const head = [
-    top,
-    line(frame, banner(board, agents)),
-    ...agentsSection(frame, board, agentRows(board, board.time)),
-  ];
   const tail = [...footer(frame, board), rule(frame, ['╰', '╯'], [])];
+  const table = agentsSection(frame, board, agentRows(board, board.time));
+  // Причина ожидания сокращается, пока под ней остаётся журнал: низкое окно с 4 потоками.
+  let head: string[] = [];
+  for (let reason = REASON_LINES; reason >= 1; reason -= 1) {
+    head = [top, ...banner(frame, board, agents, reason), ...table];
+    if (head.length + tail.length + 1 + MIN_JOURNAL <= height) break;
+  }
   const optional = [stageSection(frame, board), totalsSection(frame, board)];
   // Журнал с заголовком: высота минус обязательное; необязательные разделы — пока хватает места.
   let middle: string[] = [];
@@ -355,6 +386,7 @@ export function renderFrame(
     if (height - head.length - tail.length - middle.length - section.length - 1 >= MIN_JOURNAL)
       middle = [...middle, ...section];
   const journal = Math.max(0, height - head.length - tail.length - middle.length - 1);
-  const lines = [...head, ...middle, ...journalSection(frame, board, journal), ...tail];
-  return lines.slice(0, height);
+  const body = [...head, ...middle, ...journalSection(frame, board, journal)];
+  // Не влезло — режется середина, а не низ: в нижней строке ответы на клавиши владельца.
+  return [...body.slice(0, Math.max(0, height - tail.length)), ...tail].slice(0, height);
 }

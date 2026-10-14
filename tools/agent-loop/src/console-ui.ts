@@ -3,6 +3,8 @@
 // сессий codex сигналом: выход останавливает их сам (stopAllCommands).
 import { stageSummary, type Board } from './board.ts';
 import { readStage } from './context.ts';
+import type { GithubClient } from './github.ts';
+import { actionKey, openExternal, type ActionKey } from './owner-actions.ts';
 import { stopAllCommands } from './process.ts';
 import { renderFrame } from './screen.ts';
 import { MAX_STREAMS } from './state.ts';
@@ -19,6 +21,11 @@ const QUIT_CONFIRM_MS = 5000;
 const NOTICE_MS = 8000;
 /** Строк журнала, оставляемых в обычном экране терминала после выхода. */
 const TAIL_AFTER_EXIT = 15;
+/**
+ * Через сколько после перезапуска прогона цикл проверяет его снова: сразу после запроса GitHub
+ * ещё может отдавать прежний красный итог.
+ */
+const RERUN_SETTLE_MS = 20_000;
 
 const ESC = '\u001b[';
 const SCREEN_ON = `${ESC}?1049h${ESC}?25l${ESC}2J`;
@@ -27,10 +34,12 @@ const SCREEN_OFF = `${ESC}0m${ESC}?25h${ESC}?1049l`;
 export type KeyAction =
   | { readonly kind: 'limit'; readonly value: number }
   | { readonly kind: 'wake' }
+  | { readonly kind: 'action'; readonly key: ActionKey }
   | { readonly kind: 'quit'; readonly force: boolean };
 
 /**
- * Клавиша владельца: число агентов, «проверить сейчас», выход; раскладка — латиница и кириллица.
+ * Клавиша владельца: число агентов, «проверить сейчас», ответ на ожидание, выход; раскладка —
+ * латиница и кириллица.
  * Кусок ввода длиннее одной клавиши — вставка текста, а не команда: иначе две «й» в вставленной
  * строке оборвали бы все сессии codex.
  */
@@ -44,7 +53,74 @@ export function parseKey(chunk: string, limit: number): KeyAction | undefined {
   if (new RegExp(`^[1-${MAX_STREAMS}]$`, 'u').test(key))
     return { kind: 'limit', value: Number(key) };
   if (/^[\r\nrRкК]$/u.test(key)) return { kind: 'wake' };
-  return undefined;
+  const action = actionKey(key);
+  return action === undefined ? undefined : { kind: 'action', key: action };
+}
+
+export interface ActionDeps {
+  readonly board: Board;
+  readonly github: GithubClient | undefined;
+  readonly open: (target: string, onError: (message: string) => void) => void;
+  readonly say: (notice: string) => void;
+  /** Разбудить цикл: сейчас или через delayMs. */
+  readonly wake: (delayMs?: number) => void;
+}
+
+/** Ответ владельца на ожидание в баннере клавишей key. */
+/** Запрос перезапуска уже идёт: второе нажатие не шлёт второй POST, GitHub ответил бы 403. */
+let rerunning = false;
+/** Ответы GitHub, когда у токена нет права на Actions; прочие 403 — состояние самого прогона. */
+const NO_PERMISSION_RE = /Resource not accessible|Must have admin rights|нет нужного права/u;
+
+export async function performAction(key: ActionKey, deps: ActionDeps): Promise<void> {
+  const { board, say } = deps;
+  const agent = board.focus?.name;
+  const action = board.focusActions.find((candidate) => candidate.key === key);
+  if (agent === undefined || action === undefined) {
+    say(`Клавиша ${key} сейчас ничего не делает: она для ожидания, где показана`);
+    return;
+  }
+  if (action.kind === 'retry') {
+    board.requestRetry(agent);
+    say(`Повторяю шаг ${agent}`);
+    deps.wake();
+    return;
+  }
+  if (action.kind === 'open') {
+    deps.open(action.target, say);
+    say(`Открываю: ${action.label}`);
+    return;
+  }
+  if (deps.github === undefined) {
+    say(
+      'Без GITHUB_TOKEN цикл не перезапустит прогон: открой ссылку (О) и нажми «Re-run failed jobs»',
+    );
+    return;
+  }
+  if (rerunning) {
+    say('Перезапуск прогона уже запрошен — жду ответа GitHub');
+    return;
+  }
+  rerunning = true;
+  say('Перезапускаю прогон на GitHub…');
+  try {
+    await deps.github.rerunFailedJobs(action.runId);
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error);
+    say(
+      NO_PERMISSION_RE.test(text)
+        ? 'GitHub не дал перезапустить: GITHUB_TOKEN нужно право «Actions: Read and write». Пока открой ссылку (О) и нажми «Re-run failed jobs»'
+        : `Прогон не перезапущен: ${text}`,
+    );
+    return;
+  } finally {
+    rerunning = false;
+  }
+  // Баннер больше не зовёт владельца: прогон идёт, итог цикл проверит сам.
+  board.end(agent, 'прогон перезапущен на GitHub — жду итога');
+  board.requestRetry(agent);
+  say('Прогон перезапущен — цикл работает дальше, пока он идёт; красный снова — спросит');
+  deps.wake(RERUN_SETTLE_MS);
 }
 
 export interface ConsoleUi {
@@ -136,7 +212,11 @@ function openScreen(board: Board, root: string): Screen {
 }
 
 /** Консоль на весь экран; только для терминала — без него cli печатает прежние строки. */
-export function createConsoleUi(board: Board, root: string): ConsoleUi {
+export function createConsoleUi(
+  board: Board,
+  root: string,
+  github: GithubClient | undefined,
+): ConsoleUi {
   const input = process.stdin;
   const screen = openScreen(board, root);
   const sleepers = new Set<() => void>();
@@ -173,6 +253,23 @@ export function createConsoleUi(board: Board, root: string): ConsoleUi {
           ? `Агентов и так до ${limit}`
           : `Агентов станет до ${limit}, как только цикл закончит текущий шаг`,
       );
+    } else if (action.kind === 'action') {
+      performAction(action.key, {
+        board,
+        github,
+        open: openExternal,
+        say: screen.say,
+        wake: (delayMs = 0) => {
+          if (delayMs === 0) wakeAll();
+          else setTimeout(wakeAll, delayMs).unref();
+        },
+      }).catch((error: unknown) => {
+        // Ошибка ответа на клавишу не должна ронять цикл необработанным отказом промиса.
+        screen.say(
+          `Клавиша не сработала: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+      return;
     } else screen.say('Проверяю Issues и main сейчас');
     wakeAll();
   };

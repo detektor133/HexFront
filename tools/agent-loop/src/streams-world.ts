@@ -270,6 +270,7 @@ function fakeGithub(world: StreamsWorld): GithubClient | undefined {
     },
     addLabel: () => Promise.resolve(),
     openPullRequest: () => Promise.resolve('https://example/pr'),
+    rerunFailedJobs: () => Promise.resolve(),
     changed: () => Promise.resolve(false),
   };
 }

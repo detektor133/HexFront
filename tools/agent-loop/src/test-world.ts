@@ -309,6 +309,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       out.pulls.push(`${head_} → ${base}`);
       return Promise.resolve('https://github.com/detektor133/HexFront/pull/7');
     },
+    rerunFailedJobs: () => Promise.resolve(),
   };
   let polls = world.polls ?? 0;
   try {

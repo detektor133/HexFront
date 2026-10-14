@@ -114,7 +114,7 @@ async function followUp(
     await park(
       context,
       `task:${task}`,
-      `${task} не отмечена [~]: нужен владелец (вопрос, проверка или задача владельца)`,
+      `${task} не отмечена [~]: нужен владелец — ответ на вопрос Issue «$decide», своя проверка или задача — «$done ${task}»`,
       message,
     ),
   );

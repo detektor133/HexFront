@@ -2,6 +2,7 @@
 // а этап закрывается только на зелёном.
 import {
   park,
+  settleWait,
   pollSlow,
   runSkill,
   save,
@@ -26,6 +27,8 @@ export async function headTask(context: LoopContext): Promise<string | undefined
  */
 export async function slowGate(context: LoopContext): Promise<Step | undefined> {
   const slow = await pollSlow(context);
+  // Прогон перезапущен на GitHub (кнопкой на сайте или клавишей консоли): красного больше нет.
+  if (slow.verdict !== 'red') await settleWait(context, (key) => key.startsWith('slow:'));
   if (slow.verdict === 'green') {
     if (context.state.slowFixes.length > 0) {
       context.state.slowFixes = [];

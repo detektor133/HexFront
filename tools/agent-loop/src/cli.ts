@@ -54,7 +54,8 @@ const stampLine = (line: string): void =>
   console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${line}`);
 // Панель агентов — только в терминале; вывод в файл получает прежние строки с временем.
 const board = process.stdout.isTTY && process.stdin.isTTY ? new Board(Date.now) : undefined;
-const ui = board === undefined ? undefined : createConsoleUi(board, process.cwd());
+const github = token ? httpGithubClient(repo, token) : undefined;
+const ui = board === undefined ? undefined : createConsoleUi(board, process.cwd(), github);
 
 // Консоль держит stdin: без close в finally процесс не завершился бы после ошибки цикла.
 try {
@@ -73,7 +74,7 @@ try {
     sleep: ui?.sleep ?? sleepOrEnter,
     writeLine: ui?.writeLine ?? stampLine,
     ...(board === undefined ? {} : { board }),
-    ...(token ? { github: httpGithubClient(repo, token) } : {}),
+    ...(github === undefined ? {} : { github }),
   });
 } finally {
   ui?.close();

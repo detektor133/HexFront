@@ -28,6 +28,8 @@ export interface GithubClient {
   readonly addLabel: (issue: number, label: string) => Promise<void>;
   /** @returns адрес открытого PR head → base, нового или уже существующего. */
   readonly openPullRequest: (head: string, base: string, title: string) => Promise<string>;
+  /** Перезапуск упавших jobs прогона Actions; нужно право GITHUB_TOKEN «Actions: read and write». */
+  readonly rerunFailedJobs: (runId: number) => Promise<void>;
   /**
    * Дешёвая проверка между шагами: изменились ли Issues с меткой `agent` или `main`
    * (мерж PR этапа) с прошлого вызова. Первый вызов только запоминает состояние.
@@ -140,8 +142,21 @@ export function httpGithubClient(repo: string, token: string): GithubClient {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (response.status === 403)
-      throw new Error(`GitHub ${method} ${path}: 403 — у GITHUB_TOKEN нет нужного права`);
+    if (response.status === 403) {
+      // 403 — не только права токена: GitHub так же отвечает на перезапуск идущего прогона.
+      const text = await response.text();
+      const message = (() => {
+        try {
+          return (JSON.parse(text) as { message?: string }).message ?? text;
+        } catch {
+          // Тело не JSON (прокси, HTML-страница ошибки): показываем его как есть.
+          return text;
+        }
+      })();
+      throw new Error(
+        `GitHub ${method} ${path}: 403 — ${message.trim() || 'у GITHUB_TOKEN нет нужного права'}`,
+      );
+    }
     return response;
   };
   const expectOk = async (response: Response, what: string): Promise<Response> => {
@@ -208,6 +223,10 @@ export function httpGithubClient(repo: string, token: string): GithubClient {
       if (!pull)
         throw new Error(`GitHub создание PR: 422, открытого PR ${head} → ${baseBranch} нет`);
       return pull.html_url;
+    },
+    async rerunFailedJobs(runId) {
+      const response = await request(`/actions/runs/${runId}/rerun-failed-jobs`, 'POST');
+      await expectOk(response, `перезапуск прогона ${runId}`);
     },
     async changed() {
       const issues = await changedSince(issuesPath);

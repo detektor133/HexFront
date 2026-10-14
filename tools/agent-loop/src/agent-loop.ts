@@ -3,6 +3,7 @@ import { MAIN_AGENT } from './board.ts';
 import { loadAgentDefinitions } from './codex.ts';
 import {
   endPause,
+  settleWait,
   selfClearing,
   firstLine,
   openLog,
@@ -14,7 +15,7 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import { applyLimitRequest, runStreams, streamLimit } from './dispatcher.ts';
+import { applyLimitRequest, applyRetries, runStreams, streamLimit } from './dispatcher.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
@@ -98,6 +99,8 @@ async function tick(context: LoopContext): Promise<Step> {
   }
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
+  // Ветка, дерево и синхронизация в порядке: их ожидание снято.
+  await settleWait(context, (key) => !key.startsWith('slow:'));
   const issue = await processIssues(context, false);
   if (issue !== undefined) return issue;
   const broken = await brokenStatus(context);
@@ -247,6 +250,7 @@ async function runSingle(context: LoopContext): Promise<number | 'switch'> {
   for (;;) {
     // Предел, поднятый Issue или клавишами, переводит в потоки до следующей задачи.
     await applyLimitRequest(context);
+    await applyRetries(context);
     if (await switchToStreams(context)) return 'switch';
     let step: Step;
     try {

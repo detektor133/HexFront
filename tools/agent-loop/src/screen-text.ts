@@ -60,3 +60,38 @@ export function fit(text: string, width: number): string {
   if (list.length > width) return `${list.slice(0, width - 1).join('')}…`;
   return list.join('') + ' '.repeat(width - list.length);
 }
+
+/**
+ * Текст по словам в строки: первая шириной first, остальные — rest, не больше maxLines.
+ * Не влезший хвост обрезается «…» в последней строке; слово длиннее строки режется.
+ */
+export function wrap(text: string, first: number, rest: number, maxLines: number): string[] {
+  const words = clean(text).split(/\s+/u).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  const width = (): number => Math.max(1, lines.length === 0 ? first : rest);
+  for (const word of words) {
+    const joined = current === '' ? word : `${current} ${word}`;
+    if (chars(joined).length <= width()) {
+      current = joined;
+      continue;
+    }
+    if (current !== '') lines.push(current);
+    current = word;
+    while (chars(current).length > width()) {
+      const cut = width();
+      lines.push(chars(current).slice(0, cut).join(''));
+      current = chars(current).slice(cut).join('');
+    }
+  }
+  if (current !== '') lines.push(current);
+  if (maxLines <= 0) return [];
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  const last = kept.length - 1;
+  kept[last] = fit(
+    `${kept[last] ?? ''} ${lines[maxLines] ?? ''}`,
+    Math.max(1, last === 0 ? first : rest),
+  );
+  return kept.map((item) => item.trimEnd());
+}

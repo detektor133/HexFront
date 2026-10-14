@@ -6,6 +6,7 @@ import { MAIN_AGENT, type Board } from './board.ts';
 import { minutes, runCodex, type AgentDefinitions, type Role, type Session } from './codex.ts';
 import { changedPaths, dirtyFiles, head, syncWithOrigin, type Git } from './git.ts';
 import type { GithubClient } from './github.ts';
+import { waitActions } from './owner-actions.ts';
 import type { RunCommand } from './process.ts';
 import { saveState, type LoopState } from './state.ts';
 
@@ -72,13 +73,13 @@ const CI_TIMEOUT_MS = 660_000;
 /** Пауза после сбоя codex (обычно кончился лимит), мс. */
 const RETRY_MS = 30 * 60_000;
 
-/** Имя агента на панели: поток `wN` или главный каталог. */
 /**
  * Ожидания, которые снимаются сами, без нового коммита: их проверка повторяется каждый шаг.
  * Красный `slow` — тоже: прогон, перезапущенный на GitHub, зеленеет на том же HEAD.
  */
 export const selfClearing = (key: string): boolean => /^(dirty|branch|sync|slow:.+)$/u.test(key);
 
+/** Имя агента на панели: поток `wN` или главный каталог. */
 export const agentName = (context: LoopContext): string => context.stream?.name ?? MAIN_AGENT;
 
 export const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';
@@ -110,10 +111,31 @@ export async function park(
   }
   context.state.parked = { key, head: current, reason };
   await save(context);
-  context.config.board?.wait(agentName(context), reason);
+  context.config.board?.wait(
+    agentName(context),
+    reason,
+    waitActions(key, reason, selfClearing(key), context.config.github?.repo),
+  );
   await context.say(`жду: ${reason}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
   return 'idle';
+}
+
+/**
+ * Ожидание, которое снялось само (дерево чистое, ветка верная, `slow` не красный): строка агента
+ * больше не зовёт владельца. В режиме потоков главный агент иначе так и висел бы в баннере,
+ * а клавиши ответа доставались бы ему, а не потоку с настоящим вопросом.
+ */
+export async function settleWait(
+  context: LoopContext,
+  cleared: (key: string) => boolean,
+): Promise<void> {
+  const key = context.state.parked?.key;
+  if (key === undefined || !selfClearing(key) || !cleared(key)) return;
+  delete context.state.parked;
+  await save(context);
+  context.config.board?.end(agentName(context), 'ожидание снялось само');
+  await context.say(`ожидание снялось само: ${key}`);
 }
 
 export async function backoff(context: LoopContext, reason: string, answer: string): Promise<Step> {
@@ -150,7 +172,12 @@ export async function session(
   const result = await runCodex(context.config, context.definitions, role, full, locked);
   board?.count('sessions');
   board?.count('sessionMs', context.config.now() - started);
-  board?.end(agentName(context), `${title}: ${firstLine(result.message)}`, result.log);
+  board?.end(
+    agentName(context),
+    `${title}: ${firstLine(result.message)}`,
+    result.log,
+    join(context.config.root, result.log),
+  );
   await context.say(
     `← ${title} за ${minutes(context.config.now() - started)}: ${firstLine(result.message)} (лог ${result.log})`,
   );

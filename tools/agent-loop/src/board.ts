@@ -1,5 +1,6 @@
 // Модель экрана консоли цикла: кто из агентов что делает, этап, счётчики запуска и журнал.
 // Только данные — рисует screen.ts, клавиши и терминал — console-ui.ts.
+import { logAction, type WaitAction } from './owner-actions.ts';
 import { parseQueue, statusBranch, statusStage, taskMark } from './stage-file.ts';
 import { MAX_STREAMS } from './state.ts';
 
@@ -14,6 +15,10 @@ export interface AgentView {
   readonly task?: string;
   /** Лог последней сессии codex агента. */
   readonly log?: string;
+  /** Тот же лог полным путём: каталог потока — не главный каталог. */
+  readonly logFile?: string;
+  /** Чем владелец может ответить на ожидание клавишей; только у фазы `wait`. */
+  readonly actions?: readonly WaitAction[];
 }
 export interface LogLine {
   /** Время записи, мс. */
@@ -73,6 +78,7 @@ export class Board {
   private readonly rows = new Map<string, AgentView>();
   private readonly lines: LogLine[] = [];
   private requested: number | undefined;
+  private readonly retries = new Set<string>();
   // Без параметра-свойства в конструкторе: цикл запускается node с удалением типов.
   private readonly clock: () => number;
 
@@ -85,10 +91,16 @@ export class Board {
     return this.clock();
   }
 
-  private set(agent: string, phase: AgentPhase, text: string, log?: string): void {
+  private set(
+    agent: string,
+    phase: AgentPhase,
+    text: string,
+    extra: { log?: string; logFile?: string; actions?: readonly WaitAction[] } = {},
+  ): void {
     const before = this.rows.get(agent);
     const task = before?.task;
-    const shownLog = log ?? before?.log;
+    const shownLog = extra.log ?? before?.log;
+    const logFile = extra.logFile ?? before?.logFile;
     this.rows.set(agent, {
       name: agent,
       phase,
@@ -97,6 +109,10 @@ export class Board {
       since: this.clock(),
       ...(task === undefined ? {} : { task }),
       ...(shownLog === undefined ? {} : { log: shownLog }),
+      ...(logFile === undefined ? {} : { logFile }),
+      ...(extra.actions === undefined || extra.actions.length === 0
+        ? {}
+        : { actions: extra.actions }),
     });
     this.onChange();
   }
@@ -120,14 +136,18 @@ export class Board {
     this.set(agent, 'work', text);
   }
 
-  end(agent: string, text: string, log?: string): void {
+  /** @param logFile лог полным путём — для клавиши «открыть лог»; log — как его показать. */
+  end(agent: string, text: string, log?: string, logFile?: string): void {
     if (log !== undefined) this.lastLog = { agent, path: log };
-    this.set(agent, 'idle', text, log);
+    this.set(agent, 'idle', text, {
+      ...(log === undefined ? {} : { log }),
+      ...(logFile === undefined ? {} : { logFile }),
+    });
   }
 
-  /** Ждёт владельца: Issue, ответа на вопрос, задачи владельца. */
-  wait(agent: string, reason: string): void {
-    this.set(agent, 'wait', reason);
+  /** Ждёт владельца: Issue, ответа на вопрос, задачи владельца; actions — ответы клавишей. */
+  wait(agent: string, reason: string, actions: readonly WaitAction[] = []): void {
+    this.set(agent, 'wait', reason, { actions });
   }
 
   /** Пауза после сбоя (лимит codex, сеть): снимется сама. */
@@ -189,6 +209,29 @@ export class Board {
   /** Предел, который видит владелец: ещё не применённая просьба или текущий. */
   get shownLimit(): number {
     return this.requested ?? this.limit();
+  }
+
+  /** Ожидание, которому отвечают клавиши: первое по порядку агентов, оно же в баннере. */
+  get focus(): AgentView | undefined {
+    return this.agents().find((agent) => agent.phase === 'wait');
+  }
+
+  /** Ответы на ожидание в баннере: свои действия ожидания и лог последней сессии агента. */
+  get focusActions(): readonly WaitAction[] {
+    const focus = this.focus;
+    return focus === undefined ? [] : [...(focus.actions ?? []), ...logAction(focus.logFile)];
+  }
+
+  /** Владелец просит повторить шаг агента: ожидание снимет цикл перед следующим шагом. */
+  requestRetry(agent: string): void {
+    this.retries.add(agent);
+  }
+
+  /** Агенты, чей шаг владелец просил повторить; после чтения список пуст. */
+  takeRetries(): string[] {
+    const agents = [...this.retries];
+    this.retries.clear();
+    return agents;
   }
 
   get working(): number {

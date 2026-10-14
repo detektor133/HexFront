@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
 import { parseKey } from './console-ui.ts';
-import { clean, duration, fit } from './screen-text.ts';
+import { waitActions } from './owner-actions.ts';
+import { clean, duration, fit, wrap } from './screen-text.ts';
 import { describeWork, lineColor, MIN_HEIGHT, MIN_WIDTH, renderFrame } from './screen.ts';
 
 // Ширина кадра — в видимых клетках: цвет не занимает места.
@@ -96,6 +97,48 @@ describe('кадр консоли', () => {
     board.end(MAIN_AGENT, 'нет работы');
     board.end('w2', 'готово');
     expect(renderFrame(board, 100, 30, false)[1]).toContain('Работы сейчас нет');
+  });
+
+  it('ожидание: причина целиком в несколько строк и клавиши ответа под ней', () => {
+    const { board } = sampleBoard();
+    const reason =
+      'красный slow (все тесты) на служебном коммите, не задаче этапа. Открой ссылку: упал сам прогон — нажми «Re-run failed jobs». Станет зелёным — цикл продолжит сам: failure job=tests https://github.com/detektor133/HexFront/actions/runs/38533518333';
+    board.end(MAIN_AGENT, 'ревью', '.ai-logs/agent-loop/1.log', '/repo/.ai-logs/agent-loop/1.log');
+    board.wait(MAIN_AGENT, reason, waitActions('slow:abc', reason, true, 'detektor133/HexFront'));
+    const lines = renderFrame(board, 100, 30, false);
+    for (const line of lines) expect(cells(line)).toBe(100);
+    expect(lines[1]).toMatch(/^│ ◆ Нужен ты: главный — красный slow \(все тесты\)/u);
+    expect(lines[2]).toMatch(/^│ {3}\S/u);
+    expect(lines.slice(1, 4).join(' ')).toContain('actions/runs/38533518333');
+    expect(lines[4]).toContain('[З] перезапуск прогона  [О] ссылка  [Л] лог сессии');
+    board.end(MAIN_AGENT, 'повторяю');
+    expect(renderFrame(board, 100, 30, false).join('\n')).not.toContain('[З]');
+  });
+
+  it('низкое окно с четырьмя потоками и длинным ожиданием: причина короче, низ с ответами клавиш виден', () => {
+    const { board } = sampleBoard();
+    board.limit = () => 4;
+    for (const name of ['w1', 'w3', 'w4']) board.begin(name, `$task 07/T${name}`);
+    const reason = `красный slow ${'причина '.repeat(60)} https://github.com/a/b/actions/runs/7`;
+    board.wait(MAIN_AGENT, reason, waitActions('slow:abc', reason, true));
+    board.notice = 'Открываю: ссылка';
+    for (const height of [MIN_HEIGHT, 18, 20]) {
+      const lines = renderFrame(board, 80, height, false);
+      expect(lines).toHaveLength(height);
+      for (const line of lines) expect(cells(line)).toBe(80);
+      expect(lines.at(-1)).toMatch(/^╰─+╯$/u);
+      expect(lines.at(-3)).toContain('Открываю: ссылка');
+    }
+    const roomy = renderFrame(board, 80, 40, false).join('\n');
+    expect(roomy).toContain('[З] перезапуск прогона');
+  });
+
+  it('перенос по словам: ширина строк, длинное слово режется, лишнее — «…»', () => {
+    expect(wrap('раз два три четыре', 8, 6, 5)).toEqual(['раз два', 'три', 'четыре']);
+    expect(wrap('x'.repeat(10), 4, 4, 5)).toEqual(['xxxx', 'xxxx', 'xx']);
+    expect(wrap('раз два три четыре пять', 7, 7, 2)).toEqual(['раз два', 'три че…']);
+    expect(wrap('что угодно', 0, 0, 0)).toEqual([]);
+    expect(wrap('', 10, 10, 3)).toEqual([]);
   });
 
   it('этап: полоса готового и ревью, дальше по очереди', () => {

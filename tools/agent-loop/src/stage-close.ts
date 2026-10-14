@@ -32,7 +32,7 @@ export async function closeStage(context: LoopContext, stage: StageState): Promi
     return park(
       context,
       `queue:${stage.stage}`,
-      `в очереди нет открытых задач, а в этапе ${stage.stage} открыты ${open.join(', ')} — нужна Issue $decide с очередью`,
+      `в очереди нет открытых задач, а в этапе ${stage.stage} открыты ${open.join(', ')} — нужна Issue «$decide» с очередью`,
     );
   const slow = await slowBeforeClose(context);
   if (slow !== undefined) return slow;

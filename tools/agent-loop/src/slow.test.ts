@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { Board, MAIN_AGENT } from './board.ts';
 import { closeAll, fixtureStage, fixtureStatus, runWorld, type Session } from './test-world.ts';
 
 const NEXT_DONE: Session = {
@@ -56,6 +57,24 @@ describe('workflow slow (все тесты)', () => {
       wake: true,
     });
     expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+  });
+
+  it('перезапущенный прогон ещё идёт — ожидание снято: баннер не зовёт владельца, работа идёт', async () => {
+    const board = new Board(Date.now);
+    const run = await runWorld({
+      board,
+      sessions: [NEXT_DONE, REVIEW_OK],
+      slow: [RED, 'pending https://slow/2 1'],
+      headTrailer: '06/infra\n',
+      polls: 1,
+      wake: true,
+    });
+    expect(run.lines.some((line) => line.startsWith('ожидание снялось само: slow:'))).toBe(true);
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    // Дальше очередь может ждать владельца по другой причине, но не по красному slow.
+    expect(board.agents().find((agent) => agent.name === MAIN_AGENT)?.text).not.toMatch(
+      /красный slow/u,
+    );
   });
 
   it('второй красный slow после исправления той же задачи — к владельцу', async () => {
