@@ -40,13 +40,13 @@ export async function slowGate(context: LoopContext): Promise<Step | undefined> 
     return park(
       context,
       `slow:${current}`,
-      `красный slow (все тесты): ${slow.line} — коммит HEAD не относится к задаче, нужен владелец`,
+      `красный slow (все тесты) на служебном коммите, не задаче этапа. Открой ссылку: упал сам прогон (раннер, процесс) — нажми «Re-run failed jobs», упал тест — перешли ссылку Claude. Станет зелёным — цикл продолжит сам: ${slow.line}`,
     );
   if (context.state.slowFixes.includes(task))
     return park(
       context,
       `slow:${current}`,
-      `slow снова красный после исправления ${task}: ${slow.line} — нужен владелец`,
+      `slow снова красный после исправления ${task}. Открой ссылку: упал сам прогон — «Re-run failed jobs», упал тест — перешли ссылку Claude. Станет зелёным — цикл продолжит сам: ${slow.line}`,
     );
   context.state.slowFixes.push(task);
   await save(context);

@@ -2,6 +2,7 @@
 // этапа, потоки — задачи «Очереди» без пересечений по `Файлы:` и `После:`.
 import {
   endPause,
+  selfClearing,
   firstLine,
   park,
   readStage,
@@ -41,9 +42,6 @@ interface Slot {
   /** Текст задачи изменился: поток отбрасывает работу при первой возможности. */
   cancel?: string;
 }
-
-/** Ожидания главного каталога, которые снимаются сами, без нового коммита. */
-const SELF_CLEARING = /^(dirty|branch|sync)$/;
 
 const busyTasks = (slots: readonly Slot[]): string[] =>
   slots.flatMap((slot) => (slot.task === undefined ? [] : [slot.task]));
@@ -117,7 +115,7 @@ async function mainStep(context: LoopContext, slots: readonly Slot[]): Promise<S
   const closed = closedStageBranch(stage.status);
   if (closed !== undefined) return busy.length === 0 ? closedStage(context, closed) : 'idle';
   const { parked } = state;
-  if (parked && !SELF_CLEARING.test(parked.key) && parked.head === (await head(git))) return 'idle';
+  if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
   if (busy.length > 0 || selectStreamTask(stage.status, stage.stageText, busy) !== undefined)

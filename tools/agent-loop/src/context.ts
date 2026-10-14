@@ -73,6 +73,12 @@ const CI_TIMEOUT_MS = 660_000;
 const RETRY_MS = 30 * 60_000;
 
 /** Имя агента на панели: поток `wN` или главный каталог. */
+/**
+ * Ожидания, которые снимаются сами, без нового коммита: их проверка повторяется каждый шаг.
+ * Красный `slow` — тоже: прогон, перезапущенный на GitHub, зеленеет на том же HEAD.
+ */
+export const selfClearing = (key: string): boolean => /^(dirty|branch|sync|slow:.+)$/u.test(key);
+
 export const agentName = (context: LoopContext): string => context.stream?.name ?? MAIN_AGENT;
 
 export const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';

@@ -3,6 +3,7 @@ import { MAIN_AGENT } from './board.ts';
 import { loadAgentDefinitions } from './codex.ts';
 import {
   endPause,
+  selfClearing,
   firstLine,
   openLog,
   park,
@@ -39,9 +40,6 @@ export {
   type CommandResult,
   type RunCommand,
 } from './process.ts';
-
-/** Ожидания, которые снимаются сами, без нового коммита: их проверка повторяется каждый шаг. */
-const SELF_CLEARING = /^(dirty|branch|sync)$/;
 
 /** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
 async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
@@ -108,7 +106,7 @@ async function tick(context: LoopContext): Promise<Step> {
   const closed = closedStageBranch(stage.status);
   if (closed !== undefined) return closedStage(context, closed);
   const { parked } = state;
-  if (parked && !SELF_CLEARING.test(parked.key) && parked.head === (await head(git))) return 'idle';
+  if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
   const task = selectTask(stage.status, stage.stageText);

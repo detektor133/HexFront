@@ -38,9 +38,24 @@ describe('workflow slow (все тесты)', () => {
   it('служебный коммит без задачи в трейлере — к владельцу, без сессий', async () => {
     const run = await runWorld({ sessions: [], slow: [RED], headTrailer: '06/infra\n' });
     expect(run.prompts).toEqual([]);
-    expect(run.lines).toContain(
-      `жду: красный slow (все тесты): ${RED} — коммит HEAD не относится к задаче, нужен владелец`,
-    );
+    const waiting = run.lines.find((line) => line.startsWith('жду: красный slow'));
+    expect(waiting).toContain('на служебном коммите');
+    expect(waiting).toContain('«Re-run failed jobs»');
+    expect(waiting).toContain('перешли ссылку Claude');
+    expect(waiting).toContain(RED);
+  });
+
+  it('красный slow, перезапущенный на GitHub, зеленеет на том же HEAD — цикл продолжает сам', async () => {
+    // 2026-10-14: прогон slow упал на SIGSEGV воркера vitest; после «Re-run failed jobs»
+    // цикл ждал нового коммита, хотя HEAD тот же и slow уже зелёный.
+    const run = await runWorld({
+      sessions: [NEXT_DONE, REVIEW_OK],
+      slow: [RED, 'success https://slow/3'],
+      headTrailer: '06/infra\n',
+      polls: 1,
+      wake: true,
+    });
+    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
   });
 
   it('второй красный slow после исправления той же задачи — к владельцу', async () => {
@@ -50,9 +65,11 @@ describe('workflow slow (все тесты)', () => {
       headTrailer: '06/T1e',
     });
     expect(run.prompts).toEqual([`$task 06/T1e CI красный: slow ${RED}`]);
-    expect(run.lines).toContain(
-      `жду: slow снова красный после исправления 06/T1e: ${RED} — нужен владелец`,
-    );
+    expect(
+      run.lines.some((line) =>
+        line.startsWith('жду: slow снова красный после исправления 06/T1e. Открой ссылку'),
+      ),
+    ).toBe(true);
   });
 
   it('непроверенный slow (сеть) работу не держит', async () => {
