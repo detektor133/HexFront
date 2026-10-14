@@ -30,13 +30,13 @@ describe('статические карты gen для сборки клиент
     }
   });
 
-  it('в dist/maps находятся 20 файлов gen-<сид>-30.json, и каждый проходит loadMap', () => {
+  it('сборка создаёт 20 файлов gen-<сид>-30.json, и каждый проходит loadMap', () => {
     const mapDirectoryExists = existsSync(DIST_MAPS_DIR);
     expect(mapDirectoryExists).toBe(true);
-    if (!mapDirectoryExists) return;
 
     const files = readdirSync(DIST_MAPS_DIR).filter((file) => /^gen-.+-30\.json$/.test(file));
-    expect(files).toHaveLength(20);
+    const expectedFiles = QUICK_MATCH_SEEDS.map((seed) => `gen-${seed}-30.json`);
+    expect(files.sort()).toEqual(expectedFiles.sort());
 
     for (const file of files) {
       const map = JSON.parse(readFileSync(new URL(file, DIST_MAPS_DIR), 'utf8')) as unknown;

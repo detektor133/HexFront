@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T3 возвращена ревью: в коммите задачи цитата замены `main-menu.test.ts` не совпадает дословно с текстом задачи; требуется исправить тело коммита и повторить ревью. `pnpm verify --changed` и `pnpm depcheck` зелёные.
-Следующая сессия: продолжить 07/T3.
-Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/ci.yml`, `package.json`, `apps/client/vite.config.ts`, `apps/client/test/static-maps-build.test.ts`.
+07/T3: усилен `apps/client/test/static-maps-build.test.ts`: набор файлов сравнивается с 20 ожидаемыми сидами, ранний выход после проверки каталога удалён. `pnpm verify --changed` зелёный.
+Следующая сессия: `$review 07/T3`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/static-maps-build.test.ts`, `docs/STATUS.md`.
