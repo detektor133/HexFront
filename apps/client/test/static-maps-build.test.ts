@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
 
@@ -13,12 +13,21 @@ describe('статические карты gen для сборки клиент
   it('quickMatchUrl выдаёт только сиды из набора из 20 сидов', () => {
     expect(QUICK_MATCH_SEEDS).toHaveLength(20);
 
-    const url = new URL(`http://localhost${quickMatchUrl()}`);
-    const seed = Number(url.searchParams.get('seed'));
+    const random = vi.spyOn(Math, 'random');
 
-    expect(QUICK_MATCH_SEEDS).toContain(seed);
-    expect(url.searchParams.get('map')).toBe('gen');
-    expect(url.searchParams.get('players')).toBe('30');
+    try {
+      for (let index = 0; index < QUICK_MATCH_SEEDS.length; index += 1) {
+        random.mockReturnValue((index + 0.5) / QUICK_MATCH_SEEDS.length);
+        const url = new URL(`http://localhost${quickMatchUrl()}`);
+        const seed = Number(url.searchParams.get('seed'));
+
+        expect(QUICK_MATCH_SEEDS).toContain(seed);
+        expect(url.searchParams.get('map')).toBe('gen');
+        expect(url.searchParams.get('players')).toBe('30');
+      }
+    } finally {
+      random.mockRestore();
+    }
   });
 
   it('в dist/maps находятся 20 файлов gen-<сид>-30.json, и каждый проходит loadMap', () => {

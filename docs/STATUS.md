@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T3: исправлен CI-путь проверки сборки — `pnpm check` теперь собирает workspace-пакеты перед тестами, поэтому `apps/client/dist/maps` существует для `static-maps-build.test.ts`. Приёмочный тест не изменялся.
+07/T3: приёмочный тест `static-maps-build.test.ts` теперь вызывает `quickMatchUrl()` для каждого из 20 интервалов выбора и подтверждает, что каждый результат использует сид из набора. `pnpm verify --changed` зелёный.
 Следующая задача: 07/T4.
 Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/ci.yml`, `package.json`, `apps/client/vite.config.ts`, `apps/client/test/static-maps-build.test.ts`.
