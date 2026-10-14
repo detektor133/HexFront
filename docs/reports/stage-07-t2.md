@@ -12,6 +12,16 @@
 
 Этап: 07/T2
 
+## Возврат ревью 2026-10-14 (текущий)
+
+- `pnpm exec vitest run apps/client/test/match-screen.test.ts apps/client/test/sim-worker-telemetry.test.ts`: 2 файла, 5 тестов прошли.
+- `pnpm verify --changed`: `verify: OK (11 с)`.
+- СПЕК: `apps/client/test/match-screen.test.ts:20-43` проверяет исходники и оболочку `MatchPage`, но не рендерит `MatchSurface` с реальным debug-путём.
+- СПЕК: `apps/client/test/match-screen.test.ts:46-49` проверяет production-маршрут regex-ом, а не вызовом маршрутизатора.
+- `apps/client/src/match/MatchSurface.tsx:1,10` переиспользует `SandboxSurface` из `DevSandboxPage.tsx`, что нарушает требование отдельного компонента экрана `/match`.
+
+Этап: 07/T2
+
 ## Возврат ревью 2026-10-14 (повтор)
 
 - `pnpm verify --changed`: `verify: OK (13 с)`.

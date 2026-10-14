@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-07/T2 выполнена: `/match` использует отдельный `MatchSurface`, debug-панель остаётся только в debug-режиме, сериализация worker условна, production-маршрут `/dev/*` закрыт.
+07/T2 возвращена ревью: тест экрана проверяет исходники вместо реального рендера, production-маршрут проверяется regex-ом, `MatchSurface` переиспользует `SandboxSurface` из `DevSandboxPage`.
 
 Подтверждение: `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`, visual-эталоны `match-*`, `pnpm verify --changed`.
 
-Следующая сессия: ревью 07/T2, затем перейти к 07/T3.
+Следующая сессия: исправить замечания ревью 07/T2, затем повторить ревью.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/local/sim-worker.ts`, `apps/client/tests/visual/visual-check.ts`.
