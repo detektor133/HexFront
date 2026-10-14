@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T4: исправлены тесты публикации и причина красного CI `check`.
+07/T4: возврат ревью — workflow не запускает `pnpm lint`, а проверка `/` и `/match` использует тестовый fallback, не подтверждающий реальную маршрутизацию Cloudflare Pages.
 `apps/client/test/deployment.test.ts` запускает реальную сборку клиента, проверяет проект `hexfront`, ref `main`/`stage-07`, условия секретов и SPA-маршруты `/` и `/match`.
 `apps/client/test/static-maps-build.test.ts` сам запускает сборку, поэтому проверка карт не зависит от порядка запуска файлов Vitest.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
