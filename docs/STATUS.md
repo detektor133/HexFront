@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T3: добавлены двадцать статических карт `gen` для 30 игроков, быстрый матч выбирает случайный seed из набора, `mapUrl` использует статический путь, сборка генерирует карты через существующий mapgen-скрипт. Приёмочный тест `apps/client/test/static-maps-build.test.ts` не изменялся; устаревшее ожидание seed 42 в `apps/client/test/main-menu.test.ts` заменено проверкой набора.
+07/T3: исправлен CI-путь проверки сборки — `pnpm check` теперь собирает workspace-пакеты перед тестами, поэтому `apps/client/dist/maps` существует для `static-maps-build.test.ts`. Приёмочный тест не изменялся.
 Следующая задача: 07/T4.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/vite.config.ts`, `apps/client/src/routes.ts`, `apps/client/src/local/map-request.ts`, `apps/client/test/static-maps-build.test.ts`.
+Читать: `docs/stages/stage-07-playable-build.md`, `.github/workflows/ci.yml`, `package.json`, `apps/client/vite.config.ts`, `apps/client/test/static-maps-build.test.ts`.

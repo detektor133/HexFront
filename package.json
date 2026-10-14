@@ -12,7 +12,7 @@
     "depcheck": "depcruise packages apps tools --config .dependency-cruiser.cjs",
     "test": "vitest run",
     "test:all": "vitest run --coverage --config vitest.all.config.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm test",
+    "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm -r --if-present build && pnpm test",
     "format": "prettier --write .",
     "ai-check": "node --experimental-strip-types tools/ai-check/src/cli.ts",
     "verify": "node --experimental-strip-types tools/ai-check/src/verify.ts",
