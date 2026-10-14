@@ -1,5 +1,6 @@
 // Круги задачи: работа ($next или $task) → CI → $review; $split, $accept и доделка — без владельца.
 import {
+  agentName,
   backoff,
   checkPermissions,
   firstLine,
@@ -17,7 +18,9 @@ import { dirtyFiles, head, syncWithOrigin } from './git.ts';
 import {
   forgetSpec,
   mentionsSpec,
+  pendingSpecReturn,
   placeSpec,
+  prepareSpec,
   returnedForSpec,
   SPEC_REMARK_RE,
   specRemarks,
@@ -155,19 +158,28 @@ async function runWork(
   const { git, state } = context;
   const locked = specFiles(context, task);
   const base = await head(git);
-  const work = await session(context, 'next', withSpec(prompt, task, locked), locked);
+  // Приёмочные тесты написаны для этой задачи: `$next` выбрал бы задачу сам, и 2026-10-14
+  // исполнитель с тестами 07/T1 взял 07/T2. Задача с тестами идёт по номеру.
+  const pinned = prompt === '$next' && locked.length > 0 ? `$task ${task}` : prompt;
+  // Оборванная сессия (Ctrl+C, сбой ПК) оставляет работу в дереве: перезапуск её доделает.
+  state.resume = task;
+  await save(context);
+  const work = await session(context, 'next', withSpec(pinned, task, locked), locked);
   // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) или нехватку,
   // о которой сказало ревью, чинит $spec. Признак — строка `СПЕК:` исполнителя или возврат ревью
-  // в блоке задачи, который ссылается на файл приёмочного теста.
+  // в блоке задачи о файле приёмочного теста, который `$spec` ещё не получал: строка возврата
+  // остаётся в блоке до коммита задачи и после починки тестов.
   if (work.failure === undefined && locked.length > 0 && (await head(git)) === base) {
     const { stageText } = await readStage(context.config.root);
-    const broken = specRemarks(work.message) || returnedForSpec(taskBlock(stageText, task), locked);
+    const returned = returnedForSpec(taskBlock(stageText, task), locked).trim();
+    const handled = (state.specRepairNotes[task] ?? []).includes(returned);
+    const broken = specRemarks(work.message) || (handled ? '' : returned);
     if (broken !== '') return repairSpec(context, task, broken, accepted);
   }
   // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
   const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
   if (work.failure !== undefined) {
-    if (dirty) state.resume = task;
+    if (!dirty) delete state.resume;
     return step(
       await backoff(
         context,
@@ -203,7 +215,10 @@ async function runWork(
     return step(await park(context, `many:${task}`, `ждут ревью сразу ${waiting.join(', ')}`));
   const [review] = waiting;
   if (review === undefined) return followUp(context, task, work.message, accepted);
-  if (review !== task) await context.say(`${firstLine(prompt)} взял ${review} вместо ${task}`);
+  if (review !== task) {
+    context.config.board?.task(agentName(context), review);
+    await context.say(`${firstLine(prompt)} взял ${review} вместо ${task}`);
+  }
   const violation = await specViolation(context, review);
   if (violation !== undefined) return step(await park(context, `spec:${review}`, violation));
   return { kind: 'review', task: review };
@@ -277,45 +292,6 @@ async function ciBeforeReview(context: LoopContext, task: string): Promise<Work 
 }
 
 /**
- * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу
- * или заново после замечаний ревью) и лежат в дереве. Доделка новых тестов не пишет.
- * @returns шаг цикла при остановке или undefined.
- */
-async function prepareSpec(
-  context: LoopContext,
-  task: string,
-  fresh: boolean,
-  remarks: string,
-): Promise<Step | undefined> {
-  if (!specEnabled(context)) return undefined;
-  if (fresh && !(task in context.state.spec)) {
-    const stop = await writeSpec(context, task, remarks);
-    if (stop !== undefined) return stop;
-  }
-  await placeSpec(context, task);
-  return undefined;
-}
-
-/**
- * Возврат ревью в блоке задачи о приёмочных тестах, который ещё не уходил в `$spec`: замечания
- * для новых тестов. Ответ ревью может не назвать файл, а замечание прошлого запуска цикла
- * в памяти не живёт. 2026-10-14, 07/T1: после перезапуска исполнитель не мог выполнить возврат
- * со старым тестом и взял 07/T2.
- */
-async function pendingSpecReturn(context: LoopContext, task: string): Promise<string> {
-  const files = specFiles(context, task);
-  if (files.length === 0) return '';
-  const { stageText } = await readStage(context.config.root);
-  const returned = returnedForSpec(taskBlock(stageText, task), files).trim();
-  if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return '';
-  await forgetSpec(context, task);
-  context.state.specRepairNotes = { ...context.state.specRepairNotes, [task]: [returned] };
-  await save(context);
-  await context.say(`возврат ревью ${task} о приёмочных тестах — их переписывает $spec`);
-  return returned;
-}
-
-/**
  * Круги одной задачи, не больше maxRounds ВОЗВРАТ. `workPrompt` — `$next` для очереди
  * или `$task NN/Tn` для Issue; `resume` — начать с доделки незакоммиченной работы.
  */
@@ -333,6 +309,7 @@ export async function processTask(
   const { config, say } = context;
   const accepted = new Set<string>();
   let current = task;
+  config.board?.task(agentName(context), task);
   // Доделка всегда начинается с работы: `[~]` в незакоммиченном файле этапа ещё не проверен.
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
@@ -372,6 +349,7 @@ export async function processTask(
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
       await forgetSpec(context, current);
+      config.board?.count('done');
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
     }
@@ -385,6 +363,7 @@ export async function processTask(
       remarks = verdict.message;
       await forgetSpec(context, current);
     } else remarks = specEnabled(context) ? await pendingSpecReturn(context, current) : '';
+    config.board?.count('returns');
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;
     round += 1;

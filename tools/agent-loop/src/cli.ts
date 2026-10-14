@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 
 import { defaultRunCommand, runAgentLoop } from './agent-loop.ts';
+import { Board } from './board.ts';
+import { createConsoleUi } from './console-ui.ts';
 import { httpGithubClient, parseGithubRepo } from './github.ts';
 import { TASK_ID_SOURCE } from './stage-file.ts';
 import { MAX_STREAMS } from './state.ts';
@@ -48,19 +50,31 @@ const repo = parseGithubRepo(
   execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }),
 );
 
-process.exitCode = await runAgentLoop({
-  root: process.cwd(),
-  maxRounds: positive('--max-rounds', 3),
-  maxMinutes: positive('--max-minutes', 120),
-  pollSeconds: positive('--poll-seconds', 30),
-  pollMinutes: positive('--poll-minutes', 10),
-  once: process.argv.includes('--once'),
-  dryRun: process.argv.includes('--dry-run'),
-  ...(resume === undefined ? {} : { resume }),
-  ...(streams === undefined ? {} : { streams }),
-  runCommand: defaultRunCommand,
-  now: Date.now,
-  sleep: sleepOrEnter,
-  writeLine: (line) => console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${line}`),
-  ...(token ? { github: httpGithubClient(repo, token) } : {}),
-});
+const stampLine = (line: string): void =>
+  console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${line}`);
+// Панель агентов — только в терминале; вывод в файл получает прежние строки с временем.
+const board = process.stdout.isTTY && process.stdin.isTTY ? new Board(Date.now) : undefined;
+const ui = board === undefined ? undefined : createConsoleUi(board, process.cwd());
+
+// Консоль держит stdin: без close в finally процесс не завершился бы после ошибки цикла.
+try {
+  process.exitCode = await runAgentLoop({
+    root: process.cwd(),
+    maxRounds: positive('--max-rounds', 3),
+    maxMinutes: positive('--max-minutes', 120),
+    pollSeconds: positive('--poll-seconds', 30),
+    pollMinutes: positive('--poll-minutes', 10),
+    once: process.argv.includes('--once'),
+    dryRun: process.argv.includes('--dry-run'),
+    ...(resume === undefined ? {} : { resume }),
+    ...(streams === undefined ? {} : { streams }),
+    runCommand: defaultRunCommand,
+    now: Date.now,
+    sleep: ui?.sleep ?? sleepOrEnter,
+    writeLine: ui?.writeLine ?? stampLine,
+    ...(board === undefined ? {} : { board }),
+    ...(token ? { github: httpGithubClient(repo, token) } : {}),
+  });
+} finally {
+  ui?.close();
+}

@@ -2,6 +2,7 @@
 import { appendFile, mkdir, readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
+import { MAIN_AGENT, type Board } from './board.ts';
 import { minutes, runCodex, type AgentDefinitions, type Role, type Session } from './codex.ts';
 import { changedPaths, dirtyFiles, head, syncWithOrigin, type Git } from './git.ts';
 import type { GithubClient } from './github.ts';
@@ -35,6 +36,8 @@ export interface AgentConfig {
   readonly github?: GithubClient;
   /** Переменные окружения сессий codex сверх process.env (порт visual потока). */
   readonly env?: Readonly<Record<string, string>>;
+  /** Панель консоли; без неё (тесты, вывод не в терминал) — только строки протокола. */
+  readonly board?: Board;
 }
 /** `worked` — что-то сделано, сразу следующий шаг; `idle` — ждать Issue или нового коммита. */
 export type Step = 'worked' | 'idle';
@@ -69,6 +72,9 @@ const CI_TIMEOUT_MS = 660_000;
 /** Пауза после сбоя codex (обычно кончился лимит), мс. */
 const RETRY_MS = 30 * 60_000;
 
+/** Имя агента на панели: поток `wN` или главный каталог. */
+export const agentName = (context: LoopContext): string => context.stream?.name ?? MAIN_AGENT;
+
 export const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';
 export const lastLines = (text: string, count = 15): string =>
   text.trim().split(/\r?\n/).slice(-count).join('\n');
@@ -91,6 +97,7 @@ export async function park(
   if (parked?.key === key && parked.head === current) return 'idle';
   context.state.parked = { key, head: current, reason };
   await save(context);
+  context.config.board?.wait(agentName(context), reason);
   await context.say(`жду: ${reason}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
   return 'idle';
@@ -99,6 +106,7 @@ export async function park(
 export async function backoff(context: LoopContext, reason: string, answer: string): Promise<Step> {
   context.state.retryAfter = context.config.now() + RETRY_MS;
   await save(context);
+  context.config.board?.wait(agentName(context), `пауза ${minutes(RETRY_MS)}: ${reason}`);
   await context.say(`сбой: ${reason} — следующая попытка через ${minutes(RETRY_MS)}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
   return 'idle';
@@ -114,10 +122,15 @@ export async function session(
   const { stream } = context;
   const cancelled = stream?.cancelled();
   if (cancelled !== undefined) throw new StreamCancelled(cancelled);
+  const { board } = context.config;
   const started = context.config.now();
+  board?.begin(agentName(context), title);
   await context.say(`→ ${title} (новая сессия codex)`);
   const full = stream === undefined ? prompt : `${prompt}\n${streamNote(stream)}`;
   const result = await runCodex(context.config, context.definitions, role, full, locked);
+  board?.count('sessions');
+  board?.count('sessionMs', context.config.now() - started);
+  board?.end(agentName(context), `${title}: ${firstLine(result.message)}`, result.log);
   await context.say(
     `← ${title} за ${minutes(context.config.now() - started)}: ${firstLine(result.message)} (лог ${result.log})`,
   );
@@ -146,9 +159,11 @@ const ciLine = (stdout: string): string =>
 export async function waitCi(context: LoopContext, label: string): Promise<CiResult> {
   const { config, say, state } = context;
   const started = config.now();
+  config.board?.begin(agentName(context), `CI ${label}`);
   await say(`… жду CI ${label}`);
   let ci = await ciWait(context, [], CI_TIMEOUT_MS);
   if (ci.verdict === 'unknown') ci = await ciWait(context, [], CI_TIMEOUT_MS);
+  countCi(context, `CI ${label}`, ci);
   await say(`CI ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
   if (ci.verdict === 'green') {
     state.greenHead = await head(context.git);
@@ -158,6 +173,13 @@ export async function waitCi(context: LoopContext, label: string): Promise<CiRes
 }
 
 const CI_WORDS = { green: 'зелёный', red: 'красный', unknown: 'не проверен' } as const;
+
+function countCi(context: LoopContext, title: string, ci: CiResult): void {
+  const { board } = context.config;
+  if (ci.verdict === 'green') board?.count('ciGreen');
+  if (ci.verdict === 'red') board?.count('ciRed');
+  board?.end(agentName(context), `${title}: ${CI_WORDS[ci.verdict]}`);
+}
 /** Прогон всех тестов идёт дольше быстрого CI: random-match один — 4–5 мин. */
 const SLOW_TIMEOUT_MS = 25 * 60_000;
 const SLOW_ARGS = ['--workflow=slow.yml'];
@@ -195,12 +217,14 @@ export async function pollSlow(context: LoopContext): Promise<CiResult> {
 export async function waitSlow(context: LoopContext, label: string): Promise<CiResult> {
   const { config, say } = context;
   const started = config.now();
+  config.board?.begin(agentName(context), `slow ${label}`);
   await say(`… жду slow ${label}`);
   const ci = await ciWait(
     context,
     [...SLOW_ARGS, `--timeout-minutes=${SLOW_TIMEOUT_MS / 60_000}`],
     SLOW_TIMEOUT_MS + 60_000,
   );
+  countCi(context, `slow ${label}`, ci);
   await say(`slow ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
   if (ci.verdict === 'green') {
     context.state.slowGreen = await head(context.git);
@@ -306,6 +330,7 @@ export async function openLog(config: AgentConfig): Promise<(line: string) => Pr
     '.ai-logs',
     `agent-loop-${new Date(config.now()).toISOString().slice(0, 10)}.md`,
   );
+  if (config.board !== undefined) config.board.loopLog = relative(config.root, logPath);
   return async (line) => {
     config.writeLine(line);
     await appendFile(logPath, `- ${new Date(config.now()).toISOString()} ${line}\n`, 'utf8');

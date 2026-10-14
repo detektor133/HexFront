@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { runAgentLoop, type CommandResult } from './agent-loop.ts';
+import type { Board } from './board.ts';
 import type { AgentIssue, GithubClient } from './github.ts';
 import type { TaskMark } from './stage-file.ts';
 import { loadState, saveState, type LoopState } from './state.ts';
@@ -60,6 +61,8 @@ export interface World {
   readonly spec?: boolean;
   /** Память прошлого запуска цикла (`state.json`). */
   readonly state?: Partial<LoopState>;
+  /** Панель консоли: что агенты делают, счётчики, клавиши владельца. */
+  readonly board?: Board;
   /** Трейлер `Этап:` коммита HEAD. */
   readonly headTrailer?: string;
   readonly status?: string;
@@ -67,7 +70,8 @@ export interface World {
   readonly maxRounds?: number;
   readonly dryRun?: boolean;
   readonly branch?: string;
-  readonly dirty?: boolean;
+  /** Незакоммиченный файл на старте: true — веса владельца, строка — этот путь. */
+  readonly dirty?: boolean | string;
   readonly resume?: string;
   readonly issues?: readonly AgentIssue[];
   /** Ветка этапа уже смёржена в main. */
@@ -167,7 +171,12 @@ export async function runWorld(world: World): Promise<Outcome> {
   let branch = world.branch ?? 'stage-06';
   let head = 0;
   let origin = 0;
-  let dirty = world.dirty === true ? ' M packages/sim/src/bots/weights.json' : '';
+  let dirty =
+    world.dirty === true
+      ? ' M packages/sim/src/bots/weights.json'
+      : world.dirty === undefined || world.dirty === false
+        ? ''
+        : ` M ${world.dirty}`;
   let files: readonly string[] = [];
   let pushes = 0;
   // Файлы сессий вне файлов этапа: что лежит на диске и что закоммичено в HEAD.
@@ -344,6 +353,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         return Promise.resolve(world.wake === true ? ('wake' as const) : ('timer' as const));
       },
       writeLine: (line) => out.lines.push(line),
+      ...(world.board === undefined ? {} : { board: world.board }),
     });
   } catch (error) {
     if (!(error instanceof Error && error.message === 'конец теста')) throw error;

@@ -21,7 +21,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     const run = await runWorld({ spec: true, sessions: [SPEC, NEXT_DONE, REVIEW_OK] });
     expect(run.prompts).toEqual([
       '$spec 06/T1j5-Б1',
-      `$next\n${LOCKED_LINE}`,
+      `$task 06/T1j5-Б1\n${LOCKED_LINE}`,
       `$review 06/T1j5-Б1\nПриёмочные тесты задачи, написанные $spec до кода: ${TEST}`,
     ]);
     expect(run.roles).toEqual(['spec', '', 'reviewer']);
@@ -35,7 +35,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       spec: true,
       sessions: [SPEC, { ...NEXT_DONE, writes: { [TEST]: "it.skip('ослаблен', () => {});\n" } }],
     });
-    expect(run.prompts).toEqual(['$spec 06/T1j5-Б1', `$next\n${LOCKED_LINE}`]);
+    expect(run.prompts).toEqual(['$spec 06/T1j5-Б1', `$task 06/T1j5-Б1\n${LOCKED_LINE}`]);
     expect(run.lines).toContain(`жду: исполнитель изменил приёмочный тест ${TEST}`);
   });
 
@@ -44,7 +44,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       spec: true,
       sessions: [SPEC, { answer: 'Вопрос записан в docs/QUESTIONS.md', commit: false }],
     });
-    expect(run.prompts).toEqual(['$spec 06/T1j5-Б1', `$next\n${LOCKED_LINE}`]);
+    expect(run.prompts).toEqual(['$spec 06/T1j5-Б1', `$task 06/T1j5-Б1\n${LOCKED_LINE}`]);
     expect(run.lines).toContain(
       'жду: 06/T1j5-Б1 не отмечена [~]: нужен владелец (вопрос, проверка или задача владельца)',
     );
@@ -76,7 +76,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       sessions: [SPEC, NEXT_DONE, back, NEXT_DONE, REVIEW_OK],
     });
     expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(1);
-    expect(run.prompts[3]).toBe(`$next\n${LOCKED_LINE}`);
+    expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1\n${LOCKED_LINE}`);
   });
 
   it('spec не пишет код: файл вне тестов — ожидание владельца', async () => {
@@ -184,7 +184,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       sessions: [SPEC, stuck, SPEC_FIX, NEXT_DONE, REVIEW_OK],
     });
     expect(run.prompts[2]).toBe(
-      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nИсполнитель задачи:\n  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
+      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nИсполнитель задачи:\nВозврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
     );
     expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
@@ -219,7 +219,35 @@ describe('приёмочные тесты до кода ($spec)', () => {
       state: { ...LOCKED, specRepairNotes: { '06/T1j5-Б1': [RETURN.trim()] } },
       sessions: [NEXT_DONE],
     });
-    expect(run.prompts).toEqual([`$next\n${LOCKED_LINE}`]);
+    expect(run.prompts).toEqual([`$task 06/T1j5-Б1\n${LOCKED_LINE}`]);
+  });
+
+  it('исполнитель остановился без «СПЕК:» после переписанных тестов — вопрос владельцу, а не $spec', async () => {
+    // Строка возврата остаётся в блоке до коммита задачи: по ней тесты уже переписаны.
+    const question: Session = {
+      answer: 'Нужен ответ владельца: какой радиус дуги?',
+      commit: false,
+    };
+    const run = await runWorld({
+      spec: true,
+      stage: returned,
+      state: { ...LOCKED, specRepairNotes: { '06/T1j5-Б1': [RETURN.trim()] } },
+      sessions: [question],
+    });
+    expect(run.prompts).toHaveLength(1);
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1 не отмечена [~]: нужен владелец (вопрос, проверка или задача владельца)',
+    );
+  });
+
+  it('сессия прервана Ctrl+C до этой версии цикла — приёмочные тесты в дереве называют задачу для доделки', async () => {
+    const run = await runWorld({
+      spec: true,
+      dirty: TEST,
+      state: LOCKED,
+      sessions: [NEXT_DONE],
+    });
+    expect(run.prompts[0]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
   });
 
   it('ВОЗВРАТ без имени файла, но с возвратом о приёмочном тесте в блоке — тесты переписывает $spec', async () => {

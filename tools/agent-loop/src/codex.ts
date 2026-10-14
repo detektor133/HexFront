@@ -27,6 +27,8 @@ export interface CodexSettings {
   readonly now: () => number;
   readonly writeLine: (line: string) => void;
   readonly env?: Readonly<Record<string, string>>;
+  /** Панель консоли сама показывает, сколько идёт сессия: строки «идёт N мин» не нужны. */
+  readonly board?: object;
 }
 export interface Session {
   readonly result: CommandResult;
@@ -90,10 +92,10 @@ export async function runCodex(
   const outputFile = join(outputDir, 'last-message.txt');
   const started = settings.now();
   const title = prompt.split(/\r?\n/, 1)[0] ?? prompt;
-  const heartbeat = setInterval(
-    () => settings.writeLine(`  … ${title} идёт ${minutes(settings.now() - started)}`),
-    HEARTBEAT_MS,
-  );
+  const heartbeat = setInterval(() => {
+    if (settings.board === undefined)
+      settings.writeLine(`  … ${title} идёт ${minutes(settings.now() - started)}`);
+  }, HEARTBEAT_MS);
   let result: CommandResult;
   try {
     result = await settings.runCommand(

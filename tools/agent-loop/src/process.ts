@@ -34,11 +34,12 @@ function killTree(child: ChildProcess): void {
 
 const runProcess: RunCommand = (command, args, options = {}) =>
   new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      shell: process.platform === 'win32',
-    });
+    // cmd получает одну строку: так node и делал со списком аргументов, но список с shell
+    // печатал предупреждение DEP0190 поверх панели консоли. Кавычки — prepareProcessArguments.
+    const child =
+      process.platform === 'win32'
+        ? spawn([command, ...args].join(' '), { cwd: options.cwd, env: options.env, shell: true })
+        : spawn(command, args, { cwd: options.cwd, env: options.env });
     if (options.input !== undefined) child.stdin.end(options.input);
     let stdout = '';
     let stderr = '';

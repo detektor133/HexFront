@@ -1,4 +1,5 @@
 // Агентный цикл: Issues владельца → «Очередь» этапа → закрытие этапа; без работы ждёт новых Issues.
+import { MAIN_AGENT } from './board.ts';
 import { loadAgentDefinitions } from './codex.ts';
 import {
   firstLine,
@@ -11,8 +12,8 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import { runStreams, streamLimit } from './dispatcher.ts';
-import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
+import { applyLimitRequest, runStreams, streamLimit } from './dispatcher.ts';
+import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { slowGate } from './slow.ts';
@@ -44,6 +45,17 @@ const SELF_CLEARING = /^(dirty|branch|sync)$/;
 /** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
 async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   const { state, config } = context;
+  // Приёмочные тесты кладутся в дерево прямо перед работой над своей задачей: прерванную
+  // до этой версии цикла сессию (Ctrl+C) они называют без `--resume`.
+  // Пути по одному файлу: новый каталог с тестами `git status` иначе показал бы одной строкой.
+  const changed = new Set(await changedPaths(context.git));
+  const placed = Object.entries(state.spec).filter(([, spec]) => {
+    const paths = Object.keys(spec);
+    return paths.length > 0 && paths.every((path) => changed.has(path));
+  });
+  const [only] = placed;
+  if (state.resume === undefined && placed.length === 1 && only !== undefined)
+    state.resume = only[0];
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
     return (await processTask(context, state.resume, { mark, workPrompt: '$next', resume: true }))
@@ -189,6 +201,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     state: await loadState(config.root),
     say: await openLog(config),
   };
+  if (config.board !== undefined) config.board.limit = () => streamLimit(context);
   if (config.dryRun) {
     await describe(context);
     return 0;
@@ -233,6 +246,9 @@ async function runSingle(context: LoopContext): Promise<number | 'switch'> {
   const { config } = context;
   let waiting = false;
   for (;;) {
+    // Предел, поднятый Issue или клавишами, переводит в потоки до следующей задачи.
+    await applyLimitRequest(context);
+    if (await switchToStreams(context)) return 'switch';
     let step: Step;
     try {
       step = await tick(context);
@@ -241,7 +257,6 @@ async function runSingle(context: LoopContext): Promise<number | 'switch'> {
       if (config.once) return 1;
       step = 'idle';
     }
-    if (await switchToStreams(context)) return 'switch';
     if (step === 'worked') {
       waiting = false;
       continue;
@@ -250,10 +265,14 @@ async function runSingle(context: LoopContext): Promise<number | 'switch'> {
       await context.say('итог: работы без владельца нет');
       return 0;
     }
-    if (!waiting)
+    if (!waiting) {
+      // Ожидание владельца уже на панели со своей причиной: её не заменить общей строкой.
+      if (context.state.parked === undefined && context.state.retryAfter === undefined)
+        config.board?.end(MAIN_AGENT, 'нет работы — жду Issues и main');
       await context.say(
         `… жду: Issues и main проверяю раз в ${config.pollSeconds} с, Enter — проверить сейчас`,
       );
+    }
     waiting = true;
     await waitForWork(context);
   }

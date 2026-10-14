@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { Board } from './board.ts';
 import { createWorld, STAGE_FILE, type StreamsWorld, type WorldHandle } from './streams-world.ts';
 
 const worlds: WorldHandle[] = [];
@@ -356,6 +357,30 @@ describe('параллельные потоки на настоящем git', { 
       index(run.events, `end:${workPrompt('T1')}`),
     );
     expect(run.prompts.some((p) => p.prompt.startsWith('$next'))).toBe(false);
+    await expectMerged(handle, ['T1', 'T2']);
+  });
+
+  it('владелец поднял число агентов в консоли — цикл переходит на потоки, как по Issue', async () => {
+    const board = new Board(Date.now);
+    board.requestLimit(2);
+    const spec: StreamsWorld = {
+      queue: '07/T1 → 07/T2',
+      stage: stageOf(
+        task('T1', '\n  *Файлы:* `src/T1.txt`\n  *После:* —'),
+        task('T2', '\n  *Файлы:* `src/T2.txt`\n  *После:* —'),
+      ),
+      tasks: { T1: { workMs: 300 }, T2: { workMs: 300 } },
+      streams: 1,
+      board,
+    };
+    const handle = await world(spec);
+    const run = await handle.run(spec);
+    expect(run.lines).toContain('консоль: агентов до 2');
+    expect(run.lines).toContain('режим: до 2 задач одновременно');
+    expect(index(run.events, `start:${workPrompt('T2')}`)).toBeLessThan(
+      index(run.events, `end:${workPrompt('T1')}`),
+    );
+    expect(board.totals.done).toBe(2);
     await expectMerged(handle, ['T1', 'T2']);
   });
 

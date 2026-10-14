@@ -8,12 +8,14 @@ import {
   globToRegExp,
   lastLines,
   park,
+  readStage,
   save,
   session,
   type LoopContext,
   type Step,
 } from './context.ts';
 import { changedPaths, dirtyFiles, head } from './git.ts';
+import { taskBlock } from './stage-file.ts';
 
 /** Без роли spec в roles.json цикл работает по-старому: `$next` сам пишет тесты задачи. */
 export const specEnabled = (context: LoopContext): boolean =>
@@ -225,3 +227,42 @@ export const specRemarks = (message: string): string =>
     .split(/\r?\n/)
     .filter((line) => SPEC_REMARK_RE.test(line))
     .join('\n');
+
+/**
+ * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу
+ * или заново после замечаний ревью) и лежат в дереве. Доделка новых тестов не пишет.
+ * @returns шаг цикла при остановке или undefined.
+ */
+export async function prepareSpec(
+  context: LoopContext,
+  task: string,
+  fresh: boolean,
+  remarks: string,
+): Promise<Step | undefined> {
+  if (!specEnabled(context)) return undefined;
+  if (fresh && !(task in context.state.spec)) {
+    const stop = await writeSpec(context, task, remarks);
+    if (stop !== undefined) return stop;
+  }
+  await placeSpec(context, task);
+  return undefined;
+}
+
+/**
+ * Возврат ревью в блоке задачи о приёмочных тестах, который ещё не уходил в `$spec`: замечания
+ * для новых тестов. Ответ ревью может не назвать файл, а замечание прошлого запуска цикла
+ * в памяти не живёт. 2026-10-14, 07/T1: после перезапуска исполнитель не мог выполнить возврат
+ * со старым тестом и взял 07/T2.
+ */
+export async function pendingSpecReturn(context: LoopContext, task: string): Promise<string> {
+  const files = specFiles(context, task);
+  if (files.length === 0) return '';
+  const { stageText } = await readStage(context.config.root);
+  const returned = returnedForSpec(taskBlock(stageText, task), files).trim();
+  if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return '';
+  await forgetSpec(context, task);
+  context.state.specRepairNotes = { ...context.state.specRepairNotes, [task]: [returned] };
+  await save(context);
+  await context.say(`возврат ревью ${task} о приёмочных тестах — их переписывает $spec`);
+  return returned;
+}

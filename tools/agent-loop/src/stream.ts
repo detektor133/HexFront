@@ -1,7 +1,7 @@
 // Один поток: задача в своём каталоге и ветке — работа, CI, `$review` и очередь слияния.
 import { rm } from 'node:fs/promises';
 
-import { readStage, StreamCancelled, type LoopContext, type Step } from './context.ts';
+import { agentName, readStage, StreamCancelled, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, isAncestor, syncWithOrigin } from './git.ts';
 import { integrate, mergeMessage, type StageTarget } from './integrate.ts';
 import { taskMark } from './stage-file.ts';
@@ -131,6 +131,7 @@ export async function runStream(request: StreamRequest): Promise<StreamOutcome> 
       if (result === 'merged') {
         await context.say(`влита в ${target.branch}`);
         await release(request, context, false);
+        context.config.board?.remove(agentName(context));
         return { kind: 'merged' };
       }
       if (result !== 'rework') return stopped(context);
@@ -145,6 +146,7 @@ export async function runStream(request: StreamRequest): Promise<StreamOutcome> 
     if (context !== undefined) {
       await context.say(`отменена: ${error.message}`);
       await release(request, context, true);
+      context.config.board?.remove(agentName(context));
     }
     return { kind: 'cancelled', reason: error.message };
   }

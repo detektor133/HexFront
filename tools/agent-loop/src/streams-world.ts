@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { runAgentLoop } from './agent-loop.ts';
+import type { Board } from './board.ts';
 import type { AgentIssue, GithubClient } from './github.ts';
 import {
   defaultRunCommand,
@@ -44,6 +45,8 @@ export interface StreamsWorld {
   readonly decide?: { readonly atList: number; readonly stage: (text: string) => string };
   /** Issues-настройки (`$streams N`), каждая появляется на своём N-м чтении списка Issues. */
   readonly commands?: readonly { readonly atList: number; readonly body: string }[];
+  /** Панель консоли: что агенты делают, счётчики, клавиши владельца. */
+  readonly board?: Board;
 }
 
 export interface StreamsRun {
@@ -322,6 +325,7 @@ async function runWorld(
     now: Date.now,
     sleep: () => sleep(10).then(() => 'timer' as const),
     writeLine: (line) => out.lines.push(line),
+    ...(world.board === undefined ? {} : { board: world.board }),
     ...(github === undefined ? {} : { github }),
   });
   return out;

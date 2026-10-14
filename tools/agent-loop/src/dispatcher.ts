@@ -271,6 +271,15 @@ function slotAt(slots: Slot[], index: number): Slot {
 /** Предел одновременных задач из памяти цикла (Issue `$streams N`, `--streams N`). */
 export const streamLimit = (context: LoopContext): number => context.state.streams ?? 1;
 
+/** Число агентов, заданное владельцем в консоли цикла: то же, что Issue `$streams N`. */
+export async function applyLimitRequest(context: LoopContext): Promise<void> {
+  const requested = context.config.board?.takeLimit();
+  if (requested === undefined || requested === streamLimit(context)) return;
+  context.state.streams = requested;
+  await save(context);
+  await context.say(`консоль: агентов до ${requested}`);
+}
+
 /**
  * Цикл с потоками; предел читается на каждом шаге. `--once` — выход, когда потоки свободны и
  * работы без владельца нет.
@@ -290,6 +299,7 @@ export async function runStreams(context: LoopContext): Promise<number | 'switch
   let recovered = false;
   await context.say(`потоков до ${streamLimit(context)}, ветка этапа ${target.branch}`);
   for (;;) {
+    await applyLimitRequest(context);
     slotAt(slots, streamLimit(context));
     // После `$stage-close` ветка этапа новая: потоки, начатые дальше, ветвятся от неё.
     if (busyTasks(slots).length === 0)
