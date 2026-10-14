@@ -116,6 +116,7 @@ function useSandbox(
   hostRef: React.RefObject<HTMLDivElement | null>,
   loaded: Loaded,
   mapRequest: SandboxMapRequest,
+  debug: boolean,
 ): Sandbox {
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
@@ -295,10 +296,11 @@ function useSandbox(
         if (m.t === 'error') return setError(m.errors.join('; '));
         scheduleMessage(m);
       },
+      { telemetry: debug },
     );
     matchRef.current = match;
-    match.setView(null, false);
-    setFogState(false);
+    match.setView(null, !debug);
+    setFogState(!debug);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
     const params = new URLSearchParams(window.location.search);
     const initialSelect = params.get('select');
@@ -399,7 +401,7 @@ function useSandbox(
       mapViewRef.current = null;
       eventsRef.current = [];
     };
-  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab]);
+  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
 
   return {
     msg,
@@ -469,20 +471,24 @@ function useSandbox(
 }
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
-export function DevSandboxPage({
+export function MatchSurface({
   showOnboarding = false,
-}: { showOnboarding?: boolean } = {}): React.JSX.Element {
+  debug = false,
+}: { showOnboarding?: boolean; debug?: boolean } = {}): React.JSX.Element {
   const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
-  const sb = useSandbox(hostRef, loaded, mapRequest);
-  const downloadTelemetry = useTelemetry({
-    view: () => sb.msg?.view ?? null,
-    pixi: sb.pixiTelemetry,
-    worker: () => sb.workerTelemetry,
-    snapshots: sb.snapshotTelemetry,
-    caches: sb.cacheTelemetry,
-  });
+  const sb = useSandbox(hostRef, loaded, mapRequest, debug);
+  const downloadTelemetry = useTelemetry(
+    {
+      view: () => sb.msg?.view ?? null,
+      pixi: sb.pixiTelemetry,
+      worker: () => sb.workerTelemetry,
+      snapshots: sb.snapshotTelemetry,
+      caches: sb.cacheTelemetry,
+    },
+    { enabled: debug },
+  );
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
   const [observerH, setObserverH] = useState(0);
@@ -506,8 +512,8 @@ export function DevSandboxPage({
         onFocus={sb.focusEvent}
         style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
       />
-      {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} />}
-      {view && (
+      {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} showFog={debug} />}
+      {debug && view && (
         <ObserverPanel
           view={view}
           paused={sb.paused}
@@ -555,11 +561,16 @@ export function DevSandboxPage({
           onRoadPreview={sb.setRoadPreview}
         />
       )}
-      {sb.lastReject && (
+      {debug && sb.lastReject && (
         <p className={styles.reject}>
           {t('dev.economy.lastRejection')}: {sb.lastReject}
         </p>
       )}
     </div>
   );
+}
+
+/** Отладочная песочница с панелью наблюдателя и телеметрией. */
+export function DevSandboxPage(): React.JSX.Element {
+  return <MatchSurface debug showOnboarding={false} />;
 }

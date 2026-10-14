@@ -52,6 +52,7 @@ function Settings(props: {
   send: (cmd: Command) => void;
   fog: boolean;
   setFog: (on: boolean) => void;
+  showFog: boolean;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const on = props.view.me.autoCommand;
@@ -81,18 +82,20 @@ function Settings(props: {
               <span className={styles.knob} />
             </span>
           </button>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={props.fog}
-            className={styles.switchRow}
-            onClick={() => props.setFog(!props.fog)}
-          >
-            <span>{t('settings.fog')}</span>
-            <span className={props.fog ? styles.switchOn : styles.switchOff}>
-              <span className={styles.knob} />
-            </span>
-          </button>
+          {props.showFog && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={props.fog}
+              className={styles.switchRow}
+              onClick={() => props.setFog(!props.fog)}
+            >
+              <span>{t('settings.fog')}</span>
+              <span className={props.fog ? styles.switchOn : styles.switchOff}>
+                <span className={styles.knob} />
+              </span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -105,6 +108,7 @@ export function Hud(props: {
   send: (cmd: Command) => void;
   fog: boolean;
   setFog: (on: boolean) => void;
+  showFog?: boolean;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const { view } = props;
@@ -167,7 +171,13 @@ export function Hud(props: {
       />
       <Slot label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
       <Slot label={t('hud.place')} value={`#${s.place}/${s.players}`} />
-      <Settings view={view} send={props.send} fog={props.fog} setFog={props.setFog} />
+      <Settings
+        view={view}
+        send={props.send}
+        fog={props.fog}
+        setFog={props.setFog}
+        showFog={props.showFog ?? true}
+      />
     </header>
   );
 }

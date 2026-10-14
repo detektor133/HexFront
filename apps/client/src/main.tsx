@@ -16,6 +16,7 @@ function App(): React.JSX.Element {
   const path = window.location.pathname;
   if (path === '/' || path === '/menu') return <MainMenu />;
   if (isMatchPath(path)) return <MatchPage />;
+  if (import.meta.env.PROD && isDevPath(path)) return <p>{t('dev.notFound')}</p>;
   if (path === '/dev/map') return <DevMapPage />;
   if (path === '/dev/units') return <DevUnitsPage />;
   // /dev/economy — прежний адрес песочницы (этап 02), оставлен для старых ссылок.

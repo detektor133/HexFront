@@ -47,6 +47,7 @@ export type ToWorker =
       readonly seed: number;
       readonly players: number;
       readonly fog: boolean;
+      readonly telemetry?: boolean;
       /** Игроки под мозгом бота (09-bots.md). */
       readonly bots: readonly number[];
       /** Тиков sim за 100 мс: 1 — реальное время, больше — ускорение (запись матча). */

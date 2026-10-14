@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T1 возвращена ревью: `apps/client/test/construction-arc.test.ts` не проверяет фактические точки пути дуг и предел `радиус + толщина линии`. Исправления начала дуг в `apps/client/src/dev/economy-layer.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/src/dev/unit-chips.ts` остаются в коммите.
+07/T2 ждёт ревью. `/match` использует отдельный `MatchSurface`; панель наблюдателя, переключатель тумана, строка отказа и телеметрия включаются только с `?debug=1`. В production `/dev/*` возвращает «не найдено», JSON-сериализация пакета worker выполняется только при включённой телеметрии.
 
-Следующая задача: 07/T2. Прочитать блок T2 в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/gdd/08-match.md`, `docs/architecture/rendering.md`, `docs/testing.md`.
+Следующая задача: 07/T3. Прочитать блок T3 в `docs/stages/stage-07-playable-build.md`, `docs/gdd/01-map.md`, `docs/architecture/overview.md`, `docs/testing.md`.

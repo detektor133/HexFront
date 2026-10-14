@@ -14,6 +14,7 @@ let snapshotSeq = 0;
 let tickMs: number[] = [];
 let lastSnapshotAt = 0;
 let lastAckMs: number | null = null;
+let telemetryEnabled = false;
 const deltaStream = new ConfirmedViewDeltaStream();
 
 const post = (msg: FromWorker): void => postMessage(msg);
@@ -38,13 +39,17 @@ const emitSnapshot = (): void => {
     snapshotBytes: 0,
     ackMs: lastAckMs,
   };
-  const snapshotBytes = new TextEncoder().encode(
-    JSON.stringify({ ...snapshotPayload, ...transport, telemetry: telemetryBase }),
-  ).byteLength;
-  const telemetry = { ...telemetryBase, snapshotBytes };
+  const telemetry = telemetryEnabled
+    ? {
+        ...telemetryBase,
+        snapshotBytes: new TextEncoder().encode(
+          JSON.stringify({ ...snapshotPayload, ...transport, telemetry: telemetryBase }),
+        ).byteLength,
+      }
+    : undefined;
   tickMs = [];
   lastSnapshotAt = performance.now();
-  post({ ...snapshotPayload, ...transport, telemetry } as FromWorker);
+  post({ ...snapshotPayload, ...transport, ...(telemetry ? { telemetry } : {}) } as FromWorker);
 };
 
 const advance = (): void => {
@@ -67,6 +72,7 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       engine = created;
       paused = msg.speed === 0;
       speed = Math.max(1, Math.floor(msg.speed) || 1);
+      telemetryEnabled = msg.telemetry === true;
       awaitingAck = false;
       snapshotSeq = 0;
       tickMs = [];

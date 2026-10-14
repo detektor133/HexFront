@@ -25,12 +25,15 @@ export interface TelemetrySource {
 }
 
 /** Записывает dev-метрики раз в 5 секунд; production-сборка не создаёт наблюдателей. */
-export function useTelemetry(source: TelemetrySource): () => void {
+export function useTelemetry(
+  source: TelemetrySource,
+  options: { readonly enabled?: boolean } = {},
+): () => void {
   const lines = useRef<TelemetryLine[]>([]);
   const sourceRef = useRef(source);
   sourceRef.current = source;
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (options.enabled === false) return;
     const started = performance.now();
     const frames: number[] = [];
     let previous = started;
@@ -79,18 +82,20 @@ export function useTelemetry(source: TelemetrySource): () => void {
       lines.current.push(line);
       frames.length = 0;
       longTaskMs = 0;
-      void fetch('/__telemetry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: `${JSON.stringify(line)}\n`,
-      });
+      if (import.meta.env.DEV) {
+        void fetch('/__telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: `${JSON.stringify(line)}\n`,
+        });
+      }
     }, 5000);
     return () => {
       window.clearInterval(timer);
       cancelAnimationFrame(animation);
       observer.disconnect();
     };
-  }, []);
+  }, [options.enabled]);
   return (): void => {
     const body = lines.current.map((line) => JSON.stringify(line)).join('\n');
     const url = URL.createObjectURL(
