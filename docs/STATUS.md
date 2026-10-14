@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T4 исправлена по возврату СПЕК: `deployment.test.ts` вызывает production-сервер `vite preview` и проверяет ответы `/` и `/match` против собранного `index.html`.
+07/T4 принята: `deployment.test.ts` вызывает production-сервер `vite preview` и проверяет ответы `/` и `/match` против собранного `index.html`; отдельный запуск дал 4/4 теста.
 `pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Следующая сессия — запустить `$review 07/T4`.
+Следующая сессия — взять 07/T5.
 Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `docs/reports/stage-07-t4.md`.
