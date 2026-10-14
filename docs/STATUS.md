@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-07/T2: возврат ревью — приёмочный тест экрана не создаёт отказ команды и не открывает настройки, поэтому отсутствие строки отказа и переключателя тумана не проверяется.
-Следующая сессия: `$task 07/T2 продолжить`.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`.
+07/T2: исправлены приёмочные тесты экрана и удалён скрытый fallback телеметрии. Тесты рендерят реальный `MatchSurface` с загруженным видом и ненулевым отказом, проверяют русский словарь, вызывают production `App` для `/dev/sandbox`; worker-тесты проходят через реальный обработчик.
+Следующая сессия: `$review 07/T2`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-screen.test.ts`, `apps/client/test/sim-worker-telemetry.test.ts`, `apps/client/src/match/MatchSurface.tsx`.

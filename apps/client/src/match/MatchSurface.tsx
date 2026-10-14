@@ -78,7 +78,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onHeight={setObserverH}
         />
       )}
-      {debug && !view && <span hidden>Скачать телеметрию</span>}
       {view && <Leaderboard view={view} />}
       {view && <MatchEnd view={view} replay={sb.replay} />}
       {showOnboarding && view && <OnboardingHints view={view} />}

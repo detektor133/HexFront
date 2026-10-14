@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { createElement, type ReactElement } from 'react';
+import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,7 +24,7 @@ const sandbox = {
   replay: [],
   error: null,
   picked: { hex: null, units: [], target: null },
-  lastReject: null,
+  lastReject: 'Пока не сделано',
   tool: null,
   army: null,
   fog: true,
@@ -91,8 +91,8 @@ describe('экран матча игрока', () => {
     setLanguage('ru-RU');
     setWindow('');
 
-    const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    const markup = renderToStaticMarkup(createElement(MatchPage));
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const markup = renderToStaticMarkup(createElement(MatchSurface));
     const { messages } = await import('../src/i18n/dict.ts');
     const observer = messages.ru;
 
@@ -100,6 +100,7 @@ describe('экран матча игрока', () => {
     expect(markup).not.toContain(observer['observer.allMap']);
     expect(markup).not.toContain(observer['observer.downloadTelemetry']);
     expect(markup).not.toContain(observer['dev.economy.lastRejection']);
+    expect(markup).not.toContain(observer['settings.fog']);
   });
 
   it('/match?debug=1 рендерит реальную панель наблюдателя', async () => {
@@ -110,8 +111,8 @@ describe('экран матча игрока', () => {
     setLanguage('ru-RU');
     setWindow('?debug=1');
 
-    const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    const markup = renderToStaticMarkup(createElement(MatchPage));
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const markup = renderToStaticMarkup(createElement(MatchSurface, { debug: true }));
     const { messages } = await import('../src/i18n/dict.ts');
     const observer = messages.ru;
 
@@ -137,10 +138,8 @@ describe('экран матча игрока', () => {
     });
 
     await import('../src/main.tsx');
-    const strictMode = render.mock.calls[0]?.[0] as ReactElement<{ children: ReactElement }>;
-    const appElement = strictMode.props.children as ReactElement;
-    const routeElement = (appElement.type as () => ReactElement)();
+    const { App } = await import('../src/main.tsx');
 
-    expect(renderToStaticMarkup(routeElement)).toContain('Страница не найдена');
+    expect(renderToStaticMarkup(createElement(App))).toContain('Страница не найдена');
   });
 });

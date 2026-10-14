@@ -12,7 +12,7 @@ import './theme/tokens.css';
 import './theme/fonts.css';
 import './theme/global.css';
 
-function App(): React.JSX.Element {
+export function App(): React.JSX.Element {
   const path = window.location.pathname;
   if (path === '/' || path === '/menu') return <MainMenu />;
   if (isMatchPath(path)) return <MatchPage />;
