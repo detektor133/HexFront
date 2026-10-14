@@ -39,11 +39,10 @@ export interface LoopState {
   /** Приёмочные тесты `$spec` по задаче: путь → содержимое; исполнитель коммитит их без изменений. */
   spec: Record<string, Record<string, string>>;
   /**
-   * Тесты задачи пишутся заново: замечания и прежние тесты (путь → содержимое). Хранятся до
-   * удачной сессии `$spec`: пауза на лимит codex не теряет замечаний, а прежний тест, которого
-   * `$spec` не коснулся, остаётся закрытым.
+   * Приёмочные тесты, открытые возвратом ревью «СПЕК:», по задаче: пути файлов. Их исправляет
+   * исполнитель, `$spec` заново их не пишет; запись живёт до `[x]` задачи.
    */
-  specRewrite: Record<string, { readonly remarks: string; readonly files: Record<string, string> }>;
+  specUnlocked: Record<string, string[]>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
 }
@@ -60,14 +59,26 @@ export async function loadState(root: string): Promise<LoopState> {
     slowFixes: [],
     specRepairNotes: {},
     spec: {},
-    specRewrite: {},
+    specUnlocked: {},
     pullRequests: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
     throw error;
   });
-  return text === '' ? empty : { ...empty, ...(JSON.parse(text) as Partial<LoopState>) };
+  if (text === '') return empty;
+  const { specRewrite, ...saved } = JSON.parse(text) as Partial<LoopState> & {
+    readonly specRewrite?: Record<string, { readonly files: Record<string, string> }>;
+  };
+  // Просьбы переписать тесты прежней версии цикла: теперь эти тесты исправляет исполнитель.
+  const rewrites = Object.entries(specRewrite ?? {}).map(
+    ([task, rewrite]) => [task, Object.keys(rewrite.files)] as const,
+  );
+  return {
+    ...empty,
+    ...saved,
+    specUnlocked: { ...saved.specUnlocked, ...Object.fromEntries(rewrites) },
+  };
 }
 
 export async function saveState(root: string, state: LoopState): Promise<void> {

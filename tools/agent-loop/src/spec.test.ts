@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { withUnlocked } from './spec.ts';
+import type { LoopState } from './state.ts';
 import { fixtureStage, runWorld, type Session } from './test-world.ts';
 
 const TEST = 'packages/sim/test/fitness-own.test.ts';
@@ -15,6 +17,13 @@ const NEXT_DONE: Session = {
   answer: 'Готово.\nЗапусти `$review 06/T1j5-Б1` в новой сессии',
 };
 const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё подтверждено' };
+/** Работа после возврата ревью о тестах: исполнитель сам меняет приёмочный тест. */
+const NEXT_FIXES_SPEC: Session = {
+  ...NEXT_DONE,
+  writes: { [TEST]: "it('штраф по метрикам самой особи на реальном пути', () => {});\n" },
+};
+const unlockedPrompt = (prompt: string, files: readonly string[] = [TEST]): string =>
+  withUnlocked(prompt, '06/T1j5-Б1', files);
 
 describe('приёмочные тесты до кода ($spec)', () => {
   it('пишет тесты сессией spec, исполнитель получает их закрытыми и коммитит с кодом', async () => {
@@ -51,7 +60,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines.some((line) => line.includes('дерево не чистое'))).toBe(false);
   });
 
-  it('ВОЗВРАТ с замечанием «СПЕК:» пишет тесты заново с замечаниями ревью', async () => {
+  it('ВОЗВРАТ с замечанием «СПЕК:» открывает тесты исполнителю: он их исправляет, $spec не повторяется', async () => {
     const back: Session = {
       task: 'T1j5-Б1',
       mark: ' ',
@@ -59,14 +68,25 @@ describe('приёмочные тесты до кода ($spec)', () => {
     };
     const run = await runWorld({
       spec: true,
-      sessions: [SPEC, NEXT_DONE, back, SPEC, NEXT_DONE, REVIEW_OK],
+      sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(
-      run.prompts[3]?.startsWith(
-        '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- СПЕК: тест не проверяет штраф чужого игрока (п. 3)',
-      ),
-    ).toBe(true);
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(1);
+    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
+    expect(run.locked[3]).toBe('');
+    expect(run.prompts[4]).toContain(
+      `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»: ${TEST}`,
+    );
+    expect(run.lines).toContain(
+      'возврат ревью 06/T1j5-Б1 о приёмочных тестах — их исправляет исполнитель',
+    );
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('промпт открытых тестов запрещает ослаблять проверки и заглушки ради теста', () => {
+    const prompt = unlockedPrompt('$task 06/T1j5-Б1');
+    expect(prompt).toContain('исправь их сам по замечанию');
+    expect(prompt).toContain('проверки не ослабляй');
+    expect(prompt).toContain('заглушек ради теста не добавляй');
   });
 
   it('обычный ВОЗВРАТ тесты не переписывает', async () => {
@@ -164,7 +184,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('ВОЗВРАТ ревью, который ссылается на файл приёмочного теста без «СПЕК:», — тесты переписывает $spec', async () => {
+  it('ВОЗВРАТ ревью, который ссылается на файл приёмочного теста без «СПЕК:», — тесты исправляет исполнитель', async () => {
     const back: Session = {
       task: 'T1j5-Б1',
       mark: ' ',
@@ -172,17 +192,13 @@ describe('приёмочные тесты до кода ($spec)', () => {
     };
     const run = await runWorld({
       spec: true,
-      sessions: [SPEC, NEXT_DONE, back, SPEC, NEXT_DONE, REVIEW_OK],
+      sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(
-      run.prompts[3]?.startsWith(
-        `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- геометрия не подтверждена: ${TEST}:31-51 не записывает точки пути`,
-      ),
-    ).toBe(true);
+    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('исполнитель встал на возврате ревью про приёмочный тест — $spec чинит тест, работа продолжается', async () => {
+  it('исполнитель встал на возврате ревью про приёмочный тест — тест открывается, работа продолжается', async () => {
     // 2026-10-14, 07/T1 после перезапуска цикла: возврат лежит в блоке задачи, исполнитель
     // ответил «нельзя без изменения теста» без строки «СПЕК:».
     const stage = fixtureStage.replace(
@@ -196,12 +212,10 @@ describe('приёмочные тесты до кода ($spec)', () => {
     const run = await runWorld({
       spec: true,
       stage,
-      sessions: [SPEC, stuck, SPEC_FIX, NEXT_DONE, REVIEW_OK],
+      sessions: [SPEC, stuck, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(run.prompts[2]).toBe(
-      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nИсполнитель задачи:\nВозврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
-    );
-    expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(1);
+    expect(run.prompts[2]).toBe(unlockedPrompt('$task 06/T1j5-Б1 продолжить'));
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -211,18 +225,16 @@ describe('приёмочные тесты до кода ($spec)', () => {
   const returned = fixtureStage.replace('  *Приёмка:* тесты.', `  *Приёмка:* тесты.\n${RETURN}`);
   const LOCKED = { spec: { '06/T1j5-Б1': { [TEST]: "it('старый тест', () => {});\n" } } };
 
-  it('после перезапуска возврат ревью о приёмочном тесте в блоке задачи — тесты переписывает $spec', async () => {
+  it('после перезапуска возврат ревью о приёмочном тесте в блоке задачи — тесты открываются исполнителю', async () => {
     const run = await runWorld({
       spec: true,
       stage: returned,
       state: LOCKED,
-      sessions: [SPEC, NEXT_DONE, REVIEW_OK],
+      sessions: [NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(run.prompts[0]).toBe(
-      `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\n${RETURN.trim()}`,
-    );
+    expect(run.prompts[0]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
     expect(run.lines).toContain(
-      'возврат ревью 06/T1j5-Б1 о приёмочных тестах — их переписывает $spec',
+      'возврат ревью 06/T1j5-Б1 о приёмочных тестах — их исправляет исполнитель',
     );
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
@@ -265,38 +277,29 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.prompts[0]).toBe(`$task 06/T1j5-Б1 продолжить\n${LOCKED_LINE}`);
   });
 
-  it('просьба переписать тесты переживает паузу codex: замечания и прежний тест не теряются', async () => {
-    // Ревью вернуло задачу, а сессия $spec упала на лимите: после паузы замечания те же,
-    // а прежний тест, которого $spec не коснулся, по-прежнему закрыт.
+  it('просьба переписать тесты от прежней версии цикла — тесты открыты исполнителю, $spec не запускается', async () => {
+    // 2026-10-14, 07/T2 стоит с такой просьбой в state.json на ПК владельца.
     const OTHER = 'packages/sim/test/fitness-other.test.ts';
-    const run = await runWorld({
-      spec: true,
-      state: {
-        specRewrite: {
-          '06/T1j5-Б1': {
-            remarks: 'ВОЗВРАТ\n- нет проверки штрафа чужого игрока',
-            files: { [TEST]: "it('старый', () => {});\n", [OTHER]: "it('другой', () => {});\n" },
-          },
+    const old = {
+      specRewrite: {
+        '06/T1j5-Б1': {
+          remarks: 'ВОЗВРАТ\n- СПЕК: нет проверки штрафа чужого игрока',
+          files: { [TEST]: "it('старый', () => {});\n", [OTHER]: "it('другой', () => {});\n" },
         },
       },
-      sessions: [SPEC, NEXT_DONE],
-    });
-    expect(run.prompts[0]).toBe(
-      '$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\nВОЗВРАТ\n- нет проверки штрафа чужого игрока',
-    );
-    expect(run.prompts[1]).toContain(OTHER);
-    expect(run.prompts[1]).toContain(TEST);
+    } as unknown as Partial<LoopState>;
+    const run = await runWorld({ spec: true, state: old, sessions: [NEXT_DONE, REVIEW_OK] });
+    expect(run.prompts[0]).toBe(unlockedPrompt('$task 06/T1j5-Б1', [TEST, OTHER]));
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('ВОЗВРАТ без имени файла, но с возвратом о приёмочном тесте в блоке — тесты переписывает $spec', async () => {
+  it('ВОЗВРАТ без имени файла, но с возвратом о приёмочном тесте в блоке — тесты исправляет исполнитель', async () => {
     const back: Session = { stage: returned, answer: 'ВОЗВРАТ\n- геометрия не подтверждена' };
     const run = await runWorld({
       spec: true,
-      sessions: [SPEC, NEXT_DONE, back, SPEC, NEXT_DONE, REVIEW_OK],
+      sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(run.prompts[3]).toBe(
-      `$spec 06/T1j5-Б1\nЗамечания к приёмочным тестам:\n${RETURN.trim()}`,
-    );
+    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 

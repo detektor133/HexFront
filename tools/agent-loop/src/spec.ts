@@ -1,5 +1,6 @@
 // Приёмочные тесты до кода: сессия `$spec` (роль spec) пишет по тексту задачи только тесты,
 // цикл запоминает их содержимое, исполнитель коммитит их вместе с кодом и менять не может.
+// Возврат ревью о тестах их открывает: исправляет исполнитель, который видит код.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -33,6 +34,20 @@ export const withSpec = (prompt: string, task: string, files: readonly string[])
   files.length === 0
     ? prompt
     : `${prompt}\nПриёмочные тесты ${task} уже в рабочем дереве, менять их нельзя: ${files.join(', ')}`;
+
+/** Тесты, открытые возвратом ревью: исполнитель исправляет их сам. */
+export const unlockedFiles = (context: LoopContext, task: string): readonly string[] | undefined =>
+  context.state.specUnlocked[task];
+
+/** Промпт работы после возврата ревью о приёмочных тестах: их исправляет сам исполнитель. */
+export const withUnlocked = (
+  prompt: string,
+  task: string,
+  files: readonly string[] | undefined,
+): string =>
+  files === undefined
+    ? prompt
+    : `${prompt}\nПриёмочные тесты ${task}${files.length === 0 ? '' : ` (${files.join(', ')})`} ревью вернуло строкой «СПЕК:» в блоке задачи — исправь их сам по замечанию: тест проверяет критерий на реальном пути вызова; проверки не ослабляй, код под тест не подгоняй, скрытых элементов и заглушек ради теста не добавляй`;
 
 const normalize = (text: string): string => text.replace(/\r\n/g, '\n').trimEnd();
 
@@ -84,18 +99,8 @@ async function specSession(
       ),
     };
   const files: Record<string, string> = {};
-  const previous = state.specRewrite[task]?.files ?? {};
-  const kept = [...Object.keys(state.spec[task] ?? {}), ...Object.keys(previous)];
-  for (const path of new Set([...kept, ...touched])) {
-    const file = join(config.root, path);
-    let text = await readFile(file, 'utf8').catch(() => undefined);
-    // Прежний тест, убранный из дерева при остановке, возвращается: он тоже закрыт.
-    const restored = text === undefined && !touched.includes(path) ? previous[path] : undefined;
-    if (restored !== undefined) {
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, restored, 'utf8');
-      text = restored;
-    }
+  for (const path of new Set([...Object.keys(state.spec[task] ?? {}), ...touched])) {
+    const text = await readFile(join(config.root, path), 'utf8').catch(() => undefined);
     if (text === undefined)
       return {
         step: await park(
@@ -210,26 +215,27 @@ export async function specViolation(
 /** Задача закрыта или тесты пишутся заново: записанные тесты больше не нужны. */
 export async function forgetSpec(context: LoopContext, task: string): Promise<void> {
   const { state } = context;
-  if (!(task in state.spec) && !(task in state.specRepairNotes) && !(task in state.specRewrite))
+  if (!(task in state.spec) && !(task in state.specRepairNotes) && !(task in state.specUnlocked))
     return;
   const other = ([key]: [string, unknown]): boolean => key !== task;
   state.spec = Object.fromEntries(Object.entries(state.spec).filter(other));
   state.specRepairNotes = Object.fromEntries(Object.entries(state.specRepairNotes).filter(other));
-  state.specRewrite = Object.fromEntries(Object.entries(state.specRewrite).filter(other));
+  state.specUnlocked = Object.fromEntries(Object.entries(state.specUnlocked).filter(other));
   await save(context);
 }
 
-/** Тесты задачи переписываются по замечаниям: просьба хранится до удачной сессии `$spec`. */
-export async function requestRespec(
-  context: LoopContext,
-  task: string,
-  remarks: string,
-): Promise<void> {
+/**
+ * Ревью вернуло задачу из-за приёмочных тестов: тесты открываются, исправляет их исполнитель.
+ * 2026-10-14, 07/T2: `$spec`, не видя кода, трижды писал тест экрана без данных, исполнитель
+ * подгонял под него код скрытой заглушкой, и задача встала после трёх возвратов.
+ */
+export async function unlockSpec(context: LoopContext, task: string): Promise<void> {
   const { state } = context;
-  const files = { ...state.specRewrite[task]?.files, ...state.spec[task] };
+  const files = [...new Set([...(state.specUnlocked[task] ?? []), ...specFiles(context, task)])];
   await forgetSpec(context, task);
-  state.specRewrite = { ...state.specRewrite, [task]: { remarks, files } };
+  state.specUnlocked = { ...state.specUnlocked, [task]: files };
   await save(context);
+  await context.say(`возврат ревью ${task} о приёмочных тестах — их исправляет исполнитель`);
 }
 
 /** Замечание к приёмочным тестам: строка `СПЕК: …` в ответе `ВОЗВРАТ` ревью или исполнителя. */
@@ -254,8 +260,8 @@ export const specRemarks = (message: string): string =>
     .join('\n');
 
 /**
- * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу
- * или заново после замечаний ревью) и лежат в дереве. Доделка новых тестов не пишет.
+ * Перед работой над задачей очереди: приёмочные тесты `$spec` написаны (один раз на задачу)
+ * и лежат в дереве. Доделка новых тестов не пишет.
  * @returns шаг цикла при остановке или undefined.
  */
 export async function prepareSpec(
@@ -265,23 +271,20 @@ export async function prepareSpec(
 ): Promise<Step | undefined> {
   if (!specEnabled(context)) return undefined;
   const { state } = context;
-  if (fresh && !(task in state.spec)) {
-    const stop = await writeSpec(context, task, state.specRewrite[task]?.remarks ?? '');
+  // Тесты, открытые возвратом ревью, заново не пишутся: их исправляет исполнитель.
+  if (fresh && !(task in state.spec) && !(task in state.specUnlocked)) {
+    const stop = await writeSpec(context, task);
     if (stop !== undefined) return stop;
-    state.specRewrite = Object.fromEntries(
-      Object.entries(state.specRewrite).filter(([key]) => key !== task),
-    );
-    await save(context);
   }
   await placeSpec(context, task);
   return undefined;
 }
 
 /**
- * Возврат ревью в блоке задачи о приёмочных тестах, который ещё не уходил в `$spec`: замечания
- * для новых тестов. Ответ ревью может не назвать файл, а замечание прошлого запуска цикла
- * в памяти не живёт. 2026-10-14, 07/T1: после перезапуска исполнитель не мог выполнить возврат
- * со старым тестом и взял 07/T2.
+ * Возврат ревью в блоке задачи о приёмочных тестах: тесты открываются исполнителю. Ответ ревью
+ * может не назвать файл, а замечание прошлого запуска цикла в памяти не живёт. 2026-10-14, 07/T1:
+ * после перезапуска исполнитель не мог выполнить возврат со старым тестом и взял 07/T2.
+ * Возврат, по которому `$spec` уже чинил тесты прежней версией цикла, их не открывает.
  */
 export async function pendingSpecReturn(context: LoopContext, task: string): Promise<void> {
   const files = specFiles(context, task);
@@ -289,8 +292,5 @@ export async function pendingSpecReturn(context: LoopContext, task: string): Pro
   const { stageText } = await readStage(context.config.root);
   const returned = returnedForSpec(taskBlock(stageText, task), files).trim();
   if (returned === '' || (context.state.specRepairNotes[task] ?? []).includes(returned)) return;
-  await requestRespec(context, task, returned);
-  context.state.specRepairNotes = { ...context.state.specRepairNotes, [task]: [returned] };
-  await save(context);
-  await context.say(`возврат ревью ${task} о приёмочных тестах — их переписывает $spec`);
+  await unlockSpec(context, task);
 }

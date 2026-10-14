@@ -21,7 +21,6 @@ import {
   pendingSpecReturn,
   placeSpec,
   prepareSpec,
-  requestRespec,
   returnedForSpec,
   SPEC_REMARK_RE,
   specRemarks,
@@ -29,7 +28,10 @@ import {
   specEnabled,
   specFiles,
   specViolation,
+  unlockedFiles,
+  unlockSpec,
   withSpec,
+  withUnlocked,
   writeSpec,
 } from './spec.ts';
 import { commandTask, reviewTasks, taskBlock, taskMark } from './stage-file.ts';
@@ -158,27 +160,34 @@ async function runWork(
 ): Promise<Work> {
   const { git, state } = context;
   const locked = specFiles(context, task);
+  const unlocked = unlockedFiles(context, task);
   const base = await head(git);
   // Приёмочные тесты написаны для этой задачи: `$next` выбрал бы задачу сам, и 2026-10-14
   // исполнитель с тестами 07/T1 взял 07/T2. Задача с тестами идёт по номеру.
-  const pinned = prompt === '$next' && locked.length > 0 ? `$task ${task}` : prompt;
+  const pinned =
+    prompt === '$next' && (locked.length > 0 || unlocked !== undefined) ? `$task ${task}` : prompt;
   // Оборванная сессия (Ctrl+C, сбой ПК) оставляет работу в дереве: перезапуск её доделает.
   // Только когда задача известна заранее: `$next` без тестов выбирает её сам.
   if (pinned !== '$next') {
     state.resume = task;
     await save(context);
   }
-  const work = await session(context, 'next', withSpec(pinned, task, locked), locked);
-  // Исполнитель не может менять приёмочные тесты: их поломку (lint, окружение) или нехватку,
-  // о которой сказало ревью, чинит $spec. Признак — строка `СПЕК:` исполнителя или возврат ревью
-  // в блоке задачи о файле приёмочного теста, который `$spec` ещё не получал: строка возврата
-  // остаётся в блоке до коммита задачи и после починки тестов.
+  const full = withUnlocked(withSpec(pinned, task, locked), task, unlocked);
+  const work = await session(context, 'next', full, locked);
+  // Исполнитель не может менять закрытые приёмочные тесты. Их поломку (lint, окружение) по строке
+  // `СПЕК:` исполнителя чинит $spec; возврат ревью о тесте в блоке задачи их открывает
+  // исполнителю. Строка возврата остаётся в блоке до коммита задачи.
   if (work.failure === undefined && locked.length > 0 && (await head(git)) === base) {
+    const own = specRemarks(work.message);
+    if (own !== '') return repairSpec(context, task, own, accepted);
     const { stageText } = await readStage(context.config.root);
     const returned = returnedForSpec(taskBlock(stageText, task), locked).trim();
-    const handled = (state.specRepairNotes[task] ?? []).includes(returned);
-    const broken = specRemarks(work.message) || (handled ? '' : returned);
-    if (broken !== '') return repairSpec(context, task, broken, accepted);
+    if (returned !== '' && !(state.specRepairNotes[task] ?? []).includes(returned)) {
+      await unlockSpec(context, task);
+      state.resume = task;
+      await save(context);
+      return runWork(context, task, resumePrompt(task), accepted);
+    }
   }
   // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
   const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
@@ -247,12 +256,18 @@ export async function runReview(
   const { git } = context;
   const base = await head(git);
   const files = specFiles(context, task);
+  const unlocked = unlockedFiles(context, task);
   const lines = [
     `$review ${task}`,
     ...(note === '' ? [] : [note]),
     ...(files.length === 0
       ? []
       : [`Приёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`]),
+    ...(unlocked === undefined
+      ? []
+      : [
+          `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»${unlocked.length === 0 ? '' : `: ${unlocked.join(', ')}`} — сверь их с текстом задачи заново`,
+        ]),
   ];
   const prompt = lines.join('\n');
   const review = await session(context, 'review', prompt);
@@ -357,14 +372,14 @@ export async function processTask(
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
     }
-    // Ревью нашло, что приёмочные тесты не совпадают с задачей: они пишутся заново.
+    // Ревью нашло, что приёмочные тесты не совпадают с задачей: их исправляет исполнитель.
     // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
     // которому тест менять нельзя, встал. Ссылка на файл теста — тоже замечание к тестам.
     if (
       SPEC_REMARK_RE.test(verdict.message) ||
       mentionsSpec(verdict.message, specFiles(context, current))
     )
-      await requestRespec(context, current, verdict.message);
+      await unlockSpec(context, current);
     else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
