@@ -250,8 +250,36 @@ describe('пауза локального матча', () => {
     expect(markup).toContain('Заново');
     expect(markup).toContain('В меню');
     const menuButtons = (pauseMenu.props?.children as unknown as ElementNode[]).slice(1);
-    (menuButtons[1]?.props?.onClick as (() => void) | undefined)?.();
+    (menuButtons[0]?.props?.onClick as (() => void) | undefined)?.();
+    expect(setPaused).toHaveBeenCalledWith(false);
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const resumedTree = MatchSurface({});
+    expect(findNode(resumedTree, 'PauseMenu')).toBeUndefined();
+
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const resumedHud = findNode(resumedTree, 'Hud');
+    (resumedHud?.props?.onPause as (() => void) | undefined)?.();
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const pausedAgainTree = MatchSurface({});
+    const pausedAgainMenu = findNode(pausedAgainTree, 'PauseMenu');
+    expect(pausedAgainMenu).toBeDefined();
+    const pausedAgain = (pausedAgainMenu?.type as (props: Record<string, unknown>) => ElementNode)(
+      pausedAgainMenu?.props ?? {},
+    );
+    const pausedAgainButtons = (pausedAgain.props?.children as unknown as ElementNode[]).slice(1);
+    (pausedAgainButtons[1]?.props?.onClick as (() => void) | undefined)?.();
     expect(window.location.assign).toHaveBeenCalledWith('/match?map=gen&seed=73&players=30');
+
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const pausedThirdTree = MatchSurface({});
+    const pausedThirdMenu = findNode(pausedThirdTree, 'PauseMenu');
+    expect(pausedThirdMenu).toBeDefined();
+    const pausedThird = (pausedThirdMenu?.type as (props: Record<string, unknown>) => ElementNode)(
+      pausedThirdMenu?.props ?? {},
+    );
+    const pausedThirdButtons = (pausedThird.props?.children as unknown as ElementNode[]).slice(1);
+    (pausedThirdButtons[2]?.props?.onClick as (() => void) | undefined)?.();
+    expect(window.location.assign).toHaveBeenCalledWith('/');
   });
 
   it('visibilitychange hidden вызывает паузу через обработчик MatchSurface', async () => {
@@ -312,9 +340,14 @@ describe('пауза локального матча', () => {
     expect(pauseButton).toBeDefined();
     const pauseIcon = findNodeByIcon(pauseButton?.props?.children);
     expect(pauseIcon?.props?.viewBox).toBe('0 0 24 24');
-    expect(pauseIcon?.props?.children).toHaveLength(4);
+    expect(
+      (pauseIcon?.props?.children as readonly ElementNode[]).map((path) => path.props?.d),
+    ).toEqual(['M6 5v14', 'M10 5v14', 'M14 5v14', 'M18 5v14']);
     expect(readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8')).toMatch(
       /\.settingsButton\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/s,
+    );
+    expect(readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8')).toMatch(
+      /\.settingsIcon\s*\{[^}]*stroke-width:\s*1\.75;[^}]*stroke-linecap:\s*round;[^}]*stroke-linejoin:\s*round;/s,
     );
   });
 });

@@ -15,7 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T6 возвращена повторным ревью: `visibilitychange` проверяет только паузу, а тест иконки принимает один маскирующий `data-icon` без проверки геометрии Tabler и размера 44×44.
-- Профильный тест `pnpm exec vitest run apps/client/test/pause.test.ts` зелёный: 5/5; `pnpm verify --changed` запущен, лог сборки и visual зелёный.
-- Следующая сессия — исправить возврат ревью 07/T6, затем повторить `$review 07/T6`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
+- 07/T6 исправлена по замечаниям СПЕК: тесты через `MatchSurface` подтверждают `resume`, перезапуск с тем же сидом, переход в меню и меню после `visibilitychange`.
+- Проверка иконки требует точные пути Tabler `player-pause`, stroke-стиль и CSS-размер кнопки 44×44.
+- Профильный тест `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts`: 5/5.
+- `pnpm verify --changed`: зелёный; CI после push проверяется в начале следующей сессии.
+- Следующее действие — запустить `$review 07/T6` в новой сессии.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/match/MatchSurface.tsx`.
