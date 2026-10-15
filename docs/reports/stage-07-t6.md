@@ -1,5 +1,15 @@
 # 07/T6 — пауза и выход
 
+## Исправление СПЕК 2026-10-15
+
+- Приёмочные тесты вызывают обработчики через дерево `MatchSurface`: `pause`/`resume`, меню, перезапуск с тем же seed и переход на `/` проверяются результатами вызовов.
+- `visibilitychange` с `hidden` проверяет и остановку worker, и появление `PauseMenu`.
+- `/match` без `debug` рендерится целиком: тест проверяет отсутствие `ObserverPanel` и выбора скорости, кнопку 44×44 и пути Tabler `player-pause`.
+- `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts` — 5/5.
+- `pnpm verify --changed` — OK: build, types, lint, prettier, tests, visual.
+
+Этап: 07/T6
+
 ## Возврат ревью 2026-10-15 (повторная сверка после исправления СПЕК)
 
 - `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts` — 5/5.

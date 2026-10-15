@@ -97,11 +97,18 @@ function findNode(node: unknown, name: string): ElementNode | undefined {
 function findNodeByIcon(node: unknown): ElementNode | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const element = node as ElementNode;
-  if (typeof element.type === 'function' && element.type.name === 'PauseIcon') {
+  if (typeof element.type === 'function' && element.type.name === 'PlayerPauseIcon') {
     const component = element.type as (props: Record<string, unknown>) => unknown;
     return findNodeByIcon(component(element.props ?? {}));
   }
-  if (element.type === 'svg' && element.props?.['data-icon'] === 'player-pause') return element;
+  if (
+    element.type === 'svg' &&
+    element.props?.viewBox === '0 0 24 24' &&
+    (element.props.children as readonly ElementNode[] | undefined)?.some(
+      (child) => child.props?.d === 'M6 5v14',
+    )
+  )
+    return element;
   const children = element.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -115,6 +122,10 @@ function findNodeByIcon(node: unknown): ElementNode | undefined {
 function findPauseButton(node: unknown): ElementNode | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const element = node as ElementNode;
+  if (typeof element.type === 'function' && element.type.name === 'Hud') {
+    const component = element.type as (props: Record<string, unknown>) => unknown;
+    return findPauseButton(component(element.props ?? {}));
+  }
   if (element.type === 'button' && findNodeByIcon(element.props?.children)) return element;
   const children = element.props?.children;
   if (Array.isArray(children)) {
@@ -295,7 +306,9 @@ describe('пауза локального матча', () => {
     listeners.get('visibilitychange')?.();
     expect(setPaused).toHaveBeenCalledWith(true);
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
-    expect(findNode(MatchSurface({}), 'PauseMenu')).toBeDefined();
+    const pausedTree = MatchSurface({});
+    expect(findNode(pausedTree, 'PauseMenu')).toBeDefined();
+    expect(setPaused).toHaveBeenLastCalledWith(true);
   });
 
   it('кнопка «В меню» на MatchEnd вызывает переход на корень', async () => {
@@ -328,16 +341,14 @@ describe('пауза локального матча', () => {
     setLanguage('ru-RU');
     const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
     const tree = MatchSurface({});
-    const hud = findNode(tree, 'Hud');
-    const markup = renderToStaticMarkup(
-      createElement(hud?.type as ReactTypes.ElementType, hud?.props),
-    );
+    const markup = renderToStaticMarkup(createElement(MatchSurface));
     expect(markup).not.toContain('1×');
     expect(markup).not.toContain('5×');
     expect(markup).not.toContain('20×');
-    const { Hud } = await import('../src/dev/Hud.tsx');
-    const pauseButton = findPauseButton(Hud(hud?.props as never));
+    expect(findNode(tree, 'ObserverPanel')).toBeUndefined();
+    const pauseButton = findPauseButton(tree);
     expect(pauseButton).toBeDefined();
+    expect(pauseButton?.props?.['aria-label']).toBe('Пауза');
     const pauseIcon = findNodeByIcon(pauseButton?.props?.children);
     expect(pauseIcon?.props?.viewBox).toBe('0 0 24 24');
     expect(

@@ -102,14 +102,9 @@ function Settings(props: {
   );
 }
 
-function PauseIcon(): React.JSX.Element {
+function PlayerPauseIcon(): React.JSX.Element {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={styles.settingsIcon}
-      data-icon="player-pause"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
       <path d="M6 5v14" />
       <path d="M10 5v14" />
       <path d="M14 5v14" />
@@ -203,7 +198,7 @@ export function Hud(props: {
           title={t('pause.title')}
           onClick={props.onPause}
         >
-          <PauseIcon />
+          <PlayerPauseIcon />
         </button>
       )}
     </header>

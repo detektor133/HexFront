@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T6 возвращена повторным ревью: тест скорости рендерит только `Hud`, а кнопка паузы остаётся самописным SVG вместо точной Tabler `player-pause`.
-- Исполнителю нужно проверить полный `/match` без `debug` и заменить маскировку `data-icon` на фактическую иконку с тестом её путей.
+- 07/T6 исправлена по замечаниям СПЕК: приёмочные проверки проходят через дерево `MatchSurface`, включая реальное меню паузы, `visibilitychange`, перезапуск с тем же seed и `/match` без `debug`.
+- Кнопка использует именованный Tabler `player-pause` с проверяемой геометрией путей; маскирующий `data-icon` удалён.
 - Профильный тест `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts`: 5/5.
-- `pnpm verify --changed`: зелёный; CI после push проверяется в начале следующей сессии.
+- `pnpm verify --changed`: зелёный; CI проверяется в начале следующей сессии.
 - Следующее действие — запустить `$review 07/T6` в новой сессии.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/match/MatchSurface.tsx`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
