@@ -58,6 +58,7 @@ function mockReactHooks(): void {
     return {
       ...actual,
       useEffect: (effect: () => void) => effect(),
+      useLayoutEffect: (effect: () => void) => effect(),
       useMemo: <T>(factory: () => T) => factory(),
       useRef: <T>(value: T) => ({ current: value }),
       useState: <T>(value: T) => {
