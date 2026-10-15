@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-Исправлен красный CI 07/T6: `pause.test.ts` проверяет кнопки через реальное дерево `MatchSurface`, включая `PauseMenu`, `visibilitychange` и `MatchEnd`; язык теста зафиксирован как `ru-RU`.
-Профильный запуск `pnpm exec vitest run apps/client/test/pause.test.ts` — 5/5.
+07/T6 возвращена ревью: тесты вызывают обработчики меню без проверки `resume` и сида «Заново»; `MatchSurface` использует только `reload()`; HUD содержит самописный SVG вместо Tabler `player-pause`.
 `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
-Следующая задача — 07/T7; перед ней прочитать блок T7 в `docs/stages/stage-07-playable-build.md` и `docs/art/ui.md`.
-Читать: `docs/stages/stage-07-playable-build.md`, `docs/gdd/08-match.md`, `apps/client/src/match/pause-controller.ts`, `apps/client/test/pause.test.ts`.
+Следующая сессия — исправить возврат ревью 07/T6, затем повторить `$review 07/T6`.
+Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
