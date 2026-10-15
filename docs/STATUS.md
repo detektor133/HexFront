@@ -15,9 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T7 ждёт ревью: добавлена проверка геометрии раскладки, измеренная высота HUD передаётся в CSS, фиксированные верхние отступы удалены.
-- Приёмочный тест `apps/client/test/match-layout.test.ts` не изменялся; все 6 проверок проходят.
-- Visual-эталоны обновлены для сцен T7 в `apps/client/tests/visual/baseline/`.
-- `pnpm verify --changed`: зелёный (build, types, lint, prettier, tests, visual).
-- Следующее действие — взять 07/T8.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/Hud.tsx`.
+- 07/T7 возвращена на доработку: проверка не проходит по реальному пути `/match`, сторож пропускает `ObserverPanel.module.css`, отчёт T7 отсутствует.
+- `pnpm verify --changed`: зелёный (build, types, lint, prettier, tests, visual), но критерии ревью выше им не закрыты.
+- Следующее действие — исправить 07/T7 и повторить ревью.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/ObserverPanel.module.css`.
