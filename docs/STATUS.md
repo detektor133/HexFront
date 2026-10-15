@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- Исправлен красный CI 07/T21: `dom.setup.ts` сохраняет абсолютный Linux-путь после снятия префикса `/@fs/`.
-- `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
+- 07/T21 принято ревью: DOM-приёмка и `pnpm verify --changed` зелёные.
+- CI для коммита ревью ожидается после push.
 - Следующая задача: 07/T7.
 - Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/match/`.
-- CI после исправления не проверен; проверить его в начале следующей сессии.
+- Статус CI коммита ревью проверить после push.
