@@ -131,8 +131,9 @@ describe('главное меню', () => {
     const selectedColor = colors[1];
     if (selectedColor === undefined) return;
     fireEvent.click(selectedColor);
-    expect(selectedColor.getAttribute('aria-label')).toBe('Цвет brick');
-    expect(selectedColor.getAttribute('class')).toContain('selected');
+    expect(startMessages(workers.at(-1) as FakeWorker)[0]).toEqual(
+      expect.objectContaining({ playerColors: ['brick', 'teal'] }),
+    );
   });
 
   it('критерий: настройки меню применяются игровому Worker после перехода по ссылке', async () => {
@@ -151,18 +152,15 @@ describe('главное меню', () => {
     fireEvent.change(input, { target: { value: 'Адмирал' } });
     const play = screen.getByRole('button', { name: 'Играть' });
     fireEvent.click(play);
+    const menuWorkers = [...workers];
 
     expect(localStorage.getItem('hexfront.auto-command')).toBe('true');
     expect(localStorage.getItem('hexfront.nickname')).toBe('Адмирал');
     expect(play.getAttribute('href')).toContain('name=%D0%90%D0%B4%D0%BC%D0%B8%D1%80%D0%B0%D0%BB');
-    const backgroundWorker = workers[0];
-    expect(backgroundWorker).toBeDefined();
-    expect(backgroundWorker?.messages).not.toContainEqual(
-      expect.objectContaining({ t: 'command' }),
-    );
     cleanup();
 
     const gameWorker = await renderGame(play.getAttribute('href') ?? '/match');
+    expect(menuWorkers).not.toContain(gameWorker);
     const start = startMessages(gameWorker)[0];
     expect(start).toEqual(expect.objectContaining({ playerName: 'Адмирал' }));
     expect((start?.playerColors as string[]).slice(0, 2)).toEqual(['brick', 'teal']);

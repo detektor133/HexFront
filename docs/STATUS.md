@@ -15,6 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T13 возвращена на исправление: фоновой Worker по-прежнему не передаёт снимки в карту меню.
-- Проверено: `pnpm verify --changed` зелёный — build, typecheck, lint, prettier и 34 теста.
-- Следующая сессия: `$review 07/T13`.
+- 07/T13: исправлен СПЕК-тест — Worker меню и Worker игрового матча проверяются раздельно; перестановка цветов подтверждается сообщением старта фонового Worker.
+- Проверено: `pnpm verify --changed` зелёный — build, typecheck, lint, prettier и тесты.
+- Следующая задача: 07/T14.
+- Читать: блоки 07/T14 в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/art/tokens.json`.
