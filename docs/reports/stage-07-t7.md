@@ -12,6 +12,12 @@
 - Визуальные эталоны текущего раннера: `apps/client/tests/visual/baseline/match-390x844-dpr1.png`, `match-390x844-dpr3.png`, `match-844x390-dpr1.png`, `match-844x390-dpr3.png`, `match-1440x900-dpr1.png`, `match-1440x900-dpr3.png`.
 - `rg -n "top:\s*(52px|56px|72px)" apps/client/src --glob '*.css' --glob '*.ts' --glob '*.tsx'` — совпадений нет.
 
+## Возврат ревью
+
+- `apps/client/test/match-layout.test.ts:187-226,338-345` проверяет вручную собранный снимок с жёсткими координатами, а не измеренную раскладку `MatchSurface`.
+- `apps/client/test/match-layout.test.ts:320-334` не открывает реальные состояния лидерборда и меню паузы: `PauseMenu` монтируется отдельно от `MatchPage`.
+- `apps/client/tests/visual/visual-check.ts:40-50` снимает для `/match` одну сцену вместо пяти сцен T7.
+
 ## Что требуется исправить
 
 - Следующая проверка — `$review 07/T7`; отдельный браузерный просмотр запрещён правилами проекта.
