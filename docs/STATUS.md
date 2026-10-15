@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T21 выполнена: добавлены jsdom, Testing Library, отдельный проект Vitest `client-dom` и DOM-приёмка MatchPage.
-- Приёмочный тест подтвердил открытие и закрытие меню паузы через реальный DOM-путь React.
+- Исправлен красный CI 07/T21: `dom.setup.ts` больше не дублирует абсолютный Linux-путь к фикстуре при обработке URL.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая задача: 07/T7.
 - Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/match/`.
-- CI не проверен, проверится в начале следующей сессии.
+- CI после исправления не проверен; проверить его в начале следующей сессии.

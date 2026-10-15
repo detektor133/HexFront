@@ -15,7 +15,11 @@ vi.mock('node:fs', async (importOriginal) => {
     readFileSync: ((filePath: PathLike, ...args: unknown[]) => {
       if (filePath instanceof URL && filePath.protocol !== 'file:') {
         const urlPath = decodeURIComponent(filePath.pathname);
-        const filePathname = urlPath.startsWith('/@fs/') ? urlPath.slice(5) : urlPath.slice(1);
+        const filePathname = urlPath.startsWith('/@fs/')
+          ? urlPath.slice(5)
+          : /^\/[A-Za-z]:\//u.test(urlPath)
+            ? urlPath.slice(1)
+            : urlPath;
         return readFileSync(path.resolve(filePathname), ...(args as never[]));
       }
       if (filePath instanceof URL && filePath.pathname === '/C:/vitest.projects.ts') {
