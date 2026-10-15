@@ -35,6 +35,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const [popupOpen, setPopupOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(() => window.innerWidth > 600);
   const pauseController = useMemo(
     () =>
       createPauseController({
@@ -80,13 +81,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const view = sb.msg?.view;
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
-    hudHeight: hudH || (window.innerWidth <= 600 ? 88 : 48),
-    bottomPanelHeight: dockH || (window.innerWidth <= 600 ? 178 : 132),
+    hudHeight: hudH,
+    bottomPanelHeight: dockH,
     eventRows: Math.min(3, sb.events.length),
     tutorialVisible: showOnboarding && view !== null,
-    leaderboardOpen: true,
+    leaderboardOpen,
     leaderboardRows: view?.players.length ?? 0,
-    cardHeight: cardH || 180,
+    cardHeight: cardH,
     cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
     popupOpen,
     paused: pauseState.menuOpen,
@@ -144,7 +145,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onHeight={setObserverH}
         />
       )}
-      {view && <Leaderboard view={view} />}
+      {view && <Leaderboard view={view} open={leaderboardOpen} onOpenChange={setLeaderboardOpen} />}
       {view && <MatchEnd view={view} replay={sb.replay} onMenu={pauseController.goToMenu} />}
       {!debug && pauseState.menuOpen && (
         <PauseMenu

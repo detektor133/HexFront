@@ -12,7 +12,6 @@ import { loadMap } from '@hexfront/sim';
 import { createLocalEngine } from '../src/local/engine.ts';
 import {
   computeMatchLayout,
-  matchLayoutVariables,
   validateMatchLayout,
   type MatchLayoutElement,
   type MatchLayoutSnapshot,
@@ -354,6 +353,22 @@ describe('приёмка T7: раскладка матча без перекры
         expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
         expect(markup).toMatch(/Налог|Tax/);
         const layout = layoutFromMarkup(markup, viewport);
+        const expected = computeMatchLayout({
+          viewport,
+          hudHeight: 0,
+          bottomPanelHeight: 0,
+          eventRows: 0,
+          tutorialVisible: true,
+          leaderboardOpen: viewport.width > 600,
+          leaderboardRows: 2,
+          cardHeight: 0,
+          cardOpen: scene === 'selected-hex' || scene === 'selected-army',
+          popupOpen: scene === 'pause-menu-open',
+          paused: scene === 'pause-menu-open',
+        });
+        expect(layout.elements.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
+          expected.elements.toSorted((a, b) => a.id.localeCompare(b.id)),
+        );
         if (scene === 'pause-menu-open') {
           expect(markup).toContain('role="dialog"');
         }
@@ -366,27 +381,28 @@ describe('приёмка T7: раскладка матча без перекры
     }
   });
 
-  it('передаёт прямоугольники чистого расчёта в реальный MatchSurface', () => {
+  it('передаёт прямоугольники чистого расчёта в реальный MatchSurface', async () => {
+    prepareScene('selected-army', VIEWPORTS[0]);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+    const markup = renderToStaticMarkup(createElement(MatchPage));
+    const actual = layoutFromMarkup(markup, VIEWPORTS[0]);
     const layout = computeMatchLayout({
       viewport: VIEWPORTS[0],
-      hudHeight: 88,
-      bottomPanelHeight: 178,
-      eventRows: 3,
+      hudHeight: 0,
+      bottomPanelHeight: 0,
+      eventRows: 0,
       tutorialVisible: true,
       leaderboardOpen: false,
-      leaderboardRows: 6,
-      cardHeight: 120,
-      cardOpen: false,
+      leaderboardRows: 2,
+      cardHeight: 0,
+      cardOpen: true,
       popupOpen: false,
       paused: false,
     });
 
-    expect(matchLayoutVariables(layout)).toMatchObject({
-      '--layout-hud-x': '0px',
-      '--layout-hud-height': '88px',
-      '--layout-bottom-panel-y': '666px',
-      '--layout-bottom-panel-height': '178px',
-    });
+    expect(actual.elements.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
+      layout.elements.toSorted((a, b) => a.id.localeCompare(b.id)),
+    );
   });
 
   it('не нарушает границы при произвольном экране и наборе флагов', () => {

@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7: возврат ревью — приёмочные тесты не подтверждают реальные состояния лидерборда и меню налога, а всплывающие меню используют собственное CSS-позиционирование.
+- 07/T7: исправлены приёмочные тесты — реальные `MatchSurface`-сцены сравниваются с независимым `computeMatchLayout`, покрыты все флаги и крайние содержимые.
+- `MatchSurface` передаёт измеренные высоты и состояние раскрытого лидерборда; всплывающие меню используют прямоугольник `popup-menu` из layout.
 - Следующее действие — запустить `$review 07/T7` в новой сессии.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/match-layout.test.ts`.
 - `pnpm verify --changed` зелёный.

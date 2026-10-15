@@ -74,10 +74,12 @@
 }
 
 .popover {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  left: 0;
-  width: 260px;
+  position: fixed;
+  top: var(--layout-popup-menu-y);
+  left: var(--layout-popup-menu-x);
+  width: var(--layout-popup-menu-width);
+  max-height: var(--layout-popup-menu-height);
+  box-sizing: border-box;
   padding: var(--space-md);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
@@ -127,10 +129,12 @@
 }
 
 .settingsMenu {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  right: 0;
-  width: 260px;
+  position: fixed;
+  top: var(--layout-popup-menu-y);
+  left: var(--layout-popup-menu-x);
+  width: var(--layout-popup-menu-width);
+  max-height: var(--layout-popup-menu-height);
+  box-sizing: border-box;
   padding: var(--space-md);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);

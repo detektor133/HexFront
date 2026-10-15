@@ -9,6 +9,8 @@ import { formatFp, formatSoldiers } from '../i18n/format.ts';
 
 interface LeaderboardProps {
   readonly view: PlayerView;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
@@ -25,10 +27,31 @@ function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
 }
 
 /** Показывает сводку матча и обновляет её раз в секунду. */
-export function Leaderboard({ view }: LeaderboardProps): React.JSX.Element {
+export function Leaderboard({
+  view,
+  open = true,
+  onOpenChange = () => undefined,
+}: LeaderboardProps): React.JSX.Element {
   const rows = useLeaderboard(view);
+  const me = rows.find((row) => row.playerId === view.playerId);
+  const rank = me ? rows.indexOf(me) + 1 : '-';
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className={styles.collapsed}
+        onClick={() => onOpenChange(true)}
+        aria-label={t('leaderboard.title')}
+      >
+        #{rank} / {rows.length} · {me?.score ?? 0}
+      </button>
+    );
+  }
   return (
     <section className={styles.panel} aria-label={t('leaderboard.title')}>
+      <button type="button" className={styles.collapse} onClick={() => onOpenChange(false)}>
+        {t('leaderboard.title')}
+      </button>
       <h2>{t('leaderboard.title')}</h2>
       <table>
         <thead>

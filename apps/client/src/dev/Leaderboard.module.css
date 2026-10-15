@@ -13,6 +13,32 @@
   font-variant-numeric: tabular-nums;
 }
 
+.collapsed {
+  position: absolute;
+  top: var(--layout-leaderboard-y);
+  left: var(--layout-leaderboard-x);
+  z-index: 3;
+  width: var(--layout-leaderboard-width);
+  height: var(--layout-leaderboard-height);
+  padding: 0 var(--space-sm);
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.collapse {
+  min-height: var(--touch-target-min);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
 .panel h2 {
   margin: 0 0 var(--space-xs);
   font-size: var(--font-size-label);
