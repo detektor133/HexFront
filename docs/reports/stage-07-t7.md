@@ -28,3 +28,10 @@
 ## Что требуется исправить
 
 - Следующая проверка — `$review 07/T7`; отдельный браузерный просмотр запрещён правилами проекта.
+
+## Ревью 2026-10-15 — возврат
+
+- `apps/client/test/match-layout.test.ts:299-337` не проверяет развёрнутый лидерборд и меню налога через реальные состояния `MatchSurface`: `leaderboardOpen` всегда `false`, `popupOpen` включается только для паузы.
+- `apps/client/test/match-layout.test.ts:339-359` вызывает `computeMatchLayout` напрямую и не проверяет рендер с измеренными `ResizeObserver` высотами.
+- `apps/client/src/match/MatchSurface.tsx:82-90` всегда передаёт `leaderboardOpen: false` и `popupOpen: false`, поэтому эти состояния не проходят через расчёт.
+- `pnpm verify --changed` — зелёный; проверка не закрывает ослабленные приёмочные критерии.
