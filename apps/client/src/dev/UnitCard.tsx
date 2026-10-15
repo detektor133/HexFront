@@ -15,6 +15,7 @@ import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
+import { IconButton } from '../ui/icon-button.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -42,27 +43,6 @@ function MergeIcon(): React.JSX.Element {
       <polyline points="4,4 10,10 16,4" />
       <line x1="10" y1="10" x2="10" y2="17" />
     </svg>
-  );
-}
-
-// Действие одной иконкой: подпись — во всплывающей подсказке и для экранного диктора.
-function IconButton(props: {
-  label: string;
-  icon: React.JSX.Element;
-  onClick: () => void;
-}): React.JSX.Element {
-  return (
-    <div className={styles.action}>
-      <button
-        type="button"
-        className={styles.iconButton}
-        aria-label={props.label}
-        title={props.label}
-        onClick={props.onClick}
-      >
-        {props.icon}
-      </button>
-    </div>
   );
 }
 
@@ -127,11 +107,15 @@ function Orders(props: {
   return (
     <>
       {sameStack && (
-        <IconButton
-          label={t('unit.merge')}
-          icon={<MergeIcon />}
-          onClick={() => send({ t: 'merge', unitIds: ids })}
-        />
+        <div className={styles.action}>
+          <IconButton
+            label={t('unit.merge')}
+            className={styles.iconButton}
+            onClick={() => send({ t: 'merge', unitIds: ids })}
+          >
+            <MergeIcon />
+          </IconButton>
+        </div>
       )}
       {units.length === 1 && first?.type === 'artillery' && (
         <Button

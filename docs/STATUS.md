@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T9: добавлен `IconButton` с общей подписью из `title` и `aria-label`.
+- 07/T9: исправлен DOM-тест по возврату СПЕК — отпускание после удержания проверяет скрытие подписи.
+- DOM-приёмка рендерит реальные `ArmyBar`, `UnitCard` и `Hud`, а `IconButton` подключён к их иконкам.
 - Удержание дольше 350 мс показывает tooltip, движение более 8 px отменяет его, короткий тап вызывает действие.
-- Приёмка T9 подтверждена четырьмя тестами в `apps/client/test/mobile-labels.dom.test.tsx`.
 - `pnpm verify --changed` — зелёная.
 - Следующая задача: 07/T10.
-- Читать блок T10 в `docs/stages/stage-07-playable-build.md` и документы лидерборда.
+- Читать блок T10 в `docs/stages/stage-07-playable-build.md`, `packages/sim/src/queries/player-view.ts` и документы лидерборда.

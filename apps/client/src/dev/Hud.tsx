@@ -14,6 +14,7 @@ import {
 import styles from './Hud.module.css';
 import { t } from '../i18n/dict.ts';
 import { formatClock, formatFp, formatMult, formatPercent, formatRate } from '../i18n/format.ts';
+import { IconButton } from '../ui/icon-button.tsx';
 
 function Slot(props: {
   label: string;
@@ -60,12 +61,11 @@ function Settings(props: {
   const on = props.view.me.autoCommand;
   return (
     <div className={styles.settingsWrap}>
-      <button
+      <IconButton
         type="button"
         className={styles.settingsButton}
+        label={t('settings.title')}
         aria-expanded={open}
-        aria-label={t('settings.title')}
-        title={t('settings.title')}
         onClick={() =>
           setOpen((open) => {
             const next = !open;
@@ -75,7 +75,7 @@ function Settings(props: {
         }
       >
         <SettingsIcon />
-      </button>
+      </IconButton>
       {open && (
         <div
           className={styles.settingsMenu}

@@ -18,6 +18,7 @@ import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
+import { IconButton } from '../ui/icon-button.tsx';
 
 const FULL = 1000;
 
@@ -122,17 +123,16 @@ function Tool(props: {
 }): React.JSX.Element {
   const label = props.disabled ?? t(props.label);
   return (
-    <button
+    <IconButton
       type="button"
       className={styles.tool}
+      label={label}
       aria-pressed={props.active ?? false}
-      aria-label={label}
       disabled={Boolean(props.disabled)}
-      title={label}
       onClick={props.onClick}
     >
       <Icon name={props.icon} />
-    </button>
+    </IconButton>
   );
 }
 
@@ -163,16 +163,15 @@ function RunButton(props: {
   onClick: () => void;
 }): React.JSX.Element {
   return (
-    <button
+    <IconButton
       type="button"
       className={styles.run}
-      aria-label={props.hint ?? t(props.label)}
-      title={props.hint ?? t(props.label)}
+      label={props.hint ?? t(props.label)}
       disabled={!props.enabled}
       onClick={props.onClick}
     >
       <Icon name={props.icon} className={styles.runIcon} />
-    </button>
+    </IconButton>
   );
 }
 
@@ -180,16 +179,15 @@ function RunButton(props: {
 function AutoBadge(props: { on: boolean; onClick: () => void }): React.JSX.Element {
   const label = t(props.on ? 'army.autoCommandOn' : 'army.autoCommandOff');
   return (
-    <button
+    <IconButton
       type="button"
       className={styles.autoBadge}
+      label={label}
       aria-pressed={props.on}
-      aria-label={label}
-      title={label}
       onClick={props.onClick}
     >
       <span className={props.on ? styles.autoOn : styles.autoOff}>{t('army.autoLetter')}</span>
-    </button>
+    </IconButton>
   );
 }
 
@@ -434,37 +432,34 @@ export function ArmyBar(props: {
           );
         })}
         <div className={styles.reserve}>
-          <button
+          <IconButton
             type="button"
             className={styles.iconButton}
-            title={t('army.reserve')}
-            aria-label={t('army.reserve')}
+            label={t('army.reserve')}
             onClick={() =>
               props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
             }
           >
             <Icon name="reserve" />
             <span className={styles.num}>{reserve.length}</span>
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             type="button"
             className={styles.iconButton}
+            label={t('army.auto')}
             aria-pressed={view.me.autoReinforce}
-            title={t('army.auto')}
-            aria-label={t('army.auto')}
             onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
           >
             <Icon name="auto" />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             type="button"
             className={styles.iconButton}
-            title={t('army.new')}
-            aria-label={t('army.new')}
+            label={t('army.new')}
             onClick={() => send({ t: 'createArmy', name: '' })}
           >
             <Icon name="add" />
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>

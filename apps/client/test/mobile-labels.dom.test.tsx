@@ -1,7 +1,25 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { loadMap } from '@hexfront/sim';
+
+import { ArmyBar } from '../src/dev/ArmyBar.tsx';
+import { Hud } from '../src/dev/Hud.tsx';
+import { UnitCard } from '../src/dev/UnitCard.tsx';
+import { createLocalEngine } from '../src/local/engine.ts';
 import { IconButton } from '../src/ui/icon-button.tsx';
+
+const tinyMap: unknown = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
+);
+const loaded = loadMap(tinyMap);
+if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+const engine = createLocalEngine(tinyMap, 42, 2);
+if ('errors' in engine) throw new Error(engine.errors.join('; '));
+const view = engine.snapshot().view;
 
 afterEach(() => {
   cleanup();
@@ -25,6 +43,10 @@ describe('DOM-приёмка подписей на телефоне (07/T9)', ()
 
     expect(screen.getByRole('tooltip', { name: 'Фронт' })).toBeTruthy();
     expect(onClick).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(button, { clientX: 20, clientY: 20 });
+
+    expect(screen.queryByRole('tooltip', { name: 'Фронт' })).toBeNull();
   });
 
   it('критерий 2: короткий тап включает инструмент без подписи', () => {
@@ -65,29 +87,46 @@ describe('DOM-приёмка подписей на телефоне (07/T9)', ()
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
-  it('критерий 4: все кнопки-иконки панели армий, карточек и HUD имеют одинаковую подпись', () => {
+  it('критерий 4: реальные панели армий, карточка и HUD имеют одинаковые подписи иконок', () => {
+    const firstUnit = view.units[0];
+    if (!firstUnit) throw new Error('В снимке tiny-карты нет отрядов для карточки');
+    const sourceUnits = [firstUnit, view.units[1] ?? firstUnit];
+    const units = sourceUnits.map((unit, index) => ({
+      ...unit,
+      id: index + 1,
+      hex: view.units[0]?.hex ?? unit.hex,
+      type: view.units[0]?.type ?? unit.type,
+      armyId: null,
+    }));
+    const cardView = { ...view, units };
+
     render(
       <>
-        <div data-panel="army">
-          <IconButton label="Фронт" onClick={vi.fn()}>
-            <span aria-hidden="true">⌁</span>
-          </IconButton>
-        </div>
-        <div data-panel="card">
-          <IconButton label="Слить" onClick={vi.fn()}>
-            <span aria-hidden="true">⊕</span>
-          </IconButton>
-        </div>
-        <div data-panel="hud">
-          <IconButton label="Пауза" onClick={vi.fn()}>
-            <span aria-hidden="true">Ⅱ</span>
-          </IconButton>
-        </div>
+        <ArmyBar
+          view={view}
+          selected={null}
+          partial={[]}
+          onSelect={vi.fn()}
+          send={vi.fn()}
+          onPick={vi.fn()}
+          tool={null}
+          onTool={vi.fn()}
+        />
+        <UnitCard
+          view={cardView}
+          map={loaded.map}
+          picked={{ hex: null, units: units.map((unit) => unit.id), target: null }}
+          send={vi.fn()}
+          onPick={vi.fn()}
+        />
+        <Hud view={view} send={vi.fn()} fog={true} setFog={vi.fn()} onPause={vi.fn()} />
       </>,
     );
 
-    const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(3);
+    const buttons = Array.from(document.querySelectorAll('button')).filter((button) =>
+      button.querySelector('svg'),
+    );
+    expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {
       expect(button.getAttribute('title')).toBe(button.getAttribute('aria-label'));
       expect(button.getAttribute('aria-label')).not.toBe('');
