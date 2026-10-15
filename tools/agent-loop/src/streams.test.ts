@@ -136,7 +136,7 @@ describe('параллельные потоки на настоящем git', { 
     const handle = await world(spec);
     const run = await handle.run(spec);
     expect(run.events).toContain(
-      'start:$task 07/T2 слияние: влей origin/stage-07 в текущую ветку (git merge origin/stage-07), разреши конфликты по смыслу обеих сторон, pnpm verify --changed, коммит слияния с трейлером «Этап: 07/T2», push. Эталоны visual в конфликте — pnpm visual --update на слитом дереве, пути PNG — в отчёт задачи.',
+      'start:$task 07/T2 слияние: влей origin/stage-07 в текущую ветку (git merge origin/stage-07), разреши конфликты по смыслу обеих сторон, pnpm verify --changed, коммит слияния с трейлером «Этап: 07/T2», push.',
     );
     const reReview = run.prompts.find(
       (p) => p.prompt.startsWith('$review 07/T2') && p.prompt.includes('Повторное ревью'),

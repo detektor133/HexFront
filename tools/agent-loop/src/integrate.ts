@@ -35,7 +35,7 @@ export const mergeMessage = (task: string, stageBranch: string): string =>
   `chore(infra): ветка ${stageBranch} влита в задачу ${task}\n\nЭтап: ${task}`;
 
 export const mergePrompt = (task: string, stageBranch: string): string =>
-  `$task ${task} слияние: влей origin/${stageBranch} в текущую ветку (git merge origin/${stageBranch}), разреши конфликты по смыслу обеих сторон, pnpm verify --changed, коммит слияния с трейлером «Этап: ${task}», push. Эталоны visual в конфликте — pnpm visual --update на слитом дереве, пути PNG — в отчёт задачи.`;
+  `$task ${task} слияние: влей origin/${stageBranch} в текущую ветку (git merge origin/${stageBranch}), разреши конфликты по смыслу обеих сторон, pnpm verify --changed, коммит слияния с трейлером «Этап: ${task}», push.`;
 
 export const reReviewNote = (reason: string): string =>
   `Повторное ревью после слияния ветки этапа: ${reason}. Отметка задачи уже [x]: при OK её не меняй и коммит не делай; при ВОЗВРАТ — [ ] и docs-коммит, как обычно.`;

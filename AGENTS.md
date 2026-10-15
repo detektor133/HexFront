@@ -134,7 +134,7 @@
 | `pnpm verify [--changed]` | **основная проверка**: build → типы → lint → тесты; лог в `.ai-logs/verify-*.log`, в консоль итог ≤ 20 строк |
 | `pnpm ai-check --changed` | быстрая проверка без build |
 | `pnpm ai-check --staged` | lint staged-файлов (вызывает хук pre-commit) |
-| `pnpm report:match --seeds N` | N матчей ботов, метрики JSON, графики PNG → `docs/reports/match/`, сводка ≤ 20 строк |
+| `pnpm report:match --seeds N` | N матчей ботов, текстовая сводка метрик → `docs/reports/match/`, сводка ≤ 20 строк |
 | `pnpm check` | быстрые проверки CI с подробным выводом (workflow `ci`) — только для CI, агенту не запускать |
 | `pnpm test:all` | все тесты с тяжёлыми `SLOW_TESTS` и покрытием (workflow `slow`) — только для CI, агенту не запускать |
 

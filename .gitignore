@@ -16,7 +16,6 @@ docs/reports/match/
 tools/bench/results/
 # Состояние `pnpm evolve --resume` — локальное продолжение прогона на этом ПК.
 tools/evolve/results/
-# Кадры и diff визуальной проверки (pnpm visual).
 apps/client/test-results/
 # Полные логи pnpm verify.
 .ai-logs/

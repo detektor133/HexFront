@@ -35,7 +35,7 @@ export interface AgentConfig {
   readonly sleep: (ms: number) => Promise<'timer' | 'wake'>;
   readonly writeLine: (line: string) => void;
   readonly github?: GithubClient;
-  /** Переменные окружения сессий codex сверх process.env (порт visual потока). */
+  /** Переменные окружения сессий Codex сверх `process.env`. */
   readonly env?: Readonly<Record<string, string>>;
   /** Панель консоли; без неё (тесты, вывод не в терминал) — только строки протокола. */
   readonly board?: Board;

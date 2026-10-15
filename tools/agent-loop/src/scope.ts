@@ -98,16 +98,9 @@ export function selectStreamTask(
 const SERVICE_DOCS_RE =
   /^docs\/(stages\/.+|reports\/.+|STATUS\.md|BUGS\.md|QUESTIONS\.md|DECISIONS\.md|CHANGELOG-proposals\.md)$/;
 
-/**
- * Эталоны скриншотов обновляет каждая задача, меняющая вид. Их конфликт разрешает сессия
- * слияния (`pnpm visual --update` на слитом дереве), а повторное ревью их не проверит: картинки
- * агент не открывает.
- */
-const VISUAL_BASELINE_RE = /^apps\/client\/tests\/visual\/baseline\//;
-
-/** @returns пути без служебных docs и эталонов скриншотов. */
+/** @returns пути без служебных docs. */
 export const workFiles = (paths: readonly string[]): string[] =>
-  paths.filter((path) => !SERVICE_DOCS_RE.test(path) && !VISUAL_BASELINE_RE.test(path));
+  paths.filter((path) => !SERVICE_DOCS_RE.test(path));
 
 /**
  * @param changed изменённые задачей файлы, которые уже были в ветке этапа: новый файл чужую

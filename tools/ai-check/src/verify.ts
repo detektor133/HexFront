@@ -1,10 +1,9 @@
-// Единая проверка для AI-агента: build → типы → lint → тесты → visual.
+// Единая проверка для AI-агента: build → типы → lint → тесты.
 // Полный вывод шагов — в .ai-logs/verify-<время>.log, в консоль — итог до 20 строк и путь к логу.
 // Запуск: pnpm verify [--changed]
-//   (без флага)  — весь репозиторий, быстрые тесты (без SLOW_TESTS из vitest.projects.ts), visual;
+//   (без флага)  — весь репозиторий, быстрые тесты (без SLOW_TESTS из vitest.projects.ts);
 //                  тяжёлые тесты идут только в CI, workflow `slow`;
-//   --changed    — lint только изменённых файлов, тесты, затронутые изменениями, visual — если
-//                  менялся код клиента или пакетов (иначе кадры не могли измениться).
+//   --changed    — lint только изменённых файлов и тесты, затронутые изменениями.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +16,6 @@ const FORMAT_RE = /\.(ts|tsx|js|jsx|mjs|cjs|json|css|html|yml|yaml)$/;
 /** Файлы вне линтера (как .prettierignore и eslint.config.js). */
 const SKIP_RE =
   /^(docs\/|coverage\/|\.ai-logs\/|pnpm-lock\.yaml|apps\/client\/src\/theme\/tokens\.)/;
-const VISUAL_RE = /^(apps\/client|packages)\//;
 /** Что считать строкой ошибки в выводе шага. */
 const ERROR_RE = /error|FAIL|✗|×|AssertionError|не прошло|expected|warn/i;
 
@@ -66,9 +64,6 @@ function buildSteps(): Step[] {
     cmd: 'pnpm',
     args: ['exec', 'vitest', 'run', ...(changedOnly ? ['--changed', 'HEAD'] : [])],
   });
-  if (files === null || files.some((f) => VISUAL_RE.test(f))) {
-    steps.push({ name: 'visual', cmd: 'pnpm', args: ['-s', 'visual'] });
-  }
   return steps;
 }
 

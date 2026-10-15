@@ -27,9 +27,6 @@ export type StreamOutcome =
 
 /** Сколько раз повторное ревью после слияния может вернуть задачу на работу. */
 const MAX_REWORKS = 2;
-/** Порт vite для `pnpm visual` потока: два verify одновременно не делят один порт. */
-const VISUAL_PORT_BASE = 5180;
-
 export interface StreamRequest {
   readonly target: StageTarget;
   readonly slot: number;
@@ -44,11 +41,7 @@ async function streamContext(request: StreamRequest): Promise<LoopContext> {
   const git = await target.lock.run(() =>
     checkoutTask(main.git, main.config.runCommand, main.config.root, slot, task, target.branch),
   );
-  const config = {
-    ...main.config,
-    root: dir,
-    env: { ...main.config.env, VISUAL_PORT: String(VISUAL_PORT_BASE + slot) },
-  };
+  const config = { ...main.config, root: dir };
   const name = `w${slot}`;
   return {
     config,

@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-- Следующее действие — `$task 07/T20`.
-- T20 удаляет visual-проверки из работы агента и обновляет правила процесса; после него выполняется T7 с чистой функцией раскладки матча.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/testing.md`, `docs/PROCESS.md`.
+- T20 выполнена и ждёт ревью: visual-шаг verify, visual-эталоны, root `src/match/layout.ts` и настройки visual-потоков удалены.
+- Следующее действие — `$task 07/T7` после `$review 07/T20`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.test.ts`.
