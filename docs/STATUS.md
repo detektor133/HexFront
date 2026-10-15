@@ -15,9 +15,10 @@
 
 ## Следующая сессия
 
-- 07/T13 принята: фон меню подключён к `MapView` и `EconomyLayer`, снимки фонового Worker применяются через `ViewDeltaApplier`.
-- Игровой URL передаёт имя, цвет и автокомандование; `MatchSurfaceRuntime` применяет их к игровому Worker.
-- Пустой ник в `createLocalEngine` получает имя «Игрок 1».
-- `apps/client/test/main-menu.dom.test.tsx` проверяет реальный `MatchPage` Worker и перестановку цветов; результат 8/8.
-- `pnpm verify --changed` зелёный; дополнительные тесты local engine/local match — 17/17.
-- Следующая задача: 07/T14.
+- 07/T14 выполнена: оболочка страницы получила SVG-иконку, PNG 192/512, manifest и `theme-color` из токенов.
+- `svg-to-png.ts` поддерживает размер SVG и параметр `--scale`, прежний режим отчётных графиков сохранён.
+- `main.tsx` синхронизирует атрибут `lang` документа с `i18n`.
+- `apps/client/test/app-shell.test.ts`: 5/5; PNG проверены по IHDR как 192×192 и 512×512.
+- `pnpm verify --changed`: зелёный.
+- Следующая задача: 07/T15.
+- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/src/local`, `packages/protocol`, `apps/client/src/render`.

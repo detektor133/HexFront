@@ -6,3 +6,4 @@ docs/
 
 # Генерируются tools/tokens; формат задаёт генератор, сверка — тестом.
 apps/client/src/theme/tokens.*
+apps/client/public/manifest.webmanifest

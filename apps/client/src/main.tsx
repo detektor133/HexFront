@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { DevMapPage } from './dev/DevMapPage.tsx';
 import { DevSandboxPage } from './dev/DevSandboxPage.tsx';
 import { DevUnitsPage } from './dev/DevUnitsPage.tsx';
-import { messages, t } from './i18n/dict.ts';
+import { lang, messages, t } from './i18n/dict.ts';
 import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
 import { isDevPath, isMatchPath } from './routes.ts';
@@ -27,6 +27,7 @@ export function App(): React.JSX.Element {
 
 const root = document.getElementById('root');
 if (!root) throw new Error('нет элемента #root');
+document.documentElement?.setAttribute('lang', lang);
 createRoot(root).render(
   <StrictMode>
     <App />
