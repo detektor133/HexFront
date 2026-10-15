@@ -1,15 +1,19 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { startLocalMatch } from '../src/local/local-match.ts';
+import { MatchPage } from '../src/match/MatchPage.tsx';
 import { MainMenu } from '../src/menu/MainMenu.tsx';
-import { playerColorIds } from '../src/theme/colors.ts';
+import * as mapViewModule from '../src/render/map-view.ts';
 
 type WorkerMessage = Record<string, unknown>;
 
 class FakeWorker {
   public readonly messages: WorkerMessage[] = [];
   public terminate = vi.fn();
+  public onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  public onerror: ((event: ErrorEvent) => void) | null = null;
 
   public postMessage(message: WorkerMessage): void {
     this.messages.push(message);
@@ -39,6 +43,38 @@ function startMessages(worker: FakeWorker): WorkerMessage[] {
   return worker.messages.filter((message) => message.t === 'start');
 }
 
+function fakeMapView(): mapViewModule.MapView {
+  return {
+    destroy: vi.fn(),
+    setBottomInset: vi.fn(),
+    setTopInset: vi.fn(),
+    setGrab: vi.fn(),
+    setOrderHooks: vi.fn(),
+    setSelection: vi.fn(),
+    setScale: vi.fn(),
+    centerOn: vi.fn(),
+  } as unknown as mapViewModule.MapView;
+}
+
+async function renderGame(url: string): Promise<FakeWorker> {
+  const expectedWorkerCount = workers.length + 1;
+  const map = JSON.parse(readFileSync('packages/mapgen/maps/small.json', 'utf8')) as unknown;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ ok: true, json: async () => map })),
+  );
+  vi.spyOn(mapViewModule, 'createMapView').mockResolvedValue(fakeMapView());
+  window.history.pushState({}, '', url);
+  render(<MatchPage />);
+  await waitFor(() =>
+    expect(
+      workers.length >= expectedWorkerCount &&
+        workers.at(-1)?.messages.some((message) => message.t === 'start'),
+    ).toBe(true),
+  );
+  return workers.at(-1) as FakeWorker;
+}
+
 describe('главное меню', () => {
   beforeEach(() => {
     workers = [];
@@ -48,7 +84,9 @@ describe('главное меню', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
   });
 
   it('критерий: фон меню запускается на карте small с 6 ботами, без тумана и на скорости 1×', () => {
@@ -93,17 +131,17 @@ describe('главное меню', () => {
     const selectedColor = colors[1];
     if (selectedColor === undefined) return;
     fireEvent.click(selectedColor);
-    fireEvent.click(screen.getByRole('button', { name: 'Играть' }));
-
-    const latestWorker = workers.at(-1);
-    expect(latestWorker).toBeDefined();
-    expect(startMessages(latestWorker as FakeWorker)[0]).toEqual(
-      expect.objectContaining({ playerColors: ['brick', 'teal'] }),
-    );
+    expect(selectedColor.getAttribute('aria-label')).toBe('Цвет brick');
+    expect(selectedColor.getAttribute('class')).toContain('selected');
   });
 
-  it('критерий: «Автокомандование» из настроек отправляет setAutoCommand при старте матча', () => {
+  it('критерий: настройки меню применяются игровому Worker после перехода по ссылке', async () => {
     renderMenu();
+    const colors = screen.getAllByRole('button', { name: /цвет/iu });
+    const selectedColor = colors[1];
+    expect(selectedColor).toBeDefined();
+    if (selectedColor === undefined) return;
+    fireEvent.click(selectedColor);
     const autoCommand = screen.queryByRole('button', { name: /Автокомандование/iu });
 
     expect(autoCommand).not.toBeNull();
@@ -117,34 +155,36 @@ describe('главное меню', () => {
     expect(localStorage.getItem('hexfront.auto-command')).toBe('true');
     expect(localStorage.getItem('hexfront.nickname')).toBe('Адмирал');
     expect(play.getAttribute('href')).toContain('name=%D0%90%D0%B4%D0%BC%D0%B8%D1%80%D0%B0%D0%BB');
-    expect(workers.flatMap((worker) => worker.messages)).not.toContainEqual(
+    const backgroundWorker = workers[0];
+    expect(backgroundWorker).toBeDefined();
+    expect(backgroundWorker?.messages).not.toContainEqual(
       expect.objectContaining({ t: 'command' }),
     );
+    cleanup();
 
-    const game = startLocalMatch(
-      'small',
-      1,
-      { count: 6, bots: [1, 2, 3, 4, 5], speed: 1 },
-      () => undefined,
-      {
-        playerName: localStorage.getItem('hexfront.nickname') ?? '',
-        playerColors: playerColorIds('brick'),
-        autoCommand: localStorage.getItem('hexfront.auto-command') === 'true',
-      },
-    );
-    const gameWorker = workers.at(-1);
-    expect(gameWorker).toBeDefined();
-    expect(startMessages(gameWorker as FakeWorker)[0]).toEqual(
-      expect.objectContaining({
-        playerName: 'Адмирал',
-        playerColors: expect.arrayContaining(['brick', 'teal']),
-      }),
-    );
+    const gameWorker = await renderGame(play.getAttribute('href') ?? '/match');
+    const start = startMessages(gameWorker)[0];
+    expect(start).toEqual(expect.objectContaining({ playerName: 'Адмирал' }));
+    expect((start?.playerColors as string[]).slice(0, 2)).toEqual(['brick', 'teal']);
     expect(gameWorker?.messages).toContainEqual({
       t: 'command',
       cmd: { t: 'setAutoCommand', on: true },
     });
-    game.dispose();
+  });
+
+  it('критерий: пустой ник получает имя «Игрок 1» в игровом Worker', async () => {
+    renderMenu();
+    const play = screen.getByRole('button', { name: 'Играть' });
+    const url = play.getAttribute('href');
+    expect(url).not.toBeNull();
+    if (url === null) return;
+
+    cleanup();
+    const gameWorker = await renderGame(url);
+
+    expect(startMessages(gameWorker)[0]).toEqual(
+      expect.objectContaining({ playerName: 'Игрок 1' }),
+    );
   });
 
   it('критерий: «На весь экран» скрыта без Fullscreen API', () => {

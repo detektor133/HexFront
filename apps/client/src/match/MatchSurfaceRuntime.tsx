@@ -33,7 +33,7 @@ import {
   type SnapshotTelemetryCounts,
   type WorkerTelemetry,
 } from '../dev/telemetry.ts';
-import { reasonText } from '../i18n/dict.ts';
+import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -299,7 +299,7 @@ export function useSandbox(
       },
       {
         telemetry: debug,
-        playerName: localStorage.getItem(NICKNAME_KEY) ?? '',
+        playerName: localStorage.getItem(NICKNAME_KEY) || `${t('observer.player')} 1`,
         playerColors: matchPlayerColors(localStorage.getItem(COLOR_KEY) ?? 'teal'),
         autoCommand: localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
       },
