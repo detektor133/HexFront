@@ -1,6 +1,4 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,17 +8,6 @@ import { mapUrl } from '../src/local/map-request.ts';
 import { QUICK_MATCH_SEEDS, quickMatchUrl } from '../src/routes.ts';
 
 const DIST_MAPS_DIR = new URL('../dist/maps/', import.meta.url);
-const PROJECT_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-
-execFileSync(
-  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  ['--filter', '@hexfront/client', 'build'],
-  {
-    cwd: PROJECT_ROOT,
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
-  },
-);
 
 describe('статические карты gen для сборки клиента', () => {
   it('quickMatchUrl выдаёт только сиды из набора из 20 сидов', () => {

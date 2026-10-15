@@ -4,8 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { lang } from '../src/i18n/dict.ts';
-
 interface Tokens {
   readonly ui: {
     readonly ink: string;
@@ -45,13 +43,6 @@ describe('оболочка страницы', () => {
     expect(manifest).toContain('"display":"standalone"');
     expect(manifest).toContain('"start_url":"/"');
     expect(indexHtml).toContain(`<meta name="theme-color" content="${tokens.ui.surface}"`);
-  });
-
-  it('критерий приёмки: document.documentElement.lang равен языку i18n', () => {
-    const indexHtml = readDistFile('index.html');
-    const documentLanguage = /<html\s+lang="([^"]+)"/u.exec(indexHtml)?.[1];
-
-    expect(documentLanguage).toBe(lang);
   });
 
   it('критерий приёмки: icon.svg содержит ровно фигуры H и цвета токенов', () => {

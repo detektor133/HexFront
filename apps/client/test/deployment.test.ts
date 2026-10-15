@@ -1,4 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -9,21 +9,10 @@ import { describe, expect, it } from 'vitest';
 const WORKFLOW_PATH = new URL('../../../.github/workflows/pages.yml', import.meta.url);
 const ADR_DIRECTORY = new URL('../../../docs/architecture/adr/', import.meta.url);
 const DIST_DIRECTORY = new URL('../dist/', import.meta.url);
-const PROJECT_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const DIST_PATH = fileURLToPath(DIST_DIRECTORY);
 const DEPLOY_COMMAND =
   'pages deploy apps/client/dist --project-name=hexfront --branch=${{ github.ref_name }}';
 const VITE_PATH = fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url));
-
-execFileSync(
-  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  ['--filter', '@hexfront/client', 'build'],
-  {
-    cwd: PROJECT_ROOT,
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
-  },
-);
 
 function readFirstMatchingFile(pattern: RegExp): string | null {
   if (!existsSync(ADR_DIRECTORY)) return null;

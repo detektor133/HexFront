@@ -1,4 +1,5 @@
 // Проекты Vitest и два уровня тестов (docs/testing.md, «Уровни тестов»).
+import { fileURLToPath } from 'node:url';
 
 export const PROJECTS = [
   'packages/sim',
@@ -41,6 +42,9 @@ export const SLOW_TESTS = [
 ] as const;
 
 const SLOW_TEST_TIMEOUT_MS = 120_000;
+const CLIENT_BUILD_SETUP = fileURLToPath(
+  new URL('./apps/client/test/build.global-setup.ts', import.meta.url),
+);
 
 /** @returns проекты Vitest; `withSlow` — вместе с тяжёлыми файлами (`pnpm test:all`). */
 export function testProjects(withSlow: boolean) {
@@ -63,6 +67,8 @@ export function testProjects(withSlow: boolean) {
         // acceptance шёл 4,5 с и падал по таймауту). Здесь таймаут — только защита от зависания,
         // скорость меряет tools/bench. Проекты не наследуют корневой testTimeout.
         ...(withSlow ? { testTimeout: SLOW_TEST_TIMEOUT_MS } : {}),
+        // Тесты сборки читают dist: клиент собирается один раз до них, а не в каждом файле.
+        ...(root === 'apps/client' ? { globalSetup: [CLIENT_BUILD_SETUP] } : {}),
       },
     };
     if (root !== 'apps/client') return [project];
