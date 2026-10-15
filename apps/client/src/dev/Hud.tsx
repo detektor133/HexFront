@@ -104,8 +104,13 @@ function Settings(props: {
 
 function PauseIcon(): React.JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
-      <path d="M8 5v14M16 5v14" />
+    <svg
+      viewBox="0 0 24 24"
+      className={styles.settingsIcon}
+      data-icon="player-pause"
+      aria-hidden="true"
+    >
+      <path d="M6 5v14M10 5v14M14 5v4M18 5v4M14 15v4M18 15v4" />
     </svg>
   );
 }
