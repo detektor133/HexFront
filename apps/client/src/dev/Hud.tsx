@@ -110,7 +110,10 @@ function PauseIcon(): React.JSX.Element {
       data-icon="player-pause"
       aria-hidden="true"
     >
-      <path d="M6 5v14M10 5v14M14 5v14M18 5v14" />
+      <path d="M6 5v14" />
+      <path d="M10 5v14" />
+      <path d="M14 5v14" />
+      <path d="M18 5v14" />
     </svg>
   );
 }

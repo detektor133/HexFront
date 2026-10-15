@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T6 возвращена ревью: тест выбора скорости не рендерит матч с view, а иконка паузы не является Tabler `player-pause`.
-- `pnpm verify --changed` зелёный, но приёмка остаётся незакрытой до исправления теста и иконки.
-- Следующая сессия — исправить возврат ревью 07/T6.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
+- 07/T6 исправлена по возврату ревью: тест выбора скорости рендерит `MatchSurface` с `view`, helper поддерживает ленивый `useState`, SVG содержит четыре пути Tabler `player-pause`.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
+- Следующая задача — 07/T7.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.

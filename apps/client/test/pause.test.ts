@@ -63,7 +63,9 @@ function mockReactHooks(): void {
       useState: <T>(value: T) => {
         const index = cursor;
         cursor += 1;
-        if (!(index in states)) states[index] = value;
+        if (!(index in states)) {
+          states[index] = typeof value === 'function' ? (value as () => T)() : value;
+        }
         const setValue = (next: T | ((current: T) => T)): void => {
           states[index] =
             typeof next === 'function' ? (next as (current: T) => T)(states[index] as T) : next;
@@ -256,12 +258,14 @@ describe('пауза локального матча', () => {
 
   it('/match без debug не показывает выбор скорости', async () => {
     mockReactHooks();
-    mockRuntime(vi.fn(), false);
-    setBrowser('');
+    mockRuntime(vi.fn(), true);
+    setBrowser('?map=gen&seed=73&players=30');
+    setLanguage('ru-RU');
     const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
     const markup = renderToStaticMarkup(createElement(MatchSurface));
     expect(markup).not.toContain('1×');
     expect(markup).not.toContain('5×');
     expect(markup).not.toContain('20×');
+    expect(markup).toContain('player-pause');
   });
 });
