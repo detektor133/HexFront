@@ -70,3 +70,11 @@
 - `pnpm exec vitest run --config vitest.config.ts apps/client/test/match-layout.test.ts` — 13/13; `pnpm verify --changed` — `verify: OK`.
 
 Этап: 07/T7
+
+## Ревью 2026-10-15 — возврат после повторной проверки СПЕК
+
+- СПЕК: `apps/client/test/match-layout.test.ts:1` и `vitest.projects.ts:55-80` — DOM-приёмка T7 не имеет суффикса `.dom.test.tsx`, поэтому не входит в отдельный проект `client-dom` с `test/dom.setup.ts`, требуемый T21 и текстом приёмки T7.
+- `apps/client/src/match/layout.ts:1-3,101-180` — `computeMatchLayout` не возвращает отдельные прямоугольники левой колонки и меню паузы; состояния представлены разрозненными элементами и общим `popup-menu`, что не закрывает перечень плавающих элементов T7.
+- `pnpm verify --changed` — зелёный; проверка не устраняет несоответствие структуры DOM-теста и неполный набор элементов результата раскладки.
+
+Этап: 07/T7

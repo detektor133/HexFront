@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7: исправлены СПЕК-тесты DOM-раскладки.
-- Тест проверяет два набора высот `ResizeObserver`, отсутствие невидимых элементов и корневые CSS-селекторы без числовых координат.
-- `pnpm verify --changed`: зелёный, 14 тестов T7 проходят.
+- 07/T7 возвращена после повторной проверки СПЕК.
+- DOM-тест не имеет суффикса `.dom.test.tsx`, а результат `computeMatchLayout` не содержит отдельных элементов левой колонки и меню паузы.
+- `pnpm verify --changed`: зелёный, но критерии структуры DOM-теста и состава раскладки не закрыты.
 - Следующая задача по очереди: 07/T8.
 - Для ревью читать `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.
