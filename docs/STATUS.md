@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- Исправлен красный CI 07/T21: `dom.setup.ts` больше не дублирует абсолютный Linux-путь к фикстуре при обработке URL.
+- Исправлен красный CI 07/T21: `dom.setup.ts` сохраняет абсолютный Linux-путь после снятия префикса `/@fs/`.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая задача: 07/T7.
 - Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/match/`.

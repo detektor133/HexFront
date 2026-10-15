@@ -20,7 +20,11 @@ vi.mock('node:fs', async (importOriginal) => {
           : /^\/[A-Za-z]:\//u.test(urlPath)
             ? urlPath.slice(1)
             : urlPath;
-        return readFileSync(path.resolve(filePathname), ...(args as never[]));
+        const absolutePath =
+          urlPath.startsWith('/@fs/') && !path.isAbsolute(filePathname)
+            ? `/${filePathname}`
+            : filePathname;
+        return readFileSync(path.resolve(absolutePath), ...(args as never[]));
       }
       if (filePath instanceof URL && filePath.pathname === '/C:/vitest.projects.ts') {
         return readFileSync(
