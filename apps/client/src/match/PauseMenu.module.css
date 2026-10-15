@@ -1,11 +1,11 @@
 .menu {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: var(--layout-popup-menu-y);
+  left: var(--layout-popup-menu-x);
   z-index: 4;
   display: grid;
-  width: 280px;
-  max-width: calc(100% - 2 * var(--space-lg));
+  width: var(--layout-popup-menu-width);
+  height: var(--layout-popup-menu-height);
   gap: var(--space-sm);
   padding: var(--space-lg);
   box-sizing: border-box;

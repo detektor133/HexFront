@@ -23,7 +23,22 @@ export interface MatchLayoutSnapshot {
   readonly hudHeight: number;
   readonly bottomPanelHeight: number;
   mapVisibleHeight: number;
+  readonly hasSelection: boolean;
   elements: MatchLayoutElement[];
+}
+
+export interface MatchLayoutInput {
+  readonly viewport: { readonly width: number; readonly height: number };
+  readonly hudHeight: number;
+  readonly bottomPanelHeight: number;
+  readonly eventRows: number;
+  readonly tutorialVisible: boolean;
+  readonly leaderboardOpen: boolean;
+  readonly leaderboardRows: number;
+  readonly cardHeight: number;
+  readonly cardOpen: boolean;
+  readonly popupOpen: boolean;
+  readonly paused: boolean;
 }
 
 export type MatchLayoutIssue =
@@ -42,10 +57,146 @@ function overlaps(first: MatchLayoutElement, second: MatchLayoutElement): boolea
   );
 }
 
-function overlapIsAllowed(first: MatchLayoutElement, second: MatchLayoutElement): boolean {
-  return (
-    (first.kind === 'event-feed' && second.kind === 'leaderboard') ||
-    (first.kind === 'leaderboard' && second.kind === 'event-feed')
+function layoutElement(
+  id: string,
+  kind: MatchLayoutElementKind,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  interactive = false,
+): MatchLayoutElement {
+  return { id, kind, x, y, width, height, interactive, fontSize: 12 };
+}
+
+function cardOpenOnPhone(input: MatchLayoutInput, width: number): boolean {
+  const edge = width <= 600 ? 8 : 16;
+  return input.cardOpen && width < edge * 2 + 640 + 8;
+}
+
+export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot {
+  const { width, height } = input.viewport;
+  const edge = width <= 600 || height <= 500 ? 8 : 16;
+  const gap = 8;
+  const landscapeWithoutSelection = width > height && !input.cardOpen && !input.paused;
+  const maxBottomPanelHeight = landscapeWithoutSelection
+    ? Math.floor(height / 2) - input.hudHeight
+    : height - input.hudHeight - gap;
+  const bottomPanelHeight = Math.min(
+    input.bottomPanelHeight,
+    Math.max(44, maxBottomPanelHeight),
+    Math.max(44, height - input.hudHeight - gap),
+  );
+  const bottomY = height - bottomPanelHeight;
+  const elements: MatchLayoutElement[] = [
+    layoutElement('hud', 'hud', 0, 0, width, input.hudHeight),
+  ];
+  const showLeaderboard = !input.paused && !cardOpenOnPhone(input, width);
+  if (!input.paused) {
+    elements.push(
+      layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
+    );
+  }
+  const leaderboardWidth = input.leaderboardOpen ? Math.min(320, width - edge * 2) : 180;
+  const leaderboardHeight = input.leaderboardOpen
+    ? Math.min(
+        Math.max(44, input.leaderboardRows * 44 + 16),
+        Math.max(44, bottomY - gap - input.hudHeight),
+      )
+    : 44;
+  if (showLeaderboard) {
+    elements.push(
+      layoutElement(
+        'leaderboard',
+        'leaderboard',
+        Math.max(edge, width - edge - leaderboardWidth),
+        input.hudHeight + gap,
+        leaderboardWidth,
+        leaderboardHeight,
+        true,
+      ),
+    );
+  }
+  const leftWidth = Math.min(280, Math.max(44, width - leaderboardWidth - edge * 3));
+  const eventHeight = Math.min(3, Math.max(0, input.eventRows)) * 44;
+  const leftColumnTop = input.hudHeight + gap;
+  const leftColumnBottom = bottomY - gap;
+  const eventVisible = eventHeight > 0 && leftColumnTop + eventHeight <= leftColumnBottom;
+  if (eventVisible && !input.cardOpen && !input.leaderboardOpen && !input.paused) {
+    elements.push(
+      layoutElement(
+        'event-feed',
+        'event-feed',
+        edge,
+        input.hudHeight + gap,
+        leftWidth,
+        eventHeight,
+      ),
+    );
+  }
+  const tutorialY = leftColumnTop + (eventVisible ? eventHeight + gap : 0);
+  if (
+    input.tutorialVisible &&
+    !input.leaderboardOpen &&
+    !input.cardOpen &&
+    !input.paused &&
+    tutorialY + 48 <= leftColumnBottom
+  ) {
+    elements.push(layoutElement('tutorial', 'tutorial', edge, tutorialY, leftWidth, 48));
+  }
+  const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
+  if (input.cardOpen && !input.paused && cardAvailableHeight >= 44) {
+    elements.push(
+      layoutElement(
+        'card',
+        'card',
+        edge,
+        Math.max(input.hudHeight + gap, bottomY - gap - input.cardHeight),
+        Math.min(320, width - edge * 2),
+        Math.min(input.cardHeight, cardAvailableHeight),
+      ),
+    );
+  }
+  if (input.popupOpen || input.paused) {
+    elements.push(
+      layoutElement(
+        'popup-menu',
+        'popup-menu',
+        Math.max(edge, (width - 280) / 2),
+        Math.max(input.hudHeight + gap, (height - 240) / 2),
+        Math.min(280, width - edge * 2),
+        Math.max(44, Math.min(240, height - input.hudHeight - gap - edge)),
+        true,
+      ),
+    );
+  }
+  return {
+    scene: input.paused
+      ? 'pause-menu-open'
+      : input.cardOpen
+        ? 'selected-army'
+        : input.leaderboardOpen
+          ? 'leaderboard-open'
+          : input.tutorialVisible
+            ? 'start-with-tutorial'
+            : 'selected-hex',
+    viewport: input.viewport,
+    hudHeight: input.hudHeight,
+    bottomPanelHeight,
+    mapVisibleHeight: Math.max(0, height - input.hudHeight - bottomPanelHeight),
+    hasSelection: input.cardOpen,
+    elements,
+  };
+}
+
+export function matchLayoutVariables(layout: MatchLayoutSnapshot): Record<string, string> {
+  return Object.fromEntries(
+    layout.elements.flatMap((element) => [
+      [`--layout-${element.id}-x`, `${element.x}px`],
+      [`--layout-${element.id}-y`, `${element.y}px`],
+      [`--layout-${element.id}-width`, `${element.width}px`],
+      [`--layout-${element.id}-height`, `${element.height}px`],
+    ]),
   );
 }
 
@@ -75,13 +226,18 @@ export function validateMatchLayout(layout: MatchLayoutSnapshot): MatchLayoutIss
     if (!first) continue;
     for (let secondIndex = firstIndex + 1; secondIndex < layout.elements.length; secondIndex += 1) {
       const second = layout.elements[secondIndex];
-      if (second && overlaps(first, second) && !overlapIsAllowed(first, second)) {
+      if (second && overlaps(first, second)) {
         issues.push({ type: 'overlap', elements: [first.id, second.id] });
       }
     }
   }
 
-  if (width > height && width <= 900 && layout.mapVisibleHeight < height / 2) {
+  if (
+    width > height &&
+    width <= 900 &&
+    !layout.hasSelection &&
+    layout.mapVisibleHeight < height / 2
+  ) {
     issues.push({ type: 'map-area-too-small' });
   }
   return issues;

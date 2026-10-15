@@ -1,10 +1,10 @@
 .panel {
   position: absolute;
-  top: var(--hud-h, 0px);
-  right: var(--space-lg);
+  top: var(--layout-leaderboard-y);
+  left: var(--layout-leaderboard-x);
   z-index: 3;
-  max-width: calc(100% - 32px);
-  max-height: calc(100% - 72px);
+  width: var(--layout-leaderboard-width);
+  max-height: var(--layout-leaderboard-height);
   overflow: auto;
   padding: var(--space-sm);
   background: var(--ui-surface);
@@ -49,8 +49,7 @@
 
 @media (max-width: 600px) {
   .panel {
-    top: var(--hud-h, 0px);
-    left: var(--space-md);
-    right: var(--space-md);
+    top: var(--layout-leaderboard-y);
+    left: var(--layout-leaderboard-x);
   }
 }

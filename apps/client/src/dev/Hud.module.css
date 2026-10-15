@@ -1,15 +1,15 @@
 /* Верхняя полоса — ui.md «HUD»: белая, 48 px (ПК) / 44 px (телефон), жёсткая тень снизу. */
 .hud {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: var(--layout-hud-y);
+  left: var(--layout-hud-x);
+  width: var(--layout-hud-width);
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0 var(--space-xl);
-  min-height: 48px;
+  min-height: var(--layout-hud-height);
   padding: 0 var(--space-lg);
   box-sizing: border-box;
   background: var(--ui-surface);
@@ -191,7 +191,7 @@
 @media (max-width: 600px) {
   .hud {
     gap: 0 var(--space-md);
-    min-height: 44px;
+    min-height: var(--layout-hud-height);
     padding: var(--space-xs) var(--space-md);
   }
 
@@ -206,7 +206,7 @@
 
 @media (orientation: landscape) and (max-height: 500px) {
   .hud {
-    min-height: 44px;
+    min-height: var(--layout-hud-height);
     gap: 0 var(--space-md);
     padding: 0 var(--space-md);
   }

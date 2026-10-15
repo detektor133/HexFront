@@ -1,12 +1,12 @@
 /* Карточка выбранного — ui.md: ширина 320 (ПК), на телефоне на всю ширину минус поля, снизу. */
 .card {
   position: absolute;
-  left: var(--space-lg);
+  left: var(--layout-card-x);
   /* Над нижней панелью армий (--dock-h задаёт страница). */
-  bottom: calc(var(--dock-h, 0px) + var(--space-sm));
+  top: var(--layout-card-y);
   z-index: 2;
-  width: 320px;
-  max-height: calc(100% - 96px - var(--dock-h, 0px));
+  width: var(--layout-card-width);
+  max-height: var(--layout-card-height);
   overflow-y: auto;
   box-sizing: border-box;
   padding: var(--space-md);
@@ -131,8 +131,8 @@
 
 @media (max-width: 600px) {
   .card {
-    left: var(--space-lg);
-    right: var(--space-lg);
+    left: var(--layout-card-x);
+    width: var(--layout-card-width);
     width: auto;
     max-height: 45%;
   }

@@ -1,10 +1,10 @@
 .feed {
   position: absolute;
-  top: calc(var(--hud-h, 0px) + var(--observer-h, 0px) + var(--space-sm));
-  left: var(--space-lg);
+  top: var(--layout-event-feed-y);
+  left: var(--layout-event-feed-x);
   z-index: 3;
   display: flex;
-  width: min(280px, calc(100% - 2 * var(--space-lg)));
+  width: var(--layout-event-feed-width);
   flex-direction: column;
   gap: 2px;
 }

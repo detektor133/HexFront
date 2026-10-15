@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import fc from 'fast-check';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +12,8 @@ import { loadMap } from '@hexfront/sim';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { PauseMenu } from '../src/match/PauseMenu.tsx';
 import {
+  computeMatchLayout,
+  matchLayoutVariables,
   validateMatchLayout,
   type MatchLayoutElement,
   type MatchLayoutSnapshot,
@@ -68,10 +71,11 @@ const validLayout = (
   hudHeight: width < height ? 88 : 48,
   bottomPanelHeight: width < height ? 178 : 132,
   mapVisibleHeight: width < height ? 578 : 210,
+  hasSelection: scene === 'selected-hex' || scene === 'selected-army',
   elements: [
     element('hud', 'hud', 0, 0, width, width < height ? 88 : 48),
-    element('event-feed', 'event-feed', 16, width < height ? 96 : 56, 260, 48),
-    element('tutorial', 'tutorial', 16, width < height ? 152 : 108, 260, 48),
+    element('event-feed', 'event-feed', 16, width < height ? 96 : 56, 160, 48),
+    element('tutorial', 'tutorial', 16, width < height ? 152 : 108, 160, 48),
     element('leaderboard', 'leaderboard', width - 196, width < height ? 96 : 56, 180, 48),
     element(
       'bottom-panel',
@@ -184,59 +188,6 @@ function prepareScene(
   }));
 }
 
-function actualLayout(
-  scene: MatchLayoutSnapshot['scene'],
-  viewport: (typeof VIEWPORTS)[number],
-  markup: string,
-): MatchLayoutSnapshot {
-  const portrait = viewport.width < viewport.height;
-  const hudHeight = portrait ? 88 : 48;
-  const bottomPanelHeight = portrait ? 178 : 132;
-  const elements: MatchLayoutElement[] = [
-    element('hud', 'hud', 0, 0, viewport.width, hudHeight),
-    element('leaderboard', 'leaderboard', viewport.width - 196, hudHeight + 8, 180, 48),
-  ];
-  if (scene !== 'pause-menu-open') {
-    elements.push(
-      element(
-        'bottom-panel',
-        'bottom-panel',
-        0,
-        viewport.height - bottomPanelHeight,
-        viewport.width,
-        bottomPanelHeight,
-      ),
-    );
-  }
-  if (markup.includes('aria-live="polite"')) {
-    elements.push(element('tutorial', 'tutorial', 16, hudHeight + (portrait ? 64 : 52), 260, 48));
-  }
-  if (markup.includes('role="dialog"') && scene === 'pause-menu-open') {
-    elements.push(
-      element('pause-menu', 'popup-menu', 80, (viewport.height - 240) / 2, 280, 240, {
-        interactive: true,
-      }),
-    );
-  }
-  if (markup.includes('role="group"')) {
-    elements.push(
-      element('unit-card', 'card', 16, viewport.height - bottomPanelHeight - 8 - 180, 320, 180),
-    );
-  } else if (scene === 'selected-hex') {
-    elements.push(
-      element('hex-card', 'card', 16, viewport.height - bottomPanelHeight - 8 - 180, 320, 180),
-    );
-  }
-  return {
-    scene,
-    viewport,
-    hudHeight,
-    bottomPanelHeight,
-    mapVisibleHeight: viewport.height - hudHeight - bottomPanelHeight,
-    elements,
-  };
-}
-
 afterEach(() => {
   vi.resetModules();
   vi.unstubAllGlobals();
@@ -338,7 +289,28 @@ describe('приёмка T7: раскладка матча без перекры
         const markup = renderToStaticMarkup(rendered);
         expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
         expect(markup).toMatch(/Налог|Tax/);
-        const layout = actualLayout(scene, viewport, markup);
+        const layoutInput = {
+          viewport,
+          hudHeight: viewport.width < viewport.height ? 88 : 48,
+          bottomPanelHeight: viewport.width < viewport.height ? 178 : 132,
+          eventRows: 0,
+          tutorialVisible: scene === 'start-with-tutorial',
+          leaderboardOpen: false,
+          leaderboardRows: 6,
+          cardHeight: scene === 'selected-army' || scene === 'selected-hex' ? 180 : 0,
+          cardOpen: scene === 'selected-army' || scene === 'selected-hex',
+          popupOpen: false,
+          paused: false,
+        } as const;
+        const layout = computeMatchLayout(layoutInput);
+        for (const [name, value] of Object.entries(matchLayoutVariables(layout))) {
+          expect(markup, `${scene} ${viewport.width}x${viewport.height}`).toContain(
+            `${name}:${value}`,
+          );
+        }
+        if (scene === 'pause-menu-open') {
+          expect(markup).toContain('role="dialog"');
+        }
         expect(
           validateMatchLayout(layout),
           `${scene} ${viewport.width}x${viewport.height}`,
@@ -346,5 +318,56 @@ describe('приёмка T7: раскладка матча без перекры
         vi.resetModules();
       }
     }
+  });
+
+  it('передаёт прямоугольники чистого расчёта в реальный MatchSurface', () => {
+    const layout = computeMatchLayout({
+      viewport: VIEWPORTS[0],
+      hudHeight: 88,
+      bottomPanelHeight: 178,
+      eventRows: 3,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 6,
+      cardHeight: 120,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    });
+
+    expect(matchLayoutVariables(layout)).toMatchObject({
+      '--layout-hud-x': '0px',
+      '--layout-hud-height': '88px',
+      '--layout-bottom-panel-y': '666px',
+      '--layout-bottom-panel-height': '178px',
+    });
+  });
+
+  it('не нарушает границы при произвольном экране и наборе флагов', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 320, max: 1920 }),
+        fc.integer({ min: 320, max: 1200 }),
+        fc.boolean(),
+        fc.boolean(),
+        fc.boolean(),
+        (width, height, tutorialVisible, leaderboardOpen, cardOpen) => {
+          const layout = computeMatchLayout({
+            viewport: { width, height },
+            hudHeight: width <= 600 ? 88 : 48,
+            bottomPanelHeight: width <= 600 ? 178 : 132,
+            eventRows: 3,
+            tutorialVisible,
+            leaderboardOpen,
+            leaderboardRows: 6,
+            cardHeight: 900,
+            cardOpen,
+            popupOpen: false,
+            paused: false,
+          });
+          expect(validateMatchLayout(layout)).toEqual([]);
+        },
+      ),
+    );
   });
 });

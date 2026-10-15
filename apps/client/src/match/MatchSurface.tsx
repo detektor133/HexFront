@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { OnboardingHints } from './OnboardingHints.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
+import { computeMatchLayout, matchLayoutVariables } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
@@ -75,6 +76,19 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
+  const layout = computeMatchLayout({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    hudHeight: window.innerWidth <= 600 ? 88 : 48,
+    bottomPanelHeight: window.innerWidth <= 600 ? 178 : 132,
+    eventRows: Math.min(3, sb.events.length),
+    tutorialVisible: showOnboarding && view !== null,
+    leaderboardOpen: false,
+    leaderboardRows: view?.players.length ?? 0,
+    cardHeight: 180,
+    cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
+    popupOpen: false,
+    paused: pauseState.menuOpen,
+  });
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
   const armyPicked =
@@ -87,7 +101,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div
       className={styles.page}
-      style={{ '--dock-h': `${dockH}px`, '--hud-h': `${hudH}px` } as React.CSSProperties}
+      style={
+        {
+          '--dock-h': `${dockH}px`,
+          '--hud-h': `${hudH}px`,
+          ...matchLayoutVariables(layout),
+        } as React.CSSProperties
+      }
     >
       <div ref={hostRef} className={styles.map} />
       <EventFeed
