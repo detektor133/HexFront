@@ -15,7 +15,7 @@
 | E2E | Playwright | Главное меню → локальный матч → первые действия | `apps/client/tests/e2e/` |
 | Баланс | `tools/balance` | 100 матчей ботов, метрики темпа (`gdd/00-overview.md`) | отчёт, не в CI |
 
-Поведение React-компонентов (клики, открытие меню, состояние, эффекты, таймеры, `ResizeObserver`) проверяется в тестах клиента с суффиксом `.dom.test.tsx` через Testing Library и среду jsdom. SSR-рендер (`renderToStaticMarkup`) не выполняет эффекты, `ResizeObserver`, клики и состояние, поэтому для таких критериев он не подходит. Размеры, которые jsdom не считает, задаются в тесте подменой `ResizeObserver` и `getBoundingClientRect`; `Worker` и холст Pixi в таких тестах подменяются.
+Поведение React-компонентов (клики, открытие меню, состояние, эффекты, таймеры, `ResizeObserver`) проверяется в тестах клиента с суффиксом `.dom.test.tsx` через Testing Library и среду jsdom. SSR-рендер (`renderToStaticMarkup`) не выполняет эффекты, `ResizeObserver`, клики и состояние, поэтому для таких критериев он не подходит. Размеры, которые jsdom не считает, задаются в тесте подменой `ResizeObserver` и `getBoundingClientRect`; `Worker` и холст Pixi в таких тестах подменяются. jsdom не считает раскладку: `getBoundingClientRect` даёт нули, CSS-модули не применяются, поэтому положение и размер элемента проверяются по его собственному `style` (`element.style.left` и т. п.), а не по измерению.
 
 ## Уровни тестов
 
