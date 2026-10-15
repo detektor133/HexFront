@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -84,8 +84,29 @@ describe('лидерборд', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.getAllByRole('row')).toHaveLength(7);
+    const rows = screen.getAllByRole('row');
+    expect(rows).toHaveLength(7);
     expect(screen.getAllByRole('rowheader')).toHaveLength(6);
+
+    const expected = [
+      { player: 'Игрок 1', place: '1', hexes: '0', cities: '0', score: '60' },
+      { player: 'Игрок 2', place: '2', hexes: '0', cities: '0', score: '50' },
+      { player: 'Игрок 3', place: '3', hexes: '0', cities: '0', score: '40' },
+      { player: 'Игрок 4', place: '4', hexes: '0', cities: '0', score: '30' },
+      { player: 'Игрок 5', place: '5', hexes: '0', cities: '0', score: '20' },
+      { player: 'Игрок 6', place: '6', hexes: '0', cities: '0', score: '10' },
+    ];
+
+    expected.forEach((entry, index) => {
+      const row = within(rows[index + 1] as HTMLElement);
+      expect(row.getByRole('rowheader', { name: entry.place })).toBeTruthy();
+      expect(row.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+        entry.player,
+        entry.hexes,
+        entry.cities,
+        entry.score,
+      ]);
+    });
   });
 
   it('критерий: в лидерборде нет колонок золота и солдат', () => {
