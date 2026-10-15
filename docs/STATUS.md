@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T13: фон меню подключён к `MapView` и `EconomyLayer`, снимки фонового Worker применяются через `ViewDeltaApplier`.
+- 07/T13 принята: фон меню подключён к `MapView` и `EconomyLayer`, снимки фонового Worker применяются через `ViewDeltaApplier`.
 - Игровой URL передаёт имя, цвет и автокомандование; `MatchSurfaceRuntime` применяет их к игровому Worker.
 - Пустой ник в `createLocalEngine` получает имя «Игрок 1».
 - `apps/client/test/main-menu.dom.test.tsx` проверяет реальный `MatchPage` Worker и перестановку цветов; результат 8/8.
 - `pnpm verify --changed` зелёный; дополнительные тесты local engine/local match — 17/17.
-- Следующая задача: `$review 07/T13` в новой сессии.
+- Следующая задача: 07/T14.
