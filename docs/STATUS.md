@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- Исправлены возвращённые СПЕК-тесты 07/T11.
+- 07/T11 принята повторным ревью после исправления СПЕК-тестов.
 - `apps/client/test/match-end.dom.test.tsx` проверяет точную строку отсчёта в реальном `Hud` на снимке `createLocalEngine`.
 - `packages/sim/test/victory-hold.test.ts` проверяет лидера, отсутствие лидера и полный отсчёт только через `step`.
 - Кодек `packages/protocol/test/victory-hold-snapshot.test.ts` оставлен без ослабления: проверяет полный `encodeSnapshot` → `decodeSnapshot`.
