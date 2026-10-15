@@ -529,7 +529,7 @@ const en: Record<MessageKey, string> = {
 };
 
 export const lang =
-  typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
+  typeof navigator === 'undefined' || navigator.language.startsWith('ru') ? 'ru' : 'en';
 const dict: Record<MessageKey, string> = lang === 'ru' ? ru : en;
 
 /** Текст причины отказа команды; неизвестная причина — ключ как есть, чтобы её было видно. */
