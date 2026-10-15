@@ -1,5 +1,13 @@
 # 07/T6 — пауза и выход
 
+## Возврат ревью 2026-10-15 (повторная сверка)
+
+- `pnpm verify --changed` — OK: build, types, lint и tests.
+- СПЕК: `apps/client/test/pause.test.ts:257-265` передаёт `withView=false`, поэтому `Hud` и `ObserverPanel` не рендерятся; отсутствие выбора скорости не проверяется на реальном `/match` без `debug`.
+- `apps/client/src/dev/Hud.tsx:105-114` содержит самописный SVG из четырёх вертикальных линий с `data-icon="player-pause"`, а не Tabler-иконку `player-pause`.
+
+Этап: 07/T6
+
 ## Возврат ревью 2026-10-15
 
 - `pnpm verify --changed` — OK: build, types, lint, prettier, tests и visual.
