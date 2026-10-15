@@ -100,7 +100,7 @@ export function createLocalEngine(
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({
-    name: i === HUMAN_ID && playerName !== '' ? playerName : `P${i}`,
+    name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
   }));
   const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];

@@ -9,6 +9,12 @@
   background: var(--map-background);
 }
 
+.background {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .card {
   position: relative;
   z-index: 1;

@@ -7,6 +7,9 @@ export interface LocalMatchSetup {
   readonly bots: readonly number[];
   readonly speed: number;
   readonly map: MapRequest;
+  readonly playerName: string | null;
+  readonly playerColor: string | null;
+  readonly autoCommand: boolean | null;
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
@@ -21,5 +24,14 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     params.get('freezeTime') === '1'
       ? 0
       : Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
-  return { count: map.players, bots, speed, map };
+  const auto = params.get('auto');
+  return {
+    count: map.players,
+    bots,
+    speed,
+    map,
+    playerName: params.get('name'),
+    playerColor: params.get('color'),
+    autoCommand: auto === null ? null : auto === '1',
+  };
 }

@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T13: исправлен СПЕК-тест цвета — он явно выбирает `brick`, сравнивает исходный и новый фоновые Worker и подтверждает перестановку `['teal', 'brick']` → `['brick', 'teal']`.
-- СПЕК-тест настроек проверяет `setAutoCommand` в Worker, созданном после рендера `MatchPage`, а не в фоне.
-- Проверено: `pnpm exec vitest run --config vitest.config.ts apps/client/test/main-menu.dom.test.tsx` — 8/8; `pnpm verify --changed` — зелёный.
-- Остались возвраты ревью T13: живой фон не подключён к карте; пустой ник в движке получает `P0`.
-- Следующая задача: продолжить 07/T13 после исправления оставшихся возвратов, затем `$review 07/T13`.
+- 07/T13: фон меню подключён к `MapView` и `EconomyLayer`, снимки фонового Worker применяются через `ViewDeltaApplier`.
+- Игровой URL передаёт имя, цвет и автокомандование; `MatchSurfaceRuntime` применяет их к игровому Worker.
+- Пустой ник в `createLocalEngine` получает имя «Игрок 1».
+- `apps/client/test/main-menu.dom.test.tsx` проверяет реальный `MatchPage` Worker и перестановку цветов; результат 8/8.
+- `pnpm verify --changed` зелёный; дополнительные тесты local engine/local match — 17/17.
+- Следующая задача: `$review 07/T13` в новой сессии.

@@ -26,6 +26,8 @@ class FakeWorker {
 
 let workers: FakeWorker[] = [];
 
+const smallMap = JSON.parse(readFileSync('packages/mapgen/maps/small.json', 'utf8')) as unknown;
+
 function renderMenu(): void {
   vi.stubGlobal(
     'Worker',
@@ -80,6 +82,11 @@ describe('главное меню', () => {
     workers = [];
     localStorage.clear();
     vi.stubGlobal('Worker', undefined);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => smallMap })),
+    );
+    vi.spyOn(mapViewModule, 'createMapView').mockResolvedValue(fakeMapView());
   });
 
   afterEach(() => {
@@ -163,6 +170,8 @@ describe('главное меню', () => {
     expect(localStorage.getItem('hexfront.auto-command')).toBe('true');
     expect(localStorage.getItem('hexfront.nickname')).toBe('Адмирал');
     expect(play.getAttribute('href')).toContain('name=%D0%90%D0%B4%D0%BC%D0%B8%D1%80%D0%B0%D0%BB');
+    expect(play.getAttribute('href')).toContain('color=brick');
+    expect(play.getAttribute('href')).toContain('auto=1');
     cleanup();
 
     const gameWorker = await renderGame(play.getAttribute('href') ?? '/match');

@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { loadMap } from '@hexfront/sim';
+
+import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
+import type { FromWorker } from '../local/messages.ts';
+import { ViewDeltaApplier } from '../local/view-delta.ts';
+import { createMapView, type MapView } from '../render/map-view.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
+
+const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
 const NICKNAME_KEY = 'hexfront.nickname';
 const COLOR_KEY = 'hexfront.color';
@@ -15,15 +23,17 @@ function readStorage(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
 }
 
-function matchUrl(nickname: string, color: string): string {
+function matchUrl(nickname: string, color: string, autoCommand: boolean): string {
   const url = new URL(quickMatchUrl(), window.location.origin);
   if (nickname !== '') url.searchParams.set('name', nickname);
   url.searchParams.set('color', color);
+  url.searchParams.set('auto', autoCommand ? '1' : '0');
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 /** Главное меню быстрого локального матча. */
 export function MainMenu(): React.JSX.Element {
+  const backgroundHostRef = useRef<HTMLDivElement>(null);
   const backgroundRef = useRef<LocalMatch | null>(null);
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
@@ -32,18 +42,60 @@ export function MainMenu(): React.JSX.Element {
   );
 
   useEffect(() => {
-    const startBackground = (playerColors: readonly string[]): void => {
-      backgroundRef.current?.dispose();
-      backgroundRef.current = startLocalMatch(
-        'small',
-        1,
-        { count: 6, bots: [0, 1, 2, 3, 4, 5], speed: 1 },
-        () => undefined,
-        { fog: false, playerColors },
-      );
+    let disposed = false;
+    let mapView: MapView | null = null;
+    let layer: EconomyLayer | null = null;
+    let pendingMessage: Extract<FromWorker, { t: 'view' }> | null = null;
+    const deltaApplier = new ViewDeltaApplier();
+    const applyMessage = (message: Extract<FromWorker, { t: 'view' }>): void => {
+      if (layer === null) {
+        pendingMessage = message;
+        return;
+      }
+      const view =
+        message.kind === 'snapshot'
+          ? deltaApplier.applySnapshot(message.snapshot)
+          : deltaApplier.applyDelta(message.delta);
+      layer.setView(view, EMPTY_SELECTION);
+      layer.frame(performance.now());
     };
-    startBackground(playerColorIds(color).slice(0, 2));
-    return () => backgroundRef.current?.dispose();
+    backgroundRef.current = startLocalMatch(
+      'small',
+      1,
+      { count: 6, bots: [0, 1, 2, 3, 4, 5], speed: 1 },
+      (message: FromWorker): void => {
+        if (message.t === 'view') applyMessage(message);
+      },
+      { fog: false, playerColors: playerColorIds(color).slice(0, 2) },
+    );
+    const startBackground = async (): Promise<void> => {
+      const response = await fetch('/maps/small.json');
+      const json: unknown = await response.json();
+      const loaded = loadMap(json);
+      if (disposed || !loaded.ok || backgroundHostRef.current === null) return;
+      mapView = await createMapView(
+        backgroundHostRef.current,
+        loaded.map,
+        {
+          radius: tokens.map.hexRadius,
+          midLayer: (map, radius) => {
+            layer = createEconomyLayer(map, radius);
+            return layer;
+          },
+        },
+        () => undefined,
+      );
+      if (disposed) return;
+      if (pendingMessage !== null) applyMessage(pendingMessage);
+    };
+    void startBackground();
+    return () => {
+      disposed = true;
+      backgroundRef.current?.dispose();
+      layer?.destroy();
+      mapView?.destroy();
+      backgroundRef.current = null;
+    };
   }, [color]);
 
   const handleColor = (next: string): void => {
@@ -58,6 +110,7 @@ export function MainMenu(): React.JSX.Element {
 
   return (
     <main className={styles.page}>
+      <div ref={backgroundHostRef} className={styles.background} aria-hidden="true" />
       <section className={styles.card} aria-labelledby="main-menu-title">
         <p className={styles.wordmark}>Hexfront</p>
         <h1 id="main-menu-title" className={styles.title}>
@@ -90,7 +143,7 @@ export function MainMenu(): React.JSX.Element {
         <a
           className={styles.play}
           role="button"
-          href={matchUrl(nickname, color)}
+          href={matchUrl(nickname, color, autoCommand)}
           onClick={handlePlay}
         >
           {t('menu.play')}

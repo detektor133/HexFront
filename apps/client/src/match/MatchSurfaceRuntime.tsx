@@ -248,6 +248,7 @@ export function useSandbox(
     let frameRequest = 0;
     let appliedMessage = false;
     const deltaApplier = new ViewDeltaApplier();
+    const setup = readLocalMatchSetup(window.location.search);
     const applyMessage = (m: WorkerViewMessage): void => {
       const view =
         m.kind === 'snapshot'
@@ -299,12 +300,17 @@ export function useSandbox(
       },
       {
         telemetry: debug,
-        playerName: localStorage.getItem(NICKNAME_KEY) || `${t('observer.player')} 1`,
-        playerColors: matchPlayerColors(localStorage.getItem(COLOR_KEY) ?? 'teal'),
-        autoCommand: localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
+        playerName:
+          setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
+        playerColors: matchPlayerColors(
+          setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
+        ),
+        autoCommand: setup.autoCommand ?? localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
       },
     );
-    setPlayerPalette(matchPlayerColors(localStorage.getItem(COLOR_KEY) ?? 'teal'));
+    setPlayerPalette(
+      matchPlayerColors(setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal'),
+    );
     matchRef.current = match;
     match.setView(null, !debug);
     setFogState(!debug);
