@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-07/T6 возвращена ревью: тесты вызывают обработчики меню без проверки `resume` и сида «Заново»; `MatchSurface` использует только `reload()`; HUD содержит самописный SVG вместо Tabler `player-pause`.
-`pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
-Следующая сессия — исправить возврат ревью 07/T6, затем повторить `$review 07/T6`.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
+- 07/T6 исправлена по возврату ревью: приёмочные тесты проверяют `resume`, рестарт того же URL с тем же seed и переход в меню через реальный `MatchSurface`.
+- Рестарт сохраняет параметры карты и игроков, явно передавая исходный seed в URL; иконка паузы использует геометрию Tabler `player-pause`.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
+- Следующая сессия — выполнить `$review 07/T6`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.

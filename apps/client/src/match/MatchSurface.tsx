@@ -43,7 +43,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         navigate: (path) => {
           window.location.assign(path);
         },
-        restart: () => window.location.reload(),
+        restart: (seed) => {
+          const params = new URLSearchParams(window.location.search);
+          params.set('seed', String(seed));
+          window.location.assign(`${window.location.pathname}?${params.toString()}`);
+        },
         onStateChange: (paused, menuOpen) => setPauseState({ paused, menuOpen }),
       }),
     [mapRequest.seed, sb.setPaused],

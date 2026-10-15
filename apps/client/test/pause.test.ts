@@ -156,7 +156,7 @@ describe('пауза локального матча', () => {
     const setPaused = vi.fn();
     mockReactHooks();
     mockRuntime(setPaused);
-    setBrowser('');
+    setBrowser('?map=gen&seed=73&players=30');
     setLanguage('ru-RU');
     const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
     const tree = MatchSurface({});
@@ -175,18 +175,22 @@ describe('пауза локального матча', () => {
     expect(renderToStaticMarkup(pauseMarkup)).toContain('Продолжить');
     const pauseButtons = (pauseMarkup.props.children as unknown as ElementNode[]).slice(1);
     (pauseButtons[0]?.props?.onClick as (() => void) | undefined)?.();
-    (pauseButtons[1]?.props?.onClick as (() => void) | undefined)?.();
+    expect(setPaused).toHaveBeenLastCalledWith(false);
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const resumedTree = MatchSurface({});
+    expect(findNode(resumedTree, 'PauseMenu')).toBeUndefined();
+
     (pauseButtons[2]?.props?.onClick as (() => void) | undefined)?.();
-    expect(window.location.reload).toHaveBeenCalledOnce();
     expect(window.location.assign).toHaveBeenCalledWith('/');
     const { Hud } = await import('../src/dev/Hud.tsx');
     expect(renderToStaticMarkup(Hud(hud?.props as never))).toContain('player-pause');
   });
 
   it('рендерит PauseMenu и вызывает обработчики его кнопок', async () => {
+    const setPaused = vi.fn();
     mockReactHooks();
-    mockRuntime(vi.fn());
-    setBrowser('');
+    mockRuntime(setPaused);
+    setBrowser('?map=gen&seed=73&players=30');
     setLanguage('ru-RU');
     const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
     const initialTree = MatchSurface({});
@@ -207,7 +211,10 @@ describe('пауза локального матча', () => {
     expect(markup).toContain('В меню');
     const menuButtons = (pauseMenu.props?.children as unknown as ElementNode[]).slice(1);
     (menuButtons[0]?.props?.onClick as (() => void) | undefined)?.();
+    expect(setPaused).toHaveBeenCalledWith(false);
+    expect(window.location.assign).not.toHaveBeenCalled();
     (menuButtons[1]?.props?.onClick as (() => void) | undefined)?.();
+    expect(window.location.assign).toHaveBeenCalledWith('/match?map=gen&seed=73&players=30');
   });
 
   it('visibilitychange hidden вызывает паузу через обработчик MatchSurface', async () => {
