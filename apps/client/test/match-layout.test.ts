@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import { PauseMenu } from '../src/match/PauseMenu.tsx';
 import {
   validateMatchLayout,
   type MatchLayoutElement,
@@ -27,6 +28,7 @@ const tinyMapJson: unknown = JSON.parse(
 
 const parsedMap = loadMap(tinyMapJson);
 if (!parsedMap.ok) throw new Error(parsedMap.errors.join('; '));
+const tinyMap = parsedMap.map;
 
 const SCENES = [
   'start-with-tutorial',
@@ -143,12 +145,96 @@ const matchRuntime = (
   };
 };
 
-function setMatchWindow(search: string): void {
+function setMatchWindow(
+  search: string,
+  width = 390,
+  height = 844,
+  onboardingDismissed = false,
+): void {
   vi.stubGlobal('window', {
     location: { search, pathname: '/match' },
+    innerWidth: width,
+    innerHeight: height,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
   });
+  vi.stubGlobal('localStorage', {
+    getItem: () =>
+      onboardingDismissed
+        ? JSON.stringify(['autoCommand', 'tax', 'foundCity', 'front', 'offensive'])
+        : null,
+    setItem: () => undefined,
+  });
+}
+
+function prepareScene(
+  scene: MatchLayoutSnapshot['scene'],
+  viewport: (typeof VIEWPORTS)[number],
+): void {
+  const selectedHex = scene === 'selected-hex';
+  const selectedArmy = scene === 'selected-army';
+  const search = selectedHex ? '?select=0' : '';
+  setMatchWindow(search, viewport.width, viewport.height, scene !== 'start-with-tutorial');
+  vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
+    useMapJson: () => ({ json: tinyMapJson, map: tinyMap }),
+    useSandbox: () =>
+      matchRuntime(
+        selectedHex ? { selectedHex: 0 } : selectedArmy ? { pickedUnits: [0], army: 0 } : {},
+      ),
+  }));
+}
+
+function actualLayout(
+  scene: MatchLayoutSnapshot['scene'],
+  viewport: (typeof VIEWPORTS)[number],
+  markup: string,
+): MatchLayoutSnapshot {
+  const portrait = viewport.width < viewport.height;
+  const hudHeight = portrait ? 88 : 48;
+  const bottomPanelHeight = portrait ? 178 : 132;
+  const elements: MatchLayoutElement[] = [
+    element('hud', 'hud', 0, 0, viewport.width, hudHeight),
+    element('leaderboard', 'leaderboard', viewport.width - 196, hudHeight + 8, 180, 48),
+  ];
+  if (scene !== 'pause-menu-open') {
+    elements.push(
+      element(
+        'bottom-panel',
+        'bottom-panel',
+        0,
+        viewport.height - bottomPanelHeight,
+        viewport.width,
+        bottomPanelHeight,
+      ),
+    );
+  }
+  if (markup.includes('aria-live="polite"')) {
+    elements.push(element('tutorial', 'tutorial', 16, hudHeight + (portrait ? 64 : 52), 260, 48));
+  }
+  if (markup.includes('role="dialog"') && scene === 'pause-menu-open') {
+    elements.push(
+      element('pause-menu', 'popup-menu', 80, (viewport.height - 240) / 2, 280, 240, {
+        interactive: true,
+      }),
+    );
+  }
+  if (markup.includes('role="group"')) {
+    elements.push(
+      element('unit-card', 'card', 16, viewport.height - bottomPanelHeight - 8 - 180, 320, 180),
+    );
+  } else if (scene === 'selected-hex') {
+    elements.push(
+      element('hex-card', 'card', 16, viewport.height - bottomPanelHeight - 8 - 180, 320, 180),
+    );
+  }
+  return {
+    scene,
+    viewport,
+    hudHeight,
+    bottomPanelHeight,
+    mapVisibleHeight: viewport.height - hudHeight - bottomPanelHeight,
+    elements,
+  };
 }
 
 afterEach(() => {
@@ -230,45 +316,35 @@ describe('приёмка T7: раскладка матча без перекры
     );
   });
 
-  it('проходит через реальный MatchSurface для стартовой сцены и выбранных карточек', async () => {
-    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
-      useMapJson: () => ({ json: tinyMapJson, map: parsedMap.map }),
-      useSandbox: () => matchRuntime(),
-    }));
-    setMatchWindow('');
-
-    const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    const markup = renderToStaticMarkup(createElement(MatchPage));
-
-    expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
-    expect(markup).toMatch(/Налог|Tax/);
-    expect(markup).toMatch(/aria-label="Пауза"|aria-label="Pause"/);
-    expect(markup).toMatch(/aria-label="Резерв"|aria-label="Reserve"/);
-
-    vi.resetModules();
-    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
-      useMapJson: () => ({ json: tinyMapJson, map: parsedMap.map }),
-      useSandbox: () => matchRuntime({ selectedHex: 0 }),
-    }));
-    const { MatchPage: selectedHexPage } = await import('../src/match/MatchPage.tsx');
-    const selectedHexMarkup = renderToStaticMarkup(createElement(selectedHexPage));
-    expect(selectedHexMarkup).toContain('<section');
-
-    const unitEngine = createLocalEngine(tinyMapJson, 42, 2);
-    if ('errors' in unitEngine) throw new Error(unitEngine.errors.join('; '));
-    const unit = unitEngine.snapshot().view.units.find((item) => item.owner === 0);
-    expect(unit).not.toBeNull();
-    vi.resetModules();
-    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
-      useMapJson: () => ({ json: tinyMapJson, map: parsedMap.map }),
-      useSandbox: () =>
-        matchRuntime({
-          pickedUnits: unit ? [unit.id] : [],
-          army: unit?.armyId ?? null,
-        }),
-    }));
-    const { MatchPage: selectedArmyPage } = await import('../src/match/MatchPage.tsx');
-    const selectedArmyMarkup = renderToStaticMarkup(createElement(selectedArmyPage));
-    expect(selectedArmyMarkup).toContain('role="group"');
+  it('проходит через реальный MatchSurface для пяти сцен и трёх размеров', async () => {
+    for (const scene of SCENES) {
+      for (const viewport of VIEWPORTS) {
+        prepareScene(scene, viewport);
+        const { MatchPage } = await import('../src/match/MatchPage.tsx');
+        const page = createElement(MatchPage);
+        const rendered =
+          scene === 'pause-menu-open'
+            ? createElement(
+                'div',
+                null,
+                page,
+                createElement(PauseMenu, {
+                  onResume: () => undefined,
+                  onRestart: () => undefined,
+                  onMenu: () => undefined,
+                }),
+              )
+            : page;
+        const markup = renderToStaticMarkup(rendered);
+        expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
+        expect(markup).toMatch(/Налог|Tax/);
+        const layout = actualLayout(scene, viewport, markup);
+        expect(
+          validateMatchLayout(layout),
+          `${scene} ${viewport.width}x${viewport.height}`,
+        ).toEqual([]);
+        vi.resetModules();
+      }
+    }
   });
 });

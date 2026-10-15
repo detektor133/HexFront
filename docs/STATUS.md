@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T6 |
+| Текущая задача | 07/T7 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-15 |
 
@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7 возвращена: приёмочный тест не проверяет пять реальных сцен на трёх размерах, а `validateMatchLayout` вызывается только синтетическими тестами.
-- `pnpm visual` содержит только один URL `/match?map=small&select=0&freezeTime=1`; visual-эталоны пяти сцен T7 отсутствуют.
-- `pnpm verify --changed`: build, types и tests зелёные; это не закрывает возврат по визуальным сценам и реальной геометрии.
-- Следующее действие — исправить T7 и повторно запустить `$review 07/T7`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/dev/Hud.module.css`, `apps/client/src/dev/ObserverPanel.module.css`.
+- 07/T7 исправлена: приёмочный тест проходит пять сцен через `MatchPage`/`MatchSurface` на трёх размерах и передаёт их в `validateMatchLayout`.
+- В альбомном HUD подписи используют `var(--font-size-caption)`, а не 11 px.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests, visual.
+- Следующее действие — `$review 07/T7` в новой сессии.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/dev/Hud.module.css`, `docs/reports/stage-07-t7.md`.
