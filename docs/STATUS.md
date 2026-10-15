@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T11 ждёт ревью: добавлены экран конца матча, карточка выбывания, причины победы, форматтеры статистики и кнопки «Смотреть»/«В меню».
+- 07/T11 возвращена ревью: приёмочные тесты не проверяют HUD и определение удержания через реальный `step`.
 - `PlayerView.victoryHold` передаётся через protocol; отсчёт хранится как оставшиеся тики и уменьшается до нуля.
 - Приёмочные тесты T11 оставлены без изменений: `apps/client/test/match-end.dom.test.tsx`, `packages/protocol/test/victory-hold-snapshot.test.ts`, `packages/sim/test/victory-hold.test.ts`.
 - `pnpm verify --changed` — зелёная: build, types, lint, prettier, 527 тестов.
