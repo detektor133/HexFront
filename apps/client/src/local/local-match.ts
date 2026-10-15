@@ -22,7 +22,12 @@ export function startLocalMatch(
   seed: number,
   players: { readonly count: number; readonly bots: readonly number[]; readonly speed: number },
   onMessage: (msg: FromWorker) => void,
-  options: { readonly telemetry?: boolean } = {},
+  options: {
+    readonly telemetry?: boolean;
+    readonly fog?: boolean;
+    readonly playerName?: string;
+    readonly playerColors?: readonly string[];
+  } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
   const post = (msg: ToWorker): void => worker.postMessage(msg);
@@ -35,8 +40,10 @@ export function startLocalMatch(
     players: players.count,
     bots: players.bots,
     speed: players.speed,
-    fog: true,
+    fog: options.fog ?? true,
     ...(options.telemetry ? { telemetry: true } : {}),
+    ...(options.playerName ? { playerName: options.playerName } : {}),
+    ...(options.playerColors ? { playerColors: options.playerColors } : {}),
   };
   post(start);
   return {

@@ -1,7 +1,23 @@
 import type { PathLike, readFileSync as ReadFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
+
+declare module 'vitest' {
+  interface Assertion<R = void, T = unknown> {
+    toHaveValue(expected: unknown): Assertion<R, T>;
+  }
+}
+
+expect.extend({
+  toHaveValue(received: unknown, expected: unknown) {
+    const actual = received instanceof HTMLInputElement ? received.value : undefined;
+    return {
+      pass: actual === expected,
+      message: () => `ожидалось значение ${String(expected)}, получено ${String(actual)}`,
+    };
+  },
+});
 
 type FsModule = Record<string, unknown> & { readFileSync: typeof ReadFileSync };
 

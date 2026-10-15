@@ -52,6 +52,37 @@ const emitSnapshot = (): void => {
   post({ ...snapshotPayload, ...transport, ...(telemetry ? { telemetry } : {}) } as FromWorker);
 };
 
+function resolveMap(map: unknown): unknown | Promise<unknown> {
+  if (typeof map !== 'string') return map;
+  return fetch(`/maps/${map}.json`).then((response) => {
+    if (!response.ok) throw new Error(`карта не загрузилась: ${response.status}`);
+    return response.json();
+  });
+}
+
+function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void {
+  const created = createLocalEngine(map, msg.seed, msg.players, msg.bots, msg.fog);
+  if ('errors' in created) {
+    post({ t: 'error', errors: created.errors });
+    return;
+  }
+  engine = created;
+  paused = msg.speed === 0;
+  speed = Math.max(1, Math.floor(msg.speed) || 1);
+  telemetryEnabled = msg.telemetry === true;
+  awaitingAck = false;
+  snapshotSeq = 0;
+  tickMs = [];
+  lastAckMs = null;
+  deltaStream.reset();
+  emitSnapshot();
+  timer = setInterval(() => {
+    if (!engine || paused) return;
+    for (let i = 0; i < speed && engine.state.winner < 0; i += 1) advance();
+    emitSnapshot();
+  }, TICK_MS);
+}
+
 const advance = (): void => {
   if (!engine) return;
   const started = performance.now();
@@ -64,26 +95,16 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
   switch (msg.t) {
     case 'start': {
       if (timer !== null) clearInterval(timer);
-      const created = createLocalEngine(msg.map, msg.seed, msg.players, msg.bots, msg.fog);
-      if ('errors' in created) {
-        post({ t: 'error', errors: created.errors });
-        return;
+      const map = resolveMap(msg.map);
+      if (map instanceof Promise) {
+        void map
+          .then((loaded) => startEngine(msg, loaded))
+          .catch((error: unknown) => {
+            post({ t: 'error', errors: [String(error)] });
+          });
+      } else {
+        startEngine(msg, map);
       }
-      engine = created;
-      paused = msg.speed === 0;
-      speed = Math.max(1, Math.floor(msg.speed) || 1);
-      telemetryEnabled = msg.telemetry === true;
-      awaitingAck = false;
-      snapshotSeq = 0;
-      tickMs = [];
-      lastAckMs = null;
-      deltaStream.reset();
-      emitSnapshot();
-      timer = setInterval(() => {
-        if (!engine || paused) return;
-        for (let i = 0; i < speed && engine.state.winner < 0; i += 1) advance();
-        emitSnapshot();
-      }, TICK_MS);
       return;
     }
     case 'command':
