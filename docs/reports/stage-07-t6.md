@@ -1,5 +1,14 @@
 # 07/T6 — пауза и выход
 
+## Возврат ревью 2026-10-15 (повторная сверка после исправления СПЕК)
+
+- `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts` — 5/5.
+- `pnpm verify --changed` — зелёный.
+- СПЕК: `apps/client/test/pause.test.ts:324-337` рендерит только `Hud`, поэтому не проверяет отсутствие `ObserverPanel` и выбора скорости на полном `/match` без `debug`.
+- `apps/client/src/dev/Hud.tsx:105-117` и `apps/client/test/pause.test.ts:343-345` используют четыре самописные вертикальные линии и `data-icon="player-pause"`; имя атрибута не подтверждает требуемую Tabler-иконку.
+
+Этап: 07/T6
+
 ## Возврат ревью 2026-10-15 (повторная сверка)
 
 - `pnpm verify --changed` — OK: build, types, lint и tests.
