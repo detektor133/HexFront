@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T6 исправлена по замечаниям СПЕК: приёмочные проверки проходят через дерево `MatchSurface`, включая реальное меню паузы, `visibilitychange`, перезапуск с тем же seed и `/match` без `debug`.
+- 07/T6 принята: приёмочные проверки проходят через дерево `MatchSurface`, включая реальное меню паузы, `visibilitychange`, перезапуск с тем же seed и `/match` без `debug`.
 - Кнопка использует именованный Tabler `player-pause` с проверяемой геометрией путей; маскирующий `data-icon` удалён.
 - Профильный тест `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts`: 5/5.
 - `pnpm verify --changed`: зелёный; CI проверяется в начале следующей сессии.
-- Следующее действие — запустить `$review 07/T6` в новой сессии.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
+- Следующее действие — взять 07/T7.
+- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`.
