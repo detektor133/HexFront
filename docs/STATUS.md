@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T7: приёмочные тесты возвращены СПЕК; заменены SSR-проверки на DOM-путь `MatchPage`/`MatchSurface` с измерениями `ResizeObserver` и кликами по лидерборду, налогу и паузе.
+- 07/T7: возврат ревью — `apps/client/test/match-layout.test.ts` не проверяет отдельную сцену выбранной армии, реальные `style` и видимость элементов, а также не отличает измерения `ResizeObserver` от тех же констант в ожидаемом расчёте.
 - `pnpm verify --changed` зелёный.
 - Следующая задача: 07/T8.
 - Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/render/`.
