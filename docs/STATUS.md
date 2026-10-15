@@ -17,6 +17,6 @@
 
 - 07/T7 исправлена: приёмочный тест проходит через `MatchPage` → `MatchSurface` с реальным `PlayerView`, выбранными карточками и ArmyBar; сторож раскладки сканирует весь `apps/client/src`.
 - Исправлена мобильная геометрия налоговой кнопки: минимальная высота возвращена к `var(--touch-target-min)`.
-- `pnpm verify --changed`: зелёный (build, types, lint, tests, visual).
+- `pnpm verify --changed`: build, types, lint, prettier и tests зелёные; visual не проходит на существующих эталонах `ui`/`match` (расхождение canvas/HUD, эталоны не менялись).
 - Следующее действие — запустить `$review 07/T7` в новой сессии.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/dev/Hud.module.css`, `apps/client/src/dev/ObserverPanel.module.css`.

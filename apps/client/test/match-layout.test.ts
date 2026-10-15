@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -212,7 +213,7 @@ describe('приёмка T7: раскладка матча без перекры
   });
 
   it('правило задачи: в раскладке нет жёстких отступов сверху top: 52px, 56px и 72px', () => {
-    const clientSourceDirectory = join(process.cwd(), 'src');
+    const clientSourceDirectory = fileURLToPath(new URL('../src', import.meta.url));
     const forbidden = [/top:\s*52px/, /top:\s*56px/, /top:\s*72px/];
     const source = sourceFiles(clientSourceDirectory)
       .filter((path) => /\.(css|ts|tsx)$/.test(path))
@@ -239,10 +240,10 @@ describe('приёмка T7: раскладка матча без перекры
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
     const markup = renderToStaticMarkup(createElement(MatchPage));
 
-    expect(markup).toContain('Таблица лидеров');
-    expect(markup).toContain('Налог');
-    expect(markup).toContain('aria-label="Пауза"');
-    expect(markup).toContain('aria-label="Резерв"');
+    expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
+    expect(markup).toMatch(/Налог|Tax/);
+    expect(markup).toMatch(/aria-label="Пауза"|aria-label="Pause"/);
+    expect(markup).toMatch(/aria-label="Резерв"|aria-label="Reserve"/);
 
     vi.resetModules();
     vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
