@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7: возврат ревью — приёмочные тесты всё ещё не проверяют пять сцен через `computeMatchLayout` на трёх размерах и реальные прямоугольники DOM; выбранная армия оставляет в расчёте невидимую карточку.
-- После исправления исполнителем повторить `$review 07/T7`; `pnpm verify --changed` сейчас зелёный, но критерии приёмки не закрыты.
-- Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/render/`.
+- 07/T7: тесты возвращены ревью и исправлены; `MatchSurface` больше не передаёт карточку в layout при выборе армии целиком.
+- Проверено: 13 DOM/fast-check тестов `match-layout.test.ts`, затем `pnpm verify --changed` — зелёный.
+- Следующая задача по очереди: 07/T8.
+- Для ревью читать `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.
 - CI этого коммита проверить в начале следующей сессии.

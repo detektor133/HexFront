@@ -79,6 +79,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
+  // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
+  const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
+  const armyPicked =
+    armyUnits.length > 0 &&
+    armyUnits.length === sb.picked.units.length &&
+    armyUnits.every((u) => sb.picked.units.includes(u.id));
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
@@ -88,16 +94,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     leaderboardOpen,
     leaderboardRows: view?.players.length ?? 0,
     cardHeight: cardH,
-    cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
+    cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,
     paused: pauseState.menuOpen,
   });
-  // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
-  const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
-  const armyPicked =
-    armyUnits.length > 0 &&
-    armyUnits.length === sb.picked.units.length &&
-    armyUnits.every((u) => sb.picked.units.includes(u.id));
   const map = typeof loaded === 'string' ? null : loaded.map;
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
