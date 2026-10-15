@@ -15,5 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T21: добавить jsdom и Testing Library для DOM-приёмки React-компонентов, затем выполнить обновлённые критерии 07/T7–T16.
-- `pnpm verify --changed` зелёный.
+- 07/T21 выполнена: добавлены jsdom, Testing Library, отдельный проект Vitest `client-dom` и DOM-приёмка MatchPage.
+- Приёмочный тест подтвердил открытие и закрытие меню паузы через реальный DOM-путь React.
+- Следующая задача: 07/T7.
+- Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/match/`.
+- CI не проверен, проверится в начале следующей сессии.

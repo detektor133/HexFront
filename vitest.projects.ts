@@ -44,21 +44,55 @@ const SLOW_TEST_TIMEOUT_MS = 120_000;
 
 /** @returns проекты Vitest; `withSlow` — вместе с тяжёлыми файлами (`pnpm test:all`). */
 export function testProjects(withSlow: boolean) {
-  return PROJECTS.map((root) => {
+  return PROJECTS.flatMap((root) => {
     const slow = SLOW_TESTS.filter((file) => file.startsWith(`${root}/`)).map((file) =>
       file.slice(root.length + 1),
     );
-    return {
+    const project = {
       test: {
         name: root.split('/')[1] ?? root,
         root,
         include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
-        exclude: ['test/fixtures/**', 'node_modules/**', ...(withSlow ? [] : slow)],
+        exclude: [
+          'test/fixtures/**',
+          'node_modules/**',
+          ...(root === 'apps/client' ? ['test/**/*.dom.test.tsx'] : []),
+          ...(withSlow ? [] : slow),
+        ],
         // Полный уровень: 5 с по умолчанию проверяли бы скорость раннера, а не код (replay
         // acceptance шёл 4,5 с и падал по таймауту). Здесь таймаут — только защита от зависания,
         // скорость меряет tools/bench. Проекты не наследуют корневой testTimeout.
         ...(withSlow ? { testTimeout: SLOW_TEST_TIMEOUT_MS } : {}),
       },
     };
+    if (root !== 'apps/client') return [project];
+    return [
+      project,
+      {
+        test: {
+          name: 'client-dom',
+          root,
+          include: ['test/**/*.dom.test.tsx'],
+          exclude: ['node_modules/**'],
+          environment: 'jsdom',
+          viteEnvironment: 'ssr',
+          pool: 'forks',
+          setupFiles: ['test/dom.setup.ts'],
+          ...(withSlow ? { testTimeout: SLOW_TEST_TIMEOUT_MS } : {}),
+          plugins: [
+            {
+              name: 'client-dom-test-url',
+              transform(source: string, id: string) {
+                if (!id.endsWith('match-surface.dom.test.tsx')) return;
+                return source.replace(
+                  'new URL(`../../../${path}`, import.meta.url)',
+                  "new URL('../../../' + path, import.meta.url)",
+                );
+              },
+            },
+          ],
+        },
+      },
+    ];
   });
 }
