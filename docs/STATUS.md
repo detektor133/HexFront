@@ -15,10 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T14 выполнена: оболочка страницы получила SVG-иконку, PNG 192/512, manifest и `theme-color` из токенов.
-- `svg-to-png.ts` поддерживает размер SVG и параметр `--scale`, прежний режим отчётных графиков сохранён.
-- `main.tsx` синхронизирует атрибут `lang` документа с `i18n`.
-- `apps/client/test/app-shell.test.ts`: 5/5; PNG проверены по IHDR как 192×192 и 512×512.
+- Исправлен красный CI 07/T14: статический `lang="en"` в `index.html` совпадает с fallback `lang` из i18n в Node-среде; `main.tsx` синхронизирует язык браузера при запуске.
+- `apps/client/test/app-shell.test.ts`: 5/5; тесты не изменялись.
 - `pnpm verify --changed`: зелёный.
 - Следующая задача: 07/T15.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/src/local`, `packages/protocol`, `apps/client/src/render`.
