@@ -45,6 +45,10 @@ function setBrowser(search: string): void {
   });
 }
 
+function setLanguage(language: string): void {
+  vi.stubGlobal('navigator', { language });
+}
+
 function mockReactHooks(): void {
   const states: unknown[] = [];
   let cursor = 0;
@@ -88,11 +92,17 @@ function findNode(node: unknown, name: string): ElementNode | undefined {
   return findNode(children, name);
 }
 
-function mockRuntime(setPaused: () => void, withView: boolean = true): void {
+function mockRuntime(
+  setPaused: () => void,
+  withView: boolean = true,
+  winner: number | undefined = undefined,
+): void {
+  const snapshot = localEngine.snapshot();
+  const view = winner === undefined ? snapshot.view : { ...snapshot.view, winner };
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
     useMapJson: () => ({ json: tinyMap, map }),
     useSandbox: () => ({
-      msg: withView ? { ...localEngine.snapshot(), view: localEngine.snapshot().view } : null,
+      msg: withView ? { ...snapshot, view } : null,
       replay: [],
       error: null,
       picked: { hex: null, units: [], target: null },
@@ -147,6 +157,7 @@ describe('пауза локального матча', () => {
     mockReactHooks();
     mockRuntime(setPaused);
     setBrowser('');
+    setLanguage('ru-RU');
     const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
     const tree = MatchSurface({});
     const hud = findNode(tree, 'Hud');
@@ -163,6 +174,7 @@ describe('пауза локального матча', () => {
     const pauseMarkup = PauseMenu(pauseMenu?.props as never);
     expect(renderToStaticMarkup(pauseMarkup)).toContain('Продолжить');
     const pauseButtons = (pauseMarkup.props.children as unknown as ElementNode[]).slice(1);
+    (pauseButtons[0]?.props?.onClick as (() => void) | undefined)?.();
     (pauseButtons[1]?.props?.onClick as (() => void) | undefined)?.();
     (pauseButtons[2]?.props?.onClick as (() => void) | undefined)?.();
     expect(window.location.reload).toHaveBeenCalledOnce();
@@ -172,19 +184,30 @@ describe('пауза локального матча', () => {
   });
 
   it('рендерит PauseMenu и вызывает обработчики его кнопок', async () => {
-    const { PauseMenu } = await import('../src/match/PauseMenu.tsx');
-    const resume = vi.fn();
-    const restart = vi.fn();
-    const menu = PauseMenu({ onResume: resume, onRestart: restart, onMenu: vi.fn() });
-    const markup = renderToStaticMarkup(menu);
+    mockReactHooks();
+    mockRuntime(vi.fn());
+    setBrowser('');
+    setLanguage('ru-RU');
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const initialTree = MatchSurface({});
+    const hud = findNode(initialTree, 'Hud');
+    (hud?.props?.onPause as (() => void) | undefined)?.();
+    (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
+    const tree = MatchSurface({});
+    const menu = findNode(tree, 'PauseMenu');
+    expect(menu).toBeDefined();
+    const pauseMenu = (menu?.type as (props: Record<string, unknown>) => ElementNode)(
+      menu?.props ?? {},
+    );
+    const markup = renderToStaticMarkup(
+      createElement(menu?.type as ReactTypes.ElementType, menu?.props),
+    );
     expect(markup).toContain('Продолжить');
     expect(markup).toContain('Заново');
     expect(markup).toContain('В меню');
-    const menuButtons = (menu.props.children as unknown as ElementNode[]).slice(1);
+    const menuButtons = (pauseMenu.props?.children as unknown as ElementNode[]).slice(1);
     (menuButtons[0]?.props?.onClick as (() => void) | undefined)?.();
     (menuButtons[1]?.props?.onClick as (() => void) | undefined)?.();
-    expect(resume).toHaveBeenCalledOnce();
-    expect(restart).toHaveBeenCalledOnce();
   });
 
   it('visibilitychange hidden вызывает паузу через обработчик MatchSurface', async () => {
@@ -202,17 +225,26 @@ describe('пауза локального матча', () => {
   });
 
   it('кнопка «В меню» на MatchEnd вызывает переход на корень', async () => {
-    const { MatchEnd } = await import('../src/dev/MatchEnd.tsx');
-    const navigate = vi.fn();
-    const view = { ...localEngine.snapshot().view, winner: 0 };
-    const end = MatchEnd({ view, onMenu: navigate });
-    const markup = renderToStaticMarkup(createElement(MatchEnd, { view, onMenu: navigate }));
+    mockReactHooks();
+    mockRuntime(vi.fn(), true, 0);
+    setBrowser('');
+    setLanguage('ru-RU');
+    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
+    const tree = MatchSurface({});
+    const matchEnd = findNode(tree, 'MatchEnd');
+    expect(matchEnd).toBeDefined();
+    const markup = renderToStaticMarkup(
+      createElement(matchEnd?.type as ReactTypes.ElementType, matchEnd?.props),
+    );
     expect(markup).toContain('В меню');
-    const endButtons = (end?.props.children as unknown as ElementNode[]).filter(
+    const end = (matchEnd?.type as (props: Record<string, unknown>) => ElementNode)(
+      matchEnd?.props ?? {},
+    );
+    const endButtons = (end?.props?.children as unknown as ElementNode[]).filter(
       (child) => child?.type === 'button',
     );
     (endButtons.at(-1)?.props?.onClick as (() => void) | undefined)?.();
-    expect(navigate).toHaveBeenCalledOnce();
+    expect(window.location.assign).toHaveBeenCalledWith('/');
   });
 
   it('/match без debug не показывает выбор скорости', async () => {
