@@ -40,6 +40,7 @@ import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
+import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 export type Loaded = { json: unknown; map: MapStatic } | 'loading' | 'error';
@@ -68,6 +69,15 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
 
 type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
 type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
+type PlayerColorId = (typeof tokens.players.palette)[number]['id'];
+
+const NICKNAME_KEY = 'hexfront.nickname';
+const COLOR_KEY = 'hexfront.color';
+const AUTO_COMMAND_KEY = 'hexfront.auto-command';
+
+function matchPlayerColors(selected: string): readonly PlayerColorId[] {
+  return playerColorIds(selected) as readonly PlayerColorId[];
+}
 
 interface Sandbox {
   readonly msg: ViewMessage | null;
@@ -287,8 +297,14 @@ export function useSandbox(
         if (m.t === 'error') return setError(m.errors.join('; '));
         scheduleMessage(m);
       },
-      { telemetry: debug },
+      {
+        telemetry: debug,
+        playerName: localStorage.getItem(NICKNAME_KEY) ?? '',
+        playerColors: matchPlayerColors(localStorage.getItem(COLOR_KEY) ?? 'teal'),
+        autoCommand: localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
+      },
     );
+    setPlayerPalette(matchPlayerColors(localStorage.getItem(COLOR_KEY) ?? 'teal'));
     matchRef.current = match;
     match.setView(null, !debug);
     setFogState(!debug);

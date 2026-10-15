@@ -27,6 +27,7 @@ export function startLocalMatch(
     readonly fog?: boolean;
     readonly playerName?: string;
     readonly playerColors?: readonly string[];
+    readonly autoCommand?: boolean;
   } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
@@ -46,6 +47,7 @@ export function startLocalMatch(
     ...(options.playerColors ? { playerColors: options.playerColors } : {}),
   };
   post(start);
+  if (options.autoCommand) post({ t: 'command', cmd: { t: 'setAutoCommand', on: true } });
   return {
     send: (cmd) => post({ t: 'command', cmd }),
     setFog: (on) => post({ t: 'fog', on }),

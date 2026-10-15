@@ -108,7 +108,7 @@ export function pickStartNeighbors(state: MatchState, capital: Hex): HexId[] {
   return candidates.slice(0, START_HEXES - 1).map((c) => c.id);
 }
 
-function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
+function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string): void {
   const capital = hexId(spawn, state.map.width);
   const cityId = state.nextId;
   state.nextId += 1;
@@ -131,6 +131,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex): void {
   }
   state.players.push({
     id: playerId,
+    name,
     gold: START_GOLD,
     taxTarget: TAX_DEFAULT,
     taxEffective: TAX_DEFAULT,
@@ -195,9 +196,9 @@ export function createMatch(
   const state = emptyState(map, seed, options);
   seedNeutralPopulation(state);
   const spawns = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
-  players.forEach((_, playerId) => {
+  players.forEach((player, playerId) => {
     const spawn = spawns[playerId];
-    if (spawn) addPlayer(state, playerId, spawn);
+    if (spawn) addPlayer(state, playerId, spawn, player.name);
   });
   state.cities.sort((a, b) => a.id - b.id);
   rebuildUnitIndex(state);

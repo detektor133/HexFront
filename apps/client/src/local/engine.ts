@@ -95,10 +95,13 @@ export function createLocalEngine(
     (i) => i !== HUMAN_ID,
   ),
   fog = false,
+  playerName = '',
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
-  const setup = Array.from({ length: players }, (_, i) => ({ name: `P${i}` }));
+  const setup = Array.from({ length: players }, (_, i) => ({
+    name: i === HUMAN_ID && playerName !== '' ? playerName : `P${i}`,
+  }));
   const state = createMatch(loaded.map, setup, seed, { fog });
   let pending: Command[] = [];
   let selected: number | null = null;

@@ -85,6 +85,7 @@ export interface PlayerView {
   readonly plans: readonly PlanView[];
   readonly players: readonly {
     readonly id: number;
+    readonly name?: string;
     readonly gold: Fp;
     readonly taxTarget: Fp;
     readonly taxEffective: Fp;
@@ -283,6 +284,7 @@ export function playerView(
     plans: planViews(state, playerId),
     players: state.players.map((p) => ({
       id: p.id,
+      ...(p.name ? { name: p.name } : {}),
       gold: p.gold,
       taxTarget: p.taxTarget,
       taxEffective: p.taxEffective,

@@ -72,7 +72,7 @@ export function Leaderboard({
             <tr key={row.playerId}>
               <th scope="row">{row.place}</th>
               <td>
-                {t('observer.player')} {row.playerId + 1}
+                {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
               </td>
               <td>{row.hexes}</td>
               <td>{row.cities}</td>

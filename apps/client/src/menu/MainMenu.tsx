@@ -4,6 +4,7 @@ import { t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
+import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const NICKNAME_KEY = 'hexfront.nickname';
@@ -41,7 +42,7 @@ export function MainMenu(): React.JSX.Element {
         { fog: false, playerColors },
       );
     };
-    startBackground([color, 'brick']);
+    startBackground(playerColorIds(color).slice(0, 2));
     return () => backgroundRef.current?.dispose();
   }, [color]);
 
@@ -53,7 +54,6 @@ export function MainMenu(): React.JSX.Element {
   const handlePlay = (): void => {
     localStorage.setItem(NICKNAME_KEY, nickname);
     localStorage.setItem(AUTO_COMMAND_KEY, String(autoCommand));
-    if (autoCommand) backgroundRef.current?.send({ t: 'setAutoCommand', on: true });
   };
 
   return (

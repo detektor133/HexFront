@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { startLocalMatch } from '../src/local/local-match.ts';
 import { MainMenu } from '../src/menu/MainMenu.tsx';
+import { playerColorIds } from '../src/theme/colors.ts';
 
 type WorkerMessage = Record<string, unknown>;
 
@@ -33,17 +35,8 @@ function renderMenu(): void {
   render(<MainMenu />);
 }
 
-function containsValue(value: unknown, expected: unknown): boolean {
-  if (value === expected) return true;
-  if (Array.isArray(value)) return value.some((item) => containsValue(item, expected));
-  if (typeof value !== 'object' || value === null) return false;
-  return Object.values(value).some((item) => containsValue(item, expected));
-}
-
-function hasMessageValue(expected: unknown): boolean {
-  return workers.some((worker) =>
-    worker.messages.some((message) => containsValue(message, expected)),
-  );
+function startMessages(worker: FakeWorker): WorkerMessage[] {
+  return worker.messages.filter((message) => message.t === 'start');
 }
 
 describe('главное меню', () => {
@@ -61,10 +54,16 @@ describe('главное меню', () => {
   it('критерий: фон меню запускается на карте small с 6 ботами, без тумана и на скорости 1×', () => {
     renderMenu();
 
-    expect(hasMessageValue('small')).toBe(true);
-    expect(hasMessageValue(6)).toBe(true);
-    expect(hasMessageValue(false)).toBe(true);
-    expect(hasMessageValue(1)).toBe(true);
+    expect(workers).toHaveLength(1);
+    expect(startMessages(workers[0] as FakeWorker)).toEqual([
+      expect.objectContaining({
+        map: 'small',
+        players: 6,
+        bots: [0, 1, 2, 3, 4, 5],
+        fog: false,
+        speed: 1,
+      }),
+    ]);
   });
 
   it('критерий: в меню нет text-transform: uppercase', () => {
@@ -96,8 +95,11 @@ describe('главное меню', () => {
     fireEvent.click(selectedColor);
     fireEvent.click(screen.getByRole('button', { name: 'Играть' }));
 
-    expect(hasMessageValue('brick')).toBe(true);
-    expect(hasMessageValue('teal')).toBe(true);
+    const latestWorker = workers.at(-1);
+    expect(latestWorker).toBeDefined();
+    expect(startMessages(latestWorker as FakeWorker)[0]).toEqual(
+      expect.objectContaining({ playerColors: ['brick', 'teal'] }),
+    );
   });
 
   it('критерий: «Автокомандование» из настроек отправляет setAutoCommand при старте матча', () => {
@@ -107,9 +109,42 @@ describe('главное меню', () => {
     expect(autoCommand).not.toBeNull();
     if (autoCommand === null) return;
     fireEvent.click(autoCommand);
-    fireEvent.click(screen.getByRole('button', { name: 'Играть' }));
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: 'Адмирал' } });
+    const play = screen.getByRole('button', { name: 'Играть' });
+    fireEvent.click(play);
 
-    expect(hasMessageValue('setAutoCommand')).toBe(true);
+    expect(localStorage.getItem('hexfront.auto-command')).toBe('true');
+    expect(localStorage.getItem('hexfront.nickname')).toBe('Адмирал');
+    expect(play.getAttribute('href')).toContain('name=%D0%90%D0%B4%D0%BC%D0%B8%D1%80%D0%B0%D0%BB');
+    expect(workers.flatMap((worker) => worker.messages)).not.toContainEqual(
+      expect.objectContaining({ t: 'command' }),
+    );
+
+    const game = startLocalMatch(
+      'small',
+      1,
+      { count: 6, bots: [1, 2, 3, 4, 5], speed: 1 },
+      () => undefined,
+      {
+        playerName: localStorage.getItem('hexfront.nickname') ?? '',
+        playerColors: playerColorIds('brick'),
+        autoCommand: localStorage.getItem('hexfront.auto-command') === 'true',
+      },
+    );
+    const gameWorker = workers.at(-1);
+    expect(gameWorker).toBeDefined();
+    expect(startMessages(gameWorker as FakeWorker)[0]).toEqual(
+      expect.objectContaining({
+        playerName: 'Адмирал',
+        playerColors: expect.arrayContaining(['brick', 'teal']),
+      }),
+    );
+    expect(gameWorker?.messages).toContainEqual({
+      t: 'command',
+      cmd: { t: 'setAutoCommand', on: true },
+    });
+    game.dispose();
   });
 
   it('критерий: «На весь экран» скрыта без Fullscreen API', () => {

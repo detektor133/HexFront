@@ -15,6 +15,7 @@ let tickMs: number[] = [];
 let lastSnapshotAt = 0;
 let lastAckMs: number | null = null;
 let telemetryEnabled = false;
+let pendingCommands: ToWorker[] = [];
 const deltaStream = new ConfirmedViewDeltaStream();
 
 const post = (msg: FromWorker): void => postMessage(msg);
@@ -61,12 +62,23 @@ function resolveMap(map: unknown): unknown | Promise<unknown> {
 }
 
 function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void {
-  const created = createLocalEngine(map, msg.seed, msg.players, msg.bots, msg.fog);
+  const created = createLocalEngine(
+    map,
+    msg.seed,
+    msg.players,
+    msg.bots,
+    msg.fog,
+    msg.playerName ?? '',
+  );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });
     return;
   }
   engine = created;
+  for (const pending of pendingCommands) {
+    if (pending.t === 'command') engine.queue(pending.cmd);
+  }
+  pendingCommands = [];
   paused = msg.speed === 0;
   speed = Math.max(1, Math.floor(msg.speed) || 1);
   telemetryEnabled = msg.telemetry === true;
@@ -95,6 +107,8 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
   switch (msg.t) {
     case 'start': {
       if (timer !== null) clearInterval(timer);
+      engine = null;
+      pendingCommands = [];
       const map = resolveMap(msg.map);
       if (map instanceof Promise) {
         void map
@@ -108,7 +122,8 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       return;
     }
     case 'command':
-      engine?.queue(msg.cmd);
+      if (engine) engine.queue(msg.cmd);
+      else pendingCommands.push(msg);
       return;
     case 'fog':
       engine?.setFog(msg.on);

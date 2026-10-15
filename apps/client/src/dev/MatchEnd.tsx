@@ -20,6 +20,7 @@ export function MatchEnd(props: {
     gold: player?.gold ?? 0,
     winner: props.view.winner,
     playerId: props.view.playerId,
+    ...(player?.name ? { playerName: player.name } : {}),
     place: props.view.me.place,
     eliminated,
     fog: props.fog ?? true,

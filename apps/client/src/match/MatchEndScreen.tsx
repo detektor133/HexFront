@@ -15,6 +15,7 @@ export interface MatchEndScreenProps {
   readonly gold: number;
   readonly winner: number;
   readonly playerId: number;
+  readonly playerName?: string;
   readonly place: number;
   readonly eliminated: boolean;
   readonly fog: boolean;
@@ -68,6 +69,7 @@ export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | 
     <section aria-label={t('match.end')}>
       {[
         ...result,
+        <p key="name">{props.playerName ?? `${t('observer.player')} ${props.playerId + 1}`}</p>,
         <p key="soldiers">{formatSoldiers(props.soldiers)}</p>,
         <p key="gold">{formatFp(props.gold)}</p>,
         ...(props.victoryHold
