@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T21 принято ревью: DOM-приёмка и `pnpm verify --changed` зелёные.
-- CI для коммита ревью ожидается после push.
-- Следующая задача: 07/T7.
-- Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/match/`.
-- Статус CI коммита ревью проверить после push.
+- 07/T7: приёмочные тесты возвращены СПЕК; заменены SSR-проверки на DOM-путь `MatchPage`/`MatchSurface` с измерениями `ResizeObserver` и кликами по лидерборду, налогу и паузе.
+- `pnpm verify --changed` зелёный.
+- Следующая задача: 07/T8.
+- Читать `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/architecture/rendering.md`, `apps/client/src/render/`.
+- CI этого коммита проверить в начале следующей сессии.

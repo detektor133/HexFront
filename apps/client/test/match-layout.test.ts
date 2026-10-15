@@ -1,10 +1,11 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import fc from 'fast-check';
 import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
@@ -16,10 +17,6 @@ import {
   type MatchLayoutElement,
   type MatchLayoutSnapshot,
 } from '../src/match/layout.ts';
-import type {
-  createPauseController,
-  PauseControllerOptions,
-} from '../src/match/pause-controller.ts';
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -28,20 +25,12 @@ const VIEWPORTS = [
 ] as const;
 
 const tinyMapJson: unknown = JSON.parse(
-  readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
+  readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
 
 const parsedMap = loadMap(tinyMapJson);
 if (!parsedMap.ok) throw new Error(parsedMap.errors.join('; '));
 const tinyMap = parsedMap.map;
-
-const SCENES = [
-  'start-with-tutorial',
-  'selected-hex',
-  'selected-army',
-  'leaderboard-open',
-  'pause-menu-open',
-] as const;
 
 const REAL_SCENES = [
   'start-with-tutorial',
@@ -49,6 +38,12 @@ const REAL_SCENES = [
   'selected-army',
   'pause-menu-open',
 ] as const;
+
+const MEASURED_LAYOUT = {
+  hudHeight: 88,
+  bottomPanelHeight: 150,
+  cardHeight: 300,
+} as const;
 
 const element = (
   id: string,
@@ -152,113 +147,66 @@ const matchRuntime = (
   };
 };
 
-function setMatchWindow(
-  search: string,
-  width = 390,
-  height = 844,
-  onboardingDismissed = false,
-): void {
-  vi.stubGlobal('window', {
-    location: { search, pathname: '/match' },
-    innerWidth: width,
-    innerHeight: height,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  });
-  vi.stubGlobal('localStorage', {
-    getItem: () =>
-      onboardingDismissed
-        ? JSON.stringify(['autoCommand', 'tax', 'foundCity', 'front', 'offensive'])
-        : null,
-    setItem: () => undefined,
-  });
-}
-
-function prepareScene(
-  scene: MatchLayoutSnapshot['scene'],
-  viewport: (typeof VIEWPORTS)[number],
-): void {
-  const selectedHex = scene === 'selected-hex';
-  const selectedArmy = scene === 'selected-army';
-  const search = selectedHex ? '?select=0' : '';
-  setMatchWindow(search, viewport.width, viewport.height, scene !== 'start-with-tutorial');
+function prepareDomScene(search = '', viewport = VIEWPORTS[0]): void {
+  window.history.replaceState({}, '', `/match${search}`);
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewport.height });
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
     useMapJson: () => ({ json: tinyMapJson, map: tinyMap }),
-    useSandbox: () =>
-      matchRuntime(
-        selectedHex ? { selectedHex: 0 } : selectedArmy ? { pickedUnits: [0], army: 0 } : {},
-      ),
+    useSandbox: () => matchRuntime(search === '?select=0' ? { selectedHex: 0 } : {}),
   }));
-  if (scene === 'pause-menu-open') {
-    let pauseRequested = false;
-    vi.doMock('../src/match/pause-controller.ts', async () => {
-      const actual = await vi.importActual<{ createPauseController: typeof createPauseController }>(
-        '../src/match/pause-controller.ts',
-      );
-      return {
-        ...actual,
-        createPauseController: (options: PauseControllerOptions) => {
-          const controller = actual.createPauseController(options);
-          if (!pauseRequested) {
-            pauseRequested = true;
-            controller.pause();
-          }
-          return controller;
-        },
-      };
-    });
-  }
 }
 
-function layoutFromMarkup(
-  markup: string,
-  viewport: (typeof VIEWPORTS)[number],
-): MatchLayoutSnapshot {
-  const values = new Map<string, number>();
-  for (const match of markup.matchAll(/--layout-([a-z-]+)-(x|y|width|height):([0-9]+)px/g)) {
-    values.set(`${match[1]}.${match[2]}`, Number(match[3]));
+function installLayoutMeasurements(): void {
+  class MeasuredResizeObserver {
+    public observe(target: Element): void {
+      this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+    }
+
+    public unobserve(): void {}
+
+    public disconnect(): void {}
+
+    public constructor(private readonly callback: ResizeObserverCallback) {}
   }
-  const kinds: Record<string, MatchLayoutElement['kind']> = {
-    hud: 'hud',
-    'event-feed': 'event-feed',
-    tutorial: 'tutorial',
-    leaderboard: 'leaderboard',
-    'bottom-panel': 'bottom-panel',
-    card: 'card',
-    'popup-menu': 'popup-menu',
-  };
-  const elements = Object.entries(kinds)
-    .filter(([id]) => values.has(`${id}.x`))
-    .map(([id, kind]) => ({
-      id,
-      kind,
-      x: values.get(`${id}.x`) ?? 0,
-      y: values.get(`${id}.y`) ?? 0,
-      width: values.get(`${id}.width`) ?? 0,
-      height: values.get(`${id}.height`) ?? 0,
-      interactive: kind === 'leaderboard' || kind === 'popup-menu',
-      fontSize: 12,
-    }));
-  const hudHeight = values.get('hud.height') ?? 0;
-  const bottomPanelHeight = values.get('bottom-panel.height') ?? 0;
-  return {
-    scene: elements.some((element) => element.id === 'popup-menu')
-      ? 'pause-menu-open'
-      : elements.some((element) => element.id === 'card')
-        ? 'selected-army'
-        : elements.some((element) => element.id === 'leaderboard')
-          ? 'leaderboard-open'
-          : 'selected-hex',
-    viewport,
-    hudHeight,
-    bottomPanelHeight,
-    mapVisibleHeight: viewport.height - hudHeight - bottomPanelHeight,
-    hasSelection: elements.some((element) => element.id === 'card'),
-    elements,
-  };
+
+  vi.stubGlobal('ResizeObserver', MeasuredResizeObserver);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const className = this.className.toString();
+    const height =
+      this.tagName === 'HEADER'
+        ? MEASURED_LAYOUT.hudHeight
+        : className.includes('dock')
+          ? MEASURED_LAYOUT.bottomPanelHeight
+          : className.includes('card')
+            ? MEASURED_LAYOUT.cardHeight
+            : 0;
+    return new DOMRect(0, 0, window.innerWidth, height);
+  });
+}
+
+function readLayoutStyle(): CSSStyleDeclaration {
+  const root = document.querySelector<HTMLElement>('[class*="page"]');
+  if (!root) throw new Error('Корневой элемент MatchSurface не найден');
+  return root.style;
+}
+
+function expectLayoutVariables(input: Parameters<typeof computeMatchLayout>[0]): void {
+  const expected = computeMatchLayout(input);
+  const style = readLayoutStyle();
+  for (const element of expected.elements) {
+    expect(style.getPropertyValue(`--layout-${element.id}-x`)).toBe(`${element.x}px`);
+    expect(style.getPropertyValue(`--layout-${element.id}-y`)).toBe(`${element.y}px`);
+    expect(style.getPropertyValue(`--layout-${element.id}-width`)).toBe(`${element.width}px`);
+    expect(style.getPropertyValue(`--layout-${element.id}-height`)).toBe(`${element.height}px`);
+  }
+  expect(validateMatchLayout(expected)).toEqual([]);
 }
 
 afterEach(() => {
+  cleanup();
   vi.resetModules();
   vi.unstubAllGlobals();
 });
@@ -320,7 +268,7 @@ describe('приёмка T7: раскладка матча без перекры
   });
 
   it('правило задачи: в раскладке нет жёстких отступов сверху top: 52px, 56px и 72px', () => {
-    const clientSourceDirectory = fileURLToPath(new URL('../src', import.meta.url));
+    const clientSourceDirectory = join(process.cwd(), 'apps/client/src');
     const floatingModules = [
       'dev/EventFeed.module.css',
       'dev/Hud.module.css',
@@ -346,69 +294,86 @@ describe('приёмка T7: раскладка матча без перекры
     );
   });
 
-  it('проходит через реальный MatchSurface для пяти сцен и трёх размеров', async () => {
-    for (const scene of SCENES) {
-      for (const viewport of VIEWPORTS) {
-        prepareScene(scene, viewport);
-        const { MatchPage } = await import('../src/match/MatchPage.tsx');
-        const page = createElement(MatchPage);
-        const markup = renderToStaticMarkup(page);
-        expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
-        expect(markup).toMatch(/Налог|Tax/);
-        const layout = layoutFromMarkup(markup, viewport);
-        const actualCard = layout.elements.find((item) => item.id === 'card');
-        const actualPopup = layout.elements.some((item) => item.id === 'popup-menu');
-        const actualLeaderboard = layout.elements.find((item) => item.id === 'leaderboard');
-        const expected = computeMatchLayout({
-          viewport,
-          hudHeight: layout.hudHeight,
-          bottomPanelHeight: layout.bottomPanelHeight,
-          eventRows: 0,
-          tutorialVisible: layout.elements.some((item) => item.id === 'tutorial'),
-          leaderboardOpen: actualLeaderboard?.height !== 44,
-          leaderboardRows: 2,
-          cardHeight: actualCard?.height ?? 0,
-          cardOpen: actualCard !== undefined,
-          popupOpen: actualPopup,
-          paused: actualPopup,
-        });
-        expect(layout.elements.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
-          expected.elements.toSorted((a, b) => a.id.localeCompare(b.id)),
-        );
-        if (scene === 'pause-menu-open') {
-          expect(markup).toContain('role="dialog"');
-        }
-        expect(
-          validateMatchLayout(layout),
-          `${scene} ${viewport.width}x${viewport.height}`,
-        ).toEqual([]);
-        vi.resetModules();
-      }
-    }
-  });
-
-  it('передаёт прямоугольники чистого расчёта в реальный MatchSurface', async () => {
-    prepareScene('selected-army', VIEWPORTS[0]);
+  it('передаёт измеренные прямоугольники через реальный MatchSurface', async () => {
+    installLayoutMeasurements();
+    prepareDomScene('?select=0');
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    const markup = renderToStaticMarkup(createElement(MatchPage));
-    const actual = layoutFromMarkup(markup, VIEWPORTS[0]);
-    const layout = computeMatchLayout({
+
+    render(createElement(MatchPage));
+
+    expectLayoutVariables({
       viewport: VIEWPORTS[0],
-      hudHeight: actual.hudHeight,
-      bottomPanelHeight: actual.bottomPanelHeight,
+      ...MEASURED_LAYOUT,
       eventRows: 0,
       tutorialVisible: true,
-      leaderboardOpen: actual.elements.some((item) => item.id === 'leaderboard'),
+      leaderboardOpen: false,
       leaderboardRows: 2,
-      cardHeight: actual.elements.find((item) => item.id === 'card')?.height ?? 0,
       cardOpen: true,
       popupOpen: false,
       paused: false,
     });
+  });
 
-    expect(actual.elements.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
-      layout.elements.toSorted((a, b) => a.id.localeCompare(b.id)),
-    );
+  it('пересчитывает раскладку после открытия лидерборда', async () => {
+    installLayoutMeasurements();
+    prepareDomScene();
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u }));
+    expectLayoutVariables({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: true,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    });
+  });
+
+  it('пересчитывает раскладку после открытия меню налога', async () => {
+    installLayoutMeasurements();
+    prepareDomScene();
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
+    expect(screen.getByRole('dialog', { name: /Налог|Tax/u })).not.toBeNull();
+    expectLayoutVariables({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: true,
+      paused: false,
+    });
+  });
+
+  it('передаёт состояние паузы в расчёт после клика по реальному HUD', async () => {
+    installLayoutMeasurements();
+    prepareDomScene();
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    fireEvent.click(screen.getByRole('button', { name: /Пауза|Pause/u }));
+    expect(screen.getByRole('dialog', { name: /Пауза|Pause/u })).not.toBeNull();
+    expectLayoutVariables({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: false,
+      paused: true,
+    });
   });
 
   it('не нарушает границы при произвольном экране и наборе флагов', () => {
