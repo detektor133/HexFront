@@ -13,11 +13,28 @@ export interface Camera {
 export interface Viewport {
   readonly width: number;
   readonly height: number;
+  readonly top?: number;
 }
 
-/** Убирает нижнюю панель из области, в которой камера ограничивает карту. */
-export function insetViewport(view: Viewport, bottomInset: number): Viewport {
-  return { width: view.width, height: Math.max(0, view.height - Math.max(0, bottomInset)) };
+/** Убирает верхнюю и нижнюю панели из области, в которой камера ограничивает карту. */
+export function insetViewport(view: Viewport, bottomInset: number): Viewport;
+export function insetViewport(
+  view: Viewport,
+  topInset: number,
+  bottomInset: number,
+): Viewport & { readonly top: number };
+export function insetViewport(
+  view: Viewport,
+  topOrBottomInset: number,
+  bottomInset?: number,
+): Viewport {
+  const top = bottomInset === undefined ? 0 : Math.max(0, topOrBottomInset);
+  const bottom = Math.max(0, bottomInset ?? topOrBottomInset);
+  return {
+    width: view.width,
+    height: Math.max(0, view.height - top - bottom),
+    ...(top > 0 ? { top } : {}),
+  };
 }
 
 export type DetailLevel = 1 | 2 | 3;
@@ -56,12 +73,14 @@ function clampAxis(
   worldSize: number,
   viewSize: number,
   scale: number,
+  viewStart: number,
+  allowCenter: boolean,
 ): number {
   const size = worldSize * scale;
-  // Карта меньше экрана — центрируем, иначе не даём увести край карты внутрь экрана.
-  if (size <= viewSize) return (viewSize - size) / 2 - worldStart * scale;
-  const max = -worldStart * scale;
-  const min = viewSize - (worldStart + worldSize) * scale;
+  if (allowCenter) return offset;
+  if (size <= viewSize) return viewStart + (viewSize - size) / 2 - worldStart * scale;
+  const max = viewStart - worldStart * scale;
+  const min = viewStart + viewSize - (worldStart + worldSize) * scale;
   return Math.min(max, Math.max(min, offset));
 }
 
@@ -70,8 +89,29 @@ export function clampCamera(cam: Camera, view: Viewport, world: Rect): Camera {
   const scale = Math.min(MAX_SCALE, Math.max(minScale(view, world), cam.scale));
   return {
     scale,
-    x: clampAxis(cam.x, world.x, world.width, view.width, scale),
-    y: clampAxis(cam.y, world.y, world.height, view.height, scale),
+    x: clampAxis(cam.x, world.x, world.width, view.width, scale, 0, view.top !== undefined),
+    y: clampAxis(
+      cam.y,
+      world.y,
+      world.height,
+      view.height,
+      scale,
+      view.top ?? 0,
+      view.top !== undefined,
+    ),
+  };
+}
+
+/** Возвращает камеру, которая ставит мировую точку в центр видимой области. */
+export function centerCameraOnPoint(
+  point: { readonly x: number; readonly y: number },
+  scale: number,
+  view: Viewport,
+): Camera {
+  return {
+    scale,
+    x: view.width / 2 - point.x * scale,
+    y: (view.top ?? 0) + view.height / 2 - point.y * scale,
   };
 }
 

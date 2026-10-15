@@ -88,6 +88,8 @@ export interface MapView {
   setScale(scale: number): void;
   /** Оставляет нижнюю панель вне области, к которой привязаны границы камеры. */
   setBottomInset(px: number): void;
+  /** Оставляет HUD вне области, к которой привязаны границы камеры. */
+  setTopInset(px: number): void;
   /** Ставит гекс в центр экрана (в пределах границ карты). */
   centerOn(hex: Hex): void;
   /**
@@ -127,7 +129,7 @@ export async function createMapView(
   let opts = initial;
   const app = new Application();
   await app.init({
-    background: tokens.map.background,
+    background: tokens.map.water,
     resizeTo: host,
     antialias: true,
     autoDensity: true,
@@ -140,7 +142,7 @@ export async function createMapView(
   selection.context.batchMode = 'batch';
   world.addChild(selection);
 
-  let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
+  let layer: TerrainLayer = createTerrainLayer(map, opts.radius, tokens.map.waterEdge);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
   const mount = (): void => {
     world.addChild(layer.base);
@@ -151,8 +153,9 @@ export async function createMapView(
   mount();
   let bounds: Rect = mapBounds(map.width, map.height, opts.radius);
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
+  let topInset = 0;
   let bottomInset = 0;
-  const cameraView = (): Viewport => insetViewport(view(), bottomInset);
+  const cameraView = (): Viewport => insetViewport(view(), topInset, bottomInset);
   let cam: Camera = fitCamera(cameraView(), bounds);
   let drawnScale = 0;
   let velocity: Velocity | null = null;
@@ -276,7 +279,7 @@ export async function createMapView(
       layer.destroy();
       mid?.destroy();
       opts = next;
-      layer = createTerrainLayer(map, opts.radius);
+      layer = createTerrainLayer(map, opts.radius, tokens.map.waterEdge);
       mid = opts.midLayer?.(map, opts.radius) ?? null;
       mount();
       bounds = mapBounds(map.width, map.height, opts.radius);
@@ -284,7 +287,10 @@ export async function createMapView(
         {
           scale: cam.scale,
           x: cameraView().width / 2 - centerWorld.x * opts.radius * cam.scale,
-          y: cameraView().height / 2 - centerWorld.y * opts.radius * cam.scale,
+          y:
+            (cameraView().top ?? 0) +
+            cameraView().height / 2 -
+            centerWorld.y * opts.radius * cam.scale,
         },
         cameraView(),
         bounds,
@@ -295,7 +301,11 @@ export async function createMapView(
       const p = hexCenter(hex, opts.radius);
       const v = cameraView();
       cam = clampCamera(
-        { scale: cam.scale, x: v.width / 2 - p.x * cam.scale, y: v.height / 2 - p.y * cam.scale },
+        {
+          scale: cam.scale,
+          x: v.width / 2 - p.x * cam.scale,
+          y: (v.top ?? 0) + v.height / 2 - p.y * cam.scale,
+        },
         cameraView(),
         bounds,
       );
@@ -359,6 +369,11 @@ export async function createMapView(
     },
     setBottomInset(px) {
       bottomInset = Math.max(0, px);
+      cam = clampCamera(cam, cameraView(), bounds);
+      apply();
+    },
+    setTopInset(px) {
+      topInset = Math.max(0, px);
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },

@@ -108,6 +108,7 @@ interface Sandbox {
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number): void;
+  setHudHeight(height: number): void;
   pixiTelemetry(): PixiTelemetry;
 }
 
@@ -143,6 +144,7 @@ function useSandbox(
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
+  const hudHeightRef = useRef(0);
   const observerIdRef = useRef<number | null>(null);
   const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
   const snapshotTelemetryRef = useRef<SnapshotTelemetry | null>(null);
@@ -349,6 +351,7 @@ function useSandbox(
       view = v;
       mapViewRef.current = v;
       v.setBottomInset(dockHeightRef.current);
+      v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
@@ -438,6 +441,10 @@ function useSandbox(
       dockHeightRef.current = height;
       mapViewRef.current?.setBottomInset(height);
     },
+    setHudHeight(height) {
+      hudHeightRef.current = height;
+      mapViewRef.current?.setTopInset(height);
+    },
     pixiTelemetry() {
       return (
         mapViewRef.current?.sceneStats() ?? {
@@ -512,7 +519,16 @@ export function SandboxSurface({
         onFocus={sb.focusEvent}
         style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
       />
-      {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} showFog={debug} />}
+      {view && (
+        <Hud
+          view={view}
+          send={sb.send}
+          fog={sb.fog}
+          setFog={sb.setFog}
+          showFog={debug}
+          onHeight={sb.setHudHeight}
+        />
+      )}
       {debug && view && (
         <ObserverPanel
           view={view}

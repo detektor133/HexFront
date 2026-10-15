@@ -97,6 +97,7 @@ interface Sandbox {
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number): void;
+  setHudHeight(height: number): void;
   pixiTelemetry(): PixiTelemetry;
 }
 
@@ -132,6 +133,7 @@ export function useSandbox(
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
+  const hudHeightRef = useRef(0);
   const observerIdRef = useRef<number | null>(null);
   const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
   const snapshotTelemetryRef = useRef<SnapshotTelemetry | null>(null);
@@ -338,6 +340,7 @@ export function useSandbox(
       view = v;
       mapViewRef.current = v;
       v.setBottomInset(dockHeightRef.current);
+      v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
@@ -426,6 +429,10 @@ export function useSandbox(
     setDockHeight(height) {
       dockHeightRef.current = height;
       mapViewRef.current?.setBottomInset(height);
+    },
+    setHudHeight(height) {
+      hudHeightRef.current = height;
+      mapViewRef.current?.setTopInset(height);
     },
     pixiTelemetry() {
       return (

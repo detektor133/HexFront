@@ -120,7 +120,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           fog={sb.fog}
           setFog={sb.setFog}
           showFog={debug}
-          onHeight={setHudH}
+          onHeight={(height) => {
+            setHudH(height);
+            sb.setHudHeight?.(height);
+          }}
           onPopupChange={setPopupOpen}
           style={styleFor('hud')}
           popupStyle={styleFor('popup-menu')}

@@ -165,7 +165,12 @@ function drawFills(cells: readonly HexCell[], radius: number): Graphics {
 }
 
 // Берег — линия 1 px по рёбрам вода/суша (style-guide, слой 1).
-function drawCoast(map: MapStatic, cells: readonly HexCell[], radius: number): Graphics {
+function drawCoast(
+  map: MapStatic,
+  cells: readonly HexCell[],
+  radius: number,
+  waterEdge: string,
+): Graphics {
   const g = new Graphics();
   for (const cell of cells) {
     if (cell.terrain !== TERRAIN.water) continue;
@@ -175,7 +180,7 @@ function drawCoast(map: MapStatic, cells: readonly HexCell[], radius: number): G
       g.moveTo(a.x, a.y).lineTo(b.x, b.y);
     }
   }
-  g.stroke({ color: M.waterEdge, width: 1, pixelLine: true });
+  g.stroke({ color: waterEdge, width: 1, pixelLine: true });
   return g;
 }
 
@@ -207,7 +212,11 @@ export interface TerrainLayer {
 }
 
 /** Строит слои рельефа для карты при заданном радиусе гекса. */
-export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer {
+export function createTerrainLayer(
+  map: MapStatic,
+  radius: number,
+  waterEdge: string = M.waterEdge,
+): TerrainLayer {
   const cells = cellsOf(map, radius);
   const rivers = new Graphics();
   const grid = drawGrid(cells, radius);
@@ -215,7 +224,7 @@ export function createTerrainLayer(map: MapStatic, radius: number): TerrainLayer
   base.addChild(drawFills(cells, radius), rivers, grid);
   const lines = new Graphics();
   const overlay = new Container();
-  overlay.addChild(drawCrownLayer(cells, radius), lines, drawCoast(map, cells, radius));
+  overlay.addChild(drawCrownLayer(cells, radius), lines, drawCoast(map, cells, radius, waterEdge));
 
   const byTerrain = (t: number): HexCell[] => cells.filter((c) => c.terrain === t);
   const hills = byTerrain(TERRAIN.hills);
