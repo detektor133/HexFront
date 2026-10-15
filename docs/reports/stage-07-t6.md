@@ -8,6 +8,15 @@
 
 Этап: 07/T6
 
+## Возврат ревью 2026-10-15 (повторная сверка после СПЕК)
+
+- `pnpm exec vitest run apps/client/test/pause.test.ts` — 5/5, но зелёный тест не закрывает оба замечания ниже.
+- СПЕК: `apps/client/test/pause.test.ts:222-234` после `visibilitychange` проверяет только `setPaused(true)`; открытие меню паузы, требуемое текстом T6, не подтверждается.
+- СПЕК: `apps/client/test/pause.test.ts:259-269` проверяет только наличие произвольного `data-icon="player-pause"`; геометрия Tabler-иконки и кнопка 44×44 этой проверкой не подтверждаются.
+- `pnpm verify --changed` запущен; лог `.ai-logs/verify-2026-10-15T01-40-47.log` содержит успешные build и visual-проверки, итоговый код команды в консоль не выведен.
+
+Этап: 07/T6
+
 ## Возврат ревью 2026-10-15
 
 - `pnpm verify --changed` — OK: build, types, lint, prettier, tests и visual.

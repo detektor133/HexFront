@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T6 исправлена по возврату ревью: тест выбора скорости рендерит `MatchSurface` с `view`, helper поддерживает ленивый `useState`, SVG содержит четыре пути Tabler `player-pause`.
-- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests и visual.
-- Следующая задача — 07/T7.
+- 07/T6 возвращена повторным ревью: `visibilitychange` проверяет только паузу, а тест иконки принимает один маскирующий `data-icon` без проверки геометрии Tabler и размера 44×44.
+- Профильный тест `pnpm exec vitest run apps/client/test/pause.test.ts` зелёный: 5/5; `pnpm verify --changed` запущен, лог сборки и visual зелёный.
+- Следующая сессия — исправить возврат ревью 07/T6, затем повторить `$review 07/T6`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/pause.test.ts`, `apps/client/src/dev/Hud.tsx`.
