@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T20 |
+| Текущая задача | 07/T7 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-15 |
 
@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-- T20 выполнена и ждёт ревью: visual-шаг verify, visual-эталоны, root `src/match/layout.ts` и настройки visual-потоков удалены.
-- Следующее действие — `$task 07/T7` после `$review 07/T20`.
+- T20 принята ревью: visual-шаг verify, visual-эталоны, root `src/match/layout.ts` и настройки visual-потоков удалены.
+- Следующее действие — `$task 07/T7`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.test.ts`.
