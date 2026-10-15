@@ -73,18 +73,19 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
+  const [cardH, setCardH] = useState(0);
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
-    hudHeight: window.innerWidth <= 600 ? 88 : 48,
-    bottomPanelHeight: window.innerWidth <= 600 ? 178 : 132,
+    hudHeight: hudH || (window.innerWidth <= 600 ? 88 : 48),
+    bottomPanelHeight: dockH || (window.innerWidth <= 600 ? 178 : 132),
     eventRows: Math.min(3, sb.events.length),
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen: false,
     leaderboardRows: view?.players.length ?? 0,
-    cardHeight: 180,
+    cardHeight: cardH || 180,
     cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
     popupOpen: false,
     paused: pauseState.menuOpen,
@@ -171,7 +172,14 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
       {view && map && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
-        <UnitCard view={view} map={map} picked={sb.picked} send={sb.send} onPick={sb.pick} />
+        <UnitCard
+          view={view}
+          map={map}
+          picked={sb.picked}
+          send={sb.send}
+          onPick={sb.pick}
+          onHeight={setCardH}
+        />
       )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
         <HexCard
@@ -180,6 +188,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           map={map}
           send={sb.send}
           onRoadPreview={sb.setRoadPreview}
+          onHeight={setCardH}
         />
       )}
       {debug && sb.lastReject && (

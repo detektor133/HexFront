@@ -78,7 +78,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const { width, height } = input.viewport;
   const edge = width <= 600 || height <= 500 ? 8 : 16;
   const gap = 8;
-  const landscapeWithoutSelection = width > height && !input.cardOpen && !input.paused;
+  const landscapeWithoutSelection = width > height && !input.cardOpen;
   const maxBottomPanelHeight = landscapeWithoutSelection
     ? Math.floor(height / 2) - input.hudHeight
     : height - input.hudHeight - gap;
@@ -91,8 +91,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', 0, 0, width, input.hudHeight),
   ];
-  const showLeaderboard = !input.paused && !cardOpenOnPhone(input, width);
-  if (!input.paused) {
+  const showLeaderboard = !input.paused && !input.popupOpen && !cardOpenOnPhone(input, width);
+  if (!input.paused && !input.popupOpen) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
     );
@@ -122,7 +122,13 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const leftColumnTop = input.hudHeight + gap;
   const leftColumnBottom = bottomY - gap;
   const eventVisible = eventHeight > 0 && leftColumnTop + eventHeight <= leftColumnBottom;
-  if (eventVisible && !input.cardOpen && !input.leaderboardOpen && !input.paused) {
+  if (
+    eventVisible &&
+    !input.cardOpen &&
+    !input.leaderboardOpen &&
+    !input.popupOpen &&
+    !input.paused
+  ) {
     elements.push(
       layoutElement(
         'event-feed',
@@ -139,13 +145,14 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     input.tutorialVisible &&
     !input.leaderboardOpen &&
     !input.cardOpen &&
+    !input.popupOpen &&
     !input.paused &&
     tutorialY + 48 <= leftColumnBottom
   ) {
     elements.push(layoutElement('tutorial', 'tutorial', edge, tutorialY, leftWidth, 48));
   }
   const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
-  if (input.cardOpen && !input.paused && cardAvailableHeight >= 44) {
+  if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {
     elements.push(
       layoutElement(
         'card',
@@ -183,7 +190,10 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     viewport: input.viewport,
     hudHeight: input.hudHeight,
     bottomPanelHeight,
-    mapVisibleHeight: Math.max(0, height - input.hudHeight - bottomPanelHeight),
+    mapVisibleHeight: Math.max(
+      0,
+      height - input.hudHeight - (input.paused || input.popupOpen ? 0 : bottomPanelHeight),
+    ),
     hasSelection: input.cardOpen,
     elements,
   };

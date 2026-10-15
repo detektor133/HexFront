@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TERRAIN_NAMES,
@@ -178,7 +178,18 @@ export function HexCard(props: {
   map: MapStatic;
   send: (cmd: Command) => void;
   onRoadPreview?: (path: readonly number[] | null) => void;
+  onHeight?: (px: number) => void;
 }): React.JSX.Element {
+  const cardRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card || !props.onHeight) return;
+    const report = (): void => props.onHeight?.(card.getBoundingClientRect().height);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [props.onHeight]);
   const { s, view, map, send } = props;
   const owner = view.hexes.owner[s.hex] ?? -1;
   const ownerText =
@@ -200,7 +211,7 @@ export function HexCard(props: {
   const improvement = view.hexes.improvement[s.hex] ?? 0;
   const recruiting = c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
-    <section className={styles.card} aria-label={title}>
+    <section ref={cardRef} className={styles.card} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
       <dl className={styles.stats}>
         <Row label={t('card.owner')} value={ownerText} />

@@ -9,7 +9,6 @@
   gap: var(--space-sm);
   padding: var(--space-lg);
   box-sizing: border-box;
-  transform: translate(-50%, -50%);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);

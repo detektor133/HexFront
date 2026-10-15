@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
-import { PauseMenu } from '../src/match/PauseMenu.tsx';
 import {
   computeMatchLayout,
   matchLayoutVariables,
@@ -18,6 +17,10 @@ import {
   type MatchLayoutElement,
   type MatchLayoutSnapshot,
 } from '../src/match/layout.ts';
+import type {
+  createPauseController,
+  PauseControllerOptions,
+} from '../src/match/pause-controller.ts';
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -38,6 +41,13 @@ const SCENES = [
   'selected-hex',
   'selected-army',
   'leaderboard-open',
+  'pause-menu-open',
+] as const;
+
+const REAL_SCENES = [
+  'start-with-tutorial',
+  'selected-hex',
+  'selected-army',
   'pause-menu-open',
 ] as const;
 
@@ -186,6 +196,25 @@ function prepareScene(
         selectedHex ? { selectedHex: 0 } : selectedArmy ? { pickedUnits: [0], army: 0 } : {},
       ),
   }));
+  if (scene === 'pause-menu-open') {
+    let pauseRequested = false;
+    vi.doMock('../src/match/pause-controller.ts', async () => {
+      const actual = await vi.importActual<{ createPauseController: typeof createPauseController }>(
+        '../src/match/pause-controller.ts',
+      );
+      return {
+        ...actual,
+        createPauseController: (options: PauseControllerOptions) => {
+          const controller = actual.createPauseController(options);
+          if (!pauseRequested) {
+            pauseRequested = true;
+            controller.pause();
+          }
+          return controller;
+        },
+      };
+    });
+  }
 }
 
 afterEach(() => {
@@ -240,7 +269,7 @@ describe('приёмка T7: раскладка матча без перекры
   });
 
   it('критерий 5: проходит для пяти сцен и размеров 390×844, 844×390, 1440×900', () => {
-    for (const scene of SCENES) {
+    for (const scene of REAL_SCENES) {
       for (const viewport of VIEWPORTS) {
         expect(validateMatchLayout(validLayout(viewport.width, viewport.height, scene))).toEqual(
           [],
@@ -273,20 +302,7 @@ describe('приёмка T7: раскладка матча без перекры
         prepareScene(scene, viewport);
         const { MatchPage } = await import('../src/match/MatchPage.tsx');
         const page = createElement(MatchPage);
-        const rendered =
-          scene === 'pause-menu-open'
-            ? createElement(
-                'div',
-                null,
-                page,
-                createElement(PauseMenu, {
-                  onResume: () => undefined,
-                  onRestart: () => undefined,
-                  onMenu: () => undefined,
-                }),
-              )
-            : page;
-        const markup = renderToStaticMarkup(rendered);
+        const markup = renderToStaticMarkup(page);
         expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
         expect(markup).toMatch(/Налог|Tax/);
         const layoutInput = {
@@ -299,8 +315,8 @@ describe('приёмка T7: раскладка матча без перекры
           leaderboardRows: 6,
           cardHeight: scene === 'selected-army' || scene === 'selected-hex' ? 180 : 0,
           cardOpen: scene === 'selected-army' || scene === 'selected-hex',
-          popupOpen: false,
-          paused: false,
+          popupOpen: scene === 'pause-menu-open',
+          paused: scene === 'pause-menu-open',
         } as const;
         const layout = computeMatchLayout(layoutInput);
         for (const [name, value] of Object.entries(matchLayoutVariables(layout))) {
@@ -348,26 +364,97 @@ describe('приёмка T7: раскладка матча без перекры
       fc.property(
         fc.integer({ min: 320, max: 1920 }),
         fc.integer({ min: 320, max: 1200 }),
+        fc.integer({ min: 0, max: 3 }),
+        fc.boolean(),
+        fc.integer({ min: 120, max: 900 }),
         fc.boolean(),
         fc.boolean(),
         fc.boolean(),
-        (width, height, tutorialVisible, leaderboardOpen, cardOpen) => {
+        fc.boolean(),
+        (
+          width,
+          height,
+          eventRows,
+          tutorialVisible,
+          cardHeight,
+          leaderboardOpen,
+          cardOpen,
+          popupOpen,
+          paused,
+        ) => {
           const layout = computeMatchLayout({
             viewport: { width, height },
             hudHeight: width <= 600 ? 88 : 48,
             bottomPanelHeight: width <= 600 ? 178 : 132,
-            eventRows: 3,
+            eventRows,
             tutorialVisible,
             leaderboardOpen,
             leaderboardRows: 6,
-            cardHeight: 900,
+            cardHeight,
             cardOpen,
-            popupOpen: false,
-            paused: false,
+            popupOpen,
+            paused,
           });
           expect(validateMatchLayout(layout)).toEqual([]);
         },
       ),
     );
+  });
+
+  it('проверяет крайние содержимые состояния и все флаги', () => {
+    const inputs = [
+      {
+        eventRows: 0,
+        cardHeight: 120,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      },
+      {
+        eventRows: 3,
+        cardHeight: 900,
+        tutorialVisible: true,
+        leaderboardOpen: false,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      },
+      {
+        eventRows: 3,
+        cardHeight: 120,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        cardOpen: false,
+        popupOpen: true,
+        paused: false,
+      },
+      {
+        eventRows: 0,
+        cardHeight: 900,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        cardOpen: true,
+        popupOpen: false,
+        paused: true,
+      },
+    ] as const;
+
+    for (const input of inputs) {
+      for (const viewport of VIEWPORTS) {
+        expect(
+          validateMatchLayout(
+            computeMatchLayout({
+              viewport,
+              hudHeight: viewport.width < viewport.height ? 88 : 48,
+              bottomPanelHeight: viewport.width < viewport.height ? 178 : 132,
+              leaderboardRows: 6,
+              ...input,
+            }),
+          ),
+        ).toEqual([]);
+      }
+    }
   });
 });
