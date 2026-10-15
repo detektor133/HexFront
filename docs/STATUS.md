@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T8: тесты переписаны на реальный путь `createMapView` → `MapView.centerOn`; проверены позиции сцены, Pixi-фон и цвет береговой линии.
-- Приёмка T8 подтверждена тремя тестами в `apps/client/test/camera-edge.test.ts`.
+- 07/T9: добавлен `IconButton` с общей подписью из `title` и `aria-label`.
+- Удержание дольше 350 мс показывает tooltip, движение более 8 px отменяет его, короткий тап вызывает действие.
+- Приёмка T9 подтверждена четырьмя тестами в `apps/client/test/mobile-labels.dom.test.tsx`.
 - `pnpm verify --changed` — зелёная.
-- Следующая задача: 07/T9.
-- Читать блок T9 в `docs/stages/stage-07-playable-build.md` и контекст интерфейса из `docs/STATUS.md`.
+- Следующая задача: 07/T10.
+- Читать блок T10 в `docs/stages/stage-07-playable-build.md` и документы лидерборда.
