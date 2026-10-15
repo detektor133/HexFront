@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7 выполнена: реальные корни плавающих элементов получают inline `left`, `top`, `width`, `height`; невидимые элементы не рендерятся.
-- Приёмочный DOM-тест использует `ResizeObserverEntry.contentRect`, клики по лидерборду, налогу и паузе; `getBoundingClientRect()` не подменяется.
-- Проверка: `pnpm verify --changed` зелёный.
+- 07/T7: исправлены СПЕК-тесты DOM-раскладки.
+- Тест проверяет два набора высот `ResizeObserver`, отсутствие невидимых элементов и корневые CSS-селекторы без числовых координат.
+- `pnpm verify --changed`: зелёный, 14 тестов T7 проходят.
 - Следующая задача по очереди: 07/T8.
 - Для ревью читать `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.

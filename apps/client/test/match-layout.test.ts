@@ -40,10 +40,22 @@ const REAL_SCENES = [
   'pause-menu-open',
 ] as const;
 
-const MEASURED_LAYOUT = {
+type MeasuredLayout = {
+  readonly hudHeight: number;
+  readonly bottomPanelHeight: number;
+  readonly cardHeight: number;
+};
+
+const MEASURED_LAYOUT: MeasuredLayout = {
   hudHeight: 91,
   bottomPanelHeight: 157,
   cardHeight: 303,
+} as const;
+
+const SECOND_MEASURED_LAYOUT: MeasuredLayout = {
+  hudHeight: 120,
+  bottomPanelHeight: 200,
+  cardHeight: 500,
 } as const;
 
 const element = (
@@ -168,17 +180,17 @@ function prepareDomScene(search = '', viewport = VIEWPORTS[0]): void {
   }));
 }
 
-function installLayoutMeasurements(): void {
+function installLayoutMeasurements(measurements = MEASURED_LAYOUT): void {
   class MeasuredResizeObserver {
     public observe(target: Element): void {
       const className = target.className.toString();
       const height =
         target.tagName === 'HEADER'
-          ? MEASURED_LAYOUT.hudHeight
+          ? measurements.hudHeight
           : className.includes('dock')
-            ? MEASURED_LAYOUT.bottomPanelHeight
+            ? measurements.bottomPanelHeight
             : target.tagName === 'SECTION' && className.includes('card')
-              ? MEASURED_LAYOUT.cardHeight
+              ? measurements.cardHeight
               : 0;
       this.callback(
         [
@@ -249,8 +261,23 @@ function elementWithClass(fragment: string): HTMLElement {
   return element;
 }
 
+function selectorForLayoutElement(id: string): string {
+  return id === 'hud'
+    ? 'header'
+    : id === 'bottom-panel'
+      ? '[class*="dock"]'
+      : id === 'leaderboard'
+        ? '[class*="panel"], [class*="collapsed"]'
+        : id === 'card'
+          ? 'section[class*="card"]'
+          : id === 'popup-menu'
+            ? '[role="dialog"]'
+            : `[class*="${id}"]`;
+}
+
 function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0]): void {
   const expected = computeMatchLayout(input);
+  const expectedIds = new Set(expected.elements.map((element) => element.id));
   const rendered = new Map<string, HTMLElement>();
   for (const element of expected.elements) {
     const fragment =
@@ -269,6 +296,18 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     rendered.set(element.id, node);
     expect(getComputedStyle(node).display, element.id).not.toBe('none');
     expect(getComputedStyle(node).visibility, element.id).not.toBe('hidden');
+  }
+  for (const id of [
+    'event-feed',
+    'tutorial',
+    'leaderboard',
+    'bottom-panel',
+    'card',
+    'popup-menu',
+  ]) {
+    if (!expectedIds.has(id)) {
+      expect(document.querySelector(selectorForLayoutElement(id)), id).toBeNull();
+    }
   }
   for (const element of expected.elements) {
     const node = rendered.get(element.id);
@@ -419,14 +458,16 @@ describe('приёмка T7: раскладка матча без перекры
       'match/OnboardingHints.module.css',
       'match/PauseMenu.module.css',
     ];
-    const floatingSelectors =
-      /\.(feed|hud|popover|settingsMenu|panel|collapsed|dock|card|menu)\s*\{([^}]*)\}/g;
+    const floatingClass =
+      /^\s*\.(?:feed|hud|popover|settingsMenu|panel|collapsed|dock|card|menu)\s*$/;
+    const rules = /([^{}]+)\{([^{}]*)\}/g;
     const forbidden = /\b(top|right|bottom|left|width|max-height)\s*:\s*-?\d+(?:\.\d+)?px\b/g;
     for (const relativePath of floatingModules) {
       const source = readFileSync(join(clientSourceDirectory, relativePath), 'utf8');
-      for (const match of source.matchAll(floatingSelectors)) {
-        expect(match[2]?.match(forbidden), `${relativePath}:${match[1]}`).toBeNull();
-      }
+      const violations = [...source.matchAll(rules)]
+        .filter((match) => match[1]?.split(',').some((selector) => floatingClass.test(selector)))
+        .flatMap((match) => match[2]?.match(forbidden) ?? []);
+      expect(violations, relativePath).toEqual([]);
     }
 
     const hudSource = readFileSync(join(clientSourceDirectory, 'dev', 'Hud.module.css'), 'utf8');
@@ -436,10 +477,9 @@ describe('приёмка T7: раскладка матча без перекры
   });
 
   it('передаёт измеренные прямоугольники через реальный MatchSurface', async () => {
-    installLayoutMeasurements();
+    installLayoutMeasurements(MEASURED_LAYOUT);
     prepareDomScene('?select=0');
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
-
     render(createElement(MatchPage));
 
     expectInlineRectangles({
@@ -456,6 +496,36 @@ describe('приёмка T7: раскладка матча без перекры
     expectRenderedRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: true,
+      popupOpen: false,
+      paused: false,
+    });
+  });
+
+  it('проверяет второй набор измерений через реальный MatchSurface', async () => {
+    installLayoutMeasurements(SECOND_MEASURED_LAYOUT);
+    prepareDomScene('?select=0');
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    expectInlineRectangles({
+      viewport: VIEWPORTS[0],
+      ...SECOND_MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: true,
+      popupOpen: false,
+      paused: false,
+    });
+    expectRenderedRectangles({
+      viewport: VIEWPORTS[0],
+      ...SECOND_MEASURED_LAYOUT,
       eventRows: 0,
       tutorialVisible: true,
       leaderboardOpen: false,
