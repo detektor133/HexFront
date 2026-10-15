@@ -102,6 +102,14 @@ function Settings(props: {
   );
 }
 
+function PauseIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
+      <path d="M8 5v14M16 5v14" />
+    </svg>
+  );
+}
+
 /** Верхняя полоса по ui.md «HUD»: люди, золото, налог с ползунком, снабжение, время, место, настройки. */
 export function Hud(props: {
   view: PlayerView;
@@ -109,6 +117,7 @@ export function Hud(props: {
   fog: boolean;
   setFog: (on: boolean) => void;
   showFog?: boolean;
+  onPause?: () => void;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const { view } = props;
@@ -178,6 +187,17 @@ export function Hud(props: {
         setFog={props.setFog}
         showFog={props.showFog ?? true}
       />
+      {props.onPause && (
+        <button
+          type="button"
+          className={styles.settingsButton}
+          aria-label={t('pause.title')}
+          title={t('pause.title')}
+          onClick={props.onPause}
+        >
+          <PauseIcon />
+        </button>
+      )}
     </header>
   );
 }

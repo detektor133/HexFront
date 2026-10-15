@@ -1,0 +1,42 @@
+.menu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: grid;
+  width: 280px;
+  max-width: calc(100% - 2 * var(--space-lg));
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.title {
+  margin: 0 0 var(--space-sm);
+  color: var(--ui-ink);
+  font-family: var(--font-display-family);
+  font-size: var(--font-size-hud-value);
+}
+
+.button,
+.primary {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--ui-ink);
+  border-color: var(--ui-ink);
+  color: var(--ui-surface);
+}

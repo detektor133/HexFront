@@ -1,7 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { OnboardingHints } from './OnboardingHints.tsx';
+import { PauseMenu } from './PauseMenu.tsx';
+import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
 import { EventFeed } from '../dev/EventFeed.tsx';
@@ -30,6 +32,29 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
+  const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
+  const pauseController = useMemo(
+    () =>
+      createPauseController({
+        worker: {
+          postMessage: (message) => sb.setPaused(message.type === 'pause'),
+        },
+        seed: mapRequest.seed,
+        navigate: (path) => {
+          window.location.assign(path);
+        },
+        restart: () => window.location.reload(),
+        onStateChange: (paused, menuOpen) => setPauseState({ paused, menuOpen }),
+      }),
+    [mapRequest.seed, sb.setPaused],
+  );
+  useEffect(() => {
+    const onVisibilityChange = (): void => {
+      pauseController.handleVisibilityChange(document.visibilityState === 'hidden');
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [pauseController]);
   const downloadTelemetry = useTelemetry(
     {
       view: () => sb.msg?.view ?? null,
@@ -63,7 +88,16 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         onFocus={sb.focusEvent}
         style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
       />
-      {view && <Hud view={view} send={sb.send} fog={sb.fog} setFog={sb.setFog} showFog={debug} />}
+      {view && (
+        <Hud
+          view={view}
+          send={sb.send}
+          fog={sb.fog}
+          setFog={sb.setFog}
+          showFog={debug}
+          {...(debug ? {} : { onPause: pauseController.pause })}
+        />
+      )}
       {debug && view && (
         <ObserverPanel
           view={view}
@@ -79,7 +113,14 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         />
       )}
       {view && <Leaderboard view={view} />}
-      {view && <MatchEnd view={view} replay={sb.replay} />}
+      {view && <MatchEnd view={view} replay={sb.replay} onMenu={pauseController.goToMenu} />}
+      {!debug && pauseState.menuOpen && (
+        <PauseMenu
+          onResume={pauseController.resume}
+          onRestart={pauseController.restart}
+          onMenu={pauseController.goToMenu}
+        />
+      )}
       {showOnboarding && view && <OnboardingHints view={view} />}
       {view && (
         <ArmyBar

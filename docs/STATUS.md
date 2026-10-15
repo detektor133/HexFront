@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-Владелец сообщил: "https://stage-07.hexfront-5d5.pages.dev
-Аккаунт Cloudflare и секреты CLOUDFLARE_API_TOKEN и CLOUDFLARE_ACCOUNT_ID настроены, workflow pages зелёный (проект Pages создаётся автоматически). На телефоне меню открывается по ссылке, «Играть» запускает матч."
-Следующая сессия — взять 07/T6.
-Читать: `docs/stages/stage-07-playable-build.md`, `docs/gdd/08-match.md`, `apps/client/test/match-screen.test.ts`.
+07/T6 выполнена и отмечена `- [~]`; ожидается `$review 07/T6` в новой сессии.
+Реализованы контроллер паузы, меню «Продолжить · Заново · В меню», автопауза при скрытии вкладки, выход в `/` и кнопка выхода на экране конца матча.
+Проверены обычный `/match` без выбора скорости и визуальные эталоны match-сцен.
+Следующая задача — 07/T7.
+Читать: `docs/stages/stage-07-playable-build.md`, `docs/gdd/08-match.md`, `apps/client/src/match/pause-controller.ts`, `apps/client/test/pause.test.ts`.

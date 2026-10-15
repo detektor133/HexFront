@@ -62,6 +62,7 @@ export function MatchEnd(props: {
   readonly view: PlayerView;
   readonly replay?: readonly PlayerView[];
   readonly onAgain?: () => void;
+  readonly onMenu?: () => void;
 }): React.JSX.Element | null {
   const end = matchEnd(props.view);
   if (!end) return null;
@@ -87,6 +88,11 @@ export function MatchEnd(props: {
       >
         {t('match.again')}
       </button>
+      {props.onMenu && (
+        <button type="button" className={styles.again} onClick={props.onMenu}>
+          {t('pause.menu')}
+        </button>
+      )}
     </div>
   );
 }
