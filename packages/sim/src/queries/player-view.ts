@@ -33,11 +33,18 @@ export interface PlayerViewContext {
   readonly places: Int32Array;
 }
 
+export interface PlayerRanking {
+  readonly id: number;
+  readonly score: number;
+  readonly place: number;
+}
+
 export interface PlayerView {
   readonly tick: number;
   /** Победитель матча (08-match.md, «Победа»); -1 — матч идёт. */
   readonly winner: number;
   readonly playerId: number;
+  readonly ranking?: readonly PlayerRanking[];
   readonly hexes: {
     readonly owner: Int16Array;
     readonly pop: Int32Array;
@@ -207,11 +214,17 @@ export function playerView(
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
+  const ranking = Array.from(viewContext.scores, (score, id) => ({
+    id,
+    score,
+    place: viewContext.places[id] ?? 0,
+  }));
   return {
     me: summary(state, playerId, viewContext),
     tick: state.tick,
     winner: state.winner,
     playerId,
+    ranking,
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
@@ -327,6 +340,7 @@ export function commanderView(
     tick: state.tick,
     winner: state.winner,
     playerId,
+    ranking: [],
     hexes: {
       owner: hexes.owner,
       pop: hexes.pop,

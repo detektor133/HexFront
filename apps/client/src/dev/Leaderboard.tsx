@@ -5,7 +5,6 @@ import type { PlayerView } from '@hexfront/sim';
 import styles from './Leaderboard.module.css';
 import { leaderboardRows, type LeaderboardRow } from './leaderboard.ts';
 import { t } from '../i18n/dict.ts';
-import { formatFp, formatSoldiers } from '../i18n/format.ts';
 
 interface LeaderboardProps {
   readonly view: PlayerView;
@@ -36,7 +35,10 @@ export function Leaderboard({
 }: LeaderboardProps): React.JSX.Element {
   const rows = useLeaderboard(view);
   const me = rows.find((row) => row.playerId === view.playerId);
-  const rank = me ? rows.indexOf(me) + 1 : '-';
+  const rank = me?.place ?? '-';
+  const visibleRows = rows
+    .filter((row) => row.place <= 5 || row.playerId === view.playerId)
+    .sort((a, b) => a.place - b.place || a.playerId - b.playerId);
   if (!open) {
     return (
       <button
@@ -62,25 +64,16 @@ export function Leaderboard({
             <th scope="col">{t('leaderboard.player')}</th>
             <th scope="col">{t('leaderboard.hexes')}</th>
             <th scope="col">{t('leaderboard.cities')}</th>
-            <th scope="col">{t('leaderboard.soldiers')}</th>
-            <th scope="col">{t('leaderboard.gold')}</th>
             <th scope="col">{t('leaderboard.score')}</th>
-            <th scope="col">{t('leaderboard.status')}</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.playerId}
-              className={row.status === 'eliminated' ? styles.eliminated : undefined}
-            >
-              <th scope="row">{row.playerId + 1}</th>
+          {visibleRows.map((row) => (
+            <tr key={row.playerId}>
+              <th scope="row">{row.place}</th>
               <td>{row.hexes}</td>
               <td>{row.cities}</td>
-              <td>{formatSoldiers(row.soldiers)}</td>
-              <td>{formatFp(row.gold)}</td>
               <td>{row.score}</td>
-              <td>{t(row.status === 'alive' ? 'leaderboard.alive' : 'leaderboard.eliminated')}</td>
             </tr>
           ))}
         </tbody>

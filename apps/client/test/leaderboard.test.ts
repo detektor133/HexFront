@@ -11,6 +11,10 @@ function view(overrides: Partial<PlayerView>): PlayerView {
     tick: 0,
     winner: -1,
     playerId: 0,
+    ranking: [
+      { id: 0, score: 12, place: 1 },
+      { id: 1, score: 11, place: 2 },
+    ],
     hexes: {
       owner: Int16Array.from([0, 0, 1, -1]),
       pop: new Int32Array(4),
@@ -103,8 +107,8 @@ function view(overrides: Partial<PlayerView>): PlayerView {
 describe('таблица лидеров', () => {
   it('считает показатели каждого игрока по снимку', () => {
     expect(leaderboardRows(view({}))).toEqual([
-      { playerId: 0, hexes: 2, cities: 1, soldiers: 1500, gold: 1250, score: 12, status: 'alive' },
-      { playerId: 1, hexes: 1, cities: 1, soldiers: 700, gold: 0, score: 11, status: 'eliminated' },
+      { playerId: 0, place: 1, hexes: 2, cities: 1, score: 12 },
+      { playerId: 1, place: 2, hexes: 1, cities: 1, score: 11 },
     ]);
   });
 
@@ -119,12 +123,10 @@ describe('таблица лидеров', () => {
 
     expect(rows[1]).toEqual({
       playerId: 1,
+      place: 2,
       hexes: 0,
       cities: 0,
-      soldiers: 0,
-      gold: 0,
-      score: 0,
-      status: 'eliminated',
+      score: 11,
     });
   });
 
@@ -139,6 +141,11 @@ describe('таблица лидеров', () => {
         hexes: { ...view({}).hexes, owner: Int16Array.from([1, 1, 0, 2]) },
         cities: [],
         units: [],
+        ranking: [
+          { id: 1, score: 11, place: 1 },
+          { id: 0, score: 0, place: 2 },
+          { id: 2, score: 0, place: 3 },
+        ],
       }),
     );
 
