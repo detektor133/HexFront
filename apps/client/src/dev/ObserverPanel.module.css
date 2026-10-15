@@ -1,6 +1,6 @@
 .panel {
   position: absolute;
-  top: 56px;
+  top: var(--hud-h, 0px);
   left: var(--space-lg);
   z-index: 3;
   display: flex;
@@ -41,7 +41,7 @@
 
 @media (max-width: 600px) {
   .panel {
-    top: 52px;
+    top: var(--hud-h, 0px);
     left: var(--space-md);
     right: var(--space-md);
     flex-wrap: wrap;

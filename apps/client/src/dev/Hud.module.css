@@ -200,7 +200,7 @@
   }
 
   .taxButton {
-    min-height: 30px;
+    min-height: var(--touch-target-min);
   }
 }
 

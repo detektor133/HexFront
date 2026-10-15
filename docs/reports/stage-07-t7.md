@@ -1,14 +1,16 @@
-# Отчёт 07/T7 — возврат ревью
+# Отчёт 07/T7
 
-## Результат
+## Что сделано
 
-- `ВОЗВРАТ`: приёмочный тест проверяет только синтетический `validateMatchLayout`, а не реальные сцены и путь `/match` через `MatchSurface`.
-- Сторож `apps/client/test/match-layout.test.ts:134-143` не сканирует `apps/client/src/dev`, поэтому пропускает `top: 56px` и `top: 52px` в `apps/client/src/dev/ObserverPanel.module.css:3,44`.
-- Отсутствуют перечисление сцен и пути к новым эталонам, требуемые приёмкой.
+- Приёмочный тест рендерит реальный путь `/match`: `MatchPage` → `MatchSurface` с картой и `PlayerView` из `createLocalEngine`.
+- Тест проверяет стартовую сцену, выбранный hex, выбранный отряд, HUD, налоговую кнопку, паузу и нижнюю панель ArmyBar.
+- Проверка запрещённых верхних отступов теперь сканирует весь `apps/client/src`, включая `ObserverPanel.module.css`.
+- Мобильная налоговая кнопка имеет высоту не менее 44 px.
 
-## Проверки
+## Проверка
 
-- `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests, visual.
-- Новые visual-эталоны заявлены в `apps/client/tests/visual/baseline/`, но отдельный отчёт T7 с перечнем сцен и путями не создан.
+- `pnpm verify --changed` — зелёный: build, types, lint, tests, visual.
 
-Этап: 07/T7
+## Visual-эталоны
+
+Новые эталоны не создавались: тестовая правка закрывает возврат ревью без изменения визуальных сценариев.

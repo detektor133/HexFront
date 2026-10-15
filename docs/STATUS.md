@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7 возвращена на доработку: проверка не проходит по реальному пути `/match`, сторож пропускает `ObserverPanel.module.css`, отчёт T7 отсутствует.
-- `pnpm verify --changed`: зелёный (build, types, lint, prettier, tests, visual), но критерии ревью выше им не закрыты.
-- Следующее действие — исправить 07/T7 и повторить ревью.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/ObserverPanel.module.css`.
+- 07/T7 исправлена: приёмочный тест проходит через `MatchPage` → `MatchSurface` с реальным `PlayerView`, выбранными карточками и ArmyBar; сторож раскладки сканирует весь `apps/client/src`.
+- Исправлена мобильная геометрия налоговой кнопки: минимальная высота возвращена к `var(--touch-target-min)`.
+- `pnpm verify --changed`: зелёный (build, types, lint, tests, visual).
+- Следующее действие — запустить `$review 07/T7` в новой сессии.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/dev/Hud.module.css`, `apps/client/src/dev/ObserverPanel.module.css`.
