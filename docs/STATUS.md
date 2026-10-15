@@ -3,11 +3,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T4 |
+| Текущая задача | 07/T6 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-14 |
 
-Очередь: 07/T19 → 07/T1 → 07/T2 → 07/T3 → 07/T4 → 07/T5 → 07/T6 → 07/T7 → 07/T8 → 07/T9 → 07/T10 → 07/T11 → 07/T13 → 07/T14 → 07/T15 → 07/T16 → 07/T12 → 07/T17 → 07/T18
+Очередь: 07/T19 → 07/T1 → 07/T2 → 07/T3 → 07/T4 → 07/T6 → 07/T7 → 07/T8 → 07/T9 → 07/T10 → 07/T11 → 07/T13 → 07/T14 → 07/T15 → 07/T16 → 07/T12 → 07/T17 → 07/T18
 
 ## Блокеры и открытые вопросы
 
@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-07/T4 принята: `deployment.test.ts` вызывает production-сервер `vite preview` и проверяет ответы `/` и `/match` против собранного `index.html`; отдельный запуск дал 4/4 теста.
-`pnpm verify --changed` зелёный: build, типы, lint, prettier, тесты и visual.
-Следующая сессия — взять 07/T5.
-Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/deployment.test.ts`, `docs/reports/stage-07-t4.md`.
+Владелец сообщил: "https://stage-07.hexfront-5d5.pages.dev
+Аккаунт Cloudflare и секреты CLOUDFLARE_API_TOKEN и CLOUDFLARE_ACCOUNT_ID настроены, workflow pages зелёный (проект Pages создаётся автоматически). На телефоне меню открывается по ссылке, «Играть» запускает матч."
+Следующая сессия — взять 07/T6.
+Читать: `docs/stages/stage-07-playable-build.md`, `docs/gdd/08-match.md`, `apps/client/test/match-screen.test.ts`.
