@@ -89,6 +89,13 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(prompt).toContain('заглушек ради теста не добавляй');
   });
 
+  it('промпт открытых тестов не сужает работу до тестов: пункты о продукте обязательны', () => {
+    const prompt = unlockedPrompt('$task 06/T1j5-Б1');
+    expect(prompt).toContain('Выполни каждый пункт возврата ревью');
+    expect(prompt).toContain('пункты о коде продукта обязательны');
+    expect(prompt.indexOf('Выполни каждый пункт')).toBeLessThan(prompt.indexOf('СПЕК'));
+  });
+
   it('обычный ВОЗВРАТ тесты не переписывает', async () => {
     const back: Session = { task: 'T1j5-Б1', mark: ' ', answer: 'ВОЗВРАТ\n- п.1 — нет обработки' };
     const run = await runWorld({

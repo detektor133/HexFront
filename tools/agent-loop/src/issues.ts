@@ -140,7 +140,10 @@ async function runTaskIssue(
   if (mark === 'x' || mark === '—') return finish(context, issue, `${task} уже закрыта [${mark}]`);
   if (command.skill === 'review' && mark !== '~')
     return stopIssue(context, issue, `${task} не ждёт ревью (отметка [${mark}])`);
-  const run = await processTask(context, task, { mark, workPrompt: `$task ${task}` });
+  // Текст владельца под командой — часть поручения: 2026-10-15, 07/T13 (#21) исполнитель получил
+  // только `$task 07/T13` и не увидел, что первым делать живой фон меню.
+  const workPrompt = command.skill === 'task' ? command.prompt : `$task ${task}`;
+  const run = await processTask(context, task, { mark, workPrompt });
   if (run.done)
     return finish(
       context,

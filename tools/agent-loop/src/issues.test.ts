@@ -128,6 +128,36 @@ describe('Issues в цикле', () => {
     expect(run.closed).toEqual([9]);
   });
 
+  it('$task из Issue передаёт исполнителю текст владельца, и после ВОЗВРАТ тоже', async () => {
+    const body = '$task 06/T2\nПервым — живой фон меню: снимки фонового Worker идут в карту.';
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(12, body)],
+      sessions: [
+        { task: 'T2', mark: '~', answer: 'Готово' },
+        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- MainMenu.tsx:41 — фон не рисуется' },
+        { task: 'T2', mark: '~', answer: 'Готово' },
+        { task: 'T2', mark: 'x', answer: 'OK' },
+      ],
+    });
+    expect(run.prompts[0]).toBe(body);
+    expect(run.prompts[2]).toContain('Первым — живой фон меню');
+    expect(run.closed).toEqual([12]);
+  });
+
+  it('$review из Issue работает кругами с обычным $task, без текста ревью', async () => {
+    const run = await runWorld({
+      stage: setMark(ownerParked, 'T2', '~'),
+      issues: [issue(13, '$review 06/T2\nпосмотри внимательнее')],
+      sessions: [
+        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- a.ts:1 — нет проверки' },
+        { task: 'T2', mark: '~', answer: 'Готово' },
+        { task: 'T2', mark: 'x', answer: 'OK' },
+      ],
+    });
+    expect(run.prompts[1]).toBe('$task 06/T2');
+  });
+
   it('при грязном дереве (работа владельца) исполняет только $done', async () => {
     const run = await runWorld({
       stage: ownerParked,
