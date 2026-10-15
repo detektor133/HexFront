@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -91,8 +89,7 @@ const validLayout = (
   hasSelection: scene === 'selected-hex' || scene === 'selected-army',
   elements: [
     element('hud', 'hud', 0, 0, width, width < height ? 88 : 48),
-    element('event-feed', 'event-feed', 16, width < height ? 96 : 56, 160, 48),
-    element('tutorial', 'tutorial', 16, width < height ? 152 : 108, 160, 48),
+    element('left-column', 'left-column', 16, width < height ? 96 : 56, 160, 104),
     element('leaderboard', 'leaderboard', width - 196, width < height ? 96 : 56, 180, 48),
     element(
       'bottom-panel',
@@ -234,7 +231,9 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
               ? 'card'
               : element.id === 'popup-menu'
                 ? 'dialog'
-                : element.id,
+                : element.id === 'pause-menu'
+                  ? 'dialog'
+                  : element.id,
     );
     expect(node.style.left, element.id).toBe(`${element.x}px`);
     expect(node.style.top, element.id).toBe(`${element.y}px`);
@@ -271,8 +270,10 @@ function selectorForLayoutElement(id: string): string {
         : id === 'card'
           ? 'section[class*="card"]'
           : id === 'popup-menu'
-            ? '[role="dialog"]'
-            : `[class*="${id}"]`;
+            ? '[role="dialog"]:not([aria-label="Пауза"])'
+            : id === 'pause-menu'
+              ? '[role="dialog"][aria-label="Пауза"]'
+              : `[class*="${id}"]`;
 }
 
 function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0]): void {
@@ -289,7 +290,7 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
             ? 'panel'
             : element.id === 'card'
               ? 'card'
-              : element.id === 'popup-menu'
+              : element.id === 'popup-menu' || element.id === 'pause-menu'
                 ? 'dialog'
                 : element.id;
     const node = elementWithClass(fragment);
@@ -298,12 +299,12 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     expect(getComputedStyle(node).visibility, element.id).not.toBe('hidden');
   }
   for (const id of [
-    'event-feed',
-    'tutorial',
+    'left-column',
     'leaderboard',
     'bottom-panel',
     'card',
     'popup-menu',
+    'pause-menu',
   ]) {
     if (!expectedIds.has(id)) {
       expect(document.querySelector(selectorForLayoutElement(id)), id).toBeNull();
@@ -336,12 +337,12 @@ describe('приёмка T7: раскладка матча без перекры
   it('критерий 1: падает при пересечении двух плавающих элементов', () => {
     const layout = validLayout(390, 844);
     layout.elements = [
-      element('event-feed', 'event-feed', 16, 96, 260, 48),
-      element('tutorial', 'tutorial', 16, 120, 260, 48),
+      element('left-column', 'left-column', 16, 96, 260, 48),
+      element('leaderboard', 'leaderboard', 16, 120, 260, 48),
     ];
 
     expect(validateMatchLayout(layout)).toContainEqual(
-      expect.objectContaining({ type: 'overlap', elements: ['event-feed', 'tutorial'] }),
+      expect.objectContaining({ type: 'overlap', elements: ['left-column', 'leaderboard'] }),
     );
   });
 
@@ -349,7 +350,7 @@ describe('приёмка T7: раскладка матча без перекры
     const layout = validLayout(390, 844);
     layout.elements = [
       element('tax', 'popup-menu', 10, 100, 43, 44, { interactive: true }),
-      element('small-label', 'event-feed', 10, 160, 100, 20, { fontSize: 11 }),
+      element('small-label', 'left-column', 10, 160, 100, 20, { fontSize: 11 }),
     ];
 
     expect(validateMatchLayout(layout)).toEqual(
@@ -458,15 +459,14 @@ describe('приёмка T7: раскладка матча без перекры
       'match/OnboardingHints.module.css',
       'match/PauseMenu.module.css',
     ];
-    const floatingClass =
-      /^\s*\.(?:feed|hud|popover|settingsMenu|panel|collapsed|dock|card|menu)\s*$/;
-    const rules = /([^{}]+)\{([^{}]*)\}/g;
-    const forbidden = /\b(top|right|bottom|left|width|max-height)\s*:\s*-?\d+(?:\.\d+)?px\b/g;
+    const forbidden =
+      /(?<!-)\b(?:top|right|bottom|left|max-height|width)\s*:\s*-?\d+(?:\.\d+)?px\b/g;
     for (const relativePath of floatingModules) {
       const source = readFileSync(join(clientSourceDirectory, relativePath), 'utf8');
-      const violations = [...source.matchAll(rules)]
-        .filter((match) => match[1]?.split(',').some((selector) => floatingClass.test(selector)))
-        .flatMap((match) => match[2]?.match(forbidden) ?? []);
+      const rules = /[^{}]+\{([^{}]*)\}/g;
+      const violations = [...source.matchAll(rules)].flatMap(
+        (match) => match[1]?.match(forbidden) ?? [],
+      );
       expect(violations, relativePath).toEqual([]);
     }
 

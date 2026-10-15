@@ -107,13 +107,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      {styleFor('event-feed') && (
-        <EventFeed
-          items={sb.events}
-          now={performance.now()}
-          onFocus={sb.focusEvent}
-          style={styleFor('event-feed')}
-        />
+      {styleFor('left-column') && (
+        <div className={styles.leftColumn} style={styleFor('left-column')}>
+          <EventFeed items={sb.events} now={performance.now()} onFocus={sb.focusEvent} />
+          {showOnboarding && view && <OnboardingHints view={view} />}
+        </div>
       )}
       {view && (
         <Hud
@@ -156,11 +154,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onResume={pauseController.resume}
           onRestart={pauseController.restart}
           onMenu={pauseController.goToMenu}
-          style={styleFor('popup-menu')}
+          style={styleFor('pause-menu')}
         />
-      )}
-      {showOnboarding && view && styleFor('tutorial') && (
-        <OnboardingHints view={view} style={styleFor('tutorial')} />
       )}
       {view && styleFor('bottom-panel') && (
         <ArmyBar

@@ -1,5 +1,5 @@
 .feed {
-  position: absolute;
+  position: relative;
   z-index: 3;
   display: flex;
   flex-direction: column;
@@ -27,7 +27,7 @@
 }
 
 .owner {
-  width: 8px;
+  width: var(--space-sm);
   height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;

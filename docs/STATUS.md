@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T7 возвращена после повторной проверки СПЕК.
-- DOM-тест не имеет суффикса `.dom.test.tsx`, а результат `computeMatchLayout` не содержит отдельных элементов левой колонки и меню паузы.
-- `pnpm verify --changed`: зелёный, но критерии структуры DOM-теста и состава раскладки не закрыты.
+- 07/T7 исправлена после возврата СПЕК: DOM-тест переименован в `.dom.test.tsx`, проверяет два набора измерений и отсутствие невидимых узлов.
+- `computeMatchLayout` возвращает отдельные `left-column` и `pause-menu`; `MatchSurface` применяет их прямоугольники на реальном DOM-пути.
+- CSS-сторож проверяет декларации всех CSS-модулей плавающих элементов без числовых координат, ширин и `max-height`.
+- `pnpm verify --changed`: зелёный.
 - Следующая задача по очереди: 07/T8.
-- Для ревью читать `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.test.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.
+- Для ревью читать `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.dom.test.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.

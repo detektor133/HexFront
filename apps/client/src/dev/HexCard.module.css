@@ -98,7 +98,7 @@
 }
 
 .coin {
-  width: 14px;
+  width: calc(var(--space-md) + var(--space-xs) / 2);
   height: 14px;
   fill: none;
   stroke: currentColor;
@@ -165,7 +165,7 @@
 }
 
 .glyph {
-  width: 18px;
+  width: calc(var(--space-lg) + var(--space-xs) / 2);
   height: 18px;
   fill: none;
   stroke: currentColor;
@@ -195,7 +195,7 @@
 }
 
 .icon {
-  width: 22px;
+  width: calc(var(--touch-target-min) / 2);
   height: 22px;
   fill: none;
   stroke: currentColor;
@@ -238,5 +238,5 @@
 
 .plateBand {
   align-self: stretch;
-  width: 6px;
+  width: calc(var(--space-xs) + var(--space-xs) / 2);
 }

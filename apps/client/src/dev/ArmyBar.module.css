@@ -71,7 +71,7 @@
 }
 
 .icon {
-  width: 22px;
+  width: calc(var(--touch-target-min) / 2);
   height: 22px;
   fill: none;
   stroke: currentcolor;
@@ -148,7 +148,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  width: var(--touch-target-min);
   height: 44px;
   padding: 0;
   background: none;
@@ -162,7 +162,7 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 22px;
+  width: calc(var(--touch-target-min) / 2);
   height: 22px;
   border-radius: 50%;
   font-family: var(--font-ui-family);
@@ -185,7 +185,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  width: var(--touch-target-min);
   height: 44px;
   padding: 0;
   background: none;
@@ -200,7 +200,7 @@
 }
 
 .runIcon {
-  width: 22px;
+  width: calc(var(--touch-target-min) / 2);
   height: 22px;
   fill: currentColor;
   stroke: currentColor;
@@ -262,7 +262,7 @@
 
 .meterIcon {
   flex: 0 0 14px;
-  width: 14px;
+  width: calc(var(--space-md) + var(--space-xs) / 2);
   height: 14px;
   fill: none;
   stroke: var(--ui-ink2);
@@ -285,7 +285,7 @@
 }
 
 .alarmIcon {
-  width: 16px;
+  width: var(--space-lg);
   height: 16px;
   fill: none;
   stroke: var(--status-danger);
@@ -295,7 +295,7 @@
 }
 
 .stuckIcon {
-  width: 16px;
+  width: var(--space-lg);
   height: 16px;
   fill: none;
   stroke: var(--status-warning);

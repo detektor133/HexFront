@@ -1,5 +1,5 @@
 export type MatchLayoutElementKind =
-  'hud' | 'event-feed' | 'tutorial' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu';
+  'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 export interface MatchLayoutElement {
   readonly id: string;
@@ -131,34 +131,23 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const leftColumnTop = input.hudHeight + gap;
   const leftColumnBottom = bottomY - gap;
   const eventVisible = eventHeight > 0 && leftColumnTop + eventHeight <= leftColumnBottom;
-  if (
-    eventVisible &&
-    !input.cardOpen &&
-    !input.leaderboardOpen &&
-    !input.popupOpen &&
-    !input.paused
-  ) {
-    elements.push(
-      layoutElement(
-        'event-feed',
-        'event-feed',
-        edge,
-        input.hudHeight + gap,
-        leftWidth,
-        eventHeight,
-      ),
-    );
-  }
   const tutorialY = leftColumnTop + (eventVisible ? eventHeight + gap : 0);
-  if (
-    input.tutorialVisible &&
-    !input.leaderboardOpen &&
+  const tutorialVisible = input.tutorialVisible && tutorialY + 48 <= leftColumnBottom;
+  const leftColumnVisible =
+    (eventVisible || tutorialVisible) &&
     !input.cardOpen &&
+    !input.leaderboardOpen &&
     !input.popupOpen &&
-    !input.paused &&
-    tutorialY + 48 <= leftColumnBottom
-  ) {
-    elements.push(layoutElement('tutorial', 'tutorial', edge, tutorialY, leftWidth, 48));
+    !input.paused;
+  if (leftColumnVisible) {
+    const tutorialHeight = tutorialVisible ? 48 : 0;
+    const leftColumnHeight = Math.min(
+      leftColumnBottom - leftColumnTop,
+      eventVisible ? eventHeight + (tutorialHeight > 0 ? gap + tutorialHeight : 0) : tutorialHeight,
+    );
+    elements.push(
+      layoutElement('left-column', 'left-column', edge, leftColumnTop, leftWidth, leftColumnHeight),
+    );
   }
   const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
   if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {
@@ -176,8 +165,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   if (input.popupOpen || input.paused) {
     elements.push(
       layoutElement(
-        'popup-menu',
-        'popup-menu',
+        input.paused ? 'pause-menu' : 'popup-menu',
+        input.paused ? 'pause-menu' : 'popup-menu',
         Math.max(edge, (width - 280) / 2),
         Math.max(input.hudHeight + gap, (height - 240) / 2),
         Math.min(280, width - edge * 2),

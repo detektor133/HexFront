@@ -1,5 +1,5 @@
 .card {
-  position: absolute;
+  position: relative;
   z-index: 3;
   padding: var(--space-md);
   background: var(--ui-surface);

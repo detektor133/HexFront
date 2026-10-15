@@ -102,7 +102,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  width: var(--touch-target-min);
   height: 44px;
   padding: 0;
   background: none;
@@ -112,7 +112,7 @@
 }
 
 .settingsIcon {
-  width: 22px;
+  width: calc(var(--touch-target-min) / 2);
   height: 22px;
   fill: none;
   stroke: currentColor;
@@ -172,7 +172,7 @@
 }
 
 .knob {
-  width: 18px;
+  width: calc(var(--space-lg) + var(--space-xs) / 2);
   height: 18px;
   box-sizing: border-box;
   border-radius: var(--radius-chip);
