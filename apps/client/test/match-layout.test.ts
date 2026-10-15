@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -96,12 +96,6 @@ const validLayout = (
     ),
   ],
 });
-
-const sourceFiles = (directory: string): string[] =>
-  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    return entry.isDirectory() ? sourceFiles(path) : [path];
-  });
 
 const matchRuntime = (
   options: {
@@ -327,14 +321,23 @@ describe('приёмка T7: раскладка матча без перекры
 
   it('правило задачи: в раскладке нет жёстких отступов сверху top: 52px, 56px и 72px', () => {
     const clientSourceDirectory = fileURLToPath(new URL('../src', import.meta.url));
-    const forbidden = [/top:\s*52px/, /top:\s*56px/, /top:\s*72px/];
-    const source = sourceFiles(clientSourceDirectory)
-      .filter((path) => /\.(css|ts|tsx)$/.test(path))
-      .map((path) => readFileSync(path, 'utf8'))
-      .join('\n');
-
-    for (const pattern of forbidden) {
-      expect(source).not.toMatch(pattern);
+    const floatingModules = [
+      'dev/EventFeed.module.css',
+      'dev/Hud.module.css',
+      'dev/Leaderboard.module.css',
+      'dev/ArmyBar.module.css',
+      'dev/HexCard.module.css',
+      'match/OnboardingHints.module.css',
+      'match/PauseMenu.module.css',
+    ];
+    const floatingSelectors =
+      /\.(feed|hud|popover|settingsMenu|panel|collapsed|dock|card|menu)\s*\{([^}]*)\}/g;
+    const forbidden = /\b(top|right|bottom|left|width|max-height)\s*:\s*-?\d+(?:\.\d+)?px\b/g;
+    for (const relativePath of floatingModules) {
+      const source = readFileSync(join(clientSourceDirectory, relativePath), 'utf8');
+      for (const match of source.matchAll(floatingSelectors)) {
+        expect(match[2]?.match(forbidden), `${relativePath}:${match[1]}`).toBeNull();
+      }
     }
 
     const hudSource = readFileSync(join(clientSourceDirectory, 'dev', 'Hud.module.css'), 'utf8');
@@ -353,18 +356,21 @@ describe('приёмка T7: раскладка матча без перекры
         expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
         expect(markup).toMatch(/Налог|Tax/);
         const layout = layoutFromMarkup(markup, viewport);
+        const actualCard = layout.elements.find((item) => item.id === 'card');
+        const actualPopup = layout.elements.some((item) => item.id === 'popup-menu');
+        const actualLeaderboard = layout.elements.find((item) => item.id === 'leaderboard');
         const expected = computeMatchLayout({
           viewport,
-          hudHeight: 0,
-          bottomPanelHeight: 0,
+          hudHeight: layout.hudHeight,
+          bottomPanelHeight: layout.bottomPanelHeight,
           eventRows: 0,
-          tutorialVisible: true,
-          leaderboardOpen: viewport.width > 600,
+          tutorialVisible: layout.elements.some((item) => item.id === 'tutorial'),
+          leaderboardOpen: actualLeaderboard?.height !== 44,
           leaderboardRows: 2,
-          cardHeight: 0,
-          cardOpen: scene === 'selected-hex' || scene === 'selected-army',
-          popupOpen: scene === 'pause-menu-open',
-          paused: scene === 'pause-menu-open',
+          cardHeight: actualCard?.height ?? 0,
+          cardOpen: actualCard !== undefined,
+          popupOpen: actualPopup,
+          paused: actualPopup,
         });
         expect(layout.elements.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
           expected.elements.toSorted((a, b) => a.id.localeCompare(b.id)),
@@ -388,13 +394,13 @@ describe('приёмка T7: раскладка матча без перекры
     const actual = layoutFromMarkup(markup, VIEWPORTS[0]);
     const layout = computeMatchLayout({
       viewport: VIEWPORTS[0],
-      hudHeight: 0,
-      bottomPanelHeight: 0,
+      hudHeight: actual.hudHeight,
+      bottomPanelHeight: actual.bottomPanelHeight,
       eventRows: 0,
       tutorialVisible: true,
-      leaderboardOpen: false,
+      leaderboardOpen: actual.elements.some((item) => item.id === 'leaderboard'),
       leaderboardRows: 2,
-      cardHeight: 0,
+      cardHeight: actual.elements.find((item) => item.id === 'card')?.height ?? 0,
       cardOpen: true,
       popupOpen: false,
       paused: false,

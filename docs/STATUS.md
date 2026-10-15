@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T7: возврат ревью после повторной проверки СПЕК — тест измеренных высот всё ещё использует нулевые SSR-высоты, CSS-сторож не проверяет все запрещённые числовые свойства.
-- Следующее действие — исправить `apps/client/test/match-layout.test.ts` и повторно запустить `$review 07/T7`.
+- 07/T7: исправлен приёмочный тест раскладки — сравнение реального MatchSurface использует фактические layout-переменные, а CSS-сторож проверяет координаты и размеры контейнеров раскладки.
+- `pnpm verify --changed` зелёный.
+- Следующее действие — `$review 07/T7`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/match-layout.test.ts`.
 - `pnpm verify --changed` зелёный.
