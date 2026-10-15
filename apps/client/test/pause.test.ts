@@ -355,8 +355,12 @@ describe('пауза локального матча', () => {
     expect(
       (pauseIcon?.props?.children as readonly ElementNode[]).map((path) => path.props?.d),
     ).toEqual(['M6 5v14', 'M10 5v14', 'M14 5v14', 'M18 5v14']);
-    expect(readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8')).toMatch(
+    const hudCss = readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8');
+    expect(hudCss).toMatch(
       /\.settingsButton\s*\{[^}]*width:\s*var\(--touch-target-min\);[^}]*height:\s*44px;/s,
+    );
+    expect(hudCss).not.toMatch(
+      /\.settingsButton\s*\{[^}]*\b(?:top|right|bottom|left|width|max-height)\s*:\s*-?\d+(?:\.\d+)?px\b/s,
     );
     expect(readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8')).toMatch(
       /\.settingsIcon\s*\{[^}]*stroke-width:\s*1\.75;[^}]*stroke-linecap:\s*round;[^}]*stroke-linejoin:\s*round;/s,
