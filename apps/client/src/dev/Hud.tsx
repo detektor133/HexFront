@@ -231,15 +231,14 @@ export function Hud(props: {
         {...(props.onPopupChange ? { onOpenChange: props.onPopupChange } : {})}
       />
       {props.onPause && (
-        <button
+        <IconButton
           type="button"
           className={styles.settingsButton}
-          aria-label={t('pause.title')}
-          title={t('pause.title')}
+          label={t('pause.title')}
           onClick={props.onPause}
         >
           <PlayerPauseIcon />
-        </button>
+        </IconButton>
       )}
     </header>
   );

@@ -88,6 +88,8 @@ describe('DOM-приёмка подписей на телефоне (07/T9)', ()
   });
 
   it('критерий 4: реальные панели армий, карточка и HUD имеют одинаковые подписи иконок', () => {
+    vi.useFakeTimers();
+    const onPause = vi.fn();
     const firstUnit = view.units[0];
     if (!firstUnit) throw new Error('В снимке tiny-карты нет отрядов для карточки');
     const sourceUnits = [firstUnit, view.units[1] ?? firstUnit];
@@ -119,7 +121,7 @@ describe('DOM-приёмка подписей на телефоне (07/T9)', ()
           send={vi.fn()}
           onPick={vi.fn()}
         />
-        <Hud view={view} send={vi.fn()} fog={true} setFog={vi.fn()} onPause={vi.fn()} />
+        <Hud view={view} send={vi.fn()} fog={true} setFog={vi.fn()} onPause={onPause} />
       </>,
     );
 
@@ -128,8 +130,18 @@ describe('DOM-приёмка подписей на телефоне (07/T9)', ()
     );
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {
-      expect(button.getAttribute('title')).toBe(button.getAttribute('aria-label'));
-      expect(button.getAttribute('aria-label')).not.toBe('');
+      const label = button.getAttribute('aria-label');
+      expect(label).not.toBeNull();
+      expect(label).not.toBe('');
+      expect(button.getAttribute('title')).toBe(label);
+
+      fireEvent.pointerDown(button, { pointerType: 'touch', clientX: 20, clientY: 20 });
+      vi.advanceTimersByTime(400);
+      expect(screen.getByRole('tooltip', { name: label ?? '' })).toBeTruthy();
+
+      fireEvent.pointerUp(button, { pointerType: 'touch', clientX: 20, clientY: 20 });
+      expect(screen.queryByRole('tooltip', { name: label ?? '' })).toBeNull();
     }
+    expect(onPause).not.toHaveBeenCalled();
   });
 });

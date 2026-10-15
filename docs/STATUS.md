@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T9: повторный возврат ревью — кнопка паузы HUD не подключена к `IconButton`, а DOM-тест проверяет только атрибуты.
-- DOM-приёмка рендерит реальные `ArmyBar`, `UnitCard` и `Hud`, но кнопка паузы HUD ещё не подключена к `IconButton`.
-- Удержание дольше 350 мс показывает tooltip, движение более 8 px отменяет его, короткий тап вызывает действие.
-- `pnpm verify --changed` — зелёная.
+- 07/T9 исправлена после возврата ревью: пауза HUD подключена к `IconButton`.
+- DOM-приёмка перебирает реальные SVG-кнопки `ArmyBar`, `UnitCard` и `Hud`, проверяет tooltip после удержания и скрытие после `pointerup`.
+- Обновлён SSR-поиск кнопки паузы в `pause.test.ts`, чтобы он раскрывал `IconButton` и сохранял проверки иконки.
+- `pnpm verify --changed` — зелёная: build, types, lint, prettier, 30 тестов.
 - Следующая задача: 07/T10.
 - Читать блок T10 в `docs/stages/stage-07-playable-build.md`, `packages/sim/src/queries/player-view.ts` и документы лидерборда.

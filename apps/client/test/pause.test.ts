@@ -123,7 +123,10 @@ function findNodeByIcon(node: unknown): ElementNode | undefined {
 function findPauseButton(node: unknown): ElementNode | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const element = node as ElementNode;
-  if (typeof element.type === 'function' && element.type.name === 'Hud') {
+  if (
+    typeof element.type === 'function' &&
+    (element.type.name === 'Hud' || element.type.name === 'IconButton')
+  ) {
     const component = element.type as (props: Record<string, unknown>) => unknown;
     return findPauseButton(component(element.props ?? {}));
   }
