@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T7 ждёт ревью: добавлены `computeMatchLayout`, проверка fast-check и передача CSS-переменных из `MatchSurface`.
-- Следующее действие — `$review 07/T7`.
+- 07/T7 возвращена на доработку: приёмочные тесты не покрывают все флаги и крайние содержимые, а `MatchSurface` передаёт в расчёт константные, а не измеренные высоты.
+- Следующее действие — исправить возврат ревью 07/T7.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/match-layout.test.ts`.
 - `pnpm verify --changed` зелёный.

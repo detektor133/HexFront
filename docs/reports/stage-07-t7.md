@@ -12,6 +12,13 @@
 - Визуальные эталоны текущего раннера: `apps/client/tests/visual/baseline/match-390x844-dpr1.png`, `match-390x844-dpr3.png`, `match-844x390-dpr1.png`, `match-844x390-dpr3.png`, `match-1440x900-dpr1.png`, `match-1440x900-dpr3.png`.
 - `rg -n "top:\s*(52px|56px|72px)" apps/client/src --glob '*.css' --glob '*.ts' --glob '*.tsx'` — совпадений нет.
 
+## Повторное ревью — возврат
+
+- `apps/client/test/match-layout.test.ts:346-367` не перебирает `popupOpen`, `paused`, `eventRows = 0` и `cardHeight = 120`, поэтому fast-check слабее критериев задачи.
+- `apps/client/test/match-layout.test.ts:270-317` монтирует меню паузы отдельно и проверяет расчёт с `paused: false`, поэтому не подтверждает реальный путь.
+- `apps/client/src/match/MatchSurface.tsx:79-90` передаёт константные высоты вместо измеренных `ResizeObserver`; `cardHeight` также зафиксирован числом.
+- `apps/client/src/match/PauseMenu.module.css:14` сдвигает уже рассчитанный левый верхний угол через `translate(-50%, -50%)`.
+
 ## Возврат ревью
 
 - `apps/client/test/match-layout.test.ts:187-226,338-345` проверяет вручную собранный снимок с жёсткими координатами, а не измеренную раскладку `MatchSurface`.
