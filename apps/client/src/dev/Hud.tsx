@@ -221,6 +221,9 @@ export function Hud(props: {
       />
       <Slot label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
       <Slot label={t('hud.place')} value={`#${s.place}/${s.players}`} />
+      {view.victoryHold && (
+        <span>{`${t('leaderboard.player')} ${view.victoryHold.player + 1} ${t('match.holdsCities')} · 00:${String(view.victoryHold.seconds).padStart(2, '0')}`}</span>
+      )}
       <Settings
         view={view}
         send={props.send}

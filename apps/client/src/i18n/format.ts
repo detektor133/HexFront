@@ -9,7 +9,9 @@ export function formatFp(fp: number, digits = 0): string {
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-  }).format(fp / FP);
+  })
+    .format(fp / FP)
+    .replace(/\u00a0/g, ' ');
 }
 
 /** Скорость со знаком: «+1,2/с», «−0,6/с». */

@@ -3,13 +3,12 @@
 import { planViews, type PlanView } from './plan-view.ts';
 import { playerPlace, playerPlaces, playerScore, playerScores } from './score.ts';
 import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
-import type { UnitType } from '../balance.ts';
-import { RECRUIT_STEP } from '../balance.ts';
+import { RECRUIT_STEP, TICKS_PER_S, type UnitType } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
-import { FP, type Fp } from '../math/int.ts';
+import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import {
@@ -39,11 +38,17 @@ export interface PlayerRanking {
   readonly place: number;
 }
 
+export interface VictoryHold {
+  readonly player: number;
+  readonly seconds: number;
+}
+
 export interface PlayerView {
   readonly tick: number;
   /** Победитель матча (08-match.md, «Победа»); -1 — матч идёт. */
   readonly winner: number;
   readonly playerId: number;
+  readonly victoryHold?: VictoryHold | null;
   readonly ranking?: readonly PlayerRanking[];
   readonly hexes: {
     readonly owner: Int16Array;
@@ -130,6 +135,14 @@ export interface PlayerView {
     readonly progressTicks: number;
     readonly totalTicks: number;
   }[];
+}
+
+function victoryHold(state: MatchState): VictoryHold | null {
+  if (state.holdPlayer < 0) return null;
+  return {
+    player: state.holdPlayer,
+    seconds: intDiv(Math.max(0, state.holdTicks), TICKS_PER_S),
+  };
 }
 
 function links(state: MatchState): Uint8Array {
@@ -224,6 +237,7 @@ export function playerView(
     tick: state.tick,
     winner: state.winner,
     playerId,
+    victoryHold: victoryHold(state),
     ranking,
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
@@ -340,6 +354,7 @@ export function commanderView(
     tick: state.tick,
     winner: state.winner,
     playerId,
+    victoryHold: null,
     ranking: [],
     hexes: {
       owner: hexes.owner,

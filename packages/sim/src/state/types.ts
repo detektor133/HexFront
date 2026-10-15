@@ -278,7 +278,7 @@ export interface MatchState {
   events: GameEvent[];
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */
   winner: number;
-  /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и сколько тиков подряд; -1 — никто. */
+  /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и оставшиеся тики; -1 — никто. */
   holdPlayer: number;
   holdTicks: number;
 }

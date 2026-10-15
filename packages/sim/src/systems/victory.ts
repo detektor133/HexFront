@@ -40,12 +40,12 @@ export function victorySystem(state: MatchState): void {
   if (leader < 0) {
     state.holdPlayer = -1;
     state.holdTicks = 0;
-  } else if (leader === state.holdPlayer) state.holdTicks += 1;
+  } else if (leader === state.holdPlayer) state.holdTicks = Math.max(0, state.holdTicks - 1);
   else {
     state.holdPlayer = leader;
-    state.holdTicks = 1;
+    state.holdTicks = Math.max(0, HOLD_TICKS - 1);
   }
-  if (leader >= 0 && state.holdTicks >= HOLD_TICKS) return win(state, leader, 'cities');
+  if (leader >= 0 && state.holdTicks === 0) return win(state, leader, 'cities');
   if (state.tick + 1 < LIMIT_TICKS) return;
   let best = -1;
   let bestScore = -1;

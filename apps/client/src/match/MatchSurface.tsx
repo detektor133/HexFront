@@ -151,7 +151,18 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('leaderboard')}
         />
       )}
-      {view && <MatchEnd view={view} replay={sb.replay} onMenu={pauseController.goToMenu} />}
+      {view && (
+        <MatchEnd
+          view={view}
+          fog={sb.fog}
+          onWatch={(message) => sb.setFog(message.enabled)}
+          onMenu={pauseController.goToMenu}
+          {...(() => {
+            const reason = sb.msg?.events.find((event) => event.t === 'matchWon')?.reason;
+            return reason ? { reason } : {};
+          })()}
+        />
+      )}
       {!debug && pauseState.menuOpen && (
         <PauseMenu
           onResume={pauseController.resume}
