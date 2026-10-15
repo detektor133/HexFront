@@ -11,6 +11,7 @@ interface LeaderboardProps {
   readonly view: PlayerView;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  readonly style?: React.CSSProperties | undefined;
 }
 
 function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
@@ -31,6 +32,7 @@ export function Leaderboard({
   view,
   open = true,
   onOpenChange = () => undefined,
+  style,
 }: LeaderboardProps): React.JSX.Element {
   const rows = useLeaderboard(view);
   const me = rows.find((row) => row.playerId === view.playerId);
@@ -40,6 +42,7 @@ export function Leaderboard({
       <button
         type="button"
         className={styles.collapsed}
+        style={style}
         onClick={() => onOpenChange(true)}
         aria-label={t('leaderboard.title')}
       >
@@ -48,7 +51,7 @@ export function Leaderboard({
     );
   }
   return (
-    <section className={styles.panel} aria-label={t('leaderboard.title')}>
+    <section className={styles.panel} style={style} aria-label={t('leaderboard.title')}>
       <button type="button" className={styles.collapse} onClick={() => onOpenChange(false)}>
         {t('leaderboard.title')}
       </button>

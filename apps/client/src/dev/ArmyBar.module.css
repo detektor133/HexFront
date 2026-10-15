@@ -2,10 +2,6 @@
    над ним — приказы выбранной армии иконками. Текста минимум: подписи — в подсказках. */
 .dock {
   position: absolute;
-  top: var(--layout-bottom-panel-y);
-  left: var(--layout-bottom-panel-x);
-  width: var(--layout-bottom-panel-width);
-  height: var(--layout-bottom-panel-height);
   z-index: 2;
   display: flex;
   flex-direction: column;

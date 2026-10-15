@@ -1,10 +1,7 @@
 .feed {
   position: absolute;
-  top: var(--layout-event-feed-y);
-  left: var(--layout-event-feed-x);
   z-index: 3;
   display: flex;
-  width: var(--layout-event-feed-width);
   flex-direction: column;
   gap: 2px;
 }

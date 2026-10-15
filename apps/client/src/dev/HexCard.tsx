@@ -179,13 +179,14 @@ export function HexCard(props: {
   send: (cmd: Command) => void;
   onRoadPreview?: (path: readonly number[] | null) => void;
   onHeight?: (px: number) => void;
+  style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const cardRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card || !props.onHeight) return;
-    const report = (): void => props.onHeight?.(card.getBoundingClientRect().height);
-    report();
+    const report = (entries: readonly ResizeObserverEntry[]): void =>
+      props.onHeight?.(entries[0]?.contentRect.height ?? 0);
     const observer = new ResizeObserver(report);
     observer.observe(card);
     return () => observer.disconnect();
@@ -211,7 +212,7 @@ export function HexCard(props: {
   const improvement = view.hexes.improvement[s.hex] ?? 0;
   const recruiting = c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
-    <section ref={cardRef} className={styles.card} aria-label={title}>
+    <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
       <dl className={styles.stats}>
         <Row label={t('card.owner')} value={ownerText} />

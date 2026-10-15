@@ -169,10 +169,26 @@ function prepareDomScene(search = '', viewport = VIEWPORTS[0]): void {
 }
 
 function installLayoutMeasurements(): void {
-  const measurementCalls = new WeakMap<Element, number>();
   class MeasuredResizeObserver {
     public observe(target: Element): void {
-      this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      const className = target.className.toString();
+      const height =
+        target.tagName === 'HEADER'
+          ? MEASURED_LAYOUT.hudHeight
+          : className.includes('dock')
+            ? MEASURED_LAYOUT.bottomPanelHeight
+            : target.tagName === 'SECTION' && className.includes('card')
+              ? MEASURED_LAYOUT.cardHeight
+              : 0;
+      this.callback(
+        [
+          {
+            target,
+            contentRect: new DOMRect(0, 0, window.innerWidth, height),
+          } as ResizeObserverEntry,
+        ],
+        this as unknown as ResizeObserver,
+      );
     }
 
     public unobserve(): void {}
@@ -183,45 +199,6 @@ function installLayoutMeasurements(): void {
   }
 
   vi.stubGlobal('ResizeObserver', MeasuredResizeObserver);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-    this: HTMLElement,
-  ) {
-    const calls = measurementCalls.get(this) ?? 0;
-    measurementCalls.set(this, calls + 1);
-    const className = this.className.toString();
-    const measurementHeight =
-      this.tagName === 'HEADER'
-        ? MEASURED_LAYOUT.hudHeight
-        : className.includes('dock')
-          ? MEASURED_LAYOUT.bottomPanelHeight
-          : this.tagName === 'SECTION' && className.includes('card')
-            ? MEASURED_LAYOUT.cardHeight
-            : null;
-    if (measurementHeight !== null && calls < 2) {
-      return new DOMRect(0, 0, window.innerWidth, measurementHeight);
-    }
-    const root = document.querySelector<HTMLElement>('[class*="page"]');
-    const id =
-      this.tagName === 'HEADER'
-        ? 'hud'
-        : className.includes('dock')
-          ? 'bottom-panel'
-          : className.includes('panel') || className.includes('collapsed')
-            ? 'leaderboard'
-            : this.tagName === 'SECTION' && className.includes('card')
-              ? 'card'
-              : this.getAttribute('role') === 'dialog'
-                ? 'popup-menu'
-                : className.includes('feed')
-                  ? 'event-feed'
-                  : className.includes('tutorial')
-                    ? 'tutorial'
-                    : null;
-    if (!root || !id) return new DOMRect();
-    const value = (name: string): number =>
-      Number.parseFloat(root.style.getPropertyValue(`--layout-${id}-${name}`));
-    return new DOMRect(value('x'), value('y'), value('width'), value('height'));
-  });
 }
 
 function readLayoutStyle(): CSSStyleDeclaration {
@@ -230,14 +207,27 @@ function readLayoutStyle(): CSSStyleDeclaration {
   return root.style;
 }
 
-function expectLayoutVariables(input: Parameters<typeof computeMatchLayout>[0]): void {
+function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0]): void {
   const expected = computeMatchLayout(input);
-  const style = readLayoutStyle();
+  expect(readLayoutStyle().cssText).not.toContain('--layout-');
   for (const element of expected.elements) {
-    expect(style.getPropertyValue(`--layout-${element.id}-x`)).toBe(`${element.x}px`);
-    expect(style.getPropertyValue(`--layout-${element.id}-y`)).toBe(`${element.y}px`);
-    expect(style.getPropertyValue(`--layout-${element.id}-width`)).toBe(`${element.width}px`);
-    expect(style.getPropertyValue(`--layout-${element.id}-height`)).toBe(`${element.height}px`);
+    const node = elementWithClass(
+      element.id === 'hud'
+        ? 'hud'
+        : element.id === 'bottom-panel'
+          ? 'dock'
+          : element.id === 'leaderboard'
+            ? 'panel'
+            : element.id === 'card'
+              ? 'card'
+              : element.id === 'popup-menu'
+                ? 'dialog'
+                : element.id,
+    );
+    expect(node.style.left, element.id).toBe(`${element.x}px`);
+    expect(node.style.top, element.id).toBe(`${element.y}px`);
+    expect(node.style.width, element.id).toBe(`${element.width}px`);
+    expect(node.style.height, element.id).toBe(`${element.height}px`);
   }
   expect(validateMatchLayout(expected)).toEqual([]);
 }
@@ -284,11 +274,15 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     const node = rendered.get(element.id);
     if (!node) throw new Error(`Прямоугольник ${element.id} не отрендерен`);
     expect(node.isConnected, element.id).toBe(true);
-    const rect = node.getBoundingClientRect();
     expect(
-      { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+      { x: node.style.left, y: node.style.top, width: node.style.width, height: node.style.height },
       element.id,
-    ).toEqual({ x: element.x, y: element.y, width: element.width, height: element.height });
+    ).toEqual({
+      x: `${element.x}px`,
+      y: `${element.y}px`,
+      width: `${element.width}px`,
+      height: `${element.height}px`,
+    });
   }
   expect(validateMatchLayout(expected)).toEqual([]);
 }
@@ -448,7 +442,7 @@ describe('приёмка T7: раскладка матча без перекры
 
     render(createElement(MatchPage));
 
-    expectLayoutVariables({
+    expectInlineRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
@@ -501,7 +495,7 @@ describe('приёмка T7: раскладка матча без перекры
 
     render(createElement(MatchPage));
     fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u }));
-    expectLayoutVariables({
+    expectInlineRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
@@ -533,7 +527,7 @@ describe('приёмка T7: раскладка матча без перекры
     render(createElement(MatchPage));
     fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
     expect(screen.getByRole('dialog', { name: /Налог|Tax/u })).not.toBeNull();
-    expectLayoutVariables({
+    expectInlineRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
@@ -565,7 +559,7 @@ describe('приёмка T7: раскладка матча без перекры
     render(createElement(MatchPage));
     fireEvent.click(screen.getByRole('button', { name: /Пауза|Pause/u }));
     expect(screen.getByRole('dialog', { name: /Пауза|Pause/u })).not.toBeNull();
-    expectLayoutVariables({
+    expectInlineRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,

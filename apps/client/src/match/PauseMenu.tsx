@@ -5,9 +5,10 @@ export function PauseMenu(props: {
   readonly onResume: () => void;
   readonly onRestart: () => void;
   readonly onMenu: () => void;
+  readonly style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   return (
-    <div className={styles.menu} role="dialog" aria-label={t('pause.title')}>
+    <div className={styles.menu} style={props.style} role="dialog" aria-label={t('pause.title')}>
       <h2 className={styles.title}>{t('pause.title')}</h2>
       <button type="button" className={styles.primary} onClick={props.onResume}>
         {t('pause.resume')}

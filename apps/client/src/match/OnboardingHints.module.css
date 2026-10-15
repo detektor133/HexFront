@@ -1,9 +1,6 @@
 .card {
   position: absolute;
-  top: var(--layout-tutorial-y);
-  left: var(--layout-tutorial-x);
   z-index: 3;
-  width: var(--layout-tutorial-width);
   padding: var(--space-md);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);

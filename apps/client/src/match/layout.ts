@@ -41,6 +41,15 @@ export interface MatchLayoutInput {
   readonly paused: boolean;
 }
 
+export function matchLayoutElementStyle(element: MatchLayoutElement): CSSProperties {
+  return {
+    left: `${element.x}px`,
+    top: `${element.y}px`,
+    width: `${element.width}px`,
+    height: `${element.height}px`,
+  };
+}
+
 export type MatchLayoutIssue =
   | { readonly type: 'overlap'; readonly elements: readonly [string, string] }
   | { readonly type: 'interactive-too-small'; readonly element: string }
@@ -199,17 +208,6 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   };
 }
 
-export function matchLayoutVariables(layout: MatchLayoutSnapshot): Record<string, string> {
-  return Object.fromEntries(
-    layout.elements.flatMap((element) => [
-      [`--layout-${element.id}-x`, `${element.x}px`],
-      [`--layout-${element.id}-y`, `${element.y}px`],
-      [`--layout-${element.id}-width`, `${element.width}px`],
-      [`--layout-${element.id}-height`, `${element.height}px`],
-    ]),
-  );
-}
-
 export function validateMatchLayout(layout: MatchLayoutSnapshot): MatchLayoutIssue[] {
   const issues: MatchLayoutIssue[] = [];
   const { width, height } = layout.viewport;
@@ -252,3 +250,4 @@ export function validateMatchLayout(layout: MatchLayoutSnapshot): MatchLayoutIss
   }
   return issues;
 }
+import type { CSSProperties } from 'react';

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { OnboardingHints } from './OnboardingHints.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
-import { computeMatchLayout, matchLayoutVariables } from './layout.ts';
+import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
@@ -76,7 +76,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
   const [cardH, setCardH] = useState(0);
-  const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
   // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
@@ -99,26 +98,23 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     paused: pauseState.menuOpen,
   });
   const map = typeof loaded === 'string' ? null : loaded.map;
+  const styleFor = (id: string): React.CSSProperties | undefined => {
+    const element = layout.elements.find((item) => item.id === id);
+    return element ? matchLayoutElementStyle(element) : undefined;
+  };
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   return (
-    <div
-      className={styles.page}
-      style={
-        {
-          '--dock-h': `${dockH}px`,
-          '--hud-h': `${hudH}px`,
-          ...matchLayoutVariables(layout),
-        } as React.CSSProperties
-      }
-    >
+    <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      <EventFeed
-        items={sb.events}
-        now={performance.now()}
-        onFocus={sb.focusEvent}
-        style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
-      />
+      {styleFor('event-feed') && (
+        <EventFeed
+          items={sb.events}
+          now={performance.now()}
+          onFocus={sb.focusEvent}
+          style={styleFor('event-feed')}
+        />
+      )}
       {view && (
         <Hud
           view={view}
@@ -128,6 +124,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           showFog={debug}
           onHeight={setHudH}
           onPopupChange={setPopupOpen}
+          style={styleFor('hud')}
+          popupStyle={styleFor('popup-menu')}
           {...(debug ? {} : { onPause: pauseController.pause })}
         />
       )}
@@ -142,20 +140,29 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setSpeed={sb.setSpeed}
           setObserver={sb.setObserver}
           downloadTelemetry={downloadTelemetry}
-          onHeight={setObserverH}
         />
       )}
-      {view && <Leaderboard view={view} open={leaderboardOpen} onOpenChange={setLeaderboardOpen} />}
+      {view && styleFor('leaderboard') && (
+        <Leaderboard
+          view={view}
+          open={leaderboardOpen}
+          onOpenChange={setLeaderboardOpen}
+          style={styleFor('leaderboard')}
+        />
+      )}
       {view && <MatchEnd view={view} replay={sb.replay} onMenu={pauseController.goToMenu} />}
       {!debug && pauseState.menuOpen && (
         <PauseMenu
           onResume={pauseController.resume}
           onRestart={pauseController.restart}
           onMenu={pauseController.goToMenu}
+          style={styleFor('popup-menu')}
         />
       )}
-      {showOnboarding && view && <OnboardingHints view={view} />}
-      {view && (
+      {showOnboarding && view && styleFor('tutorial') && (
+        <OnboardingHints view={view} style={styleFor('tutorial')} />
+      )}
+      {view && styleFor('bottom-panel') && (
         <ArmyBar
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
@@ -169,6 +176,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onPick={sb.pick}
           tool={sb.tool}
           onTool={sb.setTool}
+          style={styleFor('bottom-panel')}
         />
       )}
       {(loaded === 'error' || sb.error) && (
@@ -182,6 +190,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           send={sb.send}
           onPick={sb.pick}
           onHeight={setCardH}
+          style={styleFor('card')}
         />
       )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
@@ -192,6 +201,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           send={sb.send}
           onRoadPreview={sb.setRoadPreview}
           onHeight={setCardH}
+          style={styleFor('card')}
         />
       )}
       {debug && sb.lastReject && (

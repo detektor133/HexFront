@@ -1,11 +1,8 @@
 .menu {
   position: absolute;
-  top: var(--layout-popup-menu-y);
-  left: var(--layout-popup-menu-x);
   z-index: 4;
   display: grid;
-  width: var(--layout-popup-menu-width);
-  height: var(--layout-popup-menu-height);
+  box-sizing: border-box;
   gap: var(--space-sm);
   padding: var(--space-lg);
   box-sizing: border-box;

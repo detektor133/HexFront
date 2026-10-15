@@ -46,7 +46,13 @@ function saveDismissed(dismissed: ReadonlySet<OnboardingHintId>): void {
   localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
 }
 
-export function OnboardingHints({ view }: { view: PlayerView }): React.JSX.Element | null {
+export function OnboardingHints({
+  view,
+  style,
+}: {
+  view: PlayerView;
+  style?: React.CSSProperties | undefined;
+}): React.JSX.Element | null {
   const [dismissed, setDismissed] = useState<Set<OnboardingHintId>>(readDismissed);
   const available = useMemo(
     () => availableOnboardingHints(onboardingState(view), dismissed),
@@ -63,7 +69,7 @@ export function OnboardingHints({ view }: { view: PlayerView }): React.JSX.Eleme
     saveDismissed(next);
   };
   return (
-    <aside className={styles.card} aria-live="polite">
+    <aside className={styles.card} style={style} aria-live="polite">
       <h2 className={styles.title}>{t(hint.title)}</h2>
       <p className={styles.text}>{t(hint.text)}</p>
       <div className={styles.actions}>

@@ -152,13 +152,14 @@ export function UnitCard(props: {
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
   onHeight?: (px: number) => void;
+  style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const cardRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card || !props.onHeight) return;
-    const report = (): void => props.onHeight?.(card.getBoundingClientRect().height);
-    report();
+    const report = (entries: readonly ResizeObserverEntry[]): void =>
+      props.onHeight?.(entries[0]?.contentRect.height ?? 0);
     const observer = new ResizeObserver(report);
     observer.observe(card);
     return () => observer.disconnect();
@@ -175,7 +176,7 @@ export function UnitCard(props: {
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
       : `${t('unit.selected')}: ${units.length} · ${formatSoldiers(total)}`;
   return (
-    <section ref={cardRef} className={styles.card} aria-label={title}>
+    <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
       {units.length === 1 && <UnitRows u={first} view={view} />}
       <Orders units={units} view={view} send={props.send} />

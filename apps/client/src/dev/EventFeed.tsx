@@ -16,7 +16,7 @@ export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
-  readonly style?: React.CSSProperties;
+  readonly style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const [, redraw] = useState(0);
   useEffect(() => {

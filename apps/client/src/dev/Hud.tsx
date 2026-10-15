@@ -54,6 +54,7 @@ function Settings(props: {
   setFog: (on: boolean) => void;
   showFog: boolean;
   onOpenChange?: (open: boolean) => void;
+  style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const on = props.view.me.autoCommand;
@@ -76,7 +77,12 @@ function Settings(props: {
         <SettingsIcon />
       </button>
       {open && (
-        <div className={styles.settingsMenu} role="dialog" aria-label={t('settings.title')}>
+        <div
+          className={styles.settingsMenu}
+          style={props.style}
+          role="dialog"
+          aria-label={t('settings.title')}
+        >
           <button
             type="button"
             role="switch"
@@ -130,6 +136,8 @@ export function Hud(props: {
   onPause?: () => void;
   onHeight?: (height: number) => void;
   onPopupChange?: (open: boolean) => void;
+  style?: React.CSSProperties | undefined;
+  popupStyle?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const hudRef = useRef<HTMLElement>(null);
@@ -144,14 +152,14 @@ export function Hud(props: {
   useLayoutEffect(() => {
     const hud = hudRef.current;
     if (!hud || !props.onHeight) return;
-    const report = (): void => props.onHeight?.(hud.getBoundingClientRect().height);
-    report();
+    const report = (entries: readonly ResizeObserverEntry[]): void =>
+      props.onHeight?.(entries[0]?.contentRect.height ?? 0);
     const observer = new ResizeObserver(report);
     observer.observe(hud);
     return () => observer.disconnect();
   }, [props.onHeight]);
   return (
-    <header ref={hudRef} className={styles.hud}>
+    <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
         label={t('hud.people')}
         value={formatFp(s.popTotal)}
@@ -180,7 +188,12 @@ export function Hud(props: {
           <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
         </button>
         {taxOpen && (
-          <div className={styles.popover} role="dialog" aria-label={t('hud.tax')}>
+          <div
+            className={styles.popover}
+            style={props.popupStyle}
+            role="dialog"
+            aria-label={t('hud.tax')}
+          >
             <input
               className={styles.slider}
               type="range"
@@ -214,6 +227,7 @@ export function Hud(props: {
         fog={props.fog}
         setFog={props.setFog}
         showFog={props.showFog ?? true}
+        style={props.popupStyle}
         {...(props.onPopupChange ? { onOpenChange: props.onPopupChange } : {})}
       />
       {props.onPause && (

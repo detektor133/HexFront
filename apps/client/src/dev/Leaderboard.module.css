@@ -1,10 +1,7 @@
 .panel {
   position: absolute;
-  top: var(--layout-leaderboard-y);
-  left: var(--layout-leaderboard-x);
   z-index: 3;
-  width: var(--layout-leaderboard-width);
-  max-height: var(--layout-leaderboard-height);
+  box-sizing: border-box;
   overflow: auto;
   padding: var(--space-sm);
   background: var(--ui-surface);
@@ -15,11 +12,8 @@
 
 .collapsed {
   position: absolute;
-  top: var(--layout-leaderboard-y);
-  left: var(--layout-leaderboard-x);
   z-index: 3;
-  width: var(--layout-leaderboard-width);
-  height: var(--layout-leaderboard-height);
+  box-sizing: border-box;
   padding: 0 var(--space-sm);
   overflow: hidden;
   background: var(--ui-surface);
@@ -75,7 +69,5 @@
 
 @media (max-width: 600px) {
   .panel {
-    top: var(--layout-leaderboard-y);
-    left: var(--layout-leaderboard-x);
   }
 }

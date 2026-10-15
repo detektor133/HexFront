@@ -329,14 +329,15 @@ export function ArmyBar(props: {
   onTool: (t: ToolState | null) => void;
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
+  style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const dockRef = useRef<HTMLDivElement>(null);
   const { onHeight } = props;
   useLayoutEffect(() => {
     const el = dockRef.current;
     if (!el || !onHeight) return;
-    const report = (): void => onHeight(el.getBoundingClientRect().height);
-    report();
+    const report = (entries: readonly ResizeObserverEntry[]): void =>
+      onHeight(entries[0]?.contentRect.height ?? 0);
     const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
@@ -368,7 +369,7 @@ export function ArmyBar(props: {
     return offensiveButtons(front ? p.offensive : null, auto);
   };
   return (
-    <div className={styles.dock} ref={dockRef}>
+    <div className={styles.dock} ref={dockRef} style={props.style}>
       {army && (
         <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
           <Tool
