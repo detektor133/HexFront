@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T10 |
+| Текущая задача | 07/T11 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-15 |
 
@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T11 возвращена ревью: приёмочные тесты не проверяют HUD и определение удержания через реальный `step`.
-- `PlayerView.victoryHold` передаётся через protocol; отсчёт хранится как оставшиеся тики и уменьшается до нуля.
-- Приёмочные тесты T11 оставлены без изменений: `apps/client/test/match-end.dom.test.tsx`, `packages/protocol/test/victory-hold-snapshot.test.ts`, `packages/sim/test/victory-hold.test.ts`.
-- `pnpm verify --changed` — зелёная: build, types, lint, prettier, 527 тестов.
-- Следующая задача: 07/T13. Читать блок T13 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, последние 10 строк `docs/DECISIONS.md`.
+- Исправлены возвращённые СПЕК-тесты 07/T11.
+- `apps/client/test/match-end.dom.test.tsx` проверяет точную строку отсчёта в реальном `Hud` на снимке `createLocalEngine`.
+- `packages/sim/test/victory-hold.test.ts` проверяет лидера, отсутствие лидера и полный отсчёт только через `step`.
+- Кодек `packages/protocol/test/victory-hold-snapshot.test.ts` оставлен без ослабления: проверяет полный `encodeSnapshot` → `decodeSnapshot`.
+- Следующая задача: 07/T13; перед ней прочитать этот раздел, блок T13 и `docs/DECISIONS.md`.

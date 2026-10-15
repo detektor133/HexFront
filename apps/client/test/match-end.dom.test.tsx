@@ -1,8 +1,25 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { type PlayerView } from '@hexfront/sim';
+
+import { Hud } from '../src/dev/Hud.tsx';
 import { formatFp, formatSoldiers } from '../src/i18n/format.ts';
+import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchEndScreen } from '../src/match/MatchEndScreen.tsx';
+
+const tinyMap: unknown = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
+);
+const engine = createLocalEngine(tinyMap, 42, 2);
+if ('errors' in engine) throw new Error(engine.errors.join('; '));
+const hudView: PlayerView = {
+  ...engine.snapshot().view,
+  victoryHold: { player: 1, seconds: 37 },
+};
 
 const baseProps = {
   soldiers: 1_200_000,
@@ -73,14 +90,7 @@ describe('экран конца матча и выбывание', () => {
   });
 
   it('критерий: HUD показывает отсчёт у игрока, который не держит города', () => {
-    render(
-      <MatchEndScreen
-        {...baseProps}
-        victoryHold={{ player: 2, seconds: 37 }}
-        playerId={0}
-        winner={-1}
-      />,
-    );
+    render(<Hud view={hudView} send={vi.fn()} fog setFog={vi.fn()} />);
 
     expect(screen.getByText('Игрок 2 держит 70 % городов · 00:37')).toBeTruthy();
   });
