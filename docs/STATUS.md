@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T7: исправлены приёмочные тесты — реальные `MatchSurface`-сцены сравниваются с независимым `computeMatchLayout`, покрыты все флаги и крайние содержимые.
-- `MatchSurface` передаёт измеренные высоты и состояние раскрытого лидерборда; всплывающие меню используют прямоугольник `popup-menu` из layout.
-- Следующее действие — запустить `$review 07/T7` в новой сессии.
+- 07/T7: возврат ревью после повторной проверки СПЕК — тест измеренных высот всё ещё использует нулевые SSR-высоты, CSS-сторож не проверяет все запрещённые числовые свойства.
+- Следующее действие — исправить `apps/client/test/match-layout.test.ts` и повторно запустить `$review 07/T7`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/match-layout.test.ts`.
 - `pnpm verify --changed` зелёный.
