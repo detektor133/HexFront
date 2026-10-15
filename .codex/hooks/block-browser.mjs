@@ -1,5 +1,5 @@
 // PreToolUse-хук: запрещает ручной запуск dev-сервера и Playwright.
-// Скрипты pnpm visual / pnpm verify вызывают Playwright сами и не блокируются.
+// Скрипт pnpm probe:memory вызывает Playwright сам и не блокируется.
 import { readFileSync } from 'node:fs';
 
 let event = {};
@@ -27,7 +27,7 @@ const hit = forbidden.find((re) => re.test(command));
 if (hit) {
   process.stderr.write(
     'Запрещено правилами проекта: ручной dev-сервер и Playwright. ' +
-      'Проверяй через pnpm verify / pnpm visual и читай их текстовый вывод.\n',
+      'Проверяй через pnpm verify и читай его текстовый вывод.\n',
   );
   process.exit(2);
 }
