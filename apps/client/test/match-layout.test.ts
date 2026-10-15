@@ -40,9 +40,9 @@ const REAL_SCENES = [
 ] as const;
 
 const MEASURED_LAYOUT = {
-  hudHeight: 88,
-  bottomPanelHeight: 150,
-  cardHeight: 300,
+  hudHeight: 91,
+  bottomPanelHeight: 157,
+  cardHeight: 303,
 } as const;
 
 const element = (
@@ -103,14 +103,21 @@ const matchRuntime = (
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
   engine.select(options.selectedHex ?? null);
   const snapshot = engine.snapshot();
+  const selectedArmy =
+    options.army ?? snapshot.view.units.find((unit) => unit.armyId !== null)?.armyId ?? null;
+  const pickedUnits =
+    options.pickedUnits ??
+    (options.army === undefined
+      ? []
+      : snapshot.view.units.filter((unit) => unit.armyId === selectedArmy).map((unit) => unit.id));
   return {
     msg: snapshot,
     replay: [],
     error: null,
-    picked: { hex: options.selectedHex ?? null, units: options.pickedUnits ?? [], target: null },
+    picked: { hex: options.selectedHex ?? null, units: pickedUnits, target: null },
     lastReject: null,
     tool: null,
-    army: options.army ?? null,
+    army: options.army === undefined ? null : selectedArmy,
     fog: true,
     paused: false,
     speed: 1,
@@ -153,7 +160,10 @@ function prepareDomScene(search = '', viewport = VIEWPORTS[0]): void {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewport.height });
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
     useMapJson: () => ({ json: tinyMapJson, map: tinyMap }),
-    useSandbox: () => matchRuntime(search === '?select=0' ? { selectedHex: 0 } : {}),
+    useSandbox: () =>
+      matchRuntime(
+        search === '?select=0' ? { selectedHex: 0 } : search === '?army=1' ? { army: 1 } : {},
+      ),
   }));
 }
 
@@ -201,6 +211,68 @@ function expectLayoutVariables(input: Parameters<typeof computeMatchLayout>[0]):
     expect(style.getPropertyValue(`--layout-${element.id}-y`)).toBe(`${element.y}px`);
     expect(style.getPropertyValue(`--layout-${element.id}-width`)).toBe(`${element.width}px`);
     expect(style.getPropertyValue(`--layout-${element.id}-height`)).toBe(`${element.height}px`);
+  }
+  expect(validateMatchLayout(expected)).toEqual([]);
+}
+
+function elementWithClass(fragment: string): HTMLElement {
+  const element =
+    fragment === 'dialog'
+      ? document.querySelector<HTMLElement>('[role="dialog"]')
+      : Array.from(document.querySelectorAll<HTMLElement>('*')).find((candidate) =>
+          candidate.className
+            .toString()
+            .split(' ')
+            .some((name) => name.includes(fragment)),
+        );
+  if (!element) throw new Error(`Элемент MatchSurface с классом ${fragment} не найден`);
+  return element;
+}
+
+function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0]): void {
+  const expected = computeMatchLayout(input);
+  const rendered = new Map<string, HTMLElement>();
+  const stylesByElement: Record<string, string> = {
+    hud: readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8'),
+    'bottom-panel': readFileSync(
+      join(process.cwd(), 'apps/client/src/dev/ArmyBar.module.css'),
+      'utf8',
+    ),
+    leaderboard: readFileSync(
+      join(process.cwd(), 'apps/client/src/dev/Leaderboard.module.css'),
+      'utf8',
+    ),
+    card: readFileSync(join(process.cwd(), 'apps/client/src/dev/HexCard.module.css'), 'utf8'),
+    'popup-menu': [
+      readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8'),
+      readFileSync(join(process.cwd(), 'apps/client/src/match/PauseMenu.module.css'), 'utf8'),
+    ].join('\n'),
+  };
+  for (const element of expected.elements) {
+    const fragment =
+      element.id === 'hud'
+        ? 'hud'
+        : element.id === 'bottom-panel'
+          ? 'dock'
+          : element.id === 'leaderboard'
+            ? 'panel'
+            : element.id === 'card'
+              ? 'card'
+              : element.id === 'popup-menu'
+                ? 'dialog'
+                : element.id;
+    const node = elementWithClass(fragment);
+    rendered.set(element.id, node);
+    const source = stylesByElement[element.id];
+    expect(source, element.id).toContain(`var(--layout-${element.id}-x)`);
+    expect(source, element.id).toContain(`var(--layout-${element.id}-y)`);
+    expect(source, element.id).toContain(`var(--layout-${element.id}-width)`);
+    expect(source, element.id).toContain(`var(--layout-${element.id}-height)`);
+  }
+  for (const element of expected.elements) {
+    const node = rendered.get(element.id);
+    if (!node) throw new Error(`Прямоугольник ${element.id} не отрендерен`);
+    expect(node.isConnected, element.id).toBe(true);
   }
   expect(validateMatchLayout(expected)).toEqual([]);
 }
@@ -312,6 +384,39 @@ describe('приёмка T7: раскладка матча без перекры
       popupOpen: false,
       paused: false,
     });
+    expectRenderedRectangles({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: true,
+      popupOpen: false,
+      paused: false,
+    });
+  });
+
+  it('отдельно рендерит выбранную армию без карточки отряда', async () => {
+    installLayoutMeasurements();
+    prepareDomScene('?army=1');
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+
+    expect(elementWithClass('dock')).toBeTruthy();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expectRenderedRectangles({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: true,
+      popupOpen: false,
+      paused: false,
+    });
   });
 
   it('пересчитывает раскладку после открытия лидерборда', async () => {
@@ -322,6 +427,17 @@ describe('приёмка T7: раскладка матча без перекры
     render(createElement(MatchPage));
     fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u }));
     expectLayoutVariables({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: true,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    });
+    expectRenderedRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
@@ -353,6 +469,17 @@ describe('приёмка T7: раскладка матча без перекры
       popupOpen: true,
       paused: false,
     });
+    expectRenderedRectangles({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: true,
+      paused: false,
+    });
   });
 
   it('передаёт состояние паузы в расчёт после клика по реальному HUD', async () => {
@@ -364,6 +491,17 @@ describe('приёмка T7: раскладка матча без перекры
     fireEvent.click(screen.getByRole('button', { name: /Пауза|Pause/u }));
     expect(screen.getByRole('dialog', { name: /Пауза|Pause/u })).not.toBeNull();
     expectLayoutVariables({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: false,
+      popupOpen: false,
+      paused: true,
+    });
+    expectRenderedRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
