@@ -35,3 +35,11 @@
 - `apps/client/test/match-layout.test.ts:339-359` вызывает `computeMatchLayout` напрямую и не проверяет рендер с измеренными `ResizeObserver` высотами.
 - `apps/client/src/match/MatchSurface.tsx:82-90` всегда передаёт `leaderboardOpen: false` и `popupOpen: false`, поэтому эти состояния не проходят через расчёт.
 - `pnpm verify --changed` — зелёный; проверка не закрывает ослабленные приёмочные критерии.
+
+## Ревью 2026-10-15 — возврат после исправления СПЕК
+
+- `apps/client/test/match-layout.test.ts:347-367` проверяет CSS-переменные, извлечённые из `MatchSurface`, но не сравнивает их с ожидаемым результатом `computeMatchLayout`.
+- `apps/client/test/match-layout.test.ts:199-217,347-367` не открывает через реальный путь развёрнутый лидерборд и меню налога.
+- `apps/client/test/match-layout.test.ts:369-390` не проверяет рендер с измеренными `ResizeObserver` высотами.
+- `apps/client/src/dev/Hud.module.css:77-80,130-133` оставляет всплывающие меню на числовом CSS-позиционировании вместо переменных раскладки.
+- `apps/client/test/match-layout.test.ts:329-345` не обнаруживает такие `width` и координаты, потому что сторож проверяет только три значения `top`.

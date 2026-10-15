@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T7: исправлены приёмочные тесты по СПЕК; CI-проверка паузы теперь совместима с React 19 и не вызывает dispatcher вне рендера.
+- 07/T7: возврат ревью — приёмочные тесты не подтверждают реальные состояния лидерборда и меню налога, а всплывающие меню используют собственное CSS-позиционирование.
 - Следующее действие — запустить `$review 07/T7` в новой сессии.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test/match-layout.test.ts`.
 - `pnpm verify --changed` зелёный.
