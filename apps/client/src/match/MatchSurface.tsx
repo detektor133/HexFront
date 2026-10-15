@@ -177,7 +177,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view && map && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
+      {view && map && styleFor('card') && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
         <UnitCard
           view={view}
           map={map}
@@ -188,17 +188,22 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('card')}
         />
       )}
-      {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
-        <HexCard
-          s={sb.msg.selection}
-          view={view}
-          map={map}
-          send={sb.send}
-          onRoadPreview={sb.setRoadPreview}
-          onHeight={setCardH}
-          style={styleFor('card')}
-        />
-      )}
+      {view &&
+        map &&
+        styleFor('card') &&
+        sb.picked.units.length === 0 &&
+        !sb.tool &&
+        sb.msg?.selection && (
+          <HexCard
+            s={sb.msg.selection}
+            view={view}
+            map={map}
+            send={sb.send}
+            onRoadPreview={sb.setRoadPreview}
+            onHeight={setCardH}
+            style={styleFor('card')}
+          />
+        )}
       {debug && sb.lastReject && (
         <p className={styles.reject}>
           {t('dev.economy.lastRejection')}: {sb.lastReject}

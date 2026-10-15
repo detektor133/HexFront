@@ -622,6 +622,28 @@ describe('приёмка T7: раскладка матча без перекры
     });
   });
 
+  it('не рендерит карточку, исключённую расчётом при открытии меню налога', async () => {
+    installLayoutMeasurements();
+    prepareDomScene('?select=0');
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
+
+    expectRenderedRectangles({
+      viewport: VIEWPORTS[0],
+      ...MEASURED_LAYOUT,
+      eventRows: 0,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 2,
+      cardOpen: true,
+      popupOpen: true,
+      paused: false,
+    });
+    expect(document.querySelector('section[class*="card"]')).toBeNull();
+  });
+
   it('передаёт состояние паузы в расчёт после клика по реальному HUD', async () => {
     installLayoutMeasurements();
     prepareDomScene();
