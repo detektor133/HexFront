@@ -125,23 +125,29 @@ describe('главное меню', () => {
 
   it('критерий: выбранный цвет применяется к игроку, а прежний цвет передаётся игроку, у которого он был', () => {
     renderMenu();
-    const colors = screen.queryAllByRole('button', { name: /цвет/iu });
+    const initialWorker = workers[0];
+    expect(initialWorker).toBeDefined();
+    if (initialWorker === undefined) return;
 
-    expect(colors.length).toBeGreaterThan(1);
-    const selectedColor = colors[1];
-    if (selectedColor === undefined) return;
+    expect(startMessages(initialWorker)[0]).toEqual(
+      expect.objectContaining({ playerColors: ['teal', 'brick'] }),
+    );
+    const selectedColor = screen.getByRole('button', { name: 'Цвет brick' });
     fireEvent.click(selectedColor);
-    expect(startMessages(workers.at(-1) as FakeWorker)[0]).toEqual(
+
+    expect(workers).toHaveLength(2);
+    const changedWorker = workers[1];
+    expect(changedWorker).toBeDefined();
+    if (changedWorker === undefined) return;
+    expect(changedWorker).not.toBe(initialWorker);
+    expect(startMessages(changedWorker)[0]).toEqual(
       expect.objectContaining({ playerColors: ['brick', 'teal'] }),
     );
   });
 
   it('критерий: настройки меню применяются игровому Worker после перехода по ссылке', async () => {
     renderMenu();
-    const colors = screen.getAllByRole('button', { name: /цвет/iu });
-    const selectedColor = colors[1];
-    expect(selectedColor).toBeDefined();
-    if (selectedColor === undefined) return;
+    const selectedColor = screen.getByRole('button', { name: 'Цвет brick' });
     fireEvent.click(selectedColor);
     const autoCommand = screen.queryByRole('button', { name: /Автокомандование/iu });
 
