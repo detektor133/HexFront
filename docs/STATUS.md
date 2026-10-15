@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T6 принята: приёмочные проверки проходят через дерево `MatchSurface`, включая реальное меню паузы, `visibilitychange`, перезапуск с тем же seed и `/match` без `debug`.
-- Кнопка использует именованный Tabler `player-pause` с проверяемой геометрией путей; маскирующий `data-icon` удалён.
-- Профильный тест `pnpm exec vitest run --config vitest.config.ts apps/client/test/pause.test.ts`: 5/5.
-- `pnpm verify --changed`: зелёный; CI проверяется в начале следующей сессии.
-- Следующее действие — взять 07/T7.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`.
+- 07/T7 ждёт ревью: добавлена проверка геометрии раскладки, измеренная высота HUD передаётся в CSS, фиксированные верхние отступы удалены.
+- Приёмочный тест `apps/client/test/match-layout.test.ts` не изменялся; все 6 проверок проходят.
+- Visual-эталоны обновлены для сцен T7 в `apps/client/tests/visual/baseline/`.
+- `pnpm verify --changed`: зелёный (build, types, lint, prettier, tests, visual).
+- Следующее действие — взять 07/T8.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/Hud.tsx`.

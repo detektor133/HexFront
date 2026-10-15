@@ -12,7 +12,7 @@
 
 .error {
   position: absolute;
-  top: 64px;
+  top: calc(var(--hud-h, 0px) + var(--space-md));
   left: var(--space-lg);
   z-index: 2;
   color: var(--status-danger);
@@ -21,7 +21,7 @@
 /* Последний отказ команды — строка внизу справа, без постоянной красной плашки (ui.md). */
 .reject {
   position: absolute;
-  top: 72px;
+  top: calc(var(--hud-h, 0px) + var(--space-md));
   right: var(--space-lg);
   z-index: 2;
   margin: 0;

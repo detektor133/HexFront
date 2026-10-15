@@ -1,6 +1,6 @@
 .card {
   position: absolute;
-  top: 72px;
+  top: calc(var(--hud-h, 0px) + var(--space-md));
   left: var(--space-lg);
   z-index: 3;
   width: min(320px, calc(100vw - 32px));

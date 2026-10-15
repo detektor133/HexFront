@@ -121,6 +121,7 @@ export function Hud(props: {
   setFog: (on: boolean) => void;
   showFog?: boolean;
   onPause?: () => void;
+  onHeight?: (height: number) => void;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const { view } = props;
@@ -132,7 +133,12 @@ export function Hud(props: {
   const supplyTone =
     s.supplyLevel < ATTRITION_THRESHOLD ? 'danger' : s.supplyLevel < FP ? 'warning' : undefined;
   return (
-    <header className={styles.hud}>
+    <header
+      ref={(hud: HTMLElement | null): void => {
+        if (hud) props.onHeight?.(hud.getBoundingClientRect().height);
+      }}
+      className={styles.hud}
+    >
       <Slot
         label={t('hud.people')}
         value={formatFp(s.popTotal)}

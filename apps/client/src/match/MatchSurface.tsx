@@ -71,6 +71,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
+  const [hudH, setHudH] = useState(0);
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
@@ -84,7 +85,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   return (
-    <div className={styles.page} style={{ '--dock-h': `${dockH}px` } as React.CSSProperties}>
+    <div
+      className={styles.page}
+      style={{ '--dock-h': `${dockH}px`, '--hud-h': `${hudH}px` } as React.CSSProperties}
+    >
       <div ref={hostRef} className={styles.map} />
       <EventFeed
         items={sb.events}
@@ -99,6 +103,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           fog={sb.fog}
           setFog={sb.setFog}
           showFog={debug}
+          onHeight={setHudH}
           {...(debug ? {} : { onPause: pauseController.pause })}
         />
       )}
