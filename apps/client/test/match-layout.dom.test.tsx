@@ -45,9 +45,9 @@ type MeasuredLayout = {
 };
 
 const MEASURED_LAYOUT: MeasuredLayout = {
-  hudHeight: 91,
-  bottomPanelHeight: 157,
-  cardHeight: 303,
+  hudHeight: 88,
+  bottomPanelHeight: 150,
+  cardHeight: 300,
 } as const;
 
 const SECOND_MEASURED_LAYOUT: MeasuredLayout = {
@@ -55,6 +55,15 @@ const SECOND_MEASURED_LAYOUT: MeasuredLayout = {
   bottomPanelHeight: 200,
   cardHeight: 500,
 } as const;
+
+const LAYOUT_ELEMENT_IDS = [
+  'left-column',
+  'leaderboard',
+  'bottom-panel',
+  'card',
+  'popup-menu',
+  'pause-menu',
+] as const;
 
 const element = (
   id: string,
@@ -298,14 +307,7 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     expect(getComputedStyle(node).display, element.id).not.toBe('none');
     expect(getComputedStyle(node).visibility, element.id).not.toBe('hidden');
   }
-  for (const id of [
-    'left-column',
-    'leaderboard',
-    'bottom-panel',
-    'card',
-    'popup-menu',
-    'pause-menu',
-  ]) {
+  for (const id of LAYOUT_ELEMENT_IDS) {
     if (!expectedIds.has(id)) {
       expect(document.querySelector(selectorForLayoutElement(id)), id).toBeNull();
     }
@@ -463,10 +465,9 @@ describe('приёмка T7: раскладка матча без перекры
       /(?<!-)\b(?:top|right|bottom|left|max-height|width)\s*:\s*-?\d+(?:\.\d+)?px\b/g;
     for (const relativePath of floatingModules) {
       const source = readFileSync(join(clientSourceDirectory, relativePath), 'utf8');
-      const rules = /[^{}]+\{([^{}]*)\}/g;
-      const violations = [...source.matchAll(rules)].flatMap(
-        (match) => match[1]?.match(forbidden) ?? [],
-      );
+      const violations = source
+        .split(/\r?\n/)
+        .flatMap((line) => (line.trimStart().startsWith('@') ? [] : (line.match(forbidden) ?? [])));
       expect(violations, relativePath).toEqual([]);
     }
 
