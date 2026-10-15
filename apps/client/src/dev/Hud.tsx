@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TAX_MAX,
@@ -53,6 +53,7 @@ function Settings(props: {
   fog: boolean;
   setFog: (on: boolean) => void;
   showFog: boolean;
+  onOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const on = props.view.me.autoCommand;
@@ -64,7 +65,13 @@ function Settings(props: {
         aria-expanded={open}
         aria-label={t('settings.title')}
         title={t('settings.title')}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() =>
+          setOpen((open) => {
+            const next = !open;
+            props.onOpenChange?.(next);
+            return next;
+          })
+        }
       >
         <SettingsIcon />
       </button>
@@ -122,8 +129,10 @@ export function Hud(props: {
   showFog?: boolean;
   onPause?: () => void;
   onHeight?: (height: number) => void;
+  onPopupChange?: (open: boolean) => void;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
+  const hudRef = useRef<HTMLElement>(null);
   const { view } = props;
   const me = view.players[view.playerId];
   if (!me) return null;
@@ -132,13 +141,17 @@ export function Hud(props: {
   const net = s.incomePerS - s.upkeepPerS;
   const supplyTone =
     s.supplyLevel < ATTRITION_THRESHOLD ? 'danger' : s.supplyLevel < FP ? 'warning' : undefined;
+  useLayoutEffect(() => {
+    const hud = hudRef.current;
+    if (!hud || !props.onHeight) return;
+    const report = (): void => props.onHeight?.(hud.getBoundingClientRect().height);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(hud);
+    return () => observer.disconnect();
+  }, [props.onHeight]);
   return (
-    <header
-      ref={(hud: HTMLElement | null): void => {
-        if (hud) props.onHeight?.(hud.getBoundingClientRect().height);
-      }}
-      className={styles.hud}
-    >
+    <header ref={hudRef} className={styles.hud}>
       <Slot
         label={t('hud.people')}
         value={formatFp(s.popTotal)}
@@ -155,7 +168,13 @@ export function Hud(props: {
           type="button"
           className={styles.taxButton}
           aria-expanded={taxOpen}
-          onClick={() => setTaxOpen((o) => !o)}
+          onClick={() =>
+            setTaxOpen((open) => {
+              const next = !open;
+              props.onPopupChange?.(next);
+              return next;
+            })
+          }
         >
           <span className={styles.label}>{t('hud.tax')}</span>
           <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
@@ -195,6 +214,7 @@ export function Hud(props: {
         fog={props.fog}
         setFog={props.setFog}
         showFog={props.showFog ?? true}
+        {...(props.onPopupChange ? { onOpenChange: props.onPopupChange } : {})}
       />
       {props.onPause && (
         <button

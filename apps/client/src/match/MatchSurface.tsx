@@ -34,6 +34,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const hostRef = useRef<HTMLDivElement>(null);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
+  const [popupOpen, setPopupOpen] = useState(false);
   const pauseController = useMemo(
     () =>
       createPauseController({
@@ -83,11 +84,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     bottomPanelHeight: dockH || (window.innerWidth <= 600 ? 178 : 132),
     eventRows: Math.min(3, sb.events.length),
     tutorialVisible: showOnboarding && view !== null,
-    leaderboardOpen: false,
+    leaderboardOpen: true,
     leaderboardRows: view?.players.length ?? 0,
     cardHeight: cardH || 180,
     cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
-    popupOpen: false,
+    popupOpen,
     paused: pauseState.menuOpen,
   });
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
@@ -125,6 +126,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setFog={sb.setFog}
           showFog={debug}
           onHeight={setHudH}
+          onPopupChange={setPopupOpen}
           {...(debug ? {} : { onPause: pauseController.pause })}
         />
       )}

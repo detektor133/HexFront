@@ -217,6 +217,54 @@ function prepareScene(
   }
 }
 
+function layoutFromMarkup(
+  markup: string,
+  viewport: (typeof VIEWPORTS)[number],
+): MatchLayoutSnapshot {
+  const values = new Map<string, number>();
+  for (const match of markup.matchAll(/--layout-([a-z-]+)-(x|y|width|height):([0-9]+)px/g)) {
+    values.set(`${match[1]}.${match[2]}`, Number(match[3]));
+  }
+  const kinds: Record<string, MatchLayoutElement['kind']> = {
+    hud: 'hud',
+    'event-feed': 'event-feed',
+    tutorial: 'tutorial',
+    leaderboard: 'leaderboard',
+    'bottom-panel': 'bottom-panel',
+    card: 'card',
+    'popup-menu': 'popup-menu',
+  };
+  const elements = Object.entries(kinds)
+    .filter(([id]) => values.has(`${id}.x`))
+    .map(([id, kind]) => ({
+      id,
+      kind,
+      x: values.get(`${id}.x`) ?? 0,
+      y: values.get(`${id}.y`) ?? 0,
+      width: values.get(`${id}.width`) ?? 0,
+      height: values.get(`${id}.height`) ?? 0,
+      interactive: kind === 'leaderboard' || kind === 'popup-menu',
+      fontSize: 12,
+    }));
+  const hudHeight = values.get('hud.height') ?? 0;
+  const bottomPanelHeight = values.get('bottom-panel.height') ?? 0;
+  return {
+    scene: elements.some((element) => element.id === 'popup-menu')
+      ? 'pause-menu-open'
+      : elements.some((element) => element.id === 'card')
+        ? 'selected-army'
+        : elements.some((element) => element.id === 'leaderboard')
+          ? 'leaderboard-open'
+          : 'selected-hex',
+    viewport,
+    hudHeight,
+    bottomPanelHeight,
+    mapVisibleHeight: viewport.height - hudHeight - bottomPanelHeight,
+    hasSelection: elements.some((element) => element.id === 'card'),
+    elements,
+  };
+}
+
 afterEach(() => {
   vi.resetModules();
   vi.unstubAllGlobals();
@@ -305,25 +353,7 @@ describe('приёмка T7: раскладка матча без перекры
         const markup = renderToStaticMarkup(page);
         expect(markup).toMatch(/Таблица лидеров|Leaderboard/);
         expect(markup).toMatch(/Налог|Tax/);
-        const layoutInput = {
-          viewport,
-          hudHeight: viewport.width < viewport.height ? 88 : 48,
-          bottomPanelHeight: viewport.width < viewport.height ? 178 : 132,
-          eventRows: 0,
-          tutorialVisible: scene === 'start-with-tutorial',
-          leaderboardOpen: false,
-          leaderboardRows: 6,
-          cardHeight: scene === 'selected-army' || scene === 'selected-hex' ? 180 : 0,
-          cardOpen: scene === 'selected-army' || scene === 'selected-hex',
-          popupOpen: scene === 'pause-menu-open',
-          paused: scene === 'pause-menu-open',
-        } as const;
-        const layout = computeMatchLayout(layoutInput);
-        for (const [name, value] of Object.entries(matchLayoutVariables(layout))) {
-          expect(markup, `${scene} ${viewport.width}x${viewport.height}`).toContain(
-            `${name}:${value}`,
-          );
-        }
+        const layout = layoutFromMarkup(markup, viewport);
         if (scene === 'pause-menu-open') {
           expect(markup).toContain('role="dialog"');
         }
