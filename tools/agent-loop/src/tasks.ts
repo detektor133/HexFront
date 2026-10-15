@@ -2,7 +2,6 @@
 import {
   agentName,
   backoff,
-  checkPermissions,
   firstLine,
   park,
   readStage,
@@ -15,6 +14,7 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { runReview } from './review.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
   forgetSpec,
@@ -35,7 +35,7 @@ import {
   withUnlocked,
   writeSpec,
 } from './spec.ts';
-import { commandTask, reviewTasks, taskBlock, taskMark } from './stage-file.ts';
+import { commandTask, reviewTasks, taskBlock } from './stage-file.ts';
 
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
 type Work =
@@ -234,67 +234,6 @@ async function runWork(
   const violation = await specViolation(context, review);
   if (violation !== undefined) return step(await park(context, `spec:${review}`, violation));
   return { kind: 'review', task: review };
-}
-
-/** Вердикт `$review`: новая отметка задачи и ответ ревью (замечания к приёмочным тестам). */
-export interface Verdict {
-  readonly mark: 'x' | ' ';
-  readonly message: string;
-}
-
-/**
- * `$review` в новой сессии; возвращает вердикт или шаг цикла.
- * @param note строка запроса сверх команды (повторное ревью после слияния ветки этапа).
- */
-export async function runReview(
-  context: LoopContext,
-  task: string,
-  note = '',
-): Promise<Verdict | Step> {
-  const { git } = context;
-  const base = await head(git);
-  const files = specFiles(context, task);
-  const unlocked = unlockedFiles(context, task);
-  const lines = [
-    `$review ${task}`,
-    ...(note === '' ? [] : [note]),
-    ...(files.length === 0
-      ? []
-      : [`Приёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`]),
-    ...(unlocked === undefined
-      ? []
-      : [
-          `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»${unlocked.length === 0 ? '' : `: ${unlocked.join(', ')}`} — сверь их с текстом задачи заново`,
-        ]),
-  ];
-  const prompt = lines.join('\n');
-  const review = await session(context, 'review', prompt);
-  if (review.failure !== undefined)
-    return backoff(context, `$review ${task}: ${review.failure}`, review.message);
-  // Ревью уже запушило коммит, поэтому откат здесь только развёл бы локальную и удалённую ветку.
-  if (!(await checkPermissions(context, base, context.definitions.reviewerPaths)))
-    return park(
-      context,
-      `review:${task}`,
-      'ревью изменило файлы вне permissions.json — проверь коммит',
-      review.message,
-    );
-  if ((await dirtyFiles(git)) !== '')
-    return park(context, `review:${task}`, 'после $review дерево не чистое', review.message);
-  const unsynced = await syncWithOrigin(git, true);
-  if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
-  const mark = taskMark((await readStage(context.config.root)).stageText, task);
-  // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
-  const verdict = firstLine(review.message).replace(/[`*_]/g, '').trim();
-  if (mark === 'x' && /^OK(?![\p{L}\d])/u.test(verdict))
-    return { mark: 'x', message: review.message };
-  if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return { mark: ' ', message: review.message };
-  return park(
-    context,
-    `review:${task}`,
-    `ответ $review «${verdict}» не совпадает с отметкой [${mark ?? '?'}]`,
-    review.message,
-  );
 }
 
 /**

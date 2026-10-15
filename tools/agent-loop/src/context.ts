@@ -290,6 +290,8 @@ export async function waitSlow(context: LoopContext, label: string): Promise<CiR
 
 export interface StageState {
   readonly stage: string;
+  /** Файл этапа от корня репозитория: `docs/stages/stage-07-….md`. */
+  readonly path: string;
   readonly status: string;
   readonly stageText: string;
 }
@@ -309,7 +311,8 @@ export async function readStage(root: string): Promise<StageState> {
     file.startsWith(`stage-${stage}-`),
   );
   if (!name) throw new Error(`Файл этапа ${stage} не найден`);
-  return { stage, status, stageText: await readFile(join(root, 'docs/stages', name), 'utf8') };
+  const path = `docs/stages/${name}`;
+  return { stage, path, status, stageText: await readFile(join(root, path), 'utf8') };
 }
 
 // Glob путей прав: `*` — внутри каталога, `**` — через каталоги, `**` со слешем — и без каталога.

@@ -2,9 +2,10 @@
 // зелёная — свежая ветка этапа вливается в ветку задачи, CI на слитом дереве, потом fast-forward.
 import { backoff, park, runSkill, save, waitCi, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, isAncestor, syncWithOrigin, type Git } from './git.ts';
+import { runReview } from './review.ts';
 import { outsideScope, taskScope, workFiles } from './scope.ts';
 import { taskBlock } from './stage-file.ts';
-import { ciFixPrompt, runReview, skillFailed } from './tasks.ts';
+import { ciFixPrompt, skillFailed } from './tasks.ts';
 import type { Lock } from './worktree.ts';
 
 /** Главный каталог на ветке этапа: в него вливает только диспетчер, под общим замком. */

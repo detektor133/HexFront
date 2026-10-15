@@ -58,6 +58,11 @@ export interface LoopState {
   specUnlocked: Record<string, string[]>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
+  /**
+   * Коммит последнего ВОЗВРАТ ревью по задаче: от него повторное ревью видит изменённые строки
+   * (review-scope.ts). Живёт до `[x]` задачи.
+   */
+  reviewReturns: Record<string, string>;
 }
 
 export const statePath = (root: string): string =>
@@ -74,6 +79,7 @@ export async function loadState(root: string): Promise<LoopState> {
     spec: {},
     specUnlocked: {},
     pullRequests: {},
+    reviewReturns: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';

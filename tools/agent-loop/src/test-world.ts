@@ -87,6 +87,11 @@ export interface World {
    * виде; `bumped` — с новым `updated_at` от ответа цикла, как список GitHub 2026-10-14.
    */
   readonly staleList?: boolean | 'bumped';
+  /**
+   * Ответ `git diff -M` от коммита прошлого возврата: включает снимки файла этапа по коммитам для
+   * `git show <коммит>:<файл>`; без значения `show` коммита не читается, как раньше.
+   */
+  readonly reviewDiff?: string;
 }
 
 export interface Outcome {
@@ -188,6 +193,8 @@ export async function runWorld(world: World): Promise<Outcome> {
         : ` M ${world.dirty}`;
   let files: readonly string[] = [];
   let pushes = 0;
+  // Файл этапа на каждом коммите: повторное ревью сравнивает текст задачи с коммитом возврата.
+  const snapshots = new Map<number, string>([[0, await readFile(stagePath, 'utf8')]]);
   // Файлы сессий вне файлов этапа: что лежит на диске и что закоммичено в HEAD.
   const tracked = new Set<string>();
   const committed = new Map<string, string>();
@@ -231,6 +238,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       session.mark !== undefined || session.stage !== undefined || session.status !== undefined;
     if (session.commit ?? changed) {
       head += 1;
+      snapshots.set(head, await readFile(stagePath, 'utf8'));
       for (const path of tracked) {
         const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
         if (text === undefined) committed.delete(path);
@@ -267,6 +275,12 @@ export async function runWorld(world: World): Promise<Outcome> {
     if (sub === 'diff' && args.includes('--diff-filter=U')) return ok();
     if (sub === 'branch') return ok(branch);
     if (sub === 'status') return ok([dirty, ...(await fileStatus())].filter(Boolean).join('\n'));
+    const snapshot = /^c(\d+):docs\/stages\//u.exec(first ?? '');
+    if (sub === 'show' && snapshot !== null && world.reviewDiff !== undefined) {
+      const text = snapshots.get(Number(snapshot[1]));
+      return text === undefined ? { code: 128, stdout: '', stderr: 'нет коммита' } : ok(text);
+    }
+    if (sub === 'diff' && first === '-M') return ok(world.reviewDiff ?? '');
     if (sub === 'show') {
       const text = committed.get(first?.replace(/^HEAD:/, '') ?? '');
       return text === undefined ? { code: 128, stdout: '', stderr: 'нет в HEAD' } : ok(text);
