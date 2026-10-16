@@ -15,11 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T16: Vite пишет `.vite/manifest.json`, скрипт `check-bundle-size` считает HTML-ресурсы и статические imports, исключая dynamic imports и недостижимые карты/фоновые файлы.
-- Лимит первичной загрузки — 10 МБ; в локальной production-сборке измерено 1 201 247 байт.
-- CI запускает `pnpm --filter @hexfront/client check-bundle-size` сразу после сборки клиента.
+- 07/T16: исправлен приёмочный тест CI — он проверяет команды `build` и `check-bundle-size` в одной job `deploy` файла `.github/workflows/pages.yml` и их порядок.
 - Приёмочный тест `apps/client/test/bundle-size.test.ts`: 4 теста прошли.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
-- Проверит владелец (раунды замечаний этапа): визуальная часть отсутствует, задача проверяется текстовыми тестами и командой.
 - Следующая задача: 07/T12.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/scripts/check-bundle-size.ts`, `apps/client/test/bundle-size.test.ts`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/scripts/check-bundle-size.ts`, `apps/client/test/bundle-size.test.ts`, `.github/workflows/pages.yml`.

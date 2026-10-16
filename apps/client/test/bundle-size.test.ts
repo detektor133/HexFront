@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -81,16 +81,13 @@ describe('контроль размера начальной загрузки к
   });
 
   it('критерий: скрипт проверки запускается в CI после сборки клиента', async () => {
-    const workflows = readdirSync(new URL('../../../.github/workflows/', import.meta.url));
-    const workflowText = workflows
-      .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
-      .map((file) =>
-        readFileSync(new URL(`../../../.github/workflows/${file}`, import.meta.url), 'utf8'),
-      )
-      .join('\n');
+    const workflowText = readFileSync(
+      new URL('../../../.github/workflows/pages.yml', import.meta.url),
+      'utf8',
+    );
 
     expect(workflowText).toMatch(
-      /pnpm --filter @hexfront\/client build[\s\S]*?pnpm (?:--filter @hexfront\/client )?check-bundle-size/,
+      /^\s{2}deploy:[\s\S]*?run: pnpm --filter @hexfront\/client build[\s\S]*?run: pnpm --filter @hexfront\/client check-bundle-size/m,
     );
   });
 });
