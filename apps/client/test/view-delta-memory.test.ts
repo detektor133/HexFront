@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { drawForecastPlate } from '../src/dev/forecast-plate.ts';
 import { createPlanLayer } from '../src/dev/plan-layer.ts';
 import { createChip, type ChipState } from '../src/dev/unit-chips.ts';
+import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { ViewDeltaApplier, ConfirmedViewDeltaStream } from '../src/local/view-delta.ts';
 
@@ -16,6 +17,10 @@ const SOURCE_ROOT = join(process.cwd(), 'apps/client/src');
 function installCanvasStub(): void {
   class TestCanvasRenderingContext2D {
     public font = '';
+
+    public scale(_x: number, _y: number): void {}
+
+    public fillText(_text: string, _x: number, _y: number): void {}
 
     public measureText(value: string): TextMetrics {
       return { width: value.length * 8 } as TextMetrics;
@@ -121,7 +126,14 @@ describe('дельты вида и текст карты (07/T15)', () => {
       () => ({ x: 0, y: 0 }),
     );
     plan.setView(
-      { tick: 0, winner: -1, playerId: 0, hexes: { owner: new Int16Array(1) } } as never,
+      {
+        tick: 0,
+        winner: -1,
+        playerId: 0,
+        hexes: { owner: new Int16Array(1) },
+        armies: [],
+        plans: [],
+      } as never,
       null,
       null,
       { center: { x: 0, y: 0 }, ring: 1, share: 0.5, amount: 100, target: null },
@@ -144,14 +156,14 @@ describe('дельты вида и текст карты (07/T15)', () => {
     const labels = initial as [BitmapText, BitmapText];
 
     for (let value = 0; value < 10_000; value += 1) {
-      chip.draw(chipState(value + 1, 3));
+      chip.draw(chipState((value + 1) * 1000 + 1000, 3));
     }
 
     const updated = bitmapTexts(chip.root);
     expect(updated).toHaveLength(2);
     expect(updated).toContain(labels[0]);
     expect(updated).toContain(labels[1]);
-    expect([labels[0].text, labels[1].text].sort()).toEqual(['10 001', '3']);
+    expect([labels[0].text, labels[1].text].sort()).toEqual([formatSoldiers(10_001_000), '3']);
     chip.destroy();
   });
 });

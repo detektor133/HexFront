@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T15 возвращена ревью: приёмочный canvas-stub не реализует `context.scale`, поэтому реальный путь `drawForecastPlate` падает до проверки `BitmapText`.
-- `pnpm verify --changed` зелёный, но полный `SLOW_TESTS`-прогон T15 падает на приёмочном тесте.
+- 07/T15 доработана после возврата ревью: приёмочный тест проходит реальные пути `drawForecastPlate` и `createPlanLayer`, а обновление фишки 10 000 раз сохраняет объекты `BitmapText`.
+- Продуктовые слои `forecast-plate.ts` и `plan-layer.ts` проверены на `BitmapText`; сериализация полного вида в `view-delta.ts` не используется.
+- `pnpm exec vitest run --config vitest.all.config.ts apps/client/test/view-delta-memory.test.ts` — 3/3; `pnpm verify --changed` — зелёный.
 - `pnpm probe:memory` не запускался: проект запрещает открывать браузер; пункт проверит владелец.
 - Следующая сессия: 07/T16.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/test/view-delta-memory.test.ts`, `apps/client/scripts/memory-probe.ts`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/scripts/memory-probe.ts`.
