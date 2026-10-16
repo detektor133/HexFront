@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T12a: исправлен красный CI — уничтожение восьми кэшированных состояний маркера передаёт `context: true`.
-- 07/T12a: приёмочный тест проверяет реальные Pixi-объекты маркера и рендера прогноза: без наведения остаётся только `Graphics`-иконка без `BitmapText`.
-- Проверено: `pnpm exec vitest run apps/client/test/battle-marker.test.ts apps/client/test/graphics-context.test.ts` — 8/8; `pnpm verify --changed` — зелёный.
-- Следующая задача: 07/T17, раунды замечаний владельца.
+- 07/T12a возвращена ревью: `apps/client/test/battle-marker.test.ts:8-14` не проверяет точную границу 12,5 % — `(1, 7)` составляет 14,29 %.
+- Проверено: `pnpm verify --changed` — зелёный; `rg` по изменённым файлам не нашёл запрещённых конструкций.
+- Следующая сессия: исправить замечание `СПЕК:` в `docs/stages/stage-07-playable-build.md`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/test/battle-marker.test.ts`.
