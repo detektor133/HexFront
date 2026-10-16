@@ -116,7 +116,7 @@ export function createBattleMarker(
       state = nextState;
     },
     destroy(): void {
-      for (const cached of states) cached.container?.destroy({ children: true });
+      for (const cached of states) cached.container?.destroy({ children: true, context: true });
     },
   };
 }

@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T12a: маркер боя подключён к `createUnitLayer`; восемь Pixi-состояний создаются один раз и переиспользуются, крест заменён двухсекторным маркером по организованности сторон.
-- 07/T12a: `PlanLayer` постоянно рисует иконку исхода у конца линии, карточку потерь — только при наведении; приёмочный тест проверяет реальные Pixi-объекты без внедрённой фабрики.
-- Проверено: `pnpm verify --changed` — зелёный (build, types, lint, prettier, tests).
+- 07/T12a: исправлен красный CI — уничтожение восьми кэшированных состояний маркера передаёт `context: true`.
+- 07/T12a: приёмочный тест проверяет реальные Pixi-объекты маркера и рендера прогноза: без наведения остаётся только `Graphics`-иконка без `BitmapText`.
+- Проверено: `pnpm exec vitest run apps/client/test/battle-marker.test.ts apps/client/test/graphics-context.test.ts` — 8/8; `pnpm verify --changed` — зелёный.
 - Следующая задача: 07/T17, раунды замечаний владельца.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/test/battle-marker.test.ts`.

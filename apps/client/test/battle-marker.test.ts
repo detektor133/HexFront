@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 import { describe, expect, it } from 'vitest';
 
 import { drawForecastPresentation } from '../src/dev/forecast-plate.ts';
@@ -38,7 +38,9 @@ describe('маркер боя и плашка прогноза (07/T12a)', () =>
       false,
     );
     expect(container.children).toHaveLength(1);
-    expect(container.children[0]).toBeDefined();
-    container.destroy({ children: true });
+    expect(container.children[0]).toBeInstanceOf(Graphics);
+    expect(container.children.some((child) => child instanceof BitmapText)).toBe(false);
+
+    container.destroy({ children: true, context: true });
   });
 });
