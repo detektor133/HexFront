@@ -16,17 +16,49 @@ import { t } from '../i18n/dict.ts';
 import { formatClock, formatFp, formatMult, formatPercent, formatRate } from '../i18n/format.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
+type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
+
+function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
+  const iconRef = useRef<SVGSVGElement>(null);
+  const paths: Record<MetricIconName, string> = {
+    people: 'M4 12a3 3 0 1 1 6 0M7 9a2 2 0 1 1 0-4M10 12a3 3 0 0 1 4-2.65M12 7a2 2 0 1 1 3.2-1.6',
+    gold: 'M7 1v12M4 3h6a3 3 0 0 1 0 6H4a3 3 0 0 0 0 6h7M5 1h4M5 13h4',
+    tax: 'M3 4h10M8 4v8M5 8h6M3 12h10M5 16h8M7 12v4',
+    supply: 'M2 5h8l2 2v6H2zM12 8h2v5h-2M5 10h3',
+    time: 'M7 2a5 5 0 1 1 0 10a5 5 0 0 1 0-10M7 4v3l2 2',
+    place: 'M7 2l2 3h3l-2.5 2 1 4L7 9.5 3.5 11l1-4L2 5h3z',
+  };
+  useLayoutEffect(() => {
+    iconRef.current?.setAttribute('title', props.label);
+  }, [props.label]);
+  return (
+    <svg
+      ref={iconRef}
+      viewBox="0 0 14 14"
+      aria-label={props.label}
+      className={styles.metricIcon}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={paths[props.name]} />
+    </svg>
+  );
+}
+
 function Slot(props: {
+  icon: MetricIconName;
   label: string;
   value: string;
   rate?: string;
   negative?: boolean;
-  title?: string;
-  tone?: 'warning' | 'danger';
+  tone?: 'success' | 'warning' | 'danger';
 }): React.JSX.Element {
   return (
-    <div className={styles.slot} title={props.title}>
-      <span className={styles.label}>{props.label}</span>
+    <div className={styles.slot}>
+      <MetricIcon name={props.icon} label={props.label} />
       <span className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}>
         {props.value}
       </span>
@@ -152,7 +184,8 @@ export function Hud(props: {
   // Прирост золота в HUD — баланс: доход минус содержание отрядов (02-economy.md, «Золото»).
   const net = s.incomePerS - s.upkeepPerS;
   const supplyTone =
-    s.supplyLevel < ATTRITION_THRESHOLD ? 'danger' : s.supplyLevel < FP ? 'warning' : undefined;
+    s.supplyLevel < ATTRITION_THRESHOLD ? 'danger' : s.supplyLevel < FP ? 'warning' : 'success';
+  const compactPlace = window.innerWidth <= 360;
   useLayoutEffect(() => {
     const hud = hudRef.current;
     if (!hud || !props.onHeight) return;
@@ -182,13 +215,15 @@ export function Hud(props: {
     return () => observer.disconnect();
   }, [props.onTaxSize, taxOpen]);
   return (
-    <header ref={hudRef} className={styles.hud} style={props.style}>
+    <header ref={hudRef} className={styles.hud} style={{ ...props.style, overflowX: 'hidden' }}>
       <Slot
+        icon="people"
         label={t('hud.people')}
         value={formatFp(s.popTotal)}
         rate={formatRate(s.popGrowthPerS)}
       />
       <Slot
+        icon="gold"
         label={t('hud.gold')}
         value={formatFp(me.gold)}
         rate={formatRate(net)}
@@ -208,7 +243,7 @@ export function Hud(props: {
             })
           }
         >
-          <span className={styles.label}>{t('hud.tax')}</span>
+          <MetricIcon name="tax" label={t('hud.tax')} />
           <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
         </button>
         {taxOpen && (
@@ -240,12 +275,17 @@ export function Hud(props: {
         )}
       </div>
       <Slot
+        icon="supply"
         label={t('hud.supply')}
         value={formatPercent(s.supplyLevel)}
         {...(supplyTone ? { tone: supplyTone } : {})}
       />
-      <Slot label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
-      <Slot label={t('hud.place')} value={`#${s.place}/${s.players}`} />
+      <Slot icon="time" label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
+      <Slot
+        icon="place"
+        label={t('hud.place')}
+        value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`}
+      />
       {view.victoryHold && (
         <span>{`${t('leaderboard.player')} ${view.victoryHold.player + 1} ${t('match.holdsCities')} · 00:${String(view.victoryHold.seconds).padStart(2, '0')}`}</span>
       )}
