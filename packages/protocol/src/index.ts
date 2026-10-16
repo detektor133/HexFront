@@ -23,10 +23,25 @@ export interface CollectionDelta<T> {
   readonly removed: readonly number[];
 }
 
+export type ViewMetadata = Pick<
+  PlayerView,
+  | 'winner'
+  | 'playerId'
+  | 'victoryHold'
+  | 'ranking'
+  | 'cities'
+  | 'armies'
+  | 'players'
+  | 'me'
+  | 'constructions'
+  | 'recruits'
+>;
+
 export interface ViewDelta {
   readonly hexes: readonly HexChange[];
   readonly units: CollectionDelta<UnitView>;
   readonly fronts: CollectionDelta<PlanView>;
+  readonly view?: Partial<ViewMetadata>;
   readonly events: readonly GameEvent[];
 }
 

@@ -3,21 +3,52 @@ import {
   type DeltaMessage,
   type HexChange,
   type SnapshotMessage,
+  type ViewMetadata,
 } from '@hexfront/protocol';
 import type { GameEvent, PlanView, PlayerView, UnitView } from '@hexfront/sim';
 
 export type FullSnapshotReason = 'start' | 'view' | 'fog';
 type ViewEvent = GameEvent;
 
-function equalJson(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function deltaMetadata(view: PlayerView): unknown {
-  return JSON.stringify(view, (key, value: unknown) =>
-    ['tick', 'hexes', 'units', 'plans'].includes(key) ? undefined : value,
+function equalValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  if (ArrayBuffer.isView(left) || ArrayBuffer.isView(right)) {
+    if (!ArrayBuffer.isView(left) || !ArrayBuffer.isView(right)) return false;
+    const leftValues = Array.from(left as unknown as ArrayLike<unknown>);
+    const rightValues = Array.from(right as unknown as ArrayLike<unknown>);
+    if (leftValues.length !== rightValues.length) {
+      return false;
+    }
+    return leftValues.every((value, index) => equalValue(value, rightValues[index]));
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => equalValue(value, right[index]));
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const keys = Object.keys(leftRecord);
+  return (
+    keys.length === Object.keys(rightRecord).length &&
+    keys.every((key) => key in rightRecord && equalValue(leftRecord[key], rightRecord[key]))
   );
 }
+
+const METADATA_FIELDS: readonly (keyof ViewMetadata)[] = [
+  'winner',
+  'playerId',
+  'victoryHold',
+  'ranking',
+  'cities',
+  'armies',
+  'players',
+  'me',
+  'constructions',
+  'recruits',
+];
 
 function sameHexShape(left: PlayerView, right: PlayerView): boolean {
   const names: readonly (keyof PlayerView['hexes'])[] = [
@@ -39,7 +70,7 @@ function collectionDelta<T extends { readonly id: number }>(
 ): { readonly upsert: readonly T[]; readonly removed: readonly number[] } {
   const oldById = new Map(before.map((item) => [item.id, item]));
   const currentIds = new Set(after.map((item) => item.id));
-  const upsert = after.filter((item) => !equalJson(oldById.get(item.id), item));
+  const upsert = after.filter((item) => !equalValue(oldById.get(item.id), item));
   const removed = before.filter((item) => !currentIds.has(item.id)).map((item) => item.id);
   return { upsert, removed };
 }
@@ -50,13 +81,13 @@ function planDelta(
 ): { readonly upsert: readonly PlanView[]; readonly removed: readonly number[] } {
   const oldById = new Map(before.map((plan) => [plan.armyId, plan]));
   const currentIds = new Set(after.map((plan) => plan.armyId));
-  const upsert = after.filter((plan) => !equalJson(oldById.get(plan.armyId), plan));
+  const upsert = after.filter((plan) => !equalValue(oldById.get(plan.armyId), plan));
   const removed = before.filter((plan) => !currentIds.has(plan.armyId)).map((plan) => plan.armyId);
   return { upsert, removed };
 }
 
 export function canBuildViewDelta(before: PlayerView, after: PlayerView): boolean {
-  return sameHexShape(before, after) && equalJson(deltaMetadata(before), deltaMetadata(after));
+  return sameHexShape(before, after) && before.playerId === after.playerId;
 }
 
 export function buildViewDelta(
@@ -65,6 +96,7 @@ export function buildViewDelta(
   events: readonly GameEvent[],
 ): DeltaMessage {
   const hexes: HexChange[] = [];
+  const view: Partial<ViewMetadata> = {};
   const names: readonly (keyof PlayerView['hexes'])[] = [
     'owner',
     'pop',
@@ -83,6 +115,9 @@ export function buildViewDelta(
     }
     if (Object.keys(change).length > 1) hexes.push(change);
   }
+  for (const field of METADATA_FIELDS) {
+    if (!equalValue(before[field], after[field])) Object.assign(view, { [field]: after[field] });
+  }
   return {
     t: 'delta',
     baseTick: before.tick,
@@ -91,6 +126,7 @@ export function buildViewDelta(
       hexes,
       units: collectionDelta(before.units, after.units),
       fronts: planDelta(before.plans, after.plans),
+      ...(Object.keys(view).length > 0 ? { view } : {}),
       events,
     },
   };
@@ -252,6 +288,7 @@ export class ViewDeltaApplier {
     this.currentView = {
       ...view,
       tick: message.tick,
+      ...(message.d.view ?? {}),
       hexes: applyHexChanges(view, message.d.hexes),
       units: replaceCollection(view.units, message.d.units.upsert, message.d.units.removed),
       plans: replacePlans(view.plans, message.d.fronts.upsert, message.d.fronts.removed),

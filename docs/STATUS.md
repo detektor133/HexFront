@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T14 выполнена; глобальная сборка клиента перед тестами устраняет гонку очистки общего `dist`.
-- Приёмочные тесты оболочки и DOM-тест языка проходят; `pnpm verify --changed` зелёный.
-- Следующая сессия: 07/T15.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/src/local`, `packages/protocol`, `apps/client/src/render`.
+- 07/T15 выполнена по коду: дельты передают изменившиеся поля вида, сравнение не сериализует весь вид, числовые подписи фишек используют `BitmapText`.
+- Приёмочный тест 1 200 тиков и тест переиспользования текста проходят в полном конфиге Vitest; `pnpm verify --changed` зелёный.
+- `pnpm probe:memory` не запускался: проект запрещает открывать браузер; требуется отдельный запуск владельцем.
+- Следующая сессия: 07/T16.
+- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/test/view-delta-memory.test.ts`, `apps/client/scripts/memory-probe.ts`.

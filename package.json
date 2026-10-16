@@ -19,6 +19,7 @@
     "report:match": "node --experimental-strip-types tools/replay/src/report-match.ts",
     "evolve": "node --experimental-strip-types tools/evolve/src/index.ts",
     "telemetry:report": "node --experimental-strip-types tools/telemetry/src/cli.ts",
+    "probe:memory": "node --experimental-strip-types apps/client/scripts/memory-probe.ts",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
     "ci:wait": "node --experimental-strip-types tools/ci-wait/src/cli.ts",
     "agent:run": "node --experimental-strip-types tools/agent-loop/src/cli.ts",

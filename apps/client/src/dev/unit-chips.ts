@@ -3,7 +3,7 @@
 // рода войск, в его углу — число отрядов в стопке; справа на белой плашке — число солдат и два
 // вертикальных столбика: организация `chip.org` и снабжение `chip.supply` (жёлтый/красный при
 // нехватке). Выбранная фишка — золотая рамка `selection` по краю. Размеры — px при масштабе 1.
-import { Container, Graphics, Text } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import type { UnitType } from '@hexfront/sim';
 
@@ -100,8 +100,8 @@ function vbar(g: Graphics, x: number, top: number, h: number, share: number, col
 
 interface Parts {
   readonly g: Graphics;
-  readonly label: Text;
-  readonly count: Text;
+  readonly label: BitmapText;
+  readonly count: BitmapText;
 }
 
 function barsWidth(s: ChipState): number {
@@ -164,7 +164,7 @@ function marks(p: Parts, s: ChipState, sq: number): void {
 
 function drawChip(p: Parts, s: ChipState): void {
   const top = -H / 2;
-  const text = Math.max(MIN_TEXT, Math.ceil(p.label.width) + TEXT_SLACK);
+  const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX + TEXT_SLACK);
   const w = (s.army ? TAB : 0) + SQUARE + PAD + text + PAD + barsWidth(s);
   const left = -w / 2;
   const { g } = p;
@@ -195,7 +195,7 @@ function drawRetreatHatch(g: Graphics, left: number, top: number, width: number)
 
 // Призрак набора в городе: пунктирный контур, глиф и столбик прогресса набора.
 function drawGhost(p: Parts, s: ChipState): void {
-  const text = Math.max(MIN_TEXT, Math.ceil(p.label.width));
+  const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX);
   const w = SQUARE + PAD + text + PAD + BAR_W + BAR_INSET;
   const left = -w / 2;
   const top = -H / 2;
@@ -226,8 +226,8 @@ export function createChip(): Chip {
     fontWeight: '600',
     fill: tokens.ui.ink,
   } as const;
-  const label = new Text({ text: '', style: { ...font, fontSize: LABEL_PX } });
-  const count = new Text({ text: '', style: { ...font, fontSize: COUNT_PX } });
+  const label = new BitmapText({ text: '', style: { ...font, fontSize: LABEL_PX } });
+  const count = new BitmapText({ text: '', style: { ...font, fontSize: COUNT_PX } });
   label.anchor.set(0.5, 0.5);
   count.anchor.set(0.5, 0.5);
   const textResolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;

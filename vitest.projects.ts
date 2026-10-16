@@ -36,6 +36,7 @@ export const SLOW_TESTS = [
   'packages/mapgen/test/validate-generated.test.ts',
   'packages/mapgen/test/map.test.ts',
   'apps/client/test/offensive-scenes.test.ts',
+  'apps/client/test/view-delta-memory.test.ts',
   'tools/evolve/src/index.test.ts',
   'tools/replay/src/acceptance.test.ts',
   'tools/agent-loop/src/streams.test.ts',
