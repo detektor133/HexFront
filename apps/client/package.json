@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "check-bundle-size": "node --experimental-strip-types scripts/check-bundle-size.ts"
   },
   "dependencies": {
     "@hexfront/protocol": "workspace:*",

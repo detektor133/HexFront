@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T15 |
+| Текущая задача | 07/T16 |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-16 |
 
@@ -15,9 +15,11 @@
 
 ## Следующая сессия
 
-- 07/T15: `memory-probe.ts` проверяет `dist`, запускает `vite preview` на порту 4173 с `--strictPort`, ждёт HTTP-ответ и останавливает preview вместе с браузером.
-- Приёмочный тест проверяет реальный вызов `runMemoryProbe`: preview готов до `page.goto`, а `finally` закрывает браузер и процесс при ошибке страницы.
-- `pnpm verify --changed` зелёный; полный slow-тест `view-delta-memory.test.ts` также прошёл: 4 теста.
-- Проверит владелец (раунды замечаний этапа): реальный `pnpm probe:memory` — запуск браузера запрещён правилами проекта.
-- Следующая задача: 07/T16.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/scripts/memory-probe.ts`, `apps/client/test/view-delta-memory.test.ts`.
+- 07/T16: Vite пишет `.vite/manifest.json`, скрипт `check-bundle-size` считает HTML-ресурсы и статические imports, исключая dynamic imports и недостижимые карты/фоновые файлы.
+- Лимит первичной загрузки — 10 МБ; в локальной production-сборке измерено 1 201 247 байт.
+- CI запускает `pnpm --filter @hexfront/client check-bundle-size` сразу после сборки клиента.
+- Приёмочный тест `apps/client/test/bundle-size.test.ts`: 4 теста прошли.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
+- Проверит владелец (раунды замечаний этапа): визуальная часть отсутствует, задача проверяется текстовыми тестами и командой.
+- Следующая задача: 07/T12.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/scripts/check-bundle-size.ts`, `apps/client/test/bundle-size.test.ts`.

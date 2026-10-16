@@ -125,6 +125,7 @@ function telemetryPlugin(): Plugin {
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), mapsPlugin(), ...(command === 'serve' ? [telemetryPlugin()] : [])],
+  build: { manifest: true },
   server: { port: 5173, strictPort: true },
   // Прямой путь /dev/map отдаёт index.html — роутинг на клиенте.
   appType: 'spa',
