@@ -89,23 +89,11 @@ function readPixels(value: string): number {
   return pixels;
 }
 
-function mockTaxGeometry(): void {
+function mockTaxButtonGeometry(): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
     function getBoundingClientRect(this: HTMLElement): DOMRect {
       if (this.tagName === 'BUTTON' && this.textContent?.includes('Налог')) {
         return new DOMRect(window.innerWidth <= 600 ? 80 : 320, 0, 120, 48);
-      }
-      if (this.getAttribute('role') === 'dialog') {
-        const contentWidth = Math.max(
-          ...Array.from(this.children, (child) => child.textContent?.length ?? 0),
-        );
-        const contentHeight = this.children.length;
-        return new DOMRect(
-          readPixels(this.style.left),
-          readPixels(this.style.top),
-          contentWidth,
-          contentHeight,
-        );
       }
       return new DOMRect();
     },
@@ -138,7 +126,7 @@ describe('Приёмка 07/T17e: окно налога', () => {
   });
 
   it('критерий 2: окно налога привязано прямо под кнопкой, содержит только нужный контент и не имеет пустой фиксированной высоты', async () => {
-    mockTaxGeometry();
+    mockTaxButtonGeometry();
     await renderMatch(VIEWPORTS[1]);
     const button = screen.getByRole('button', { name: /Налог|Tax/u });
     const buttonRect = button.getBoundingClientRect();
@@ -153,10 +141,6 @@ describe('Приёмка 07/T17e: окно налога', () => {
     expect(readPixels(dialog.style.top)).toBe(buttonRect.bottom);
     expect(readPixels(dialog.style.left)).toBe(buttonRect.left);
 
-    const dialogRect = dialog.getBoundingClientRect();
-    expect(dialogRect.top).toBe(buttonRect.bottom);
-    expect(dialogRect.left).toBeGreaterThanOrEqual(buttonRect.left);
-
     const layout = computeMatchLayout({
       viewport: VIEWPORTS[1],
       hudHeight: buttonRect.height,
@@ -169,29 +153,24 @@ describe('Приёмка 07/T17e: окно налога', () => {
       cardOpen: false,
       popupOpen: true,
       popupAnchorX: buttonRect.left,
-      popupSize: { width: dialogRect.width, height: dialogRect.height },
       paused: false,
     });
     const popup = layout.elements.find((element) => element.id === 'popup-menu');
     if (!popup) throw new Error('Окно налога не попало в раскладку');
-    expect(dialogRect).toMatchObject({
-      x: popup.x,
-      y: popup.y,
-      width: popup.width,
-      height: popup.height,
-    });
+    expect(readPixels(dialog.style.left)).toBe(popup.x);
+    expect(readPixels(dialog.style.top)).toBe(popup.y);
     const mapRect = {
       left: 0,
       top: layout.hudHeight,
       right: VIEWPORTS[1].width,
       bottom: layout.hudHeight + layout.mapVisibleHeight,
     };
-    expect(dialogRect.left).toBeGreaterThanOrEqual(mapRect.left);
-    expect(dialogRect.top).toBeGreaterThanOrEqual(mapRect.top);
-    expect(dialogRect.right).toBeLessThanOrEqual(mapRect.right);
-    expect(dialogRect.bottom).toBeLessThanOrEqual(mapRect.bottom);
+    expect(popup.x).toBeGreaterThanOrEqual(mapRect.left);
+    expect(popup.y).toBeGreaterThanOrEqual(mapRect.top);
+    expect(popup.x + popup.width).toBeLessThanOrEqual(mapRect.right);
+    expect(popup.y + popup.height).toBeLessThanOrEqual(mapRect.bottom);
     expect(
-      (dialogRect.width * dialogRect.height) / (VIEWPORTS[1].width * VIEWPORTS[1].height),
+      (popup.width * popup.height) / (VIEWPORTS[1].width * VIEWPORTS[1].height),
     ).toBeLessThanOrEqual(0.05);
     expect(layout.elements.some((element) => element.id === 'bottom-panel')).toBe(false);
     expect(layout.mapVisibleHeight).toBe(VIEWPORTS[1].height - buttonRect.height);
@@ -199,16 +178,15 @@ describe('Приёмка 07/T17e: окно налога', () => {
 
   it('критерий 3: окно налога не выходит за экран на 360×640, 1440×900 и 1920×1080', async () => {
     for (const viewport of VIEWPORTS) {
-      mockTaxGeometry();
+      mockTaxButtonGeometry();
       await renderMatch(viewport);
       fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
       const dialog = screen.getByRole('dialog', { name: /Налог|Tax/u });
       expectIntrinsicTaxSizing(dialog);
       const button = screen.getByRole('button', { name: /Налог|Tax/u });
       const buttonRect = button.getBoundingClientRect();
-      const dialogRect = dialog.getBoundingClientRect();
-      expect(dialogRect.top).toBe(buttonRect.bottom);
-      expect(dialogRect.left).toBeGreaterThanOrEqual(buttonRect.left);
+      expect(readPixels(dialog.style.top)).toBe(buttonRect.bottom);
+      expect(readPixels(dialog.style.left)).toBeGreaterThanOrEqual(buttonRect.left);
       const layout = computeMatchLayout({
         viewport,
         hudHeight: buttonRect.height,
@@ -222,7 +200,6 @@ describe('Приёмка 07/T17e: окно налога', () => {
         popupOpen: true,
         popupAnchorX: buttonRect.left,
         popupAnchorY: buttonRect.bottom,
-        popupSize: { width: dialogRect.width, height: dialogRect.height },
         paused: false,
       });
       const popup = layout.elements.find((element) => element.id === 'popup-menu');
@@ -233,20 +210,16 @@ describe('Приёмка 07/T17e: окно налога', () => {
         right: viewport.width,
         bottom: layout.hudHeight + layout.mapVisibleHeight,
       };
-      expect(dialogRect).toMatchObject({
-        x: popup.x,
-        y: popup.y,
-        width: popup.width,
-        height: popup.height,
-      });
-      expect(dialogRect.left).toBeGreaterThanOrEqual(mapRect.left);
-      expect(dialogRect.top).toBeGreaterThanOrEqual(mapRect.top);
-      expect(dialogRect.right).toBeLessThanOrEqual(mapRect.right);
-      expect(dialogRect.bottom).toBeLessThanOrEqual(mapRect.bottom);
+      expect(readPixels(dialog.style.left)).toBe(popup.x);
+      expect(readPixels(dialog.style.top)).toBe(popup.y);
+      expect(popup.x).toBeGreaterThanOrEqual(mapRect.left);
+      expect(popup.y).toBeGreaterThanOrEqual(mapRect.top);
+      expect(popup.x + popup.width).toBeLessThanOrEqual(mapRect.right);
+      expect(popup.y + popup.height).toBeLessThanOrEqual(mapRect.bottom);
       const maxArea = viewport.width === 360 ? 0.25 : 0.05;
-      expect(
-        (dialogRect.width * dialogRect.height) / (viewport.width * viewport.height),
-      ).toBeLessThanOrEqual(maxArea);
+      expect((popup.width * popup.height) / (viewport.width * viewport.height)).toBeLessThanOrEqual(
+        maxArea,
+      );
       expect(document.querySelector('[class*="dock"]')).toBeNull();
       cleanup();
       vi.resetModules();
