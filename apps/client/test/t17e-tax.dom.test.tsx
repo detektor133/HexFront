@@ -96,11 +96,28 @@ function mockTaxGeometry(): void {
         return new DOMRect(window.innerWidth <= 600 ? 80 : 320, 0, 120, 48);
       }
       if (this.getAttribute('role') === 'dialog') {
-        return new DOMRect(readPixels(this.style.left), readPixels(this.style.top), 232, 88);
+        const contentWidth = Math.max(
+          ...Array.from(this.children, (child) => child.textContent?.length ?? 0),
+        );
+        const contentHeight = this.children.length;
+        return new DOMRect(
+          readPixels(this.style.left),
+          readPixels(this.style.top),
+          contentWidth,
+          contentHeight,
+        );
       }
       return new DOMRect();
     },
   );
+}
+
+function expectIntrinsicTaxSizing(dialog: HTMLElement): void {
+  expect(dialog.style.width).toBe('');
+  expect(dialog.style.height).toBe('');
+  // jsdom нормализует CSS `max-content` в `auto`; фиксированный px-размер остаётся px.
+  expect(getComputedStyle(dialog).width).toBe('auto');
+  expect(getComputedStyle(dialog).height).toBe('auto');
 }
 
 afterEach(() => {
@@ -132,8 +149,7 @@ describe('Приёмка 07/T17e: окно налога', () => {
     expect(dialog.querySelectorAll('input[type="range"]')).toHaveLength(1);
     expect(dialog.querySelectorAll('p')).toHaveLength(2);
     expect(dialog.querySelectorAll(':scope > *:not(input):not(p)')).toHaveLength(0);
-    expect(dialog.style.width).toBe('');
-    expect(dialog.style.height).toBe('');
+    expectIntrinsicTaxSizing(dialog);
     expect(readPixels(dialog.style.top)).toBe(buttonRect.bottom);
     expect(readPixels(dialog.style.left)).toBe(buttonRect.left);
 
@@ -153,7 +169,7 @@ describe('Приёмка 07/T17e: окно налога', () => {
       cardOpen: false,
       popupOpen: true,
       popupAnchorX: buttonRect.left,
-      popupSize: { width: 232, height: 88 },
+      popupSize: { width: dialogRect.width, height: dialogRect.height },
       paused: false,
     });
     const popup = layout.elements.find((element) => element.id === 'popup-menu');
@@ -187,8 +203,7 @@ describe('Приёмка 07/T17e: окно налога', () => {
       await renderMatch(viewport);
       fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
       const dialog = screen.getByRole('dialog', { name: /Налог|Tax/u });
-      expect(dialog.style.width).toBe('');
-      expect(dialog.style.height).toBe('');
+      expectIntrinsicTaxSizing(dialog);
       const button = screen.getByRole('button', { name: /Налог|Tax/u });
       const buttonRect = button.getBoundingClientRect();
       const dialogRect = dialog.getBoundingClientRect();
