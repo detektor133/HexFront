@@ -1,5 +1,6 @@
 # Журнал решений
 
+- 2026-10-16 · 07/T17, раунд замечаний 1 · T17c исправлена: панели армий и окна клеток возвращаются в левый нижний угол через `computeMatchLayout` (`left-column`, `bottom-panel`, `card`); история регрессии — перенос на inline-стили в `bfe3af7` от 2026-10-15. Добавлена дочерняя T17h перед T17: верхняя панель матча с иконками вместо видимых подписей, постоянными значениями и приростами, адаптацией места на 360 px и описанием в `docs/art/` · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`, `docs/art/ui.md`, `docs/gdd/07-controls.md` · Решение владельца 2026-10-16
 - 2026-10-15 · 07/T20 и 07/T7 · Скриншоты и visual-проверка убраны из работы агента; вид проверяет владелец по ссылке предпросмотра ветки в раундах 07/T17; раскладка матча задаётся правилами `art/ui.md` и чистой функцией с тестами без браузера · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/art/ui.md`, `docs/testing.md`, `docs/PROCESS.md`, `docs/CONVENTIONS.md`, `AGENTS.md`, `.agents/skills/{split,stage-close,task}/SKILL.md`, `.codex/hooks/block-browser.mjs` · Решение владельца 2026-10-15
 
 Одна строка на решение, новые сверху. Формат: дата · решение · затронутые файлы · CR (если был).
