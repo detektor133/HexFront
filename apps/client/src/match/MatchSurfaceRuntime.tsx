@@ -5,11 +5,13 @@ import {
   hexId,
   inBounds,
   loadMap,
+  neighbors,
   type Command,
   type MapStatic,
   type PlayerView,
 } from '@hexfront/sim';
 
+import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
@@ -247,8 +249,24 @@ export function useSandbox(
     let pendingMessage: WorkerViewMessage | null = null;
     let frameRequest = 0;
     let appliedMessage = false;
+    let startCameraApplied = false;
     const deltaApplier = new ViewDeltaApplier();
     const setup = readLocalMatchSetup(window.location.search);
+    const applyStartCameraToView = (currentView: PlayerView): void => {
+      if (startCameraApplied || !mapViewRef.current) return;
+      const city = currentView.cities.find((item) => item.owner === currentView.playerId);
+      if (!city) return;
+      startCameraApplied = true;
+      const playerCity = hexFromId(city.hex, map.width);
+      applyStartCameraToMap({
+        mapView: mapViewRef.current,
+        playerCity,
+        playerUnitHexes: currentView.units
+          .filter((unit) => unit.owner === currentView.playerId)
+          .map((unit) => hexFromId(unit.hex, map.width)),
+        nearbyHexes: neighbors(playerCity),
+      });
+    };
     const applyMessage = (m: WorkerViewMessage): void => {
       const view =
         m.kind === 'snapshot'
@@ -263,6 +281,7 @@ export function useSandbox(
       }
       snapshotTelemetryRef.current?.track(applied);
       viewRef.current = view;
+      applyStartCameraToView(view);
       workerTelemetryRef.current = m.telemetry ?? null;
       layerRef.current?.setView(view, pickedRef.current);
       setMsg(applied);
@@ -361,6 +380,7 @@ export function useSandbox(
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      if (viewRef.current) applyStartCameraToView(viewRef.current);
       v.setBottomInset(dockHeightRef.current);
       v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
