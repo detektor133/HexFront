@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T15 возвращена ревью: `pnpm probe:memory` не запускает `vite preview` и требует заранее поднятый сервер, поэтому критерий 3 не выполнен на реальном пути.
-- Приёмочный тест `apps/client/test/view-delta-memory.test.ts` проходит 3/3; `pnpm verify --changed` ранее был зелёным.
-- Браузерная проверка `pnpm probe:memory` не запускалась: проект запрещает открывать браузер; после исправления её выполнит владелец.
-- Следующая сессия: 07/T15 после исправления запуска `vite preview`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/scripts/memory-probe.ts`.
+- 07/T15: `memory-probe.ts` проверяет `dist`, запускает `vite preview` на порту 4173 с `--strictPort`, ждёт HTTP-ответ и останавливает preview вместе с браузером.
+- Приёмочный тест проверяет реальный вызов `runMemoryProbe`: preview готов до `page.goto`, а `finally` закрывает браузер и процесс при ошибке страницы.
+- `pnpm verify --changed` зелёный; полный slow-тест `view-delta-memory.test.ts` также прошёл: 4 теста.
+- Проверит владелец (раунды замечаний этапа): реальный `pnpm probe:memory` — запуск браузера запрещён правилами проекта.
+- Следующая задача: 07/T16.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/scripts/memory-probe.ts`, `apps/client/test/view-delta-memory.test.ts`.

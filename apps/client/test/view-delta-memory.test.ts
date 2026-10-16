@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { BitmapText, Container } from 'pixi.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { drawForecastPlate } from '../src/dev/forecast-plate.ts';
 import { createPlanLayer } from '../src/dev/plan-layer.ts';
@@ -10,6 +10,12 @@ import { createChip, type ChipState } from '../src/dev/unit-chips.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { ViewDeltaApplier, ConfirmedViewDeltaStream } from '../src/local/view-delta.ts';
+
+const spawnMock = vi.hoisted(() => vi.fn());
+const launchMock = vi.hoisted(() => vi.fn());
+
+vi.mock('node:child_process', () => ({ spawn: spawnMock }));
+vi.mock('@playwright/test', () => ({ chromium: { launch: launchMock } }));
 
 const GEN_MAP_PATH = join(process.cwd(), 'apps/client/dist/maps/gen-42-30.json');
 const SOURCE_ROOT = join(process.cwd(), 'apps/client/src');
@@ -165,5 +171,46 @@ describe('дельты вида и текст карты (07/T15)', () => {
     expect(updated).toContain(labels[1]);
     expect([labels[0].text, labels[1].text].sort()).toEqual([formatSoldiers(10_001_000), '3']);
     chip.destroy();
+  });
+
+  it('критерий 3: запускает preview до page.goto и останавливает его при ошибке', async () => {
+    const events: string[] = [];
+    const originalFetch = globalThis.fetch;
+    const preview = { exitCode: null, kill: vi.fn(() => events.push('kill')) };
+    const page = {
+      goto: vi.fn(async () => {
+        events.push('goto');
+        throw new Error('ошибка страницы');
+      }),
+    };
+    const browser = {
+      newPage: vi.fn(async () => page),
+      close: vi.fn(async () => events.push('close')),
+    };
+    spawnMock.mockImplementation(() => {
+      events.push('spawn');
+      return preview;
+    });
+    launchMock.mockResolvedValue(browser);
+    globalThis.fetch = vi.fn(async () => {
+      events.push('ready');
+      return { ok: true } as Response;
+    });
+
+    try {
+      const { runMemoryProbe } = await import('../scripts/memory-probe.ts');
+      await expect(runMemoryProbe()).rejects.toThrow('ошибка страницы');
+      expect(events).toEqual(['spawn', 'ready', 'goto', 'close', 'kill']);
+      expect(spawnMock).toHaveBeenCalledWith(
+        process.execPath,
+        expect.arrayContaining(['preview', '--port', '4173', '--strictPort']),
+        expect.objectContaining({ cwd: expect.any(String), stdio: 'ignore' }),
+      );
+      expect(spawnMock.mock.calls[0]?.[2]).not.toHaveProperty('shell');
+    } finally {
+      globalThis.fetch = originalFetch;
+      spawnMock.mockReset();
+      launchMock.mockReset();
+    }
   });
 });
