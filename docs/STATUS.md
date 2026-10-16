@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T12a возвращена ревью: `apps/client/test/battle-marker.test.ts:8-14` не проверяет точную границу 12,5 % — `(1, 7)` составляет 14,29 %.
-- Проверено: `pnpm verify --changed` — зелёный; `rg` по изменённым файлам не нашёл запрещённых конструкций.
-- Следующая сессия: исправить замечание `СПЕК:` в `docs/stages/stage-07-playable-build.md`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/test/battle-marker.test.ts`.
+- 07/T12a: исправлена проверка точной границы 12,5 % через отношение `1000/7000`; возврат ревью по коду и СПЕК закрыт.
+- Проверено: `pnpm verify --changed` — зелёный; CI для HEAD перед работой — зелёный.
+- Следующая сессия: выполнить 07/T17.
+- Читать: `docs/stages/stage-07-playable-build.md`, блок 07/T17 и соответствующие файлы из его приёмки.

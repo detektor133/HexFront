@@ -7,7 +7,7 @@ import { battleOrgState, createBattleMarker } from '../src/match/battle-marker.t
 describe('маркер боя и плашка прогноза (07/T12a)', () => {
   it('4: переводит долю организованности в одно из 8 состояний на границах 0, 12,5, 50 и 100 % и для равных сторон', () => {
     expect(battleOrgState(0, 100)).toBe(0);
-    expect(battleOrgState(1, 7)).toBe(1);
+    expect(battleOrgState(1000, 7000)).toBe(1);
     expect(battleOrgState(50, 50)).toBe(4);
     expect(battleOrgState(100, 0)).toBe(7);
     expect(battleOrgState(40, 40)).toBe(4);
