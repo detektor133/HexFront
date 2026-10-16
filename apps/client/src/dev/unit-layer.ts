@@ -155,6 +155,40 @@ export function createUnitLayer(
   const cities = new Map<number, number>();
   const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
 
+  function drawBattleMarker(u: UnitView, v: PlayerView, pulse: number): void {
+    const key = `${u.hex}:${u.target}`;
+    const attackers = v.units.filter(
+      (candidate) =>
+        candidate.hex === u.hex && candidate.target === u.target && candidate.order === 'attack',
+    );
+    const defenders = v.units.filter(
+      (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
+    );
+    let attackerOrg = 0;
+    for (const candidate of attackers) attackerOrg += candidate.org;
+    let defenderOrg = 0;
+    for (const candidate of defenders) defenderOrg += candidate.org;
+    let marker = battleMarkers.get(key);
+    if (!marker) {
+      marker = createBattleMarker({
+        ownColor: playerLine(u.owner),
+        enemyColor: playerLine(defenders[0]?.owner ?? -1),
+      });
+      battleMarkers.set(key, marker);
+    }
+    const previous = marker.object;
+    marker.update(battleOrgState(attackerOrg, defenderOrg));
+    const current = marker.object;
+    if (current && current !== previous) {
+      if (previous?.container) battles.removeChild(previous.container);
+      if (current.container) battles.addChild(current.container);
+    }
+    const a = center(u.hex);
+    const b = center(u.target);
+    current?.container?.position.set((a.x + b.x) / 2, (a.y + b.y) / 2);
+    current?.container?.scale.set(CHIP_WORLD * pulse);
+  }
+
   const base = (hex: number): Point => {
     const c = center(hex);
     const level = cities.get(hex);
@@ -309,37 +343,7 @@ export function createUnitLayer(
       if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}:${u.target}`)) continue;
       const key = `${u.hex}:${u.target}`;
       drawn.add(key);
-      const a = center(u.hex);
-      const b = center(u.target);
-      const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const attackers = v.units.filter(
-        (candidate) =>
-          candidate.hex === u.hex && candidate.target === u.target && candidate.order === 'attack',
-      );
-      const defenders = v.units.filter(
-        (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
-      );
-      let attackerOrg = 0;
-      for (const candidate of attackers) attackerOrg += candidate.org;
-      let defenderOrg = 0;
-      for (const candidate of defenders) defenderOrg += candidate.org;
-      let marker = battleMarkers.get(key);
-      if (!marker) {
-        marker = createBattleMarker({
-          ownColor: playerLine(u.owner),
-          enemyColor: playerLine(defenders[0]?.owner ?? -1),
-        });
-        battleMarkers.set(key, marker);
-      }
-      const previous = marker.object;
-      marker.update(battleOrgState(attackerOrg, defenderOrg));
-      const current = marker.object;
-      if (current && current !== previous) {
-        if (previous?.container) battles.removeChild(previous.container);
-        if (current.container) battles.addChild(current.container);
-      }
-      current?.container?.position.set(m.x, m.y);
-      current?.container?.scale.set(CHIP_WORLD * pulse);
+      drawBattleMarker(u, v, pulse);
     }
     for (const [key, marker] of battleMarkers) {
       if (drawn.has(key)) continue;

@@ -8,6 +8,7 @@ import type { Forecast, ForecastOutcome } from '@hexfront/sim';
 
 import { OUTCOME_ICON } from './forecast-icons.ts';
 import { formatPercent } from '../i18n/format.ts';
+import { getBattleForecastPresentation } from '../match/battle-marker.ts';
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -50,6 +51,7 @@ export function drawForecastIcon(
   k: number,
 ): void {
   const g = new Graphics();
+  g.context.batchMode = 'batch';
   const x0 = -ICON_PX / 2;
   const y0 = -ICON_PX / 2;
   for (const line of OUTCOME_ICON[badge.icon]) {
@@ -74,8 +76,13 @@ export function drawForecastPresentation(
   k: number,
   hovered: boolean,
 ): void {
-  drawForecastIcon(container, badge, at, k);
-  if (hovered) drawForecastPlate(container, badge, at, k);
+  const presentation = getBattleForecastPresentation({
+    hovered,
+    outcome:
+      badge.icon === 'victory' ? 'success' : badge.icon === 'stalemate' ? 'warning' : 'danger',
+  });
+  if (presentation.showOutcomeIcon) drawForecastIcon(container, badge, at, k);
+  if (presentation.showForecastCard) drawForecastPlate(container, badge, at, k);
 }
 
 /**

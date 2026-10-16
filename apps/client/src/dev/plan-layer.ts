@@ -258,7 +258,7 @@ export function createPlanLayer(
     labels.addChild(tx);
   }
 
-  function drawOffensive(v: PlayerView, p: FrontPlan, showForecast: boolean): void {
+  function drawOffensive(v: PlayerView, p: FrontPlan, showForecastCard: boolean): void {
     if (!p.offensive) return;
     const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
@@ -266,7 +266,7 @@ export function createPlanLayer(
     const badge = worst ? forecastBadge(worst) : null;
     // Иконка постоянна у конца линии; число потерь появляется только по наведению.
     if (badge && end) {
-      drawForecastPresentation(labels, badge, end, k, showForecast);
+      drawForecastPresentation(labels, badge, end, k, showForecastCard);
     }
   }
 
@@ -343,9 +343,9 @@ export function createPlanLayer(
         }
         const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
         const paths = runsOf(p.offensive?.edges ?? []);
-        const showForecast =
+        const showForecastCard =
           p.armyId === selectedArmy && hover !== null && isPointNearPath(hover, paths, 14 * k);
-        drawOffensive(v, p, showForecast);
+        drawOffensive(v, p, showForecastCard);
         drawFront(front, color);
         if (p.armyId === selectedArmy && !draft) {
           drawHandles(frontHandles({ map, view: v, radius }, p), color);

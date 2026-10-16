@@ -65,7 +65,11 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
     },
     hold(world, phase) {
       const hex = hexAt(world);
-      if (phase === 'start' || phase === 'move') return show(hex, false);
+      if (phase === 'start' || phase === 'move') {
+        d.setPlanHover?.(world);
+        return show(hex, false);
+      }
+      d.setPlanHover?.(null);
       show(null, false);
       if (phase === 'end' && hex !== null) d.order(hex);
     },

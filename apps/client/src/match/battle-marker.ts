@@ -89,14 +89,22 @@ function drawState(state: number | null, ownColor: string, enemyColor: string): 
 export function createBattleMarker(
   options: BattleMarkerOptions = {},
 ): BattleMarker<BattleMarkerObject> {
-  const states = Array.from({ length: SECTOR_COUNT }, (_, index) =>
-    drawState(
-      index,
-      options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
-      options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
+  const states = new Map<number | null, BattleMarkerObject>(
+    Array.from(
+      { length: SECTOR_COUNT },
+      (_, index) =>
+        [
+          index,
+          drawState(
+            index,
+            options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
+            options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
+          ),
+        ] as const,
     ),
   );
-  states.push(
+  states.set(
+    null,
     drawState(
       null,
       options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
@@ -112,11 +120,12 @@ export function createBattleMarker(
     },
     update(nextState: number | null): void {
       if (object !== null && state === nextState) return;
-      object = states[nextState === null ? SECTOR_COUNT : nextState] as BattleMarkerObject;
+      object = states.get(nextState) ?? null;
       state = nextState;
     },
     destroy(): void {
-      for (const cached of states) cached.container?.destroy({ children: true, context: true });
+      for (const cached of states.values())
+        cached.container?.destroy({ children: true, context: true });
     },
   };
 }

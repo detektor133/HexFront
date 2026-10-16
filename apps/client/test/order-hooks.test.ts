@@ -50,6 +50,7 @@ describe('приказ удержанием и прогноз при навед�
   function setup(p: Picked, tool = false) {
     const targets: (OrderTarget | null)[] = [];
     const orders: number[] = [];
+    const planHovers: ({ x: number; y: number } | null)[] = [];
     const hooks = createOrderHooks({
       map: MAP,
       radius: R,
@@ -58,9 +59,10 @@ describe('приказ удержанием и прогноз при навед�
       tool: () => tool,
       chipAt: (hex) => at(hex),
       setTarget: (t) => targets.push(t),
+      setPlanHover: (point) => planHovers.push(point),
       order: (hex) => orders.push(hex),
     });
-    return { hooks, targets, orders };
+    return { hooks, targets, orders, planHovers };
   }
   const picked = selectHex(v, { hex: null, units: [], target: null }, home);
 
@@ -91,6 +93,7 @@ describe('приказ удержанием и прогноз при навед�
     expect(s.targets.at(-1)?.badge).not.toBeNull();
     s.hooks.hold(at(enemy.hex), 'end');
     expect(s.targets.at(-1)).toBeNull();
+    expect(s.planHovers).toEqual([at(free), at(enemy.hex), null]);
     expect(s.orders).toEqual([enemy.hex]);
   });
 
