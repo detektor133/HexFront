@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T16: повторно проверить границу job в приёмочном тесте CI: команды `build` и `check-bundle-size` должны находиться в одной job `deploy` файла `.github/workflows/pages.yml`.
+- 07/T16: исправить СПЕК в приёмочном тесте CI — его регулярное выражение пересекает границу job; команды `build` и `check-bundle-size` должны находиться в одной job `deploy` файла `.github/workflows/pages.yml`.
 - Приёмочный тест `apps/client/test/bundle-size.test.ts`: 4 теста прошли.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
 - Следующая задача: 07/T12.
