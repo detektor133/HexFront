@@ -105,6 +105,13 @@ describe('Приёмка 07/T17e: окно налога', () => {
   });
 
   it('критерий 2: окно налога привязано прямо под кнопкой, содержит только нужный контент и не имеет пустой фиксированной высоты', async () => {
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect(): DOMRect {
+      if (this.tagName === 'BUTTON' && this.textContent?.includes('Налог')) {
+        return new DOMRect(320, 0, 120, 48);
+      }
+      return originalRect.call(this);
+    };
     await renderMatch(VIEWPORTS[1]);
     const button = screen.getByRole('button', { name: /Налог|Tax/u });
     const hud = button.closest('header');
@@ -112,7 +119,10 @@ describe('Приёмка 07/T17e: окно налога', () => {
     fireEvent.click(button);
     const dialog = screen.getByRole('dialog', { name: /Налог|Tax/u });
 
-    expect(dialog.textContent?.trim()).not.toBe('');
+    expect(dialog.children).toHaveLength(3);
+    expect(dialog.querySelectorAll('input[type="range"]')).toHaveLength(1);
+    expect(dialog.querySelectorAll('p')).toHaveLength(2);
+    expect(dialog.querySelectorAll(':scope > *:not(input):not(p)')).toHaveLength(0);
     expect(dialog.style.height).not.toBe('100%');
     expect(dialog.style.minHeight).not.toBe('100%');
     expect(dialog.style.width).not.toBe('100%');
@@ -120,8 +130,9 @@ describe('Приёмка 07/T17e: окно налога', () => {
     expect(readPixels(dialog.style.top)).toBe(
       readPixels(hud.style.top) + readPixels(hud.style.height),
     );
-    expect(readPixels(dialog.style.width)).toBeLessThan(1440);
-    expect(readPixels(dialog.style.height)).toBeLessThan(900);
+    expect(readPixels(dialog.style.left)).toBe(320);
+    expect(readPixels(dialog.style.width)).toBeLessThanOrEqual(260);
+    expect(readPixels(dialog.style.height)).toBeLessThanOrEqual(120);
   });
 
   it('критерий 3: окно налога не выходит за экран на 360×640, 1440×900 и 1920×1080', async () => {
@@ -138,6 +149,7 @@ describe('Приёмка 07/T17e: окно налога', () => {
       expect(top).toBeGreaterThanOrEqual(0);
       expect(right).toBeLessThanOrEqual(viewport.width);
       expect(bottom).toBeLessThanOrEqual(viewport.height);
+      expect(document.querySelector('[class*="dock"]')).toBeNull();
       cleanup();
       vi.resetModules();
     }

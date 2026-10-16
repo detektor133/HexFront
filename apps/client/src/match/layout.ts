@@ -164,8 +164,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     );
   }
   if (input.popupOpen || input.paused) {
-    const popupHeight = Math.max(44, Math.min(136, height - input.hudHeight - gap - edge));
-    const popupWidth = Math.min(280, width - edge * 2);
+    const popupHeight = Math.max(44, Math.min(120, height - input.hudHeight - gap - edge));
+    const popupWidth = Math.min(260, width - edge * 2);
     const popupX = Math.min(
       Math.max(edge, input.popupAnchorX ?? (width - popupWidth) / 2),
       width - edge - popupWidth,
