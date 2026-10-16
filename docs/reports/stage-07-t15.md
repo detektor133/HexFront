@@ -21,3 +21,11 @@
 `pnpm exec vitest run --config vitest.all.config.ts --project client apps/client/test/view-delta-memory.test.ts` — 3/3.
 
 Этап: 07/T15
+
+## Повторное ревью после `43db828f`
+
+OK. `pnpm verify --changed` — зелёный. `runMemoryProbe` запускает `vite preview` до открытия страницы, ждёт HTTP-готовность и закрывает browser и preview в `finally`. Приёмочный тест проверяет этот путь и порядок очистки при ошибке страницы.
+
+Проверит владелец (раунды замечаний этапа): вывод `pnpm probe:memory` — запуск Playwright запрещён правилами проекта.
+
+Этап: 07/T15
