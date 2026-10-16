@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17f: ревью принято — тесты подтверждают порядок слоёв и сцену с соседней фишкой на реальном Pixi-пути.
-- T17f отмечена `[x]`.
-- Следующая задача: 07/T17g.
-- Читать: блок 07/T17g в `docs/stages/stage-07-playable-build.md`, `apps/client/src/render`, `apps/client/test`.
+- 07/T17g: реализованы стрелки путей всех своих отрядов; выбранный путь получает alpha-акцент, чужие пути скрыты.
+- Приёмочный тест `apps/client/test/t17g-movement-paths.test.ts` проходит.
+- Следующая задача: 07/T17h.
+- Читать: блок 07/T17h в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match`, `apps/client/test`.

@@ -304,9 +304,19 @@ export function createUnitLayer(
       if (u.path.length === 0) continue;
       const pts = [shown.get(u.id) ?? unitAt(u, frac), ...u.path.map(base)];
       dashedPath(ground, pts, PATH_DASH * k, PATH_GAP * k, phase * k);
-      ground.stroke({ color: playerLine(u.owner), width: PATH_PX * k, cap: 'round' });
+      const selected = picked.units.includes(u.id);
+      ground.stroke({
+        color: playerLine(u.owner),
+        width: PATH_PX * k,
+        alpha: selected ? 1 : 0.7,
+        cap: 'round',
+      });
       const end = pts[pts.length - 1] as Point;
-      ground.circle(end.x, end.y, 4 * k).stroke({ color: playerLine(u.owner), width: PATH_PX * k });
+      ground.circle(end.x, end.y, 4 * k).stroke({
+        color: playerLine(u.owner),
+        width: PATH_PX * k,
+        alpha: selected ? 1 : 0.7,
+      });
     }
     // Линия огня своей артиллерии.
     for (const a of mine) {
