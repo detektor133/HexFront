@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17e: решение владельца разрешает явные прямоугольники и подмену `getBoundingClientRect` в jsdom; следующий `$review` проверяет геометрию по `computeMatchLayout` и заданным тестом прямоугольникам.
+- 07/T17e: ревью принято; приёмочный тест проверяет геометрию по `computeMatchLayout` и разрешённым явно заданным прямоугольникам.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача: 07/T17f.
 - Читать: блок 07/T17f в `docs/stages/stage-07-playable-build.md`, `apps/client/src/render`, `apps/client/test`.
