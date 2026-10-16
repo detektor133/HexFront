@@ -189,8 +189,8 @@ describe('круги $next → CI → $review', () => {
   });
 
   it('ждёт владельца, если ответ ревью не совпадает с отметкой', async () => {
-    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: '~' }] });
-    expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [~]');
+    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: ' ' }] });
+    expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [ ]');
   });
 
   it('при сбое codex делает паузу и больше сессий не запускает', async () => {

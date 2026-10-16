@@ -51,6 +51,33 @@ async function reviewSession(
         ]),
   ];
   const review = await session(context, 'review', lines.join('\n'));
+  const checked = await afterReview(context, task, base, review);
+  if (typeof checked === 'string') return checked;
+  return checked ?? fixMark(context, task, base, review.message);
+}
+
+type ReviewRun = Awaited<ReturnType<typeof session>>;
+
+/** Отметка файла этапа, которой требует вердикт: `OK` — `[x]`, `ВОЗВРАТ` — `[ ]`. */
+function verdictMark(message: string): Verdict['mark'] | undefined {
+  // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
+  const word = firstLine(message).replace(/[`*_]/g, '').trim();
+  if (/^OK(?![\p{L}\d])/u.test(word)) return 'x';
+  return word.startsWith('ВОЗВРАТ') ? ' ' : undefined;
+}
+
+/**
+ * Проверки после сессии ревью. Вердикт — если ответ и отметка совпали; шаг цикла — если пора
+ * ждать; `undefined` — вердикт есть, но отметка осталась `[~]` (ревью забыло её сменить).
+ */
+async function afterReview(
+  context: LoopContext,
+  task: string,
+  base: string,
+  review: ReviewRun,
+  verdictText = review.message,
+): Promise<Verdict | Step | undefined> {
+  const { git } = context;
   if (review.failure !== undefined)
     return backoff(context, `$review ${task}: ${review.failure}`, review.message);
   // Ревью уже запушило коммит, поэтому откат здесь только развёл бы локальную и удалённую ветку.
@@ -66,17 +93,47 @@ async function reviewSession(
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   const mark = taskMark((await readStage(context.config.root)).stageText, task);
-  // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
-  const verdict = firstLine(review.message).replace(/[`*_]/g, '').trim();
-  if (mark === 'x' && /^OK(?![\p{L}\d])/u.test(verdict))
-    return { mark: 'x', message: review.message };
-  if (mark === ' ' && verdict.startsWith('ВОЗВРАТ')) return { mark: ' ', message: review.message };
+  const wanted = verdictMark(verdictText);
+  if (wanted !== undefined && mark === wanted) return { mark: wanted, message: verdictText };
+  if (wanted !== undefined && mark === '~') return undefined;
   return park(
     context,
     `review:${task}`,
-    `ответ $review «${verdict}» не совпадает с отметкой [${mark ?? '?'}]`,
+    `ответ $review «${firstLine(verdictText).replace(/[`*_]/g, '').trim()}» не совпадает с отметкой [${mark ?? '?'}]`,
     review.message,
   );
+}
+
+/**
+ * 2026-10-16, 07/T17e и T17f: ревью писало `ВОЗВРАТ` и `OK`, а отметку в файле этапа не меняло, и
+ * цикл вставал. Одна короткая сессия правит только отметку; не помогла — ожидание владельца.
+ */
+async function fixMark(
+  context: LoopContext,
+  task: string,
+  base: string,
+  message: string,
+): Promise<Verdict | Step> {
+  const wanted = verdictMark(message) ?? ' ';
+  await context.say(`$review ${task}: вердикт есть, отметка [~] не сменена — прошу исправить`);
+  const fix = await session(
+    context,
+    'review',
+    [
+      `Исправление отметки после $review ${task}: задачу заново не проверяй.`,
+      `Твой вердикт: ${firstLine(message)}. В файле этапа отметка задачи ${task} осталась «- [~]».`,
+      `Замени в строке задачи ${task} «- [~]» на «- [${wanted}]», больше ничего не меняй, создай docs-коммит с трейлером «Этап: ${task}» и запушь ветку.`,
+    ].join('\n'),
+  );
+  const checked = await afterReview(context, task, base, fix, message);
+  if (checked === undefined)
+    return park(
+      context,
+      `review:${task}`,
+      `ответ $review «${firstLine(message)}» не совпадает с отметкой [~] даже после просьбы исправить`,
+      message,
+    );
+  return checked;
 }
 
 /**
