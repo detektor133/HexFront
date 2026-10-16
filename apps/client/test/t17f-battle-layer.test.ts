@@ -34,7 +34,12 @@ function installCanvasStub(): void {
   });
 }
 
-function createBattleScene(): ReturnType<typeof createUnitLayer> {
+function createBattleScene(): {
+  layer: ReturnType<typeof createUnitLayer>;
+  mapWidth: number;
+  attackerHex: number;
+  defenderHex: number;
+} {
   const loaded = loadMap(small);
   if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
@@ -65,7 +70,12 @@ function createBattleScene(): ReturnType<typeof createUnitLayer> {
   );
 
   layer.setView(view, { hex: null, units: [], target: null }, 0);
-  return layer;
+  return {
+    layer,
+    mapWidth: loaded.map.width,
+    attackerHex: own.hex,
+    defenderHex: adjacentEnemy.hex,
+  };
 }
 
 function getBattleAndChipLayers(layer: ReturnType<typeof createUnitLayer>): {
@@ -85,7 +95,7 @@ function getBattleAndChipLayers(layer: ReturnType<typeof createUnitLayer>): {
 
 describe('07/T17f: слой маркера боя', () => {
   it('Приёмка 1: слой маркера боя находится выше слоя фишек', () => {
-    const layer = createBattleScene();
+    const { layer } = createBattleScene();
     const { battles, chips } = getBattleAndChipLayers(layer);
 
     expect(layer.container.children.indexOf(battles)).toBeGreaterThan(
@@ -97,15 +107,24 @@ describe('07/T17f: слой маркера боя', () => {
 
   it('Приёмка 2: фишки рядом с маркером боя не закрывают маркер', () => {
     installCanvasStub();
-    const layer = createBattleScene();
+    const { layer, mapWidth, attackerHex, defenderHex } = createBattleScene();
     const { battles, chips } = getBattleAndChipLayers(layer);
     const marker = battles.children[0];
     if (!(marker instanceof Container)) throw new Error('маркер боя не найден');
 
-    expect(chips.children.length).toBeGreaterThan(0);
-    expect(layer.container.children.indexOf(battles)).toBeGreaterThan(
-      layer.container.children.indexOf(chips),
+    const attackerCenter = hexCenter(hexFromId(attackerHex, mapWidth), tokens.map.hexRadius);
+    const defenderCenter = hexCenter(hexFromId(defenderHex, mapWidth), tokens.map.hexRadius);
+    const adjacentChip = chips.children.find(
+      (child) =>
+        Math.abs(child.position.x - defenderCenter.x) < 0.001 &&
+        Math.abs(child.position.y - defenderCenter.y) < 0.001,
     );
+    if (!adjacentChip) throw new Error('соседняя фишка боя не найдена');
+
+    expect(marker.position.x).toBeCloseTo((attackerCenter.x + defenderCenter.x) / 2);
+    expect(marker.position.y).toBeCloseTo((attackerCenter.y + defenderCenter.y) / 2);
+    expect(marker.parent).toBe(battles);
+    expect(adjacentChip.parent).toBe(chips);
 
     layer.destroy();
   });
