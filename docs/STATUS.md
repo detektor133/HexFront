@@ -15,9 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T15 доработана после возврата ревью: приёмочный тест проходит реальные пути `drawForecastPlate` и `createPlanLayer`, а обновление фишки 10 000 раз сохраняет объекты `BitmapText`.
-- Продуктовые слои `forecast-plate.ts` и `plan-layer.ts` проверены на `BitmapText`; сериализация полного вида в `view-delta.ts` не используется.
-- `pnpm exec vitest run --config vitest.all.config.ts apps/client/test/view-delta-memory.test.ts` — 3/3; `pnpm verify --changed` — зелёный.
-- `pnpm probe:memory` не запускался: проект запрещает открывать браузер; пункт проверит владелец.
-- Следующая сессия: 07/T16.
+- 07/T15 возвращена ревью: `pnpm probe:memory` не запускает `vite preview` и требует заранее поднятый сервер, поэтому критерий 3 не выполнен на реальном пути.
+- Приёмочный тест `apps/client/test/view-delta-memory.test.ts` проходит 3/3; `pnpm verify --changed` ранее был зелёным.
+- Браузерная проверка `pnpm probe:memory` не запускалась: проект запрещает открывать браузер; после исправления её выполнит владелец.
+- Следующая сессия: 07/T15 после исправления запуска `vite preview`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/scripts/memory-probe.ts`.
