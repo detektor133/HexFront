@@ -163,7 +163,8 @@ export function Hud(props: {
   useLayoutEffect(() => {
     const taxButton = taxButtonRef.current;
     if (!taxButton || !props.onTaxAnchor) return;
-    props.onTaxAnchor(taxButton.getBoundingClientRect().left);
+    const anchorX = taxButton.getBoundingClientRect().left;
+    if (anchorX > 0) props.onTaxAnchor(anchorX);
   }, [props.onTaxAnchor]);
   return (
     <header ref={hudRef} className={styles.hud} style={props.style}>

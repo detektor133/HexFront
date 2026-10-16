@@ -15,9 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17e выполнена: окно налога открывается по клику и получает координату кнопки «Налог» через измерение реального DOM-элемента.
-- Раскладка ставит окно сразу под HUD, ограничивает ширину/высоту содержимым и удерживает его внутри viewport на 360×640, 1440×900 и 1920×1080.
-- Приёмочный DOM-тест `apps/client/test/t17e-tax.dom.test.tsx` не изменялся и проходит: 3 теста.
-- `pnpm verify --changed` зелёный.
+- Исправлен красный CI 07/T17e: нулевое измерение `getBoundingClientRect()` в jsdom больше не затирает fallback-центрирование окна налога.
+- В реальном DOM положительная координата кнопки по-прежнему привязывает окно прямо под кнопкой; тест `apps/client/test/t17e-tax.dom.test.tsx` не изменялся.
+- `pnpm verify --changed` зелёный, включая `apps/client/test/match-layout.dom.test.tsx` и `apps/client/test/t17e-tax.dom.test.tsx`.
 - Следующая задача: 07/T17f — слой маркера боя.
 - Читать: `docs/stages/stage-07-playable-build.md`, блок 07/T17f, `apps/client/src/render`, `apps/client/test`.
