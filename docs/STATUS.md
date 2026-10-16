@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T16 выполнена: тест выделяет блок job `deploy` до следующей job верхнего уровня и проверяет порядок `build` → `check-bundle-size` внутри него.
+- 07/T16 принята: тест выделяет блок job `deploy` до следующей job верхнего уровня и проверяет порядок `build` → `check-bundle-size` внутри него.
 - Приёмочный тест `apps/client/test/bundle-size.test.ts`: 4 теста прошли.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
 - Следующая задача: 07/T12.
