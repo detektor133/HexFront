@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- Владелец: Вид маркера боя и плашки прогноза утверждён Issue #23 ($decide), задача 07/T12a добавлена в файл этапа (коммит facc6ff). Моя часть T12 сделана.
-- Коммит решения владельца: `facc6ff`.
-- Следующая задача: 07/T12a.
-- Читать: `docs/stages/stage-07-playable-build.md`, `docs/BUGS.md`, `docs/art/units.md`.
+- 07/T12a ждёт ревью: добавлены кэшируемый Pixi-маркер боя, квантование организованности и презентация иконки/карточки прогноза.
+- Проверено: `pnpm verify --changed`.
+- Следующая задача: 07/T17.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/battle-marker.ts`, `docs/art/units.md`.
