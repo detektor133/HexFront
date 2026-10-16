@@ -85,9 +85,22 @@ describe('контроль размера начальной загрузки к
       new URL('../../../.github/workflows/pages.yml', import.meta.url),
       'utf8',
     );
-
-    expect(workflowText).toMatch(
-      /^\s{2}deploy:[\s\S]*?run: pnpm --filter @hexfront\/client build[\s\S]*?run: pnpm --filter @hexfront\/client check-bundle-size/m,
+    const jobsStart = workflowText.indexOf('\njobs:\n');
+    const deployStart = workflowText.indexOf('\n  deploy:\n', jobsStart);
+    const nextJobStart = workflowText.slice(deployStart + 1).search(/\n[ ]{2}[a-zA-Z0-9_-]+:\n/);
+    const deployJob = workflowText.slice(
+      deployStart,
+      nextJobStart === -1 ? workflowText.length : deployStart + 1 + nextJobStart,
     );
+
+    expect(jobsStart).toBeGreaterThanOrEqual(0);
+    expect(deployStart).toBeGreaterThan(jobsStart);
+    const buildPosition = deployJob.indexOf('run: pnpm --filter @hexfront/client build');
+    const checkPosition = deployJob.indexOf(
+      'run: pnpm --filter @hexfront/client check-bundle-size',
+    );
+
+    expect(buildPosition).toBeGreaterThanOrEqual(0);
+    expect(checkPosition).toBeGreaterThan(buildPosition);
   });
 });
