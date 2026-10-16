@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T12a возвращена ревью: новый маркер не подключён к игровому слою, старый крест и постоянная карточка прогноза остались; приёмочные тесты проверяют только вспомогательные функции и заглушку кэша.
-- Проверено: `pnpm exec vitest run apps/client/test/battle-marker.test.ts` — 3 теста зелёные, но они не подтверждают реальный Pixi-путь.
-- Следующая сессия: исправить пункты «Возврат ревью» в `docs/stages/stage-07-playable-build.md`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/dev/plan-layer.ts`.
+- 07/T12a: маркер боя подключён к `createUnitLayer`; восемь Pixi-состояний создаются один раз и переиспользуются, крест заменён двухсекторным маркером по организованности сторон.
+- 07/T12a: `PlanLayer` постоянно рисует иконку исхода у конца линии, карточку потерь — только при наведении; приёмочный тест проверяет реальные Pixi-объекты без внедрённой фабрики.
+- Проверено: `pnpm verify --changed` — зелёный (build, types, lint, prettier, tests).
+- Следующая задача: 07/T17, раунды замечаний владельца.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/plan-layer.ts`, `apps/client/test/battle-marker.test.ts`.

@@ -1,10 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { Container } from 'pixi.js';
+import { describe, expect, it } from 'vitest';
 
-import {
-  battleOrgState,
-  createBattleMarker,
-  getBattleForecastPresentation,
-} from '../src/match/battle-marker.ts';
+import { drawForecastPresentation } from '../src/dev/forecast-plate.ts';
+import { battleOrgState, createBattleMarker } from '../src/match/battle-marker.ts';
 
 describe('маркер боя и плашка прогноза (07/T12a)', () => {
   it('4: переводит долю организованности в одно из 8 состояний на границах 0, 12,5, 50 и 100 % и для равных сторон', () => {
@@ -17,21 +15,30 @@ describe('маркер боя и плашка прогноза (07/T12a)', () =>
   });
 
   it('4: при неизменном состоянии маркер не создаёт новых объектов Pixi', () => {
-    const createStateObject = vi.fn(() => ({ state: 4 }));
-    const marker = createBattleMarker({ createStateObject });
+    const marker = createBattleMarker();
 
     marker.update(4);
     const firstObject = marker.object;
     marker.update(4);
 
-    expect(createStateObject).toHaveBeenCalledTimes(1);
     expect(marker.object).toBe(firstObject);
+    marker.update(3);
+    marker.update(4);
+    expect(marker.object).toBe(firstObject);
+    marker.destroy();
   });
 
   it('4: на карте без наведения есть иконка исхода, но нет карточки плашки', () => {
-    expect(getBattleForecastPresentation({ hovered: false, outcome: 'success' })).toEqual({
-      showOutcomeIcon: true,
-      showForecastCard: false,
-    });
+    const container = new Container();
+    drawForecastPresentation(
+      container,
+      { icon: 'victory', color: '#000000', text: '−28 %' },
+      { x: 0, y: 0 },
+      1,
+      false,
+    );
+    expect(container.children).toHaveLength(1);
+    expect(container.children[0]).toBeDefined();
+    container.destroy({ children: true });
   });
 });

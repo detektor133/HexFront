@@ -24,7 +24,7 @@ import {
 } from '@hexfront/sim';
 
 import type { FrontTweenCacheTelemetry } from './cache-telemetry.ts';
-import { drawForecastPlate, forecastBadge } from './forecast-plate.ts';
+import { drawForecastPresentation, forecastBadge } from './forecast-plate.ts';
 import { createFrontTweens } from './front-tween.ts';
 import {
   arrowCount,
@@ -262,9 +262,12 @@ export function createPlanLayer(
     if (!p.offensive) return;
     const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
     const worst = worstForecast(v, p);
-    const mid = pts[Math.floor(pts.length / 2)];
-    // У линии — плашка прогноза без слов: иконка и цвет исхода + свои потери (art/units.md).
-    if (showForecast && worst && mid) drawForecastPlate(labels, forecastBadge(worst), mid, k);
+    const end = pts[pts.length - 1];
+    const badge = worst ? forecastBadge(worst) : null;
+    // Иконка постоянна у конца линии; число потерь появляется только по наведению.
+    if (badge && end) {
+      drawForecastPresentation(labels, badge, end, k, showForecast);
+    }
   }
 
   // Кольцо деления: подложка, дуга «сколько взять» от верха по часовой, ручка, число; путь в гекс.

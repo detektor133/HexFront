@@ -30,7 +30,7 @@ export function forecastBadge(f: Forecast): ForecastBadge {
   return { icon: f.outcome, color: COLOR[f.outcome], text: `−${formatPercent(f.attackerLoss)}` };
 }
 
-/** Размеры плашки, px экрана. */
+/** Размеры иконки, px экрана. */
 const ICON_PX = 14;
 const TEXT_PX = 12;
 const PAD_X = 6;
@@ -41,6 +41,42 @@ const BORDER = 1.2;
 /** Жёсткая тень `shadow.hard`: сдвиг вниз 2 px, без размытия. */
 const SHADOW_DY = 2;
 const SHADOW_ALPHA = 0.14;
+
+/** Рисует постоянную иконку исхода у конца линии наступления. */
+export function drawForecastIcon(
+  container: Container,
+  badge: ForecastBadge,
+  at: Point,
+  k: number,
+): void {
+  const g = new Graphics();
+  const x0 = -ICON_PX / 2;
+  const y0 = -ICON_PX / 2;
+  for (const line of OUTCOME_ICON[badge.icon]) {
+    for (let i = 0; i + 1 < line.length; i += 2) {
+      const px = x0 + (line[i] as number);
+      const py = y0 + (line[i + 1] as number);
+      if (i === 0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+  }
+  g.stroke({ color: badge.color, width: 2, cap: 'round', join: 'round' });
+  g.scale.set(k);
+  g.position.set(at.x, at.y);
+  container.addChild(g);
+}
+
+/** Рисует реальное представление прогноза: иконку всегда, карточку только при наведении. */
+export function drawForecastPresentation(
+  container: Container,
+  badge: ForecastBadge,
+  at: Point,
+  k: number,
+  hovered: boolean,
+): void {
+  drawForecastIcon(container, badge, at, k);
+  if (hovered) drawForecastPlate(container, badge, at, k);
+}
 
 /**
  * Рисует плашку в container (очищать снаружи): низ плашки — над точкой at на lift px экрана.

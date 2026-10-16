@@ -20,6 +20,12 @@ import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
+import {
+  battleOrgState,
+  createBattleMarker,
+  type BattleMarker,
+  type BattleMarkerObject,
+} from '../match/battle-marker.ts';
 import { hexCorner, hexEdge, type Point } from '../render/hex-geometry.ts';
 import { armyColor, playerLine, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -37,9 +43,7 @@ const SMOOTH_MS = 90;
 /** Шаг разрешения текста — чтобы не перерисовывать текст на каждом шаге колеса. */
 const RES_STEP = 0.5;
 const ARTY_RANGE_HEXES = 2;
-/** Маркер боя (units.md): ⌀16, обводка 2, крест 7. */
-const BATTLE_R = 8;
-const BATTLE_CROSS = 3.5;
+/** Маркер боя (units.md): ⌀16, обводка 2. */
 const FULL = 1000;
 const ENCIRCLED_MS = 3000;
 const ENCIRCLED_DASH = 6;
@@ -130,8 +134,9 @@ export function createUnitLayer(
 ): UnitLayer {
   const container = new Container();
   const ground = new Graphics();
+  const battles = new Container();
   const chipsLayer = new Container();
-  container.addChild(ground, chipsLayer);
+  container.addChild(ground, battles, chipsLayer);
   const chips = new Map<string, Chip>();
   let entries: Entry[] = [];
   let view: PlayerView | null = null;
@@ -148,6 +153,7 @@ export function createUnitLayer(
   const shown = new Map<number, Point>();
   /** Гексы с городами и их уровень — фишка стоит ниже знака города. */
   const cities = new Map<number, number>();
+  const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
 
   const base = (hex: number): Point => {
     const c = center(hex);
@@ -301,22 +307,45 @@ export function createUnitLayer(
     const drawn = new Set<string>();
     for (const u of v.units) {
       if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}:${u.target}`)) continue;
-      drawn.add(`${u.hex}:${u.target}`);
+      const key = `${u.hex}:${u.target}`;
+      drawn.add(key);
       const a = center(u.hex);
       const b = center(u.target);
       const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const r = BATTLE_R * CHIP_WORLD * pulse;
-      const c = BATTLE_CROSS * CHIP_WORLD * pulse;
-      ground
-        .circle(m.x, m.y, r)
-        .fill(tokens.ui.surface)
-        .stroke({ color: tokens.ui.ink, width: 2 * CHIP_WORLD });
-      ground
-        .moveTo(m.x - c, m.y - c)
-        .lineTo(m.x + c, m.y + c)
-        .moveTo(m.x + c, m.y - c)
-        .lineTo(m.x - c, m.y + c);
-      ground.stroke({ color: tokens.ui.ink, width: 2 * CHIP_WORLD, cap: 'round' });
+      const attackers = v.units.filter(
+        (candidate) =>
+          candidate.hex === u.hex && candidate.target === u.target && candidate.order === 'attack',
+      );
+      const defenders = v.units.filter(
+        (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
+      );
+      let attackerOrg = 0;
+      for (const candidate of attackers) attackerOrg += candidate.org;
+      let defenderOrg = 0;
+      for (const candidate of defenders) defenderOrg += candidate.org;
+      let marker = battleMarkers.get(key);
+      if (!marker) {
+        marker = createBattleMarker({
+          ownColor: playerLine(u.owner),
+          enemyColor: playerLine(defenders[0]?.owner ?? -1),
+        });
+        battleMarkers.set(key, marker);
+      }
+      const previous = marker.object;
+      marker.update(battleOrgState(attackerOrg, defenderOrg));
+      const current = marker.object;
+      if (current && current !== previous) {
+        if (previous?.container) battles.removeChild(previous.container);
+        if (current.container) battles.addChild(current.container);
+      }
+      current?.container?.position.set(m.x, m.y);
+      current?.container?.scale.set(CHIP_WORLD * pulse);
+    }
+    for (const [key, marker] of battleMarkers) {
+      if (drawn.has(key)) continue;
+      if (marker.object?.container) battles.removeChild(marker.object.container);
+      marker.destroy();
+      battleMarkers.delete(key);
     }
   }
 
@@ -390,6 +419,7 @@ export function createUnitLayer(
     },
     destroy() {
       for (const chip of chips.values()) chip.destroy();
+      for (const marker of battleMarkers.values()) marker.destroy();
       container.destroy({ children: true, context: true });
     },
   };

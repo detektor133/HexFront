@@ -40,8 +40,7 @@ export interface BattleMarkerObject {
   readonly container?: Container;
 }
 
-export interface BattleMarkerOptions<T extends BattleMarkerObject> {
-  readonly createStateObject?: (state: number | null) => T;
+export interface BattleMarkerOptions {
   readonly ownColor?: string;
   readonly enemyColor?: string;
 }
@@ -49,6 +48,7 @@ export interface BattleMarkerOptions<T extends BattleMarkerObject> {
 export interface BattleMarker<T extends BattleMarkerObject> {
   readonly object: T | null;
   update(state: number | null): void;
+  destroy(): void;
 }
 
 function drawState(state: number | null, ownColor: string, enemyColor: string): BattleMarkerObject {
@@ -87,32 +87,36 @@ function drawState(state: number | null, ownColor: string, enemyColor: string): 
 
 /** Создаёт маркер с кэшем: Pixi-объект меняется только при смене состояния. */
 export function createBattleMarker(
-  options?: BattleMarkerOptions<BattleMarkerObject>,
-): BattleMarker<BattleMarkerObject>;
-export function createBattleMarker<T extends BattleMarkerObject>(
-  options: BattleMarkerOptions<T>,
-): BattleMarker<T>;
-export function createBattleMarker<T extends BattleMarkerObject>(
-  options: BattleMarkerOptions<T> = {},
-): BattleMarker<T> {
-  const createStateObject = options.createStateObject;
-  let object: T | null = null;
+  options: BattleMarkerOptions = {},
+): BattleMarker<BattleMarkerObject> {
+  const states = Array.from({ length: SECTOR_COUNT }, (_, index) =>
+    drawState(
+      index,
+      options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
+      options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
+    ),
+  );
+  states.push(
+    drawState(
+      null,
+      options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
+      options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
+    ),
+  );
+  let object: BattleMarkerObject | null = null;
   let state: number | null | undefined;
 
   return {
-    get object(): T | null {
+    get object(): BattleMarkerObject | null {
       return object;
     },
     update(nextState: number | null): void {
       if (object !== null && state === nextState) return;
-      object = createStateObject
-        ? createStateObject(nextState)
-        : (drawState(
-            nextState,
-            options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
-            options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
-          ) as T);
+      object = states[nextState === null ? SECTOR_COUNT : nextState] as BattleMarkerObject;
       state = nextState;
+    },
+    destroy(): void {
+      for (const cached of states) cached.container?.destroy({ children: true });
     },
   };
 }
