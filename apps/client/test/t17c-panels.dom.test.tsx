@@ -13,6 +13,7 @@ const MAP_JSON: unknown = JSON.parse(
 );
 const LOADED_MAP = loadMap(MAP_JSON);
 if (!LOADED_MAP.ok) throw new Error(LOADED_MAP.errors.join('; '));
+const LOADED_MAP_VALUE = LOADED_MAP.map;
 
 const VIEWPORTS = [
   { width: 360, height: 640 },
@@ -83,7 +84,7 @@ function createRuntime(search: string): Record<string, unknown> {
 async function renderMatch(search: string): Promise<void> {
   window.history.replaceState({}, '', `/match${search}`);
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
-    useMapJson: () => ({ json: MAP_JSON, map: LOADED_MAP.map }),
+    useMapJson: () => ({ json: MAP_JSON, map: LOADED_MAP_VALUE }),
     useSandbox: () => createRuntime(search),
   }));
   const { MatchPage } = await import('../src/match/MatchPage.tsx');
