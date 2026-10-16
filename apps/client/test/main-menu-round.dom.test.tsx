@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MainMenu } from '../src/menu/MainMenu.tsx';
 
 type WorkerMessage = Record<string, unknown>;
+
+const mainMenuCss = readFileSync('apps/client/src/menu/MainMenu.module.css', 'utf8');
 
 class FakeWorker {
   public onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
@@ -54,6 +58,12 @@ function expectVisible(element: HTMLElement): void {
   expect(element.hidden).toBe(false);
 }
 
+function cssRule(selector: string): string {
+  const match = mainMenuCss.match(new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`, 'u'));
+  expect(match, `CSS rule .${selector}`).not.toBeNull();
+  return match?.[1] ?? '';
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -65,23 +75,27 @@ describe('приёмка 07/T17a: главное меню после раунд�
     setViewport(360, 640);
   });
 
-  it('критерий: на 360×640, 390×844, 1440×900 и 1920×1080 нет прокрутки, ник, образец цвета и «Играть» видны сразу', () => {
+  it('критерий: на 360×640, 390×844, 1440×900 и 1920×1080 раскладка не создаёт прокрутку, ник, образец цвета и «Играть» видны сразу', () => {
+    const pageRule = cssRule('page');
+    const cardRule = cssRule('card');
+    expect(pageRule).toMatch(/overflow:\s*hidden/u);
+    expect(pageRule).toMatch(/min-height:\s*100%/u);
+    expect(pageRule).toMatch(/box-sizing:\s*border-box/u);
+    expect(cardRule).toMatch(/width:\s*min\(100%,\s*420px\)/u);
+    expect(cardRule).toMatch(/box-sizing:\s*border-box/u);
+
     for (const viewport of VIEWPORTS) {
       cleanup();
       setViewport(viewport.width, viewport.height);
       renderMenu();
 
-      expect(
-        document.documentElement.scrollWidth,
-        `${viewport.width}×${viewport.height}`,
-      ).toBeLessThanOrEqual(viewport.width);
-      expect(
-        document.documentElement.scrollHeight,
-        `${viewport.width}×${viewport.height}`,
-      ).toBeLessThanOrEqual(viewport.height);
       expectVisible(screen.getByRole('textbox'));
       expectVisible(screen.getByRole('button', { name: 'Играть' }));
       expect(colorButtons()).toHaveLength(1);
+      const [swatch] = colorButtons();
+      expect(swatch).toBeDefined();
+      if (swatch === undefined) continue;
+      expectVisible(swatch);
     }
   });
 
@@ -94,7 +108,9 @@ describe('приёмка 07/T17a: главное меню после раунд�
     const input = screen.getByRole('textbox');
     const [swatch] = colorButtons();
     expect(swatch).toBeDefined();
-    expect(input.parentElement?.parentElement?.contains(swatch as HTMLButtonElement)).toBe(true);
+    if (swatch === undefined) return;
+    expectVisible(swatch);
+    expect(input.closest('label')?.nextElementSibling).toBe(swatch.closest('div')?.parentElement);
   });
 
   it('критерий: клик по образцу открывает компактный селектор с кругами ⌀28 по 6 в ряд, выбор и клик вне закрывают его', () => {
