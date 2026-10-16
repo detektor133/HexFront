@@ -14,8 +14,8 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
-import { runReview } from './review.ts';
 import { skippedPrompt, skippedReturnItems } from './return-guard.ts';
+import { runReview } from './review.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
   adoptOwnerSpec,
@@ -337,7 +337,9 @@ export async function processTask(
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
       await forgetSpec(context, current);
-      delete context.state.returnTotals[current];
+      context.state.returnTotals = Object.fromEntries(
+        Object.entries(context.state.returnTotals).filter(([key]) => key !== current),
+      );
       config.board?.count('done');
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
