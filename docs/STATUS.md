@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- Исправлен красный CI 07/T14: fallback i18n без `navigator` теперь `ru`, а статический `lang` в `index.html` равен `ru`; язык браузера по-прежнему выбирается при запуске.
-- `apps/client/test/app-shell.test.ts`: 5/5; тесты не изменялись.
-- `pnpm verify --changed`: зелёный.
-- Следующая задача: 07/T15.
+- 07/T14 возвращена на исправление: в её diff изменены существующие `apps/client/test/deployment.test.ts` и `apps/client/test/static-maps-build.test.ts` без обязательных строк `Заменён тест: ...`.
+- Приёмочные тесты оболочки проходят; `pnpm verify --changed` зелёный.
+- Следующая сессия: добавить обоснование заменённых тестов или убрать изменения этих тестов, затем повторить `$review 07/T14`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/src/local`, `packages/protocol`, `apps/client/src/render`.
