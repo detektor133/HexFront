@@ -34,9 +34,11 @@ function matchUrl(nickname: string, color: string, autoCommand: boolean): string
 /** Главное меню быстрого локального матча. */
 export function MainMenu(): React.JSX.Element {
   const backgroundHostRef = useRef<HTMLDivElement>(null);
+  const colorsRef = useRef<HTMLDivElement>(null);
   const backgroundRef = useRef<LocalMatch | null>(null);
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
   const [autoCommand, setAutoCommand] = useState<boolean>(
     () => readStorage(AUTO_COMMAND_KEY, 'false') === 'true',
   );
@@ -98,6 +100,16 @@ export function MainMenu(): React.JSX.Element {
     };
   }, [color]);
 
+  useEffect(() => {
+    const closeColorPicker = (event: MouseEvent): void => {
+      if (!colorsRef.current?.contains(event.target as Node)) {
+        setIsColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeColorPicker);
+    return () => document.removeEventListener('mousedown', closeColorPicker);
+  }, []);
+
   const handleColor = (next: string): void => {
     setColor(next);
     localStorage.setItem(COLOR_KEY, next);
@@ -127,15 +139,33 @@ export function MainMenu(): React.JSX.Element {
         </label>
         <div className={styles.field}>
           <span>{t('menu.color')}</span>
-          <div className={styles.colors}>
-            {tokens.players.palette.map((playerColor) => (
+          <div
+            ref={colorsRef}
+            className={styles.colors}
+            style={
+              isColorPickerOpen
+                ? { display: 'grid', gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }
+                : undefined
+            }
+          >
+            {(isColorPickerOpen
+              ? tokens.players.palette
+              : tokens.players.palette.filter((playerColor) => playerColor.id === color)
+            ).map((playerColor) => (
               <button
                 key={playerColor.id}
                 type="button"
                 className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
                 aria-label={`${t('menu.color')} ${playerColor.id}`}
-                style={{ backgroundColor: playerColor.line }}
-                onClick={() => handleColor(playerColor.id)}
+                style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                onClick={() => {
+                  if (!isColorPickerOpen) {
+                    setIsColorPickerOpen(true);
+                    return;
+                  }
+                  handleColor(playerColor.id);
+                  setIsColorPickerOpen(false);
+                }}
               />
             ))}
           </div>
@@ -148,17 +178,6 @@ export function MainMenu(): React.JSX.Element {
         >
           {t('menu.play')}
         </a>
-        <section className={styles.section} aria-labelledby="how-to-play-title">
-          <h2 id="how-to-play-title">{t('menu.howToPlay')}</h2>
-          <div className={styles.tutorials}>
-            {(['auto', 'tax', 'front', 'offensive'] as const).map((key) => (
-              <article key={key} className={styles.tutorial}>
-                <h3>{t(`onboarding.${key}.title`)}</h3>
-                <p>{t(`onboarding.${key}.text`)}</p>
-              </article>
-            ))}
-          </div>
-        </section>
         <section className={styles.section} aria-labelledby="settings-title">
           <h2 id="settings-title">{t('menu.settings')}</h2>
           <button

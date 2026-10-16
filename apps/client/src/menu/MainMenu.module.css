@@ -1,6 +1,6 @@
 .page {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
   display: grid;
   min-height: 100%;
   place-items: center;
@@ -77,8 +77,8 @@
 }
 
 .color {
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;

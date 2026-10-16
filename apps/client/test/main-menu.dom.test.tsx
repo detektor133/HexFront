@@ -139,8 +139,9 @@ describe('главное меню', () => {
     expect(startMessages(initialWorker)[0]).toEqual(
       expect.objectContaining({ playerColors: ['teal', 'brick'] }),
     );
-    const selectedColor = screen.getByRole('button', { name: 'Цвет brick' });
+    const selectedColor = screen.getByRole('button', { name: /^Цвет /u });
     fireEvent.click(selectedColor);
+    fireEvent.click(screen.getByRole('button', { name: 'Цвет brick' }));
 
     expect(workers).toHaveLength(2);
     const changedWorker = workers[1];
@@ -154,8 +155,9 @@ describe('главное меню', () => {
 
   it('критерий: настройки меню применяются игровому Worker после перехода по ссылке', async () => {
     renderMenu();
-    const selectedColor = screen.getByRole('button', { name: 'Цвет brick' });
+    const selectedColor = screen.getByRole('button', { name: /^Цвет /u });
     fireEvent.click(selectedColor);
+    fireEvent.click(screen.getByRole('button', { name: 'Цвет brick' }));
     const autoCommand = screen.queryByRole('button', { name: /Автокомандование/iu });
 
     expect(autoCommand).not.toBeNull();
