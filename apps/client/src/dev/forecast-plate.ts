@@ -2,7 +2,7 @@
 // «−28 %». Видна при наведении на вражеский гекс (ПК), пока палец держит его (телефон) и у линии
 // наступления. Иконки исхода — свои по сетке 14×14, линия 2, round; форма — на утверждение
 // владельцу (04/T16).
-import { Container, Graphics, Text } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import type { Forecast, ForecastOutcome } from '@hexfront/sim';
 
@@ -53,7 +53,7 @@ export function drawForecastPlate(
   k: number,
   lift = 16,
 ): void {
-  const text = new Text({
+  const text = new BitmapText({
     text: badge.text,
     style: {
       fontFamily: tokens.font.ui.family,

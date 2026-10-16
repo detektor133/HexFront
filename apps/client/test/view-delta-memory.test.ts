@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { BitmapText, Container } from 'pixi.js';
 import { describe, expect, it } from 'vitest';
 
+import { drawForecastPlate } from '../src/dev/forecast-plate.ts';
+import { createPlanLayer } from '../src/dev/plan-layer.ts';
 import { createChip, type ChipState } from '../src/dev/unit-chips.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { ViewDeltaApplier, ConfirmedViewDeltaStream } from '../src/local/view-delta.ts';
@@ -22,6 +24,7 @@ function installCanvasStub(): void {
   const context = new TestCanvasRenderingContext2D();
   Object.assign(globalThis, {
     CanvasRenderingContext2D: TestCanvasRenderingContext2D,
+    window: { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) },
     document: {
       createElement: () => ({ getContext: () => context }),
     },
@@ -83,9 +86,50 @@ describe('дельты вида и текст карты (07/T15)', () => {
   });
 
   it('критерий 2: числа солдат и другие меняющиеся числа карты создаются как BitmapText, а не Text', () => {
-    const unitChips = readFileSync(join(SOURCE_ROOT, 'dev/unit-chips.ts'), 'utf8');
-    expect(unitChips).toContain('BitmapText');
-    expect(unitChips).not.toMatch(/new\s+Text\s*\(/u);
+    installCanvasStub();
+    const dynamicNumberLayers = ['dev/unit-chips.ts', 'dev/forecast-plate.ts', 'dev/plan-layer.ts'];
+    for (const file of dynamicNumberLayers) {
+      const source = readFileSync(join(SOURCE_ROOT, file), 'utf8');
+      expect(source, file).toContain('BitmapText');
+      expect(source, file).not.toMatch(/new\s+Text\s*\(/u);
+    }
+
+    const forecast = new Container();
+    drawForecastPlate(
+      forecast,
+      { icon: 'victory', color: '#000000', text: '−28 %' },
+      { x: 0, y: 0 },
+      1,
+    );
+    expect(bitmapTexts(forecast)).toHaveLength(1);
+    forecast.destroy({ children: true });
+
+    const plan = createPlanLayer(
+      {
+        version: 1,
+        id: 'test',
+        width: 1,
+        height: 1,
+        terrain: new Uint8Array(1),
+        features: new Uint8Array(1),
+        rivers: new Uint8Array(1),
+        roads: new Uint8Array(1),
+        cities: [],
+        spawns: [],
+      },
+      1,
+      () => ({ x: 0, y: 0 }),
+    );
+    plan.setView(
+      { tick: 0, winner: -1, playerId: 0, hexes: { owner: new Int16Array(1) } } as never,
+      null,
+      null,
+      { center: { x: 0, y: 0 }, ring: 1, share: 0.5, amount: 100, target: null },
+      1,
+      2,
+    );
+    expect(bitmapTexts(plan.container)).toHaveLength(1);
+    plan.destroy();
 
     const deltaSource = readFileSync(join(SOURCE_ROOT, 'local/view-delta.ts'), 'utf8');
     expect(deltaSource).not.toMatch(/JSON\.stringify\(\s*view\b/u);

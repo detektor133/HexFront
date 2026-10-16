@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T15 возвращена ревью: динамические числа в `forecast-plate.ts` и `plan-layer.ts` всё ещё создаются через `Text`; приёмочный сторож проверяет только `unit-chips.ts`.
-- `pnpm verify --changed` зелёный; исправить критерий 2 и расширить сторож `apps/client/test/view-delta-memory.test.ts`.
-- `pnpm probe:memory` не запускался: проект запрещает открывать браузер; требуется отдельный запуск владельцем.
+- 07/T15 исправлена: `forecast-plate.ts` и `plan-layer.ts` используют `BitmapText`; сторож проверяет все три числовых слоя и вызывает реальные пути отрисовки.
+- `pnpm verify --changed` зелёный.
+- `pnpm probe:memory` не запускался: проект запрещает открывать браузер; пункт проверит владелец.
 - Следующая сессия: 07/T16.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/test/view-delta-memory.test.ts`, `apps/client/scripts/memory-probe.ts`.

@@ -2,7 +2,7 @@
 // цвета армии по граням на белой подложке, у выбранной армии — ручки на концах; линия
 // наступления — пунктир `arrow.color` гладкой кривой по граням и широкие полупрозрачные стрелки
 // к ней; линия обороны — через центры гексов с зубцами к врагу; прогноз у линии; черновик.
-import { Container, Graphics, Text } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import {
   edgeHex,
@@ -241,7 +241,7 @@ export function createPlanLayer(
   }
 
   function label(text: string, color: string, at: Point): void {
-    const tx = new Text({
+    const tx = new BitmapText({
       text,
       style: {
         fontFamily: tokens.font.ui.family,
