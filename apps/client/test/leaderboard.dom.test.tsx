@@ -74,7 +74,7 @@ describe('лидерборд', () => {
     expect(screen.getByRole('button').textContent).toContain('#6 / 6');
   });
 
-  it('критерий: после клика есть ровно 5 строк топа плюс своя строка при месте > 5', () => {
+  it('критерий: после клика есть не больше 5 строк игроков', () => {
     function Harness(): React.JSX.Element {
       const [open, setOpen] = useState(false);
       return <Leaderboard view={view()} open={open} onOpenChange={setOpen} />;
@@ -85,16 +85,15 @@ describe('лидерборд', () => {
     fireEvent.click(screen.getByRole('button'));
 
     const rows = screen.getAllByRole('row');
-    expect(rows).toHaveLength(7);
-    expect(screen.getAllByRole('rowheader')).toHaveLength(6);
+    expect(rows).toHaveLength(6);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(5);
 
     const expected = [
-      { player: 'Игрок 1', place: '1', hexes: '0', cities: '0', score: '60' },
-      { player: 'Игрок 2', place: '2', hexes: '0', cities: '0', score: '50' },
-      { player: 'Игрок 3', place: '3', hexes: '0', cities: '0', score: '40' },
-      { player: 'Игрок 4', place: '4', hexes: '0', cities: '0', score: '30' },
-      { player: 'Игрок 5', place: '5', hexes: '0', cities: '0', score: '20' },
-      { player: 'Игрок 6', place: '6', hexes: '0', cities: '0', score: '10' },
+      { player: 'Игрок 1', place: '1', score: '60' },
+      { player: 'Игрок 2', place: '2', score: '50' },
+      { player: 'Игрок 3', place: '3', score: '40' },
+      { player: 'Игрок 4', place: '4', score: '30' },
+      { player: 'Игрок 5', place: '5', score: '20' },
     ];
 
     expected.forEach((entry, index) => {
@@ -102,8 +101,6 @@ describe('лидерборд', () => {
       expect(row.getByRole('rowheader', { name: entry.place })).toBeTruthy();
       expect(row.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
         entry.player,
-        entry.hexes,
-        entry.cities,
         entry.score,
       ]);
     });
