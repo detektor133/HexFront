@@ -1,11 +1,17 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { withUnlocked } from './spec.ts';
-import type { LoopState } from './state.ts';
+import type { LoopContext } from './context.ts';
+import type { Git } from './git.ts';
+import { adoptOwnerSpec, SPEC_UPDATE_LINE, withSpec, withUnlocked } from './spec.ts';
+import { loadState, type LoopState } from './state.ts';
 import { fixtureStage, runWorld, type Session } from './test-world.ts';
 
 const TEST = 'packages/sim/test/fitness-own.test.ts';
-const LOCKED_LINE = `Приёмочные тесты 06/T1j5-Б1 уже в рабочем дереве, менять их нельзя: ${TEST}`;
+const LOCKED_LINE = withSpec('', '06/T1j5-Б1', [TEST]).slice(1);
 const SPEC: Session = {
   answer: `Тесты по 2 критериям.\nСПЕК: ${TEST}`,
   writes: { [TEST]: "it('штраф по метрикам самой особи', () => {});\n" },
@@ -334,5 +340,68 @@ describe('приёмочные тесты до кода ($spec)', () => {
   it('без роли spec в roles.json цикл работает по-старому', async () => {
     const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
     expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+  });
+});
+
+describe('закрытые тесты: неверный тест и правка владельца', () => {
+  it('промпт закрытых тестов велит не подгонять код, а ответить «СПЕК:» без коммита', () => {
+    const prompt = withSpec('$task 06/T1j5-Б1 CI красный: failure https://ci/1', '06/T1j5-Б1', [
+      TEST,
+    ]);
+    expect(prompt).toContain('менять их нельзя');
+    expect(prompt).toContain('код под него не подгоняй');
+    expect(prompt).toContain('ничего не коммить и ответь строкой «СПЕК:');
+  });
+
+  const OLD = "it('старый тест', () => {});\n";
+  const NEW = "it('исправленный владельцем тест', () => {});\n";
+  const adopt = async (log: string, headText: string) => {
+    const root = await mkdtemp(join(tmpdir(), 'hexfront-adopt-'));
+    const calls: string[] = [];
+    const lines: string[] = [];
+    const state = {
+      ...(await loadState(root)),
+      spec: { '07/T14': { [TEST]: OLD } },
+    };
+    const git: Git = {
+      attempt: (args) => {
+        calls.push(args[0] ?? '');
+        if (args[0] === 'show') return Promise.resolve({ code: 0, stdout: headText, stderr: '' });
+        return Promise.resolve({ code: 0, stdout: log, stderr: '' });
+      },
+      run: () => Promise.resolve(''),
+    };
+    const context = {
+      config: { root },
+      git,
+      state,
+      say: (line: string) => {
+        lines.push(line);
+        return Promise.resolve();
+      },
+    } as unknown as LoopContext;
+    await adoptOwnerSpec(context, '07/T14');
+    await rm(root, { recursive: true, force: true });
+    return { saved: state.spec['07/T14']?.[TEST], calls, lines };
+  };
+
+  it('тест, исправленный коммитом владельца со строкой «Приёмочный тест обновлён», берётся из HEAD', async () => {
+    const run = await adopt(`fix(client): тест\n\n${SPEC_UPDATE_LINE} ${TEST}\n`, NEW);
+    expect(run.saved).toBe(NEW);
+    expect(run.lines.join('\n')).toContain('обновлён владельцем');
+  });
+
+  it('без строки владельца изменённый тест не берётся — это правка исполнителя', async () => {
+    const run = await adopt('fix(client): подогнан тест\n\nЭтап: 07/T14\n', NEW);
+    expect(run.saved).toBe(OLD);
+    expect(run.lines).toHaveLength(0);
+  });
+
+  it('строка владельца про другой файл тест не открывает; совпадающий HEAD журнал не читает', async () => {
+    expect((await adopt(`${SPEC_UPDATE_LINE} apps/client/test/other.test.ts`, NEW)).saved).toBe(
+      OLD,
+    );
+    const same = await adopt(`${SPEC_UPDATE_LINE} ${TEST}`, OLD);
+    expect(same.calls).toEqual(['show']);
   });
 });

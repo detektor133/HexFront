@@ -29,11 +29,15 @@ export const specFiles = (context: LoopContext, task: string): readonly string[]
 export const specPrompt = (task: string, remarks: string): string =>
   remarks === '' ? `$spec ${task}` : `$spec ${task}\nЗамечания к приёмочным тестам:\n${remarks}`;
 
-/** Промпт работы с приёмочными тестами: исполнитель знает, что они уже в дереве и закрыты. */
+/**
+ * Промпт работы с приёмочными тестами: исполнитель знает, что они уже в дереве и закрыты, и как
+ * сообщить о неверном тесте. 2026-10-15, 07/T14: тест зависел от локали CI, исполнитель дважды
+ * подгонял под него код вместо замечания `СПЕК:`, по которому тест чинит `$spec`.
+ */
 export const withSpec = (prompt: string, task: string, files: readonly string[]): string =>
   files.length === 0
     ? prompt
-    : `${prompt}\nПриёмочные тесты ${task} уже в рабочем дереве, менять их нельзя: ${files.join(', ')}`;
+    : `${prompt}\nПриёмочные тесты ${task} уже в рабочем дереве, менять их нельзя: ${files.join(', ')}. Если закрытый тест сам неверен (зависит от окружения, локали или порядка файлов, проверяет не тот путь, противоречит тексту задачи) — код под него не подгоняй: ничего не коммить и ответь строкой «СПЕК: <файл>:<строки> — что не так», тест исправит $spec.`;
 
 /** Тесты, открытые возвратом ревью: исполнитель исправляет их сам. */
 export const unlockedFiles = (context: LoopContext, task: string): readonly string[] | undefined =>
@@ -172,8 +176,43 @@ export async function writeSpec(
   }
 }
 
+/** Строка коммита владельца: приёмочный тест исправлен им, цикл берёт версию из HEAD. */
+export const SPEC_UPDATE_LINE = 'Приёмочный тест обновлён:';
+/** Сколько последних коммитов цикл просматривает в поисках строки владельца. */
+const SPEC_UPDATE_WINDOW = 30;
+
+/**
+ * Приёмочные тесты, исправленные коммитом владельца (строка «Приёмочный тест обновлён: <путь>»),
+ * цикл берёт из HEAD вместо записанных. 2026-10-15, 07/T14: тест исправили вне цикла, а цикл
+ * вернул бы старую копию и встал на «исполнитель изменил приёмочный тест». Вызывается только до
+ * сессии исполнителя: его правка теста в своей сессии по-прежнему нарушение (`specViolation`).
+ */
+export async function adoptOwnerSpec(context: LoopContext, task: string): Promise<void> {
+  const saved = context.state.spec[task];
+  if (saved === undefined) return;
+  let log: string | undefined;
+  const updated: Record<string, string> = { ...saved };
+  let changed = false;
+  for (const [path, text] of Object.entries(saved)) {
+    const shown = await context.git.attempt(['show', `HEAD:${path}`]);
+    if (shown.code !== 0 || normalize(shown.stdout) === normalize(text)) continue;
+    log ??= (await context.git.attempt(['log', `-${SPEC_UPDATE_WINDOW}`, '--format=%B'])).stdout;
+    const marked = log
+      .split(/\r?\n/u)
+      .some((line) => line.trim() === `${SPEC_UPDATE_LINE} ${path}`);
+    if (!marked) continue;
+    updated[path] = shown.stdout;
+    changed = true;
+    await context.say(`приёмочный тест ${path} обновлён владельцем — цикл берёт версию из HEAD`);
+  }
+  if (!changed) return;
+  context.state.spec = { ...context.state.spec, [task]: updated };
+  await save(context);
+}
+
 /** Перед работой: приёмочные тесты в дереве в записанном виде (после остановки их убирали). */
 export async function placeSpec(context: LoopContext, task: string): Promise<void> {
+  await adoptOwnerSpec(context, task);
   for (const [path, text] of Object.entries(context.state.spec[task] ?? {})) {
     const file = join(context.config.root, path);
     const current = await readFile(file, 'utf8').catch(() => undefined);

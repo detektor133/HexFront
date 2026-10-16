@@ -17,6 +17,7 @@ import { dirtyFiles, head, syncWithOrigin } from './git.ts';
 import { runReview } from './review.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
+  adoptOwnerSpec,
   forgetSpec,
   mentionsSpec,
   pendingSpecReturn,
@@ -160,6 +161,9 @@ async function runWork(
   accepted: Set<string>,
 ): Promise<Work> {
   const { git, state } = context;
+  // До сессии: тест, исправленный владельцем, — не нарушение исполнителя (`$task` из Issue
+  // идёт без `placeSpec`).
+  await adoptOwnerSpec(context, task);
   const locked = specFiles(context, task);
   const unlocked = unlockedFiles(context, task);
   const base = await head(git);
