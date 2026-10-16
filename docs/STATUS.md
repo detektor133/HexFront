@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T14 возвращена на исправление: в её diff изменены существующие `apps/client/test/deployment.test.ts` и `apps/client/test/static-maps-build.test.ts` без обязательных строк `Заменён тест: ...`.
-- Приёмочные тесты оболочки проходят; `pnpm verify --changed` зелёный.
-- Следующая сессия: добавить обоснование заменённых тестов или убрать изменения этих тестов, затем повторить `$review 07/T14`.
+- 07/T14 выполнена; глобальная сборка клиента перед тестами устраняет гонку очистки общего `dist`.
+- Приёмочные тесты оболочки и DOM-тест языка проходят; `pnpm verify --changed` зелёный.
+- Следующая сессия: `$review 07/T14`, затем 07/T15.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/src/local`, `packages/protocol`, `apps/client/src/render`.
