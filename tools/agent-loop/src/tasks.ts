@@ -15,6 +15,7 @@ import {
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
 import { runReview } from './review.ts';
+import { skippedPrompt, skippedReturnItems } from './return-guard.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
   adoptOwnerSpec,
@@ -54,6 +55,12 @@ const MAX_FOLLOW_UPS = 2;
 
 /** Сколько раз за задачу `$spec` чинит тесты по разным замечаниям исполнителя. */
 const MAX_SPEC_REPAIRS = 3;
+
+/** Сколько всего возвратов было за все запуски цикла, если больше кругов одного запуска. */
+const totalNote = (context: LoopContext, task: string): string => {
+  const total = context.state.returnTotals[task] ?? 0;
+  return total > context.config.maxRounds ? ` (всего возвратов за задачу: ${total})` : '';
+};
 
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
 /** Работа над задачей после красного CI: сессия начинает с причины, а не с поиска задачи в очереди. */
@@ -275,6 +282,7 @@ export async function processTask(
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
+  let skipRetried = false;
   const writesSpec = options.spec ?? options.workPrompt === '$next';
   for (let round = 1; round <= config.maxRounds;) {
     if (needsWork && writesSpec) {
@@ -286,9 +294,29 @@ export async function processTask(
     const work = needsWork
       ? await runWork(context, current, prompt, accepted)
       : { kind: 'review' as const, task: current };
-    const checked = work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
     if (work.kind === 'review') current = work.task;
     prompt = options.workPrompt;
+    // Файл пункта возврата не тронут — ревью вернёт то же самое: сначала один явный повтор работы.
+    const skipped =
+      needsWork && work.kind === 'review' ? await skippedReturnItems(context, current) : [];
+    if (skipped.length > 0) {
+      if (skipRetried)
+        return {
+          step: await park(
+            context,
+            `skip:${current}`,
+            `исполнитель не тронул файлы пунктов возврата ${current} даже после напоминания: ${skipped.join(' | ')} — Issue «$task ${current} <что делать>» или «$decide»`,
+          ),
+          done: false,
+        };
+      skipRetried = true;
+      await say(
+        `${current}: файлы пунктов возврата не тронуты — повторяю работу со списком пунктов`,
+      );
+      prompt = skippedPrompt(current, skipped);
+      continue;
+    }
+    const checked = work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
     if (checked?.kind === 'step') return { step: checked.step, done: false };
     if (checked?.kind === 'again') {
       followUps += 1;
@@ -309,6 +337,7 @@ export async function processTask(
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
       await forgetSpec(context, current);
+      delete context.state.returnTotals[current];
       config.board?.count('done');
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
@@ -323,6 +352,11 @@ export async function processTask(
       await unlockSpec(context, current);
     else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
+    context.state.returnTotals = {
+      ...context.state.returnTotals,
+      [current]: (context.state.returnTotals[current] ?? 0) + 1,
+    };
+    await save(context);
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
     needsWork = true;
     round += 1;
@@ -331,7 +365,7 @@ export async function processTask(
     step: await park(
       context,
       `rounds:${current}`,
-      `${config.maxRounds} ВОЗВРАТ подряд по ${current} — нужно решение владельца`,
+      `${config.maxRounds} ВОЗВРАТ подряд по ${current}${totalNote(context, current)} — нужно решение владельца`,
     ),
     done: false,
   };

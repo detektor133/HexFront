@@ -92,6 +92,8 @@ export interface World {
    * `git show <коммит>:<файл>`; без значения `show` коммита не читается, как раньше.
    */
   readonly reviewDiff?: string;
+  /** Ответ `git diff -M --name-status` от коммита прошлого возврата (сторож пропуска пунктов). */
+  readonly reviewFiles?: string;
 }
 
 export interface Outcome {
@@ -280,6 +282,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       const text = snapshots.get(Number(snapshot[1]));
       return text === undefined ? { code: 128, stdout: '', stderr: 'нет коммита' } : ok(text);
     }
+    if (sub === 'diff' && args.includes('--name-status')) return ok(world.reviewFiles ?? '');
     if (sub === 'diff' && first === '-M') return ok(world.reviewDiff ?? '');
     if (sub === 'show') {
       const text = committed.get(first?.replace(/^HEAD:/, '') ?? '');

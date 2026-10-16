@@ -63,6 +63,11 @@ export interface LoopState {
    * (review-scope.ts). Живёт до `[x]` задачи.
    */
   reviewReturns: Record<string, string>;
+  /**
+   * Сколько раз ревью вернуло задачу за все запуски цикла: лимит кругов считается на запуск, а это
+   * число показывает владельцу, сколько возвратов уже было. Живёт до `[x]` задачи.
+   */
+  returnTotals: Record<string, number>;
 }
 
 export const statePath = (root: string): string =>
@@ -80,6 +85,7 @@ export async function loadState(root: string): Promise<LoopState> {
     specUnlocked: {},
     pullRequests: {},
     reviewReturns: {},
+    returnTotals: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';

@@ -85,7 +85,7 @@ export function remarkRefs(text: string): RemarkRef[] {
 }
 
 /** Путь из замечания и путь из diff — один файл: совпадают или один — хвост другого. */
-const samePath = (a: string, b: string): boolean =>
+export const samePath = (a: string, b: string): boolean =>
   a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
 
 const overlaps = (a: readonly LineRange[], b: readonly LineRange[]): boolean =>
