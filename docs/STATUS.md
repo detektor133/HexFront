@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T12a ждёт ревью: добавлены кэшируемый Pixi-маркер боя, квантование организованности и презентация иконки/карточки прогноза.
-- Проверено: `pnpm verify --changed`.
-- Следующая задача: 07/T17.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/battle-marker.ts`, `docs/art/units.md`.
+- 07/T12a возвращена ревью: новый маркер не подключён к игровому слою, старый крест и постоянная карточка прогноза остались; приёмочные тесты проверяют только вспомогательные функции и заглушку кэша.
+- Проверено: `pnpm exec vitest run apps/client/test/battle-marker.test.ts` — 3 теста зелёные, но они не подтверждают реальный Pixi-путь.
+- Следующая сессия: исправить пункты «Возврат ревью» в `docs/stages/stage-07-playable-build.md`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/battle-marker.ts`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/dev/plan-layer.ts`.
