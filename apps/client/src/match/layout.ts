@@ -39,6 +39,8 @@ export interface MatchLayoutInput {
   readonly cardOpen: boolean;
   readonly popupOpen: boolean;
   readonly popupAnchorX?: number;
+  readonly popupAnchorY?: number;
+  readonly popupSize?: { readonly width: number; readonly height: number };
   readonly paused: boolean;
 }
 
@@ -164,8 +166,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     );
   }
   if (input.popupOpen || input.paused) {
-    const popupHeight = Math.max(44, Math.min(120, height - input.hudHeight - gap - edge));
-    const popupWidth = Math.min(260, width - edge * 2);
+    const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
+    const popupHeight =
+      input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);
     const popupX = Math.min(
       Math.max(edge, input.popupAnchorX ?? (width - popupWidth) / 2),
       width - edge - popupWidth,
@@ -175,7 +178,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
         input.paused ? 'pause-menu' : 'popup-menu',
         input.paused ? 'pause-menu' : 'popup-menu',
         input.paused ? Math.max(edge, (width - 280) / 2) : popupX,
-        input.paused ? Math.max(input.hudHeight + gap, (height - 240) / 2) : input.hudHeight,
+        input.paused
+          ? Math.max(input.hudHeight + gap, (height - 240) / 2)
+          : (input.popupAnchorY ?? input.hudHeight),
         popupWidth,
         input.paused
           ? Math.max(44, Math.min(240, height - input.hudHeight - gap - edge))

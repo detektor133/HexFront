@@ -136,13 +136,15 @@ export function Hud(props: {
   onPause?: () => void;
   onHeight?: (height: number) => void;
   onPopupChange?: (open: boolean) => void;
-  onTaxAnchor?: (x: number) => void;
+  onTaxAnchor?: (anchor: { x: number; y: number }) => void;
+  onTaxSize?: (size: { width: number; height: number }) => void;
   style?: React.CSSProperties | undefined;
   popupStyle?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const hudRef = useRef<HTMLElement>(null);
   const taxButtonRef = useRef<HTMLButtonElement>(null);
+  const taxPopupRef = useRef<HTMLDivElement>(null);
   const { view } = props;
   const me = view.players[view.playerId];
   if (!me) return null;
@@ -163,9 +165,22 @@ export function Hud(props: {
   useLayoutEffect(() => {
     const taxButton = taxButtonRef.current;
     if (!taxButton || !props.onTaxAnchor) return;
-    const anchorX = taxButton.getBoundingClientRect().left;
-    if (anchorX > 0) props.onTaxAnchor(anchorX);
+    const rect = taxButton.getBoundingClientRect();
+    if (rect.width > 0) props.onTaxAnchor?.({ x: rect.left, y: rect.bottom });
   }, [props.onTaxAnchor]);
+  useLayoutEffect(() => {
+    const popup = taxPopupRef.current;
+    const onTaxSize = props.onTaxSize;
+    if (!popup || !onTaxSize) return;
+    const report = (): void => {
+      const rect = popup.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) onTaxSize({ width: rect.width, height: rect.height });
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(popup);
+    return () => observer.disconnect();
+  }, [props.onTaxSize, taxOpen]);
   return (
     <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
@@ -198,6 +213,7 @@ export function Hud(props: {
         </button>
         {taxOpen && (
           <div
+            ref={taxPopupRef}
             className={styles.popover}
             style={props.popupStyle}
             role="dialog"

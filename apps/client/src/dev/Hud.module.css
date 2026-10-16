@@ -72,6 +72,9 @@
 
 .popover {
   position: fixed;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 16px));
+  height: auto;
   box-sizing: border-box;
   padding: var(--space-md);
   background: var(--ui-surface);

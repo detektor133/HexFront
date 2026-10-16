@@ -246,8 +246,13 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
     );
     expect(node.style.left, element.id).toBe(`${element.x}px`);
     expect(node.style.top, element.id).toBe(`${element.y}px`);
-    expect(node.style.width, element.id).toBe(`${element.width}px`);
-    expect(node.style.height, element.id).toBe(`${element.height}px`);
+    if (element.id === 'popup-menu') {
+      expect(node.style.width, element.id).toBe('');
+      expect(node.style.height, element.id).toBe('');
+    } else {
+      expect(node.style.width, element.id).toBe(`${element.width}px`);
+      expect(node.style.height, element.id).toBe(`${element.height}px`);
+    }
   }
   expect(validateMatchLayout(expected)).toEqual([]);
 }
@@ -317,13 +322,18 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     if (!node) throw new Error(`Прямоугольник ${element.id} не отрендерен`);
     expect(node.isConnected, element.id).toBe(true);
     expect(
-      { x: node.style.left, y: node.style.top, width: node.style.width, height: node.style.height },
+      {
+        x: node.style.left,
+        y: node.style.top,
+        width: element.id === 'popup-menu' ? '' : node.style.width,
+        height: element.id === 'popup-menu' ? '' : node.style.height,
+      },
       element.id,
     ).toEqual({
       x: `${element.x}px`,
       y: `${element.y}px`,
-      width: `${element.width}px`,
-      height: `${element.height}px`,
+      width: element.id === 'popup-menu' ? '' : `${element.width}px`,
+      height: element.id === 'popup-menu' ? '' : `${element.height}px`,
     });
   }
   expect(validateMatchLayout(expected)).toEqual([]);

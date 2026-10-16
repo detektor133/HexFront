@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import { computeMatchLayout } from '../src/match/layout.ts';
 
 const MAP_JSON: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
@@ -91,6 +92,7 @@ function readPixels(value: string): number {
 afterEach(() => {
   cleanup();
   vi.resetModules();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -105,17 +107,17 @@ describe('Приёмка 07/T17e: окно налога', () => {
   });
 
   it('критерий 2: окно налога привязано прямо под кнопкой, содержит только нужный контент и не имеет пустой фиксированной высоты', async () => {
-    const originalRect = HTMLElement.prototype.getBoundingClientRect;
-    HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect(): DOMRect {
-      if (this.tagName === 'BUTTON' && this.textContent?.includes('Налог')) {
-        return new DOMRect(320, 0, 120, 48);
-      }
-      return originalRect.call(this);
-    };
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function getBoundingClientRect(this: HTMLElement): DOMRect {
+        if (this.tagName === 'BUTTON' && this.textContent?.includes('Налог')) {
+          return new DOMRect(320, 0, 120, 48);
+        }
+        return new DOMRect();
+      },
+    );
     await renderMatch(VIEWPORTS[1]);
     const button = screen.getByRole('button', { name: /Налог|Tax/u });
-    const hud = button.closest('header');
-    if (!hud) throw new Error('Кнопка «Налог» не находится в верхней панели');
+    const buttonRect = button.getBoundingClientRect();
     fireEvent.click(button);
     const dialog = screen.getByRole('dialog', { name: /Налог|Tax/u });
 
@@ -123,16 +125,36 @@ describe('Приёмка 07/T17e: окно налога', () => {
     expect(dialog.querySelectorAll('input[type="range"]')).toHaveLength(1);
     expect(dialog.querySelectorAll('p')).toHaveLength(2);
     expect(dialog.querySelectorAll(':scope > *:not(input):not(p)')).toHaveLength(0);
-    expect(dialog.style.height).not.toBe('100%');
-    expect(dialog.style.minHeight).not.toBe('100%');
-    expect(dialog.style.width).not.toBe('100%');
-    expect(dialog.style.minWidth).not.toBe('100%');
-    expect(readPixels(dialog.style.top)).toBe(
-      readPixels(hud.style.top) + readPixels(hud.style.height),
-    );
-    expect(readPixels(dialog.style.left)).toBe(320);
-    expect(readPixels(dialog.style.width)).toBeLessThanOrEqual(260);
-    expect(readPixels(dialog.style.height)).toBeLessThanOrEqual(120);
+    expect(dialog.style.width).toBe('');
+    expect(dialog.style.height).toBe('');
+    expect(readPixels(dialog.style.top)).toBe(buttonRect.bottom);
+    expect(readPixels(dialog.style.left)).toBe(buttonRect.left);
+
+    const layout = computeMatchLayout({
+      viewport: VIEWPORTS[1],
+      hudHeight: buttonRect.height,
+      bottomPanelHeight: 132,
+      eventRows: 0,
+      tutorialVisible: false,
+      leaderboardOpen: false,
+      leaderboardRows: 0,
+      cardHeight: 0,
+      cardOpen: false,
+      popupOpen: true,
+      popupAnchorX: buttonRect.left,
+      popupSize: { width: 232, height: 88 },
+      paused: false,
+    });
+    const popup = layout.elements.find((element) => element.id === 'popup-menu');
+    if (!popup) throw new Error('Окно налога не попало в раскладку');
+    expect(popup).toMatchObject({
+      x: buttonRect.left,
+      y: buttonRect.bottom,
+      width: 232,
+      height: 88,
+    });
+    expect(layout.elements.some((element) => element.id === 'bottom-panel')).toBe(false);
+    expect(layout.mapVisibleHeight).toBe(VIEWPORTS[1].height - buttonRect.height);
   });
 
   it('критерий 3: окно налога не выходит за экран на 360×640, 1440×900 и 1920×1080', async () => {
@@ -140,15 +162,29 @@ describe('Приёмка 07/T17e: окно налога', () => {
       await renderMatch(viewport);
       fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
       const dialog = screen.getByRole('dialog', { name: /Налог|Tax/u });
-      const left = readPixels(dialog.style.left);
-      const top = readPixels(dialog.style.top);
-      const right = left + readPixels(dialog.style.width);
-      const bottom = top + readPixels(dialog.style.height);
-
-      expect(left).toBeGreaterThanOrEqual(0);
-      expect(top).toBeGreaterThanOrEqual(0);
-      expect(right).toBeLessThanOrEqual(viewport.width);
-      expect(bottom).toBeLessThanOrEqual(viewport.height);
+      expect(dialog.style.width).toBe('');
+      expect(dialog.style.height).toBe('');
+      const layout = computeMatchLayout({
+        viewport,
+        hudHeight: viewport.width < viewport.height ? 88 : 48,
+        bottomPanelHeight: 132,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        leaderboardRows: 0,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: true,
+        popupAnchorX: 0,
+        popupAnchorY: viewport.width < viewport.height ? 88 : 48,
+        paused: false,
+      });
+      const popup = layout.elements.find((element) => element.id === 'popup-menu');
+      if (!popup) throw new Error('Окно налога не попало в раскладку');
+      expect(popup.x).toBeGreaterThanOrEqual(0);
+      expect(popup.y).toBeGreaterThanOrEqual(0);
+      expect(popup.x + popup.width).toBeLessThanOrEqual(viewport.width);
+      expect(popup.y + popup.height).toBeLessThanOrEqual(viewport.height);
       expect(document.querySelector('[class*="dock"]')).toBeNull();
       cleanup();
       vi.resetModules();

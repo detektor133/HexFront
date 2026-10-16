@@ -76,7 +76,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
   const [cardH, setCardH] = useState(0);
-  const [taxAnchorX, setTaxAnchorX] = useState<number | undefined>(undefined);
+  const [taxAnchor, setTaxAnchor] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [taxPopupSize, setTaxPopupSize] = useState<{ width: number; height: number } | undefined>(
+    undefined,
+  );
   const { army } = sb;
   const view = sb.msg?.view;
   // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
@@ -96,13 +99,20 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,
-    ...(taxAnchorX === undefined ? {} : { popupAnchorX: taxAnchorX }),
+    ...(taxAnchor === undefined ? {} : { popupAnchorX: taxAnchor.x, popupAnchorY: taxAnchor.y }),
+    ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
     paused: pauseState.menuOpen,
   });
   const map = typeof loaded === 'string' ? null : loaded.map;
   const styleFor = (id: string): React.CSSProperties | undefined => {
     const element = layout.elements.find((item) => item.id === id);
-    return element ? matchLayoutElementStyle(element) : undefined;
+    if (!element) return undefined;
+    const style = matchLayoutElementStyle(element);
+    if (id === 'popup-menu') {
+      delete style.width;
+      delete style.height;
+    }
+    return style;
   };
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
@@ -127,7 +137,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             sb.setHudHeight?.(height);
           }}
           onPopupChange={setPopupOpen}
-          onTaxAnchor={(x) => setTaxAnchorX(x)}
+          onTaxAnchor={setTaxAnchor}
+          onTaxSize={setTaxPopupSize}
           style={styleFor('hud')}
           popupStyle={styleFor('popup-menu')}
           {...(debug ? {} : { onPause: pauseController.pause })}
