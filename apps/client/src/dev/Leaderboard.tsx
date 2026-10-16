@@ -36,9 +36,7 @@ export function Leaderboard({
   const rows = useLeaderboard(view);
   const me = rows.find((row) => row.playerId === view.playerId);
   const rank = me?.place ?? '-';
-  const visibleRows = rows
-    .filter((row) => row.place <= 5 || row.playerId === view.playerId)
-    .sort((a, b) => a.place - b.place || a.playerId - b.playerId);
+  const visibleRows = [...rows].sort((a, b) => a.place - b.place || a.playerId - b.playerId);
   if (!open) {
     return (
       <button
@@ -57,25 +55,27 @@ export function Leaderboard({
       <button type="button" className={styles.collapse} onClick={() => onOpenChange(false)}>
         {t('leaderboard.title')}
       </button>
-      <h2>{t('leaderboard.title')}</h2>
+      <p>
+        {t('leaderboard.aliveCount').replace(
+          '{count}',
+          String(view.players.filter((player) => player.status === 'alive').length),
+        )}
+      </p>
       <table>
         <thead>
           <tr>
+            <th scope="col">{t('leaderboard.place')}</th>
             <th scope="col">{t('leaderboard.player')}</th>
-            <th scope="col">{t('leaderboard.hexes')}</th>
-            <th scope="col">{t('leaderboard.cities')}</th>
             <th scope="col">{t('leaderboard.score')}</th>
           </tr>
         </thead>
         <tbody>
-          {visibleRows.map((row) => (
+          {visibleRows.slice(0, 5).map((row) => (
             <tr key={row.playerId}>
               <th scope="row">{row.place}</th>
               <td>
                 {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
               </td>
-              <td>{row.hexes}</td>
-              <td>{row.cities}</td>
               <td>{row.score}</td>
             </tr>
           ))}
