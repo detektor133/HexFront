@@ -38,6 +38,7 @@ export interface MatchLayoutInput {
   readonly cardHeight: number;
   readonly cardOpen: boolean;
   readonly popupOpen: boolean;
+  readonly popupAnchorX?: number;
   readonly paused: boolean;
 }
 
@@ -163,14 +164,22 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     );
   }
   if (input.popupOpen || input.paused) {
+    const popupHeight = Math.max(44, Math.min(136, height - input.hudHeight - gap - edge));
+    const popupWidth = Math.min(280, width - edge * 2);
+    const popupX = Math.min(
+      Math.max(edge, input.popupAnchorX ?? (width - popupWidth) / 2),
+      width - edge - popupWidth,
+    );
     elements.push(
       layoutElement(
         input.paused ? 'pause-menu' : 'popup-menu',
         input.paused ? 'pause-menu' : 'popup-menu',
-        Math.max(edge, (width - 280) / 2),
-        Math.max(input.hudHeight + gap, (height - 240) / 2),
-        Math.min(280, width - edge * 2),
-        Math.max(44, Math.min(240, height - input.hudHeight - gap - edge)),
+        input.paused ? Math.max(edge, (width - 280) / 2) : popupX,
+        input.paused ? Math.max(input.hudHeight + gap, (height - 240) / 2) : input.hudHeight,
+        popupWidth,
+        input.paused
+          ? Math.max(44, Math.min(240, height - input.hudHeight - gap - edge))
+          : popupHeight,
         true,
       ),
     );

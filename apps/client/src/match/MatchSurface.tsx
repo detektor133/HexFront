@@ -76,6 +76,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
   const [cardH, setCardH] = useState(0);
+  const [taxAnchorX, setTaxAnchorX] = useState<number | undefined>(undefined);
   const { army } = sb;
   const view = sb.msg?.view;
   // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
@@ -95,6 +96,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,
+    ...(taxAnchorX === undefined ? {} : { popupAnchorX: taxAnchorX }),
     paused: pauseState.menuOpen,
   });
   const map = typeof loaded === 'string' ? null : loaded.map;
@@ -125,6 +127,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             sb.setHudHeight?.(height);
           }}
           onPopupChange={setPopupOpen}
+          onTaxAnchor={(x) => setTaxAnchorX(x)}
           style={styleFor('hud')}
           popupStyle={styleFor('popup-menu')}
           {...(debug ? {} : { onPause: pauseController.pause })}

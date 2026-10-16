@@ -136,11 +136,13 @@ export function Hud(props: {
   onPause?: () => void;
   onHeight?: (height: number) => void;
   onPopupChange?: (open: boolean) => void;
+  onTaxAnchor?: (x: number) => void;
   style?: React.CSSProperties | undefined;
   popupStyle?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const [taxOpen, setTaxOpen] = useState(false);
   const hudRef = useRef<HTMLElement>(null);
+  const taxButtonRef = useRef<HTMLButtonElement>(null);
   const { view } = props;
   const me = view.players[view.playerId];
   if (!me) return null;
@@ -158,6 +160,11 @@ export function Hud(props: {
     observer.observe(hud);
     return () => observer.disconnect();
   }, [props.onHeight]);
+  useLayoutEffect(() => {
+    const taxButton = taxButtonRef.current;
+    if (!taxButton || !props.onTaxAnchor) return;
+    props.onTaxAnchor(taxButton.getBoundingClientRect().left);
+  }, [props.onTaxAnchor]);
   return (
     <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
@@ -174,6 +181,7 @@ export function Hud(props: {
       <div className={styles.taxWrap}>
         <button
           type="button"
+          ref={taxButtonRef}
           className={styles.taxButton}
           aria-expanded={taxOpen}
           onClick={() =>
