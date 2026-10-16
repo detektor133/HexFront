@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
@@ -122,15 +122,28 @@ describe('приёмка 07/T17c: панели матча в левом нижн
 
   it('критерий 2: панель армий рендерится при выборе армии, а окно клетки — при выборе клетки', async () => {
     await renderMatch('?army=1');
-    const armyPanel = document.querySelector<HTMLElement>('[class*="dock"]');
-    expect(armyPanel).not.toBeNull();
-    expect(armyPanel?.textContent).toMatch(/армия|army/iu);
+    const armyCards = screen
+      .getAllByRole('button', { name: /армия/iu })
+      .filter((card) => card.hasAttribute('aria-pressed'));
+    expect(armyCards.length).toBeGreaterThan(0);
+    expect(armyCards.filter((card) => card.getAttribute('aria-pressed') === 'true')).toHaveLength(
+      1,
+    );
 
     cleanup();
     vi.resetModules();
     await renderMatch('?hex=0');
-    const cellCard = document.querySelector<HTMLElement>('section[class*="card"]');
-    expect(cellCard).not.toBeNull();
-    expect(cellCard?.textContent?.trim()).not.toBe('');
+    const cellCards = screen
+      .getAllByRole('region')
+      .filter(
+        (region) =>
+          region.querySelector('h2') && region.getAttribute('aria-label') !== 'Таблица лидеров',
+      );
+    expect(cellCards).toHaveLength(1);
+    const cellCard = cellCards[0];
+    if (!cellCard) throw new Error('Карточка клетки не найдена');
+    expect(cellCard.getAttribute('aria-label')).toBeTruthy();
+    expect(cellCard.querySelector('h2')).not.toBeNull();
+    expect(cellCard.textContent?.trim()).not.toBe('');
   });
 });

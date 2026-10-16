@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17c: приёмочный DOM-тест подтверждает расчёт `bottom-panel` и `card` на 360×640, 1440×900 и 1920×1080, а также рендер панелей при выборе армии и клетки.
-- Панели уже присутствуют в продуктовом пути из T7: `ArmyBar` и `HexCard` получают inline-стили из `computeMatchLayout`; дополнительная правка кода не требуется.
-- История: `fce3e56` добавил `ArmyBar`/карточки в `MatchSurface`, `cf02bc5` добавил расчёт раскладки, `bfe3af7` перенёс позиции в inline-стили.
+- 07/T17c: усилен DOM-тест возврата ревью; он проходит через `MatchPage → MatchSurface`, проверяет список карточек армий и ровно одну выбранную карточку, а также содержимое карточки клетки.
+- Продуктовый код T17c не менялся: `ArmyBar` и `HexCard` уже получают позиции из `computeMatchLayout` через inline-стили.
+- Раскладка проверяет `bottom-panel` и `card` на 360×640, 1440×900 и 1920×1080; `validateMatchLayout` не возвращает ошибок.
 - `pnpm verify --changed` зелёный.
 - Следующая задача: 07/T17d — таблица лидеров.
 - Читать: `docs/stages/stage-07-playable-build.md`, блок 07/T17d, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/src/match/MatchSurface.tsx`.
