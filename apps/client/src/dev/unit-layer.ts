@@ -136,7 +136,8 @@ export function createUnitLayer(
   const ground = new Graphics();
   const battles = new Container();
   const chipsLayer = new Container();
-  container.addChild(ground, battles, chipsLayer);
+  chipsLayer.addChild(ground);
+  container.addChild(chipsLayer, battles);
   const chips = new Map<string, Chip>();
   let entries: Entry[] = [];
   let view: PlayerView | null = null;
