@@ -96,11 +96,13 @@ function movementScene(): {
     if (!next) throw new Error('для отряда нет соседнего гекса');
     return { ...unit, path: [hexId(next, loaded.map.width)] };
   });
+  const enemyNext = neighbors(hexFromId(enemy.hex, loaded.map.width))[0];
+  if (!enemyNext) throw new Error('для чужого отряда нет соседнего гекса');
   const view = {
     ...message.view,
     units: [
       ...moving,
-      { ...enemy, path: [] },
+      { ...enemy, path: [hexId(enemyNext, loaded.map.width)] },
       ...message.view.units.filter(
         (unit) => !moving.some((candidate) => candidate.id === unit.id) && unit.id !== enemy.id,
       ),
