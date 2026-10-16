@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T15 исправлена: `forecast-plate.ts` и `plan-layer.ts` используют `BitmapText`; сторож проверяет все три числовых слоя и вызывает реальные пути отрисовки.
-- `pnpm verify --changed` зелёный.
+- 07/T15 возвращена ревью: приёмочный canvas-stub не реализует `context.scale`, поэтому реальный путь `drawForecastPlate` падает до проверки `BitmapText`.
+- `pnpm verify --changed` зелёный, но полный `SLOW_TESTS`-прогон T15 падает на приёмочном тесте.
 - `pnpm probe:memory` не запускался: проект запрещает открывать браузер; пункт проверит владелец.
 - Следующая сессия: 07/T16.
 - Читать: `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `apps/client/test/view-delta-memory.test.ts`, `apps/client/scripts/memory-probe.ts`.
