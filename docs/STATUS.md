@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17f: исправлен порядок слоёв в `apps/client/src/dev/unit-layer.ts`: линии и фишки находятся ниже отдельного слоя маркера боя.
-- Приёмочный тест `apps/client/test/t17f-battle-layer.test.ts`: 2 теста проходят.
+- 07/T17f: ревью возвращено — второй приёмочный тест повторяет проверку порядка слоёв и не доказывает неперекрытие маркера соседней фишкой.
+- Исправление требуется в `apps/client/test/t17f-battle-layer.test.ts`; задача остаётся в очереди.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача: 07/T17g.
 - Читать: блок 07/T17g в `docs/stages/stage-07-playable-build.md`, `apps/client/src/render`, `apps/client/test`.
