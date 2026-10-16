@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- Исправлен красный CI 07/T17e: нулевое измерение `getBoundingClientRect()` в jsdom больше не затирает fallback-центрирование окна налога.
-- В реальном DOM положительная координата кнопки по-прежнему привязывает окно прямо под кнопкой; тест `apps/client/test/t17e-tax.dom.test.tsx` не изменялся.
-- `pnpm verify --changed` зелёный, включая `apps/client/test/match-layout.dom.test.tsx` и `apps/client/test/t17e-tax.dom.test.tsx`.
-- Следующая задача: 07/T17f — слой маркера боя.
+- 07/T17e возвращена ревью: `apps/client/test/t17e-tax.dom.test.tsx` не проверяет горизонтальную привязку, состав контента и минимальное перекрытие карты.
+- `pnpm verify --changed` зелёный, целевой тест окна налога — 3/3.
+- Следующая сессия: исправить приёмочные проверки 07/T17e, затем повторить ревью.
 - Читать: `docs/stages/stage-07-playable-build.md`, блок 07/T17f, `apps/client/src/render`, `apps/client/test`.
