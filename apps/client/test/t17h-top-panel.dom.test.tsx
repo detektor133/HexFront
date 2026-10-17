@@ -96,11 +96,23 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       expect(screen.getByText(value, { exact: true })).toBeTruthy();
     }
 
+    const metrics = [
+      { label: 'Люди', value: '280', rate: '+2,8/с' },
+      { label: 'Золото', value: '200', rate: '+0,4/с' },
+      { label: 'Налог', value: '20 %' },
+      { label: 'Снабжение', value: '100 %' },
+      { label: 'Время', value: '00:00' },
+      { label: 'Место', value: '#1/2' },
+    ] as const;
     const icons = Array.from(document.querySelectorAll<SVGElement>('svg[aria-label][title]'));
-    expect(icons).toHaveLength(6);
-    for (const icon of icons) {
-      expect(icon.getAttribute('aria-label')).toBeTruthy();
-      expect(icon.getAttribute('title')).toBeTruthy();
+    expect(icons).toHaveLength(metrics.length);
+    for (const metric of metrics) {
+      const icon = within(header).getByLabelText(metric.label, { selector: 'svg' });
+      expect(icon.getAttribute('title')).toBe(metric.label);
+      const metricElement = icon.parentElement;
+      if (!metricElement) throw new Error(`Иконка «${metric.label}» не связана со значением`);
+      expect(metricElement.textContent).toContain(metric.value);
+      if ('rate' in metric) expect(metricElement.textContent).toContain(metric.rate);
     }
   });
 
