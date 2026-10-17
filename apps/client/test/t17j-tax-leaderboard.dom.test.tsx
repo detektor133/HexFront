@@ -14,6 +14,7 @@ const MAP_JSON: unknown = JSON.parse(
 );
 const loaded = loadMap(MAP_JSON);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+const loadedMap = loaded.map;
 
 function createRuntime(): Record<string, unknown> {
   const engine = createLocalEngine(MAP_JSON, 42, 2);
@@ -66,7 +67,7 @@ function createRuntime(): Record<string, unknown> {
 
 function mockRuntime(): void {
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
-    useMapJson: () => ({ json: MAP_JSON, map: loaded.map }),
+    useMapJson: () => ({ json: MAP_JSON, map: loadedMap }),
     useSandbox: () => createRuntime(),
   }));
 }
