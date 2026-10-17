@@ -273,7 +273,14 @@ describe('T17m: карточка клетки', () => {
     );
     expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
-    expect(screen.getAllByRole('button')).toHaveLength(2);
+    const cityActionButtons = screen
+      .getAllByRole('button')
+      .filter((button) => /Улучшить город|Проложить дорогу/u.test(button.textContent ?? ''));
+    expect(cityActionButtons).toHaveLength(2);
+    expect(cityActionButtons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining('Улучшить город'),
+      expect.stringContaining('Проложить дорогу'),
+    ]);
 
     const prepared = {
       ...message.selection,
