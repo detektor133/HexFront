@@ -39,9 +39,7 @@ export function MainMenu(): React.JSX.Element {
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
-  const [autoCommand, setAutoCommand] = useState<boolean>(
-    () => readStorage(AUTO_COMMAND_KEY, 'false') === 'true',
-  );
+  const [autoCommand] = useState<boolean>(() => readStorage(AUTO_COMMAND_KEY, 'false') === 'true');
 
   useEffect(() => {
     let disposed = false;
@@ -129,46 +127,62 @@ export function MainMenu(): React.JSX.Element {
           {t('menu.title')}
         </h1>
         <p className={styles.subtitle}>{t('menu.subtitle')}</p>
-        <label className={styles.field}>
-          <span>{t('menu.nickname')}</span>
-          <input
-            value={nickname}
-            maxLength={16}
-            onChange={(event) => setNickname(event.target.value.slice(0, 16))}
-          />
-        </label>
-        <div className={styles.field}>
-          <span>{t('menu.color')}</span>
-          <div
-            ref={colorsRef}
-            className={styles.colors}
-            style={
-              isColorPickerOpen
-                ? { display: 'grid', gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }
-                : undefined
-            }
-          >
-            {(isColorPickerOpen
-              ? tokens.players.palette
-              : tokens.players.palette.filter((playerColor) => playerColor.id === color)
-            ).map((playerColor) => (
-              <button
-                key={playerColor.id}
-                type="button"
-                className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
-                aria-label={`${t('menu.color')} ${playerColor.id}`}
-                style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
-                onClick={() => {
-                  if (!isColorPickerOpen) {
-                    setIsColorPickerOpen(true);
-                    return;
-                  }
-                  handleColor(playerColor.id);
-                  setIsColorPickerOpen(false);
-                }}
-              />
-            ))}
+        <div className={styles.identityRow}>
+          <div ref={colorsRef} className={styles.colorPicker}>
+            {!isColorPickerOpen &&
+              tokens.players.palette
+                .filter((playerColor) => playerColor.id === color)
+                .map((playerColor) => (
+                  <button
+                    key={playerColor.id}
+                    type="button"
+                    className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
+                    aria-label={`${t('menu.color')} ${playerColor.id}`}
+                    aria-expanded={isColorPickerOpen}
+                    aria-haspopup="listbox"
+                    style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                    onClick={() => {
+                      if (!isColorPickerOpen) {
+                        setIsColorPickerOpen(true);
+                        return;
+                      }
+                      handleColor(playerColor.id);
+                      setIsColorPickerOpen(false);
+                    }}
+                  />
+                ))}
+            {isColorPickerOpen && (
+              <div
+                className={styles.palette}
+                role="listbox"
+                aria-label={t('menu.color')}
+                style={{ gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }}
+              >
+                {tokens.players.palette.map((playerColor) => (
+                  <button
+                    key={playerColor.id}
+                    type="button"
+                    aria-label={`${t('menu.color')} ${playerColor.id}`}
+                    aria-selected={playerColor.id === color}
+                    className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
+                    style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                    onClick={() => {
+                      handleColor(playerColor.id);
+                      setIsColorPickerOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
+          <label className={styles.nickname}>
+            <span>{t('menu.nickname')}</span>
+            <input
+              value={nickname}
+              maxLength={16}
+              onChange={(event) => setNickname(event.target.value.slice(0, 16))}
+            />
+          </label>
         </div>
         <a
           className={styles.play}
@@ -178,22 +192,6 @@ export function MainMenu(): React.JSX.Element {
         >
           {t('menu.play')}
         </a>
-        <section className={styles.section} aria-labelledby="settings-title">
-          <h2 id="settings-title">{t('menu.settings')}</h2>
-          <button
-            type="button"
-            className={styles.secondary}
-            aria-pressed={autoCommand}
-            onClick={() => setAutoCommand((value) => !value)}
-          >
-            {t('menu.autoCommand')}
-          </button>
-          {'requestFullscreen' in document.documentElement && (
-            <button type="button" className={styles.secondary}>
-              {t('menu.fullscreen')}
-            </button>
-          )}
-        </section>
       </section>
     </main>
   );

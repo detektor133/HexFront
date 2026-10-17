@@ -110,7 +110,7 @@ describe('приёмка 07/T17a: главное меню после раунд�
     expect(swatch).toBeDefined();
     if (swatch === undefined) return;
     expectVisible(swatch);
-    expect(input.closest('label')?.nextElementSibling).toBe(swatch.closest('div')?.parentElement);
+    expect(input.closest('label')?.parentElement?.firstElementChild).toBe(swatch.closest('div'));
   });
 
   it('критерий: клик по образцу открывает компактный селектор с кругами ⌀28 по 6 в ряд, выбор и клик вне закрывают его', () => {

@@ -153,16 +153,12 @@ describe('главное меню', () => {
     );
   });
 
-  it('критерий: настройки меню применяются игровому Worker после перехода по ссылке', async () => {
+  it('критерий: сохранённое автокомандование применяется игровому Worker после перехода по ссылке', async () => {
+    localStorage.setItem('hexfront.auto-command', 'true');
     renderMenu();
     const selectedColor = screen.getByRole('button', { name: /^Цвет /u });
     fireEvent.click(selectedColor);
     fireEvent.click(screen.getByRole('button', { name: 'Цвет brick' }));
-    const autoCommand = screen.queryByRole('button', { name: /Автокомандование/iu });
-
-    expect(autoCommand).not.toBeNull();
-    if (autoCommand === null) return;
-    fireEvent.click(autoCommand);
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: 'Адмирал' } });
     const play = screen.getByRole('button', { name: 'Играть' });
