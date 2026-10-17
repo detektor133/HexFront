@@ -15,6 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T22: исправления прошли `slow/tests` и `pnpm verify --changed`, но ревью возвращено из-за изменённых существующих тестов без обязательной отметки замены.
-- Следующая задача: 07/T22 после исправления возврата.
-- Читать: блок 07/T22 в `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17e-tax.dom.test.tsx`, `apps/client/test/view-delta-memory.test.ts`.
+- 07/T22: исправлен планировщик ревью — при одном потоке две задачи `[~]` проверяются последовательно; добавлен регрессионный тест для T17h и T22.
+- `pnpm verify --changed` зелёный; T22 отмечена `[~]`, T17h не изменена и остаётся ожидающей ревью.
+- Следующий шаг цикла: `$review 07/T17h`, затем `$review 07/T22`.
+- Читать: `tools/agent-loop/src/tasks.ts`, `tools/agent-loop/src/agent-loop.test.ts`, блоки 07/T17h и 07/T22 в `docs/stages/stage-07-playable-build.md`.

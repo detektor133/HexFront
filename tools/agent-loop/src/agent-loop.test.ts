@@ -120,6 +120,34 @@ describe('круги $next → CI → $review', () => {
     expect(run.ciCalls).toBe(1);
   });
 
+  it('при одном потоке последовательно ревьюит две ожидающие задачи', async () => {
+    const stage = `# Этап 06
+
+- [~] **T17h. Первая задача на ревью**.
+- [ ] **T22. Вторая задача**.
+`;
+    const status = `# Статус
+
+| Текущий этап | 06 — тестовый этап |
+| Ветка | \`stage-06\` |
+
+Очередь: 06/T22
+`;
+    const run = await runWorld({
+      stage,
+      status,
+      sessions: [
+        { task: 'T22', mark: '~', answer: 'Готово. Запусти `$review 06/T22`.' },
+        { task: 'T17h', mark: 'x', answer: 'OK' },
+        { task: 'T22', mark: 'x', answer: 'OK' },
+      ],
+    });
+
+    expect(run.prompts.slice(0, 3)).toEqual(['$next', '$review 06/T17h', '$review 06/T22']);
+    expect(run.lines).toContain('готово: 06/T17h');
+    expect(run.lines).toContain('готово: 06/T22');
+  });
+
   it('при красном CI запускает $task с причиной, а не $next', async () => {
     const run = await runWorld({
       sessions: [NEXT_DONE, { answer: 'CI починен, задача ждёт ревью', commit: true }, REVIEW_OK],

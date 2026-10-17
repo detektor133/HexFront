@@ -234,7 +234,7 @@ async function runWork(
   if (unsynced !== undefined) return step(await park(context, `sync:${task}`, unsynced));
   const { stage, stageText } = await readStage(context.config.root);
   const waiting = reviewTasks(stageText, stage);
-  if (waiting.length > 1)
+  if (waiting.length > 1 && (context.state.streams ?? 1) > 1)
     return step(await park(context, `many:${task}`, `ждут ревью сразу ${waiting.join(', ')}`));
   const [review] = waiting;
   if (review === undefined) return followUp(context, task, work.message, accepted);
