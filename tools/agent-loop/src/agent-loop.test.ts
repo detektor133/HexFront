@@ -136,6 +136,7 @@ describe('круги $next → CI → $review', () => {
     const run = await runWorld({
       stage,
       status,
+      state: { streams: 1 },
       sessions: [
         { task: 'T22', mark: '~', answer: 'Готово. Запусти `$review 06/T22`.' },
         { task: 'T17h', mark: 'x', answer: 'OK' },
