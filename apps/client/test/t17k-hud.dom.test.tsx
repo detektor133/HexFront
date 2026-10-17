@@ -69,6 +69,12 @@ describe('07/T17k: компактный HUD', () => {
       'Настройки',
     );
     expect(screen.getByRole('button', { name: 'Пауза' }).getAttribute('title')).toBe('Пауза');
+    expect(
+      screen
+        .getByRole('button', { name: 'Настройки' })
+        .querySelector('svg[aria-hidden="true"]')
+        ?.getAttribute('aria-hidden'),
+    ).toBe('true');
     for (const icon of Array.from(document.querySelectorAll('header svg[aria-label]'))) {
       expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
     }
@@ -94,6 +100,8 @@ describe('07/T17k: компактный HUD', () => {
     expect(hudCss).toContain('.goldIcon {\n  color: var(--selection-color);\n}');
     expect(hudCss).toContain('height: 44px;');
     expect(hudCss).toContain('min-height: var(--touch-target-min);');
+    expect(hudCss).toContain('min-width: var(--touch-target-min);');
+    expect(hudCss).not.toContain('overflow-x: hidden;');
   });
 
   it('сохраняет компактную ширину, центрирование и один ряд на четырёх viewport', () => {

@@ -11,7 +11,6 @@
   box-sizing: border-box;
   background: var(--ui-surface);
   box-shadow: var(--shadow-hard);
-  overflow-x: hidden;
 }
 
 .hud > .slot,
@@ -95,6 +94,7 @@
   /* Подпись и значение — по центру кнопки, на одной линии с остальными слотами. */
   align-items: center;
   min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
   padding: 0 var(--space-xs);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-button);

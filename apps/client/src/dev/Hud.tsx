@@ -216,7 +216,7 @@ export function Hud(props: {
     return () => observer.disconnect();
   }, [props.onTaxSize, taxOpen]);
   return (
-    <header ref={hudRef} className={styles.hud} style={{ ...props.style, overflowX: 'hidden' }}>
+    <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
         icon="people"
         label={t('hud.people')}

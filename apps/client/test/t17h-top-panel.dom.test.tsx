@@ -142,7 +142,7 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       if (!header) throw new Error('Верхняя панель не найдена');
 
       expect(getComputedStyle(header).flexWrap).toBe('nowrap');
-      expect(getComputedStyle(header).overflowX).toBe('hidden');
+      expect(getComputedStyle(header).overflowX).not.toBe('hidden');
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(viewportWidth);
       expect(document.body.scrollWidth).toBeLessThanOrEqual(viewportWidth);
       if (viewportWidth === 360) {

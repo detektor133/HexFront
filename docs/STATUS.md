@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17k повторно возвращена ревью: тест не подтверждает отсутствие клиппинга и сохранение шестерёнки; в HUD скрывается переполнение, кнопка налога не имеет зоны 44×44.
-- Читать `docs/stages/stage-07-playable-build.md` (07/T17n), `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/match/layout.ts`.
+- 07/T17k исправлена: HUD больше не клиппит содержимое, кнопка налога имеет зону 44×44, тест проверяет шестерёнку.
+- Читать `docs/stages/stage-07-playable-build.md` (07/T17k и 07/T17n), `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/test/t17h-top-panel.dom.test.tsx`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`.
 - Отчёт: `docs/reports/stage-07-t17k.md`.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая сессия: `$review 07/T17k`; затем `$task 07/T17n`.
