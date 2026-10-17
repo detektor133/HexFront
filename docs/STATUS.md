@@ -15,10 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q выполнена: на ПК видимый низ карточек ArmyBar получил дополнительный `space.sm`, а внутренний `padding-bottom` `.dock` сохранён равным `space.sm`.
-- Раскладка остаётся единой через `computeMatchLayout`; прямоугольник `bottom-panel` не зависит от высоты карточки или лидерборда.
-- Добавлен DOM-тест T17q для трёх viewport, границ панели и CSS-разделения отступов.
+- 07/T17q возвращена на доработку: тест должен пройти через `MatchPage → MatchSurface`, контролируемый `ResizeObserver` и интерактивные состояния из приёмки.
+- CSS-разделение внутреннего `padding-bottom` `.dock` и видимого отступа карточек сохранено в коммите реализации.
 - `docs/art/ui.md` синхронизирован с правилом нижней привязки ArmyBar.
 - `pnpm verify --changed` — зелёный.
-- Следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
+- После исправления 07/T17q следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
