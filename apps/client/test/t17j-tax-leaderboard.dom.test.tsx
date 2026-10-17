@@ -141,61 +141,66 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
     ] as const;
 
     for (const viewport of viewports) {
-      const layout = computeMatchLayout({
-        viewport,
-        hudHeight: viewport.hudHeight,
-        bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
-        eventRows: 0,
-        tutorialVisible: false,
-        leaderboardOpen: true,
-        leaderboardRows: 5,
-        cardHeight: 0,
-        cardOpen: false,
-        popupOpen: true,
-        popupAnchorX: viewport.anchorX,
-        popupAnchorY: viewport.anchorY,
-        popupSize: { width: 260, height: 120 },
-        paused: false,
-      });
-      const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
-      const popup = layout.elements.find((element) => element.id === 'popup-menu');
-      expect(leaderboard).toBeDefined();
-      expect(popup).toBeDefined();
-      if (!leaderboard || !popup) continue;
-
-      expect(leaderboard.x).toBeGreaterThanOrEqual(0);
-      expect(leaderboard.y).toBeGreaterThanOrEqual(0);
-      expect(leaderboard.x + leaderboard.width).toBeLessThanOrEqual(viewport.width);
-      expect(leaderboard.y + leaderboard.height).toBeLessThanOrEqual(viewport.height);
-      const defaultLeaderboard: Rect = {
-        x:
-          viewport.width -
-          (viewport.width <= 600 ? 8 : 16) -
-          (viewport.width <= 600 ? viewport.width - 16 : 320),
-        y: viewport.hudHeight + 8,
-        width: viewport.width <= 600 ? viewport.width - 16 : 320,
-        height: 5 * 44 + 16,
+      // Кнопка налога — реальный якорь попапа; проверяем обе кнопки задачи
+      // («не пересекается ... с кнопками»): кнопку налога и кнопку лидерборда.
+      const taxButtonRect: Rect = {
+        x: viewport.anchorX,
+        y: 0,
+        width: 120,
+        height: viewport.hudHeight,
       };
-      if (overlaps(defaultLeaderboard, popup)) {
-        expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
+
+      for (const leaderboardOpen of [true, false] as const) {
+        const layout = computeMatchLayout({
+          viewport,
+          hudHeight: viewport.hudHeight,
+          bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
+          eventRows: 0,
+          tutorialVisible: false,
+          leaderboardOpen,
+          leaderboardRows: 5,
+          cardHeight: 0,
+          cardOpen: false,
+          popupOpen: true,
+          popupAnchorX: viewport.anchorX,
+          popupAnchorY: viewport.anchorY,
+          popupSize: { width: 260, height: 120 },
+          paused: false,
+        });
+        const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+        const popup = layout.elements.find((element) => element.id === 'popup-menu');
+        expect(leaderboard).toBeDefined();
+        expect(popup).toBeDefined();
+        if (!leaderboard || !popup) continue;
+
+        expect(leaderboard.x).toBeGreaterThanOrEqual(0);
+        expect(leaderboard.y).toBeGreaterThanOrEqual(0);
+        expect(leaderboard.x + leaderboard.width).toBeLessThanOrEqual(viewport.width);
+        expect(leaderboard.y + leaderboard.height).toBeLessThanOrEqual(viewport.height);
+
+        if (leaderboardOpen) {
+          const defaultLeaderboard: Rect = {
+            x:
+              viewport.width -
+              (viewport.width <= 600 ? 8 : 16) -
+              (viewport.width <= 600 ? viewport.width - 16 : 320),
+            y: viewport.hudHeight + 8,
+            width: viewport.width <= 600 ? viewport.width - 16 : 320,
+            height: 5 * 44 + 16,
+          };
+          if (overlaps(defaultLeaderboard, popup)) {
+            expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
+          }
+        } else {
+          // Свёрнутый лидерборд — сам и есть кнопка лидерборда: проверяем,
+          // что окно налога не закрывает её, когда лидерборд остаётся доступной кнопкой.
+          expect(overlaps(leaderboard, popup)).toBe(false);
+        }
+
+        expect(overlaps(leaderboard, taxButtonRect)).toBe(false);
+        expect(overlaps(popup, taxButtonRect)).toBe(false);
+        expect(overlaps(leaderboard, popup)).toBe(false);
       }
-      expect(
-        overlaps(leaderboard, {
-          x: viewport.anchorX,
-          y: 0,
-          width: 120,
-          height: viewport.hudHeight,
-        }),
-      ).toBe(false);
-      expect(
-        overlaps(popup, {
-          x: viewport.anchorX,
-          y: 0,
-          width: 120,
-          height: viewport.hudHeight,
-        }),
-      ).toBe(false);
-      expect(overlaps(leaderboard, popup)).toBe(false);
     }
   });
 
