@@ -15,7 +15,6 @@
 
 ## Следующая сессия
 
-- 07/T17j: исправлен CI typecheck в `apps/client/test/t17j-tax-leaderboard.dom.test.tsx` — результат `loadMap` сужается до успешной ветки до передачи в замыкание.
-- `pnpm verify --changed`: зелёный (build, types, lint, prettier, tests).
-- Следующая задача: 07/T17k.
-- Читать блок T17k в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/src/match/layout.ts` и тесты верхней панели.
+- 07/T17j возвращена на доработку: тест раскладки не покрывает 1440×900, границы и пересечение с кнопками; нет отдельной проверки поведения нижней панели T17e.
+- `pnpm verify --changed`: зелёный до возврата.
+- Следующая сессия: исправить приёмочный тест T17j и повторить `$review 07/T17j` после зелёного CI.
