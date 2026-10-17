@@ -335,7 +335,7 @@ export function ArmyBar(props: {
     const el = dockRef.current;
     if (!el || !onHeight) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      onHeight(entries[0]?.contentRect.height ?? 0);
+      onHeight(Math.max(entries[0]?.contentRect.height ?? 0, el.scrollHeight));
     const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
