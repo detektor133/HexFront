@@ -15,9 +15,10 @@
 
 ## Следующая сессия
 
-- 07/T17q возвращена на доработку: тест должен пройти через `MatchPage → MatchSurface`, контролируемый `ResizeObserver` и интерактивные состояния из приёмки.
-- CSS-разделение внутреннего `padding-bottom` `.dock` и видимого отступа карточек сохранено в коммите реализации.
-- `docs/art/ui.md` синхронизирован с правилом нижней привязки ArmyBar.
+- 07/T17q исправлена по возврату СПЕК: DOM-тест монтирует `MatchPage → MatchSurface` с реальными `ArmyBar`, `HexCard`, HUD и лидербордом.
+- Тест проверяет координаты `bottom-panel` на 1440×900 после выбора, смены и снятия выбора клетки, содержимое ArmyBar и отсутствие второго узла.
+- Контролируемый `ResizeObserver` проверяет `contentRect.height`, `scrollHeight`, одну подписку без цикла при выборе и корректный disconnect при налоговом popup.
+- Тест проверяет нижнюю панель при открытии и закрытии налога, CSS-отступы `.dock` и горизонтальную прокрутку ряда карточек.
 - `pnpm verify --changed` — зелёный.
-- После исправления 07/T17q следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
+- Следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
