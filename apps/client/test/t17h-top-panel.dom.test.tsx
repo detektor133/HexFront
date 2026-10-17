@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import type { ViewPayload } from '../src/local/messages.ts';
 
 const MAP_JSON: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
@@ -18,12 +19,22 @@ const LOADED_MAP_VALUE = LOADED_MAP.map;
 const VIEWPORTS = [360, 768, 1440] as const;
 const LABELS = ['Люди', 'Золото', 'Налог', 'Снабжение', 'Время', 'Место'] as const;
 
-function createRuntime(): Record<string, unknown> {
+function createRuntime(negativePopGrowth: boolean = false): Record<string, unknown> {
   const engine = createLocalEngine(MAP_JSON, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
+  const snapshot = engine.snapshot();
+  const msg: ViewPayload = negativePopGrowth
+    ? {
+        ...snapshot,
+        view: {
+          ...snapshot.view,
+          me: { ...snapshot.view.me, popGrowthPerS: -1 },
+        },
+      }
+    : snapshot;
 
   return {
-    msg: engine.snapshot(),
+    msg,
     replay: [],
     error: null,
     picked: { hex: null, units: [], target: null },
@@ -66,13 +77,16 @@ function createRuntime(): Record<string, unknown> {
   };
 }
 
-async function renderMatch(viewportWidth: number): Promise<void> {
+async function renderMatch(
+  viewportWidth: number,
+  negativePopGrowth: boolean = false,
+): Promise<void> {
   window.history.replaceState({}, '', '/match');
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewportWidth });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 640 });
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
     useMapJson: () => ({ json: MAP_JSON, map: LOADED_MAP_VALUE }),
-    useSandbox: () => createRuntime(),
+    useSandbox: () => createRuntime(negativePopGrowth),
   }));
   const { MatchPage } = await import('../src/match/MatchPage.tsx');
   render(<MatchPage />);
@@ -152,6 +166,29 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       expect(icon.getAttribute('stroke-width')).toBe('2');
       expect(icon.getAttribute('stroke-linecap')).toBe('round');
       expect(icon.getAttribute('stroke-linejoin')).toBe('round');
+      const path = icon.querySelector('path');
+      if (!path) throw new Error('У иконки нет пути');
+      const coordinates = path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [];
+      expect(
+        coordinates.every((coordinate) => {
+          return Number(coordinate) <= 14;
+        }),
+      ).toBe(true);
     }
+  });
+
+  it('критерий цвета прироста: отрицательный прирост людей получает status.danger', async () => {
+    await renderMatch(1440, true);
+
+    const peopleIcon = within(document.querySelector('header') as HTMLElement).getByLabelText(
+      'Люди',
+      {
+        selector: 'svg',
+      },
+    );
+    const peopleSlot = peopleIcon.parentElement;
+    if (!peopleSlot) throw new Error('Слот людей не найден');
+    const rate = within(peopleSlot).getByText('−0,0/с', { exact: true });
+    expect(rate.className).toContain('rateBad');
   });
 });
