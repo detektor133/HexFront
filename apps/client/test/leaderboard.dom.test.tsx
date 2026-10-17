@@ -151,5 +151,12 @@ describe('лидерборд', () => {
       ['Игрок 4', '20'],
       ['Игрок 5', '6'],
     ]);
+    expect(rows.slice(1).map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
+      '1',
+      '1',
+      '3',
+      '3',
+      '5',
+    ]);
   });
 });
