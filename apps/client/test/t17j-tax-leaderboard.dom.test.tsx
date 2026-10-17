@@ -72,6 +72,22 @@ function mockRuntime(): void {
   }));
 }
 
+interface Rect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function overlaps(first: Rect, second: Rect): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
+
 afterEach(() => {
   cleanup();
   vi.resetModules();
@@ -119,10 +135,75 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
   });
 
   it('оставляет лидерборд в раскладке при открытом налоге и разводит прямоугольники', () => {
+    const viewports = [
+      { width: 360, height: 640, hudHeight: 44, anchorX: 80, anchorY: 44 },
+      { width: 1440, height: 900, hudHeight: 48, anchorX: 320, anchorY: 48 },
+    ] as const;
+
+    for (const viewport of viewports) {
+      const layout = computeMatchLayout({
+        viewport,
+        hudHeight: viewport.hudHeight,
+        bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: true,
+        popupAnchorX: viewport.anchorX,
+        popupAnchorY: viewport.anchorY,
+        popupSize: { width: 260, height: 120 },
+        paused: false,
+      });
+      const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+      const popup = layout.elements.find((element) => element.id === 'popup-menu');
+      expect(leaderboard).toBeDefined();
+      expect(popup).toBeDefined();
+      if (!leaderboard || !popup) continue;
+
+      expect(leaderboard.x).toBeGreaterThanOrEqual(0);
+      expect(leaderboard.y).toBeGreaterThanOrEqual(0);
+      expect(leaderboard.x + leaderboard.width).toBeLessThanOrEqual(viewport.width);
+      expect(leaderboard.y + leaderboard.height).toBeLessThanOrEqual(viewport.height);
+      const defaultLeaderboard: Rect = {
+        x:
+          viewport.width -
+          (viewport.width <= 600 ? 8 : 16) -
+          (viewport.width <= 600 ? viewport.width - 16 : 320),
+        y: viewport.hudHeight + 8,
+        width: viewport.width <= 600 ? viewport.width - 16 : 320,
+        height: 5 * 44 + 16,
+      };
+      if (overlaps(defaultLeaderboard, popup)) {
+        expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
+      }
+      expect(
+        overlaps(leaderboard, {
+          x: viewport.anchorX,
+          y: 0,
+          width: 120,
+          height: viewport.hudHeight,
+        }),
+      ).toBe(false);
+      expect(
+        overlaps(popup, {
+          x: viewport.anchorX,
+          y: 0,
+          width: 120,
+          height: viewport.hudHeight,
+        }),
+      ).toBe(false);
+      expect(overlaps(leaderboard, popup)).toBe(false);
+    }
+  });
+
+  it('сохраняет поведение нижней панели T17e при открытом налоге', () => {
     const layout = computeMatchLayout({
-      viewport: { width: 360, height: 640 },
-      hudHeight: 44,
-      bottomPanelHeight: 178,
+      viewport: { width: 1440, height: 900 },
+      hudHeight: 48,
+      bottomPanelHeight: 132,
       eventRows: 0,
       tutorialVisible: false,
       leaderboardOpen: true,
@@ -130,17 +211,13 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
       cardHeight: 0,
       cardOpen: false,
       popupOpen: true,
-      popupAnchorX: 80,
-      popupAnchorY: 44,
+      popupAnchorX: 320,
+      popupAnchorY: 48,
       popupSize: { width: 260, height: 120 },
       paused: false,
     });
-    const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
-    const popup = layout.elements.find((element) => element.id === 'popup-menu');
-    expect(leaderboard).toBeDefined();
-    expect(popup).toBeDefined();
-    if (!leaderboard || !popup) return;
-    expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
-    expect(leaderboard.y + leaderboard.height).toBeLessThanOrEqual(640);
+
+    expect(layout.elements.some((element) => element.id === 'bottom-panel')).toBe(false);
+    expect(layout.mapVisibleHeight).toBe(900 - 48);
   });
 });
