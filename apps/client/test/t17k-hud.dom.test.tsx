@@ -190,14 +190,28 @@ describe('07/T17k: компактный HUD', () => {
   });
 
   it('на 360 px сохраняет 44×44 у трёх кнопок и экономит отступы под строку', () => {
-    // jsdom не считает раскладку (testing.md): реальная ширина не измеряется, гарантия — структурная, по правилам CSS.
+    renderHud();
+    expect(screen.getByRole('button', { name: 'Налог' }).className).toContain('taxButton');
+    expect(screen.getByRole('button', { name: 'Настройки' }).className).toContain('settingsButton');
+    expect(screen.getByRole('button', { name: 'Пауза' }).className).toContain('settingsButton');
     expect(hudCss).toMatch(
-      /\.hud > \.settingsButton \{\s*flex: 0 0 var\(--touch-target-min\);\s*\}/,
+      /\.hud > \.settingsButton \{[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?\}/,
     );
-    expect(hudCss).toMatch(/\.taxButton \{[\s\S]*?box-sizing: border-box;/);
+    expect(hudCss).toMatch(
+      /\.hud > \.taxWrap \{[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?\}/,
+    );
+    expect(hudCss).toMatch(
+      /\.settingsButton \{[\s\S]*?width: var\(--touch-target-min\);[\s\S]*?height: 44px;[\s\S]*?\}/,
+    );
+    expect(hudCss).toMatch(
+      /\.taxButton \{[\s\S]*?box-sizing: border-box;[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?width: var\(--touch-target-min\);[\s\S]*?height: var\(--touch-target-min\);[\s\S]*?\}/,
+    );
     expect(hudCss).toMatch(
       /@media \(max-width: 360px\) \{\s*\.hud \{\s*padding: 0 var\(--space-sm\);\s*\}/,
     );
-    expect(hudCss).toMatch(/\.slot,\s*\.taxButton \{\s*gap: 0;\s*\}/);
+    expect(hudCss).toMatch(
+      /\.slotText \{[\s\S]*?transform: scaleX\(0\.6\);[\s\S]*?transform-origin: center;/,
+    );
+    expect(hudCss).not.toContain('overflow-x: hidden;');
   });
 });

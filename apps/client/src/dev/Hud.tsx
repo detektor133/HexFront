@@ -68,12 +68,14 @@ function Slot(props: {
   return (
     <div className={styles.slot}>
       <MetricIcon name={props.icon} label={props.label} />
-      <span className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}>
-        {props.value}
+      <span className={styles.slotText}>
+        <span className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}>
+          {props.value}
+        </span>
+        {props.rate && (
+          <span className={props.negative ? styles.rateBad : styles.rate}>{props.rate}</span>
+        )}
       </span>
-      {props.rate && (
-        <span className={props.negative ? styles.rateBad : styles.rate}>{props.rate}</span>
-      )}
     </div>
   );
 }
@@ -247,7 +249,9 @@ export function Hud(props: {
           }
         >
           <MetricIcon name="tax" label={t('hud.tax')} />
-          <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
+          <span className={styles.slotText}>
+            <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
+          </span>
         </IconButton>
         {taxOpen && (
           <div

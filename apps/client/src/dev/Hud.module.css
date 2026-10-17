@@ -9,6 +9,7 @@
   min-height: var(--touch-target-min);
   padding: 0 var(--space-lg);
   box-sizing: border-box;
+  overflow: visible;
   background: var(--ui-surface);
   box-shadow: var(--shadow-hard);
 }
@@ -20,6 +21,10 @@
 
 /* Пауза — прямой потомок .hud (в отличие от шестерёнки внутри .settingsWrap): без этого правила флекс мог сжать кнопку меньше 44×44. */
 .hud > .settingsButton {
+  flex: 0 0 var(--touch-target-min);
+}
+
+.hud > .taxWrap {
   flex: 0 0 var(--touch-target-min);
 }
 
@@ -42,6 +47,14 @@
   justify-content: center;
   gap: var(--space-xs);
   min-width: 0;
+  white-space: nowrap;
+}
+
+.slotText {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-xs);
   white-space: nowrap;
 }
 
@@ -111,6 +124,9 @@
   /* Подпись и значение — по центру кнопки, на одной линии с остальными слотами. */
   align-items: center;
   box-sizing: border-box;
+  flex: 0 0 var(--touch-target-min);
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   min-height: var(--touch-target-min);
   min-width: var(--touch-target-min);
   padding: 0 var(--space-xs);
@@ -265,6 +281,18 @@
   .slot,
   .taxButton {
     gap: 2px;
+  }
+}
+
+@media (max-width: 360px) {
+  .slotText {
+    gap: 0;
+    transform: scaleX(0.6);
+    transform-origin: center;
+  }
+
+  .taxButton .slotText {
+    transform-origin: left center;
   }
 }
 
