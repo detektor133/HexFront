@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17k возвращена на доработку: на 360 px не доказано и не обеспечено отсутствие горизонтального переполнения строки HUD.
-- Читать `docs/stages/stage-07-playable-build.md` (07/T17k и 07/T17n), `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/test/t17h-top-panel.dom.test.tsx`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`.
-- Отчёт: `docs/reports/stage-07-t17k.md`.
-- `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
-- Следующая сессия: `$task 07/T17k продолжить`; после исправления — `$review 07/T17k`, затем `$task 07/T17n`.
+- 07/T17k исправлена после третьего возврата (владелец): кнопка паузы получила флекс-пол 44×44 (`.hud > .settingsButton`), кнопка налога переведена на `box-sizing: border-box`, на 360 px добавлен `@media` с уменьшенными отступами/зазором под обязательные цифры и приросты.
+- Новые тесты в `apps/client/test/t17k-hud.dom.test.tsx`: `window.innerWidth = 360` → «место» показывает `#N` без потери остальных значений/приростов; структурная проверка CSS-правил 44×44 и медиа-правила (jsdom не считает раскладку — `docs/testing.md`).
+- Отчёт: `docs/reports/stage-07-t17k.md` («Третий возврат» и «Исправление третьего возврата»).
+- `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
+- Задача отмечена `- [~]` (ждёт ревью). Следующая сессия: `$review 07/T17k`, затем `$task 07/T17n`.
 - CI не проверен, проверится в начале следующей сессии.

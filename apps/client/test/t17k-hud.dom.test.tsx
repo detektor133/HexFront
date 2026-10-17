@@ -167,4 +167,37 @@ describe('07/T17k: компактный HUD', () => {
     expect(onPause).toHaveBeenCalledOnce();
     expect(hudCss).toMatch(/\.settingsButton[\s\S]*?height: 44px;/);
   });
+
+  it('на 360 px сокращает место до #N без удаления прироста и остальных цифр', () => {
+    const innerWidth = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(360);
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const view = engine.snapshot().view;
+    const me = view.players[view.playerId];
+    if (!me) throw new Error('Игрок не найден');
+    render(<Hud view={view} send={vi.fn()} fog={true} setFog={vi.fn()} showFog={false} />);
+    expect(screen.getByText(`#${view.me.place}`)).toBeTruthy();
+    expect(screen.queryByText(`#${view.me.place}/${view.me.players}`)).toBeNull();
+    const hudText = document.querySelector('header')?.textContent ?? '';
+    expect(hudText).toContain(formatFp(view.me.popTotal));
+    expect(hudText).toContain(formatFp(me.gold));
+    expect(hudText).toContain(formatPercent(me.taxTarget));
+    expect(hudText).toContain(formatPercent(view.me.supplyLevel));
+    expect(hudText).toContain(formatClock(view.tick, TICKS_PER_S));
+    expect(hudText).toContain(formatRate(view.me.popGrowthPerS));
+    expect(hudText).toContain(formatRate(view.me.incomePerS - view.me.upkeepPerS));
+    innerWidth.mockRestore();
+  });
+
+  it('на 360 px сохраняет 44×44 у трёх кнопок и экономит отступы под строку', () => {
+    // jsdom не считает раскладку (testing.md): реальная ширина не измеряется, гарантия — структурная, по правилам CSS.
+    expect(hudCss).toMatch(
+      /\.hud > \.settingsButton \{\s*flex: 0 0 var\(--touch-target-min\);\s*\}/,
+    );
+    expect(hudCss).toMatch(/\.taxButton \{[\s\S]*?box-sizing: border-box;/);
+    expect(hudCss).toMatch(
+      /@media \(max-width: 360px\) \{\s*\.hud \{\s*padding: 0 var\(--space-sm\);\s*\}/,
+    );
+    expect(hudCss).toMatch(/\.slot,\s*\.taxButton \{\s*gap: 0;\s*\}/);
+  });
 });
