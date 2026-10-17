@@ -107,12 +107,14 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen ? Math.max(44, leaderboardRows * 44 + 16) : 44;
   const leaderboardY = input.hudHeight + gap;
+  const leaderboardFitsViewport = leaderboardY + leaderboardHeight <= height;
   const leaderboardFitsAboveBottomPanel = leaderboardY + leaderboardHeight <= bottomY - gap;
   const showBottomPanel =
     !input.paused &&
     !input.popupOpen &&
     (!input.leaderboardOpen || leaderboardFitsAboveBottomPanel);
-  const showLeaderboard = !input.paused && !input.popupOpen && !cardOpenOnPhone(input, width);
+  const showLeaderboard =
+    !input.paused && !input.popupOpen && !cardOpenOnPhone(input, width) && leaderboardFitsViewport;
   if (showBottomPanel) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
