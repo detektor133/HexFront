@@ -16,6 +16,7 @@ import {
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
 import { skippedPrompt, skippedReturnItems } from './return-guard.ts';
 import { runReview } from './review.ts';
+import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
 import {
   adoptOwnerSpec,
@@ -230,6 +231,11 @@ async function runWork(
   }
   delete state.resume;
   await save(context);
+  if (!isInfraTask(task)) {
+    const forbidden = await forbiddenPaths(git, base);
+    if (forbidden.length > 0)
+      return step(await park(context, `scope:${task}`, scopeViolation(task, forbidden)));
+  }
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return step(await park(context, `sync:${task}`, unsynced));
   const { stage, stageText } = await readStage(context.config.root);
