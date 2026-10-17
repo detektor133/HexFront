@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
 const tinyMap: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
@@ -91,6 +92,7 @@ function mockRuntime(selectedArmy: number | null = null): {
 }
 
 afterEach(() => {
+  cleanup();
   vi.resetModules();
   vi.unstubAllGlobals();
   window.history.replaceState({}, '', '/match');
@@ -137,6 +139,30 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
       expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
     }
     expect(document.querySelector('[class*="strip"]')).not.toBeNull();
-    expect(document.querySelector('[class*="dock"]')).not.toBeNull();
+    expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
+  });
+
+  it('удерживает нижнюю панель внутри раскладки на телефоне и ПК', () => {
+    for (const viewport of [
+      { width: 360, height: 640 },
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      const layout = computeMatchLayout({
+        viewport,
+        hudHeight: 88,
+        bottomPanelHeight: 150,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        leaderboardRows: 0,
+        cardHeight: 300,
+        cardOpen: true,
+        popupOpen: false,
+        paused: false,
+      });
+      expect(layout.elements.some((element) => element.id === 'bottom-panel')).toBe(true);
+      expect(validateMatchLayout(layout)).toEqual([]);
+    }
   });
 });
