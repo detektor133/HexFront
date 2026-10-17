@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17k ждёт ревью: HUD центрируется на ПК и занимает ширину телефона, шесть метрик и приросты остаются в одном ряду, SVG и меню соответствуют приёмке.
+- 07/T17k возвращена ревью: приёмочный тест не проверяет `computeMatchLayout`, все SVG-контуры, значения и приросты, клик паузы и зоны 44×44; подробности в `docs/reports/stage-07-t17k.md`.
 - Приёмка подтверждена `apps/client/test/t17k-hud.dom.test.tsx`; изменённый старый тест паузы синхронизирован с двумя полосами.
 - Читать `docs/stages/stage-07-playable-build.md` (07/T17n), `apps/client/src/dev/Hud.tsx`, `apps/client/src/match/layout.ts`, `docs/art/ui.md`.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и 76 tests.
