@@ -229,9 +229,23 @@ describe('T17m: карточка клетки', () => {
         },
       ] as (typeof message.view.recruits)[number][],
     };
+    const ready = { ok: true, cost: 1, timeS: 1 } as unknown as ConstructionCheck;
+    const readyRebuild = {
+      ok: true,
+      cityHex: city.hex,
+      path: [city.hex],
+      toBuild: [],
+      cost: 1,
+      affordable: true,
+    } as unknown as typeof city.rebuild;
     const preparedSelection = {
       ...message.selection,
-      city: { ...city, roadJob: { built: 1, total: 3 } },
+      city: {
+        ...city,
+        roadJob: { built: 1, total: 3 },
+        upgrade: ready,
+        rebuild: readyRebuild,
+      },
     };
     cleanup();
     render(
@@ -247,7 +261,19 @@ describe('T17m: карточка клетки', () => {
     expect(screen.getByText(/Прокладка дороги/u)).toBeTruthy();
     expect(screen.getByText(/Набор/u)).toBeTruthy();
 
-    const ready = { ok: true, cost: 1, timeS: 1 } as unknown as ConstructionCheck;
+    // Без активной стройки на гексе (не busy) видны и свои кнопки города.
+    cleanup();
+    render(
+      <HexCard
+        s={preparedSelection}
+        view={message.view}
+        map={mapResult.map}
+        send={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
+
     const prepared = {
       ...message.selection,
       city: null,
@@ -261,6 +287,8 @@ describe('T17m: карточка клетки', () => {
     for (const label of ['Основать город', 'Благоустроить', 'Укрепление', 'Склад']) {
       expect(screen.getByRole('button', { name: new RegExp(label, 'u') })).toBeTruthy();
     }
+    expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });
 
   it('берёт высоту из scrollHeight, если ResizeObserver сообщает нулевой contentRect', () => {
