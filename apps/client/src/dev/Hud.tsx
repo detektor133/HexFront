@@ -21,12 +21,13 @@ type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
 function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
   const iconRef = useRef<SVGSVGElement>(null);
   const paths: Record<MetricIconName, string> = {
-    people: 'M4 12a3 3 0 1 1 6 0M7 9a2 2 0 1 1 0-4M10 12a3 3 0 0 1 3-2.65M11 7a2 2 0 1 1 2-1.2',
+    people:
+      'M4 12C4 10.34 5.34 9 7 9C8.66 9 10 10.34 10 12M5 7C5 5.9 5.9 5 7 5C8.1 5 9 5.9 9 7M10 12C10 10.34 11.34 9 13 9M11 7C11 5.9 11.9 5 13 5',
     gold: 'M7 1v12M4 3h6a3 3 0 0 1 0 6H4a3 3 0 0 0 0 6h7M5 1h4M5 13h4',
     tax: 'M3 4h10M8 4v8M5 8h6M3 12h10M5 13h8M7 12v1',
-    supply: 'M2 5h8l2 2v6H2zM12 8h2v5h-2M5 10h3',
-    time: 'M7 2a5 5 0 1 1 0 10a5 5 0 0 1 0-10M7 4v3l2 2',
-    place: 'M7 2l2 3h3l-2.5 2 1 4L7 9.5 3.5 11l1-4L2 5h3z',
+    supply: 'M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8',
+    time: 'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
+    place: 'M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z',
   };
   useLayoutEffect(() => {
     iconRef.current?.setAttribute('title', props.label);

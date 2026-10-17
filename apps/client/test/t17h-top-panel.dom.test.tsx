@@ -171,7 +171,8 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       const coordinates = path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [];
       expect(
         coordinates.every((coordinate) => {
-          return Number(coordinate) <= 14;
+          const value = Number(coordinate);
+          return value >= 0 && value <= 14;
         }),
       ).toBe(true);
     }
