@@ -44,6 +44,9 @@ describe('07/T17o: прокрутка и движение панелей', () =>
       expect(node.scrollHeight).toBeGreaterThan(node.clientHeight);
       expect(style.overflowY).toBe('auto');
       expect(style.scrollbarWidth).toBe('none');
+
+      node.scrollTop = 40;
+      expect(node.scrollTop).toBe(40);
     }
   });
 
@@ -66,27 +69,35 @@ describe('07/T17o: прокрутка и движение панелей', () =>
       { width: 1440, height: 900 },
       { width: 1920, height: 1080 },
     ]) {
-      const layout = computeMatchLayout({
-        viewport,
-        hudHeight: viewport.width <= 600 ? 44 : 48,
-        bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
-        eventRows: 0,
-        tutorialVisible: false,
-        leaderboardOpen: false,
-        leaderboardRows: 0,
-        cardHeight: viewport.height,
-        cardOpen: true,
-        popupOpen: false,
-        paused: false,
-      });
-      const card = layout.elements.find((element) => element.id === 'card');
+      let previousCardHeight: number | undefined;
 
-      expect(card).toBeDefined();
-      expect(validateMatchLayout(layout)).toEqual([]);
-      expect(card?.y).toBeGreaterThanOrEqual(layout.hudHeight + 8);
-      expect((card?.y ?? 0) + (card?.height ?? 0)).toBeLessThanOrEqual(
-        viewport.height - layout.bottomPanelHeight - 8,
-      );
+      for (const cardHeight of [44, 120, viewport.height]) {
+        const layout = computeMatchLayout({
+          viewport,
+          hudHeight: viewport.width <= 600 ? 44 : 48,
+          bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
+          eventRows: 0,
+          tutorialVisible: false,
+          leaderboardOpen: false,
+          leaderboardRows: 0,
+          cardHeight,
+          cardOpen: true,
+          popupOpen: false,
+          paused: false,
+        });
+        const card = layout.elements.find((element) => element.id === 'card');
+
+        expect(card).toBeDefined();
+        expect(validateMatchLayout(layout)).toEqual([]);
+        expect(card?.y).toBeGreaterThanOrEqual(layout.hudHeight + 8);
+        expect((card?.y ?? 0) + (card?.height ?? 0)).toBeLessThanOrEqual(
+          viewport.height - layout.bottomPanelHeight - 8,
+        );
+        if (previousCardHeight !== undefined) {
+          expect(card?.height).not.toBe(previousCardHeight);
+        }
+        previousCardHeight = card?.height;
+      }
     }
   });
 });
