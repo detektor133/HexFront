@@ -68,6 +68,12 @@ export interface LoopState {
    * число показывает владельцу, сколько возвратов уже было. Живёт до `[x]` задачи.
    */
   returnTotals: Record<string, number>;
+  /**
+   * Задачи, которые `plan` заблокировал вопросом в `docs/QUESTIONS.md`, по задаче — снимок её
+   * блока на момент блокировки. Пока блок не изменился, цикл не зовёт `plan` снова и выбирает
+   * следующую незаблокированную задачу очереди; изменённый блок (ответ владельца) снимает блок.
+   */
+  planBlocked: Record<string, string>;
 }
 
 export const statePath = (root: string): string =>
@@ -86,6 +92,7 @@ export async function loadState(root: string): Promise<LoopState> {
     pullRequests: {},
     reviewReturns: {},
     returnTotals: {},
+    planBlocked: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';

@@ -1,4 +1,11 @@
 {
   "reviewer": ["docs/stages/**", "docs/STATUS.md", "docs/reports/**", ".ai-logs/**"],
-  "spec": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", ".ai-logs/**"]
+  "spec": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", ".ai-logs/**"],
+  "plan": [
+    "docs/stages/**",
+    "docs/STATUS.md",
+    "docs/QUESTIONS.md",
+    "docs/DECISIONS.md",
+    ".ai-logs/**"
+  ]
 }

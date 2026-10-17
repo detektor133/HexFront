@@ -347,6 +347,9 @@ export async function processTask(
       context.state.returnTotals = Object.fromEntries(
         Object.entries(context.state.returnTotals).filter(([key]) => key !== current),
       );
+      context.state.planBlocked = Object.fromEntries(
+        Object.entries(context.state.planBlocked).filter(([key]) => key !== current),
+      );
       config.board?.count('done');
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };

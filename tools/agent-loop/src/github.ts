@@ -44,6 +44,7 @@ export const STOP_LABEL = 'agent-stop';
 const SKILLS = {
   decide: 'text',
   bug: 'text',
+  plan: 'text',
   split: 'task',
   task: 'task',
   accept: 'task',

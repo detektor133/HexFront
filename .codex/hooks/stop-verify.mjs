@@ -17,7 +17,7 @@ function readEvent() {
 const event = readEvent();
 
 // spec оставляет в дереве нарочно красные приёмочные тесты: verify для него всегда красный.
-if (['planner', 'tester', 'coder', 'reviewer', 'spec'].includes(process.env.AGENT_ROLE))
+if (['planner', 'tester', 'coder', 'reviewer', 'spec', 'plan'].includes(process.env.AGENT_ROLE))
   process.exit(0);
 
 // Ход уже был продолжен этим хуком — не зацикливаемся, решение за агентом.

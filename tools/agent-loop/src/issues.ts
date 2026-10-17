@@ -185,7 +185,11 @@ async function runIssue(
     return setStreams(context, issue, command.count);
   if ((command.skill === 'task' || command.skill === 'review') && command.task !== undefined)
     return runTaskIssue(context, issue, command, command.task);
-  const result = await runSkill(context, 'next', command.prompt);
+  const result = await runSkill(
+    context,
+    command.skill === 'plan' ? 'plan' : 'next',
+    command.prompt,
+  );
   if (result.ok)
     return finish(
       context,

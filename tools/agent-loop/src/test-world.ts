@@ -59,6 +59,8 @@ export interface World {
   readonly lint?: readonly string[];
   /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
   readonly spec?: boolean;
+  /** В roles.json есть роль plan: цикл проверяет текст задачи перед работой над ней. */
+  readonly plan?: boolean;
   /** Память прошлого запуска цикла (`state.json`). */
   readonly state?: Partial<LoopState>;
   /** Панель консоли: что агенты делают, счётчики, клавиши владельца. */
@@ -148,6 +150,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       next: { model: 'luna', reasoningEffort: 'medium' },
       review: { reasoningEffort: 'medium' },
       ...(world.spec === true ? { spec: { reasoningEffort: 'medium' } } : {}),
+      ...(world.plan === true ? { plan: { reasoningEffort: 'medium' } } : {}),
     }),
   );
   await writeFile(
@@ -155,6 +158,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     JSON.stringify({
       reviewer: ['docs/stages/**', 'docs/STATUS.md', 'docs/reports/**'],
       spec: ['**/*.test.ts', '**/test/**'],
+      plan: ['docs/stages/**', 'docs/STATUS.md', 'docs/QUESTIONS.md', 'docs/DECISIONS.md'],
     }),
   );
   const sessions = [...world.sessions];

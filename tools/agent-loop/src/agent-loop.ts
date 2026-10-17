@@ -19,6 +19,7 @@ import { applyLimitRequest, applyRetries, runStreams, streamLimit } from './disp
 import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
+import { planEnabled, selectPlannedTask } from './plan.ts';
 import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
 import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
@@ -123,9 +124,12 @@ async function tick(context: LoopContext): Promise<Step> {
   if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
-  const task = selectTask(stage.status, stage.stageText);
-  if (task === undefined) return closeStage(context, stage);
-  const block = taskBlock(stage.stageText, task);
+  const selected = await selectPlannedTask(context, stage);
+  if (selected === undefined) return closeStage(context, await readStage(config.root));
+  if (typeof selected === 'string') return selected;
+  const { task, mark, workPrompt } = selected;
+  const fresh = await readStage(config.root);
+  const block = taskBlock(fresh.stageText, task);
   if (isOwnerTask(block))
     return park(
       context,
@@ -133,9 +137,8 @@ async function tick(context: LoopContext): Promise<Step> {
       `очередь дошла до ${task} — это задача владельца. Когда сделаешь — Issue «$done ${task}» с текстом, что сделано`,
       firstLine(block),
     );
-  const mark = taskMark(stage.stageText, task) ?? ' ';
   await context.say(`задача ${task} [${mark}]`);
-  return (await processTask(context, task, { mark, workPrompt: '$next' })).step;
+  return (await processTask(context, task, { mark, workPrompt })).step;
 }
 
 /**
@@ -202,7 +205,13 @@ async function describe(context: LoopContext): Promise<void> {
     config.writeLine(`задача владельца: ${task}`);
   else
     config.writeLine(
-      `${taskMark(stage.stageText, task) === '~' ? '$review' : '$next → CI → $review'}: ${task}`,
+      `${
+        taskMark(stage.stageText, task) === '~'
+          ? '$review'
+          : planEnabled(context)
+            ? '$next → plan → $task → CI → $review'
+            : '$next → CI → $review'
+      }: ${task}`,
     );
 }
 

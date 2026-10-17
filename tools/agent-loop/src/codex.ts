@@ -11,14 +11,19 @@ interface RoleConfig {
 }
 /**
  * `next` — сессии, которые пишут код и docs; `review` — только `$review`, с правами reviewer;
- * `spec` — `$spec`, только приёмочные тесты до кода.
+ * `spec` — `$spec`, только приёмочные тесты до кода; `plan` — `$plan`, только проверка текста
+ * задачи перед исполнителем (файл этапа, STATUS, QUESTIONS, DECISIONS).
  */
-export type Role = 'next' | 'review' | 'spec';
+export type Role = 'next' | 'review' | 'spec' | 'plan';
 export interface AgentDefinitions {
-  /** Роль `spec` необязательна: без неё в roles.json цикл не пишет приёмочные тесты до кода. */
-  readonly roles: Readonly<Record<'next' | 'review', RoleConfig>> & { readonly spec?: RoleConfig };
+  /** Роли `spec` и `plan` необязательны: без них в roles.json цикл работает по-старому. */
+  readonly roles: Readonly<Record<'next' | 'review', RoleConfig>> & {
+    readonly spec?: RoleConfig;
+    readonly plan?: RoleConfig;
+  };
   readonly reviewerPaths: readonly string[];
   readonly specPaths: readonly string[];
+  readonly planPaths: readonly string[];
 }
 export interface CodexSettings {
   readonly root: string;
@@ -55,12 +60,19 @@ export async function loadAgentDefinitions(root: string): Promise<AgentDefinitio
   const permissions = JSON.parse(permissionsText) as {
     readonly reviewer?: readonly string[];
     readonly spec?: readonly string[];
+    readonly plan?: readonly string[];
   };
   if (!roles.next || !roles.review) throw new Error('В roles.json нужны роли next и review');
   return {
-    roles: { next: roles.next, review: roles.review, ...(roles.spec ? { spec: roles.spec } : {}) },
+    roles: {
+      next: roles.next,
+      review: roles.review,
+      ...(roles.spec ? { spec: roles.spec } : {}),
+      ...(roles.plan ? { plan: roles.plan } : {}),
+    },
     reviewerPaths: permissions.reviewer ?? [],
     specPaths: permissions.spec ?? [],
+    planPaths: permissions.plan ?? [],
   };
 }
 
@@ -86,8 +98,13 @@ export async function runCodex(
   /** Приёмочные тесты, которые сессия не может менять (`AGENT_LOCKED` для хука прав). */
   locked: readonly string[] = [],
 ): Promise<Session> {
-  const roleConfig = role === 'spec' ? definitions.roles.spec : definitions.roles[role];
-  if (roleConfig === undefined) throw new Error('В roles.json нет роли spec');
+  const roleConfig =
+    role === 'spec'
+      ? definitions.roles.spec
+      : role === 'plan'
+        ? definitions.roles.plan
+        : definitions.roles[role];
+  if (roleConfig === undefined) throw new Error(`В roles.json нет роли ${role}`);
   const outputDir = await mkdtemp(join(tmpdir(), 'hexfront-agent-'));
   const outputFile = join(outputDir, 'last-message.txt');
   const started = settings.now();
@@ -118,7 +135,8 @@ export async function runCodex(
         env: {
           ...process.env,
           ...settings.env,
-          AGENT_ROLE: role === 'review' ? 'reviewer' : role === 'spec' ? 'spec' : '',
+          AGENT_ROLE:
+            role === 'review' ? 'reviewer' : role === 'spec' || role === 'plan' ? role : '',
           AGENT_LOCKED: locked.join('\n'),
         },
         input: prompt,

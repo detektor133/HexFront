@@ -42,11 +42,18 @@ export const parseQueue = (status: string): string[] =>
     ...(status.match(/Очередь:\s*([^\r\n]+)/)?.[1] ?? '').matchAll(new RegExp(TASK_ID_SOURCE, 'g')),
   ].map((match) => match[0]);
 
-/** @returns первая задача очереди STATUS, не закрытая в файле этапа (`[ ]` или `[~]`). */
-export function selectTask(status: string, stageText: string): string | undefined {
+/**
+ * @returns первая задача очереди STATUS, не закрытая в файле этапа (`[ ]` или `[~]`) и не в
+ * `skip` (задачи, которые `plan` заблокировал вопросом в `docs/QUESTIONS.md`).
+ */
+export function selectTask(
+  status: string,
+  stageText: string,
+  skip: readonly string[] = [],
+): string | undefined {
   return parseQueue(status).find((task) => {
     const mark = taskMark(stageText, task);
-    return mark === ' ' || mark === '~';
+    return (mark === ' ' || mark === '~') && !skip.includes(task);
   });
 }
 
