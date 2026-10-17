@@ -21,9 +21,9 @@ type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
 function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
   const iconRef = useRef<SVGSVGElement>(null);
   const paths: Record<MetricIconName, string> = {
-    people: 'M4 12a3 3 0 1 1 6 0M7 9a2 2 0 1 1 0-4M10 12a3 3 0 0 1 4-2.65M12 7a2 2 0 1 1 3.2-1.6',
+    people: 'M4 12a3 3 0 1 1 6 0M7 9a2 2 0 1 1 0-4M10 12a3 3 0 0 1 3-2.65M11 7a2 2 0 1 1 2-1.2',
     gold: 'M7 1v12M4 3h6a3 3 0 0 1 0 6H4a3 3 0 0 0 0 6h7M5 1h4M5 13h4',
-    tax: 'M3 4h10M8 4v8M5 8h6M3 12h10M5 16h8M7 12v4',
+    tax: 'M3 4h10M8 4v8M5 8h6M3 12h10M5 13h8M7 12v1',
     supply: 'M2 5h8l2 2v6H2zM12 8h2v5h-2M5 10h3',
     time: 'M7 2a5 5 0 1 1 0 10a5 5 0 0 1 0-10M7 4v3l2 2',
     place: 'M7 2l2 3h3l-2.5 2 1 4L7 9.5 3.5 11l1-4L2 5h3z',
@@ -221,6 +221,7 @@ export function Hud(props: {
         label={t('hud.people')}
         value={formatFp(s.popTotal)}
         rate={formatRate(s.popGrowthPerS)}
+        negative={s.popGrowthPerS < 0}
       />
       <Slot
         icon="gold"

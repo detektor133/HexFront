@@ -111,8 +111,13 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       expect(icon.getAttribute('title')).toBe(metric.label);
       const metricElement = icon.parentElement;
       if (!metricElement) throw new Error(`Иконка «${metric.label}» не связана со значением`);
-      expect(metricElement.textContent).toContain(metric.value);
-      if ('rate' in metric) expect(metricElement.textContent).toContain(metric.rate);
+      expect(metricElement).not.toBe(header);
+      const metricText = metricElement.textContent?.replace(/\s+/g, '') ?? '';
+      const expectedText = `${metric.value}${'rate' in metric ? metric.rate : ''}`.replace(
+        /\s+/g,
+        '',
+      );
+      expect(metricText).toBe(expectedText);
     }
   });
 
