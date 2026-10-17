@@ -173,14 +173,15 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   }
   const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
   if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {
+    const cardHeight = Math.min(Math.max(44, input.cardHeight), cardAvailableHeight);
     elements.push(
       layoutElement(
         'card',
         'card',
         edge,
-        Math.max(input.hudHeight + gap, bottomY - gap - input.cardHeight),
+        Math.max(input.hudHeight + gap, bottomY - gap - cardHeight),
         Math.min(320, width - edge * 2),
-        Math.min(input.cardHeight, cardAvailableHeight),
+        cardHeight,
       ),
     );
   }
