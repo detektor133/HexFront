@@ -4,13 +4,11 @@
 // делал соседние пункты, цикл видел коммит и зелёный CI и снова отправлял задачу на ревью.
 import { readStage, type LoopContext } from './context.ts';
 import { remarkRefs, samePath } from './review-scope.ts';
-import { SPEC_REMARK_RE } from './spec.ts';
+import { SPEC_REMARK_RE, specFiles } from './spec.ts';
 import { taskBlock } from './stage-file.ts';
 
 const RETURN_HEAD_RE = /^\s*Возврат ревью/u;
 const ITEM_RE = /^\s{2,}[-*]\s+(.*\S)/u;
-// Тесты исполнитель может не менять (закрыты, отдельная ветка возврата «СПЕК:»): их не судим.
-const TEST_PATH_RE = /\.test\.[cm]?[jt]sx?$|\/tests?\//u;
 
 /** Пункты последнего блока «Возврат ревью:» задачи. */
 export function lastReturnItems(block: string): string[] {
@@ -38,14 +36,21 @@ export const touchedPaths = (nameStatus: string): string[] =>
 
 /**
  * Пункты про код продукта, у которых названы файлы `файл:строки`, и ни один из них не менялся.
- * Пункт без ссылок, «СПЕК:» и ссылки на тесты цикл судить не может — они не считаются пропуском.
+ * Пункт без ссылок, «СПЕК:» и ссылки на закрытые приёмочные тесты задачи (их исполнитель не может
+ * тронуть, это не пропуск) цикл не судит. Обычный тест-файл, названный возвратом, судится как
+ * любой другой: 2026-10-17, 07/T22 — возврат указал на `view-delta-memory.test.ts`, исполнитель
+ * вместо него правил код цикла, а прежнее блан­кетное исключение всех `*.test.*` это бы не поймало.
  */
-export function untouchedItems(items: readonly string[], touched: readonly string[]): string[] {
+export function untouchedItems(
+  items: readonly string[],
+  touched: readonly string[],
+  locked: readonly string[] = [],
+): string[] {
   return items.filter((item) => {
     if (SPEC_REMARK_RE.test(item)) return false;
     const paths = remarkRefs(item)
       .map((ref) => ref.path)
-      .filter((path) => !TEST_PATH_RE.test(path));
+      .filter((path) => !locked.some((l) => samePath(l, path)));
     return paths.length > 0 && !paths.some((p) => touched.some((t) => samePath(t, p)));
   });
 }
@@ -65,7 +70,7 @@ export async function skippedReturnItems(context: LoopContext, task: string): Pr
   if (items.length === 0) return [];
   const diff = await git.attempt(['diff', '-M', '--name-status', '--no-color', base, 'HEAD']);
   if (diff.code !== 0 || diff.stdout.trim() === '') return [];
-  return untouchedItems(items, touchedPaths(diff.stdout));
+  return untouchedItems(items, touchedPaths(diff.stdout), specFiles(context, task));
 }
 
 /** Запрос работы: пункты возврата, файлы которых исполнитель не тронул. */

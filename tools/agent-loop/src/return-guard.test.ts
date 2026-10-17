@@ -47,14 +47,22 @@ describe('пропуск пунктов возврата', () => {
     expect(untouchedItems([`${MENU}:1 и worker.ts:2 — связь`], ['src/worker.ts'])).toEqual([]);
   });
 
-  it('пункты без ссылок, СПЕК и ссылки на тесты пропуском не считаются', () => {
+  it('пункты без ссылок и СПЕК пропуском не считаются; закрытый тест задачи — тоже', () => {
+    const locked = 'apps/client/test/locked.test.ts';
     const items = [
       'нет проверки клика',
       `СПЕК: ${MENU}:40 — тест слаб`,
-      'apps/client/test/menu.dom.test.tsx:12 — не хватает случая',
-      'apps/client/test/helper.ts:3 — общий помощник',
+      `${locked}:12 — пункт о закрытом тесте`,
     ];
-    expect(untouchedItems(items, [])).toEqual([]);
+    expect(untouchedItems(items, [], [locked])).toEqual([]);
+  });
+
+  it('обычный, не закрытый тест-файл судится как любой другой файл', () => {
+    // 2026-10-17, 07/T22: возврат указал на view-delta-memory.test.ts, исполнитель вместо него
+    // правил код цикла — прежнее исключение всех *.test.* файлов этот пропуск не ловило.
+    const item = 'apps/client/test/view-delta-memory.test.ts:23-46,117 — слабее toEqual';
+    expect(untouchedItems([item], [], ['apps/client/test/locked.test.ts'])).toEqual([item]);
+    expect(untouchedItems([item], ['apps/client/test/view-delta-memory.test.ts'], [])).toEqual([]);
   });
 
   it('запрос повтора называет пункты и оставляет выход, если пункт выполнен в другом файле', () => {
