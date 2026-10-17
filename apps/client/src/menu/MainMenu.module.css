@@ -82,6 +82,20 @@
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 150ms var(--motion-easing),
+    border-color 150ms var(--motion-easing);
+}
+
+.color:hover {
+  transform: scale(1.12);
+  border-color: var(--ui-border-strong);
+}
+
+.color:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
 }
 
 .color.selected {
@@ -130,6 +144,12 @@
   background: var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
+  cursor: pointer;
+  transition: background-color 150ms var(--motion-easing);
+}
+
+.secondary:hover {
+  background: var(--ui-surface2);
 }
 
 .play {
@@ -143,5 +163,12 @@
   background: var(--ui-button-primary-bg);
   color: var(--ui-button-primary-ink);
   font: inherit;
+  font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms var(--motion-easing);
+}
+
+.play:hover {
+  background: color-mix(in srgb, var(--ui-button-primary-bg) 85%, var(--ui-button-primary-ink));
 }
