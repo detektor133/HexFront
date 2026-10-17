@@ -92,7 +92,7 @@ function readPixels(value: string): number {
 function mockTaxButtonGeometry(): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
     function getBoundingClientRect(this: HTMLElement): DOMRect {
-      if (this.tagName === 'BUTTON' && this.getAttribute('aria-label')?.match(/Налог|Tax/u)) {
+      if (this.tagName === 'BUTTON' && this.getAttribute('aria-label')?.match(/^(Налог|Tax)$/u)) {
         return new DOMRect(window.innerWidth <= 600 ? 80 : 320, 0, 120, 48);
       }
       return new DOMRect();

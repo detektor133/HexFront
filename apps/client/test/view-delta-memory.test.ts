@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -9,6 +10,7 @@ import { createPlanLayer } from '../src/dev/plan-layer.ts';
 import { createChip, type ChipState } from '../src/dev/unit-chips.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
+import type { ViewPayload } from '../src/local/messages.ts';
 import { ViewDeltaApplier, ConfirmedViewDeltaStream } from '../src/local/view-delta.ts';
 
 const spawnMock = vi.hoisted(() => vi.fn());
@@ -19,31 +21,6 @@ vi.mock('@playwright/test', () => ({ chromium: { launch: launchMock } }));
 
 const GEN_MAP_PATH = join(process.cwd(), 'apps/client/dist/maps/gen-42-30.json');
 const SOURCE_ROOT = join(process.cwd(), 'apps/client/src');
-
-function equalView(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true;
-  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
-    return false;
-  }
-  if (ArrayBuffer.isView(left) || ArrayBuffer.isView(right)) {
-    if (!ArrayBuffer.isView(left) || !ArrayBuffer.isView(right)) return false;
-    if (left.byteLength !== right.byteLength) return false;
-    const leftBytes = new Uint8Array(left.buffer, left.byteOffset, left.byteLength);
-    const rightBytes = new Uint8Array(right.buffer, right.byteOffset, right.byteLength);
-    return leftBytes.every((value, index) => value === rightBytes[index]);
-  }
-  if (Array.isArray(left) || Array.isArray(right)) {
-    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((value, index) => equalView(value, right[index]));
-  }
-  const leftRecord = left as Record<string, unknown>;
-  const rightRecord = right as Record<string, unknown>;
-  const keys = Object.keys(leftRecord);
-  return (
-    keys.length === Object.keys(rightRecord).length &&
-    keys.every((key) => key in rightRecord && equalView(leftRecord[key], rightRecord[key]))
-  );
-}
 
 function installCanvasStub(): void {
   class TestCanvasRenderingContext2D {
@@ -103,7 +80,7 @@ describe('дельты вида и текст карты (07/T15)', () => {
     let messageCount = 0;
 
     for (let tick = 0; tick < 1200; tick += 1) {
-      const message = created.tick();
+      const message: ViewPayload = created.tick();
       if (message.t !== 'view') throw new Error('ожидался снимок локального движка');
       const transport = stream.next(message.view, message.events);
       if (transport === null) throw new Error('поток ожидает подтверждение');
@@ -114,7 +91,7 @@ describe('дельты вида и текст карты (07/T15)', () => {
         applier.applyDelta(transport.delta);
       }
       stream.acknowledge();
-      expect(equalView(applier.view, message.view)).toBe(true);
+      assert.deepStrictEqual(applier.view, message.view);
       messageCount += 1;
     }
 
