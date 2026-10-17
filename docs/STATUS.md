@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17k возвращена ревью: приёмочный тест не проверяет `computeMatchLayout`, все SVG-контуры, значения и приросты, клик паузы и зоны 44×44; подробности в `docs/reports/stage-07-t17k.md`.
-- Приёмка подтверждена `apps/client/test/t17k-hud.dom.test.tsx`; изменённый старый тест паузы синхронизирован с двумя полосами.
-- Читать `docs/stages/stage-07-playable-build.md` (07/T17n), `apps/client/src/dev/Hud.tsx`, `apps/client/src/match/layout.ts`, `docs/art/ui.md`.
-- `pnpm verify --changed` зелёный: build, types, lint, prettier и 76 tests.
+- 07/T17k исправлена после возврата ревью: усилен DOM-тест компактного HUD; задача отмечена `[~]`.
+- Читать `docs/stages/stage-07-playable-build.md` (07/T17n), `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/match/layout.ts`.
+- Отчёт: `docs/reports/stage-07-t17k.md`.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая сессия: `$review 07/T17k`; затем `$task 07/T17n`.
 - CI не проверен, проверится в начале следующей сессии.
