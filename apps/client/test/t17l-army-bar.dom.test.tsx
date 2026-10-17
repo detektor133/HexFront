@@ -20,9 +20,13 @@ function installResizeObserver(): void {
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
     public observe(target: Element): void {
-      const height = target.className.toString().includes('dock') ? 150 : 88;
+      const isDock = target.className.toString().includes('dock');
+      Object.defineProperty(target, 'scrollHeight', {
+        configurable: true,
+        value: isDock ? 150 : 88,
+      });
       this.callback(
-        [{ target, contentRect: new DOMRect(0, 0, 1440, height) } as ResizeObserverEntry],
+        [{ target, contentRect: new DOMRect(0, 0, 1440, 0) } as ResizeObserverEntry],
         this as unknown as ResizeObserver,
       );
     }

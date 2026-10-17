@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17l: возвращена существующая панель армий в реальный `MatchSurface`; измерение высоты использует `scrollHeight`, чтобы тулбар и карточки не выходили из расчётной нижней панели.
-- Добавлен DOM-тест `apps/client/test/t17l-army-bar.dom.test.tsx`: проверены видимость панели, выбор армии, резерв, `setAutoReinforce`, `createArmy`, тулбар и горизонтальная лента.
+- 07/T17l: исправлен возврат ревью — DOM-тест задаёт `contentRect.height = 0` и положительный `scrollHeight`, поэтому проверяет защиту панели от нулевой высоты.
+- Реализация `ArmyBar` остаётся единственным компонентом в `MatchSurface` и измеряет фактическую высоту через `scrollHeight`.
 - `pnpm verify --changed`: зелёный.
 - Следующая задача: 07/T17m. Читать блок T17m в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`.
