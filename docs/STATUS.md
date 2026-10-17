@@ -16,7 +16,7 @@
 ## Следующая сессия
 
 - 07/T17m исправлена: тест сравнивает полный набор кнопок городской и обычной карточки с `visibleActions`, исключая только кнопки набора по отсутствию `aria-label`.
-- T17m отмечена `- [~]`; следующая сессия — новый `$review 07/T17m`.
+- T17m отмечена `- [x]`; следующая сессия — 07/T17n.
 - Следующая задача очереди — 07/T17n: проверить, что ArmyBar не пропадает и не дёргается при открытии карточки клетки.
 - Следующей сессии читать `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test/t17n-army-bar.dom.test.tsx` и блок T17n в этапе.
 - CI не проверен, проверится в начале следующей сессии.
