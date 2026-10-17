@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadMap } from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
+import { UnitCard } from '../src/dev/UnitCard.tsx';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
@@ -111,6 +112,43 @@ describe('T17m: карточка клетки', () => {
     expect(screen.queryByText(/Строительство/u)).toBeNull();
     expect(screen.queryByText(/Набор/u)).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('не раскрывает fogged-нейтральную клетку и не ломает UnitCard', () => {
+    const engine = createLocalEngine(mapJson, 42, 2, [], true);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const initial = engine.snapshot();
+    const neutralHex = initial.view.hexes.owner.findIndex(
+      (owner, index) => owner === -1 && initial.view.hexes.visible[index] === 0,
+    );
+    const unit = initial.view.units.find((item) => item.owner === 0);
+    if (neutralHex < 0 || !unit) throw new Error('нейтральный гекс или свой отряд не найден');
+
+    engine.select(neutralHex);
+    const message = engine.snapshot();
+    if (!message.selection) throw new Error('выбор нейтральной клетки не создан');
+    render(
+      <HexCard
+        s={message.selection}
+        view={message.view}
+        map={mapResult.map}
+        send={() => undefined}
+      />,
+    );
+    expect(screen.getByText('нейтральный')).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
+    cleanup();
+
+    render(
+      <UnitCard
+        view={message.view}
+        map={mapResult.map}
+        picked={{ hex: null, units: [unit.id], target: null }}
+        send={() => undefined}
+        onPick={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'В армию' })).toBeTruthy();
   });
 
   it.each([
