@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17m: исправлена причина красного CI в приёмочном тесте — кнопки набора исключены из подсчёта действий карточки города, но точный набор `upgrade`/`rebuild` сохранён.
-- `apps/client/test/t17m-hex-card.dom.test.tsx` и запись возврата в этапе обновлены; `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
-- T17m остаётся `- [~]`; следующий шаг — `$review 07/T17m` в новой сессии.
+- 07/T17m возвращена: проверка городской карточки фильтрует только ожидаемые `upgrade`/`rebuild` и пропускает лишнее действие; нужно сравнить полный набор действий с `visibleActions`, исключив только кнопки набора по явному признаку.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests; зелёный прогон не закрывает неполную приёмку.
+- T17m отмечена `- [ ]`; после исправления приёмочного теста нужен новый `$review 07/T17m`.
 - Следующей сессии читать `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test/t17n-army-bar.dom.test.tsx` и блок T17n в этапе.
 - CI не проверен, проверится в начале следующей сессии.
