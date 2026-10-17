@@ -2,12 +2,23 @@
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-width: none;
+  transition:
+    top 150ms var(--motion-easing),
+    height 150ms var(--motion-easing);
   padding: var(--space-sm);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   box-shadow: var(--shadow-hard);
   font-variant-numeric: tabular-nums;
+}
+
+.panel::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .collapsed {
