@@ -15,11 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17m возвращена на доработку по новому тексту задачи: приёмочный DOM-тест не сравнивает полный набор действий городской карточки с `visibleActions`; лишняя кнопка останется незамеченной. Профильные тесты 13/13 и `pnpm verify --changed` зелёные.
-- Следующая сессия — исправить `СПЕК:` в `apps/client/test/t17m-hex-card.dom.test.tsx`, затем повторить `$review 07/T17m`.
-- `apps/client/test/t17k-hud.dom.test.tsx` монтирует реальный `Hud`, проверяет четыре viewport, все значения и приросты, SVG, кнопки и CSS-контракт компактного режима.
-- `docs/reports/stage-07-t17k.md` дополнен разделом «Исправление третьего возврата ревью».
-- `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
-- Задача отмечена `- [~]`; следующая сессия — `$review 07/T17k`.
-- Читать `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test/t17k-hud.dom.test.tsx` и отчёт задачи.
-- CI проверится в начале следующей сессии.
+- 07/T17m: приёмочный тест усилен по СПЕК — реальный путь выбора клетки проверяет исходные данные, смену клетки и закрытие; подготовленные карточки сравнивают полный набор допустимых действий без лишних кнопок.
+- `apps/client/test/t17m-hex-card.dom.test.tsx` изменён, `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
+- T17m отмечена `- [~]`; следующая задача — 07/T17n.
+- Следующей сессии читать `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test/t17n-army-bar.dom.test.tsx` и блок T17n в этапе.
+- CI не проверен, проверится в начале следующей сессии.

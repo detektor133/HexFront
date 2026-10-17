@@ -273,6 +273,7 @@ describe('T17m: карточка клетки', () => {
     );
     expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
 
     const prepared = {
       ...message.selection,
@@ -284,9 +285,14 @@ describe('T17m: карточка клетки', () => {
     };
     cleanup();
     render(<HexCard s={prepared} view={message.view} map={mapResult.map} send={() => undefined} />);
-    for (const label of ['Основать город', 'Благоустроить', 'Укрепление', 'Склад']) {
-      expect(screen.getByRole('button', { name: new RegExp(label, 'u') })).toBeTruthy();
-    }
+    const plainButtons = screen.getAllByRole('button');
+    expect(plainButtons).toHaveLength(4);
+    expect(plainButtons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining('Основать город'),
+      expect.stringContaining('Благоустроить'),
+      expect.stringContaining('Укрепление'),
+      expect.stringContaining('Склад'),
+    ]);
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });
