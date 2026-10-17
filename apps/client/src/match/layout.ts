@@ -106,7 +106,22 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen ? Math.max(44, leaderboardRows * 44 + 16) : 44;
-  const leaderboardY = input.hudHeight + gap;
+  const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
+  const popupHeight =
+    input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);
+  const popupX = Math.min(
+    Math.max(edge, input.popupAnchorX ?? (width - popupWidth) / 2),
+    width - edge - popupWidth,
+  );
+  const popupY = input.popupAnchorY ?? input.hudHeight;
+  const defaultLeaderboardY = input.hudHeight + gap;
+  const popupOverlapsLeaderboard =
+    input.popupOpen &&
+    popupX < width - edge &&
+    popupX + popupWidth > Math.max(edge, width - edge - leaderboardWidth) &&
+    popupY < defaultLeaderboardY + leaderboardHeight &&
+    popupY + popupHeight > defaultLeaderboardY;
+  const leaderboardY = popupOverlapsLeaderboard ? popupY + popupHeight + gap : defaultLeaderboardY;
   const leaderboardFitsViewport = leaderboardY + leaderboardHeight <= height;
   const leaderboardFitsAboveBottomPanel = leaderboardY + leaderboardHeight <= bottomY - gap;
   const showBottomPanel =
@@ -114,7 +129,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     !input.popupOpen &&
     (!input.leaderboardOpen || leaderboardFitsAboveBottomPanel);
   const showLeaderboard =
-    !input.paused && !input.popupOpen && !cardOpenOnPhone(input, width) && leaderboardFitsViewport;
+    !input.paused && !cardOpenOnPhone(input, width) && leaderboardFitsViewport;
   if (showBottomPanel) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
@@ -170,21 +185,12 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     );
   }
   if (input.popupOpen || input.paused) {
-    const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
-    const popupHeight =
-      input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);
-    const popupX = Math.min(
-      Math.max(edge, input.popupAnchorX ?? (width - popupWidth) / 2),
-      width - edge - popupWidth,
-    );
     elements.push(
       layoutElement(
         input.paused ? 'pause-menu' : 'popup-menu',
         input.paused ? 'pause-menu' : 'popup-menu',
         input.paused ? Math.max(edge, (width - 280) / 2) : popupX,
-        input.paused
-          ? Math.max(input.hudHeight + gap, (height - 240) / 2)
-          : (input.popupAnchorY ?? input.hudHeight),
+        input.paused ? Math.max(input.hudHeight + gap, (height - 240) / 2) : popupY,
         popupWidth,
         input.paused
           ? Math.max(44, Math.min(240, height - input.hudHeight - gap - edge))

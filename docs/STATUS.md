@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17i принята после повторной сверки изменённого текста задачи; DOM и раскладка подтверждены целевыми тестами.
-- Следующая задача: 07/T17j.
-- Читать блок T17j в `docs/stages/stage-07-playable-build.md`, затем связанные файлы из `docs/STATUS.md` и `docs/DECISIONS.md`.
-- Следующая задача: 07/T17j.
-- Читать блок T17j в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/MatchPage.tsx` и тесты налога/лидерборда.
+- 07/T17j выполнена: лидерборд не размонтируется при открытии налога, а на узком экране раскладка разводит его с окном налога.
+- DOM-тест проверяет раскрытый и свёрнутый режимы при открытии, изменении и закрытии налога; тест раскладки проверяет границы и отсутствие пересечения.
+- Следующая задача: 07/T17k.
+- Читать блок T17k в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/src/match/layout.ts` и тесты верхней панели.
