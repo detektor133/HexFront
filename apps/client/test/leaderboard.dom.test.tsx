@@ -117,7 +117,11 @@ describe('лидерборд', () => {
     const source = view();
     const largeView = {
       ...source,
-      ranking: Array.from({ length: 30 }, (_, id) => ({ id, score: 30 - id, place: id + 1 })),
+      ranking: Array.from({ length: 30 }, (_, id) => ({
+        id,
+        score: id < 2 ? 30 : id < 4 ? 20 : 10 - id,
+        place: id < 2 ? 1 : id < 4 ? 3 : id + 1,
+      })),
       players: Array.from({ length: 30 }, (_, id) => ({
         id,
         gold: 0 as Fp,
@@ -132,5 +136,20 @@ describe('лидерборд', () => {
     expect(screen.getAllByRole('rowheader')).toHaveLength(5);
     expect(screen.getByText('Живы: 30')).toBeTruthy();
     expect(screen.queryByText('Игрок 6')).toBeNull();
+
+    const rows = screen.getAllByRole('row');
+    expect(
+      rows.slice(1).map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      ),
+    ).toEqual([
+      ['Игрок 1', '30'],
+      ['Игрок 2', '30'],
+      ['Игрок 3', '20'],
+      ['Игрок 4', '20'],
+      ['Игрок 5', '6'],
+    ]);
   });
 });
