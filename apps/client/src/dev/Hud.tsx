@@ -230,10 +230,11 @@ export function Hud(props: {
         negative={net < 0}
       />
       <div className={styles.taxWrap}>
-        <button
+        <IconButton
           type="button"
-          ref={taxButtonRef}
+          buttonRef={taxButtonRef}
           className={styles.taxButton}
+          label={t('hud.tax')}
           aria-expanded={taxOpen}
           onClick={() =>
             setTaxOpen((open) => {
@@ -245,7 +246,7 @@ export function Hud(props: {
         >
           <MetricIcon name="tax" label={t('hud.tax')} />
           <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
-        </button>
+        </IconButton>
         {taxOpen && (
           <div
             ref={taxPopupRef}

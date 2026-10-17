@@ -20,6 +20,31 @@ vi.mock('@playwright/test', () => ({ chromium: { launch: launchMock } }));
 const GEN_MAP_PATH = join(process.cwd(), 'apps/client/dist/maps/gen-42-30.json');
 const SOURCE_ROOT = join(process.cwd(), 'apps/client/src');
 
+function equalView(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  if (ArrayBuffer.isView(left) || ArrayBuffer.isView(right)) {
+    if (!ArrayBuffer.isView(left) || !ArrayBuffer.isView(right)) return false;
+    if (left.byteLength !== right.byteLength) return false;
+    const leftBytes = new Uint8Array(left.buffer, left.byteOffset, left.byteLength);
+    const rightBytes = new Uint8Array(right.buffer, right.byteOffset, right.byteLength);
+    return leftBytes.every((value, index) => value === rightBytes[index]);
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => equalView(value, right[index]));
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const keys = Object.keys(leftRecord);
+  return (
+    keys.length === Object.keys(rightRecord).length &&
+    keys.every((key) => key in rightRecord && equalView(leftRecord[key], rightRecord[key]))
+  );
+}
+
 function installCanvasStub(): void {
   class TestCanvasRenderingContext2D {
     public font = '';
@@ -89,7 +114,7 @@ describe('дельты вида и текст карты (07/T15)', () => {
         applier.applyDelta(transport.delta);
       }
       stream.acknowledge();
-      expect(applier.view).toEqual(message.view);
+      expect(equalView(applier.view, message.view)).toBe(true);
       messageCount += 1;
     }
 

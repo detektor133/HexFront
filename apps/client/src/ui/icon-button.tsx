@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { flushSync } from 'react-dom';
 
 const LONG_PRESS_MS = 350;
@@ -10,11 +17,12 @@ export interface IconButtonProps extends Omit<
 > {
   readonly label: string;
   readonly children: ReactNode;
+  readonly buttonRef?: Ref<HTMLButtonElement>;
 }
 
 /** Кнопка-иконка с подписью при удержании на сенсорном экране. */
 export function IconButton(props: IconButtonProps): React.JSX.Element {
-  const { children, label, onClick, type, ...buttonProps } = props;
+  const { buttonRef, children, label, onClick, type, ...buttonProps } = props;
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -71,6 +79,7 @@ export function IconButton(props: IconButtonProps): React.JSX.Element {
   return (
     <>
       <button
+        ref={buttonRef}
         {...buttonProps}
         type={type ?? 'button'}
         aria-label={label}
