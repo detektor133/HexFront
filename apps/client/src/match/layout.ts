@@ -109,10 +109,11 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
     );
   }
-  const leaderboardWidth = input.leaderboardOpen ? Math.min(320, width - edge * 2) : 180;
+  const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
+  const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen
     ? Math.min(
-        Math.max(44, input.leaderboardRows * 44 + 16),
+        Math.max(44, leaderboardRows * 44 + 16),
         Math.max(44, bottomY - gap - input.hudHeight),
       )
     : 44;

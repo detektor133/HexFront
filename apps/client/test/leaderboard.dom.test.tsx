@@ -112,4 +112,25 @@ describe('лидерборд', () => {
     expect(screen.queryByRole('columnheader', { name: 'Золото' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Солдаты' })).toBeNull();
   });
+
+  it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {
+    const source = view();
+    const largeView = {
+      ...source,
+      ranking: Array.from({ length: 30 }, (_, id) => ({ id, score: 30 - id, place: id + 1 })),
+      players: Array.from({ length: 30 }, (_, id) => ({
+        id,
+        gold: 0 as Fp,
+        taxTarget: 0 as Fp,
+        taxEffective: 0 as Fp,
+        status: 'alive' as const,
+      })),
+    } as RankingView;
+
+    render(<Leaderboard view={largeView} />);
+
+    expect(screen.getAllByRole('rowheader')).toHaveLength(5);
+    expect(screen.getByText('Живы: 30')).toBeTruthy();
+    expect(screen.queryByText('Игрок 6')).toBeNull();
+  });
 });
