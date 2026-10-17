@@ -31,6 +31,56 @@ describe('07/T17i: раскладка лидерборда', () => {
     }
   });
 
+  it('не меняет высоту содержимого из-за экрана и нижней панели', () => {
+    const layouts = [
+      computeMatchLayout({
+        viewport: { width: 360, height: 640 },
+        hudHeight: 44,
+        bottomPanelHeight: 178,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      }),
+      computeMatchLayout({
+        viewport: { width: 360, height: 300 },
+        hudHeight: 44,
+        bottomPanelHeight: 178,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      }),
+      computeMatchLayout({
+        viewport: { width: 360, height: 640 },
+        hudHeight: 44,
+        bottomPanelHeight: 500,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      }),
+    ];
+
+    for (const layout of layouts) {
+      expect(layout.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
+        height: 5 * 44 + 16,
+      });
+    }
+  });
+
   it('на телефоне занимает ширину экрана между отступами, а на ПК — 320 px', () => {
     const phone = computeMatchLayout({
       viewport: { width: 360, height: 640 },

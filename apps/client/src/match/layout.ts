@@ -103,27 +103,28 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', 0, 0, width, input.hudHeight),
   ];
+  const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
+  const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
+  const leaderboardHeight = input.leaderboardOpen ? Math.max(44, leaderboardRows * 44 + 16) : 44;
+  const leaderboardY = input.hudHeight + gap;
+  const leaderboardFitsAboveBottomPanel = leaderboardY + leaderboardHeight <= bottomY - gap;
+  const showBottomPanel =
+    !input.paused &&
+    !input.popupOpen &&
+    (!input.leaderboardOpen || leaderboardFitsAboveBottomPanel);
   const showLeaderboard = !input.paused && !input.popupOpen && !cardOpenOnPhone(input, width);
-  if (!input.paused && !input.popupOpen) {
+  if (showBottomPanel) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
     );
   }
-  const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
-  const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
-  const leaderboardHeight = input.leaderboardOpen
-    ? Math.min(
-        Math.max(44, leaderboardRows * 44 + 16),
-        Math.max(44, bottomY - gap - input.hudHeight),
-      )
-    : 44;
   if (showLeaderboard) {
     elements.push(
       layoutElement(
         'leaderboard',
         'leaderboard',
         Math.max(edge, width - edge - leaderboardWidth),
-        input.hudHeight + gap,
+        leaderboardY,
         leaderboardWidth,
         leaderboardHeight,
         true,
