@@ -18,3 +18,12 @@
 - `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
 
 Этап: 07/T17k
+
+## Повторный возврат ревью
+
+- `pnpm verify --changed` — зелёный: build, types, tests; 19 с.
+- СПЕК: `apps/client/test/t17k-hud.dom.test.tsx:100-117` проверяет только внешний прямоугольник HUD, а не содержимое ряда и отсутствие клиппинга на 360 px.
+- СПЕК: `apps/client/test/t17k-hud.dom.test.tsx:72-89` не проверяет `viewBox` и сохранение шестерёнки, скрытой через `aria-hidden`.
+- `apps/client/src/dev/Hud.module.css:14` скрывает переполнение HUD; `apps/client/src/dev/Hud.module.css:94-100` не задаёт кнопке налога размер 44×44.
+
+Задача повторно возвращена: критерии отсутствия клиппинга, сохранения шестерёнки и зоны кнопки налога не подтверждены.

@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17k исправлена после возврата ревью: усилен DOM-тест компактного HUD; задача отмечена `[~]`.
+- 07/T17k повторно возвращена ревью: тест не подтверждает отсутствие клиппинга и сохранение шестерёнки; в HUD скрывается переполнение, кнопка налога не имеет зоны 44×44.
 - Читать `docs/stages/stage-07-playable-build.md` (07/T17n), `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/match/layout.ts`.
 - Отчёт: `docs/reports/stage-07-t17k.md`.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
