@@ -8,9 +8,11 @@ import { hexFromId, loadMap, type ConstructionCheck, type MapStatic } from '@hex
 
 import { HexCard } from '../src/dev/HexCard.tsx';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
+import { visibleActions } from '../src/dev/hex-actions.ts';
+import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
-import type { FromWorker } from '../src/local/messages.ts';
+import type { FromWorker, Selection } from '../src/local/messages.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 import type { Point } from '../src/render/hex-geometry.ts';
 import type { MapView, MapViewOptions, MapViewState, TapKind } from '../src/render/map-view.ts';
@@ -273,14 +275,14 @@ describe('T17m: карточка клетки', () => {
     );
     expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
-    const cityActionButtons = screen
-      .getAllByRole('button')
-      .filter((button) => /Улучшить город|Проложить дорогу/u.test(button.textContent ?? ''));
-    expect(cityActionButtons).toHaveLength(2);
-    expect(cityActionButtons.map((button) => button.textContent)).toEqual([
-      expect.stringContaining('Улучшить город'),
-      expect.stringContaining('Проложить дорогу'),
-    ]);
+    const actionLabels = (selection: Selection): string[] =>
+      visibleActions(selection, 0, 0, false).map(({ kind }) => t(`action.${kind}` as MessageKey));
+    const getActionLabels = (): string[] =>
+      screen
+        .getAllByRole('button')
+        .filter((button) => button.getAttribute('aria-label') === null)
+        .map((button) => button.firstElementChild?.textContent?.trim() ?? '');
+    expect(getActionLabels()).toEqual(actionLabels(preparedSelection));
 
     const prepared = {
       ...message.selection,
@@ -292,14 +294,7 @@ describe('T17m: карточка клетки', () => {
     };
     cleanup();
     render(<HexCard s={prepared} view={message.view} map={mapResult.map} send={() => undefined} />);
-    const plainButtons = screen.getAllByRole('button');
-    expect(plainButtons).toHaveLength(4);
-    expect(plainButtons.map((button) => button.textContent)).toEqual([
-      expect.stringContaining('Основать город'),
-      expect.stringContaining('Благоустроить'),
-      expect.stringContaining('Укрепление'),
-      expect.stringContaining('Склад'),
-    ]);
+    expect(getActionLabels()).toEqual(actionLabels(prepared));
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });
