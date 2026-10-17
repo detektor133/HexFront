@@ -186,7 +186,7 @@ export function HexCard(props: {
     const card = cardRef.current;
     if (!card || !props.onHeight) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      props.onHeight?.(entries[0]?.contentRect.height ?? 0);
+      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, card.scrollHeight));
     const observer = new ResizeObserver(report);
     observer.observe(card);
     return () => observer.disconnect();
@@ -200,17 +200,22 @@ export function HexCard(props: {
         ? t('dev.economy.you')
         : t('dev.economy.rival');
   const terrain = TERRAIN_NAMES[map.terrain[s.hex] ?? 0] ?? 'plains';
-  const c = s.city;
+  const visible = view.hexes.visible[s.hex] === 1;
+  const c = visible ? s.city : null;
   // Снабжение, золото и связь со столицей есть только у своего города.
   const mine = c !== null && c.owner === view.playerId;
   const title = c
     ? `${c.isCapital ? t('card.capital') : t('card.city')} · ${t('card.level')} ${c.level}`
     : t(`terrain.${terrain}` as MessageKey);
-  const job = view.constructions.find((x) => x.hex === s.hex && x.kind !== 'road');
-  const road = view.constructions.find((x) => x.hex === s.hex && x.kind === 'road');
-  const actions = visibleActions(s, owner, view.playerId, job !== undefined);
-  const improvement = view.hexes.improvement[s.hex] ?? 0;
-  const recruiting = c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
+  const job = visible
+    ? view.constructions.find((x) => x.hex === s.hex && x.kind !== 'road')
+    : undefined;
+  const road = visible
+    ? view.constructions.find((x) => x.hex === s.hex && x.kind === 'road')
+    : undefined;
+  const actions = visibleActions(s, visible ? owner : -1, view.playerId, job !== undefined);
+  const improvement = visible ? (view.hexes.improvement[s.hex] ?? 0) : 0;
+  const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <h2 className={styles.title}>{title}</h2>
