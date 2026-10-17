@@ -15,11 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17q исправлена по возврату СПЕК: DOM-тест монтирует `MatchPage → MatchSurface` с реальными `ArmyBar`, `HexCard`, HUD и лидербордом.
-- Тест подменяет только загрузку `tiny.json`, сохраняет реальный путь рендера и проверяет координаты `bottom-panel` на 360×640, 1440×900 и 1920×1080.
-- Тест проверяет выбор своей клетки, повторный выбор клетки, Escape, содержимое ArmyBar, отсутствие второго узла и неизменность координат панели.
-- Контролируемый `ResizeObserver` проверяет `Math.max(contentRect.height, scrollHeight)`, одну пару observe/disconnect и отсутствие повторных измерений.
-- Тест проверяет независимость от `HexCard` и лидерборда, поведение панели при открытии/закрытии налога, CSS-отступы `.dock` и горизонтальную прокрутку.
-- `pnpm verify --changed` — зелёный.
+- 07/T17q повторно возвращена: mock `ResizeObserver` записывает ожидаемую высоту сам, не проверяя аргумент `onHeight`.
+- Не проверены повторное уведомление той же высоты, вызов `computeMatchLayout` при налоге и изменение высот `HexCard`/лидерборда.
+- `pnpm verify --changed` — зелёный, но приёмочный тест требует доработки.
 - Следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
