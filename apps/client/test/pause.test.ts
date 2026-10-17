@@ -104,9 +104,9 @@ function findNodeByIcon(node: unknown): ElementNode | undefined {
   }
   if (
     element.type === 'svg' &&
-    element.props?.viewBox === '0 0 24 24' &&
+    element.props?.viewBox === '0 0 14 14' &&
     (element.props.children as readonly ElementNode[] | undefined)?.some(
-      (child) => child.props?.d === 'M6 5v14',
+      (child) => child.props?.d === 'M4 3v8',
     )
   )
     return element;
@@ -354,10 +354,10 @@ describe('пауза локального матча', () => {
     expect(pauseButton).toBeDefined();
     expect(pauseButton?.props?.['aria-label']).toBe('Пауза');
     const pauseIcon = findNodeByIcon(pauseButton?.props?.children);
-    expect(pauseIcon?.props?.viewBox).toBe('0 0 24 24');
+    expect(pauseIcon?.props?.viewBox).toBe('0 0 14 14');
     expect(
       (pauseIcon?.props?.children as readonly ElementNode[]).map((path) => path.props?.d),
-    ).toEqual(['M6 5v14', 'M10 5v14', 'M14 5v14', 'M18 5v14']);
+    ).toEqual(['M4 3v8', 'M10 3v8']);
     const hudCss = readFileSync(new URL('../src/dev/Hud.module.css', import.meta.url), 'utf8');
     expect(hudCss).toMatch(
       /\.settingsButton\s*\{[^}]*width:\s*var\(--touch-target-min\);[^}]*height:\s*44px;/s,

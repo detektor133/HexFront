@@ -1,6 +1,8 @@
 export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
+const HUD_MAX_WIDTH = 720;
+
 export interface MatchLayoutElement {
   readonly id: string;
   readonly kind: MatchLayoutElementKind;
@@ -100,8 +102,10 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     Math.max(44, height - input.hudHeight - gap),
   );
   const bottomY = height - bottomPanelHeight;
+  const hudWidth = width <= 600 ? width : Math.min(width - edge * 2, HUD_MAX_WIDTH);
+  const hudX = (width - hudWidth) / 2;
   const elements: MatchLayoutElement[] = [
-    layoutElement('hud', 'hud', 0, 0, width, input.hudHeight),
+    layoutElement('hud', 'hud', hudX, 0, hudWidth, input.hudHeight),
   ];
   const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));

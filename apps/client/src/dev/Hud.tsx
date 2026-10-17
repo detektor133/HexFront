@@ -20,14 +20,20 @@ type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
 
 function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
   const iconRef = useRef<SVGSVGElement>(null);
-  const paths: Record<MetricIconName, string> = {
-    people:
+  const paths: Record<MetricIconName, readonly string[]> = {
+    people: [
       'M4 12C4 10.34 5.34 9 7 9C8.66 9 10 10.34 10 12M5 7C5 5.9 5.9 5 7 5C8.1 5 9 5.9 9 7M10 12C10 10.34 11.34 9 13 9M11 7C11 5.9 11.9 5 13 5',
-    gold: 'M7 1v12M4 3h6a3 3 0 0 1 0 6H4a3 3 0 0 0 0 6h7M5 1h4M5 13h4',
-    tax: 'M3 4h10M8 4v8M5 8h6M3 12h10M5 13h8M7 12v1',
-    supply: 'M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8',
-    time: 'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
-    place: 'M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z',
+    ],
+    gold: [
+      'M3 4C3 2.9 4.8 2 7 2C9.2 2 11 2.9 11 4C11 5.1 9.2 6 7 6C4.8 6 3 5.1 3 4',
+      'M3 4V10C3 11.1 4.8 12 7 12C9.2 12 11 11.1 11 10V4',
+    ],
+    tax: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
+    supply: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
+    time: [
+      'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
+    ],
+    place: ['M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z'],
   };
   useLayoutEffect(() => {
     iconRef.current?.setAttribute('title', props.label);
@@ -37,14 +43,16 @@ function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.E
       ref={iconRef}
       viewBox="0 0 14 14"
       aria-label={props.label}
-      className={styles.metricIcon}
+      className={`${styles.metricIcon} ${props.name === 'gold' ? styles.goldIcon : ''}`}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d={paths[props.name]} />
+      {paths[props.name].map((path) => (
+        <path key={path} d={path} />
+      ))}
     </svg>
   );
 }
@@ -88,7 +96,6 @@ function Settings(props: {
   setFog: (on: boolean) => void;
   showFog: boolean;
   onOpenChange?: (open: boolean) => void;
-  style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const on = props.view.me.autoCommand;
@@ -110,12 +117,7 @@ function Settings(props: {
         <SettingsIcon />
       </IconButton>
       {open && (
-        <div
-          className={styles.settingsMenu}
-          style={props.style}
-          role="dialog"
-          aria-label={t('settings.title')}
-        >
+        <div className={styles.settingsMenu} role="dialog" aria-label={t('settings.title')}>
           <button
             type="button"
             role="switch"
@@ -150,11 +152,9 @@ function Settings(props: {
 
 function PlayerPauseIcon(): React.JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
-      <path d="M6 5v14" />
-      <path d="M10 5v14" />
-      <path d="M14 5v14" />
-      <path d="M18 5v14" />
+    <svg viewBox="0 0 14 14" className={styles.pauseIcon} aria-hidden="true">
+      <path d="M4 3v8" />
+      <path d="M10 3v8" />
     </svg>
   );
 }
@@ -298,7 +298,6 @@ export function Hud(props: {
         fog={props.fog}
         setFog={props.setFog}
         showFog={props.showFog ?? true}
-        style={props.popupStyle}
         {...(props.onPopupChange ? { onOpenChange: props.onPopupChange } : {})}
       />
       {props.onPause && (
