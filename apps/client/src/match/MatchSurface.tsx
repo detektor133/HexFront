@@ -103,6 +103,16 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
     paused: pauseState.menuOpen,
   });
+  const dockHeightSetter = useRef(sb.setDockHeight);
+  dockHeightSetter.current = sb.setDockHeight;
+  const handleArmyBarHeight = useMemo(
+    () =>
+      (height: number): void => {
+        setDockH(height);
+        dockHeightSetter.current(height);
+      },
+    [],
+  );
   const map = typeof loaded === 'string' ? null : loaded.map;
   const styleFor = (id: string): React.CSSProperties | undefined => {
     const element = layout.elements.find((item) => item.id === id);
@@ -190,10 +200,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
           partial={partial.filter((a) => a !== army)}
-          onHeight={(height) => {
-            setDockH(height);
-            sb.setDockHeight(height);
-          }}
+          onHeight={handleArmyBarHeight}
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}
