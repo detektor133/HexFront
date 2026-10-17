@@ -16,7 +16,10 @@ const loaded = loadMap(MAP_JSON);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 const loadedMap = loaded.map;
 
+let sentCommands: unknown[] = [];
+
 function createRuntime(): Record<string, unknown> {
+  sentCommands = [];
   const engine = createLocalEngine(MAP_JSON, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
   const snapshot = engine.snapshot();
@@ -41,7 +44,9 @@ function createRuntime(): Record<string, unknown> {
       frontTween: { byArmy: 0 },
     }),
     focusEvent: () => undefined,
-    send: () => undefined,
+    send: (command: unknown) => {
+      sentCommands.push(command);
+    },
     setFog: () => undefined,
     setPaused: () => undefined,
     step: () => undefined,
@@ -79,6 +84,15 @@ interface Rect {
   readonly height: number;
 }
 
+function readInlineRect(element: HTMLElement): Rect {
+  return {
+    x: Number.parseFloat(element.style.left),
+    y: Number.parseFloat(element.style.top),
+    width: Number.parseFloat(element.style.width),
+    height: Number.parseFloat(element.style.height),
+  };
+}
+
 function overlaps(first: Rect, second: Rect): boolean {
   return (
     first.x < second.x + second.width &&
@@ -104,16 +118,24 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
     render(<MatchPage />);
     const leaderboard = screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u });
     const taxButton = screen.getByRole('button', { name: /Налог|Tax/u });
+    const initialRect = readInlineRect(leaderboard);
 
     expect(leaderboard).toBeTruthy();
     fireEvent.click(taxButton);
-    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBeTruthy();
+    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
+    expect(readInlineRect(leaderboard)).toEqual(initialRect);
+    const slider = screen.getByRole('slider', { name: /Налог|Tax/u });
     fireEvent.change(screen.getByRole('slider', { name: /Налог|Tax/u }), {
       target: { value: '300' },
     });
-    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBeTruthy();
+    expect(sentCommands).toContainEqual({ t: 'setTax', rate: 300 });
+    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
+    expect(readInlineRect(leaderboard)).toEqual(initialRect);
     fireEvent.click(taxButton);
-    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: /Налог|Tax/u })).toBeNull();
+    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
+    expect(readInlineRect(leaderboard)).toEqual(initialRect);
+    expect(slider).toBeTruthy();
   });
 
   it('сохраняет кнопку свёрнутого лидерборда при открытом налоге', async () => {
@@ -128,6 +150,17 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
       name: /Таблица лидеров|Leaderboard/u,
     });
 
+    fireEvent.click(taxButton);
+    expect(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u })).toBe(
+      leaderboardButton,
+    );
+    fireEvent.change(screen.getByRole('slider', { name: /Налог|Tax/u }), {
+      target: { value: '300' },
+    });
+    expect(sentCommands).toContainEqual({ t: 'setTax', rate: 300 });
+    expect(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u })).toBe(
+      leaderboardButton,
+    );
     fireEvent.click(taxButton);
     expect(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u })).toBe(
       leaderboardButton,
