@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +15,10 @@ const tinyMap: unknown = JSON.parse(
 const loaded = loadMap(tinyMap);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 const loadedMap = loaded.map;
+const armyBarCss = readFileSync(
+  path.resolve(process.cwd(), 'apps/client/src/dev/ArmyBar.module.css'),
+  'utf8',
+);
 
 function installResizeObserver(): void {
   class TestResizeObserver {
@@ -37,15 +42,48 @@ function installResizeObserver(): void {
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
 }
 
-function mockRuntime(selectedArmy: number | null = null): {
+function mockRuntime(
+  selectedArmy: number | null = null,
+  armyCount = 2,
+): {
   send: ReturnType<typeof vi.fn>;
   setArmy: ReturnType<typeof vi.fn>;
+  pick: ReturnType<typeof vi.fn>;
+  setTool: ReturnType<typeof vi.fn>;
 } {
   const send = vi.fn();
   const setArmy = vi.fn();
+  const pick = vi.fn();
+  const setTool = vi.fn();
   const engine = createLocalEngine(tinyMap, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
-  const snapshot = engine.snapshot();
+  const initial = engine.snapshot();
+  const sourceArmy = initial.view.armies[0];
+  if (!sourceArmy) throw new Error('Исходная армия не найдена');
+  const armies = Array.from({ length: armyCount }, (_, index) => ({
+    ...sourceArmy,
+    id: index === 0 ? (selectedArmy ?? sourceArmy.id) : (selectedArmy ?? sourceArmy.id) + index,
+    number: index + 1,
+    name: `${index + 1}-я армия`,
+  }));
+  const plans =
+    selectedArmy === null
+      ? initial.view.plans
+      : [
+          {
+            armyId: selectedArmy,
+            kind: 'front' as const,
+            edges: [],
+            hexes: [],
+            offensive: null,
+            zone: [],
+            stuck: false,
+            facing: [],
+            lost: [],
+            startWanted: false,
+          },
+        ];
+  const snapshot = { ...initial, view: { ...initial.view, armies, plans } };
   vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
     useMapJson: () => ({ json: tinyMap, map: loadedMap }),
     useSandbox: () => ({
@@ -75,8 +113,8 @@ function mockRuntime(selectedArmy: number | null = null): {
       step: vi.fn(),
       setSpeed: vi.fn(),
       setObserver: vi.fn(),
-      pick: vi.fn(),
-      setTool: vi.fn(),
+      pick,
+      setTool,
       setArmy,
       setRoadPreview: vi.fn(),
       setDockHeight: vi.fn(),
@@ -92,7 +130,7 @@ function mockRuntime(selectedArmy: number | null = null): {
       }),
     }),
   }));
-  return { send, setArmy };
+  return { send, setArmy, pick, setTool };
 }
 
 afterEach(() => {
@@ -133,17 +171,99 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
 
     render(<MatchPage />);
 
-    for (const label of [
-      'Фронт',
-      'Сначала назначьте фронт',
-      'Оборона',
-      'Нет линий, чтобы удалить',
-      'Расформировать',
-    ]) {
+    for (const label of ['Фронт', 'Наступление', 'Оборона', 'Удалить', 'Расформировать']) {
       expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
     }
     expect(document.querySelector('[class*="strip"]')).not.toBeNull();
     expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
+  });
+
+  it.each([1, 3, 10])('рендерит %d армий и резерв в реальном DOM', async (armyCount) => {
+    installResizeObserver();
+    mockRuntime(null, armyCount);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(<MatchPage />);
+
+    const strip = document.querySelector<HTMLElement>('[class*="strip"]');
+    const content = document.querySelector<HTMLElement>('[class*="stripContent"]');
+    if (!content) throw new Error('Содержимое ленты не найдено');
+    const cards = [...content.children].filter((child) =>
+      child.className.toString().includes('card'),
+    );
+    expect(cards).toHaveLength(armyCount);
+    expect(screen.getByRole('button', { name: 'Резерв' })).toBeTruthy();
+    expect(strip).not.toBeNull();
+    expect(content).not.toBeNull();
+    expect(content?.children).toHaveLength(armyCount + 1);
+    expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*overflow-x:\s*auto/s);
+    expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*pointer-events:\s*none/s);
+    for (const card of cards) {
+      expect(card.className.toString()).toContain('card');
+    }
+    expect(armyBarCss).toMatch(/\.card\s*\{[^}]*box-sizing:\s*border-box/s);
+    expect(armyBarCss).toMatch(/\.card\s*\{[^}]*flex:\s*0\s+0\s+238px/s);
+  });
+
+  it('докручивает переполненную ленту до последней карточки колесом и не блокирует карту', async () => {
+    installResizeObserver();
+    const { pick, setArmy } = mockRuntime(null, 10);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(<MatchPage />);
+
+    const strip = document.querySelector<HTMLElement>('[class*="strip"]');
+    const content = document.querySelector<HTMLElement>('[class*="stripContent"]');
+    if (!strip || !content) throw new Error('Лента армий не найдена');
+    Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 238 });
+    Object.defineProperty(strip, 'scrollWidth', {
+      configurable: true,
+      value: 10 * 238 + content.children.length * 8,
+    });
+    Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 0 });
+    const wheel = new WheelEvent('wheel', { bubbles: true, deltaX: 238, deltaY: 0 });
+    strip.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(false);
+    const cards = [...content.children].filter((child) =>
+      child.className.toString().includes('card'),
+    );
+    expect(cards[9]).toBeTruthy();
+    fireEvent.click(cards[9]?.querySelector('[class*="pick"]') as HTMLElement);
+    expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth);
+    expect(fireEvent.click(strip)).toBe(true);
+    expect(pick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
+    expect(setArmy).toHaveBeenCalledWith(expect.any(Number));
+    expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*pointer-events:\s*none/s);
+  });
+
+  it('передаёт клики по карточке, резерву, приказам, автопополнению и созданию армии', async () => {
+    installResizeObserver();
+    const { send, setArmy, setTool, pick } = mockRuntime(5);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(<MatchPage />);
+
+    fireEvent.click(
+      document.querySelectorAll('[class*="strip"] [class*="pick"]')[1] as HTMLElement,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Резерв' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Автопополнение' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Новая армия' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Фронт' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Наступление' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Оборона' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Расформировать' }));
+
+    expect(setArmy).toHaveBeenCalledWith(expect.any(Number));
+    expect(pick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
+    expect(setTool).toHaveBeenCalledWith({ tool: 'front', armyId: expect.any(Number) });
+    expect(setTool).toHaveBeenCalledWith({ tool: 'offensive', armyId: expect.any(Number) });
+    expect(setTool).toHaveBeenCalledWith({ tool: 'line', armyId: expect.any(Number) });
+    expect(setTool).toHaveBeenCalledWith({ tool: 'erase', armyId: expect.any(Number) });
+    expect(send).toHaveBeenCalledWith({ t: 'setAutoReinforce', on: true });
+    expect(send).toHaveBeenCalledWith({ t: 'createArmy', name: '' });
+    expect(send).toHaveBeenCalledWith({ t: 'disbandArmy', armyId: expect.any(Number) });
   });
 
   it('сохраняет реальный DOM всех интерактивных элементов в растянутой ленте', async () => {
