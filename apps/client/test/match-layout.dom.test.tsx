@@ -173,7 +173,10 @@ const matchRuntime = (
   };
 };
 
-function prepareDomScene(search = '', viewport = VIEWPORTS[0]): void {
+function prepareDomScene(
+  search = '',
+  viewport: { readonly width: number; readonly height: number } = VIEWPORTS[0],
+): void {
   window.history.replaceState({}, '', `/match${search}`);
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewport.height });
