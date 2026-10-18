@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { requirementPreserved, verifyPlanTransition } from './requirements.ts';
+import { verifyPlanTransition } from './requirements.ts';
 import { taskBlock } from './stage-file.ts';
 import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
 
@@ -12,16 +12,15 @@ const PLAN_UNTOUCHED: Session = {
 };
 
 describe('роль plan перед исполнением задачи', () => {
-  it('считает раскрытие путей и списка элементов уточнением, но не потерей требования', () => {
+  it('принимает уточнение отдельным блоком без изменения исходного текста', () => {
     const before = [
       '# Этап 07',
       '- [ ] **T17w. ArmyBar** (`ArmyBar.module.css`, при необходимости `ArmyBar.tsx`, связанные тесты).',
       'Карточки, резерв, приказы, кнопки и прокрутка остаются рабочими. Ширина карточки 238 px, вертикального скролла нет.',
     ].join('\n');
     const after = [
-      '# Этап 07',
-      '- [ ] **T17w. ArmyBar** (`apps/client/src/dev/ArmyBar.module.css`, при необходимости `apps/client/src/dev/ArmyBar.tsx`, `army-bar-layout.test.ts`).',
-      'Карточки армий, элемент «Резерв», кнопки приказов и прокрутка остаются рабочими. Ширина карточки 238 px, вертикального скролла нет.',
+      before,
+      '*Уточнение plan:* пути: `apps/client/src/dev/ArmyBar.module.css`, `apps/client/src/dev/ArmyBar.tsx`, `army-bar-layout.test.ts`; элементы: карточки армий, «Резерв» и кнопки приказов.',
     ].join('\n');
 
     expect(
@@ -34,12 +33,18 @@ describe('роль plan перед исполнением задачи', () => {
     ).toEqual([]);
   });
 
-  it('не принимает уточнением удаление числа, отрицания или короткого критерия', () => {
+  it('не принимает перефразирование исходного текста, даже если смысл похож', () => {
+    const before = '# Этап 07\n- [ ] **T17t. HUD**.\nПриёмка: остальные иконки не изменены.\n';
+    const after =
+      '# Этап 07\n- [ ] **T17t. HUD**.\nПриёмка: у остальных иконок сохранены `fill` и `stroke`.\n';
     expect(
-      requirementPreserved('Ширина 238 px, вертикального скролла нет', 'Ширина карточки'),
-    ).toBe(false);
-    expect(requirementPreserved('Панель не скрывать', 'Панель скрывать')).toBe(false);
-    expect(requirementPreserved('Приёмка: тесты', 'Приёмка: отключить проверки')).toBe(false);
+      verifyPlanTransition(
+        '07/T17t',
+        { stageText: before, status: fixtureStatus },
+        { stageText: after, status: fixtureStatus },
+        'уточнено',
+      ),
+    ).toEqual(['при уточнении изменён исходный текст задачи; разрешено только дописать блок']);
   });
 
   it('без роли plan в roles.json цикл работает по-старому', async () => {
@@ -59,7 +64,7 @@ describe('роль plan перед исполнением задачи', () => {
     const clarified = setMark(
       fixtureStage.replace(
         '*Приёмка:* тесты.',
-        '*Приёмка:* тесты. Дополнительно: 2 критерия (п.1, п.2).',
+        '*Приёмка:* тесты.\n  *Уточнение plan:* дополнительно проверить 2 критерия (п.1, п.2).',
       ),
       'T1j5-Б1',
       ' ',

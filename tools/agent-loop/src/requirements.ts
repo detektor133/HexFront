@@ -40,35 +40,7 @@ const requirements = (block: string): string[] => {
 const shortId = (task: string): string => task.split('/').at(-1) ?? task;
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const excerpt = (value: string): string => value.slice(0, 140);
-const WORD_RE = /[\p{L}\p{N}_@.-]+/gu;
-const NEGATIONS = new Set(['без', 'не', 'нельзя', 'нет', 'только', 'запрещено', 'запрещён']);
-
-const words = (text: string): string[] =>
-  [...text.toLocaleLowerCase('ru').matchAll(WORD_RE)]
-    .map(([word = '']) => word.split('/').at(-1) ?? word)
-    .map((word) => (word.includes('.test.') ? 'тесты' : word))
-    .filter((word) => word.length > 1);
-
-const criticalWords = (text: string): Set<string> => {
-  const critical = new Set(words(text).filter((word) => /^\d/u.test(word) || NEGATIONS.has(word)));
-  for (const [, code = ''] of text.matchAll(/`([^`]+)`/gu)) {
-    for (const word of words(code)) critical.add(word);
-  }
-  return critical;
-};
-
-/**
- * Уточнение может раскрыть общий термин списком или полный путь вместо basename. Оно сохраняет
- * требование, если осталось не меньше 80% его слов и все числа, отрицания и code-токены.
- */
-export function requirementPreserved(original: string, candidate: string): boolean {
-  if (candidate.includes(original)) return true;
-  const expected = [...new Set(words(original))];
-  if (expected.length < 3) return false;
-  const actual = new Set(words(candidate));
-  const coverage = expected.filter((word) => actual.has(word)).length / expected.length;
-  return coverage >= 0.8 && [...criticalWords(original)].every((word) => actual.has(word));
-}
+const exactBlock = (text: string): string => text.replace(/\r\n/gu, '\n').trimEnd();
 
 /**
  * Проверяет именованные разделы Issue вида "## T17s — ...".
@@ -178,10 +150,17 @@ export function verifyPlanTransition(
   const current = taskBlock(after.stageText, task);
   if (original === '' || current === '') return ['исходная задача отсутствует после $plan'];
   if (outcome === 'уточнено') {
-    const currentItems = requirements(current);
-    return requirements(original)
-      .filter((item) => !currentItems.some((candidate) => requirementPreserved(item, candidate)))
-      .map((item) => 'потеряно при уточнении: «' + excerpt(item) + '»');
+    const originalText = exactBlock(original);
+    const currentText = exactBlock(current);
+    if (!currentText.startsWith(`${originalText}\n`)) {
+      return ['при уточнении изменён исходный текст задачи; разрешено только дописать блок'];
+    }
+    const addition = currentText.slice(originalText.length).trimStart();
+    if (!addition.startsWith('*Уточнение plan:*')) {
+      return ['добавление должно начинаться с «*Уточнение plan:*»'];
+    }
+    if (before.status !== after.status) return ['при уточнении изменена очередь STATUS'];
+    return [];
   }
   if (original !== current || before.status !== after.status)
     return ['$plan изменил задачу или очередь, но ответил «' + outcome + '»'];
