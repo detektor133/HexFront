@@ -42,6 +42,22 @@ const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\
 const excerpt = (value: string): string => value.slice(0, 140);
 const exactBlock = (text: string): string => text.replace(/\r\n/gu, '\n').trimEnd();
 
+/** @returns строки, добавленные в current, либо undefined при удалении/изменении исходной строки. */
+function addedLines(original: string, current: string): string[] | undefined {
+  const expected = exactBlock(original).split('\n');
+  const actual = exactBlock(current).split('\n');
+  const added: string[] = [];
+  let expectedIndex = 0;
+  for (const line of actual) {
+    if (line === expected[expectedIndex]) {
+      expectedIndex += 1;
+    } else {
+      added.push(line);
+    }
+  }
+  return expectedIndex === expected.length ? added : undefined;
+}
+
 /**
  * Проверяет именованные разделы Issue вида "## T17s — ...".
  * Каждый непустой пункт и строка примера должны быть в СОБСТВЕННОЙ задаче,
@@ -150,13 +166,12 @@ export function verifyPlanTransition(
   const current = taskBlock(after.stageText, task);
   if (original === '' || current === '') return ['исходная задача отсутствует после $plan'];
   if (outcome === 'уточнено') {
-    const originalText = exactBlock(original);
-    const currentText = exactBlock(current);
-    if (!currentText.startsWith(`${originalText}\n`)) {
-      return ['при уточнении изменён исходный текст задачи; разрешено только дописать блок'];
+    const added = addedLines(original, current);
+    if (added === undefined) {
+      return ['при уточнении изменена или удалена исходная строка; разрешено только добавление'];
     }
-    const addition = currentText.slice(originalText.length).trimStart();
-    if (!addition.startsWith('*Уточнение plan:*')) {
+    const firstAdded = added.find((line) => line.trim() !== '')?.trim();
+    if (firstAdded?.startsWith('*Уточнение plan:*') !== true) {
       return ['добавление должно начинаться с «*Уточнение plan:*»'];
     }
     if (before.status !== after.status) return ['при уточнении изменена очередь STATUS'];
