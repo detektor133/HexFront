@@ -48,8 +48,8 @@ export function Leaderboard({
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel || !onSize) return;
-    const report = (): void => {
-      const rect = panel.getBoundingClientRect();
+    const report = (entries: readonly ResizeObserverEntry[] = []): void => {
+      const rect = entries[0]?.contentRect ?? panel.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) onSize({ width: rect.width, height: rect.height });
     };
     report();

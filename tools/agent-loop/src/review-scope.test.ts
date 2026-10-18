@@ -162,6 +162,20 @@ describe('текст задачи', () => {
   it('изменённая приёмка — другой текст', () => {
     expect(taskText(block.replace('88/150/300', '91/157/303'))).not.toBe(taskText(block));
   });
+
+  it('не считает журнал исполнения новой редакцией задачи независимо от отступов', () => {
+    const normative = '- [ ] **T17u. Регрессия**.\n*Приёмка:* реальный DOM-путь.\n### Трассировка';
+    const returned = normative.replace(
+      '### Трассировка',
+      'Возврат ревью после коммита `abc`:\n- СПЕК: x.test.ts:10 — пустая проверка\n\n### Трассировка',
+    );
+    const fixed = normative.replace(
+      '### Трассировка',
+      'ИСПРАВЛЕНО ПО РЕВЬЮ:\n- СПЕК: x.test.ts:10 → RED/GREEN подтверждены\n\nИсправлено: тест усилен.\n### Трассировка',
+    );
+    expect(taskText(returned)).toBe(taskText(normative));
+    expect(taskText(fixed)).toBe(taskText(normative));
+  });
 });
 
 const fakeGit = (answers: Record<string, { code: number; stdout: string }>): Git => {
@@ -196,6 +210,28 @@ describe('reviewScope', () => {
     expect(scope.kind).toBe('narrow');
     expect(scopeNote(scope).join('\n')).toContain(`${TEST}:92,234-236,305-306`);
     expect(scopeNote(scope).join('\n')).toContain('не новые файлы');
+  });
+
+  it('служебная замена возврата отчётом исполнителя не сбрасывает узкое ревью', async () => {
+    const returned = stage.replace(
+      ' *Приёмка:* тест.',
+      ' *Приёмка:* тест.\nВозврат ревью:\n- СПЕК: x.test.ts:10 — нет проверки',
+    );
+    const fixed = stage.replace(
+      ' *Приёмка:* тест.',
+      ' *Приёмка:* тест.\nИСПРАВЛЕНО ПО РЕВЬЮ:\n- СПЕК: x.test.ts:10 → RED/GREEN',
+    );
+    const scope = await reviewScope(
+      fakeGit({
+        show: { code: 0, stdout: returned },
+        diff: { code: 0, stdout: RENAME_DIFF },
+      }),
+      '07/T7',
+      'abc',
+      's.md',
+      fixed,
+    );
+    expect(scope.kind).toBe('narrow');
   });
 
   it('текст задачи изменён после возврата — ревью целиком', async () => {

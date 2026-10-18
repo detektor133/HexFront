@@ -15,6 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u возвращена reviewer: `t17i` удалил фиктивный `getBoundingClientRect`, но `EmptyResizeObserver` не передаёт DOM-размер и не проверяет вызов `onSize`.
-- `pnpm verify --changed` — зелёный; исправить приёмочный тест реального пути и повторить `$review 07/T17u`.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- 07/T17u исправлена по третьему возврату и ждёт повторного review.
+- `Leaderboard` принимает размер из `ResizeObserverEntry.contentRect`; тест подтверждает передачу в layout на реальном React-пути.
+- RED: без чтения `contentRect` целевой тест падает по `style.left`; GREEN: 5/5.
+- Исправлена сходимость цикла: журнал review больше не меняет нормативный текст задачи, `СПЕК:` требует RED/GREEN.
+- Следующая задача после review: 07/T17, задача владельца.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

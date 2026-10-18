@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  hasSpecRegressionProof,
   lastReturnItems,
   resolvedElsewhere,
   reviewResolutionItems,
@@ -28,6 +29,12 @@ describe('пункты последнего возврата', () => {
       'СПЕК: x.test.ts:3 — нет проверки',
     ]);
     expect(lastReturnItems('- [ ] **T1. Без возврата**')).toEqual([]);
+  });
+
+  it('читает пункты возврата без зависимости от markdown-отступа', () => {
+    expect(
+      lastReturnItems('- [ ] **T1. X**\nВозврат ревью:\n- СПЕК: x.test.ts:3 — нет проверки'),
+    ).toEqual(['СПЕК: x.test.ts:3 — нет проверки']);
   });
 
   it('пути diff: при переименовании и старый, и новый', () => {
@@ -72,6 +79,17 @@ describe('пропуск пунктов возврата', () => {
     expect(untouchedItems([item], ['apps/client/test/view-delta-memory.test.ts'], [])).toEqual([]);
   });
 
+  it('СПЕК требует RED/GREEN-доказательство той же проверки', () => {
+    const spec = 'СПЕК: apps/client/test/x.test.ts:10 — тест зелёный при сломанном callback';
+    const weak = '### ИСПРАВЛЕНО ПО РЕВЬЮ\n- x.test.ts изменён; тест 5/5.';
+    const proven =
+      '### ИСПРАВЛЕНО ПО РЕВЬЮ\n- x.test.ts: RED — при отключённом callback тест упал по assertion; GREEN — тест 5/5.';
+    expect(hasSpecRegressionProof(spec, weak)).toBe(false);
+    expect(hasSpecRegressionProof(spec, proven)).toBe(true);
+    expect(untouchedItems([spec], ['apps/client/test/x.test.ts'], [], weak)).toEqual([spec]);
+    expect(untouchedItems([spec], ['apps/client/test/x.test.ts'], [], proven)).toEqual([]);
+  });
+
   it('пропускает альтернативное исправление только с исходным и изменённым файлами и тестом', () => {
     const layout = 'apps/client/src/match/layout.ts:5-11 — фиксированные размеры';
     const touched = [
@@ -97,7 +115,7 @@ describe('пропуск пунктов возврата', () => {
 
   it('запрос повтора называет пункты и оставляет выход, если пункт выполнен в другом файле', () => {
     const prompt = skippedPrompt('07/T13', [item]);
-    expect(prompt.split('\n')[0]).toBe('$task 07/T13 пункты возврата ревью не выполнены');
+    expect(prompt.split('\n')[0]).toBe('$task 07/T13 пункты возврата ревью не доказаны');
     expect(prompt).toContain(`- ${item}`);
     expect(prompt).toContain('в другом файле');
   });
@@ -120,7 +138,7 @@ describe('сторож в цикле', () => {
       sessions: [WORK, BACK, WORK, WORK],
     });
     expect(run.prompts).toHaveLength(4);
-    expect(run.prompts[3]).toContain('пункты возврата ревью не выполнены');
+    expect(run.prompts[3]).toContain('пункты возврата ревью не доказаны');
     expect(run.prompts[3]).toContain(`${MENU}:40`);
     expect(run.lines.join('\n')).toContain(
       `исполнитель не тронул файлы пунктов возврата ${TASK} даже после напоминания`,

@@ -4,15 +4,17 @@
 // делал соседние пункты, цикл видел коммит и зелёный CI и снова отправлял задачу на ревью.
 import { readStage, type LoopContext } from './context.ts';
 import { remarkRefs, samePath } from './review-scope.ts';
-import { specFiles } from './spec.ts';
+import { SPEC_REMARK_RE, specFiles } from './spec.ts';
 import { taskBlock } from './stage-file.ts';
 
 const RETURN_HEAD_RE = /^\s*Возврат ревью/u;
-const ITEM_RE = /^\s{2,}[-*]\s+(.*\S)/u;
-const REPORT_HEAD_RE = /^\s*#{0,3}\s*ИСПРАВЛЕНО ПО РЕВЬЮ\s*$/iu;
+const ITEM_RE = /^\s*[-*]\s+(.*\S)/u;
+const REPORT_HEAD_RE = /^\s*#{0,3}\s*ИСПРАВЛЕНО ПО РЕВЬЮ\s*:?\s*$/iu;
 const REPORT_ITEM_RE = /^\s*[-*]\s+(.*\S)/u;
 const PATH_RE = /[\w@.-]+(?:\/[\w@.-]+)*\.[A-Za-z]\w*/gu;
 const EVIDENCE_RE = /(?:тест|провер|verify|команд|коммит)/iu;
+const RED_RE = /(?:\bRED\b|красн|падает|упал|failed assertion)/iu;
+const GREEN_RE = /(?:\bGREEN\b|зел[её]н|проходит|passed|\d+\/\d+)/iu;
 
 /** Пункты последнего блока «Возврат ревью:» задачи. */
 export function lastReturnItems(block: string): string[] {
@@ -54,6 +56,19 @@ export function reviewResolutionItems(message: string): string[] {
 }
 
 const pathsIn = (text: string): string[] => [...text.matchAll(PATH_RE)].map(([path = '']) => path);
+
+/** СПЕК закрыт только если один пункт отчёта называет тест и доказывает RED до исправления и GREEN после. */
+export function hasSpecRegressionProof(item: string, message: string): boolean {
+  if (!SPEC_REMARK_RE.test(item)) return true;
+  const expected = remarkRefs(item).map((ref) => ref.path);
+  return reviewResolutionItems(message).some((resolution) => {
+    const mentioned = pathsIn(resolution);
+    const namesTest =
+      expected.length === 0 ||
+      expected.some((path) => mentioned.some((candidate) => samePath(path, candidate)));
+    return namesTest && RED_RE.test(resolution) && GREEN_RE.test(resolution);
+  });
+}
 
 /**
  * Исполнитель явно перенёс исправление в другой файл: в одном пункте отчёта названы исходный
@@ -98,11 +113,11 @@ export function untouchedItems(
     const paths = remarkRefs(item)
       .map((ref) => ref.path)
       .filter((path) => !locked.some((l) => samePath(l, path)));
-    return (
+    const untouched =
       paths.length > 0 &&
       !paths.some((p) => touched.some((t) => samePath(t, p))) &&
-      !resolvedElsewhere(item, resolution, touched)
-    );
+      !resolvedElsewhere(item, resolution, touched);
+    return untouched || !hasSpecRegressionProof(item, resolution);
   });
 }
 
@@ -124,8 +139,8 @@ export const withReviewFeedback = (prompt: string, task: string, feedback?: stri
     '',
     'До отметки [~]:',
     '1. Выполни каждый пункт возврата, включая СПЕК; не заменяй его соседней правкой или новым форматом проверки.',
-    '2. Для каждого пункта проверь требование на реальном пути вызова и запусти относящийся к нему тест.',
-    '3. В итоговом ответе дай раздел «ИСПРАВЛЕНО ПО РЕВЬЮ»: каждый пункт → файлы → тест/команда и результат.',
+    '2. Для каждого СПЕК временно воспроизведи конкретную регрессию из замечания: целевой тест обязан упасть по assertion (RED); восстанови исправление и получи GREEN.',
+    '3. В итоговом ответе дай раздел «ИСПРАВЛЕНО ПО РЕВЬЮ»: каждый пункт → файлы → RED с конкретной регрессией и командой → GREEN с той же командой.',
     'Если пункт неверен или уже выполнен в другом месте — не игнорируй его: назови доказательство и точный файл.',
   ].join('\n');
 };
@@ -155,9 +170,10 @@ export async function skippedReturnItems(
 /** Запрос работы: пункты возврата, файлы которых исполнитель не тронул. */
 export const skippedPrompt = (task: string, items: readonly string[]): string =>
   [
-    `$task ${task} пункты возврата ревью не выполнены`,
-    'После возврата ни один файл из этих пунктов не изменён. Выполни каждый пункт в коде продукта, а не соседние:',
+    `$task ${task} пункты возврата ревью не доказаны`,
+    'Для этих пунктов нет изменения адресного файла или обязательного RED/GREEN-доказательства. Закрой каждый пункт, а не соседний:',
     ...items.map((item) => `- ${item}`),
-    'Если пункт выполнен в другом файле, в одном пункте раздела «ИСПРАВЛЕНО ПО РЕВЬЮ» назови исходный файл, реально изменённый файл и тест/команду, которая это подтверждает.',
+    'Для СПЕК в одном пункте отчёта назови тест, временную регрессию, RED-команду с падением assertion и GREEN той же команды после восстановления.',
+    'Если пункт выполнен в другом файле, назови исходный файл, реально изменённый файл и проверяющую команду.',
     'Если пункт неверен — назови точную причину и доказательство в ответе.',
   ].join('\n');

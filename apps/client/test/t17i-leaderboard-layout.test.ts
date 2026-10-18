@@ -96,17 +96,31 @@ function installMatchRuntime(): void {
   }));
 }
 
+const OBSERVED_LEADERBOARD_SIZE = { width: 173, height: 139 } as const;
+
 function installResizeObserver(): void {
-  class EmptyResizeObserver {
+  class ControlledResizeObserver {
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
-    public observe(): void {
-      this.callback([], this as unknown as ResizeObserver);
+    public observe(target: Element): void {
+      const size =
+        target.getAttribute('aria-label') === 'Leaderboard'
+          ? OBSERVED_LEADERBOARD_SIZE
+          : { width: 0, height: 0 };
+      this.callback(
+        [
+          {
+            target,
+            contentRect: new DOMRect(0, 0, size.width, size.height),
+          } as ResizeObserverEntry,
+        ],
+        this as unknown as ResizeObserver,
+      );
     }
 
     public disconnect(): void {}
   }
-  vi.stubGlobal('ResizeObserver', EmptyResizeObserver);
+  vi.stubGlobal('ResizeObserver', ControlledResizeObserver);
 }
 
 afterEach(() => {
@@ -157,7 +171,9 @@ describe('07/T17i: раскладка лидерборда', () => {
       const { unmount } = render(createElement(MatchPage));
       await waitFor(() => {
         const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
-        expect(leaderboard?.style.right).toBe('16px');
+        expect(leaderboard?.style.left).toBe(
+          `${viewport.width - 16 - OBSERVED_LEADERBOARD_SIZE.width}px`,
+        );
         expect(leaderboard?.style.width).toBe('');
         expect(leaderboard?.style.height).toBe('');
       });

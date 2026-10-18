@@ -39,6 +39,9 @@ export interface RemarkRef {
 const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u;
 const REF_RE = /([\w@.-]+(?:\/[\w@.-]+)*\.[A-Za-z]\w*):(\d+(?:-\d+)?(?:,\s?\d+(?:-\d+)?)*)/gu;
 const RETURN_HEAD_RE = /^\s*Возврат ревью/u;
+const AUDIT_BLOCK_HEAD_RE = /^\s*(?:Возврат ревью(?:[^:]*)?|ИСПРАВЛЕНО ПО РЕВЬЮ)\s*:\s*$/iu;
+const AUDIT_LINE_RE =
+  /^\s*(?:Исправлено(?:\s|:|\()|Повторное ревью|Замечание ревью|Возврат ревью исправлен)/iu;
 const LIST_ITEM_RE = /^\s*[-*]\s+\S/u;
 
 /**
@@ -126,19 +129,25 @@ export const remarkLines = (message: string): string[] =>
     .filter((line) => LIST_ITEM_RE.test(line))
     .map((line) => line.trim());
 
-/** Блок задачи без отметки и без строк возвратов: изменился он — изменились критерии. */
+/** Блок задачи без отметки и журнала исполнения/ревью: изменился он — изменились критерии. */
 export function taskText(block: string): string {
   const kept: string[] = [];
-  let inReturn = false;
+  let inAuditBlock = false;
   for (const line of block.replace(/^- \[[^\]]\]/u, '- []').split(/\r?\n/u)) {
-    if (RETURN_HEAD_RE.test(line)) inReturn = true;
-    else if (inReturn && /^\s{2,}[-*]\s/u.test(line)) continue;
-    else {
-      inReturn = false;
-      kept.push(line.trimEnd());
+    if (AUDIT_BLOCK_HEAD_RE.test(line)) {
+      inAuditBlock = true;
+      continue;
     }
+    if (inAuditBlock && /^\s*[-*]\s+\S/u.test(line)) continue;
+    if (inAuditBlock && line.trim() === '') continue;
+    inAuditBlock = false;
+    if (AUDIT_LINE_RE.test(line)) continue;
+    kept.push(line.trimEnd());
   }
-  return kept.join('\n').trim();
+  return kept
+    .filter((line) => line.trim() !== '')
+    .join('\n')
+    .trim();
 }
 
 /** Ссылки всех пунктов возвратов в блоке задачи, пути — после переименований. */
