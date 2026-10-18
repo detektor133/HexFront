@@ -59,32 +59,40 @@ describe('07/T17i: раскладка лидерборда', () => {
     });
   });
 
-  it('применяет естественный размер панели, измеренный по трём полям', () => {
-    const layouts = [2, 5, 30].map((leaderboardRows) =>
-      layoutFor({ width: 1440, height: 900 }, { leaderboardRows }),
-    );
-
-    for (const layout of layouts) {
+  it('использует измеренные ширину и высоту панели на трёх desktop-размерах', () => {
+    for (const viewport of viewports.slice(0, 3)) {
+      const layout = layoutFor(viewport, {
+        leaderboardSize: { width: 174, height: 142 },
+      });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
-      expect(leaderboard).toBeDefined();
-      expect(leaderboard?.x).toBe(1440 - 16);
-      expect(leaderboard?.width).toBe(0);
-      expect(leaderboard?.height).toBe(0);
+
+      expect(leaderboard).toMatchObject({
+        x: viewport.width - 16 - 174,
+        y: 56,
+        width: 174,
+        height: 142,
+      });
+      expect(validateMatchLayout(layout)).toEqual([]);
     }
   });
 
-  it('не меняет измеренный размер при смене viewport и сохраняет правую привязку', () => {
-    const layouts = viewports.map((viewport) => layoutFor(viewport));
+  it('сохраняет правую привязку и не зависит от числа игроков', () => {
+    const layouts = viewports.slice(0, 3).map((viewport) =>
+      layoutFor(viewport, {
+        leaderboardRows: 30,
+        leaderboardSize: { width: 174, height: 142 },
+      }),
+    );
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
 
-    expect(leaderboards.every((leaderboard) => leaderboard?.width === 0)).toBe(true);
-    expect(leaderboards.every((leaderboard) => leaderboard?.height === 0)).toBe(true);
+    expect(leaderboards.map((leaderboard) => leaderboard?.width)).toEqual([174, 174, 174]);
+    expect(leaderboards.map((leaderboard) => leaderboard?.height)).toEqual([142, 142, 142]);
     expect(
       leaderboards.every((leaderboard, index) => {
         const viewport = viewports[index];
-        return viewport !== undefined && leaderboard?.x === viewport.width - 16;
+        return viewport !== undefined && leaderboard?.x === viewport.width - 16 - 174;
       }),
     ).toBe(true);
   });

@@ -57,12 +57,13 @@ describe('07/T17o: прокрутка и движение панелей', () =>
     }
   });
 
-  it('не анимирует изменение высоты и позиции карточки', () => {
+  it('не анимирует изменение высоты и позиции карточки и лидерборда', () => {
     installPanelStyles();
 
-    const transition = getComputedStyle(addScrollableNode('card')).transition;
-
-    expect(transition).not.toMatch(/top|height/u);
+    for (const className of ['card', 'panel']) {
+      const transition = getComputedStyle(addScrollableNode(className)).transition;
+      expect(transition).not.toMatch(/top|height/u);
+    }
   });
 
   it('ограничивает карточку вычисленной раскладкой на целевых экранах', () => {

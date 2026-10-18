@@ -45,14 +45,20 @@ function installResizeObserver(stats: ResizeStats): void {
       const isDock = target.className.toString().includes('content');
       this.isDock = isDock;
       if (isDock) stats.dockObserves += 1;
+      const external = target.parentElement as HTMLElement | null;
+      const contentHeight = isDock ? 120 : 88;
+      const verticalPaddingAndBorder = isDock ? 30 : 0;
       Object.defineProperty(target, 'scrollHeight', {
         configurable: true,
         get: () => {
-          const assignedHeight = Number.parseFloat((target as HTMLElement).style.height);
-          return (isDock ? 150 : 88) + (Number.isNaN(assignedHeight) ? 0 : assignedHeight);
+          const assignedHeight = Number.parseFloat(external?.style.height ?? '');
+          const intrinsicHeight = contentHeight + verticalPaddingAndBorder;
+          return Math.max(
+            intrinsicHeight,
+            Number.isFinite(assignedHeight) ? Math.min(assignedHeight, intrinsicHeight) : 0,
+          );
         },
       });
-      const contentHeight = isDock ? 120 : 88;
       const observer = this as unknown as ResizeObserver;
       stats.observers.push({
         kind: isDock ? 'dock' : 'card',
@@ -302,6 +308,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       ).toContain('content');
       const armyBar = panel();
       const armyBarStyle = panelStyle();
+      expect(getComputedStyle(armyBar).transition).not.toMatch(/top|height/u);
       expectDockPadding();
       for (const leaderboardRows of [2, 5]) {
         for (const cardHeight of [88, 160]) {
@@ -327,6 +334,9 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
         width > 600 ? document.querySelector<HTMLElement>('section[aria-label]') : null;
       if (width > 600 && !leaderboard) throw new Error('лидерборд не найден');
       const leaderboardStyle = leaderboard?.getAttribute('style');
+      if (leaderboard) {
+        expect(getComputedStyle(leaderboard).transition).not.toMatch(/top|height/u);
+      }
 
       const tap = getTap();
       if (!tap) throw new Error('обработчик карты не установлен');
@@ -343,6 +353,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(panelStyle()).toEqual(armyBarStyle);
       const renderedCard = document.querySelector<HTMLElement>('section[class*="card"]');
       if (!renderedCard) throw new Error('карточка клетки не найдена');
+      expect(getComputedStyle(renderedCard).transition).not.toMatch(/top|height/u);
       expectElementStyle('card', {
         viewport: { width, height },
         hudHeight: 88,
@@ -440,6 +451,8 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     await waitFor(() => expect(getTap()).toBeDefined());
     await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(1440, 900, 150, 0, 5)));
     expect(screen.getByText('Живы: 5')).toBeTruthy();
+    expect(screen.getAllByRole('row')).toHaveLength(5);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(5);
     expect(stats.dockObserves).toBe(1);
     for (const cardHeight of [88, 160]) {
       act(() => reportHeight(stats, 'card', cardHeight, cardHeight));
