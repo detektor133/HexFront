@@ -1,11 +1,19 @@
 // Детерминированная сверка сохранности требований: модель не может объявить
 // $decide/$plan/$split успешными, если исчезла исходная строка приёмки.
 // Сверка намеренно консервативна: перефразирование требует решения владельца.
-import type { StageState } from './context.ts';
 import { parseQueue, taskBlock } from './stage-file.ts';
 
+interface RequirementsState {
+  readonly stageText: string;
+  readonly status: string;
+}
+
 const normalize = (text: string): string =>
-  text.replace(/\*\*/gu, '').replace(/\s+/gu, ' ').trim().replace(/[.!?。]+$/gu, '');
+  text
+    .replace(/\*\*/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .replace(/[.!?。]+$/gu, '');
 
 const lines = (text: string): string[] =>
   text
@@ -64,8 +72,8 @@ export function verifyDecisionTasks(
  */
 export function verifySplit(
   task: string,
-  before: StageState,
-  after: StageState,
+  before: RequirementsState,
+  after: RequirementsState,
 ): readonly string[] {
   const errors: string[] = [];
   const original = taskBlock(before.stageText, task);
@@ -125,8 +133,8 @@ export function verifySplit(
 /** Сохранность исходных требований после $plan до передачи задачи исполнителю. */
 export function verifyPlanTransition(
   task: string,
-  before: StageState,
-  after: StageState,
+  before: RequirementsState,
+  after: RequirementsState,
   outcome: string,
 ): readonly string[] {
   if (outcome === 'разбито') return verifySplit(task, before, after);

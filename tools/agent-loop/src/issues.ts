@@ -370,7 +370,8 @@ export async function processIssues(
       !('error' in command) &&
       command.skill !== 'done' &&
       command.skill !== 'streams'
-    ) continue;
+    )
+      continue;
     if ('error' in command) return stopIssue(context, fresh, command.error);
     return answer && waiting !== undefined
       ? answerIssue(context, fresh, command, waiting)
