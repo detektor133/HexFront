@@ -241,13 +241,13 @@ describe('07/T17i: раскладка лидерборда', () => {
     expect(compact).toBeDefined();
     expect(expanded).toBeDefined();
     expect(compact?.width).toBeLessThan(150);
-    expect(expanded?.width).toBe(compact?.width);
+    expect(expanded?.width).toBeGreaterThan(compact?.width ?? 0);
     expect(expanded?.width).toBeLessThanOrEqual(170);
     expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
     expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
   });
 
-  it('расширяет ПК-лидерборд только для полного длинного счёта', () => {
+  it('сохраняет компактную ширину для полного длинного счёта', () => {
     const compact = computeMatchLayout({
       viewport: { width: 1440, height: 900 },
       hudHeight: 48,
@@ -277,7 +277,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       paused: false,
     }).elements.find((element) => element.id === 'leaderboard');
 
-    expect(longScore?.width).toBeGreaterThan(compact?.width ?? 0);
+    expect(longScore?.width).toBe(compact?.width);
   });
 
   it('оставляет мобильную кнопку и постоянно показывает ПК-лидерборд', () => {
