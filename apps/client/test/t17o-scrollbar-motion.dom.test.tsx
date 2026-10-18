@@ -44,6 +44,7 @@ describe('07/T17o: прокрутка и движение панелей', () =>
       expect(node.scrollHeight).toBeGreaterThan(node.clientHeight);
       if (className === 'panel') {
         expect(style.overflowY).not.toMatch(/auto|scroll/u);
+        expect(cssSources[0]).toMatch(/\.panel\s*\{[\s\S]*width:\s*max-content/u);
       } else {
         expect(style.overflowY).toBe('auto');
         expect(style.scrollbarWidth).toBe('none');

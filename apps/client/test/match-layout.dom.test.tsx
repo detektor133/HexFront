@@ -248,7 +248,12 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
                   ? 'dialog'
                   : element.id,
     );
-    expect(node.style.left, element.id).toBe(`${element.x}px`);
+    if (element.id === 'leaderboard' && node.style.left === '') {
+      const edge = input.viewport.width <= 600 || input.viewport.height <= 500 ? 8 : 16;
+      expect(node.style.right, element.id).toBe(`${edge}px`);
+    } else {
+      expect(node.style.left, element.id).toBe(`${element.x}px`);
+    }
     expect(node.style.top, element.id).toBe(`${element.y}px`);
     if (element.id === 'popup-menu') {
       expect(node.style.width, element.id).toBe('');
@@ -329,14 +334,14 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     expect(node.isConnected, element.id).toBe(true);
     expect(
       {
-        x: node.style.left,
+        x: element.id === 'leaderboard' && node.style.left === '' ? '' : node.style.left,
         y: node.style.top,
         width: element.id === 'popup-menu' ? '' : node.style.width,
         height: element.id === 'popup-menu' ? '' : node.style.height,
       },
       element.id,
     ).toEqual({
-      x: `${element.x}px`,
+      x: element.id === 'leaderboard' && node.style.left === '' ? '' : `${element.x}px`,
       y: `${element.y}px`,
       width:
         element.id === 'popup-menu' || (element.id === 'leaderboard' && node.style.width === '')
@@ -804,5 +809,40 @@ describe('приёмка T7: раскладка матча без перекры
         ).toEqual([]);
       }
     }
+  });
+
+  it('обновляет desktop-координату лидерборда после DOM-измерения панели', async () => {
+    installLayoutMeasurements();
+    prepareDomScene('', VIEWPORTS[2]);
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.className.toString().includes('panel')) {
+        return {
+          x: 1274,
+          y: 56,
+          width: 150,
+          height: 138,
+          top: 56,
+          right: 1424,
+          bottom: 194,
+          left: 1274,
+          toJSON: () => ({}),
+        };
+      }
+      return originalRect.call(this);
+    });
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(createElement(MatchPage));
+    const leaderboard = await screen.findByRole('region', {
+      name: /Таблица лидеров|Leaderboard/u,
+    });
+
+    expect(leaderboard.style.right).toBe('');
+    expect(leaderboard.style.left).toBe('1274px');
+    expect(leaderboard.style.width).toBe('');
+    expect(leaderboard.style.height).toBe('');
   });
 });

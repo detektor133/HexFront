@@ -129,6 +129,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     if (id === 'leaderboard') {
       delete style.width;
       delete style.height;
+      if (leaderboardSize === undefined) {
+        delete style.left;
+        style.right = `${window.innerWidth <= 600 || window.innerHeight <= 500 ? 8 : 16}px`;
+      }
     }
     return style;
   };

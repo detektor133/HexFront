@@ -111,4 +111,12 @@ describe('07/T17i: раскладка лидерборда', () => {
       height: 246,
     });
   });
+  it('desktop-раскладка не получает фиксированные размеры без DOM-измерения', () => {
+    const layout = layoutFor({ width: 1440, height: 900 });
+    const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+
+    expect(leaderboard).toMatchObject({ x: 1424, width: 0, height: 0 });
+    expect([150, 136, 138]).not.toContain(leaderboard?.width);
+    expect([150, 136, 138]).not.toContain(leaderboard?.height);
+  });
 });

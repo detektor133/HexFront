@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- Исправлен возврат 07/T17s: ПК-лидерборд не получает inline `width`/`height`, поэтому сохраняет естественные размеры `.panel`; реальный DOM-путь проверен на ПК-viewport.
-- `t17i` больше не передаёт фиктивный `leaderboardSize`; мобильные размеры сохранены.
-- Четыре связанных тестовых файла прошли, `pnpm verify --changed` зелёный.
+- Исправлен возврат 07/T17s: до измерения `.panel` лидерборд закрепляется через `right`, после измерения layout использует фактические `width` и `height`.
+- Реальный DOM-путь `MatchPage → MatchSurface → Leaderboard` проверяет переход к координате `left: 1274px` при измерении панели `150×138 px`; inline-размеры остаются пустыми.
+- Изменены четыре связанные проверки разрешённых замен; `pnpm verify --changed`: 16 файлов и 86 тестов зелёные.
 - Следующая задача: `$task 07/T17v`.
 - Читать: блоки T17s/T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.dom.test.tsx`.

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Fp, PlayerView } from '@hexfront/sim';
 
@@ -68,6 +68,18 @@ const view = (overrides: Partial<RankingView> = {}): RankingView =>
 describe('лидерборд', () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('передаёт layout фактический размер панели после DOM-измерения', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(1274, 56, 150, 138),
+    );
+    const onSize = vi.fn();
+
+    render(<Leaderboard view={view()} onSize={onSize} />);
+
+    expect(onSize).toHaveBeenCalledWith({ width: 150, height: 138 });
   });
 
   it('критерий 07/T17s: на ПК лидерборд видим без кнопки сворачивания', () => {
