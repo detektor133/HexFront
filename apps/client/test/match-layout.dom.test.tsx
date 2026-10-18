@@ -193,7 +193,7 @@ function installLayoutMeasurements(measurements = MEASURED_LAYOUT): void {
       const height =
         target.tagName === 'HEADER'
           ? measurements.hudHeight
-          : className.includes('dock')
+          : className.includes('dock') || className.includes('content')
             ? measurements.bottomPanelHeight
             : target.tagName === 'SECTION' && className.includes('card')
               ? measurements.cardHeight

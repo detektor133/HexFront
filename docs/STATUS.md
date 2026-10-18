@@ -15,9 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17q: решение владельца переписало требования ArmyBar; нужно устранить первопричину дрейфа `ResizeObserver → style.height → ResizeObserver`, проверить первый видимый кадр, зависимость `scrollHeight` от назначенной высоты и нижний отступ карточек 16 px.
-- 07/T17r заблокирована зависимостью от T17q; не переходить к ней, пока T17q не исправлена и не принята.
-- T17o остаётся `[x]`; отменена только конфликтующая часть о переходах `top`/`height`, правило прокрутки без видимого нативного скроллбара сохраняется.
+- 07/T17q исправлена и отмечена `[~]`: ArmyBar измеряет отдельный контентный узел, CSS даёт видимый desktop-отступ 16 px, тесты проверяют реальный DOM-путь и возвраты ревью.
+- Следующая задача — 07/T17r после ревью T17q.
+- Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.tsx`.
 - `pnpm verify --changed` — зелёный.
-- Следующая сессия — выполнить 07/T17q по новому тексту задачи; после её принятия перейти к 07/T17r.
-- Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx` и `apps/client/src/dev/ArmyBar.tsx`.

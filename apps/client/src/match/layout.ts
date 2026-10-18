@@ -92,7 +92,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const { width, height } = input.viewport;
   const edge = width <= 600 || height <= 500 ? 8 : 16;
   const gap = 8;
-  const landscapeWithoutSelection = width > height && !input.cardOpen;
+  const phoneViewport = width <= 600 || height <= 500;
+  const landscapeWithoutSelection = phoneViewport && width > height && !input.cardOpen;
   const maxBottomPanelHeight = landscapeWithoutSelection
     ? Math.floor(height / 2) - input.hudHeight
     : height - input.hudHeight - gap;

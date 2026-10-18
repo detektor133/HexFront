@@ -329,10 +329,10 @@ export function ArmyBar(props: {
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
-  const dockRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const { onHeight } = props;
   useLayoutEffect(() => {
-    const el = dockRef.current;
+    const el = contentRef.current;
     if (!el || !onHeight) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
       onHeight(Math.max(entries[0]?.contentRect.height ?? 0, el.scrollHeight));
@@ -367,99 +367,101 @@ export function ArmyBar(props: {
     return offensiveButtons(front ? p.offensive : null, auto);
   };
   return (
-    <div className={styles.dock} ref={dockRef} style={props.style}>
-      {army && (
-        <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
-          <Tool
-            icon="front"
-            label="plan.front"
-            onClick={() => use('front')}
-            active={active('front')}
-            disabled={needWhole}
-          />
-          <Tool
-            icon="offensive"
-            label="plan.offensive"
-            onClick={() => use('offensive')}
-            active={active('offensive')}
-            disabled={needWhole ?? (plan?.kind === 'front' ? null : t('plan.needFront'))}
-          />
-          <Tool
-            icon="line"
-            label="plan.line"
-            onClick={() => use('line')}
-            active={active('line')}
-            disabled={needWhole}
-          />
-          <Tool
-            icon="erase"
-            label="plan.erase"
-            onClick={() => use('erase')}
-            active={active('erase')}
-            disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
-          />
-          <Tool
-            icon="disband"
-            label="army.disband"
-            onClick={() => {
-              send({ t: 'disbandArmy', armyId: army.id });
-              props.onSelect(null);
-            }}
-          />
-        </div>
-      )}
-      <div className={styles.strip}>
-        {view.armies.map((a) => {
-          const units = mine.filter((u) => u.armyId === a.id);
-          return (
-            <ArmyCard
-              key={a.id}
-              name={armyName(a)}
-              rawName={a.name}
-              color={armyColor(a.number)}
-              stats={armyStats(units)}
-              stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
-              selected={a.id === selected}
-              partial={props.partial.includes(a.id)}
-              run={runOf(a)}
-              runHint={t('plan.needFront')}
-              onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
-              auto={a.auto}
-              onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
-              onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
-              onClick={() => select(a.id, units)}
+    <div className={styles.dock} style={props.style}>
+      <div className={styles.content} ref={contentRef}>
+        {army && (
+          <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
+            <Tool
+              icon="front"
+              label="plan.front"
+              onClick={() => use('front')}
+              active={active('front')}
+              disabled={needWhole}
             />
-          );
-        })}
-        <div className={styles.reserve}>
-          <IconButton
-            type="button"
-            className={styles.iconButton}
-            label={t('army.reserve')}
-            onClick={() =>
-              props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
-            }
-          >
-            <Icon name="reserve" />
-            <span className={styles.num}>{reserve.length}</span>
-          </IconButton>
-          <IconButton
-            type="button"
-            className={styles.iconButton}
-            label={t('army.auto')}
-            aria-pressed={view.me.autoReinforce}
-            onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
-          >
-            <Icon name="auto" />
-          </IconButton>
-          <IconButton
-            type="button"
-            className={styles.iconButton}
-            label={t('army.new')}
-            onClick={() => send({ t: 'createArmy', name: '' })}
-          >
-            <Icon name="add" />
-          </IconButton>
+            <Tool
+              icon="offensive"
+              label="plan.offensive"
+              onClick={() => use('offensive')}
+              active={active('offensive')}
+              disabled={needWhole ?? (plan?.kind === 'front' ? null : t('plan.needFront'))}
+            />
+            <Tool
+              icon="line"
+              label="plan.line"
+              onClick={() => use('line')}
+              active={active('line')}
+              disabled={needWhole}
+            />
+            <Tool
+              icon="erase"
+              label="plan.erase"
+              onClick={() => use('erase')}
+              active={active('erase')}
+              disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
+            />
+            <Tool
+              icon="disband"
+              label="army.disband"
+              onClick={() => {
+                send({ t: 'disbandArmy', armyId: army.id });
+                props.onSelect(null);
+              }}
+            />
+          </div>
+        )}
+        <div className={styles.strip}>
+          {view.armies.map((a) => {
+            const units = mine.filter((u) => u.armyId === a.id);
+            return (
+              <ArmyCard
+                key={a.id}
+                name={armyName(a)}
+                rawName={a.name}
+                color={armyColor(a.number)}
+                stats={armyStats(units)}
+                stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
+                selected={a.id === selected}
+                partial={props.partial.includes(a.id)}
+                run={runOf(a)}
+                runHint={t('plan.needFront')}
+                onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
+                auto={a.auto}
+                onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
+                onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
+                onClick={() => select(a.id, units)}
+              />
+            );
+          })}
+          <div className={styles.reserve}>
+            <IconButton
+              type="button"
+              className={styles.iconButton}
+              label={t('army.reserve')}
+              onClick={() =>
+                props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
+              }
+            >
+              <Icon name="reserve" />
+              <span className={styles.num}>{reserve.length}</span>
+            </IconButton>
+            <IconButton
+              type="button"
+              className={styles.iconButton}
+              label={t('army.auto')}
+              aria-pressed={view.me.autoReinforce}
+              onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
+            >
+              <Icon name="auto" />
+            </IconButton>
+            <IconButton
+              type="button"
+              className={styles.iconButton}
+              label={t('army.new')}
+              onClick={() => send({ t: 'createArmy', name: '' })}
+            >
+              <Icon name="add" />
+            </IconButton>
+          </div>
         </div>
       </div>
     </div>

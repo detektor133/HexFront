@@ -10,6 +10,12 @@
   pointer-events: none;
 }
 
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
 .tools,
 .strip {
   display: flex;
@@ -324,5 +330,11 @@
 
   .card {
     flex-basis: 220px;
+  }
+}
+
+@media (min-width: 601px) {
+  .strip {
+    margin-bottom: var(--space-sm);
   }
 }

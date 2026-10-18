@@ -40,13 +40,15 @@ function installResizeObserver(stats: ResizeStats): void {
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
     public observe(target: Element): void {
-      const isDock = target.className.toString().includes('dock');
+      const isDock = target.className.toString().includes('content');
       this.isDock = isDock;
       if (isDock) stats.dockObserves += 1;
       Object.defineProperty(target, 'scrollHeight', {
         configurable: true,
-        writable: true,
-        value: isDock ? 150 : 88,
+        get: () => {
+          const assignedHeight = Number.parseFloat((target as HTMLElement).style.height);
+          return (isDock ? 150 : 88) + (Number.isNaN(assignedHeight) ? 0 : assignedHeight);
+        },
       });
       const contentHeight = isDock ? 120 : 88;
       const observer = this as unknown as ResizeObserver;
@@ -208,8 +210,28 @@ function expectDockPadding(): void {
   expect(source).toMatch(/padding: 0 var\(--space-sm\) var\(--space-sm\);/u);
   if (style.paddingBottom !== '0') expect(style.paddingBottom).toBe('var(--space-sm)');
   if (style.paddingLeft !== '0') expect(style.paddingLeft).toBe('var(--space-lg)');
-  expect(source).not.toMatch(/\.strip\s*\{[\s\S]*?margin-bottom:/u);
+  expect(source).toMatch(
+    /@media \(min-width: 601px\)[\s\S]*?\.strip\s*\{[\s\S]*?margin-bottom: var\(--space-sm\);/u,
+  );
+  expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"lg": 16/u);
+  expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"sm": 8/u);
   expect(source).not.toMatch(/position:\s*fixed/u);
+}
+
+function expectElementStyle(
+  elementId: string,
+  input: Parameters<typeof computeMatchLayout>[0],
+): void {
+  const element = computeMatchLayout(input).elements.find((item) => item.id === elementId);
+  if (!element) throw new Error(`элемент раскладки ${elementId} не найден`);
+  const node =
+    elementId === 'card'
+      ? document.querySelector<HTMLElement>('section[class*="card"]')
+      : document.querySelector<HTMLElement>('[class*="dock"]');
+  if (!node) throw new Error(`DOM-элемент ${elementId} не найден`);
+  expect(
+    ['left', 'top', 'width', 'height'].map((property) => node.style.getPropertyValue(property)),
+  ).toEqual([element.x, element.y, element.width, element.height].map((value) => `${value}px`));
 }
 
 afterEach(() => {
@@ -252,6 +274,9 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
       expect(stats.dockObserves).toBe(1);
       expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(1);
+      expect(
+        stats.observers.find((item) => item.kind === 'dock')?.target.className.toString(),
+      ).toContain('content');
       expectDockPadding();
       for (const leaderboardRows of [2, 5]) {
         for (const cardHeight of [88, 160]) {
@@ -292,6 +317,21 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       };
       await select(firstHex);
       expect(panelStyle()).toEqual(before);
+      const renderedCard = document.querySelector<HTMLElement>('section[class*="card"]');
+      if (!renderedCard) throw new Error('карточка клетки не найдена');
+      expectElementStyle('card', {
+        viewport: { width, height },
+        hudHeight: 88,
+        bottomPanelHeight: Number.parseFloat(panel().style.height),
+        eventRows: 0,
+        tutorialVisible: true,
+        leaderboardOpen: width > 600,
+        leaderboardRows: 2,
+        cardHeight: Number.parseFloat(renderedCard.style.height),
+        cardOpen: true,
+        popupOpen: false,
+        paused: false,
+      });
       if (width > 600) {
         expect(
           document.querySelector<HTMLElement>('section[aria-label]')?.getAttribute('style'),
@@ -409,5 +449,62 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(2);
     unmount();
     expect(stats.dockDisconnects).toBe(2);
+  });
+
+  it.each([
+    [1440, 900],
+    [1920, 1080],
+  ])(
+    'сохраняет границы карточки при двух высотах и двух размерах лидерборда (%dx%d)',
+    (width, height) => {
+      for (const leaderboardRows of [2, 5]) {
+        for (const cardHeight of [88, 160]) {
+          const layout = computeMatchLayout({
+            viewport: { width, height },
+            hudHeight: 88,
+            bottomPanelHeight: 150,
+            eventRows: 0,
+            tutorialVisible: true,
+            leaderboardOpen: true,
+            leaderboardRows,
+            cardHeight,
+            cardOpen: true,
+            popupOpen: false,
+            paused: false,
+          });
+          const dock = layout.elements.find((item) => item.id === 'bottom-panel');
+          const card = layout.elements.find((item) => item.id === 'card');
+          expect(dock).toBeDefined();
+          expect(card).toBeDefined();
+          if (!dock || !card) continue;
+          expect(card.y + card.height).toBeLessThanOrEqual(dock.y - 8);
+          expect(card.y + card.height).toBeLessThanOrEqual(height);
+          expect(dock.y + dock.height).toBeLessThanOrEqual(height);
+        }
+      }
+    },
+  );
+
+  it('не ограничивает обычный ПК правилом телефонного альбома', () => {
+    for (const viewport of [
+      { width: 1366, height: 768 },
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      const layout = computeMatchLayout({
+        viewport,
+        hudHeight: 88,
+        bottomPanelHeight: 1000,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        leaderboardRows: 0,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      });
+      expect(layout.bottomPanelHeight).toBe(viewport.height - 88 - 8);
+    }
   });
 });
