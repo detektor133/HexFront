@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q исправлена после красного CI: тест получил корректное сужение `LocalEngine`, полную инициализацию `ResizeStats` и сохранённые проверки возврата ревью.
-- Приёмочный DOM-тест проходит реальный путь `MatchPage → MatchSurface`, проверяет `ResizeObserver`, повторные измерения, четыре координаты ArmyBar, обновление данных армий, отступ 16 px и отсутствие `position: fixed`.
-- Следующая задача — 07/T17r после нового ревью T17q.
-- Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.tsx`.
+- 07/T17r выполнена: HexCard и UnitCard измеряют отдельный естественный контентный узел, поэтому назначенная геометрия карточки не создаёт цикл `ResizeObserver`.
+- У HexCard удалены переходы `top`/`height`; скрытая внутренняя прокрутка и доступность содержимого сохранены.
+- Обновлён регрессионный mock измерений и тест отсутствия геометрической анимации; прежние проверки ArmyBar и содержимого карточки проходят.
+- Следующая задача — 07/T17s.
+- Читать блоки T17s–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/Leaderboard.tsx`.
 - `pnpm verify --changed` — зелёный.

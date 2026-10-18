@@ -139,13 +139,14 @@ export function UnitCard(props: {
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const cardRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const card = cardRef.current;
-    if (!card || !props.onHeight) return;
+    const content = contentRef.current;
+    if (!content || !props.onHeight) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      props.onHeight?.(entries[0]?.contentRect.height ?? 0);
+      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, content.scrollHeight));
     const observer = new ResizeObserver(report);
-    observer.observe(card);
+    observer.observe(content);
     return () => observer.disconnect();
   }, [props.onHeight]);
   const { view, picked } = props;
@@ -161,9 +162,11 @@ export function UnitCard(props: {
       : `${t('unit.selected')}: ${units.length} · ${formatSoldiers(total)}`;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
-      <h2 className={styles.title}>{title}</h2>
-      {units.length === 1 && <UnitRows u={first} view={view} />}
-      <Orders units={units} view={view} send={props.send} />
+      <div ref={contentRef} className={styles.cardBody}>
+        <h2 className={styles.title}>{title}</h2>
+        {units.length === 1 && <UnitRows u={first} view={view} />}
+        <Orders units={units} view={view} send={props.send} />
+      </div>
     </section>
   );
 }

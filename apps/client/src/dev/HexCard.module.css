@@ -6,14 +6,15 @@
   box-sizing: border-box;
   overflow-y: auto;
   scrollbar-width: none;
-  transition:
-    top 150ms var(--motion-easing),
-    height 150ms var(--motion-easing);
   padding: var(--space-md);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
+}
+
+.cardBody {
+  min-height: 0;
 }
 
 .card::-webkit-scrollbar {

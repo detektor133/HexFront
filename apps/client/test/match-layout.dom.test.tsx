@@ -195,7 +195,8 @@ function installLayoutMeasurements(measurements = MEASURED_LAYOUT): void {
           ? measurements.hudHeight
           : className.includes('dock') || className.includes('content')
             ? measurements.bottomPanelHeight
-            : target.tagName === 'SECTION' && className.includes('card')
+            : (target.tagName === 'SECTION' && className.includes('card')) ||
+                className.includes('cardBody')
               ? measurements.cardHeight
               : 0;
       this.callback(

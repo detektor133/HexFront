@@ -50,17 +50,12 @@ describe('07/T17o: прокрутка и движение панелей', () =>
     }
   });
 
-  it('анимирует изменение высоты и позиции панели UI-motion токенами', () => {
+  it('не анимирует изменение высоты и позиции карточки', () => {
     installPanelStyles();
 
-    for (const className of ['panel', 'card']) {
-      const transition = getComputedStyle(addScrollableNode(className)).transition;
+    const transition = getComputedStyle(addScrollableNode('card')).transition;
 
-      expect(transition).toContain('150ms');
-      expect(transition).toMatch(/var\(--motion-easing\)|cubic-bezier\(0\.22, 1, 0\.36, 1\)/u);
-      expect(transition).toContain('top');
-      expect(transition).toContain('height');
-    }
+    expect(transition).not.toMatch(/top|height/u);
   });
 
   it('ограничивает карточку вычисленной раскладкой на целевых экранах', () => {

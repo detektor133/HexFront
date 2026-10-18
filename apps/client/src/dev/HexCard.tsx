@@ -182,13 +182,14 @@ export function HexCard(props: {
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const cardRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const card = cardRef.current;
-    if (!card || !props.onHeight) return;
+    const content = contentRef.current;
+    if (!content || !props.onHeight) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, card.scrollHeight));
+      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, content.scrollHeight));
     const observer = new ResizeObserver(report);
-    observer.observe(card);
+    observer.observe(content);
     return () => observer.disconnect();
   }, [props.onHeight]);
   const { s, view, map, send } = props;
@@ -218,63 +219,67 @@ export function HexCard(props: {
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
-      <h2 className={styles.title}>{title}</h2>
-      <dl className={styles.stats}>
-        <Row label={t('card.owner')} value={ownerText} />
-        <Row
-          label={t('card.pop')}
-          value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
-        />
-        <Row label={t('card.growth')} value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
-        {improvement > 0 && <Row label={t('card.improvementLevel')} value={String(improvement)} />}
-        {mine && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
-        {mine && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
-      </dl>
-      {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
-      {mine && !c.isCapital && (
-        <p className={c.link === 'isolated' ? styles.bad : styles.good}>
-          {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
-        </p>
-      )}
-      {job && (
-        <div className={styles.progress}>
-          <p className={styles.progressText}>
-            {t('card.building')}: {t(`build.${job.kind}` as MessageKey)} · {t('card.left')}{' '}
-            {Math.ceil((job.totalTicks - job.progressTicks) / TICKS_PER_S)} {t('card.seconds')}
+      <div ref={contentRef} className={styles.cardBody}>
+        <h2 className={styles.title}>{title}</h2>
+        <dl className={styles.stats}>
+          <Row label={t('card.owner')} value={ownerText} />
+          <Row
+            label={t('card.pop')}
+            value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
+          />
+          <Row label={t('card.growth')} value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
+          {improvement > 0 && (
+            <Row label={t('card.improvementLevel')} value={String(improvement)} />
+          )}
+          {mine && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
+          {mine && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
+        </dl>
+        {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
+        {mine && !c.isCapital && (
+          <p className={c.link === 'isolated' ? styles.bad : styles.good}>
+            {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
           </p>
-          <div className={styles.bar}>
-            <div
-              className={styles.fill}
-              style={{ width: `${(100 * job.progressTicks) / job.totalTicks}%` }}
-            />
+        )}
+        {job && (
+          <div className={styles.progress}>
+            <p className={styles.progressText}>
+              {t('card.building')}: {t(`build.${job.kind}` as MessageKey)} · {t('card.left')}{' '}
+              {Math.ceil((job.totalTicks - job.progressTicks) / TICKS_PER_S)} {t('card.seconds')}
+            </p>
+            <div className={styles.bar}>
+              <div
+                className={styles.fill}
+                style={{ width: `${(100 * job.progressTicks) / job.totalTicks}%` }}
+              />
+            </div>
           </div>
-        </div>
-      )}
-      {road && c?.roadJob && (
-        <p className={styles.progressText}>
-          {t('dev.economy.roadJob')} · {c.roadJob.built} {t('dev.economy.of')} {c.roadJob.total}
-        </p>
-      )}
-      {actions.map((a) => (
-        <ActionButton
-          key={a.kind}
-          a={a}
-          send={send}
-          blockedText={blockedText(a, s, view)}
-          {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
-        />
-      ))}
-      {recruiting && (
-        <p className={styles.progressText}>
-          {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}
-          {formatSoldiers(recruiting.soldiers)} · {t('card.left')}{' '}
-          {Math.ceil((recruiting.totalTicks - recruiting.progressTicks) / TICKS_PER_S)}{' '}
-          {t('card.seconds')}
-        </p>
-      )}
-      {c &&
-        !recruiting &&
-        s.recruit.map((o) => <RecruitButton key={o.type} o={o} send={send} cityId={c.id} />)}
+        )}
+        {road && c?.roadJob && (
+          <p className={styles.progressText}>
+            {t('dev.economy.roadJob')} · {c.roadJob.built} {t('dev.economy.of')} {c.roadJob.total}
+          </p>
+        )}
+        {actions.map((a) => (
+          <ActionButton
+            key={a.kind}
+            a={a}
+            send={send}
+            blockedText={blockedText(a, s, view)}
+            {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
+          />
+        ))}
+        {recruiting && (
+          <p className={styles.progressText}>
+            {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}
+            {formatSoldiers(recruiting.soldiers)} · {t('card.left')}{' '}
+            {Math.ceil((recruiting.totalTicks - recruiting.progressTicks) / TICKS_PER_S)}{' '}
+            {t('card.seconds')}
+          </p>
+        )}
+        {c &&
+          !recruiting &&
+          s.recruit.map((o) => <RecruitButton key={o.type} o={o} send={send} cityId={c.id} />)}
+      </div>
     </section>
   );
 }
