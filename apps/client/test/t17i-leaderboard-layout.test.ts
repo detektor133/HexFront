@@ -195,6 +195,41 @@ describe('07/T17i: раскладка лидерборда', () => {
     expect(leaderboards[0]?.width).toBeGreaterThan(160);
   });
 
+  it('определяет ширину по компактному содержимому и ограничивает её максимумом', () => {
+    const createLayout = (names: readonly string[]) =>
+      computeMatchLayout({
+        viewport: { width: 1440, height: 900 },
+        hudHeight: 48,
+        bottomPanelHeight: 132,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: names.length,
+        leaderboardPlayerNames: names,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      });
+    const compact = createLayout(['А', 'Б', 'В', 'Г', 'Д']).elements.find(
+      (element) => element.id === 'leaderboard',
+    );
+    const expanded = createLayout([
+      'Очень длинное имя игрока 1',
+      'Очень длинное имя игрока 2',
+      'Очень длинное имя игрока 3',
+      'Очень длинное имя игрока 4',
+      'Очень длинное имя игрока 5',
+    ]).elements.find((element) => element.id === 'leaderboard');
+
+    expect(compact).toBeDefined();
+    expect(expanded).toBeDefined();
+    expect(compact?.width).toBeLessThan(expanded?.width ?? 0);
+    expect(expanded?.width).toBeLessThanOrEqual(320);
+    expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
+    expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
+  });
+
   it('оставляет свёрнутую кнопку справа сверху на всех целевых экранах', () => {
     for (const viewport of viewports) {
       const layout = computeMatchLayout({

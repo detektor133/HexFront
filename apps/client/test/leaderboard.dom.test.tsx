@@ -150,9 +150,13 @@ describe('лидерборд', () => {
     const [player] = within(screen.getAllByRole('row')[0] as HTMLElement).getAllByRole('cell');
     if (!player) throw new Error('Строка игрока не найдена');
     expect(player.className).toContain('player');
+    const row = screen.getAllByRole('row')[0] as HTMLElement;
+    expect(row.children).toHaveLength(3);
+    expect(within(row).getByRole('rowheader')).not.toBe(within(row).getAllByRole('cell')[1]);
     const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
     expect(stylesheet).toMatch(/grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u);
+    expect(stylesheet).toMatch(/\.place,\s*\.score\s*\{[\s\S]*white-space:\s*nowrap/u);
   });
 
   it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {
