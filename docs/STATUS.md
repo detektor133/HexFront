@@ -15,9 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17u возвращена на усиление проверки полной геометрии `contentRect`.
-- Тест подтверждает ширину через `style.left`, но ещё не подтверждает передачу высоты в layout.
-- `pnpm verify --changed` — зелёный до исправления.
-- Исправлена сходимость цикла: журнал review больше не меняет нормативный текст задачи, `СПЕК:` требует RED/GREEN.
+- 07/T17u исправлена по возврату review: тест теперь отдельно проверяет влияние `contentRect.height` на вертикальный расчёт `layout`.
+- Сохранён реальный путь `MatchPage → MatchSurface → layout → Leaderboard`, проверка ширины и мобильные проверки.
+- `pnpm verify --changed` — зелёный.
 - Следующая задача после review: 07/T17, задача владельца.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

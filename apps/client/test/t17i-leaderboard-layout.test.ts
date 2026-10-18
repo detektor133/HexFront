@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { afterEach, vi } from 'vitest';
@@ -97,6 +97,7 @@ function installMatchRuntime(): void {
 }
 
 const LEADERBOARD_RESIZE_EVENT = { width: 173, height: 139 } as const;
+const LEADERBOARD_LAYOUT_EVENT = { width: 173, height: 139 } as const;
 
 function installResizeObserver(): void {
   class ControlledResizeObserver {
@@ -180,6 +181,27 @@ describe('07/T17i: раскладка лидерборда', () => {
       expect(document.querySelector('[aria-label="Leaderboard"] h2')).not.toBeNull();
       unmount();
     }
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 601 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    const { unmount } = render(createElement(MatchPage));
+    const leaderboard = await screen.findByRole('region', { name: /Таблица лидеров|Leaderboard/u });
+    await waitFor(() => expect(leaderboard.style.top).toBe('8px'));
+
+    fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
+    await waitFor(() => expect(leaderboard.style.top).toBe('128px'));
+
+    const measuredLayout = layoutFor(
+      { width: 601, height: 900 },
+      {
+        leaderboardSize: LEADERBOARD_LAYOUT_EVENT,
+        popupOpen: true,
+        popupAnchorY: 64,
+        popupSize: { width: 260, height: 120 },
+      },
+    );
+    expect(measuredLayout.elements.find((element) => element.id === 'leaderboard')?.y).toBe(192);
+    unmount();
   });
 
   it('сохраняет правую привязку и не зависит от числа игроков', () => {
