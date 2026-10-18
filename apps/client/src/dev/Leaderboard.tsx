@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayerView } from '@hexfront/sim';
 
 import styles from './Leaderboard.module.css';
-import { leaderboardRows, type LeaderboardRow } from './leaderboard.ts';
+import { leaderboardRows, sortLeaderboardRows, type LeaderboardRow } from './leaderboard.ts';
 import { t } from '../i18n/dict.ts';
 
 interface LeaderboardProps {
@@ -40,7 +40,7 @@ export function Leaderboard({
   const rows = useLeaderboard(view);
   const me = rows.find((row) => row.playerId === view.playerId);
   const rank = me?.place ?? '-';
-  const visibleRows = [...rows].sort((a, b) => a.place - b.place || a.playerId - b.playerId);
+  const visibleRows = sortLeaderboardRows(rows).slice(0, 5);
   if (!open) {
     return (
       <button

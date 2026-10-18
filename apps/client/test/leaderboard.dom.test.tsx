@@ -156,6 +156,11 @@ describe('лидерборд', () => {
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
     expect(stylesheet).toMatch(/grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u);
     expect(stylesheet).toMatch(/\.place,\s*\.score\s*\{[\s\S]*white-space:\s*nowrap/u);
+    expect(stylesheet).toMatch(
+      /\.row\s*\{[\s\S]*grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u,
+    );
+    expect(within(row).getByRole('rowheader').className).toContain('place');
+    expect(within(row).getAllByRole('cell')[1]?.className).toContain('score');
   });
 
   it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {

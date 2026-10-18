@@ -12,6 +12,7 @@ const LEADERBOARD_ALIVE_HEIGHT = 28;
 const LEADERBOARD_ROW_HEIGHT = 28;
 const LEADERBOARD_ROW_GAP = 4;
 const LEADERBOARD_PADDING = 16;
+const LEADERBOARD_BORDER_WIDTH = 2;
 
 export interface MatchLayoutElement {
   readonly id: string;
@@ -138,7 +139,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen
-    ? LEADERBOARD_PADDING +
+    ? LEADERBOARD_BORDER_WIDTH +
+      LEADERBOARD_PADDING +
       LEADERBOARD_HEADER_HEIGHT +
       LEADERBOARD_ALIVE_HEIGHT +
       leaderboardRows * LEADERBOARD_ROW_HEIGHT +

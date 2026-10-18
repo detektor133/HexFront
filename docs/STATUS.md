@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-- 07/T17s реализована и ждёт ревью: адаптивная ширина лидерборда и усиленные DOM/layout-проверки зелёные.
+- 07/T17s повторно исправлена и отмечена `[~]`: ширина считает пять отсортированных видимых строк, высота учитывает границы, проверки лидерборда и налога усилены.
 - Следующая задача — 07/T17v; затем 07/T17w → 07/T17t → 07/T17u.
-- Читать блоки T17v–T17u в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.module.css`, `apps/client/test`.
+- Перед работой проверить CI для текущего HEAD; затем читать блок T17v в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test`.

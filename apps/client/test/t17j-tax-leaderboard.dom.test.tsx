@@ -183,6 +183,24 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
         height: viewport.hudHeight,
       };
 
+      const baseline = computeMatchLayout({
+        viewport,
+        hudHeight: viewport.hudHeight,
+        bottomPanelHeight: viewport.width <= 600 ? 178 : 132,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        popupAnchorX: viewport.anchorX,
+        popupAnchorY: viewport.anchorY,
+        popupSize: { width: 260, height: 120 },
+        paused: false,
+      }).elements.find((element) => element.id === 'leaderboard');
+      expect(baseline).toBeDefined();
+
       for (const leaderboardOpen of [true, false] as const) {
         const layout = computeMatchLayout({
           viewport,
@@ -194,10 +212,7 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
           leaderboardRows: 5,
           cardHeight: 0,
           cardOpen: false,
-          popupOpen: true,
-          popupAnchorX: viewport.anchorX,
-          popupAnchorY: viewport.anchorY,
-          popupSize: { width: 260, height: 120 },
+          popupOpen: false,
           paused: false,
         });
         const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
@@ -205,6 +220,18 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
         expect(leaderboard).toBeDefined();
         expect(popup).toBeDefined();
         if (!leaderboard || !popup) continue;
+
+        if (leaderboardOpen) {
+          expect(leaderboard.width).toBe(baseline?.width);
+          expect(leaderboard.height).toBe(baseline?.height);
+          if (viewport.width > 600) {
+            expect(leaderboard.x).toBe(baseline?.x);
+            expect(leaderboard.y).toBe(baseline?.y);
+          } else {
+            expect(leaderboard.x).toBe(baseline?.x);
+            expect(leaderboard.y).toBeGreaterThanOrEqual(baseline?.y ?? 0);
+          }
+        }
 
         expect(leaderboard.x).toBeGreaterThanOrEqual(0);
         expect(leaderboard.y).toBeGreaterThanOrEqual(0);

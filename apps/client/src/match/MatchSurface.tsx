@@ -14,6 +14,7 @@ import { Leaderboard } from '../dev/Leaderboard.tsx';
 import { MatchEnd } from '../dev/MatchEnd.tsx';
 import { ObserverPanel } from '../dev/ObserverPanel.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
+import { visibleLeaderboardRows } from '../dev/leaderboard.ts';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
@@ -82,6 +83,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   const { army } = sb;
   const view = sb.msg?.view;
+  const visibleRows = view ? visibleLeaderboardRows(view) : [];
   // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
   const armyPicked =
@@ -96,9 +98,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
     leaderboardRows: view?.players.length ?? 0,
-    leaderboardPlayerNames:
-      view?.players.map((player, index) => player.name ?? `${t('observer.player')} ${index + 1}`) ??
-      [],
+    leaderboardPlayerNames: visibleRows.map(
+      (row) => view?.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`,
+    ),
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,

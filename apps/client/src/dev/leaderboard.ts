@@ -18,3 +18,15 @@ export function leaderboardRows(view: PlayerView): LeaderboardRow[] {
     score: entry.score,
   }));
 }
+
+/** Сортирует строки по месту и идентификатору игрока. */
+export function sortLeaderboardRows(rows: readonly LeaderboardRow[]): readonly LeaderboardRow[] {
+  return [...rows].sort(
+    (first, second) => first.place - second.place || first.playerId - second.playerId,
+  );
+}
+
+/** Возвращает строки в порядке отображения лидерборда. */
+export function visibleLeaderboardRows(view: PlayerView): readonly LeaderboardRow[] {
+  return sortLeaderboardRows(leaderboardRows(view)).slice(0, 5);
+}

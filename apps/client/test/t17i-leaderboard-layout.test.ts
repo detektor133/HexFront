@@ -28,7 +28,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
 
-      expect(leaderboard).toMatchObject({ height: 244 });
+      expect(leaderboard).toMatchObject({ height: 246 });
       expect(validateMatchLayout(layout)).toEqual([]);
     }
   });
@@ -78,7 +78,7 @@ describe('07/T17i: раскладка лидерборда', () => {
 
     for (const layout of layouts) {
       expect(layout.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-        height: 244,
+        height: 246,
       });
     }
   });
@@ -190,7 +190,7 @@ describe('07/T17i: раскладка лидерборда', () => {
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
-    expect(leaderboards.every((leaderboard) => leaderboard?.height === 244)).toBe(true);
+    expect(leaderboards.every((leaderboard) => leaderboard?.height === 246)).toBe(true);
     expect(
       leaderboards.every((leaderboard, index) => {
         const layout = layouts[index];
