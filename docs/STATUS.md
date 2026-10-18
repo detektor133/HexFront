@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q: исправлены все возвраты ревью и усилены приёмочные проверки реального пути `MatchPage → MatchSurface`.
-- CSS ArmyBar больше не добавляет desktop `margin-bottom: var(--space-sm)`; нижний видимый отступ задаётся `padding-bottom: var(--space-sm)` и `padding-left: var(--space-lg)` без `position: fixed`.
-- Тест проверяет обе высоты карточки 88/160 px при 2/5 строках лидерборда на 1440×900 и 1920×1080, одну пару `observe`/`disconnect`, `Math.max(contentRect.height, scrollHeight)`, налог и сохранение содержимого.
+- 07/T17q: возврат ревью по новому тексту задачи; не выполнен нижний отступ карточек ArmyBar 16 px.
+- CSS ArmyBar оставляет только `padding-bottom: var(--space-sm)` и удаляет desktop-добавку `.strip`, поэтому видимый низ карточек получает 8 px вместо 16 px.
+- Приёмочный тест проверяет отсутствие `.strip`-отступа, но не проверяет итоговые 16 px и остаётся зелёным при дефекте.
 - `pnpm verify --changed` — зелёный.
 - Следующая сессия — взять 07/T17r.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
