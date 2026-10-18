@@ -146,6 +146,8 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     for (const [label, paths] of Object.entries(expectedIcons)) {
       const icon = screen.getByLabelText(label, { selector: 'svg' });
       expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
+      expect(icon.getAttribute('fill')).toBe('none');
+      expect(icon.getAttribute('stroke')).toBe('currentColor');
       expect(icon.getAttribute('stroke-width')).toBe('2');
       expect(icon.getAttribute('stroke-linecap')).toBe('round');
       expect(icon.getAttribute('stroke-linejoin')).toBe('round');
