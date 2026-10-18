@@ -24,12 +24,6 @@
   overflow-x: auto;
 }
 
-@media (min-width: 601px) {
-  .strip {
-    margin-bottom: var(--space-sm);
-  }
-}
-
 /* Приказы — прямо над карточками армий, слева. */
 .tools {
   flex-wrap: wrap;

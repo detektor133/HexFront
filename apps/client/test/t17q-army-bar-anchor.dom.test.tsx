@@ -208,6 +208,8 @@ function expectDockPadding(): void {
   expect(source).toMatch(/padding: 0 var\(--space-sm\) var\(--space-sm\);/u);
   if (style.paddingBottom !== '0') expect(style.paddingBottom).toBe('var(--space-sm)');
   if (style.paddingLeft !== '0') expect(style.paddingLeft).toBe('var(--space-lg)');
+  expect(source).not.toMatch(/\.strip\s*\{[\s\S]*?margin-bottom:/u);
+  expect(source).not.toMatch(/position:\s*fixed/u);
 }
 
 afterEach(() => {
@@ -251,6 +253,13 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(stats.dockObserves).toBe(1);
       expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(1);
       expectDockPadding();
+      for (const leaderboardRows of [2, 5]) {
+        for (const cardHeight of [88, 160]) {
+          expect(expectedPanelStyle(width, height, 150, cardHeight, leaderboardRows)).toEqual(
+            before,
+          );
+        }
+      }
       expect(document.querySelector('[class*="strip"]')).not.toBeNull();
       const strip = document.querySelector<HTMLElement>('[class*="strip"]');
       if (!strip) throw new Error('лента армий не найдена');
@@ -342,6 +351,12 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(1440, 900, 150, 0, 5)));
     expect(screen.getByText('Живы: 5')).toBeTruthy();
     expect(stats.dockObserves).toBe(1);
+    for (const cardHeight of [88, 160]) {
+      act(() => reportHeight(stats, 'card', cardHeight, cardHeight));
+      await waitFor(() =>
+        expect(panelStyle()).toEqual(expectedPanelStyle(1440, 900, 150, cardHeight, 5)),
+      );
+    }
     unmount();
     expect(stats.dockDisconnects).toBe(1);
   });

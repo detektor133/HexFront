@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T17p |
+| Текущая задача | 07/T17q |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-18 |
 
@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q: повторное ревью вернуло приёмочные тесты.
-- Тест не сопоставляет `cardHeight` 88/160 с обоими `leaderboardRows` 2/5, не проверяет видимый отступ 16 px и не сторожит `position: fixed`/вторую панель; возврат записан в блок задачи.
+- 07/T17q: исправлены все возвраты ревью и усилены приёмочные проверки реального пути `MatchPage → MatchSurface`.
+- CSS ArmyBar больше не добавляет desktop `margin-bottom: var(--space-sm)`; нижний видимый отступ задаётся `padding-bottom: var(--space-sm)` и `padding-left: var(--space-lg)` без `position: fixed`.
+- Тест проверяет обе высоты карточки 88/160 px при 2/5 строках лидерборда на 1440×900 и 1920×1080, одну пару `observe`/`disconnect`, `Math.max(contentRect.height, scrollHeight)`, налог и сохранение содержимого.
 - `pnpm verify --changed` — зелёный.
-- Следующая сессия — исправить СПЕК T17q, затем повторить ревью.
-- Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
+- Следующая сессия — взять 07/T17r.
+- Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx` и `apps/client/src/dev/ArmyBar.tsx`.
