@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17s: устранено падение CI в `t17i-leaderboard-layout.test.ts` после перехода на естественную ширину трёх CSS-колонок.
-- Тест теперь допускает расширение для ника до 12ch и требует компактную ширину для полного счёта, если он уже помещается под заголовком.
-- Проверка: `pnpm verify --changed` зелёная.
-- Следующая задача: `$task 07/T17v`.
-- Читать: блок T17v в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/DECISIONS.md`, тесты `apps/client/test`.
+- 07/T17s возвращена повторным ревью после `f0a01493`: layout вычисляет ширину ника запрещённой формулой длина строки × 8 px.
+- `pnpm verify --changed` зелёная, но задача не принята.
+- Следующая сессия: `$task 07/T17s продолжить`.
+- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/DECISIONS.md`, тесты `apps/client/test`.
