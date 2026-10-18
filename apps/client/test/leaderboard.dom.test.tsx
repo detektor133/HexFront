@@ -107,6 +107,11 @@ describe('лидерборд', () => {
         entry.score,
       ]);
     });
+
+    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров/u }));
+    expect(screen.getByRole('button', { name: /Таблица лидеров/u })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров/u }));
+    expect(screen.getAllByRole('row')).toHaveLength(5);
   });
 
   it('критерий: в лидерборде нет колонок золота и солдат', () => {
@@ -147,6 +152,7 @@ describe('лидерборд', () => {
     expect(player.className).toContain('player');
     const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
+    expect(stylesheet).toMatch(/grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u);
   });
 
   it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {

@@ -2,7 +2,10 @@ export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
-const LEADERBOARD_COMPACT_WIDTH = 238;
+const LEADERBOARD_MIN_WIDTH = 160;
+const LEADERBOARD_MAX_WIDTH = 320;
+const LEADERBOARD_CHAR_WIDTH = 8;
+const LEADERBOARD_FIXED_COLUMNS_WIDTH = 16 + 24 + 32 + 16 + 2;
 const LEADERBOARD_HEADER_HEIGHT = 44;
 const LEADERBOARD_ALIVE_HEIGHT = 28;
 const LEADERBOARD_ROW_HEIGHT = 28;
@@ -43,6 +46,7 @@ export interface MatchLayoutInput {
   readonly tutorialVisible: boolean;
   readonly leaderboardOpen: boolean;
   readonly leaderboardRows: number;
+  readonly leaderboardPlayerNames?: readonly string[];
   readonly cardHeight: number;
   readonly cardOpen: boolean;
   readonly popupOpen: boolean;
@@ -114,10 +118,21 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', hudX, 0, hudWidth, input.hudHeight),
   ];
+  const longestPlayerName = Math.max(
+    0,
+    ...(input.leaderboardPlayerNames ?? []).slice(0, 5).map((name) => name.length),
+  );
+  const compactLeaderboardWidth = Math.min(
+    LEADERBOARD_MAX_WIDTH,
+    Math.max(
+      LEADERBOARD_MIN_WIDTH,
+      LEADERBOARD_FIXED_COLUMNS_WIDTH + longestPlayerName * LEADERBOARD_CHAR_WIDTH,
+    ),
+  );
   const leaderboardWidth = input.leaderboardOpen
     ? width <= 600
       ? width - edge * 2
-      : LEADERBOARD_COMPACT_WIDTH
+      : compactLeaderboardWidth
     : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen

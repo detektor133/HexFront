@@ -96,6 +96,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
     leaderboardRows: view?.players.length ?? 0,
+    leaderboardPlayerNames:
+      view?.players.map((player, index) => player.name ?? `${t('observer.player')} ${index + 1}`) ??
+      [],
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,
