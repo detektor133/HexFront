@@ -26,7 +26,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
 
-      expect(leaderboard).toMatchObject({ height: 5 * 44 + 16 });
+      expect(leaderboard).toMatchObject({ height: 244 });
       expect(validateMatchLayout(layout)).toEqual([]);
     }
   });
@@ -76,7 +76,7 @@ describe('07/T17i: раскладка лидерборда', () => {
 
     for (const layout of layouts) {
       expect(layout.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-        height: 5 * 44 + 16,
+        height: 244,
       });
     }
   });
@@ -115,8 +115,8 @@ describe('07/T17i: раскладка лидерборда', () => {
       y: 52,
     });
     expect(desktop.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-      x: 1104,
-      width: 320,
+      x: 1186,
+      width: 238,
       y: 56,
     });
   });

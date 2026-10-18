@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,7 +11,7 @@ import { Leaderboard } from '../src/dev/Leaderboard.tsx';
 type Ranking = readonly { readonly id: number; readonly score: number; readonly place: number }[];
 type RankingView = PlayerView & { readonly ranking: Ranking };
 
-const view = (): RankingView =>
+const view = (overrides: Partial<RankingView> = {}): RankingView =>
   ({
     tick: 0,
     winner: -1,
@@ -61,6 +63,7 @@ const view = (): RankingView =>
     },
     constructions: [],
     recruits: [],
+    ...overrides,
   }) as RankingView;
 
 describe('лидерборд', () => {
@@ -85,7 +88,7 @@ describe('лидерборд', () => {
     fireEvent.click(screen.getByRole('button'));
 
     const rows = screen.getAllByRole('row');
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(5);
     expect(screen.getAllByRole('rowheader')).toHaveLength(5);
 
     const expected = [
@@ -97,7 +100,7 @@ describe('лидерборд', () => {
     ];
 
     expected.forEach((entry, index) => {
-      const row = within(rows[index + 1] as HTMLElement);
+      const row = within(rows[index] as HTMLElement);
       expect(row.getByRole('rowheader', { name: entry.place })).toBeTruthy();
       expect(row.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
         entry.player,
@@ -109,8 +112,41 @@ describe('лидерборд', () => {
   it('критерий: в лидерборде нет колонок золота и солдат', () => {
     render(<Leaderboard view={view()} />);
 
+    expect(screen.queryByRole('columnheader')).toBeNull();
+    expect(screen.queryByRole('rowgroup')).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Золото' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Солдаты' })).toBeNull();
+  });
+
+  it('критерий 07/T17s: обновляет строки после изменения снимка', () => {
+    const initial = view();
+    const updated = view({
+      ranking: [{ id: 0, score: 99, place: 1 }, ...initial.ranking.slice(1)],
+    });
+
+    const { rerender } = render(<Leaderboard view={initial} />);
+    expect(screen.getAllByRole('cell').map((cell) => cell.textContent)).toContain('60');
+
+    rerender(<Leaderboard view={updated} />);
+    expect(screen.getAllByRole('cell').map((cell) => cell.textContent)).toContain('99');
+  });
+
+  it('критерий 07/T17s: длинное имя сокращается многоточием', () => {
+    const source = view();
+    const namedView = {
+      ...source,
+      players: source.players.map((player, id) =>
+        id === 0 ? { ...player, name: 'Очень длинное имя игрока' } : player,
+      ),
+    } as RankingView;
+
+    render(<Leaderboard view={namedView} />);
+
+    const [player] = within(screen.getAllByRole('row')[0] as HTMLElement).getAllByRole('cell');
+    if (!player) throw new Error('Строка игрока не найдена');
+    expect(player.className).toContain('player');
+    const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
+    expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
   });
 
   it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {
@@ -139,7 +175,7 @@ describe('лидерборд', () => {
 
     const rows = screen.getAllByRole('row');
     expect(
-      rows.slice(1).map((row) =>
+      rows.map((row) =>
         within(row)
           .getAllByRole('cell')
           .map((cell) => cell.textContent),
@@ -151,7 +187,7 @@ describe('лидерборд', () => {
       ['Игрок 4', '20'],
       ['Игрок 5', '6'],
     ]);
-    expect(rows.slice(1).map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
+    expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
       '1',
       '1',
       '3',

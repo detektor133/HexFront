@@ -71,15 +71,13 @@ describe('07/T17d: таблица лидеров', () => {
     cleanup();
   });
 
-  it('критерий: таблица содержит только колонки места, игрока и счёта', () => {
+  it('критерий: список содержит только место, игрока и счёт', () => {
     render(<Leaderboard view={view()} />);
 
-    expect(screen.getAllByRole('columnheader')).toHaveLength(3);
-    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-      'Место',
-      'Игрок',
-      'Счёт',
-    ]);
+    expect(screen.queryByRole('columnheader')).toBeNull();
+    expect(screen.getAllByRole('row')).toHaveLength(5);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(5);
+    expect(screen.getAllByRole('cell')).toHaveLength(10);
     expect(screen.queryByText('Гексы')).toBeNull();
     expect(screen.queryByText('Города')).toBeNull();
     expect(screen.queryByText('Золото')).toBeNull();

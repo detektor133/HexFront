@@ -5,9 +5,6 @@
   overflow-x: auto;
   overflow-y: auto;
   scrollbar-width: none;
-  transition:
-    top 150ms var(--motion-easing),
-    height 150ms var(--motion-easing);
   padding: var(--space-sm);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
@@ -49,29 +46,44 @@
   font-size: var(--font-size-label);
 }
 
-.panel table {
-  border-collapse: collapse;
-  white-space: nowrap;
+.panel {
+  max-width: 320px;
+}
+
+.panel p {
+  margin: 0 0 var(--space-sm);
+  line-height: 20px;
+}
+
+.rows {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--font-size-caption);
 }
 
-.panel th,
-.panel td {
-  padding: var(--space-xs) var(--space-sm);
+.row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) max-content;
+  gap: var(--space-sm);
+  align-items: center;
+  min-height: 28px;
   border-bottom: 1px solid var(--ui-border);
+}
+
+.place,
+.score {
   text-align: right;
+  white-space: nowrap;
 }
 
-.panel th:first-child,
-.panel td:first-child,
-.panel th:last-child,
-.panel td:last-child {
-  text-align: left;
-}
-
-.panel thead th {
-  color: var(--ui-ink2);
-  font-weight: 500;
+.player {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eliminated {

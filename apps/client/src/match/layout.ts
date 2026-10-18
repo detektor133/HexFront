@@ -2,6 +2,12 @@ export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
+const LEADERBOARD_COMPACT_WIDTH = 238;
+const LEADERBOARD_HEADER_HEIGHT = 44;
+const LEADERBOARD_ALIVE_HEIGHT = 28;
+const LEADERBOARD_ROW_HEIGHT = 28;
+const LEADERBOARD_ROW_GAP = 4;
+const LEADERBOARD_PADDING = 16;
 
 export interface MatchLayoutElement {
   readonly id: string;
@@ -108,9 +114,19 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', hudX, 0, hudWidth, input.hudHeight),
   ];
-  const leaderboardWidth = input.leaderboardOpen ? (width <= 600 ? width - edge * 2 : 320) : 180;
+  const leaderboardWidth = input.leaderboardOpen
+    ? width <= 600
+      ? width - edge * 2
+      : LEADERBOARD_COMPACT_WIDTH
+    : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
-  const leaderboardHeight = input.leaderboardOpen ? Math.max(44, leaderboardRows * 44 + 16) : 44;
+  const leaderboardHeight = input.leaderboardOpen
+    ? LEADERBOARD_PADDING +
+      LEADERBOARD_HEADER_HEIGHT +
+      LEADERBOARD_ALIVE_HEIGHT +
+      leaderboardRows * LEADERBOARD_ROW_HEIGHT +
+      Math.max(0, leaderboardRows - 1) * LEADERBOARD_ROW_GAP
+    : 44;
   const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
   const popupHeight =
     input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);

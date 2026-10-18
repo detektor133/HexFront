@@ -19,6 +19,10 @@ function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
   latest.current = view;
 
   useEffect(() => {
+    setRows(leaderboardRows(view));
+  }, [view.ranking, view.players, view.hexes.owner, view.cities]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setRows(leaderboardRows(latest.current)), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -61,26 +65,24 @@ export function Leaderboard({
           String(view.players.filter((player) => player.status === 'alive').length),
         )}
       </p>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">{t('leaderboard.place')}</th>
-            <th scope="col">{t('leaderboard.player')}</th>
-            <th scope="col">{t('leaderboard.score')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleRows.slice(0, 5).map((row) => (
-            <tr key={row.playerId}>
-              <th scope="row">{row.place}</th>
-              <td>
-                {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
-              </td>
-              <td>{row.score}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ol
+        className={styles.rows}
+        aria-label={`${t('leaderboard.place')} / ${t('leaderboard.player')} / ${t('leaderboard.score')}`}
+      >
+        {visibleRows.slice(0, 5).map((row) => (
+          <li className={styles.row} key={row.playerId} role="row">
+            <span className={styles.place} role="rowheader">
+              {row.place}
+            </span>
+            <span className={styles.player} role="cell">
+              {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
+            </span>
+            <span className={styles.score} role="cell">
+              {row.score}
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

@@ -216,10 +216,10 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
             x:
               viewport.width -
               (viewport.width <= 600 ? 8 : 16) -
-              (viewport.width <= 600 ? viewport.width - 16 : 320),
+              (viewport.width <= 600 ? viewport.width - 16 : 238),
             y: viewport.hudHeight + 8,
-            width: viewport.width <= 600 ? viewport.width - 16 : 320,
-            height: 5 * 44 + 16,
+            height: 244,
+            width: viewport.width <= 600 ? viewport.width - 16 : 238,
           };
           if (overlaps(defaultLeaderboard, popup)) {
             expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
