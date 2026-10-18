@@ -47,14 +47,14 @@ describe('пропуск пунктов возврата', () => {
     expect(untouchedItems([`${MENU}:1 и worker.ts:2 — связь`], ['src/worker.ts'])).toEqual([]);
   });
 
-  it('пункты без ссылок и СПЕК пропуском не считаются; закрытый тест задачи — тоже', () => {
+  it('пункт без ссылок и закрытый тест не проверяет; открытый СПЕК обязан измениться', () => {
     const locked = 'apps/client/test/locked.test.ts';
     const items = [
       'нет проверки клика',
       `СПЕК: ${MENU}:40 — тест слаб`,
       `${locked}:12 — пункт о закрытом тесте`,
     ];
-    expect(untouchedItems(items, [], [locked])).toEqual([]);
+    expect(untouchedItems(items, [], [locked])).toEqual([`СПЕК: ${MENU}:40 — тест слаб`]);
   });
 
   it('обычный, не закрытый тест-файл судится как любой другой файл', () => {

@@ -295,7 +295,7 @@ describe('Issues в цикле', () => {
     expect(run.closed).toEqual([12]);
   });
 
-  it('$review из Issue работает кругами с обычным $task, без текста ревью', async () => {
+  it('$review из Issue передаёт исполнителю дословный возврат', async () => {
     const run = await runWorld({
       stage: setMark(ownerParked, 'T2', '~'),
       issues: [issue(13, '$review 06/T2\nпосмотри внимательнее')],
@@ -305,7 +305,8 @@ describe('Issues в цикле', () => {
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts[1]).toBe('$task 06/T2');
+    expect(run.prompts[1]).toContain('$task 06/T2 исправить возврат ревью');
+    expect(run.prompts[1]).toContain('a.ts:1 — нет проверки');
   });
 
   it('при грязном дереве (работа владельца) исполняет только $done', async () => {

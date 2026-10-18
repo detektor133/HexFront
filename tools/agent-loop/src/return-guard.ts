@@ -4,7 +4,7 @@
 // делал соседние пункты, цикл видел коммит и зелёный CI и снова отправлял задачу на ревью.
 import { readStage, type LoopContext } from './context.ts';
 import { remarkRefs, samePath } from './review-scope.ts';
-import { SPEC_REMARK_RE, specFiles } from './spec.ts';
+import { specFiles } from './spec.ts';
 import { taskBlock } from './stage-file.ts';
 
 const RETURN_HEAD_RE = /^\s*Возврат ревью/u;
@@ -35,11 +35,10 @@ export const touchedPaths = (nameStatus: string): string[] =>
     .filter((path) => path !== '');
 
 /**
- * Пункты про код продукта, у которых названы файлы `файл:строки`, и ни один из них не менялся.
- * Пункт без ссылок, «СПЕК:» и ссылки на закрытые приёмочные тесты задачи (их исполнитель не может
- * тронуть, это не пропуск) цикл не судит. Обычный тест-файл, названный возвратом, судится как
- * любой другой: 2026-10-17, 07/T22 — возврат указал на `view-delta-memory.test.ts`, исполнитель
- * вместо него правил код цикла, а прежнее блан­кетное исключение всех `*.test.*` это бы не поймало.
+ * Пункты, у которых названы файлы `файл:строки`, и ни один из них не менялся. Пункт без ссылок и
+ * ссылки на закрытые приёмочные тесты задачи (их исполнитель пока не может тронуть) цикл не судит.
+ * Открытый возвратом `СПЕК:` тест судится как код продукта: иначе исполнитель может снова отдать
+ * ревью тот же фиктивный тест, вообще его не изменив.
  */
 export function untouchedItems(
   items: readonly string[],
@@ -47,13 +46,36 @@ export function untouchedItems(
   locked: readonly string[] = [],
 ): string[] {
   return items.filter((item) => {
-    if (SPEC_REMARK_RE.test(item)) return false;
     const paths = remarkRefs(item)
       .map((ref) => ref.path)
       .filter((path) => !locked.some((l) => samePath(l, path)));
     return paths.length > 0 && !paths.some((p) => touched.some((t) => samePath(t, p)));
   });
 }
+
+/** Дословный возврат reviewer как обязательный контракт следующей сессии исполнителя. */
+export const withReviewFeedback = (prompt: string, task: string, feedback?: string): string => {
+  if (feedback === undefined || feedback.trim() === '') return prompt;
+  const [first = prompt, ...rest] = prompt.split('\n');
+  const command =
+    first === '$next' || first === `$task ${task}`
+      ? `$task ${task} исправить возврат ревью`
+      : first;
+  const prepared = [command, ...rest].join('\n');
+  const exact = feedback.replace(/\n\(последний ответ не записан: [^\n]*\)\s*$/u, '');
+  return [
+    prepared,
+    '',
+    'ОБЯЗАТЕЛЬНЫЙ ВОЗВРАТ REVIEWER — это главный объём этой сессии:',
+    exact.trim(),
+    '',
+    'До отметки [~]:',
+    '1. Выполни каждый пункт возврата, включая СПЕК; не заменяй его соседней правкой или новым форматом проверки.',
+    '2. Для каждого пункта проверь требование на реальном пути вызова и запусти относящийся к нему тест.',
+    '3. В итоговом ответе дай раздел «ИСПРАВЛЕНО ПО РЕВЬЮ»: каждый пункт → файлы → тест/команда и результат.',
+    'Если пункт неверен или уже выполнен в другом месте — не игнорируй его: назови доказательство и точный файл.',
+  ].join('\n');
+};
 
 /**
  * Пункты последнего возврата задачи, файлы которых не тронуты с коммита этого возврата.

@@ -98,8 +98,30 @@ describe('круги $next → CI → $review', () => {
 
   it('после ВОЗВРАТ снова запускает $next и затем $review', async () => {
     const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_OK] });
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1', '$next', '$review 06/T1j5-Б1']);
+    expect(run.prompts[0]).toBe('$next');
+    expect(run.prompts[1]).toBe('$review 06/T1j5-Б1');
+    expect(run.prompts[2]).toContain('$task 06/T1j5-Б1');
+    expect(run.prompts[2]).toContain(REVIEW_BACK.answer);
+    expect(run.prompts[2]).toContain('ИСПРАВЛЕНО ПО РЕВЬЮ');
+    expect(run.prompts[3]).toBe('$review 06/T1j5-Б1');
     expect(run.lines).toContain('ВОЗВРАТ 06/T1j5-Б1, круг 1 из 3');
+  });
+
+  it('после перезапуска восстанавливает возврат из блока задачи и не запускает безымянный $next', async () => {
+    const returned = setMark(fixtureStage, 'T1j5-Б1', ' ').replace(
+      '  *Приёмка:* тесты.',
+      '  Возврат ревью:\n  - apps/client/test/path.test.ts:12 — тест обходит реальный путь\n  *Приёмка:* тесты.',
+    );
+    const run = await runWorld({
+      stage: returned,
+      state: { reviewReturns: { '06/T1j5-Б1': 'c1' } },
+      sessions: [NEXT_DONE, REVIEW_OK],
+    });
+    expect(run.prompts[0]).toContain('$task 06/T1j5-Б1');
+    expect(run.prompts[0]).toContain(
+      'apps/client/test/path.test.ts:12 — тест обходит реальный путь',
+    );
+    expect(run.prompts[0]).toContain('ОБЯЗАТЕЛЬНЫЙ ВОЗВРАТ REVIEWER');
   });
 
   it('после maxRounds ВОЗВРАТ ждёт владельца и не начинает задачу заново', async () => {

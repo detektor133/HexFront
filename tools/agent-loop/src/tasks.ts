@@ -14,7 +14,13 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
-import { skippedPrompt, skippedReturnItems } from './return-guard.ts';
+import {
+  lastReturnItems,
+  skippedPrompt,
+  skippedReturnItems,
+  withReviewFeedback,
+} from './return-guard.ts';
+import { remarkRefs } from './review-scope.ts';
 import { runReview } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
@@ -68,6 +74,33 @@ export const resumePrompt = (task: string): string => `$task ${task} продо�
 export const ciFixPrompt = (task: string, line: string): string =>
   `$task ${task} CI красный: ${line}`;
 const step = (value: Step): Work => ({ kind: 'step', step: value });
+
+/** Пути только из строк `СПЕК:` возврата: старый state мог уже забыть исходный список `$spec`. */
+const mentionedSpecFiles = (message: string): string[] => [
+  ...new Set(
+    message
+      .split(/\r?\n/u)
+      .filter((line) => SPEC_REMARK_RE.test(line))
+      .flatMap((line) => remarkRefs(line).map((ref) => ref.path)),
+  ),
+];
+
+/**
+ * Миграция незакрытого возврата прежней версии цикла: восстанавливает активный handoff из блока
+ * задачи. Новые возвраты сохраняются дословно сразу после reviewer.
+ */
+async function restoreReviewFeedback(context: LoopContext, task: string): Promise<void> {
+  const { state } = context;
+  if (state.reviewFeedback[task] !== undefined || state.reviewReturns[task] === undefined) return;
+  const { stageText } = await readStage(context.config.root);
+  const items = lastReturnItems(taskBlock(stageText, task));
+  if (items.length === 0) return;
+  state.reviewFeedback = {
+    ...state.reviewFeedback,
+    [task]: ['ВОЗВРАТ', ...items.map((item) => `- ${item}`)].join('\n'),
+  };
+  await save(context);
+}
 
 /** Скилл не выполнился: сбой codex — пауза, иначе ожидание владельца с ответом скилла. */
 export const skillFailed = (
@@ -178,17 +211,24 @@ async function runWork(
   // Приёмочные тесты написаны для этой задачи: `$next` выбрал бы задачу сам, и 2026-10-14
   // исполнитель с тестами 07/T1 взял 07/T2. Задача с тестами идёт по номеру.
   const pinned =
-    prompt === '$next' && (locked.length > 0 || unlocked !== undefined) ? `$task ${task}` : prompt;
+    prompt === '$next' &&
+    (locked.length > 0 || unlocked !== undefined || state.reviewFeedback[task] !== undefined)
+      ? `$task ${task}`
+      : prompt;
   // Оборванная сессия (Ctrl+C, сбой ПК) оставляет работу в дереве: перезапуск её доделает.
   // Только когда задача известна заранее: `$next` без тестов выбирает её сам.
   if (pinned !== '$next') {
     state.resume = task;
     await save(context);
   }
-  const full = withUnlocked(
-    withSpec(await withAnswer(context, pinned, resumePrompt(task)), task, locked),
+  const full = withReviewFeedback(
+    withUnlocked(
+      withSpec(await withAnswer(context, pinned, resumePrompt(task)), task, locked),
+      task,
+      unlocked,
+    ),
     task,
-    unlocked,
+    state.reviewFeedback[task],
   );
   const work = await session(context, 'next', full, locked);
   // Исполнитель не может менять закрытые приёмочные тесты. Их поломку (lint, окружение) по строке
@@ -284,6 +324,7 @@ export async function processTask(
   const { config, say } = context;
   const accepted = new Set<string>();
   let current = task;
+  await restoreReviewFeedback(context, current);
   config.board?.task(agentName(context), task);
   // Доделка всегда начинается с работы: `[~]` в незакоммиченном файле этапа ещё не проверен.
   let needsWork = options.resume === true || options.mark !== '~';
@@ -344,12 +385,16 @@ export async function processTask(
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
       await forgetSpec(context, current);
+      context.state.reviewFeedback = Object.fromEntries(
+        Object.entries(context.state.reviewFeedback).filter(([key]) => key !== current),
+      );
       context.state.returnTotals = Object.fromEntries(
         Object.entries(context.state.returnTotals).filter(([key]) => key !== current),
       );
       context.state.planBlocked = Object.fromEntries(
         Object.entries(context.state.planBlocked).filter(([key]) => key !== current),
       );
+      await save(context);
       config.board?.count('done');
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
@@ -357,11 +402,15 @@ export async function processTask(
     // Ревью нашло, что приёмочные тесты не совпадают с задачей: их исправляет исполнитель.
     // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
     // которому тест менять нельзя, встал. Ссылка на файл теста — тоже замечание к тестам.
+    context.state.reviewFeedback = {
+      ...context.state.reviewFeedback,
+      [current]: verdict.message,
+    };
     if (
       SPEC_REMARK_RE.test(verdict.message) ||
       mentionsSpec(verdict.message, specFiles(context, current))
     )
-      await unlockSpec(context, current);
+      await unlockSpec(context, current, mentionedSpecFiles(verdict.message));
     else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
     context.state.returnTotals = {

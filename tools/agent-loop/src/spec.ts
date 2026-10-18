@@ -272,9 +272,19 @@ export async function forgetSpec(context: LoopContext, task: string): Promise<vo
  * 2026-10-14, 07/T2: `$spec`, не видя кода, трижды писал тест экрана без данных, исполнитель
  * подгонял под него код скрытой заглушкой, и задача встала после трёх возвратов.
  */
-export async function unlockSpec(context: LoopContext, task: string): Promise<void> {
+export async function unlockSpec(
+  context: LoopContext,
+  task: string,
+  mentionedFiles: readonly string[] = [],
+): Promise<void> {
   const { state } = context;
-  const files = [...new Set([...(state.specUnlocked[task] ?? []), ...specFiles(context, task)])];
+  const files = [
+    ...new Set([
+      ...(state.specUnlocked[task] ?? []),
+      ...specFiles(context, task),
+      ...mentionedFiles,
+    ]),
+  ];
   await forgetSpec(context, task);
   state.specUnlocked = { ...state.specUnlocked, [task]: files };
   await save(context);

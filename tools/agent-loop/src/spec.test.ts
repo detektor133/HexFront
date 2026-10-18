@@ -77,7 +77,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
     expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(1);
-    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
+    expect(run.prompts[3]).toContain(unlockedPrompt('$task 06/T1j5-Б1 исправить возврат ревью'));
     expect(run.locked[3]).toBe('');
     expect(run.prompts[4]).toContain(
       `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»: ${TEST}`,
@@ -86,6 +86,24 @@ describe('приёмочные тесты до кода ($spec)', () => {
       'возврат ревью 06/T1j5-Б1 о приёмочных тестах — их исправляет исполнитель',
     );
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('СПЕК восстанавливает названный тест, когда старая память $spec уже пустая', async () => {
+    const back: Session = {
+      task: 'T1j5-Б1',
+      mark: ' ',
+      answer: `ВОЗВРАТ\n- СПЕК: ${TEST}:12-30 обходит реальный путь вызова`,
+    };
+    const run = await runWorld({
+      spec: true,
+      state: { specUnlocked: { '06/T1j5-Б1': [] } },
+      sessions: [NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
+    });
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(0);
+    expect(run.prompts[2]).toContain(`приёмочные тесты 06/T1j5-Б1 (${TEST})`);
+    expect(run.prompts[3]).toContain(
+      `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»: ${TEST}`,
+    );
   });
 
   it('промпт открытых тестов запрещает ослаблять проверки и заглушки ради теста', () => {
@@ -109,7 +127,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       sessions: [SPEC, NEXT_DONE, back, NEXT_DONE, REVIEW_OK],
     });
     expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(1);
-    expect(run.prompts[3]).toBe(`$task 06/T1j5-Б1\n${LOCKED_LINE}`);
+    expect(run.prompts[3]).toContain(`$task 06/T1j5-Б1 исправить возврат ревью\n${LOCKED_LINE}`);
   });
 
   it('spec не пишет код: файл вне тестов — ожидание владельца', async () => {
@@ -207,7 +225,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       spec: true,
       sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
+    expect(run.prompts[3]).toContain(unlockedPrompt('$task 06/T1j5-Б1 исправить возврат ревью'));
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -312,7 +330,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
       spec: true,
       sessions: [SPEC, NEXT_DONE, back, NEXT_FIXES_SPEC, REVIEW_OK],
     });
-    expect(run.prompts[3]).toBe(unlockedPrompt('$task 06/T1j5-Б1'));
+    expect(run.prompts[3]).toContain(unlockedPrompt('$task 06/T1j5-Б1 исправить возврат ревью'));
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 

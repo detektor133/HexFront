@@ -64,6 +64,12 @@ export interface LoopState {
    */
   reviewReturns: Record<string, string>;
   /**
+   * Дословный последний ВОЗВРАТ ревью по задаче. Следующая сессия исполнителя получает его
+   * напрямую; файл этапа остаётся историей, но больше не служит единственным каналом передачи.
+   * Живёт до `[x]` задачи.
+   */
+  reviewFeedback: Record<string, string>;
+  /**
    * Сколько раз ревью вернуло задачу за все запуски цикла: лимит кругов считается на запуск, а это
    * число показывает владельцу, сколько возвратов уже было. Живёт до `[x]` задачи.
    */
@@ -91,6 +97,7 @@ export async function loadState(root: string): Promise<LoopState> {
     specUnlocked: {},
     pullRequests: {},
     reviewReturns: {},
+    reviewFeedback: {},
     returnTotals: {},
     planBlocked: {},
   };
