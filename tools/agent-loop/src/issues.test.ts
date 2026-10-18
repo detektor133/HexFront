@@ -115,6 +115,86 @@ describe('Issues в цикле', () => {
     expect(run.comments).toHaveLength(2);
   });
 
+  it('выполняет свежий текст Issue, даже если список GitHub отстал', async () => {
+    const changed = '$decide\nНовое решение владельца.';
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(20, DECIDE)],
+      freshIssues: [{ ...issue(20, changed), updatedAt: '2026-10-18T04:00:00Z' }],
+      sessions: [{ answer: 'Новое решение записано', status: fixtureStatus }],
+    });
+    expect(run.prompts).toEqual([changed]);
+    expect(run.closed).toEqual([20]);
+    expect(run.lines.some((line) => line.includes('sha256='))).toBe(true);
+  });
+
+  it('не исполняет Issue, если в свежем ответе снята метка agent или изменён автор', async () => {
+    for (const fresh of [
+      { ...issue(21, DECIDE), labels: [] },
+      issue(21, DECIDE, 'stranger'),
+    ]) {
+      const run = await runWorld({
+        stage: ownerParked,
+        issues: [issue(21, DECIDE)],
+        freshIssues: [fresh],
+        sessions: [],
+      });
+      expect(run.prompts).toEqual([]);
+      expect(run.closed).toEqual([]);
+    }
+  });
+
+  it('не закрывает Issue с непроверенным CI', async () => {
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(22, DECIDE)],
+      ci: ['network error', 'network error'],
+      sessions: [{ answer: 'Коммит создан', status: fixtureStatus }],
+    });
+    expect(run.closed).toEqual([]);
+    expect(run.labels).toContain('#22: agent-stop');
+    expect(run.comments[0]).toContain('CI не проверен');
+  });
+
+  it('прямой $plan из Issue ограничен правами plan', async () => {
+    const run = await runWorld({
+      stage: ownerParked,
+      plan: true,
+      issues: [issue(23, '$plan\nДобавь задачи этапа.')],
+      sessions: [{
+        answer: 'PLAN: уточнено',
+        writes: { 'packages/sim/src/step.ts': 'export {};\n' },
+        commit: true,
+        files: ['packages/sim/src/step.ts'],
+      }],
+    });
+    expect(run.closed).toEqual([]);
+    expect(run.labels).toContain('#23: agent-stop');
+    expect(run.comments[0]).toContain('вне permissions.json');
+  });
+
+  it('$task из Issue проходит $plan и $spec до реализации', async () => {
+    const run = await runWorld({
+      stage: ownerParked,
+      plan: true,
+      spec: true,
+      issues: [issue(24, '$task 06/T2')],
+      sessions: [
+        { answer: 'PLAN: не трогал' },
+        { answer: 'Тесты написаны', writes: { 'apps/client/test/accept.test.ts': 'export {};\n' }, commit: false },
+        { task: 'T2', mark: '~', answer: 'Готово' },
+        { task: 'T2', mark: 'x', answer: 'OK' },
+      ],
+    });
+    expect(run.prompts.slice(0, 3)).toEqual([
+      '$plan 06/T2',
+      '$spec 06/T2',
+      expect.stringContaining('$task 06/T2'),
+    ]);
+    expect(run.locked[2]).toContain('apps/client/test/accept.test.ts');
+    expect(run.closed).toEqual([24]);
+  });
+
   it('$task из Issue идёт кругами до [x] и закрывает Issue', async () => {
     const run = await runWorld({
       stage: ownerParked,

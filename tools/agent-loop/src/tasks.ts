@@ -277,7 +277,7 @@ export async function processTask(
     readonly mark: string;
     readonly workPrompt: string;
     readonly resume?: boolean;
-    /** Писать приёмочные тесты `$spec` до работы; по умолчанию — только для `$next` очереди. */
+    /** Писать приёмочные тесты `$spec` до работы; Issue с `$task` передаёт true явно. */
     readonly spec?: boolean;
   },
 ): Promise<TaskRun> {

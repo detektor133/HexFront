@@ -1,4 +1,6 @@
 // Issue с меткой `agent` от владельца репозитория — конверт команды: первая строка — скилл, дальше текст дословно.
+import { createHash } from 'node:crypto';
+
 import { USAGE_LIMIT } from './codex.ts';
 import {
   backoff,
@@ -12,9 +14,16 @@ import {
   type Step,
 } from './context.ts';
 import { head } from './git.ts';
-import { parseIssueCommand, STOP_LABEL, type AgentIssue, type IssueCommand } from './github.ts';
+import { planEnabled, runPlan } from './plan.ts';
+import {
+  AGENT_LABEL,
+  parseIssueCommand,
+  STOP_LABEL,
+  type AgentIssue,
+  type IssueCommand,
+} from './github.ts';
 import { shelveWork, unshelveWork } from './shelve.ts';
-import { taskMark } from './stage-file.ts';
+import { isOwnerTask, taskBlock, taskMark } from './stage-file.ts';
 import { processTask } from './tasks.ts';
 
 /** Второй сбой codex на одной Issue снимает её с очереди меткой `agent-stop`. */
@@ -70,7 +79,27 @@ const recentlyAnswered = (context: LoopContext, issue: AgentIssue): boolean => {
   );
 };
 
+/** Не подтверждать результат устаревшей Issue: владелец мог изменить поручение во время сессии. */
+async function stillCurrent(context: LoopContext, issue: AgentIssue): Promise<boolean> {
+  const github = context.config.github;
+  if (github === undefined) return false;
+  let current: AgentIssue | undefined;
+  if (!(await safely(context, `повторно проверить Issue #${issue.number}`, async () => {
+    current = await github.openIssue(issue.number);
+  }))) return false;
+  const valid =
+    current !== undefined &&
+    current.body === issue.body &&
+    current.author.toLowerCase() === github.owner.toLowerCase() &&
+    current.labels.includes(AGENT_LABEL) &&
+    !current.labels.includes(STOP_LABEL);
+  if (!valid)
+    await context.say(`Issue #${issue.number}: поручение или метки изменились — старый результат не подтверждаю`);
+  return valid;
+}
+
 async function finish(context: LoopContext, issue: AgentIssue, text: string): Promise<Step> {
+  if (!(await stillCurrent(context, issue))) return 'worked';
   const github = context.config.github;
   await context.say(`Issue #${issue.number}: ${text}`);
   const delivered =
@@ -90,6 +119,7 @@ async function stopIssue(
   reason: string,
   answer = '',
 ): Promise<Step> {
+  if (!(await stillCurrent(context, issue))) return 'worked';
   const github = context.config.github;
   // Снятая владельцем agent-stop даёт Issue снова две попытки.
   context.state.issueFailures[String(issue.number)] = 0;
@@ -134,16 +164,34 @@ async function runTaskIssue(
   command: IssueCommand,
   task: string,
 ): Promise<Step> {
-  const mark = taskMark((await readStage(context.config.root)).stageText, task);
+  const initial = await readStage(context.config.root);
+  let mark = taskMark(initial.stageText, task);
   if (mark === undefined)
     return stopIssue(context, issue, `задачи ${task} нет в файле текущего этапа`);
   if (mark === 'x' || mark === '—') return finish(context, issue, `${task} уже закрыта [${mark}]`);
   if (command.skill === 'review' && mark !== '~')
     return stopIssue(context, issue, `${task} не ждёт ревью (отметка [${mark}])`);
+  // Issue с $task должна проходить тот же plan и spec, что задача обычной очереди.
+  if (
+    command.skill === 'task' &&
+    mark === ' ' &&
+    planEnabled(context) &&
+    !isOwnerTask(taskBlock(initial.stageText, task))
+  ) {
+    const planned = await runPlan(context, task);
+    if (typeof planned === 'string') return planned;
+    if (planned.blocked)
+      return stopIssue(context, issue, `$plan ${task} запросил решение владельца`);
+    const fresh = await readStage(context.config.root);
+    const nextMark = taskMark(fresh.stageText, task);
+    if (nextMark === undefined)
+      return finish(context, issue, `${task} изменена или разбита планировщиком; продолжение — по очереди STATUS`);
+    mark = nextMark;
+  }
   // Текст владельца под командой — часть поручения: 2026-10-15, 07/T13 (#21) исполнитель получил
   // только `$task 07/T13` и не увидел, что первым делать живой фон меню.
   const workPrompt = command.skill === 'task' ? command.prompt : `$task ${task}`;
-  const run = await processTask(context, task, { mark, workPrompt });
+  const run = await processTask(context, task, { mark, workPrompt, spec: true });
   if (run.done)
     return finish(
       context,
@@ -180,7 +228,10 @@ async function runIssue(
   issue: AgentIssue,
   command: IssueCommand,
 ): Promise<Step> {
-  await context.say(`Issue #${issue.number} «${issue.title}»: ${firstLine(command.prompt)}`);
+  const digest = createHash('sha256').update(issue.body).digest('hex');
+  await context.say(
+    `Issue #${issue.number} «${issue.title}»: ${firstLine(command.prompt)} (updated_at=${issue.updatedAt}, sha256=${digest})`,
+  );
   if (command.skill === 'streams' && command.count !== undefined)
     return setStreams(context, issue, command.count);
   if ((command.skill === 'task' || command.skill === 'review') && command.task !== undefined)
@@ -264,17 +315,6 @@ export async function processIssues(
       recentlyAnswered(context, issue)
     )
       continue;
-    const command = parseIssueCommand(issue.body);
-    // `$done` коммитит работу владельца, `$streams` — настройка цикла: обоим чистое дерево не нужно.
-    const answer = !('error' in command) && waiting !== undefined && ANSWERS.has(command.skill);
-    if (
-      dirty &&
-      !answer &&
-      !('error' in command) &&
-      command.skill !== 'done' &&
-      command.skill !== 'streams'
-    )
-      continue;
     // Перед исполнением — состояние Issue прямым запросом: отстающий список мог отдать уже
     // закрытую или остановленную Issue (2026-10-14: #12 исполнилась второй раз через 4 с).
     let fresh: AgentIssue | undefined;
@@ -284,11 +324,26 @@ export async function processIssues(
       }))
     )
       return undefined;
-    if (fresh === undefined || fresh.labels.includes(STOP_LABEL)) continue;
-    if ('error' in command) return stopIssue(context, issue, command.error);
+    if (
+      fresh === undefined ||
+      !fresh.labels.includes(AGENT_LABEL) ||
+      fresh.labels.includes(STOP_LABEL) ||
+      fresh.author.toLowerCase() !== github.owner.toLowerCase()
+    ) continue;
+    // Команда и права читаются из свежей Issue, а не из потенциально устаревшего списка.
+    const command = parseIssueCommand(fresh.body);
+    const answer = !('error' in command) && waiting !== undefined && ANSWERS.has(command.skill);
+    if (
+      dirty &&
+      !answer &&
+      !('error' in command) &&
+      command.skill !== 'done' &&
+      command.skill !== 'streams'
+    ) continue;
+    if ('error' in command) return stopIssue(context, fresh, command.error);
     return answer && waiting !== undefined
-      ? answerIssue(context, issue, command, waiting)
-      : runIssue(context, issue, command);
+      ? answerIssue(context, fresh, command, waiting)
+      : runIssue(context, fresh, command);
   }
   return undefined;
 }

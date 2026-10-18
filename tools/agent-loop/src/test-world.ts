@@ -76,6 +76,8 @@ export interface World {
   readonly dirty?: boolean | string;
   readonly resume?: string;
   readonly issues?: readonly AgentIssue[];
+  /** Прямой ответ GitHub по Issue; позволяет моделировать устаревший список. */
+  readonly freshIssues?: readonly AgentIssue[];
   /** Ветка этапа уже смёржена в main. */
   readonly merged?: boolean;
   /** Сколько раз дать циклу поспать до выхода; без значения — режим `--once`. */
@@ -331,7 +333,9 @@ export async function runWorld(world: World): Promise<Outcome> {
       ),
     openIssue: (number) =>
       Promise.resolve(
-        out.closed.includes(number) ? undefined : issues.find((item) => item.number === number),
+        out.closed.includes(number)
+          ? undefined
+          : (world.freshIssues ?? issues).find((item) => item.number === number),
       ),
     comment: (issue, body) => {
       out.comments.push(`#${issue}: ${body}`);

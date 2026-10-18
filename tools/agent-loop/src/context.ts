@@ -373,11 +373,15 @@ export async function runSkill(
   if (done.failure !== undefined) return fail(done.failure, { codexFailed: true });
   if ((await dirtyFiles(git)) !== '') return fail('после сессии рабочее дерево не чистое');
   if ((await head(git)) === base) return fail('коммита нет — скилл остановился сам (см. ответ)');
+  if (role === 'plan' && !(await checkPermissions(context, base, context.definitions.planPaths)))
+    return fail('$plan изменил файлы вне permissions.json');
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return fail(unsynced);
-  // Коммит скилла уже запушен: CI, который не удалось проверить, проверит ревью следующей задачи.
+  // Непроверенный CI — не успех. Issue останется открытой с agent-stop, без повторного
+  // исполнения уже закоммиченного поручения (повтор мог бы создать второй коммит).
   const ci = await waitCi(context, `после ${firstLine(prompt).split(/\s/, 1)[0] ?? ''}`);
-  if (ci.verdict === 'red') return fail(`CI красный: ${ci.line}`);
+  if (ci.verdict !== 'green')
+    return fail(`CI ${ci.verdict === 'red' ? 'красный' : 'не проверен'}: ${ci.line}`);
   return { ok: true, sha: await head(git), message: done.message };
 }
 
