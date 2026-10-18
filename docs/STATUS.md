@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17v: исправлен возврат `СПЕК` в `apps/client/test/t17m-hex-card.dom.test.tsx`; mock реального `ResizeObserver` задаёт padding 12+12 px и рамку 1+1 px на контейнере, тест проверяет внешние 274 px.
+- 07/T17v принята ревью; внешняя высота 274 px подтверждена тестом с padding и рамкой.
 - Измерение высоты идёт по внутреннему узлу с добавлением padding и рамки; наблюдение внешней карточки не создаёт петлю `ResizeObserver`.
 - Связанный тест: `pnpm exec vitest run --project client-dom apps/client/test/t17m-hex-card.dom.test.tsx` — 8 тестов зелёные.
 - `pnpm verify --changed` зелёный.
