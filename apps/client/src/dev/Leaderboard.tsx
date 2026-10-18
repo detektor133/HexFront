@@ -49,7 +49,8 @@ export function Leaderboard({
     const panel = panelRef.current;
     if (!panel || !onSize) return;
     const report = (entries: readonly ResizeObserverEntry[] = []): void => {
-      const rect = entries[0]?.contentRect ?? panel.getBoundingClientRect();
+      const observedRect = entries[0]?.contentRect;
+      const rect = observedRect ?? panel.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) onSize({ width: rect.width, height: rect.height });
     };
     report();

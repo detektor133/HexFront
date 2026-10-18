@@ -96,7 +96,7 @@ function installMatchRuntime(): void {
   }));
 }
 
-const OBSERVED_LEADERBOARD_SIZE = { width: 173, height: 139 } as const;
+const LEADERBOARD_RESIZE_EVENT = { width: 173, height: 139 } as const;
 
 function installResizeObserver(): void {
   class ControlledResizeObserver {
@@ -105,7 +105,7 @@ function installResizeObserver(): void {
     public observe(target: Element): void {
       const size =
         target.getAttribute('aria-label') === 'Leaderboard'
-          ? OBSERVED_LEADERBOARD_SIZE
+          ? LEADERBOARD_RESIZE_EVENT
           : { width: 0, height: 0 };
       this.callback(
         [
@@ -172,7 +172,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       await waitFor(() => {
         const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
         expect(leaderboard?.style.left).toBe(
-          `${viewport.width - 16 - OBSERVED_LEADERBOARD_SIZE.width}px`,
+          `${viewport.width - 16 - LEADERBOARD_RESIZE_EVENT.width}px`,
         );
         expect(leaderboard?.style.width).toBe('');
         expect(leaderboard?.style.height).toBe('');
