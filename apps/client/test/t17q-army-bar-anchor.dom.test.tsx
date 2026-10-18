@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hexFromId, loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import type { LocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
 import type { FromWorker } from '../src/local/messages.ts';
 import { computeMatchLayout } from '../src/match/layout.ts';
@@ -91,13 +92,12 @@ function reportHeight(
 }
 
 function installMatchMocks(
-  engine: ReturnType<typeof createLocalEngine>,
+  engine: LocalEngine,
   matchMap: unknown = mapJson,
 ): {
   getTap: () => ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
   emit: () => void;
 } {
-  if ('errors' in engine) throw new Error(engine.errors.join('; '));
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({
@@ -171,6 +171,11 @@ function installMatchMocks(
   return { getTap: () => tap, emit };
 }
 
+function requireLocalEngine(engine: ReturnType<typeof createLocalEngine>): LocalEngine {
+  if ('errors' in engine) throw new Error(engine.errors.join('; '));
+  return engine;
+}
+
 function panel(): HTMLElement {
   const element = document.querySelector<HTMLElement>('[class*="dock"]');
   if (!element) throw new Error('панель армий не найдена');
@@ -220,12 +225,10 @@ function expectDockPadding(): void {
   if (style.paddingBottom !== '0') expect(style.paddingBottom).toBe('var(--space-sm)');
   if (style.paddingLeft !== '0') expect(style.paddingLeft).toBe('var(--space-lg)');
   if (stripStyle.marginBottom !== '0') expect(stripStyle.marginBottom).toBe('var(--space-sm)');
-  expect(
-    Number.parseInt(
-      readFileSync('docs/art/tokens.json', 'utf8').match(/"sm":\s*(\d+)/u)?.[1] ?? '',
-      10,
-    ) * 2,
-  ).toBe(16);
+  const tokens = readFileSync('docs/art/tokens.json', 'utf8');
+  const spaceSm = Number.parseInt(tokens.match(/"sm":\s*(\d+)/u)?.[1] ?? '', 10);
+  const spaceLg = Number.parseInt(tokens.match(/"lg":\s*(\d+)/u)?.[1] ?? '', 10);
+  expect(spaceSm + spaceSm).toBe(spaceLg);
   expect(source).toMatch(/\.strip\s*\{[\s\S]*?margin-bottom: var\(--space-sm\);/u);
   expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"lg": 16/u);
   expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"sm": 8/u);
@@ -272,11 +275,9 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
         observers: [],
       };
       installResizeObserver(stats);
-      const engine = createLocalEngine(mapJson, 42, 2);
-      const firstHex =
-        'errors' in engine ? undefined : engine.state.cities.find((city) => city.owner === 0)?.hex;
-      const secondHex =
-        'errors' in engine ? undefined : engine.state.cities.find((city) => city.owner === 1)?.hex;
+      const engine = requireLocalEngine(createLocalEngine(mapJson, 42, 2));
+      const firstHex = engine.state.cities.find((city) => city.owner === 0)?.hex;
+      const secondHex = engine.state.cities.find((city) => city.owner === 1)?.hex;
       if (firstHex === undefined || secondHex === undefined)
         throw new Error('города для выбора не найдены');
       const { getTap, emit } = installMatchMocks(engine);
@@ -326,7 +327,6 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
         const point = hexFromId(hex, loadedMap.width);
         act(() => tap(point, 'select', { x: 100, y: 100 }));
         act(() => tap(point, 'select', { x: 100, y: 100 }));
-        if ('errors' in engine) throw new Error(engine.errors.join('; '));
         expect(engine.snapshot().selection?.hex).toBe(hex);
         await waitFor(() =>
           expect(document.querySelector('section[class*="card"]')).not.toBeNull(),
@@ -368,6 +368,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
       expect(panel()).toBe(armyBar);
       expect(panelStyle()).toEqual(armyBarStyle);
+      expectDockPadding();
       expect(stats.dockObserves).toBe(1);
       firstArmy.name = '1-я армия';
       act(emit);
@@ -424,7 +425,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       observers: [],
     };
     installResizeObserver(stats);
-    const engine = createLocalEngine(fivePlayerMapJson, 42, 5);
+    const engine = requireLocalEngine(createLocalEngine(fivePlayerMapJson, 42, 5));
     const { getTap } = installMatchMocks(engine, fivePlayerMapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
@@ -449,10 +450,11 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     const stats: ResizeStats = {
       dockObserves: 0,
       dockDisconnects: 0,
+      dockCallbacks: 0,
       observers: [],
     };
     installResizeObserver(stats);
-    const engine = createLocalEngine(mapJson, 42, 2);
+    const engine = requireLocalEngine(createLocalEngine(mapJson, 42, 2));
     const { getTap } = installMatchMocks(engine);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 

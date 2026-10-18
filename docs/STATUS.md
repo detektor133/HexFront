@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17q доработана: исправлен общий нижний отступ `.strip` и усилен DOM-тест реального пути `MatchPage → MatchSurface`.
-- Проверено обновление данных армий без замены DOM-узла ArmyBar и без изменения его четырёх координат.
+- 07/T17q исправлена после красного CI: тест получил корректное сужение `LocalEngine`, полную инициализацию `ResizeStats` и сохранённые проверки возврата ревью.
+- Приёмочный DOM-тест проходит реальный путь `MatchPage → MatchSurface`, проверяет `ResizeObserver`, повторные измерения, четыре координаты ArmyBar, обновление данных армий, отступ 16 px и отсутствие `position: fixed`.
 - Следующая задача — 07/T17r после нового ревью T17q.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.tsx`.
 - `pnpm verify --changed` — зелёный.
