@@ -97,10 +97,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     eventRows: Math.min(3, sb.events.length),
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
-    leaderboardRows: view?.players.length ?? 0,
+    leaderboardRows: view?.ranking?.length ?? 0,
     leaderboardPlayerNames: visibleRows.map(
       (row) => view?.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`,
     ),
+    leaderboardScores: visibleRows.map((row) => row.score),
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,

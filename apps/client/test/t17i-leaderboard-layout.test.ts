@@ -196,7 +196,7 @@ describe('07/T17i: раскладка лидерборда', () => {
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
-    expect(leaderboards.every((leaderboard) => leaderboard?.height === 136)).toBe(true);
+    expect(leaderboards.every((leaderboard) => leaderboard?.height === 138)).toBe(true);
     expect(
       leaderboards.every((leaderboard, index) => {
         const layout = layouts[index];
@@ -244,6 +244,40 @@ describe('07/T17i: раскладка лидерборда', () => {
     expect(expanded?.width).toBeLessThanOrEqual(170);
     expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
     expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
+  });
+
+  it('расширяет ПК-лидерборд только для полного длинного счёта', () => {
+    const compact = computeMatchLayout({
+      viewport: { width: 1440, height: 900 },
+      hudHeight: 48,
+      bottomPanelHeight: 132,
+      eventRows: 0,
+      tutorialVisible: false,
+      leaderboardOpen: true,
+      leaderboardRows: 5,
+      leaderboardScores: [19, 12, 7, 5, 0],
+      cardHeight: 0,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    }).elements.find((element) => element.id === 'leaderboard');
+    const longScore = computeMatchLayout({
+      viewport: { width: 1440, height: 900 },
+      hudHeight: 48,
+      bottomPanelHeight: 132,
+      eventRows: 0,
+      tutorialVisible: false,
+      leaderboardOpen: true,
+      leaderboardRows: 5,
+      leaderboardScores: [2147483647, 999999999, 19, 12, 0],
+      cardHeight: 0,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    }).elements.find((element) => element.id === 'leaderboard');
+
+    expect(longScore?.width).toBeGreaterThan(compact?.width ?? 0);
+    expect(longScore?.width).toBe(214);
   });
 
   it('оставляет мобильную кнопку и постоянно показывает ПК-лидерборд', () => {
