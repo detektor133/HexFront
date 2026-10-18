@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -64,10 +63,10 @@ describe('область событий панели армий', () => {
     expect(css).toMatch(/\.strip\s*\{[^}]*overflow-x:\s*auto/s);
     expect(css).toMatch(/\.card\s*\{[^}]*box-sizing:\s*border-box/s);
     expect(css).toMatch(/\.card\s*\{[^}]*flex:\s*0\s+0\s+238px/s);
-    fireEvent.click(screen.getByRole('button', { name: 'Reserve' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Auto-reinforce' }));
-    fireEvent.click(screen.getByRole('button', { name: 'New army' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Front' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Резерв' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Автопополнение' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Новая армия' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Фронт' }));
     fireEvent.wheel(strip, { deltaX: 120, deltaY: 0 });
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
     expect(send).toHaveBeenCalledWith({ t: 'setAutoReinforce', on: true });
@@ -106,8 +105,8 @@ describe('область событий панели армий', () => {
     const domCard = document.querySelector<HTMLElement>('[class*="card"]');
     if (!domStrip || !domCard) throw new Error('DOM ArmyBar не смонтирован');
     expect(domStrip.contains(domCard)).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Reserve' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Front' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Резерв' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Фронт' }));
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
     expect(onTool).toHaveBeenCalledWith({ tool: 'front', armyId: expect.any(Number) });
 

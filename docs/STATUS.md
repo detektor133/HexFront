@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17w: ревью вернуло задачу: тест wheel не подтверждает изменение прокрутки и достижимость последней карточки, клик пустой полосы не связан с картой, DOM-тест размещён вне `client-dom`.
-- `apps/client/test/army-bar-layout.test.ts` дополнен реальным рендером ArmyBar и кликами по DOM; CSS-инварианты сохранены.
-- `pnpm verify --changed` зелёный; нужен `$review 07/T17w` в новой сессии.
-- После review: 07/T17t.
-- Читать: `docs/stages/stage-07-playable-build.md` (T17w/T17t), `apps/client/test/t17l-army-bar.dom.test.tsx`, `apps/client/test/army-bar-layout.test.ts`.
+- 07/T17w: исправлены все пункты возврата reviewer; задача ждёт повторного review.
+- ArmyBar обрабатывает wheel/трекпад через `scrollLeft`; DOM-тест подтверждает изменение прокрутки и достижение конца переполненной ленты.
+- Клик проверен через реальный DOM-узел карты; layout-тест перенесён в `army-bar-layout.dom.test.tsx` проекта `client-dom`.
+- `pnpm verify --changed` зелёный; следующая задача после review — 07/T17t.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/test/t17l-army-bar.dom.test.tsx`, `apps/client/test/army-bar-layout.dom.test.tsx`.

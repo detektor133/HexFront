@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   ORG_MAX,
@@ -359,6 +359,12 @@ export function ArmyBar(props: {
     props.onSelect(off ? null : armyId);
     props.onPick({ hex: null, units: off ? [] : units.map((u) => u.id), target: null });
   };
+  const onStripWheel = (event: WheelEvent<HTMLDivElement>): void => {
+    const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+    if (delta === 0) return;
+    event.preventDefault();
+    event.currentTarget.scrollLeft += delta;
+  };
   const reserve = mine.filter((u) => u.armyId === null);
   const runOf = (a: ArmyView) => {
     const p = view.plans.find((x) => x.armyId === a.id);
@@ -409,7 +415,7 @@ export function ArmyBar(props: {
             />
           </div>
         )}
-        <div className={styles.strip}>
+        <div className={styles.strip} onWheel={onStripWheel}>
           <div className={styles.stripContent}>
             {view.armies.map((a) => {
               const units = mine.filter((u) => u.armyId === a.id);

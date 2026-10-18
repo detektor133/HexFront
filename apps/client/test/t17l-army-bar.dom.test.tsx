@@ -225,19 +225,35 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
       configurable: true,
       value: 10 * 238 + content.children.length * 8,
     });
-    Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 0 });
-    const wheel = new WheelEvent('wheel', { bubbles: true, deltaX: 238, deltaY: 0 });
-    strip.dispatchEvent(wheel);
-    expect(wheel.defaultPrevented).toBe(false);
+    let scrollLeft = 0;
+    Object.defineProperty(strip, 'scrollLeft', {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = Math.max(0, Math.min(value, strip.scrollWidth - strip.clientWidth));
+      },
+    });
+    fireEvent.wheel(strip, { cancelable: true, deltaX: 238, deltaY: 0 });
+    expect(strip.scrollLeft).toBe(238);
+    for (let index = 0; index < 20; index += 1) {
+      fireEvent.wheel(strip, { cancelable: true, deltaX: 238, deltaY: 0 });
+    }
     const cards = Array.from(content.children).filter((child) =>
       child.className.toString().includes('card'),
     );
     expect(cards[9]).toBeTruthy();
     fireEvent.click(cards[9]?.querySelector('[class*="pick"]') as HTMLElement);
     expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth);
-    expect(fireEvent.click(strip)).toBe(true);
-    expect(pick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
+    expect(strip.scrollLeft).toBe(strip.scrollWidth - strip.clientWidth);
+    expect(strip.scrollLeft + strip.clientWidth).toBe(strip.scrollWidth);
     expect(setArmy).toHaveBeenCalledWith(expect.any(Number));
+    expect(pick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
+    const map = document.querySelector<HTMLElement>('[class*="map"]');
+    if (!map) throw new Error('Карта не найдена');
+    const mapClick = vi.fn();
+    map.addEventListener('click', mapClick);
+    fireEvent.click(map);
+    expect(mapClick).toHaveBeenCalledTimes(1);
     expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*pointer-events:\s*none/s);
   });
 
