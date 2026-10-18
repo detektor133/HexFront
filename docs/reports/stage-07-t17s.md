@@ -9,3 +9,12 @@
 - `pnpm verify --changed` — зелёный: build, types, tests; 18 с.
 
 Этап: 07/T17s
+
+## Возврат ревью 2026-10-18 по изменённому тексту
+
+- ВОЗВРАТ: ширина раскладки использует первые пять `view.players`, а не пять видимых после сортировки строк; `apps/client/src/match/MatchSurface.tsx:98-101`, `apps/client/src/match/layout.ts:122-131`, `apps/client/src/dev/Leaderboard.tsx:39-44`.
+- ВОЗВРАТ: расчёт высоты 244 px не учитывает две границы панели и оставляет вертикальное переполнение на пяти строках; `apps/client/src/match/layout.ts:140-147`, `apps/client/src/dev/Leaderboard.module.css:3-10,43-48`.
+- ВОЗВРАТ: изменённый налоговый тест сравнивает финальную раскладку с самой собой и больше не проверяет перенос ниже окна; `apps/client/test/t17j-tax-leaderboard.dom.test.tsx:214-221`.
+- `pnpm verify --changed` — зелёный: build, types, tests; 17 с.
+
+Этап: 07/T17s
