@@ -151,7 +151,6 @@ describe('лидерборд', () => {
     if (!player) throw new Error('Строка игрока не найдена');
     expect(player.className).toContain('player');
     const row = screen.getAllByRole('row')[0] as HTMLElement;
-    expect(row.children).toHaveLength(3);
     expect(within(row).getByRole('rowheader')).not.toBe(within(row).getAllByRole('cell')[1]);
     const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);

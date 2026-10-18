@@ -83,7 +83,7 @@ describe('07/T17i: раскладка лидерборда', () => {
     }
   });
 
-  it('на телефоне занимает ширину экрана между отступами, а на ПК — 320 px', () => {
+  it('на телефоне занимает ширину экрана между отступами, а на ПК следует формуле viewport', () => {
     const phone = computeMatchLayout({
       viewport: { width: 360, height: 640 },
       hudHeight: 44,
@@ -122,8 +122,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       y: 52,
     });
     const desktopLeaderboard = desktop.elements.find((element) => element.id === 'leaderboard');
-    expect(desktopLeaderboard?.width).toBeLessThanOrEqual(320);
-    expect(desktopLeaderboard?.width).toBeGreaterThan(160);
+    expect(desktopLeaderboard?.width).toBe(317);
     expect(desktopLeaderboard?.x).toBe(1440 - 16 - (desktopLeaderboard?.width ?? 0));
     expect(desktopLeaderboard?.y).toBe(56);
   });
@@ -173,12 +172,23 @@ describe('07/T17i: раскладка лидерборда', () => {
         popupOpen: false,
         paused: false,
       }),
+      computeMatchLayout({
+        viewport: { width: 2560, height: 1440 },
+        hudHeight: 48,
+        bottomPanelHeight: 420,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: true,
+        leaderboardRows: 5,
+        leaderboardPlayerNames: names,
+        cardHeight: 0,
+        cardOpen: false,
+        popupOpen: false,
+        paused: false,
+      }),
     ];
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
-    );
-    expect(leaderboards.every((leaderboard) => leaderboard?.width === leaderboards[0]?.width)).toBe(
-      true,
     );
     expect(leaderboards.every((leaderboard) => leaderboard?.height === 244)).toBe(true);
     expect(
@@ -191,8 +201,7 @@ describe('07/T17i: раскладка лидерборда', () => {
         );
       }),
     ).toBe(true);
-    expect(leaderboards[0]?.width).toBeLessThanOrEqual(320);
-    expect(leaderboards[0]?.width).toBeGreaterThan(160);
+    expect(leaderboards.map((leaderboard) => leaderboard?.width)).toEqual([301, 317, 422, 440]);
   });
 
   it('определяет ширину по компактному содержимому и ограничивает её максимумом', () => {
@@ -215,17 +224,17 @@ describe('07/T17i: раскладка лидерборда', () => {
       (element) => element.id === 'leaderboard',
     );
     const expanded = createLayout([
-      'Очень длинное имя игрока 1',
-      'Очень длинное имя игрока 2',
-      'Очень длинное имя игрока 3',
-      'Очень длинное имя игрока 4',
-      'Очень длинное имя игрока 5',
+      'Очень длинное имя игрока с дополнительным описанием 1',
+      'Очень длинное имя игрока с дополнительным описанием 2',
+      'Очень длинное имя игрока с дополнительным описанием 3',
+      'Очень длинное имя игрока с дополнительным описанием 4',
+      'Очень длинное имя игрока с дополнительным описанием 5',
     ]).elements.find((element) => element.id === 'leaderboard');
 
     expect(compact).toBeDefined();
     expect(expanded).toBeDefined();
     expect(compact?.width).toBeLessThan(expanded?.width ?? 0);
-    expect(expanded?.width).toBeLessThanOrEqual(320);
+    expect(expanded?.width).toBe(440);
     expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
     expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
   });

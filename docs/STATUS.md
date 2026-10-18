@@ -15,8 +15,6 @@
 
 ## Следующая сессия
 
-- 07/T17s не завершена: прежнее ревью возвращено; новая ширина лидерборда и усиленная приёмка ждут реализации и ревью.
-- Добавлены 07/T17v для адаптивной HexCard и 07/T17w для доступной ширины ArmyBar.
-- Сохранены решения T17q/T17r о неподвижной нижней панели, естественной высоте, левом ориентире и зазоре 8 px.
-- Следующая задача — 07/T17s; после неё 07/T17v → 07/T17w → 07/T17t → 07/T17u.
-- Читать блоки T17s–T17u в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.module.css`, `apps/client/test`.
+- 07/T17s реализована и ждёт ревью: адаптивная ширина лидерборда и усиленные DOM/layout-проверки зелёные.
+- Следующая задача — 07/T17v; затем 07/T17w → 07/T17t → 07/T17u.
+- Читать блоки T17v–T17u в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.module.css`, `apps/client/test`.

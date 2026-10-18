@@ -2,8 +2,9 @@ export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
-const LEADERBOARD_MIN_WIDTH = 160;
-const LEADERBOARD_MAX_WIDTH = 320;
+const LEADERBOARD_MIN_WIDTH = 280;
+const LEADERBOARD_MAX_WIDTH = 440;
+const LEADERBOARD_VIEWPORT_RATIO = 0.22;
 const LEADERBOARD_CHAR_WIDTH = 8;
 const LEADERBOARD_FIXED_COLUMNS_WIDTH = 16 + 24 + 32 + 16 + 2;
 const LEADERBOARD_HEADER_HEIGHT = 44;
@@ -126,6 +127,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     LEADERBOARD_MAX_WIDTH,
     Math.max(
       LEADERBOARD_MIN_WIDTH,
+      Math.round(width * LEADERBOARD_VIEWPORT_RATIO),
       LEADERBOARD_FIXED_COLUMNS_WIDTH + longestPlayerName * LEADERBOARD_CHAR_WIDTH,
     ),
   );

@@ -212,15 +212,10 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
         expect(leaderboard.y + leaderboard.height).toBeLessThanOrEqual(viewport.height);
 
         if (leaderboardOpen) {
-          const defaultLeaderboard: Rect = {
-            x:
-              viewport.width -
-              (viewport.width <= 600 ? 8 : 16) -
-              (viewport.width <= 600 ? viewport.width - 16 : 238),
-            y: viewport.hudHeight + 8,
-            height: 244,
-            width: viewport.width <= 600 ? viewport.width - 16 : 238,
-          };
+          const defaultLeaderboard = layout.elements.find(
+            (element) => element.id === 'leaderboard',
+          );
+          if (!defaultLeaderboard) continue;
           if (overlaps(defaultLeaderboard, popup)) {
             expect(leaderboard.y).toBeGreaterThanOrEqual(popup.y + popup.height + 8);
           }
