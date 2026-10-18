@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17w выполнена и ждёт отдельного `$review`; `.strip` ArmyBar растянут на доступную ширину, пустая часть пропускает события карты через отдельную `.stripContent`.
-- Карточки ArmyBar сохраняют внешнюю ширину 238 px с `box-sizing: border-box`, резерв и все кнопки остаются на реальном DOM-пути.
-- Проверены `apps/client/test/army-bar-layout.test.ts` и `apps/client/test/t17l-army-bar.dom.test.tsx`; `pnpm verify --changed` зелёный.
-- Следующая задача: 07/T17t.
+- 07/T17w возвращена ревью: приёмочные тесты не покрывают сценарии 1/3/10 элементов, прокрутку, клики по пустой карте и перечисленные кнопки.
+- Исправление кода T17w и `pnpm verify --changed` проверены; после усиления приёмки повторить `$task 07/T17w`.
+- Следующая задача: 07/T17w.
 - Читать: блок T17t в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `docs/art/ui.md`.
