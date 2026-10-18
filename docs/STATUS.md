@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17q исправлена и отмечена `[~]`: ArmyBar измеряет отдельный контентный узел, CSS даёт видимый desktop-отступ 16 px, тесты проверяют реальный DOM-путь и возвраты ревью.
+- 07/T17q возвращена на доработку: тест должен проверить итоговый видимый отступ 16 px и неподвижность ArmyBar после изменения данных армий.
 - Следующая задача — 07/T17r после ревью T17q.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/ArmyBar.tsx`.
 - `pnpm verify --changed` — зелёный.
