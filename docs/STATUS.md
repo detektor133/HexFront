@@ -7,7 +7,7 @@
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-18 |
 
-Очередь: 07/T17t → 07/T17u → 07/T17 → 07/T18
+Очередь: 07/T17u → 07/T17 → 07/T18
 
 ## Блокеры и открытые вопросы
 
@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17t: в приёмочном цикле для пяти SVG-иконок зафиксированы `fill="none"` и `stroke="currentColor"`.
+- 07/T17t: ревью завершено, задача отмечена `[x]`.
 - Относящийся тест: `pnpm exec vitest run --config vitest.config.ts apps/client/test/t17t-hud-tax.dom.test.tsx` — 3/3.
 - `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
 - Следующая задача: 07/T17u.
