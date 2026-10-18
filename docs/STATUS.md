@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17u исправлена по возврату review: тест теперь отдельно проверяет влияние `contentRect.height` на вертикальный расчёт `layout`.
-- Сохранён реальный путь `MatchPage → MatchSurface → layout → Leaderboard`, проверка ширины и мобильные проверки.
+- 07/T17u повторно исправлена по возврату review: реальный путь проверяет `contentRect.width` и `contentRect.height`; высота меняет `style.top` лидерборда при открытии налога.
+- Сохранены проверка ширины, мобильные проверки и RED/GREEN-доказательство высоты.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача после review: 07/T17, задача владельца.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

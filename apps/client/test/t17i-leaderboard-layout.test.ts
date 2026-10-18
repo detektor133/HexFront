@@ -97,7 +97,6 @@ function installMatchRuntime(): void {
 }
 
 const LEADERBOARD_RESIZE_EVENT = { width: 173, height: 139 } as const;
-const LEADERBOARD_LAYOUT_EVENT = { width: 173, height: 139 } as const;
 
 function installResizeObserver(): void {
   class ControlledResizeObserver {
@@ -182,6 +181,12 @@ describe('07/T17i: раскладка лидерборда', () => {
       unmount();
     }
 
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.tagName === 'BUTTON' && /Налог|Tax/u.test(this.getAttribute('aria-label') ?? '')) {
+        return new DOMRect(220, 20, 44, 44);
+      }
+      return new DOMRect();
+    });
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 601 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
     const { unmount } = render(createElement(MatchPage));
@@ -189,18 +194,19 @@ describe('07/T17i: раскладка лидерборда', () => {
     await waitFor(() => expect(leaderboard.style.top).toBe('8px'));
 
     fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
-    await waitFor(() => expect(leaderboard.style.top).toBe('128px'));
+    await waitFor(() => expect(leaderboard.style.top).toBe('192px'));
 
     const measuredLayout = layoutFor(
       { width: 601, height: 900 },
       {
-        leaderboardSize: LEADERBOARD_LAYOUT_EVENT,
+        leaderboardSize: LEADERBOARD_RESIZE_EVENT,
         popupOpen: true,
         popupAnchorY: 64,
         popupSize: { width: 260, height: 120 },
       },
     );
     expect(measuredLayout.elements.find((element) => element.id === 'leaderboard')?.y).toBe(192);
+    await waitFor(() => expect(leaderboard.style.top).toBe('192px'));
     unmount();
   });
 
