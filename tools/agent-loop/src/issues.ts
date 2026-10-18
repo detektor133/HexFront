@@ -85,9 +85,12 @@ async function stillCurrent(context: LoopContext, issue: AgentIssue): Promise<bo
   const github = context.config.github;
   if (github === undefined) return false;
   let current: AgentIssue | undefined;
-  if (!(await safely(context, `повторно проверить Issue #${issue.number}`, async () => {
-    current = await github.openIssue(issue.number);
-  }))) return false;
+  if (
+    !(await safely(context, `повторно проверить Issue #${issue.number}`, async () => {
+      current = await github.openIssue(issue.number);
+    }))
+  )
+    return false;
   const valid =
     current !== undefined &&
     current.body === issue.body &&
@@ -95,7 +98,9 @@ async function stillCurrent(context: LoopContext, issue: AgentIssue): Promise<bo
     current.labels.includes(AGENT_LABEL) &&
     !current.labels.includes(STOP_LABEL);
   if (!valid)
-    await context.say(`Issue #${issue.number}: поручение или метки изменились — старый результат не подтверждаю`);
+    await context.say(
+      `Issue #${issue.number}: поручение или метки изменились — старый результат не подтверждаю`,
+    );
   return valid;
 }
 
@@ -186,7 +191,11 @@ async function runTaskIssue(
     const fresh = await readStage(context.config.root);
     const nextMark = taskMark(fresh.stageText, task);
     if (nextMark === undefined)
-      return finish(context, issue, `${task} изменена или разбита планировщиком; продолжение — по очереди STATUS`);
+      return finish(
+        context,
+        issue,
+        `${task} изменена или разбита планировщиком; продолжение — по очереди STATUS`,
+      );
     mark = nextMark;
   }
   // Текст владельца под командой — часть поручения: 2026-10-15, 07/T13 (#21) исполнитель получил

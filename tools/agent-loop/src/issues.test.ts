@@ -129,10 +129,7 @@ describe('Issues в цикле', () => {
   });
 
   it('не исполняет Issue, если в свежем ответе снята метка agent или изменён автор', async () => {
-    for (const fresh of [
-      { ...issue(21, DECIDE), labels: [] },
-      issue(21, DECIDE, 'stranger'),
-    ]) {
+    for (const fresh of [{ ...issue(21, DECIDE), labels: [] }, issue(21, DECIDE, 'stranger')]) {
       const run = await runWorld({
         stage: ownerParked,
         issues: [issue(21, DECIDE)],
@@ -161,12 +158,14 @@ describe('Issues в цикле', () => {
       stage: ownerParked,
       plan: true,
       issues: [issue(23, '$plan\nДобавь задачи этапа.')],
-      sessions: [{
-        answer: 'PLAN: уточнено',
-        writes: { 'packages/sim/src/step.ts': 'export {};\n' },
-        commit: true,
-        files: ['packages/sim/src/step.ts'],
-      }],
+      sessions: [
+        {
+          answer: 'PLAN: уточнено',
+          writes: { 'packages/sim/src/step.ts': 'export {};\n' },
+          commit: true,
+          files: ['packages/sim/src/step.ts'],
+        },
+      ],
     });
     expect(run.closed).toEqual([]);
     expect(run.labels).toContain('#23: agent-stop');
@@ -181,7 +180,11 @@ describe('Issues в цикле', () => {
       issues: [issue(24, '$task 06/T2')],
       sessions: [
         { answer: 'PLAN: не трогал' },
-        { answer: 'Тесты написаны', writes: { 'apps/client/test/accept.test.ts': 'export {};\n' }, commit: false },
+        {
+          answer: 'Тесты написаны',
+          writes: { 'apps/client/test/accept.test.ts': 'export {};\n' },
+          commit: false,
+        },
         { task: 'T2', mark: '~', answer: 'Готово' },
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],

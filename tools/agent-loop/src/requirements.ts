@@ -23,7 +23,7 @@ const requirements = (block: string): string[] => {
 };
 
 const shortId = (task: string): string => task.split('/').at(-1) ?? task;
-const escapeRegExp = (value: string): string => value.replace(/[-/\\^$*+?.()|[\]{}]/gu, '\\$&');
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const excerpt = (value: string): string => value.slice(0, 140);
 
 /**
@@ -35,7 +35,7 @@ export function verifyDecisionTasks(
   issueBody: string,
   stageText: string,
 ): { readonly checked: number; readonly errors: readonly string[] } {
-  const headings = [...issueBody.matchAll(/^##\s+(T[^\s]+)\s+[—–-]/gmu)];
+  const headings = [...issueBody.matchAll(/^##[ \t]+(T[^\s]+)[ \t]+[—–-][^\r\n]*$/gmu)];
   const errors: string[] = [];
   let checked = 0;
   for (const heading of headings) {
@@ -91,13 +91,13 @@ export function verifySplit(
   const previousQueue = parseQueue(before.status);
   const parentIndex = previousQueue.indexOf(task);
   const expected = [...previousQueue];
-  if (parentIndex < 0) errors.push('исходной задачи нет в очереди STATUS');
-  else
-    expected.splice(
-      parentIndex,
-      1,
-      ...children.map((child) => task.split('/')[0] + '/' + child),
-    );
+  if (parentIndex < 0) {
+    errors.push('исходной задачи нет в очереди STATUS');
+  } else {
+    const stage = task.split('/')[0];
+    const replacements = children.map((child) => `${stage}/${child}`);
+    expected.splice(parentIndex, 1, ...replacements);
+  }
   if (JSON.stringify(parseQueue(after.status)) !== JSON.stringify(expected))
     errors.push('очередь STATUS не заменяет родителя подзадачами в прежнем порядке');
 

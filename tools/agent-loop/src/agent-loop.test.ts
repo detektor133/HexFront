@@ -260,8 +260,22 @@ describe('круги $next → CI → $review', () => {
 describe('$split, $accept и доделка без владельца', () => {
   it('запускает $split по ответу $next и снова берёт очередь', async () => {
     const split = { answer: 'Задача велика: запусти `$split 06/T1j5-Б1`.' };
+    const splitStage = fixtureStage.replace(
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1a. Часть 1** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1b. Часть 2** (tools/evolve).\n  *Проверка:* интеграция.',
+    );
+    const splitStatus = fixtureStatus.replace(
+      'Очередь: 06/T1j5-Б1 →',
+      'Очередь: 06/T1j5-Б1a → 06/T1j5-Б1b →',
+    );
     const run = await runWorld({
-      sessions: [split, { answer: 'Разбито на T1j5-Б1a…', commit: true }, split],
+      sessions: [
+        split,
+        { answer: 'Разбито на T1j5-Б1a…', stage: splitStage, status: splitStatus, commit: true },
+        split,
+      ],
     });
     expect(run.prompts).toEqual(['$next', '$split 06/T1j5-Б1', '$next']);
     expect(run.lines).toContain('жду: 06/T1j5-Б1 снова просят разбить — нужен владелец');

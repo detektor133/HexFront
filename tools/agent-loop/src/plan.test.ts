@@ -26,7 +26,10 @@ describe('роль plan перед исполнением задачи', () => {
 
   it('plan уточняет формулировку без ослабления — исполнитель получает новый текст той же задачи', async () => {
     const clarified = setMark(
-      fixtureStage.replace('*Приёмка:* тесты.', '*Приёмка:* тесты. Дополнительно: 2 критерия (п.1, п.2).'),
+      fixtureStage.replace(
+        '*Приёмка:* тесты.',
+        '*Приёмка:* тесты. Дополнительно: 2 критерия (п.1, п.2).',
+      ),
       'T1j5-Б1',
       ' ',
     );
@@ -93,7 +96,10 @@ describe('роль plan перед исполнением задачи', () => {
   });
 
   it('plan назвал удаление задачи разбиением — блокирует исполнителя', async () => {
-    const bad = fixtureStage.replace(/^- \[\x20\] \*\*T1j5-Б1\.[^\n]*\n\s{2}\*Приёмка:\* тесты\.\n/mu, '');
+    const bad = fixtureStage.replace(
+      /^- \[\x20\] \*\*T1j5-Б1\.[^\n]*\n\s{2}\*Приёмка:\* тесты\.\n/mu,
+      '',
+    );
     const run = await runWorld({
       plan: true,
       sessions: [{ answer: 'PLAN: разбито', stage: bad, commit: true }],
