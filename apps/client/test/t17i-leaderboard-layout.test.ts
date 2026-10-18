@@ -240,8 +240,8 @@ describe('07/T17i: раскладка лидерборда', () => {
 
     expect(compact).toBeDefined();
     expect(expanded).toBeDefined();
-    expect(compact?.width).toBeLessThan(150);
-    expect(expanded?.width).toBeGreaterThan(compact?.width ?? 0);
+    expect(compact?.width).toBe(134);
+    expect(expanded?.width).toBe(compact?.width);
     expect(expanded?.width).toBeLessThanOrEqual(170);
     expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
     expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
@@ -277,7 +277,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       paused: false,
     }).elements.find((element) => element.id === 'leaderboard');
 
-    expect(longScore?.width).toBe(compact?.width);
+    expect(longScore?.width).toBeGreaterThan(compact?.width ?? 0);
   });
 
   it('оставляет мобильную кнопку и постоянно показывает ПК-лидерборд', () => {

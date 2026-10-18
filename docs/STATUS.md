@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17s возвращена повторным ревью после `f0a01493`: layout вычисляет ширину ника запрещённой формулой длина строки × 8 px.
-- `pnpm verify --changed` зелёная, но задача не принята.
-- Следующая сессия: `$task 07/T17s продолжить`.
-- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `docs/DECISIONS.md`, тесты `apps/client/test`.
+- 07/T17s исправлена: desktop layout больше не вычисляет ширину по длине ника; ширина расширяется только для полного отображения длинного счёта.
+- `pnpm verify --changed` зелёная; отдельный тест T17i: 7/7.
+- Следующая сессия: `$review 07/T17s`.
+- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
