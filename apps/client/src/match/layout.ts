@@ -2,8 +2,11 @@ export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
-const LEADERBOARD_DESKTOP_BASE_WIDTH = 150;
-const LEADERBOARD_SCORE_CHARACTER_WIDTH = 8;
+const LEADERBOARD_TEXT_CHARACTER_WIDTH = 8;
+const LEADERBOARD_PANEL_HORIZONTAL_SPACE = 14;
+const LEADERBOARD_TITLE_WIDTH = 112;
+const LEADERBOARD_COLUMN_GAP = 4;
+const LEADERBOARD_NICKNAME_MAX_LENGTH = 12;
 const LEADERBOARD_HEADER_HEIGHT = 16;
 const LEADERBOARD_ALIVE_HEIGHT = 18;
 const LEADERBOARD_ROW_HEIGHT = 16;
@@ -128,9 +131,21 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     2,
     ...(input.leaderboardScores ?? []).map((score) => String(Math.abs(score)).length),
   );
+  const longestPlace = String(Math.max(1, Math.min(5, input.leaderboardRows))).length;
+  const longestNickname = Math.min(
+    LEADERBOARD_NICKNAME_MAX_LENGTH,
+    Math.max(0, ...(input.leaderboardPlayerNames ?? []).map((name) => name.length)),
+  );
+  const leaderboardRowWidth =
+    longestPlace * LEADERBOARD_TEXT_CHARACTER_WIDTH +
+    LEADERBOARD_COLUMN_GAP +
+    longestNickname * LEADERBOARD_TEXT_CHARACTER_WIDTH +
+    LEADERBOARD_COLUMN_GAP +
+    longestScore * LEADERBOARD_TEXT_CHARACTER_WIDTH;
+  const naturalLeaderboardWidth =
+    LEADERBOARD_PANEL_HORIZONTAL_SPACE + Math.max(LEADERBOARD_TITLE_WIDTH, leaderboardRowWidth);
   const leaderboardWidth = desktop
-    ? LEADERBOARD_DESKTOP_BASE_WIDTH +
-      Math.max(0, longestScore - 2) * LEADERBOARD_SCORE_CHARACTER_WIDTH
+    ? naturalLeaderboardWidth
     : input.leaderboardOpen
       ? width - edge * 2
       : 180;
