@@ -158,13 +158,10 @@ describe('07/T17n: панель армий при карточке клетки'
       paused: false,
     }).elements.find((element) => element.id === 'card');
     if (!expectedCard) throw new Error('карточка не попала в раскладку');
+    expect(card.style.width).toBe('');
     expect(
-      ['left', 'top', 'width', 'height'].map((property) => card.style.getPropertyValue(property)),
-    ).toEqual(
-      [expectedCard.x, expectedCard.y, expectedCard.width, expectedCard.height].map(
-        (value) => `${value}px`,
-      ),
-    );
+      ['left', 'top', 'height'].map((property) => card.style.getPropertyValue(property)),
+    ).toEqual([expectedCard.x, expectedCard.y, expectedCard.height].map((value) => `${value}px`));
     await select(secondHex);
     expect(style()).toEqual(before);
     fireEvent.keyDown(window, { key: 'Escape' });
