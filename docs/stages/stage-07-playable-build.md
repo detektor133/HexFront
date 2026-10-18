@@ -360,7 +360,7 @@
 - СПЕК: `apps/client/test/t17q-army-bar-anchor.dom.test.tsx:204-213,280-286` проверяет CSS-объявления `padding-bottom: var(--space-sm)` и `margin-bottom: var(--space-sm)`, но не проверяет итоговый видимый отступ карточек как сумму 8 + 8 = 16 px; тест останется зелёным при CSS, где одна из частей не действует на реальную карточку.
 - СПЕК: `apps/client/test/t17q-army-bar-anchor.dom.test.tsx:318-376,404-451` не изменяет `view.armies` или содержимое ArmyBar после mount и не проверяет четыре inline-свойства и нижний край после обновления данных армий; критерий требует сохранить неподвижность ArmyBar при изменении данных армий.
 
-- [~] **T17s. Компактный постоянно видимый топ-5 на ПК** (`apps/client/src/dev/Leaderboard.tsx`, `apps/client/src/dev/Leaderboard.module.css`, `apps/client/src/match/layout.ts`, `apps/client/test/leaderboard.dom.test.tsx`, `apps/client/test/t17d-leaderboard.dom.test.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`, `apps/client/test/t17j-tax-leaderboard.dom.test.tsx`, `apps/client/test/t17o-scrollbar-motion.dom.test.tsx`, `apps/client/test/t17q-army-bar-anchor.dom.test.tsx`, `apps/client/test/match-layout.dom.test.tsx`, `apps/client/test/leaderboard.test.ts`, `docs/art/ui.md`). Область: браузерный ПК, окна 1366×768, 1440×900, 1920×1080, 2560×1440. Мобильный интерфейс не переделывать и его независимые тесты не ломать.
+- [x] **T17s. Компактный постоянно видимый топ-5 на ПК** (`apps/client/src/dev/Leaderboard.tsx`, `apps/client/src/dev/Leaderboard.module.css`, `apps/client/src/match/layout.ts`, `apps/client/test/leaderboard.dom.test.tsx`, `apps/client/test/t17d-leaderboard.dom.test.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`, `apps/client/test/t17j-tax-leaderboard.dom.test.tsx`, `apps/client/test/t17o-scrollbar-motion.dom.test.tsx`, `apps/client/test/t17q-army-bar-anchor.dom.test.tsx`, `apps/client/test/match-layout.dom.test.tsx`, `apps/client/test/leaderboard.test.ts`, `docs/art/ui.md`). Область: браузерный ПК, окна 1366×768, 1440×900, 1920×1080, 2560×1440. Мобильный интерфейс не переделывать и его независимые тесты не ломать.
 
   Возврат ревью 2026-10-18 (повторный, после `0102e8af`):
   - СПЕК: `apps/client/test/match-layout.dom.test.tsx:809-847` монтирует реальный путь, но проверяет только одно измерение панели `150×138` и его итоговый `left`; тест останется зелёным, если `Leaderboard` всегда передаёт в layout жёстко зашитые `150×138` вместо фактического `getBoundingClientRect`.
@@ -379,6 +379,9 @@
 
   Возврат ревью 2026-10-18 (повторный, после `b9891c14`):
   - СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:13-33,64-105` не монтирует реальный путь `MatchSurface → layout → Leaderboard` и передаёт в `computeMatchLayout` фиктивные размеры `leaderboardSize`; тест остаётся зелёным, если `Leaderboard` не измеряет содержимое трёх полей или layout игнорирует фактический размер панели.
+
+Ревью: OK — после `5c88bc49` реальный путь передаёт в layout два разных DOM-размера `150×138` и `174×142`; `pnpm verify --changed` зелёный.
+Проверит владелец (раунды замечаний этапа): фактические ≤170×150 px, многоточие, отсутствие реального переполнения и перекрытий на опубликованной сборке — jsdom не считает браузерную геометрию.
 
 
 **Результат:** справа сверху под HUD — **видимые «Таблица лидеров» и «Живы: N», затем до пяти компактных строк «место · ник · очки»**. Число строк — **`min(5, view.ranking.length)`**: при 2 игроках показывать 2 строки, при 5 или 30 — ровно 5. Не дорисовывать пустые строки до пяти. Пример вида, а не требование к конкретным данным:
