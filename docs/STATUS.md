@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17t исправлен после review: тест связывает SVG золота с `tokens.selection.color`, фиксирует остальные иконки и кликает «Автокомандование» в открытом меню.
+- 07/T17t возвращён повторным review: тест не фиксирует атрибуты `fill` и `stroke` остальных пяти SVG-иконок.
 - Изменён `apps/client/test/t17t-hud-tax.dom.test.tsx`; код HUD не менялся, потому что все три требования уже реализованы.
 - `pnpm exec vitest run --config vitest.config.ts apps/client/test/t17t-hud-tax.dom.test.tsx` — 3/3.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
