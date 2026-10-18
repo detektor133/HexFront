@@ -244,7 +244,10 @@ async function runIssue(
   );
   if (result.ok) {
     if (command.skill === 'decide') {
-      const checked = verifyDecisionTasks(command.prompt, (await readStage(context.config.root)).stageText);
+      const checked = verifyDecisionTasks(
+        command.prompt,
+        (await readStage(context.config.root)).stageText,
+      );
       await context.say(`$decide Issue #${issue.number}: сверено ${checked.checked} пунктов`);
       if (checked.errors.length > 0)
         return stopIssue(

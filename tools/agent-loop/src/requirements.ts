@@ -92,7 +92,12 @@ export function verifySplit(
   const parentIndex = previousQueue.indexOf(task);
   const expected = [...previousQueue];
   if (parentIndex < 0) errors.push('исходной задачи нет в очереди STATUS');
-  else expected.splice(parentIndex, 1, ...children.map((child) => task.split('/')[0] + '/' + child));
+  else
+    expected.splice(
+      parentIndex,
+      1,
+      ...children.map((child) => task.split('/')[0] + '/' + child),
+    );
   if (JSON.stringify(parseQueue(after.status)) !== JSON.stringify(expected))
     errors.push('очередь STATUS не заменяет родителя подзадачами в прежнем порядке');
 
