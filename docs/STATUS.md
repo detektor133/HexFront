@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q повторно возвращена: mock `ResizeObserver` записывает ожидаемую высоту сам, не проверяя аргумент `onHeight`.
-- Не проверены повторное уведомление той же высоты, вызов `computeMatchLayout` при налоге и изменение высот `HexCard`/лидерборда.
-- `pnpm verify --changed` — зелёный, но приёмочный тест требует доработки.
+- 07/T17q: усилен приёмочный DOM-тест реального пути `MatchPage → MatchSurface`.
+- Mock `ResizeObserver` теперь передаёт управляемые `contentRect.height` и `scrollHeight`; проверяются `Math.max`, две разные высоты, повторная высота без новой подписки и mount/unmount.
+- Тест проверяет четыре inline-координаты ArmyBar на 360×640, 1440×900 и 1920×1080, выбор/смену/Escape, `cardHeight`/`leaderboardRows`, налог и содержимое ArmyBar.
+- `pnpm verify --changed` — зелёный.
 - Следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.

@@ -22,8 +22,12 @@ const loadedMap = mapResult.map;
 interface ResizeStats {
   dockObserves: number;
   dockDisconnects: number;
-  dockHeights: number[];
-  cardHeights: number[];
+  observers: Array<{
+    kind: 'dock' | 'card';
+    target: Element;
+    callback: ResizeObserverCallback;
+    observer: ResizeObserver;
+  }>;
 }
 
 function installResizeObserver(stats: ResizeStats): void {
@@ -32,19 +36,24 @@ function installResizeObserver(stats: ResizeStats): void {
 
     public observe(target: Element): void {
       const isDock = target.className.toString().includes('dock');
-      const isCard = target.className.toString().includes('card');
       if (isDock) stats.dockObserves += 1;
       Object.defineProperty(target, 'scrollHeight', {
         configurable: true,
+        writable: true,
         value: isDock ? 150 : 88,
       });
       const contentHeight = isDock ? 120 : 88;
+      const observer = this as unknown as ResizeObserver;
+      stats.observers.push({
+        kind: isDock ? 'dock' : 'card',
+        target,
+        callback: this.callback,
+        observer,
+      });
       this.callback(
         [{ target, contentRect: { height: contentHeight } } as ResizeObserverEntry],
-        this as unknown as ResizeObserver,
+        observer,
       );
-      if (isDock) stats.dockHeights.push(Math.max(contentHeight, target.scrollHeight));
-      if (isCard) stats.cardHeights.push(Math.max(contentHeight, target.scrollHeight));
     }
 
     public disconnect(): void {
@@ -53,6 +62,21 @@ function installResizeObserver(stats: ResizeStats): void {
   }
 
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
+}
+
+function reportHeight(
+  stats: ResizeStats,
+  kind: 'dock' | 'card',
+  contentHeight: number,
+  scrollHeight: number,
+): void {
+  const record = [...stats.observers].reverse().find((item) => item.kind === kind);
+  if (!record) throw new Error(`ResizeObserver для ${kind} не найден`);
+  Object.defineProperty(record.target, 'scrollHeight', { configurable: true, value: scrollHeight });
+  record.callback(
+    [{ target: record.target, contentRect: { height: contentHeight } } as ResizeObserverEntry],
+    record.observer,
+  );
 }
 
 function installMatchMocks(engine: ReturnType<typeof createLocalEngine>): {
@@ -142,18 +166,25 @@ function panelStyle(): string[] {
   );
 }
 
-function expectedPanelStyle(width: number, height: number): string[] {
+function expectedPanelStyle(
+  width: number,
+  height: number,
+  bottomPanelHeight = 150,
+  cardHeight = 0,
+  leaderboardRows = 2,
+  popupOpen = false,
+): string[] {
   const layout = computeMatchLayout({
     viewport: { width, height },
     hudHeight: 88,
-    bottomPanelHeight: 150,
+    bottomPanelHeight,
     eventRows: 0,
     tutorialVisible: true,
     leaderboardOpen: width > 600,
-    leaderboardRows: 2,
-    cardHeight: 0,
-    cardOpen: false,
-    popupOpen: false,
+    leaderboardRows,
+    cardHeight,
+    cardOpen: cardHeight > 0,
+    popupOpen,
     paused: false,
   });
   const element = layout.elements.find((item) => item.id === 'bottom-panel');
@@ -190,8 +221,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       const stats: ResizeStats = {
         dockObserves: 0,
         dockDisconnects: 0,
-        dockHeights: [],
-        cardHeights: [],
+        observers: [],
       };
       installResizeObserver(stats);
       const engine = createLocalEngine(mapJson, 42, 2);
@@ -210,7 +240,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       const before = panelStyle();
       expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
       expect(stats.dockObserves).toBe(1);
-      expect(stats.dockHeights).toEqual([150]);
+      expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(1);
       expectDockPadding();
       expect(document.querySelector('[class*="strip"]')).not.toBeNull();
       const strip = document.querySelector<HTMLElement>('[class*="strip"]');
@@ -249,8 +279,10 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
           document.querySelector<HTMLElement>('section[aria-label]')?.getAttribute('style'),
         ).toBe(leaderboardStyle);
       }
-      expect(stats.cardHeights).toEqual([88]);
+      expect(stats.observers.some((item) => item.kind === 'card')).toBe(true);
       expect(stats.dockObserves).toBe(1);
+      fireEvent.click(screen.getAllByRole('button', { name: '1-я армия' })[0]);
+      expect(panelStyle()).toEqual(before);
       await select(secondHex);
       expect(panelStyle()).toEqual(before);
       if (width > 600) {
@@ -263,6 +295,17 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(panelStyle()).toEqual(before);
       expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
       expect(stats.dockObserves).toBe(1);
+
+      act(() => reportHeight(stats, 'dock', 180, 200));
+      await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(width, height, 200)));
+      const afterResize = panelStyle();
+      act(() => reportHeight(stats, 'dock', 160, 220));
+      await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(width, height, 220)));
+      const afterSecondResize = panelStyle();
+      act(() => reportHeight(stats, 'dock', 160, 220));
+      await waitFor(() => expect(panelStyle()).toEqual(afterSecondResize));
+      expect(afterResize).not.toEqual(afterSecondResize);
+      expect(stats.dockObserves).toBe(1);
     },
   );
 
@@ -272,8 +315,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     const stats: ResizeStats = {
       dockObserves: 0,
       dockDisconnects: 0,
-      dockHeights: [],
-      cardHeights: [],
+      observers: [],
     };
     installResizeObserver(stats);
     const engine = createLocalEngine(mapJson, 42, 2);
@@ -283,8 +325,28 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     render(<MatchPage />);
     await waitFor(() => expect(getTap()).toBeDefined());
     await waitFor(() => expect(panel()).toBeTruthy());
-    expect(stats.dockHeights).toEqual([150]);
+    expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(1);
     const before = panelStyle();
+    expect(
+      computeMatchLayout({
+        viewport: { width: 1440, height: 900 },
+        hudHeight: 88,
+        bottomPanelHeight: 150,
+        eventRows: 0,
+        tutorialVisible: true,
+        leaderboardOpen: true,
+        leaderboardRows: 2,
+        cardHeight: 88,
+        cardOpen: true,
+        popupOpen: true,
+        paused: false,
+      }).elements.some((item) => item.id === 'bottom-panel'),
+    ).toBe(false);
+    for (const cardHeight of [88, 160]) {
+      for (const leaderboardRows of [2, 5]) {
+        expect(expectedPanelStyle(1440, 900, 150, cardHeight, leaderboardRows)).toEqual(before);
+      }
+    }
     fireEvent.click(screen.getByRole('button', { name: 'Налог' }));
     await waitFor(() => expect(document.querySelector('[class*="dock"]')).toBeNull());
     expect(screen.getByRole('slider', { name: 'Налог' })).toBeTruthy();
@@ -292,5 +354,6 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     await waitFor(() => expect(panelStyle()).toEqual(before));
     expect(stats.dockObserves).toBe(2);
     expect(stats.dockDisconnects).toBeGreaterThanOrEqual(1);
+    expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(2);
   });
 });
