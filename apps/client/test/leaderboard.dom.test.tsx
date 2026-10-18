@@ -72,20 +72,28 @@ describe('лидерборд', () => {
   });
 
   it('передаёт layout фактический размер панели после DOM-измерения', () => {
+    let panelSize = { width: 150, height: 138 };
     const getBoundingClientRect = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockReturnValueOnce(new DOMRect(1274, 56, 150, 138))
-      .mockReturnValueOnce(new DOMRect(1250, 54, 174, 142));
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.className.toString().includes('panel')) return new DOMRect();
+        return new DOMRect(0, 0, panelSize.width, panelSize.height);
+      });
     const onSize = vi.fn();
 
     render(<Leaderboard view={view()} onSize={onSize} />);
     expect(onSize).toHaveBeenLastCalledWith({ width: 150, height: 138 });
 
     cleanup();
+    panelSize = { width: 174, height: 142 };
     render(<Leaderboard view={view()} onSize={onSize} />);
 
     expect(getBoundingClientRect).toHaveBeenCalledTimes(2);
     expect(onSize).toHaveBeenLastCalledWith({ width: 174, height: 142 });
+    expect(onSize.mock.calls.map(([size]) => size)).toEqual([
+      { width: 150, height: 138 },
+      { width: 174, height: 142 },
+    ]);
   });
 
   it('критерий 07/T17s: на ПК лидерборд видим без кнопки сворачивания', () => {

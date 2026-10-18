@@ -864,5 +864,6 @@ describe('приёмка T7: раскладка матча без перекры
     expect(resizedLeaderboard.style.left).toBe('1250px');
     expect(resizedLeaderboard.style.width).toBe('');
     expect(resizedLeaderboard.style.height).toBe('');
+    expect(resizedLeaderboard.style.left).not.toBe(leaderboard.style.left);
   });
 });

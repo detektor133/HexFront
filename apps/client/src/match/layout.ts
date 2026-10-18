@@ -116,9 +116,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', hudX, 0, hudWidth, input.hudHeight),
   ];
-  const measuredLeaderboardWidth = input.leaderboardSize?.width ?? 0;
+  const desktopLeaderboardSize = desktop ? input.leaderboardSize : undefined;
   const leaderboardWidth = desktop
-    ? measuredLeaderboardWidth
+    ? (desktopLeaderboardSize?.width ?? 0)
     : input.leaderboardOpen
       ? width - edge * 2
       : 180;
@@ -131,7 +131,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
       leaderboardRows * MOBILE_LEADERBOARD_ROW_HEIGHT +
       Math.max(0, leaderboardRows - 1) * MOBILE_LEADERBOARD_ROW_GAP
     : 44;
-  const desktopLeaderboardHeight = input.leaderboardSize?.height ?? 0;
+  const desktopLeaderboardHeight = desktopLeaderboardSize?.height ?? 0;
   const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
   const popupHeight =
     input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);
