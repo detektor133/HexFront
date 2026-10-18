@@ -212,7 +212,10 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
           leaderboardRows: 5,
           cardHeight: 0,
           cardOpen: false,
-          popupOpen: false,
+          popupOpen: true,
+          popupAnchorX: viewport.anchorX,
+          popupAnchorY: viewport.anchorY,
+          popupSize: { width: 260, height: 120 },
           paused: false,
         });
         const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');

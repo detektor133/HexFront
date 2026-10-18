@@ -15,6 +15,6 @@
 
 ## Следующая сессия
 
-- 07/T17s повторно исправлена и отмечена `[~]`: ширина считает пять отсортированных видимых строк, высота учитывает границы, проверки лидерборда и налога усилены.
-- Следующая задача — 07/T17v; затем 07/T17w → 07/T17t → 07/T17u.
-- Перед работой проверить CI для текущего HEAD; затем читать блок T17v в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test`.
+- Исправлена причина красного CI по 07/T17s: геометрический тест налога снова включает `popup-menu`, который он проверяет.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
+- Следующая задача — 07/T17v; перед работой проверить CI для текущего HEAD и прочитать блок T17v в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/test`.
