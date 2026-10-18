@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T17v |
+| Текущая задача | 07/T17w |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-18 |
 
@@ -15,9 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17v принята ревью; внешняя высота 274 px подтверждена тестом с padding и рамкой.
-- Измерение высоты идёт по внутреннему узлу с добавлением padding и рамки; наблюдение внешней карточки не создаёт петлю `ResizeObserver`.
-- Связанный тест: `pnpm exec vitest run --project client-dom apps/client/test/t17m-hex-card.dom.test.tsx` — 8 тестов зелёные.
-- `pnpm verify --changed` зелёный.
-- Следующая задача: `$task 07/T17w`.
-- Читать: блок T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/card-measurement.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/match/MatchSurface.tsx`.
+- 07/T17v принята ревью; текущая задача 07/T17w.
+- `$plan` уже уточнил пути тестов и состав интерактивных элементов ArmyBar без ослабления критериев.
+- Сверка `$plan` теперь сравнивает атомарные предложения и допускает раскрытие общих терминов, сохраняя числа, code-токены и отрицания.
+- Следующий шаг: повторить `$plan 07/T17w`, затем `$task 07/T17w`.
+- Читать: блок T17w в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.module.css`, `apps/client/src/dev/ArmyBar.tsx`.
