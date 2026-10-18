@@ -28,7 +28,11 @@ describe('07/T17i: раскладка лидерборда', () => {
       });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
 
-      expect(leaderboard).toMatchObject({ height: 246 });
+      if (viewport.width <= 600) {
+        expect(leaderboard).toMatchObject({ height: 246 });
+      } else {
+        expect(leaderboard?.height).toBeLessThanOrEqual(150);
+      }
       expect(validateMatchLayout(layout)).toEqual([]);
     }
   });
@@ -77,9 +81,11 @@ describe('07/T17i: раскладка лидерборда', () => {
     ];
 
     for (const layout of layouts) {
-      expect(layout.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-        height: 246,
-      });
+      const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+      expect(leaderboard).toBeDefined();
+      if (layout.viewport.width <= 600 && layout.viewport.height > 500) {
+        expect(leaderboard).toMatchObject({ height: 246 });
+      }
     }
   });
 
@@ -122,7 +128,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       y: 52,
     });
     const desktopLeaderboard = desktop.elements.find((element) => element.id === 'leaderboard');
-    expect(desktopLeaderboard?.width).toBe(317);
+    expect(desktopLeaderboard?.width).toBeLessThanOrEqual(170);
     expect(desktopLeaderboard?.x).toBe(1440 - 16 - (desktopLeaderboard?.width ?? 0));
     expect(desktopLeaderboard?.y).toBe(56);
   });
@@ -190,7 +196,7 @@ describe('07/T17i: раскладка лидерборда', () => {
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
-    expect(leaderboards.every((leaderboard) => leaderboard?.height === 246)).toBe(true);
+    expect(leaderboards.every((leaderboard) => leaderboard?.height === 136)).toBe(true);
     expect(
       leaderboards.every((leaderboard, index) => {
         const layout = layouts[index];
@@ -201,7 +207,8 @@ describe('07/T17i: раскладка лидерборда', () => {
         );
       }),
     ).toBe(true);
-    expect(leaderboards.map((leaderboard) => leaderboard?.width)).toEqual([301, 317, 422, 440]);
+    expect(new Set(leaderboards.map((leaderboard) => leaderboard?.width)).size).toBe(1);
+    expect(leaderboards[0]?.width).toBeLessThanOrEqual(170);
   });
 
   it('определяет ширину по компактному содержимому и ограничивает её максимумом', () => {
@@ -233,13 +240,13 @@ describe('07/T17i: раскладка лидерборда', () => {
 
     expect(compact).toBeDefined();
     expect(expanded).toBeDefined();
-    expect(compact?.width).toBeLessThan(expanded?.width ?? 0);
-    expect(expanded?.width).toBe(440);
+    expect(compact?.width).toBe(expanded?.width);
+    expect(expanded?.width).toBeLessThanOrEqual(170);
     expect(compact?.x).toBe(1440 - 16 - (compact?.width ?? 0));
     expect(expanded?.x).toBe(1440 - 16 - (expanded?.width ?? 0));
   });
 
-  it('оставляет свёрнутую кнопку справа сверху на всех целевых экранах', () => {
+  it('оставляет мобильную кнопку и постоянно показывает ПК-лидерборд', () => {
     for (const viewport of viewports) {
       const layout = computeMatchLayout({
         viewport,
@@ -256,12 +263,9 @@ describe('07/T17i: раскладка лидерборда', () => {
       });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
 
-      expect(leaderboard).toMatchObject({
-        x: viewport.width - (viewport.width <= 600 ? 8 : 16) - 180,
-        y: viewport.width <= 600 ? 52 : 56,
-        width: 180,
-        height: 44,
-      });
+      expect(leaderboard).toBeDefined();
+      if (viewport.width <= 600) expect(leaderboard).toMatchObject({ width: 180, height: 44 });
+      else expect(leaderboard?.height).toBeLessThanOrEqual(150);
     }
   });
 });

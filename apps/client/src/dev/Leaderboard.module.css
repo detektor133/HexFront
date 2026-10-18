@@ -2,20 +2,13 @@
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
-  overflow-x: auto;
-  overflow-y: auto;
-  scrollbar-width: none;
-  padding: var(--space-sm);
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  padding: 6px;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   box-shadow: var(--shadow-hard);
   font-variant-numeric: tabular-nums;
-}
-
-.panel::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 .collapsed {
@@ -31,33 +24,21 @@
   cursor: pointer;
 }
 
-.collapse {
-  min-height: var(--touch-target-min);
-  padding: 0;
-  background: none;
-  border: 0;
+.title {
+  margin: 0 0 2px;
   color: var(--ui-ink);
   font: inherit;
-  cursor: pointer;
-}
-
-.panel h2 {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--font-size-label);
-}
-
-.panel {
-  max-width: 440px;
+  line-height: 16px;
 }
 
 .panel p {
-  margin: 0 0 var(--space-sm);
-  line-height: 20px;
+  margin: 0 0 2px;
+  line-height: 16px;
 }
 
 .rows {
   display: grid;
-  gap: var(--space-xs);
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -66,11 +47,10 @@
 
 .row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) max-content;
-  gap: var(--space-sm);
+  grid-template-columns: max-content minmax(0, 12ch) max-content;
+  gap: 4px;
   align-items: center;
-  min-height: 28px;
-  border-bottom: 1px solid var(--ui-border);
+  min-height: 16px;
 }
 
 .place,
@@ -84,6 +64,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 12ch;
 }
 
 .eliminated {

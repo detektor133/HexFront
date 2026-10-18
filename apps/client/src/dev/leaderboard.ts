@@ -19,10 +19,10 @@ export function leaderboardRows(view: PlayerView): LeaderboardRow[] {
   }));
 }
 
-/** Сортирует строки по месту и идентификатору игрока. */
+/** Сортирует строки по очкам и идентификатору игрока. */
 export function sortLeaderboardRows(rows: readonly LeaderboardRow[]): readonly LeaderboardRow[] {
   return [...rows].sort(
-    (first, second) => first.place - second.place || first.playerId - second.playerId,
+    (first, second) => second.score - first.score || first.playerId - second.playerId,
   );
 }
 

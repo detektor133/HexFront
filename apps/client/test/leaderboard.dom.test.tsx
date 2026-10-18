@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { useState } from 'react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Fp, PlayerView } from '@hexfront/sim';
@@ -71,21 +70,17 @@ describe('лидерборд', () => {
     cleanup();
   });
 
-  it('критерий: место в свёрнутом лидерборде совпадает с местом в HUD', () => {
+  it('критерий 07/T17s: на ПК лидерборд видим без кнопки сворачивания', () => {
     render(<Leaderboard view={view()} open={false} />);
 
-    expect(screen.getByRole('button').textContent).toContain('#6 / 6');
+    expect(screen.getByRole('region', { name: 'Таблица лидеров' })).toBeTruthy();
+    expect(screen.getByText('Таблица лидеров')).toBeTruthy();
+    expect(screen.getByText('Живы: 6')).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('критерий: после клика есть не больше 5 строк игроков', () => {
-    function Harness(): React.JSX.Element {
-      const [open, setOpen] = useState(false);
-      return <Leaderboard view={view()} open={open} onOpenChange={setOpen} />;
-    }
-
-    render(<Harness />);
-
-    fireEvent.click(screen.getByRole('button'));
+  it('критерий 07/T17s: пять строк остаются видимыми постоянно', () => {
+    render(<Leaderboard view={view()} open={false} />);
 
     const rows = screen.getAllByRole('row');
     expect(rows).toHaveLength(5);
@@ -107,11 +102,6 @@ describe('лидерборд', () => {
         entry.score,
       ]);
     });
-
-    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров/u }));
-    expect(screen.getByRole('button', { name: /Таблица лидеров/u })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров/u }));
-    expect(screen.getAllByRole('row')).toHaveLength(5);
   });
 
   it('критерий: в лидерборде нет колонок золота и солдат', () => {
@@ -154,10 +144,12 @@ describe('лидерборд', () => {
     expect(within(row).getByRole('rowheader')).not.toBe(within(row).getAllByRole('cell')[1]);
     const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
-    expect(stylesheet).toMatch(/grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u);
+    expect(stylesheet).toMatch(
+      /grid-template-columns:\s*max-content\s+minmax\(0,\s*12ch\)\s+max-content/u,
+    );
     expect(stylesheet).toMatch(/\.place,\s*\.score\s*\{[\s\S]*white-space:\s*nowrap/u);
     expect(stylesheet).toMatch(
-      /\.row\s*\{[\s\S]*grid-template-columns:\s*24px\s+minmax\(0,\s*1fr\)\s+max-content/u,
+      /\.row\s*\{[\s\S]*grid-template-columns:\s*max-content\s+minmax\(0,\s*12ch\)\s+max-content/u,
     );
     expect(within(row).getByRole('rowheader').className).toContain('place');
     expect(within(row).getAllByRole('cell')[1]?.className).toContain('score');

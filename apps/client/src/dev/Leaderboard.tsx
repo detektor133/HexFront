@@ -30,6 +30,10 @@ function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
   return rows;
 }
 
+function isDesktopViewport(): boolean {
+  return window.innerWidth > 600;
+}
+
 /** Показывает сводку матча и обновляет её раз в секунду. */
 export function Leaderboard({
   view,
@@ -41,7 +45,7 @@ export function Leaderboard({
   const me = rows.find((row) => row.playerId === view.playerId);
   const rank = me?.place ?? '-';
   const visibleRows = sortLeaderboardRows(rows).slice(0, 5);
-  if (!open) {
+  if (!open && !isDesktopViewport()) {
     return (
       <button
         type="button"
@@ -54,11 +58,17 @@ export function Leaderboard({
       </button>
     );
   }
+  const displayedPlaces = new Map<number, number>();
+  visibleRows.forEach((row, index) => {
+    const previous = visibleRows[index - 1];
+    displayedPlaces.set(
+      row.playerId,
+      previous?.score === row.score ? (displayedPlaces.get(previous.playerId) ?? 1) : index + 1,
+    );
+  });
   return (
     <section className={styles.panel} style={style} aria-label={t('leaderboard.title')}>
-      <button type="button" className={styles.collapse} onClick={() => onOpenChange(false)}>
-        {t('leaderboard.title')}
-      </button>
+      <h2 className={styles.title}>{t('leaderboard.title')}</h2>
       <p>
         {t('leaderboard.aliveCount').replace(
           '{count}',
@@ -72,9 +82,15 @@ export function Leaderboard({
         {visibleRows.slice(0, 5).map((row) => (
           <li className={styles.row} key={row.playerId} role="row">
             <span className={styles.place} role="rowheader">
-              {row.place}
+              {displayedPlaces.get(row.playerId) ?? row.place}
             </span>
-            <span className={styles.player} role="cell">
+            <span
+              className={styles.player}
+              role="cell"
+              title={
+                view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`
+              }
+            >
               {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
             </span>
             <span className={styles.score} role="cell">

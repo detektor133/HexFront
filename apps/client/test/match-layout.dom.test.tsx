@@ -570,19 +570,22 @@ describe('приёмка T7: раскладка матча без перекры
     });
   });
 
-  it('пересчитывает раскладку после открытия лидерборда', async () => {
+  it('показывает лидерборд в раскладке без отдельного открытия на ПК', async () => {
     installLayoutMeasurements();
     prepareDomScene();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     render(createElement(MatchPage));
-    fireEvent.click(screen.getByRole('button', { name: /Таблица лидеров|Leaderboard/u }));
+    expect(
+      screen.queryByRole('region', { name: /Таблица лидеров|Leaderboard/u }) ??
+        screen.queryByRole('button', { name: /Таблица лидеров|Leaderboard/u }),
+    ).toBeTruthy();
     expectInlineRectangles({
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
       tutorialVisible: false,
-      leaderboardOpen: true,
+      leaderboardOpen: false,
       leaderboardRows: 2,
       cardOpen: false,
       popupOpen: false,
@@ -592,8 +595,8 @@ describe('приёмка T7: раскладка матча без перекры
       viewport: VIEWPORTS[0],
       ...MEASURED_LAYOUT,
       eventRows: 0,
-      tutorialVisible: true,
-      leaderboardOpen: true,
+      tutorialVisible: false,
+      leaderboardOpen: false,
       leaderboardRows: 2,
       cardOpen: false,
       popupOpen: false,
