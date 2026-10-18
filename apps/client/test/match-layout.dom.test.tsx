@@ -250,6 +250,8 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
     if (element.id === 'popup-menu') {
       expect(node.style.width, element.id).toBe('');
       expect(node.style.height, element.id).toBe('');
+    } else if (element.id === 'leaderboard' && node.style.width === '') {
+      expect(node.style.height, element.id).toBe('');
     } else {
       expect(node.style.width, element.id).toBe(`${element.width}px`);
       expect(node.style.height, element.id).toBe(`${element.height}px`);
@@ -333,8 +335,14 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
     ).toEqual({
       x: `${element.x}px`,
       y: `${element.y}px`,
-      width: element.id === 'popup-menu' ? '' : `${element.width}px`,
-      height: element.id === 'popup-menu' ? '' : `${element.height}px`,
+      width:
+        element.id === 'popup-menu' || (element.id === 'leaderboard' && node.style.width === '')
+          ? ''
+          : `${element.width}px`,
+      height:
+        element.id === 'popup-menu' || (element.id === 'leaderboard' && node.style.height === '')
+          ? ''
+          : `${element.height}px`,
     });
   }
   expect(validateMatchLayout(expected)).toEqual([]);

@@ -15,7 +15,10 @@
 
 ## Следующая сессия
 
-- 07/T17s возвращена повторным ревью после `5cf3147`: layout всё ещё использует независимую базу 134 px и ручную оценку ширины счёта.
-- `pnpm verify --changed` зелёная, но задача не принята.
-- Следующая сессия: `$task 07/T17s продолжить`.
-- Читать: возврат ревью T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- 07/T17s исправлена: desktop-размер лидерборда приходит из `ResizeObserver` реального `Leaderboard`; layout больше не вычисляет ширину по длине строки или фиксированной базе.
+- Первый кадр сохраняет естественный `width: max-content`, после измерения layout получает тот же внешний прямоугольник и правую привязку.
+- Тест `t17i` проверяет измеренные ширину/высоту, независимость от viewport и от длинного ника, мобильные размеры сохранены.
+- Разрешённые замены тестов оформлены дословными строками `Заменён тест: ...` в коммите.
+- `pnpm verify --changed` зелёная.
+- Следующая сессия: `$review 07/T17s`.
+- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

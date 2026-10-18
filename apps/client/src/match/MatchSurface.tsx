@@ -14,7 +14,6 @@ import { Leaderboard } from '../dev/Leaderboard.tsx';
 import { MatchEnd } from '../dev/MatchEnd.tsx';
 import { ObserverPanel } from '../dev/ObserverPanel.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
-import { visibleLeaderboardRows } from '../dev/leaderboard.ts';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
@@ -77,13 +76,15 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
   const [cardH, setCardH] = useState(0);
+  const [leaderboardSize, setLeaderboardSize] = useState<
+    { readonly width: number; readonly height: number } | undefined
+  >(undefined);
   const [taxAnchor, setTaxAnchor] = useState<{ x: number; y: number } | undefined>(undefined);
   const [taxPopupSize, setTaxPopupSize] = useState<{ width: number; height: number } | undefined>(
     undefined,
   );
   const { army } = sb;
   const view = sb.msg?.view;
-  const visibleRows = view ? visibleLeaderboardRows(view) : [];
   // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
   const armyPicked =
@@ -98,10 +99,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
     leaderboardRows: view?.ranking?.length ?? 0,
-    leaderboardPlayerNames: visibleRows.map(
-      (row) => view?.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`,
-    ),
-    leaderboardScores: visibleRows.map((row) => row.score),
+    ...(leaderboardSize === undefined ? {} : { leaderboardSize }),
     cardHeight: cardH,
     cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
     popupOpen,
@@ -125,6 +123,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     if (!element) return undefined;
     const style = matchLayoutElementStyle(element);
     if (id === 'popup-menu') {
+      delete style.width;
+      delete style.height;
+    }
+    if (id === 'leaderboard' && leaderboardSize === undefined) {
       delete style.width;
       delete style.height;
     }
@@ -178,6 +180,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           view={view}
           open={leaderboardOpen}
           onOpenChange={setLeaderboardOpen}
+          onSize={setLeaderboardSize}
           style={styleFor('leaderboard')}
         />
       )}

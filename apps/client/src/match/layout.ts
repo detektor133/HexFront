@@ -2,13 +2,6 @@ export type MatchLayoutElementKind =
   'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
-const LEADERBOARD_COMPACT_WIDTH = 134;
-const LEADERBOARD_SCORE_CHARACTER_WIDTH = 8;
-const LEADERBOARD_HEADER_HEIGHT = 16;
-const LEADERBOARD_ALIVE_HEIGHT = 18;
-const LEADERBOARD_ROW_HEIGHT = 16;
-const LEADERBOARD_ROW_GAP = 2;
-const LEADERBOARD_PADDING = 12;
 const LEADERBOARD_BORDER_WIDTH = 2;
 const MOBILE_LEADERBOARD_HEADER_HEIGHT = 44;
 const MOBILE_LEADERBOARD_ALIVE_HEIGHT = 28;
@@ -50,8 +43,7 @@ export interface MatchLayoutInput {
   readonly tutorialVisible: boolean;
   readonly leaderboardOpen: boolean;
   readonly leaderboardRows: number;
-  readonly leaderboardPlayerNames?: readonly string[];
-  readonly leaderboardScores?: readonly number[];
+  readonly leaderboardSize?: { readonly width: number; readonly height: number };
   readonly cardHeight: number;
   readonly cardOpen: boolean;
   readonly popupOpen: boolean;
@@ -124,14 +116,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const elements: MatchLayoutElement[] = [
     layoutElement('hud', 'hud', hudX, 0, hudWidth, input.hudHeight),
   ];
-  const longestScore = Math.max(
-    2,
-    ...(input.leaderboardScores ?? []).map((score) => String(Math.abs(score)).length),
-  );
-  const naturalLeaderboardWidth =
-    LEADERBOARD_COMPACT_WIDTH + Math.max(0, longestScore - 2) * LEADERBOARD_SCORE_CHARACTER_WIDTH;
+  const measuredLeaderboardWidth = input.leaderboardSize?.width ?? 0;
   const leaderboardWidth = desktop
-    ? naturalLeaderboardWidth
+    ? measuredLeaderboardWidth
     : input.leaderboardOpen
       ? width - edge * 2
       : 180;
@@ -144,14 +131,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
       leaderboardRows * MOBILE_LEADERBOARD_ROW_HEIGHT +
       Math.max(0, leaderboardRows - 1) * MOBILE_LEADERBOARD_ROW_GAP
     : 44;
-  const desktopLeaderboardHeight =
-    LEADERBOARD_BORDER_WIDTH +
-    LEADERBOARD_PADDING +
-    LEADERBOARD_HEADER_HEIGHT +
-    LEADERBOARD_ALIVE_HEIGHT +
-    leaderboardRows * LEADERBOARD_ROW_HEIGHT +
-    Math.max(0, leaderboardRows - 1) * LEADERBOARD_ROW_GAP +
-    2;
+  const desktopLeaderboardHeight = input.leaderboardSize?.height ?? 0;
   const popupWidth = input.popupSize?.width ?? Math.min(260, width - edge * 2);
   const popupHeight =
     input.popupSize?.height ?? Math.min(120, height - input.hudHeight - gap - edge);
@@ -192,7 +172,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
         leaderboardY,
         leaderboardWidth,
         effectiveLeaderboardHeight,
-        true,
+        false,
       ),
     );
   }

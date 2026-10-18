@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { PlayerView } from '@hexfront/sim';
 
@@ -11,6 +11,7 @@ interface LeaderboardProps {
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
   readonly style?: React.CSSProperties | undefined;
+  readonly onSize?: (size: { readonly width: number; readonly height: number }) => void;
 }
 
 function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
@@ -40,8 +41,22 @@ export function Leaderboard({
   open = true,
   onOpenChange = () => undefined,
   style,
+  onSize,
 }: LeaderboardProps): React.JSX.Element {
   const rows = useLeaderboard(view);
+  const panelRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || !onSize) return;
+    const report = (): void => {
+      const rect = panel.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) onSize({ width: rect.width, height: rect.height });
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [onSize]);
   const me = rows.find((row) => row.playerId === view.playerId);
   const rank = me?.place ?? '-';
   const visibleRows = sortLeaderboardRows(rows).slice(0, 5);
@@ -67,7 +82,12 @@ export function Leaderboard({
     );
   });
   return (
-    <section className={styles.panel} style={style} aria-label={t('leaderboard.title')}>
+    <section
+      ref={panelRef}
+      className={styles.panel}
+      style={style}
+      aria-label={t('leaderboard.title')}
+    >
       <h2 className={styles.title}>{t('leaderboard.title')}</h2>
       <p>
         {t('leaderboard.aliveCount').replace(
