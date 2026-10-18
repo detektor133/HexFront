@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17q: усилен приёмочный DOM-тест реального пути `MatchPage → MatchSurface`.
-- Mock `ResizeObserver` теперь передаёт управляемые `contentRect.height` и `scrollHeight`; проверяются `Math.max`, две разные высоты, повторная высота без новой подписки и mount/unmount.
-- Тест проверяет четыре inline-координаты ArmyBar на 360×640, 1440×900 и 1920×1080, выбор/смену/Escape, `cardHeight`/`leaderboardRows`, налог и содержимое ArmyBar.
+- 07/T17q: исправлен возврат ревью и ошибка CI typecheck в DOM-тесте ArmyBar.
+- Тест проверяет реальный путь `MatchPage → MatchSurface`, четыре inline-координаты на 360×640, 1440×900 и 1920×1080, выбор/смену/Escape, `cardHeight` 88/160, лидерборд на 2/5 строк, налог и содержимое ArmyBar.
+- Контролируемый `ResizeObserver` проверяет `Math.max(contentRect.height, scrollHeight)`, две разные высоты, повторную высоту без новой подписки и точные пары mount/unmount для dock.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача — 07/T17r: HexCard непосредственно над ArmyBar; затем T17s → T17t → T17u.
 - Читать блоки T17r–T17u в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx` и `apps/client/src/dev/ArmyBar.tsx`.

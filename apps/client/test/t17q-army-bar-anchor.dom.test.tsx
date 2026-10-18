@@ -15,6 +15,9 @@ import type { MapView, MapViewOptions, MapViewState, TapKind } from '../src/rend
 const mapJson: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
 );
+const fivePlayerMapJson: unknown = JSON.parse(
+  readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
+);
 const mapResult = loadMap(mapJson);
 if (!mapResult.ok) throw new Error(mapResult.errors.join('; '));
 const loadedMap = mapResult.map;
@@ -32,10 +35,13 @@ interface ResizeStats {
 
 function installResizeObserver(stats: ResizeStats): void {
   class TestResizeObserver {
+    private isDock = false;
+
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
     public observe(target: Element): void {
       const isDock = target.className.toString().includes('dock');
+      this.isDock = isDock;
       if (isDock) stats.dockObserves += 1;
       Object.defineProperty(target, 'scrollHeight', {
         configurable: true,
@@ -57,7 +63,7 @@ function installResizeObserver(stats: ResizeStats): void {
     }
 
     public disconnect(): void {
-      stats.dockDisconnects += 1;
+      if (this.isDock) stats.dockDisconnects += 1;
     }
   }
 
@@ -79,7 +85,10 @@ function reportHeight(
   );
 }
 
-function installMatchMocks(engine: ReturnType<typeof createLocalEngine>): {
+function installMatchMocks(
+  engine: ReturnType<typeof createLocalEngine>,
+  matchMap: unknown = mapJson,
+): {
   getTap: () => ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
 } {
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
@@ -87,7 +96,7 @@ function installMatchMocks(engine: ReturnType<typeof createLocalEngine>): {
     'fetch',
     vi.fn(async () => ({
       ok: true,
-      json: async () => mapJson,
+      json: async () => matchMap,
     })),
   );
   let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
@@ -234,7 +243,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       const { getTap } = installMatchMocks(engine);
       const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
-      render(<MatchPage />);
+      const { unmount } = render(<MatchPage />);
       await waitFor(() => expect(getTap()).toBeDefined());
       await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(width, height)));
       const before = panelStyle();
@@ -281,8 +290,16 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       }
       expect(stats.observers.some((item) => item.kind === 'card')).toBe(true);
       expect(stats.dockObserves).toBe(1);
-      fireEvent.click(screen.getAllByRole('button', { name: '1-я армия' })[0]);
+      const armyButton = screen.getAllByRole('button', { name: '1-я армия' })[0];
+      if (!armyButton) throw new Error('карточка первой армии не найдена');
+      fireEvent.click(armyButton);
       expect(panelStyle()).toEqual(before);
+      for (const cardHeight of [88, 160]) {
+        act(() => reportHeight(stats, 'card', cardHeight, cardHeight));
+        await waitFor(() =>
+          expect(panelStyle()).toEqual(expectedPanelStyle(width, height, 150, cardHeight)),
+        );
+      }
       await select(secondHex);
       expect(panelStyle()).toEqual(before);
       if (width > 600) {
@@ -306,8 +323,28 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       await waitFor(() => expect(panelStyle()).toEqual(afterSecondResize));
       expect(afterResize).not.toEqual(afterSecondResize);
       expect(stats.dockObserves).toBe(1);
+      unmount();
+      expect(stats.dockDisconnects).toBe(1);
     },
   );
+
+  it('сохраняет привязку при пяти строках реального лидерборда', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    const stats: ResizeStats = { dockObserves: 0, dockDisconnects: 0, observers: [] };
+    installResizeObserver(stats);
+    const engine = createLocalEngine(fivePlayerMapJson, 42, 5);
+    const { getTap } = installMatchMocks(engine, fivePlayerMapJson);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    const { unmount } = render(<MatchPage />);
+    await waitFor(() => expect(getTap()).toBeDefined());
+    await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(1440, 900, 150, 0, 5)));
+    expect(screen.getByText('Живы: 5')).toBeTruthy();
+    expect(stats.dockObserves).toBe(1);
+    unmount();
+    expect(stats.dockDisconnects).toBe(1);
+  });
 
   it('убирает ArmyBar на время открытого налога и возвращает её с теми же координатами', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
@@ -322,7 +359,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     const { getTap } = installMatchMocks(engine);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
-    render(<MatchPage />);
+    const { unmount } = render(<MatchPage />);
     await waitFor(() => expect(getTap()).toBeDefined());
     await waitFor(() => expect(panel()).toBeTruthy());
     expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(1);
@@ -355,5 +392,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
     expect(stats.dockObserves).toBe(2);
     expect(stats.dockDisconnects).toBeGreaterThanOrEqual(1);
     expect(stats.observers.filter((item) => item.kind === 'dock')).toHaveLength(2);
+    unmount();
+    expect(stats.dockDisconnects).toBe(2);
   });
 });
