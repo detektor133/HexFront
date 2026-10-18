@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17t возвращена на доработку после review: тест не проверяет цвет SVG золота, неизменность остальных иконок и кнопку автокомандования в открытом меню настроек.
-- Изменены `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/test/t17t-hud-tax.dom.test.tsx`.
-- Приёмка покрыта DOM-тестом через `MatchPage → MatchSurface → Hud` для 1366×768, 1440×900, 1920×1080 и 2560×1440; проверены SVG, клики, фокус, зона 44×44 и ResizeObserver.
-- `pnpm verify --changed` зелёный: 99 тестов.
+- 07/T17t исправлен после review: тест связывает SVG золота с `tokens.selection.color`, фиксирует остальные иконки и кликает «Автокомандование» в открытом меню.
+- Изменён `apps/client/test/t17t-hud-tax.dom.test.tsx`; код HUD не менялся, потому что все три требования уже реализованы.
+- `pnpm exec vitest run --config vitest.config.ts apps/client/test/t17t-hud-tax.dom.test.tsx` — 3/3.
+- `pnpm verify --changed` зелёный: build, types, lint, prettier, tests.
 - Следующая задача: 07/T17u.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test/t17t-hud-tax.dom.test.tsx`.

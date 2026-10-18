@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
 
 import { createLocalEngine } from '../src/local/engine.ts';
+import { tokens } from '../src/theme/tokens.ts';
 
 const mapJson: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
@@ -16,12 +17,17 @@ if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 const loadedMap = loaded.map;
 
 const hudCss = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8');
+const themeCss = readFileSync(join(process.cwd(), 'apps/client/src/theme/tokens.css'), 'utf8');
 const tokensJson = readFileSync(join(process.cwd(), 'docs/art/tokens.json'), 'utf8');
+
+let lastSend: ReturnType<typeof vi.fn> | undefined;
 
 function createRuntime(): Record<string, unknown> {
   const engine = createLocalEngine(mapJson, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
   const snapshot = engine.snapshot();
+  const send = vi.fn();
+  lastSend = send;
   return {
     msg: snapshot,
     replay: [],
@@ -43,7 +49,7 @@ function createRuntime(): Record<string, unknown> {
       frontTween: { byArmy: 0 },
     }),
     focusEvent: () => undefined,
-    send: vi.fn(),
+    send,
     setFog: () => undefined,
     setPaused: () => undefined,
     step: () => undefined,
@@ -78,6 +84,7 @@ afterEach(() => {
   cleanup();
   vi.resetModules();
   vi.restoreAllMocks();
+  lastSend = undefined;
 });
 
 describe('07/T17t: золото и налог в HUD ПК', () => {
@@ -99,6 +106,11 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
       }
       expect(screen.getAllByText(/[+-]\d+(?:[,.]\d+)?\/с/u).length).toBeGreaterThanOrEqual(2);
       expect(screen.getByRole('button', { name: 'Настройки' })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+      const settings = screen.getByRole('dialog', { name: 'Настройки' });
+      expect(
+        within(settings).getByRole('switch', { name: 'Автокомандование новых армий' }),
+      ).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Пауза' })).toBeTruthy();
       unmount();
     }
@@ -116,7 +128,33 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     expect(gold.getAttribute('stroke-linejoin')).toBe('round');
     expect(gold.querySelectorAll('path')).toHaveLength(2);
     expect(gold.getAttribute('class')).toContain('goldIcon');
-    expect(tokensJson).toContain('"color": "#C99A2E"');
+    expect(hudCss).toContain('.goldIcon {\n  color: var(--selection-color);\n}');
+    expect(themeCss).toContain(`--selection-color: ${tokens.selection.color};`);
+    expect(tokensJson).toContain(`"color": "${tokens.selection.color}"`);
+
+    const expectedIcons: Record<string, readonly string[]> = {
+      Люди: [
+        'M4 12C4 10.34 5.34 9 7 9C8.66 9 10 10.34 10 12M5 7C5 5.9 5.9 5 7 5C8.1 5 9 5.9 9 7M10 12C10 10.34 11.34 9 13 9M11 7C11 5.9 11.9 5 13 5',
+      ],
+      Налог: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
+      Снабжение: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
+      Время: [
+        'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
+      ],
+      Место: ['M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z'],
+    };
+    for (const [label, paths] of Object.entries(expectedIcons)) {
+      const icon = screen.getByLabelText(label, { selector: 'svg' });
+      expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
+      expect(icon.getAttribute('stroke-width')).toBe('2');
+      expect(icon.getAttribute('stroke-linecap')).toBe('round');
+      expect(icon.getAttribute('stroke-linejoin')).toBe('round');
+      expect(icon.getAttribute('title')).toBe(label);
+      expect(icon.getAttribute('class')).not.toContain('goldIcon');
+      expect(
+        Array.from(icon.querySelectorAll('path')).map((path) => path.getAttribute('d')),
+      ).toEqual(paths);
+    }
 
     const taxButton = screen.getByRole('button', { name: 'Налог' });
     expect(taxButton.title).toBe('Налог');
@@ -149,6 +187,10 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     expect(screen.getByRole('dialog', { name: 'Налог' })).toBeTruthy();
     fireEvent.click(taxIcon);
     expect(screen.queryByRole('dialog', { name: 'Налог' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    const settings = screen.getByRole('dialog', { name: 'Настройки' });
+    fireEvent.click(within(settings).getByRole('switch', { name: 'Автокомандование новых армий' }));
+    expect(lastSend).toHaveBeenCalledWith({ t: 'setAutoCommand', on: false });
     const taxButtonStart = hudCss.indexOf('\n.taxButton {\n  /*');
     const taxButtonCss = hudCss.slice(taxButtonStart).match(/[\s\S]*?\n\}/u)?.[0] ?? '';
     expect(taxButtonCss).toMatch(/min-width: var\(--touch-target-min\);/u);
