@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
+import { cleanup, render, waitFor } from '@testing-library/react';
+import { createElement } from 'react';
+import { describe, expect, it } from 'vitest';
+import { afterEach, vi } from 'vitest';
+
+import { createLocalEngine } from '../src/local/engine.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
+
+const mapJson: unknown = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
+);
 
 const viewports = [
   { width: 1366, height: 768 },
@@ -28,6 +40,105 @@ function layoutFor(
     ...overrides,
   });
 }
+
+function matchRuntime(): Record<string, unknown> {
+  const engine = createLocalEngine(mapJson, 42, 2);
+  if ('errors' in engine) throw new Error(engine.errors.join('; '));
+  return {
+    msg: engine.snapshot(),
+    replay: [],
+    error: null,
+    picked: { hex: null, units: [], target: null },
+    lastReject: null,
+    tool: null,
+    army: null,
+    fog: true,
+    paused: false,
+    speed: 1,
+    observerId: null,
+    events: [],
+    workerTelemetry: null,
+    snapshotTelemetry: () => ({ received: 0, collected: 0, live: 0 }),
+    cacheTelemetry: () => ({
+      unit: { shown: 0, drawnAt: 0, chips: 0, encircledSince: 0 },
+      economy: { capturesByHex: 0, cityFlashes: 0 },
+      frontTween: { byArmy: 0 },
+    }),
+    focusEvent: () => undefined,
+    send: () => undefined,
+    setFog: () => undefined,
+    setPaused: () => undefined,
+    step: () => undefined,
+    setSpeed: () => undefined,
+    setObserver: () => undefined,
+    pick: () => undefined,
+    setTool: () => undefined,
+    setArmy: () => undefined,
+    setRoadPreview: () => undefined,
+    setDockHeight: () => undefined,
+    setHudHeight: () => undefined,
+    pixiTelemetry: () => ({
+      objects: 0,
+      text: 0,
+      graphics: 0,
+      graphicsInstructions: [],
+      graphicsDetails: [],
+      textures: 0,
+      canvasTextTextures: null,
+    }),
+  };
+}
+
+function installMatchRuntime(): void {
+  vi.doMock('../src/match/MatchSurfaceRuntime.tsx', () => ({
+    useMapJson: () => ({ json: mapJson, map: {} }),
+    useSandbox: () => matchRuntime(),
+  }));
+}
+
+function installMeasurements(): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const className = this.className.toString();
+    const height = this.tagName === 'HEADER' ? 48 : className.includes('dock') ? 132 : 142;
+    const width = className.includes('panel') ? 174 : window.innerWidth;
+    return {
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: width,
+      bottom: height,
+      width,
+      height,
+      toJSON: () => ({}),
+    };
+  });
+  class MeasuredResizeObserver {
+    public constructor(private readonly callback: ResizeObserverCallback) {}
+
+    public observe(target: Element): void {
+      const className = target.className.toString();
+      const height = target.tagName === 'HEADER' ? 48 : className.includes('dock') ? 132 : 142;
+      const width = className.includes('panel') ? 174 : window.innerWidth;
+      this.callback(
+        [{ target, contentRect: new DOMRect(0, 0, width, height) } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    }
+
+    public disconnect(): void {}
+  }
+  vi.stubGlobal('ResizeObserver', MeasuredResizeObserver);
+}
+
+afterEach(() => {
+  cleanup();
+  vi.resetModules();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('07/T17i: раскладка лидерборда', () => {
   it('использует измеренную высоту пяти строк, а не число игроков', () => {
@@ -59,20 +170,22 @@ describe('07/T17i: раскладка лидерборда', () => {
     });
   });
 
-  it('использует измеренные ширину и высоту панели на трёх desktop-размерах', () => {
-    for (const viewport of viewports.slice(0, 3)) {
-      const layout = layoutFor(viewport, {
-        leaderboardSize: { width: 174, height: 142 },
-      });
-      const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+  it('передаёт измеренный DOM-размер по пути MatchSurface → layout → Leaderboard', async () => {
+    installMatchRuntime();
+    installMeasurements();
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
-      expect(leaderboard).toMatchObject({
-        x: viewport.width - 16 - 174,
-        y: 56,
-        width: 174,
-        height: 142,
+    for (const viewport of viewports.slice(0, 3)) {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewport.height });
+      const { unmount } = render(createElement(MatchPage));
+      await waitFor(() => {
+        const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
+        expect(leaderboard?.style.left).toBe(`${viewport.width - 16 - 174}px`);
+        expect(leaderboard?.style.top).toBe('56px');
       });
-      expect(validateMatchLayout(layout)).toEqual([]);
+      expect(document.querySelector('[aria-label="Leaderboard"]')).not.toBeNull();
+      unmount();
     }
   });
 
@@ -80,19 +193,18 @@ describe('07/T17i: раскладка лидерборда', () => {
     const layouts = viewports.slice(0, 3).map((viewport) =>
       layoutFor(viewport, {
         leaderboardRows: 30,
-        leaderboardSize: { width: 174, height: 142 },
       }),
     );
     const leaderboards = layouts.map((layout) =>
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
 
-    expect(leaderboards.map((leaderboard) => leaderboard?.width)).toEqual([174, 174, 174]);
-    expect(leaderboards.map((leaderboard) => leaderboard?.height)).toEqual([142, 142, 142]);
+    expect(leaderboards.map((leaderboard) => leaderboard?.width)).toEqual([0, 0, 0]);
+    expect(leaderboards.map((leaderboard) => leaderboard?.height)).toEqual([0, 0, 0]);
     expect(
       leaderboards.every((leaderboard, index) => {
         const viewport = viewports[index];
-        return viewport !== undefined && leaderboard?.x === viewport.width - 16 - 174;
+        return viewport !== undefined && leaderboard?.x === viewport.width - 16;
       }),
     ).toBe(true);
   });

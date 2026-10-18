@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u возвращена на усиление приёмочного теста реального пути `MatchSurface → layout → Leaderboard`.
-- Тесты: целевые файлы — 32/32, `match-layout.dom.test.tsx` — 16/16.
+- 07/T17u исправлена по возврату reviewer: `t17i` монтирует реальный путь `MatchPage → MatchSurface → layout → Leaderboard`.
+- Проверено три desktop-размера; тест использует DOM-измерение `Leaderboard`, а не фиктивный `leaderboardSize`.
+- `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5.
 - `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
-- Следующая задача: 07/T17 — задача владельца, дочерние задачи этапа закрыты.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`, `apps/client/test/t17q-army-bar-anchor.dom.test.tsx`.
+- Следующая сессия: `$review 07/T17u` в новой сессии.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

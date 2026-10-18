@@ -477,7 +477,7 @@
 Возврат ревью после коммита `9a7dea14`:
 - СПЕК: `apps/client/test/t17t-hud-tax.dom.test.tsx:146-156` — проверка остальных пяти иконок не фиксирует атрибуты `fill` и `stroke`, поэтому при изменении этих атрибутов тест останется зелёным при невыполненном требовании «остальные иконки не изменены».
 
-- [ ] **T17u. Приёмочные регрессии, не закрепляющие старые ошибки** (`apps/client/test`, `apps/client/src/match/layout.ts`, затронутые компоненты, `docs/art/ui.md`).
+- [~] **T17u. Приёмочные регрессии, не закрепляющие старые ошибки** (`apps/client/test`, `apps/client/src/match/layout.ts`, затронутые компоненты, `docs/art/ui.md`).
 
 
 - **`leaderboard.dom.test.tsx`:** **сохранить** ожидания видимого заголовка и «Живы»; заменить только ПК-сворачивание и сортировку по `place` на требования T17s. Проверить пять строк, ничьи по очкам, длинный ник и полные очки. Сохранить независимые проверки обновления данных и игрового HUD.
@@ -496,8 +496,8 @@
 
 Исправлено: desktop-регрессии лидерборда проверяют измеренные размеры на трёх разрешениях; проверки T17o и T17q закрепляют отсутствие геометрической анимации, пять строк и повторные измерения без дрейфа. Mock `ResizeObserver` моделирует внутреннюю высоту, padding/рамку и внешний `style.height` без подмены `scrollHeight` внутренним стилем. `pnpm verify --changed` — зелёный.
 
-Возврат ревью:
-- СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:65-91` передаёт в `computeMatchLayout` фиктивный `leaderboardSize` и не монтирует реальный путь `MatchSurface → layout → Leaderboard`; тест останется зелёным при поломке измерения DOM или передачи фактического размера панели в layout.
+ИСПРАВЛЕНО ПО РЕВЬЮ:
+- СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:65-91` — изменён `apps/client/test/t17i-leaderboard-layout.test.ts`: desktop-сценарий монтирует `MatchPage → MatchSurface`, получает размер `Leaderboard` через `ResizeObserver` и проверяет итоговый `left/top` для 1366×768, 1440×900 и 1920×1080 без фиктивного `leaderboardSize`; `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5, `pnpm verify --changed` — OK.
 
 ### Трассировка раунда T17p–T17u
 
