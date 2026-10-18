@@ -129,7 +129,8 @@ describe('Issues в цикле', () => {
   });
 
   it('не исполняет Issue, если в свежем ответе снята метка agent или изменён автор', async () => {
-    for (const fresh of [{ ...issue(21, DECIDE), labels: [] }, issue(21, DECIDE, 'stranger')]) {
+    const candidates = [{ ...issue(21, DECIDE), labels: [] }, issue(21, DECIDE, 'stranger')];
+    for (const fresh of candidates) {
       const run = await runWorld({
         stage: ownerParked,
         issues: [issue(21, DECIDE)],
@@ -196,6 +197,30 @@ describe('Issues в цикле', () => {
     ]);
     expect(run.locked[2]).toContain('apps/client/test/accept.test.ts');
     expect(run.closed).toEqual([24]);
+  });
+
+  it('$task из Issue после разбиения plan не исполняет старого родителя', async () => {
+    const splitStage = fixtureStage.replace(
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1a. Часть 1** (tools/evolve), задача владельца.\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1b. Часть 2** (tools/evolve), задача владельца.\n  *Проверка:* интеграция.',
+    );
+    const splitStatus = fixtureStatus.replace(
+      'Очередь: 06/T1j5-Б1 →',
+      'Очередь: 06/T1j5-Б1a → 06/T1j5-Б1b →',
+    );
+    const run = await runWorld({
+      stage: fixtureStage,
+      plan: true,
+      issues: [issue(29, '$task 06/T1j5-Б1')],
+      sessions: [{ answer: 'PLAN: разбито', stage: splitStage, status: splitStatus }],
+    });
+    expect(run.prompts).toEqual(['$plan 06/T1j5-Б1']);
+    expect(run.closed).toContain(29);
+    expect(run.lines.some((line) => line.includes('дочерние задачи поставлены в очередь'))).toBe(
+      true,
+    );
   });
 
   it('$decide не закрывает Issue, если пункт отсутствует в своей задаче', async () => {

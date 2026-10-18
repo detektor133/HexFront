@@ -71,18 +71,21 @@ export function verifySplit(
   const original = taskBlock(before.stageText, task);
   const parent = taskBlock(after.stageText, task);
   if (original === '' || parent === '') return ['исходная задача удалена или отсутствует'];
-  if (original.trim() !== parent.trim())
+  if (original.trim() !== parent.trim()) {
     errors.push('исходная задача изменена или сокращена при разбиении');
+  }
 
   const name = shortId(task);
-  const ids = [...after.stageText.matchAll(/^- \[[^\]]\] \*\*(T[^.\s*]+)\./gmu)].map(
+  const ids = Array.from(
+    after.stageText.matchAll(/^- \[[^\]]\] \*\*(T[^.\s*]+)\./gmu),
     (match) => match[1] ?? '',
   );
   const index = ids.indexOf(name);
   const childName = new RegExp('^' + escapeRegExp(name) + '[a-zа-яё](?:\\d+)?$', 'iu');
   const children: string[] = [];
-  for (let i = index + 1; i < ids.length && childName.test(ids[i] ?? ''); i += 1)
+  for (let i = index + 1; i < ids.length && childName.test(ids[i] ?? ''); i += 1) {
     children.push(ids[i] ?? '');
+  }
   if (children.length < 2) {
     errors.push('нет двух последовательных подзадач непосредственно под родителем');
     return errors;
@@ -98,8 +101,9 @@ export function verifySplit(
     const replacements = children.map((child) => `${stage}/${child}`);
     expected.splice(parentIndex, 1, ...replacements);
   }
-  if (JSON.stringify(parseQueue(after.status)) !== JSON.stringify(expected))
+  if (JSON.stringify(parseQueue(after.status)) !== JSON.stringify(expected)) {
     errors.push('очередь STATUS не заменяет родителя подзадачами в прежнем порядке');
+  }
 
   const childTexts = children.map((child) => normalize(taskBlock(after.stageText, child)));
   const body = original.split(/\r?\n/u).slice(1);
@@ -108,9 +112,12 @@ export function verifySplit(
   );
   for (const item of requirements(original)) {
     const found = childTexts.filter((text) => text.includes(item)).length;
-    if (found === 0) errors.push('требование не перенесено в подзадачи: «' + excerpt(item) + '»');
-    if (found > 1 && exactOnce.has(item))
+    if (found === 0) {
+      errors.push('требование не перенесено в подзадачи: «' + excerpt(item) + '»');
+    }
+    if (found > 1 && exactOnce.has(item)) {
       errors.push('критерий продублирован в подзадачах: «' + excerpt(item) + '»');
+    }
   }
   return errors;
 }

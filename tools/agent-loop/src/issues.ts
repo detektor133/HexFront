@@ -24,7 +24,7 @@ import {
 import { planEnabled, runPlan } from './plan.ts';
 import { verifyDecisionTasks } from './requirements.ts';
 import { shelveWork, unshelveWork } from './shelve.ts';
-import { isOwnerTask, taskBlock, taskMark } from './stage-file.ts';
+import { isOwnerTask, parseQueue, taskBlock, taskMark } from './stage-file.ts';
 import { processTask } from './tasks.ts';
 
 /** Второй сбой codex на одной Issue снимает её с очереди меткой `agent-stop`. */
@@ -85,22 +85,21 @@ async function stillCurrent(context: LoopContext, issue: AgentIssue): Promise<bo
   const github = context.config.github;
   if (github === undefined) return false;
   let current: AgentIssue | undefined;
-  if (
-    !(await safely(context, `повторно проверить Issue #${issue.number}`, async () => {
-      current = await github.openIssue(issue.number);
-    }))
-  )
-    return false;
+  const fetched = await safely(context, `повторно проверить Issue #${issue.number}`, async () => {
+    current = await github.openIssue(issue.number);
+  });
+  if (!fetched) return false;
   const valid =
     current !== undefined &&
     current.body === issue.body &&
     current.author.toLowerCase() === github.owner.toLowerCase() &&
     current.labels.includes(AGENT_LABEL) &&
     !current.labels.includes(STOP_LABEL);
-  if (!valid)
+  if (!valid) {
     await context.say(
       `Issue #${issue.number}: поручение или метки изменились — старый результат не подтверждаю`,
     );
+  }
   return valid;
 }
 
@@ -190,12 +189,18 @@ async function runTaskIssue(
       return stopIssue(context, issue, `$plan ${task} запросил решение владельца`);
     const fresh = await readStage(context.config.root);
     const nextMark = taskMark(fresh.stageText, task);
-    if (nextMark === undefined)
+    // При разбиении $plan сохраняет родителя в файле, но заменяет его в очереди.
+    // Нельзя исполнять $task родителя вместо новых подзадач.
+    if (
+      nextMark === undefined ||
+      (parseQueue(initial.status).includes(task) && !parseQueue(fresh.status).includes(task))
+    ) {
       return finish(
         context,
         issue,
-        `${task} изменена или разбита планировщиком; продолжение — по очереди STATUS`,
+        `${task} разбита планировщиком; дочерние задачи поставлены в очередь STATUS`,
       );
+    }
     mark = nextMark;
   }
   // Текст владельца под командой — часть поручения: 2026-10-15, 07/T13 (#21) исполнитель получил
@@ -353,7 +358,9 @@ export async function processIssues(
       !fresh.labels.includes(AGENT_LABEL) ||
       fresh.labels.includes(STOP_LABEL) ||
       fresh.author.toLowerCase() !== github.owner.toLowerCase()
-    ) continue;
+    ) {
+      continue;
+    }
     // Команда и права читаются из свежей Issue, а не из потенциально устаревшего списка.
     const command = parseIssueCommand(fresh.body);
     const answer = !('error' in command) && waiting !== undefined && ANSWERS.has(command.skill);
