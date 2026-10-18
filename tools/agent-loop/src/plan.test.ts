@@ -45,8 +45,9 @@ describe('роль plan перед исполнением задачи', () => {
   it('plan разбивает задачу — исполнитель получает первую подзадачу', async () => {
     const split = fixtureStage.replace(
       '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',
-      '- [ ] **T1j5-Б1a. Часть первая** (tools/evolve).\n  *Приёмка:* тесты.\n' +
-        '- [ ] **T1j5-Б1b. Часть вторая** (tools/evolve).\n  *Приёмка:* тесты.',
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1a. Часть первая** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1b. Часть вторая** (tools/evolve).\n  *Проверка:* интеграция.',
     );
     const splitStatus = fixtureStatus.replace(
       'Очередь: 06/T1j5-Б1 → 06/T1i → 06/T1e',
@@ -79,6 +80,26 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain(`$plan ${TASK}: разбито`);
     expect(run.lines).toContain('готово: 06/T1j5-Б1a');
     expect(run.lines).toContain('$plan 06/T1j5-Б1b: не трогал');
+  });
+
+  it('plan удалил приёмку — блокирует $task, даже если ответил «уточнено»', async () => {
+    const bad = fixtureStage.replace('  *Приёмка:* тесты.', '  *Приёмка:* отключить проверки.');
+    const run = await runWorld({
+      plan: true,
+      sessions: [{ answer: 'PLAN: уточнено', stage: bad, commit: true }],
+    });
+    expect(run.prompts).toEqual([`$plan ${TASK}`]);
+    expect(run.lines.some((line) => line.includes('сверка требований не пройдена'))).toBe(true);
+  });
+
+  it('plan назвал удаление задачи разбиением — блокирует исполнителя', async () => {
+    const bad = fixtureStage.replace(/^- \[ \] \*\*T1j5-Б1\.[^\n]*\n  \*Приёмка:\* тесты\.\n/mu, '');
+    const run = await runWorld({
+      plan: true,
+      sessions: [{ answer: 'PLAN: разбито', stage: bad, commit: true }],
+    });
+    expect(run.prompts).toEqual([`$plan ${TASK}`]);
+    expect(run.lines.some((line) => line.includes('сверка требований не пройдена'))).toBe(true);
   });
 
   it('plan не находит ответа в доках — вопрос в QUESTIONS.md, задача не передаётся $task', async () => {

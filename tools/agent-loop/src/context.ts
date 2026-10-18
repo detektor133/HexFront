@@ -8,6 +8,7 @@ import { changedPaths, dirtyFiles, head, syncWithOrigin, type Git } from './git.
 import type { GithubClient } from './github.ts';
 import { waitActions } from './owner-actions.ts';
 import type { RunCommand } from './process.ts';
+import { verifyPlanTransition, verifySplit } from './requirements.ts';
 import { saveState, type LoopState } from './state.ts';
 
 export interface AgentConfig {
@@ -363,6 +364,9 @@ export async function runSkill(
 ): Promise<SkillResult> {
   const { git } = context;
   const base = await head(git);
+  const splitTask = prompt.match(/^\$split\s+(\d{2}\/T[^\s]+)/u)?.[1];
+  const planTask = role === 'plan' ? prompt.match(/^\$plan\s+(\d{2}\/T[^\s]+)/u)?.[1] : undefined;
+  const before = splitTask !== undefined || planTask !== undefined ? await readStage(context.config.root) : undefined;
   const done = await session(context, role, prompt);
   const fail = (reason: string, extra: { codexFailed?: boolean } = {}): SkillResult => ({
     ok: false,
@@ -375,6 +379,17 @@ export async function runSkill(
   if ((await head(git)) === base) return fail('коммита нет — скилл остановился сам (см. ответ)');
   if (role === 'plan' && !(await checkPermissions(context, base, context.definitions.planPaths)))
     return fail('$plan изменил файлы вне permissions.json');
+  if (before !== undefined) {
+    const after = await readStage(context.config.root);
+    const outcome = done.message.match(/^PLAN:\s*(не трогал|уточнено|разбито|вопрос)(?![а-яё])/imu)?.[1];
+    const errors = splitTask !== undefined
+      ? verifySplit(splitTask, before, after)
+      : planTask !== undefined && outcome !== undefined
+        ? verifyPlanTransition(planTask, before, after, outcome)
+        : ['$plan не сообщил проверяемый исход PLAN'];
+    if (errors.length > 0)
+      return fail(`сверка требований не пройдена (${errors.length}): ${errors.slice(0, 3).join(' | ')}`);
+  }
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return fail(unsynced);
   // Непроверенный CI — не успех. Issue останется открытой с agent-stop, без повторного

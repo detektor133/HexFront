@@ -1,0 +1,133 @@
+// Детерминированная сверка сохранности требований: модель не может объявить
+// $decide/$plan/$split успешными, если исчезла исходная строка приёмки.
+// Сверка намеренно консервативна: перефразирование требует решения владельца.
+import type { StageState } from './context.ts';
+import { parseQueue, taskBlock } from './stage-file.ts';
+
+const normalize = (text: string): string =>
+  text.replace(/\*\*/gu, '').replace(/\s+/gu, ' ').trim().replace(/[.!?。]+$/gu, '');
+
+const lines = (text: string): string[] =>
+  text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !/^\x60{3}/u.test(line) && !/^#{1,6}\s/u.test(line))
+    .map(normalize)
+    .filter(Boolean);
+
+/** Первая строка содержит номер и название задачи; после названия могут идти требования. */
+const requirements = (block: string): string[] => {
+  const [heading = '', ...body] = block.split(/\r?\n/u);
+  const afterTitle = heading.replace(/^- \[[^\]]\] \*\*T[^*]+\*\*/u, '');
+  return [...new Set(lines([afterTitle, ...body].join('\n')))];
+};
+
+const shortId = (task: string): string => task.split('/').at(-1) ?? task;
+const escapeRegExp = (value: string): string => value.replace(/[-/\\^$*+?.()|[\]{}]/gu, '\\$&');
+const excerpt = (value: string): string => value.slice(0, 140);
+
+/**
+ * Проверяет именованные разделы Issue вида "## T17s — ...".
+ * Каждый непустой пункт и строка примера должны быть в СОБСТВЕННОЙ задаче,
+ * а не только в трассировке или в соседней задаче.
+ */
+export function verifyDecisionTasks(
+  issueBody: string,
+  stageText: string,
+): { readonly checked: number; readonly errors: readonly string[] } {
+  const headings = [...issueBody.matchAll(/^##\s+(T[^\s]+)\s+[—–-]/gmu)];
+  const errors: string[] = [];
+  let checked = 0;
+  for (const heading of headings) {
+    const task = heading[1] ?? '';
+    const remainder = issueBody.slice((heading.index ?? 0) + heading[0].length);
+    const nextHeading = remainder.search(/^##\s+/mu);
+    const section = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading);
+    const target = taskBlock(stageText, task);
+    if (target === '') {
+      errors.push(task + ': задача отсутствует в файле этапа');
+      continue;
+    }
+    const normalizedTarget = normalize(target);
+    for (const item of lines(section)) {
+      checked += 1;
+      if (!normalizedTarget.includes(item))
+        errors.push(task + ': отсутствует пункт «' + excerpt(item) + '»');
+    }
+  }
+  return { checked, errors };
+}
+
+/**
+ * Разбиение допускается только с сохранением родителя, минимум двумя дочерними
+ * задачами, точной заменой очереди и переносом каждого исходного требования.
+ */
+export function verifySplit(
+  task: string,
+  before: StageState,
+  after: StageState,
+): readonly string[] {
+  const errors: string[] = [];
+  const original = taskBlock(before.stageText, task);
+  const parent = taskBlock(after.stageText, task);
+  if (original === '' || parent === '') return ['исходная задача удалена или отсутствует'];
+  if (original.trim() !== parent.trim())
+    errors.push('исходная задача изменена или сокращена при разбиении');
+
+  const name = shortId(task);
+  const ids = [...after.stageText.matchAll(/^- \[[^\]]\] \*\*(T[^.\s*]+)\./gmu)].map(
+    (match) => match[1] ?? '',
+  );
+  const index = ids.indexOf(name);
+  const childName = new RegExp('^' + escapeRegExp(name) + '[a-zа-яё](?:\\d+)?$', 'iu');
+  const children: string[] = [];
+  for (let i = index + 1; i < ids.length && childName.test(ids[i] ?? ''); i += 1)
+    children.push(ids[i] ?? '');
+  if (children.length < 2) {
+    errors.push('нет двух последовательных подзадач непосредственно под родителем');
+    return errors;
+  }
+
+  const previousQueue = parseQueue(before.status);
+  const parentIndex = previousQueue.indexOf(task);
+  const expected = [...previousQueue];
+  if (parentIndex < 0) errors.push('исходной задачи нет в очереди STATUS');
+  else expected.splice(parentIndex, 1, ...children.map((child) => task.split('/')[0] + '/' + child));
+  if (JSON.stringify(parseQueue(after.status)) !== JSON.stringify(expected))
+    errors.push('очередь STATUS не заменяет родителя подзадачами в прежнем порядке');
+
+  const childTexts = children.map((child) => normalize(taskBlock(after.stageText, child)));
+  const body = original.split(/\r?\n/u).slice(1);
+  const exactOnce = new Set(
+    lines(body.filter((line) => /приёмка|^\s*\d+[.)]\s/iu.test(line)).join('\n')),
+  );
+  for (const item of requirements(original)) {
+    const found = childTexts.filter((text) => text.includes(item)).length;
+    if (found === 0) errors.push('требование не перенесено в подзадачи: «' + excerpt(item) + '»');
+    if (found > 1 && exactOnce.has(item))
+      errors.push('критерий продублирован в подзадачах: «' + excerpt(item) + '»');
+  }
+  return errors;
+}
+
+/** Сохранность исходных требований после $plan до передачи задачи исполнителю. */
+export function verifyPlanTransition(
+  task: string,
+  before: StageState,
+  after: StageState,
+  outcome: string,
+): readonly string[] {
+  if (outcome === 'разбито') return verifySplit(task, before, after);
+  const original = taskBlock(before.stageText, task);
+  const current = taskBlock(after.stageText, task);
+  if (original === '' || current === '') return ['исходная задача отсутствует после $plan'];
+  if (outcome === 'уточнено') {
+    const target = normalize(current);
+    return requirements(original)
+      .filter((item) => !target.includes(item))
+      .map((item) => 'потеряно при уточнении: «' + excerpt(item) + '»');
+  }
+  if (original !== current || before.status !== after.status)
+    return ['$plan изменил задачу или очередь, но ответил «' + outcome + '»'];
+  return [];
+}

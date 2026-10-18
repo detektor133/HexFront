@@ -195,6 +195,50 @@ describe('Issues в цикле', () => {
     expect(run.closed).toEqual([24]);
   });
 
+  it('$decide не закрывает Issue, если пункт отсутствует в своей задаче', async () => {
+    const body = '$decide\n## T2 — интерфейс\nПоказать кнопку и полный счёт.\n';
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(25, body)],
+      sessions: [{ answer: 'Перенёс решение', status: fixtureStatus }],
+    });
+    expect(run.closed).toEqual([]);
+    expect(run.labels).toContain('#25: agent-stop');
+    expect(run.comments[0]).toContain('сверка требований не пройдена');
+  });
+
+  it('$decide закрывает Issue, если все пункты лежат в своих задачах', async () => {
+    const body = '$decide\n## T2 — интерфейс\nПоказать кнопку и полный счёт.\n';
+    const updated = ownerParked.replace(
+      '- [ ] **T2. Итерации баланса**.',
+      '- [ ] **T2. Итерации баланса**.\nПоказать кнопку и полный счёт.',
+    );
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(26, body)],
+      sessions: [{ answer: 'Перенёс решение', stage: updated }],
+    });
+    expect(run.closed).toEqual([26]);
+    expect(run.lines.some((line) => line.includes('сверено 1 пунктов'))).toBe(true);
+  });
+
+  it('$split из Issue не подтверждается при потере исходного критерия', async () => {
+    const bad = ownerParked.replace(
+      '- [ ] **T2. Итерации баланса**.',
+      '- [ ] **T2. Итерации баланса**.\n' +
+        '- [ ] **T2a. Часть 1**.\n' +
+        '- [ ] **T2b. Часть 2**.',
+    );
+    const run = await runWorld({
+      stage: ownerParked,
+      issues: [issue(27, '$split 06/T2')],
+      sessions: [{ answer: 'Разбито', stage: bad }],
+    });
+    expect(run.closed).toEqual([]);
+    expect(run.labels).toContain('#27: agent-stop');
+    expect(run.comments[0]).toContain('сверка требований не пройдена');
+  });
+
   it('$task из Issue идёт кругами до [x] и закрывает Issue', async () => {
     const run = await runWorld({
       stage: ownerParked,

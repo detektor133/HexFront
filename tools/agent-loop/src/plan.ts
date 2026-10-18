@@ -17,6 +17,7 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { verifyPlanTransition } from './requirements.ts';
 import { isOwnerTask, selectTask, taskBlock, taskMark, type TaskMark } from './stage-file.ts';
 
 /** Без роли plan в roles.json цикл работает по-старому: текст задачи перед работой не проверяется. */
@@ -42,6 +43,7 @@ export interface PlanOutcome {
 export async function runPlan(context: LoopContext, task: string): Promise<PlanOutcome | Step> {
   const { git, definitions } = context;
   const base = await head(git);
+  const before = await readStage(context.config.root);
   const result = await session(context, 'plan', planPrompt(task));
   if (result.failure !== undefined)
     return backoff(context, `$plan ${task}: ${result.failure}`, result.message);
@@ -67,6 +69,15 @@ export async function runPlan(context: LoopContext, task: string): Promise<PlanO
       context,
       `plan:${task}`,
       `$plan ${task} не ответил строкой «PLAN: …» — проверь`,
+      result.message,
+    );
+  const after = await readStage(context.config.root);
+  const errors = verifyPlanTransition(task, before, after, outcome);
+  if (errors.length > 0)
+    return park(
+      context,
+      `requirements:${task}`,
+      `$plan ${task}: сверка требований не пройдена (${errors.length}): ${errors.slice(0, 3).join(' | ')}`,
       result.message,
     );
   await context.say(`$plan ${task}: ${outcome}`);

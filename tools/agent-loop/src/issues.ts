@@ -14,7 +14,6 @@ import {
   type Step,
 } from './context.ts';
 import { head } from './git.ts';
-import { planEnabled, runPlan } from './plan.ts';
 import {
   AGENT_LABEL,
   parseIssueCommand,
@@ -22,6 +21,8 @@ import {
   type AgentIssue,
   type IssueCommand,
 } from './github.ts';
+import { planEnabled, runPlan } from './plan.ts';
+import { verifyDecisionTasks } from './requirements.ts';
 import { shelveWork, unshelveWork } from './shelve.ts';
 import { isOwnerTask, taskBlock, taskMark } from './stage-file.ts';
 import { processTask } from './tasks.ts';
@@ -241,12 +242,23 @@ async function runIssue(
     command.skill === 'plan' ? 'plan' : 'next',
     command.prompt,
   );
-  if (result.ok)
+  if (result.ok) {
+    if (command.skill === 'decide') {
+      const checked = verifyDecisionTasks(command.prompt, (await readStage(context.config.root)).stageText);
+      await context.say(`$decide Issue #${issue.number}: сверено ${checked.checked} пунктов`);
+      if (checked.errors.length > 0)
+        return stopIssue(
+          context,
+          issue,
+          `сверка требований не пройдена (${checked.errors.length}): ${checked.errors.slice(0, 3).join(' | ')}`,
+        );
+    }
     return finish(
       context,
       issue,
       `выполнено: коммит ${result.sha.slice(0, 7)} — ${firstLine(result.message)}`,
     );
+  }
   if (result.codexFailed) return issueCrashed(context, issue, result.reason, result.message);
   return stopIssue(context, issue, result.reason, result.message);
 }
