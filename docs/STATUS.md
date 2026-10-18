@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u исправлена по третьему возврату и ждёт повторного review.
-- `Leaderboard` принимает размер из `ResizeObserverEntry.contentRect`; тест подтверждает передачу в layout на реальном React-пути.
-- RED: без чтения `contentRect` целевой тест падает по `style.left`; GREEN: 5/5.
+- 07/T17u возвращена на усиление проверки полной геометрии `contentRect`.
+- Тест подтверждает ширину через `style.left`, но ещё не подтверждает передачу высоты в layout.
+- `pnpm verify --changed` — зелёный до исправления.
 - Исправлена сходимость цикла: журнал review больше не меняет нормативный текст задачи, `СПЕК:` требует RED/GREEN.
 - Следующая задача после review: 07/T17, задача владельца.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
