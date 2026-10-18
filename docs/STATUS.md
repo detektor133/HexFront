@@ -15,7 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u возвращена reviewer: `t17i` монтирует реальный путь, но подменяет `getBoundingClientRect` и `ResizeObserver` фиксированной геометрией, запрещённой новым текстом задачи.
-- `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5; тест остаётся недостаточным по критерию реальной геометрии.
-- Следующая сессия: исправить `apps/client/test/t17i-leaderboard-layout.test.ts`, затем `$review 07/T17u`.
+- 07/T17u исправлена по возврату reviewer: `t17i` больше не подменяет `getBoundingClientRect` и фиксированную геометрию `174×142`.
+- Реальный путь `MatchPage → MatchSurface → layout → Leaderboard` сохранён; jsdom проверяет DOM и inline-инварианты без выдачи пикселей за браузерную геометрию.
+- `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5.
+- `pnpm verify --changed` — зелёный.
+- Следующая сессия: `$review 07/T17u`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

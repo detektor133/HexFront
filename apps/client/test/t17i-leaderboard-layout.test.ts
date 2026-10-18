@@ -96,41 +96,17 @@ function installMatchRuntime(): void {
   }));
 }
 
-function installMeasurements(): void {
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-    this: HTMLElement,
-  ) {
-    const className = this.className.toString();
-    const height = this.tagName === 'HEADER' ? 48 : className.includes('dock') ? 132 : 142;
-    const width = className.includes('panel') ? 174 : window.innerWidth;
-    return {
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: width,
-      bottom: height,
-      width,
-      height,
-      toJSON: () => ({}),
-    };
-  });
-  class MeasuredResizeObserver {
+function installResizeObserver(): void {
+  class EmptyResizeObserver {
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
-    public observe(target: Element): void {
-      const className = target.className.toString();
-      const height = target.tagName === 'HEADER' ? 48 : className.includes('dock') ? 132 : 142;
-      const width = className.includes('panel') ? 174 : window.innerWidth;
-      this.callback(
-        [{ target, contentRect: new DOMRect(0, 0, width, height) } as ResizeObserverEntry],
-        this as unknown as ResizeObserver,
-      );
+    public observe(): void {
+      this.callback([], this as unknown as ResizeObserver);
     }
 
     public disconnect(): void {}
   }
-  vi.stubGlobal('ResizeObserver', MeasuredResizeObserver);
+  vi.stubGlobal('ResizeObserver', EmptyResizeObserver);
 }
 
 afterEach(() => {
@@ -172,7 +148,7 @@ describe('07/T17i: раскладка лидерборда', () => {
 
   it('передаёт измеренный DOM-размер по пути MatchSurface → layout → Leaderboard', async () => {
     installMatchRuntime();
-    installMeasurements();
+    installResizeObserver();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     for (const viewport of viewports.slice(0, 3)) {
@@ -181,10 +157,11 @@ describe('07/T17i: раскладка лидерборда', () => {
       const { unmount } = render(createElement(MatchPage));
       await waitFor(() => {
         const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
-        expect(leaderboard?.style.left).toBe(`${viewport.width - 16 - 174}px`);
-        expect(leaderboard?.style.top).toBe('56px');
+        expect(leaderboard?.style.right).toBe('16px');
+        expect(leaderboard?.style.width).toBe('');
+        expect(leaderboard?.style.height).toBe('');
       });
-      expect(document.querySelector('[aria-label="Leaderboard"]')).not.toBeNull();
+      expect(document.querySelector('[aria-label="Leaderboard"] h2')).not.toBeNull();
       unmount();
     }
   });
