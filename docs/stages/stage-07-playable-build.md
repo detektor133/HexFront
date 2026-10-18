@@ -477,7 +477,7 @@
 Возврат ревью после коммита `9a7dea14`:
 - СПЕК: `apps/client/test/t17t-hud-tax.dom.test.tsx:146-156` — проверка остальных пяти иконок не фиксирует атрибуты `fill` и `stroke`, поэтому при изменении этих атрибутов тест останется зелёным при невыполненном требовании «остальные иконки не изменены».
 
-- [~] **T17u. Приёмочные регрессии, не закрепляющие старые ошибки** (`apps/client/test`, `apps/client/src/match/layout.ts`, затронутые компоненты, `docs/art/ui.md`).
+- [ ] **T17u. Приёмочные регрессии, не закрепляющие старые ошибки** (`apps/client/test`, `apps/client/src/match/layout.ts`, затронутые компоненты, `docs/art/ui.md`).
 
 
 - **`leaderboard.dom.test.tsx`:** **сохранить** ожидания видимого заголовка и «Живы»; заменить только ПК-сворачивание и сортировку по `place` на требования T17s. Проверить пять строк, ничьи по очкам, длинный ник и полные очки. Сохранить независимые проверки обновления данных и игрового HUD.
@@ -498,6 +498,9 @@
 
 ИСПРАВЛЕНО ПО РЕВЬЮ:
 - СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:65-91` — изменён `apps/client/test/t17i-leaderboard-layout.test.ts`: desktop-сценарий монтирует `MatchPage → MatchSurface`, получает размер `Leaderboard` через `ResizeObserver` и проверяет итоговый `left/top` для 1366×768, 1440×900 и 1920×1080 без фиктивного `leaderboardSize`; `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5, `pnpm verify --changed` — OK.
+
+Возврат ревью после изменения текста задачи (коммит `c0f180b`):
+- СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:100-133` — тест проверяет геометрию через моки `HTMLElement.getBoundingClientRect` и `ResizeObserver` с заранее заданными `174×142`, что прямо нарушает требование T17u проверять реальный код и данные без ложной CSS-геометрии через мок `getBoundingClientRect` в jsdom; зелёный тест не доказывает фактическое измерение DOM-размера.
 
 ### Трассировка раунда T17p–T17u
 

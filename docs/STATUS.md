@@ -15,9 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17u исправлена по возврату reviewer: `t17i` монтирует реальный путь `MatchPage → MatchSurface → layout → Leaderboard`.
-- Проверено три desktop-размера; тест использует DOM-измерение `Leaderboard`, а не фиктивный `leaderboardSize`.
-- `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5.
-- `pnpm verify --changed` — зелёный: build, types, lint, prettier, tests.
-- Следующая сессия: `$review 07/T17u` в новой сессии.
+- 07/T17u возвращена reviewer: `t17i` монтирует реальный путь, но подменяет `getBoundingClientRect` и `ResizeObserver` фиксированной геометрией, запрещённой новым текстом задачи.
+- `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts` — 5/5; тест остаётся недостаточным по критерию реальной геометрии.
+- Следующая сессия: исправить `apps/client/test/t17i-leaderboard-layout.test.ts`, затем `$review 07/T17u`.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
