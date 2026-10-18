@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17s исправлена: desktop layout больше не вычисляет ширину по длине ника; ширина расширяется только для полного отображения длинного счёта.
-- `pnpm verify --changed` зелёная; отдельный тест T17i: 7/7.
-- Следующая сессия: `$review 07/T17s`.
-- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `docs/art/ui.md`, `apps/client/src/match/layout.ts`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- 07/T17s возвращена повторным ревью после `5cf3147`: layout всё ещё использует независимую базу 134 px и ручную оценку ширины счёта.
+- `pnpm verify --changed` зелёная, но задача не принята.
+- Следующая сессия: `$task 07/T17s продолжить`.
+- Читать: возврат ревью T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
