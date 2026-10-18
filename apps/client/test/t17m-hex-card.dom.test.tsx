@@ -312,6 +312,14 @@ describe('T17m: карточка клетки', () => {
       public constructor(private readonly callback: ResizeObserverCallback) {}
 
       public observe(target: Element): void {
+        const card = target.parentElement;
+        if (!card) throw new Error('контейнер карточки не найден');
+        card.style.paddingTop = '12px';
+        card.style.paddingBottom = '12px';
+        card.style.borderTopWidth = '1px';
+        card.style.borderBottomWidth = '1px';
+        card.style.borderTopStyle = 'solid';
+        card.style.borderBottomStyle = 'solid';
         Object.defineProperty(target, 'scrollHeight', { configurable: true, value: 248 });
         this.callback(
           [{ target, contentRect: { height: 0 } } as ResizeObserverEntry],
@@ -333,7 +341,7 @@ describe('T17m: карточка клетки', () => {
       />,
     );
 
-    expect(heights).toEqual([248]);
+    expect(heights).toEqual([274]);
   });
 
   it('не показывает сведения и действия чужого fogged-гекса', () => {

@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17v возвращена на доработку: тест внешней высоты карточки не задаёт и не проверяет padding/рамку, поэтому не подтверждает их сложение с высотой содержимого.
+- 07/T17v: исправлен возврат `СПЕК` в `apps/client/test/t17m-hex-card.dom.test.tsx`; mock реального `ResizeObserver` задаёт padding 12+12 px и рамку 1+1 px на контейнере, тест проверяет внешние 274 px.
 - Измерение высоты идёт по внутреннему узлу с добавлением padding и рамки; наблюдение внешней карточки не создаёт петлю `ResizeObserver`.
-- Тесты проверяют переполнение карточки, четыре ПК-окна, три мобильных viewport, сохранение координат ArmyBar и содержимого карточек.
+- Связанный тест: `pnpm exec vitest run --project client-dom apps/client/test/t17m-hex-card.dom.test.tsx` — 8 тестов зелёные.
 - `pnpm verify --changed` зелёный.
 - Следующая задача: `$task 07/T17w`.
 - Читать: блок T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/card-measurement.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/match/MatchSurface.tsx`.
