@@ -1,9 +1,11 @@
-/* Карточка выбранного — ui.md: ширина 320 (ПК), на телефоне на всю ширину минус поля, снизу. */
+/* Карточка выбранного — естественная ширина содержимого на ПК и ширина поля на телефоне. */
 .card {
   position: absolute;
   /* Над нижней панелью армий (--dock-h задаёт страница). */
   z-index: 2;
   box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   overflow-y: auto;
   scrollbar-width: none;
   padding: var(--space-md);
@@ -138,6 +140,8 @@
 
 @media (max-width: 600px) {
   .card {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
   }
 }
 

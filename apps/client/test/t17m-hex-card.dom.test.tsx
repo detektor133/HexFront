@@ -299,7 +299,7 @@ describe('T17m: карточка клетки', () => {
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });
 
-  it('берёт высоту из scrollHeight, если ResizeObserver сообщает нулевой contentRect', () => {
+  it('берёт внешнюю высоту содержимого с padding и рамкой', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const capital = engine.state.cities.find((city) => city.owner === 0);

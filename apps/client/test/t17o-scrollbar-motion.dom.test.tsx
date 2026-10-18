@@ -48,6 +48,8 @@ describe('07/T17o: прокрутка и движение панелей', () =>
       } else {
         expect(style.overflowY).toBe('auto');
         expect(style.scrollbarWidth).toBe('none');
+        expect(cssSources[1]).toMatch(/\.card\s*\{[\s\S]*width:\s*max-content/u);
+        expect(cssSources[1]).toMatch(/box-sizing:\s*border-box/u);
       }
 
       node.scrollTop = 40;
@@ -99,5 +101,36 @@ describe('07/T17o: прокрутка и движение панелей', () =>
         previousCardHeight = card?.height;
       }
     }
+  });
+
+  it('сохраняет естественную ПК-ширину и ширину поля на телефоне', () => {
+    const viewports = [
+      { width: 1366, height: 768 },
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+      { width: 2560, height: 1440 },
+      { width: 360, height: 640 },
+      { width: 390, height: 844 },
+      { width: 844, height: 390 },
+    ];
+    const widths = viewports.map((viewport) => {
+      const layout = computeMatchLayout({
+        viewport,
+        hudHeight: viewport.width <= 600 || viewport.height <= 500 ? 44 : 48,
+        bottomPanelHeight: 150,
+        eventRows: 0,
+        tutorialVisible: false,
+        leaderboardOpen: false,
+        leaderboardRows: 0,
+        cardHeight: 300,
+        cardOpen: true,
+        popupOpen: false,
+        paused: false,
+      });
+      return layout.elements.find((element) => element.id === 'card')?.width;
+    });
+
+    expect(widths.slice(0, 4)).toEqual([320, 320, 320, 320]);
+    expect(widths.slice(4)).toEqual([344, 374, 828]);
   });
 });

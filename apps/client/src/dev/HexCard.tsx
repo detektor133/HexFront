@@ -9,6 +9,7 @@ import {
 } from '@hexfront/sim';
 
 import styles from './HexCard.module.css';
+import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
@@ -186,8 +187,10 @@ export function HexCard(props: {
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content || !props.onHeight) return;
+    const card = cardRef.current;
+    if (!card) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, content.scrollHeight));
+      props.onHeight?.(measureCardHeight(card, content, entries[0]));
     const observer = new ResizeObserver(report);
     observer.observe(content);
     return () => observer.disconnect();

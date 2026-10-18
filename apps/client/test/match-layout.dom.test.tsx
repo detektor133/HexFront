@@ -251,6 +251,9 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
     if (element.id === 'leaderboard' && node.style.left === '') {
       const edge = input.viewport.width <= 600 || input.viewport.height <= 500 ? 8 : 16;
       expect(node.style.right, element.id).toBe(`${edge}px`);
+    } else if (element.id === 'card' && input.viewport.width > 600 && input.viewport.height > 500) {
+      expect(node.style.width, element.id).toBe('');
+      expect(node.style.height, element.id).toBe(`${element.height}px`);
     } else {
       expect(node.style.left, element.id).toBe(`${element.x}px`);
     }
@@ -344,7 +347,9 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
       x: element.id === 'leaderboard' && node.style.left === '' ? '' : `${element.x}px`,
       y: `${element.y}px`,
       width:
-        element.id === 'popup-menu' || (element.id === 'leaderboard' && node.style.width === '')
+        element.id === 'popup-menu' ||
+        (element.id === 'leaderboard' && node.style.width === '') ||
+        (element.id === 'card' && input.viewport.width > 600 && input.viewport.height > 500)
           ? ''
           : `${element.width}px`,
       height:

@@ -11,6 +11,7 @@ import {
 
 import styles from './HexCard.module.css';
 import { armyName } from './army-name.ts';
+import { measureCardHeight } from './card-measurement.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
@@ -143,8 +144,10 @@ export function UnitCard(props: {
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content || !props.onHeight) return;
+    const card = cardRef.current;
+    if (!card) return;
     const report = (entries: readonly ResizeObserverEntry[]): void =>
-      props.onHeight?.(Math.max(entries[0]?.contentRect.height ?? 0, content.scrollHeight));
+      props.onHeight?.(measureCardHeight(card, content, entries[0]));
     const observer = new ResizeObserver(report);
     observer.observe(content);
     return () => observer.disconnect();

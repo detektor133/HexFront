@@ -15,10 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17s принято повторным ревью: desktop-layout получает ширину и высоту лидерборда только из измеренного DOM-прямоугольника.
-- `match-layout.dom.test.tsx` проходит путь `MatchPage → MatchSurface → Leaderboard` и отклоняет одинаковую координату при размерах `150×138` и `174×142`.
-- `leaderboard.dom.test.tsx` проверяет последовательность двух различных callback-размеров `150×138` и `174×142`; константный результат не проходит.
-- Целевые тесты: 2 файла, 23 теста зелёные.
+- 07/T17v ждёт ревью: HexCard/UnitCard получили естественную ПК-ширину `max-content`, мобильная ширина осталась от раскладки.
+- Измерение высоты идёт по внутреннему узлу с добавлением padding и рамки; наблюдение внешней карточки не создаёт петлю `ResizeObserver`.
+- Тесты проверяют переполнение карточки, четыре ПК-окна, три мобильных viewport, сохранение координат ArmyBar и содержимого карточек.
 - `pnpm verify --changed` зелёный.
-- Следующая задача: `$task 07/T17v`.
-- Читать: блоки T17v и T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`.
+- Следующая задача: `$task 07/T17w`.
+- Читать: блок T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/card-measurement.ts`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/match/MatchSurface.tsx`.

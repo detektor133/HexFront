@@ -134,6 +134,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         style.right = `${window.innerWidth <= 600 || window.innerHeight <= 500 ? 8 : 16}px`;
       }
     }
+    if (id === 'card' && window.innerWidth > 600 && window.innerHeight > 500) {
+      delete style.width;
+    }
     return style;
   };
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.

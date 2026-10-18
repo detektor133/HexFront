@@ -248,7 +248,14 @@ function expectElementStyle(
   if (!node) throw new Error(`DOM-элемент ${elementId} не найден`);
   expect(
     ['left', 'top', 'width', 'height'].map((property) => node.style.getPropertyValue(property)),
-  ).toEqual([element.x, element.y, element.width, element.height].map((value) => `${value}px`));
+  ).toEqual([
+    `${element.x}px`,
+    `${element.y}px`,
+    elementId === 'card' && input.viewport.width > 600 && input.viewport.height > 500
+      ? ''
+      : `${element.width}px`,
+    `${element.height}px`,
+  ]);
 }
 
 afterEach(() => {
