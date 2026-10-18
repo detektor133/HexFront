@@ -48,7 +48,7 @@ import { commandTask, reviewTasks, taskBlock } from './stage-file.ts';
 
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
 type Work =
-  | { readonly kind: 'review'; readonly task: string }
+  | { readonly kind: 'review'; readonly task: string; readonly message?: string }
   | { readonly kind: 'again'; readonly prompt?: string }
   | { readonly kind: 'step'; readonly step: Step };
 export interface TaskRun {
@@ -291,7 +291,7 @@ async function runWork(
   }
   const violation = await specViolation(context, review);
   if (violation !== undefined) return step(await park(context, `spec:${review}`, violation));
-  return { kind: 'review', task: review };
+  return { kind: 'review', task: review, message: work.message };
 }
 
 /**
@@ -346,7 +346,9 @@ export async function processTask(
     prompt = options.workPrompt;
     // Файл пункта возврата не тронут — ревью вернёт то же самое: сначала один явный повтор работы.
     const skipped =
-      needsWork && work.kind === 'review' ? await skippedReturnItems(context, current) : [];
+      needsWork && work.kind === 'review'
+        ? await skippedReturnItems(context, current, work.message ?? '')
+        : [];
     if (skipped.length > 0) {
       if (skipRetried)
         return {

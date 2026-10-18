@@ -9,6 +9,10 @@ import { taskBlock } from './stage-file.ts';
 
 const RETURN_HEAD_RE = /^\s*Возврат ревью/u;
 const ITEM_RE = /^\s{2,}[-*]\s+(.*\S)/u;
+const REPORT_HEAD_RE = /^\s*#{0,3}\s*ИСПРАВЛЕНО ПО РЕВЬЮ\s*$/iu;
+const REPORT_ITEM_RE = /^\s*[-*]\s+(.*\S)/u;
+const PATH_RE = /[\w@.-]+(?:\/[\w@.-]+)*\.[A-Za-z]\w*/gu;
+const EVIDENCE_RE = /(?:тест|провер|verify|команд|коммит)/iu;
 
 /** Пункты последнего блока «Возврат ревью:» задачи. */
 export function lastReturnItems(block: string): string[] {
@@ -34,6 +38,50 @@ export const touchedPaths = (nameStatus: string): string[] =>
     .flatMap((line) => line.split('\t').slice(1))
     .filter((path) => path !== '');
 
+/** Пункты обязательного отчёта исполнителя после заголовка «ИСПРАВЛЕНО ПО РЕВЬЮ». */
+export function reviewResolutionItems(message: string): string[] {
+  const items: string[] = [];
+  let inReport = false;
+  for (const line of message.split(/\r?\n/u)) {
+    if (REPORT_HEAD_RE.test(line)) inReport = true;
+    else if (inReport) {
+      const item = REPORT_ITEM_RE.exec(line)?.[1];
+      if (item !== undefined) items.push(item);
+      else if (/^\s*#/u.test(line)) inReport = false;
+    }
+  }
+  return items;
+}
+
+const pathsIn = (text: string): string[] => [...text.matchAll(PATH_RE)].map(([path = '']) => path);
+
+/**
+ * Исполнитель явно перенёс исправление в другой файл: в одном пункте отчёта названы исходный
+ * файл замечания, реально изменённый альтернативный файл и тест/проверка. Смысл решения после
+ * этого судит reviewer; сторож проверяет только отсутствие молчаливого пропуска.
+ */
+export function resolvedElsewhere(
+  item: string,
+  message: string,
+  touched: readonly string[],
+): boolean {
+  const expected = remarkRefs(item).map((ref) => ref.path);
+  if (expected.length === 0) return false;
+  return reviewResolutionItems(message).some((resolution) => {
+    if (!EVIDENCE_RE.test(resolution)) return false;
+    const mentioned = pathsIn(resolution);
+    const namesOriginal = expected.some((path) =>
+      mentioned.some((candidate) => samePath(path, candidate)),
+    );
+    const namesTouchedAlternative = mentioned.some(
+      (candidate) =>
+        touched.some((path) => samePath(path, candidate)) &&
+        !expected.some((path) => samePath(path, candidate)),
+    );
+    return namesOriginal && namesTouchedAlternative;
+  });
+}
+
 /**
  * Пункты, у которых названы файлы `файл:строки`, и ни один из них не менялся. Пункт без ссылок и
  * ссылки на закрытые приёмочные тесты задачи (их исполнитель пока не может тронуть) цикл не судит.
@@ -44,12 +92,17 @@ export function untouchedItems(
   items: readonly string[],
   touched: readonly string[],
   locked: readonly string[] = [],
+  resolution = '',
 ): string[] {
   return items.filter((item) => {
     const paths = remarkRefs(item)
       .map((ref) => ref.path)
       .filter((path) => !locked.some((l) => samePath(l, path)));
-    return paths.length > 0 && !paths.some((p) => touched.some((t) => samePath(t, p)));
+    return (
+      paths.length > 0 &&
+      !paths.some((p) => touched.some((t) => samePath(t, p))) &&
+      !resolvedElsewhere(item, resolution, touched)
+    );
   });
 }
 
@@ -81,7 +134,11 @@ export const withReviewFeedback = (prompt: string, task: string, feedback?: stri
  * Пункты последнего возврата задачи, файлы которых не тронуты с коммита этого возврата.
  * Коммит возврата или diff не прочитать — пусто: без данных цикл не задерживает ревью.
  */
-export async function skippedReturnItems(context: LoopContext, task: string): Promise<string[]> {
+export async function skippedReturnItems(
+  context: LoopContext,
+  task: string,
+  resolution = '',
+): Promise<string[]> {
   const base = context.state.reviewReturns[task];
   if (base === undefined) return [];
   const { git } = context;
@@ -92,7 +149,7 @@ export async function skippedReturnItems(context: LoopContext, task: string): Pr
   if (items.length === 0) return [];
   const diff = await git.attempt(['diff', '-M', '--name-status', '--no-color', base, 'HEAD']);
   if (diff.code !== 0 || diff.stdout.trim() === '') return [];
-  return untouchedItems(items, touchedPaths(diff.stdout), specFiles(context, task));
+  return untouchedItems(items, touchedPaths(diff.stdout), specFiles(context, task), resolution);
 }
 
 /** Запрос работы: пункты возврата, файлы которых исполнитель не тронул. */
@@ -101,5 +158,6 @@ export const skippedPrompt = (task: string, items: readonly string[]): string =>
     `$task ${task} пункты возврата ревью не выполнены`,
     'После возврата ни один файл из этих пунктов не изменён. Выполни каждый пункт в коде продукта, а не соседние:',
     ...items.map((item) => `- ${item}`),
-    'Если пункт уже выполнен в другом файле или неверен — назови файл и причину в ответе.',
+    'Если пункт выполнен в другом файле, в одном пункте раздела «ИСПРАВЛЕНО ПО РЕВЬЮ» назови исходный файл, реально изменённый файл и тест/команду, которая это подтверждает.',
+    'Если пункт неверен — назови точную причину и доказательство в ответе.',
   ].join('\n');

@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
+- Исправлен ложный стоп agent-loop: возврат может быть выполнен в другом файле, если отчёт связывает исходный файл reviewer, реально изменённый файл и подтверждающий тест/команду.
 - Исправлен возврат 07/T17s: до измерения `.panel` лидерборд закрепляется через `right`, после измерения layout использует фактические `width` и `height`.
 - Реальный DOM-путь `MatchPage → MatchSurface → Leaderboard` проверяет переход к координате `left: 1274px` при измерении панели `150×138 px`; inline-размеры остаются пустыми.
 - Изменены четыре связанные проверки разрешённых замен; `pnpm verify --changed`: 16 файлов и 86 тестов зелёные.
-- Следующая задача: `$task 07/T17v`.
-- Читать: блоки T17s/T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.dom.test.tsx`.
+- Следующий шаг: `$review 07/T17s`; только после `[x]` — `$task 07/T17v`.
+- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.dom.test.tsx`.

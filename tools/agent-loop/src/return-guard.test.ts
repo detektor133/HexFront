@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { lastReturnItems, skippedPrompt, touchedPaths, untouchedItems } from './return-guard.ts';
+import {
+  lastReturnItems,
+  resolvedElsewhere,
+  reviewResolutionItems,
+  skippedPrompt,
+  touchedPaths,
+  untouchedItems,
+} from './return-guard.ts';
 import { fixtureStage, runWorld, setMark, type Session } from './test-world.ts';
 
 const MENU = 'apps/client/src/MainMenu.tsx';
@@ -65,6 +72,29 @@ describe('пропуск пунктов возврата', () => {
     expect(untouchedItems([item], ['apps/client/test/view-delta-memory.test.ts'], [])).toEqual([]);
   });
 
+  it('пропускает альтернативное исправление только с исходным и изменённым файлами и тестом', () => {
+    const layout = 'apps/client/src/match/layout.ts:5-11 — фиксированные размеры';
+    const touched = [
+      'apps/client/src/match/MatchSurface.tsx',
+      'apps/client/test/match-layout.dom.test.tsx',
+    ];
+    const report = [
+      'Готово.',
+      '### ИСПРАВЛЕНО ПО РЕВЬЮ',
+      '- `layout.ts` больше не навязывает размер; `MatchSurface.tsx` использует измерение, DOM-тест проверил путь.',
+    ].join('\n');
+
+    expect(reviewResolutionItems(report)).toHaveLength(1);
+    expect(resolvedElsewhere(layout, report, touched)).toBe(true);
+    expect(untouchedItems([layout], touched, [], report)).toEqual([]);
+    expect(untouchedItems([layout], touched, [], report.replace('layout.ts', 'layout'))).toEqual([
+      layout,
+    ]);
+    expect(
+      untouchedItems([layout], touched, [], report.replace('DOM-тест проверил', 'изменение')),
+    ).toEqual([layout]);
+  });
+
   it('запрос повтора называет пункты и оставляет выход, если пункт выполнен в другом файле', () => {
     const prompt = skippedPrompt('07/T13', [item]);
     expect(prompt.split('\n')[0]).toBe('$task 07/T13 пункты возврата ревью не выполнены');
@@ -105,6 +135,29 @@ describe('сторож в цикле', () => {
       sessions: [WORK, BACK, WORK, OK],
     });
     expect(run.prompts.join('\n')).not.toContain('пункты возврата ревью не выполнены');
+    expect(run.lines).toContain(`готово: ${TASK}`);
+  });
+
+  it('исправление в другом файле с явным доказательством идёт на ревью без ложной остановки', async () => {
+    const alternative: Session = {
+      ...WORK,
+      answer: [
+        'Готово.',
+        '### ИСПРАВЛЕНО ПО РЕВЬЮ',
+        `- ${MENU} исправлен через MatchSurface.tsx; match-layout.dom.test.tsx проверил реальный путь.`,
+      ].join('\n'),
+    };
+    const run = await runWorld({
+      reviewDiff: '',
+      reviewFiles: [
+        'M\tapps/client/src/match/MatchSurface.tsx',
+        'M\tapps/client/test/match-layout.dom.test.tsx',
+        'M\tdocs/stages/stage-06-bots-balance.md',
+      ].join('\n'),
+      sessions: [WORK, BACK, alternative, OK],
+    });
+    expect(run.prompts).toHaveLength(4);
+    expect(run.prompts[3]).toMatch(new RegExp(`^\\$review ${TASK}`));
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
