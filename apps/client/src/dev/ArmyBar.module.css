@@ -26,6 +26,7 @@
 .strip {
   align-items: flex-end;
   align-self: flex-start;
+  margin-bottom: var(--space-sm);
   max-width: 100%;
   overflow-x: auto;
 }
@@ -330,11 +331,5 @@
 
   .card {
     flex-basis: 220px;
-  }
-}
-
-@media (min-width: 601px) {
-  .strip {
-    margin-bottom: var(--space-sm);
   }
 }

@@ -25,6 +25,7 @@ const loadedMap = mapResult.map;
 interface ResizeStats {
   dockObserves: number;
   dockDisconnects: number;
+  dockCallbacks: number;
   observers: Array<{
     kind: 'dock' | 'card';
     target: Element;
@@ -58,6 +59,7 @@ function installResizeObserver(stats: ResizeStats): void {
         callback: this.callback,
         observer,
       });
+      if (isDock) stats.dockCallbacks += 1;
       this.callback(
         [{ target, contentRect: { height: contentHeight } } as ResizeObserverEntry],
         observer,
@@ -81,6 +83,7 @@ function reportHeight(
   const record = [...stats.observers].reverse().find((item) => item.kind === kind);
   if (!record) throw new Error(`ResizeObserver для ${kind} не найден`);
   Object.defineProperty(record.target, 'scrollHeight', { configurable: true, value: scrollHeight });
+  if (kind === 'dock') stats.dockCallbacks += 1;
   record.callback(
     [{ target: record.target, contentRect: { height: contentHeight } } as ResizeObserverEntry],
     record.observer,
@@ -92,6 +95,7 @@ function installMatchMocks(
   matchMap: unknown = mapJson,
 ): {
   getTap: () => ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
+  emit: () => void;
 } {
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
   vi.stubGlobal(
@@ -102,16 +106,18 @@ function installMatchMocks(
     })),
   );
   let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
-  const emit = (onMessage: (message: FromWorker) => void): void => onMessage(engine.snapshot());
+  let onMessage: ((message: FromWorker) => void) | undefined;
+  const emit = (): void => onMessage?.(engine.snapshot());
 
   vi.doMock('../src/local/local-match.ts', () => ({
     startLocalMatch: (
       _map: unknown,
       _seed: number,
       _setup: unknown,
-      onMessage: (message: FromWorker) => void,
+      messageHandler: (message: FromWorker) => void,
     ): LocalMatch => {
-      emit(onMessage);
+      onMessage = messageHandler;
+      emit();
       return {
         send: vi.fn(),
         setFog: vi.fn(),
@@ -122,7 +128,7 @@ function installMatchMocks(
         setView: vi.fn(),
         select: (hex) => {
           engine.select(hex);
-          emit(onMessage);
+          emit();
         },
         ack: vi.fn(),
         dispose: vi.fn(),
@@ -162,7 +168,7 @@ function installMatchMocks(
       };
     },
   }));
-  return { getTap: () => tap };
+  return { getTap: () => tap, emit };
 }
 
 function panel(): HTMLElement {
@@ -205,14 +211,22 @@ function expectedPanelStyle(
 
 function expectDockPadding(): void {
   const style = getComputedStyle(panel());
+  const strip = panel().querySelector<HTMLElement>('[class*="strip"]');
+  if (!strip) throw new Error('Лента армий не найдена');
+  const stripStyle = getComputedStyle(strip);
   const source = readFileSync('apps/client/src/dev/ArmyBar.module.css', 'utf8');
   expect(source).toMatch(/padding: 0 var\(--space-lg\) var\(--space-sm\);/u);
   expect(source).toMatch(/padding: 0 var\(--space-sm\) var\(--space-sm\);/u);
   if (style.paddingBottom !== '0') expect(style.paddingBottom).toBe('var(--space-sm)');
   if (style.paddingLeft !== '0') expect(style.paddingLeft).toBe('var(--space-lg)');
-  expect(source).toMatch(
-    /@media \(min-width: 601px\)[\s\S]*?\.strip\s*\{[\s\S]*?margin-bottom: var\(--space-sm\);/u,
-  );
+  if (stripStyle.marginBottom !== '0') expect(stripStyle.marginBottom).toBe('var(--space-sm)');
+  expect(
+    Number.parseInt(
+      readFileSync('docs/art/tokens.json', 'utf8').match(/"sm":\s*(\d+)/u)?.[1] ?? '',
+      10,
+    ) * 2,
+  ).toBe(16);
+  expect(source).toMatch(/\.strip\s*\{[\s\S]*?margin-bottom: var\(--space-sm\);/u);
   expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"lg": 16/u);
   expect(readFileSync('docs/art/tokens.json', 'utf8')).toMatch(/"sm": 8/u);
   expect(source).not.toMatch(/position:\s*fixed/u);
@@ -254,6 +268,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       const stats: ResizeStats = {
         dockObserves: 0,
         dockDisconnects: 0,
+        dockCallbacks: 0,
         observers: [],
       };
       installResizeObserver(stats);
@@ -264,7 +279,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
         'errors' in engine ? undefined : engine.state.cities.find((city) => city.owner === 1)?.hex;
       if (firstHex === undefined || secondHex === undefined)
         throw new Error('города для выбора не найдены');
-      const { getTap } = installMatchMocks(engine);
+      const { getTap, emit } = installMatchMocks(engine);
       const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
       const { unmount } = render(<MatchPage />);
@@ -277,6 +292,8 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       expect(
         stats.observers.find((item) => item.kind === 'dock')?.target.className.toString(),
       ).toContain('content');
+      const armyBar = panel();
+      const armyBarStyle = panelStyle();
       expectDockPadding();
       for (const leaderboardRows of [2, 5]) {
         for (const cardHeight of [88, 160]) {
@@ -316,7 +333,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
         );
       };
       await select(firstHex);
-      expect(panelStyle()).toEqual(before);
+      expect(panelStyle()).toEqual(armyBarStyle);
       const renderedCard = document.querySelector<HTMLElement>('section[class*="card"]');
       if (!renderedCard) throw new Error('карточка клетки не найдена');
       expectElementStyle('card', {
@@ -339,6 +356,24 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       }
       expect(stats.observers.some((item) => item.kind === 'card')).toBe(true);
       expect(stats.dockObserves).toBe(1);
+      const firstArmy = engine.state.armies.find((army) => army.owner === 0);
+      if (!firstArmy) throw new Error('Армия владельца не найдена');
+      firstArmy.name = 'Обновлённая армия';
+      act(emit);
+      await waitFor(() =>
+        expect(screen.getAllByRole('button', { name: 'Обновлённая армия' }).length).toBeGreaterThan(
+          0,
+        ),
+      );
+      expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
+      expect(panel()).toBe(armyBar);
+      expect(panelStyle()).toEqual(armyBarStyle);
+      expect(stats.dockObserves).toBe(1);
+      firstArmy.name = '1-я армия';
+      act(emit);
+      await waitFor(() =>
+        expect(screen.getAllByRole('button', { name: '1-я армия' }).length).toBeGreaterThan(0),
+      );
       const armyButton = screen.getAllByRole('button', { name: '1-я армия' })[0];
       if (!armyButton) throw new Error('карточка первой армии не найдена');
       fireEvent.click(armyButton);
@@ -368,9 +403,11 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       act(() => reportHeight(stats, 'dock', 160, 220));
       await waitFor(() => expect(panelStyle()).toEqual(expectedPanelStyle(width, height, 220)));
       const afterSecondResize = panelStyle();
+      const callbacksBeforeRepeat = stats.dockCallbacks;
       act(() => reportHeight(stats, 'dock', 160, 220));
       await waitFor(() => expect(panelStyle()).toEqual(afterSecondResize));
       expect(afterResize).not.toEqual(afterSecondResize);
+      expect(stats.dockCallbacks).toBe(callbacksBeforeRepeat + 1);
       expect(stats.dockObserves).toBe(1);
       unmount();
       expect(stats.dockDisconnects).toBe(1);
@@ -380,7 +417,12 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
   it('сохраняет привязку при пяти строках реального лидерборда', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
-    const stats: ResizeStats = { dockObserves: 0, dockDisconnects: 0, observers: [] };
+    const stats: ResizeStats = {
+      dockObserves: 0,
+      dockDisconnects: 0,
+      dockCallbacks: 0,
+      observers: [],
+    };
     installResizeObserver(stats);
     const engine = createLocalEngine(fivePlayerMapJson, 42, 5);
     const { getTap } = installMatchMocks(engine, fivePlayerMapJson);
