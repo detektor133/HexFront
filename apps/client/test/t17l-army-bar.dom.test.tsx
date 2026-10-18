@@ -146,6 +146,24 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
     expect(document.querySelectorAll('[class*="dock"]')).toHaveLength(1);
   });
 
+  it('сохраняет реальный DOM всех интерактивных элементов в растянутой ленте', async () => {
+    installResizeObserver();
+    mockRuntime(5);
+    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+    render(<MatchPage />);
+
+    const strip = document.querySelector<HTMLElement>('[class*="strip"]');
+    const content = document.querySelector<HTMLElement>('[class*="stripContent"]');
+    expect(strip).not.toBeNull();
+    expect(content).not.toBeNull();
+    expect(content?.parentElement).toBe(strip);
+    expect(screen.getByRole('button', { name: 'Резерв' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Автопополнение' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Новая армия' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: '1-я армия' }).length).toBeGreaterThan(0);
+  });
+
   it('удерживает нижнюю панель внутри раскладки на телефоне и ПК', () => {
     for (const viewport of [
       { width: 360, height: 640 },

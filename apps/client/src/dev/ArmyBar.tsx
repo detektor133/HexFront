@@ -410,57 +410,59 @@ export function ArmyBar(props: {
           </div>
         )}
         <div className={styles.strip}>
-          {view.armies.map((a) => {
-            const units = mine.filter((u) => u.armyId === a.id);
-            return (
-              <ArmyCard
-                key={a.id}
-                name={armyName(a)}
-                rawName={a.name}
-                color={armyColor(a.number)}
-                stats={armyStats(units)}
-                stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
-                selected={a.id === selected}
-                partial={props.partial.includes(a.id)}
-                run={runOf(a)}
-                runHint={t('plan.needFront')}
-                onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
-                auto={a.auto}
-                onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
-                onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
-                onClick={() => select(a.id, units)}
-              />
-            );
-          })}
-          <div className={styles.reserve}>
-            <IconButton
-              type="button"
-              className={styles.iconButton}
-              label={t('army.reserve')}
-              onClick={() =>
-                props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
-              }
-            >
-              <Icon name="reserve" />
-              <span className={styles.num}>{reserve.length}</span>
-            </IconButton>
-            <IconButton
-              type="button"
-              className={styles.iconButton}
-              label={t('army.auto')}
-              aria-pressed={view.me.autoReinforce}
-              onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
-            >
-              <Icon name="auto" />
-            </IconButton>
-            <IconButton
-              type="button"
-              className={styles.iconButton}
-              label={t('army.new')}
-              onClick={() => send({ t: 'createArmy', name: '' })}
-            >
-              <Icon name="add" />
-            </IconButton>
+          <div className={styles.stripContent}>
+            {view.armies.map((a) => {
+              const units = mine.filter((u) => u.armyId === a.id);
+              return (
+                <ArmyCard
+                  key={a.id}
+                  name={armyName(a)}
+                  rawName={a.name}
+                  color={armyColor(a.number)}
+                  stats={armyStats(units)}
+                  stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
+                  selected={a.id === selected}
+                  partial={props.partial.includes(a.id)}
+                  run={runOf(a)}
+                  runHint={t('plan.needFront')}
+                  onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
+                  auto={a.auto}
+                  onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
+                  onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
+                  onClick={() => select(a.id, units)}
+                />
+              );
+            })}
+            <div className={styles.reserve}>
+              <IconButton
+                type="button"
+                className={styles.iconButton}
+                label={t('army.reserve')}
+                onClick={() =>
+                  props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
+                }
+              >
+                <Icon name="reserve" />
+                <span className={styles.num}>{reserve.length}</span>
+              </IconButton>
+              <IconButton
+                type="button"
+                className={styles.iconButton}
+                label={t('army.auto')}
+                aria-pressed={view.me.autoReinforce}
+                onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
+              >
+                <Icon name="auto" />
+              </IconButton>
+              <IconButton
+                type="button"
+                className={styles.iconButton}
+                label={t('army.new')}
+                onClick={() => send({ t: 'createArmy', name: '' })}
+              >
+                <Icon name="add" />
+              </IconButton>
+            </div>
           </div>
         </div>
       </div>

@@ -25,10 +25,21 @@
 
 .strip {
   align-items: flex-end;
-  align-self: flex-start;
+  align-self: stretch;
+  box-sizing: border-box;
   margin-bottom: var(--space-sm);
   max-width: 100%;
   overflow-x: auto;
+  pointer-events: none;
+}
+
+.stripContent {
+  display: flex;
+  width: max-content;
+  min-width: max-content;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  pointer-events: auto;
 }
 
 /* Приказы — прямо над карточками армий, слева. */
@@ -88,6 +99,7 @@
 }
 
 .card {
+  box-sizing: border-box;
   display: flex;
   flex: 0 0 238px;
   overflow: hidden;
@@ -327,9 +339,5 @@
 @media (max-width: 600px) {
   .dock {
     padding: 0 var(--space-sm) var(--space-sm);
-  }
-
-  .card {
-    flex-basis: 220px;
   }
 }
