@@ -14,6 +14,13 @@
 
 Этап: 07/T17s
 
+## Исправлено по ревью 2026-10-18
+
+- `apps/client/src/match/MatchSurface.tsx` больше не передаёт измеренную ширину и высоту лидерборда как inline-размеры; `Leaderboard.module.css` сохраняет естественные `max-content` и высоту содержимого.
+- `apps/client/test/match-layout.dom.test.tsx` монтирует ПК-путь `MatchPage → MatchSurface → Leaderboard` и проверяет отсутствие навязанных размеров; `apps/client/test/t17i-leaderboard-layout.test.ts` больше не передаёт фиктивный `leaderboardSize`.
+- Изменённые проверки оформлены строками `Заменён тест: ...` в сообщении исправляющего коммита с дословной цитатой критерия T17s.
+- Тесты: четыре связанных файла, 28/28; `pnpm verify --changed` — зелёный.
+
 ## Возврат ревью 2026-10-18 (повторный, после `f0a01493`)
 
 - `apps/client/src/match/layout.ts:5-9,134-146` вычисляет ширину ника через длину строки и фиксированный множитель 8 px (`longestNickname * LEADERBOARD_TEXT_CHARACTER_WIDTH`), что нарушает прямой запрет T17s на формулу `name.length * 8`.

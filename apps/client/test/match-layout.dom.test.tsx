@@ -580,7 +580,7 @@ describe('приёмка T7: раскладка матча без перекры
 
   it('показывает лидерборд в раскладке без отдельного открытия на ПК', async () => {
     installLayoutMeasurements();
-    prepareDomScene();
+    prepareDomScene('', VIEWPORTS[2]);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     render(createElement(MatchPage));
@@ -588,8 +588,14 @@ describe('приёмка T7: раскладка матча без перекры
       screen.queryByRole('region', { name: /Таблица лидеров|Leaderboard/u }) ??
         screen.queryByRole('button', { name: /Таблица лидеров|Leaderboard/u }),
     ).toBeTruthy();
+    const leaderboard = screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u });
+    expect(leaderboard.style.width).toBe('');
+    expect(leaderboard.style.height).toBe('');
+    expect(
+      readFileSync(join(process.cwd(), 'apps/client/src/dev/Leaderboard.module.css'), 'utf8'),
+    ).toMatch(/\.panel\s*\{[\s\S]*width:\s*max-content/u);
     expectInlineRectangles({
-      viewport: VIEWPORTS[0],
+      viewport: VIEWPORTS[2],
       ...MEASURED_LAYOUT,
       eventRows: 0,
       tutorialVisible: false,
@@ -600,7 +606,7 @@ describe('приёмка T7: раскладка матча без перекры
       paused: false,
     });
     expectRenderedRectangles({
-      viewport: VIEWPORTS[0],
+      viewport: VIEWPORTS[2],
       ...MEASURED_LAYOUT,
       eventRows: 0,
       tutorialVisible: false,

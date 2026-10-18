@@ -126,7 +126,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       delete style.width;
       delete style.height;
     }
-    if (id === 'leaderboard' && leaderboardSize === undefined) {
+    if (id === 'leaderboard') {
       delete style.width;
       delete style.height;
     }

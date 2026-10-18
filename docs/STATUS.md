@@ -15,12 +15,8 @@
 
 ## Следующая сессия
 
-- Агентный цикл теперь передаёт исполнителю последний `ВОЗВРАТ` reviewer дословно, сохраняет его между перезапусками и требует отчёт по каждому пункту.
-- `СПЕК:` открывает названный тест даже при пустой старой памяти `$spec`; неизменённый адресный тест больше не проходит обратно на review.
-- 07/T17s возвращена: приёмочный `t17i` передаёт фиктивный `leaderboardSize` и не проверяет реальный путь `MatchSurface → layout → Leaderboard`.
-- Первый кадр сохраняет естественный `width: max-content`, после измерения layout получает тот же внешний прямоугольник и правую привязку.
-- Исправление должно добавить DOM-проверку измерения панели и сохранить мобильные размеры.
-- Разрешённые замены тестов оформлены дословными строками `Заменён тест: ...` в коммите.
-- `pnpm verify --changed` зелёная.
-- Следующая сессия: `$task 07/T17s продолжить`.
-- Читать: блок T17s в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/layout.ts`, `apps/client/src/dev/Leaderboard.tsx`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- Исправлен возврат 07/T17s: ПК-лидерборд не получает inline `width`/`height`, поэтому сохраняет естественные размеры `.panel`; реальный DOM-путь проверен на ПК-viewport.
+- `t17i` больше не передаёт фиктивный `leaderboardSize`; мобильные размеры сохранены.
+- Четыре связанных тестовых файла прошли, `pnpm verify --changed` зелёный.
+- Следующая задача: `$task 07/T17v`.
+- Читать: блоки T17s/T17v в `docs/stages/stage-07-playable-build.md`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/match/layout.ts`, `apps/client/test/match-layout.dom.test.tsx`.

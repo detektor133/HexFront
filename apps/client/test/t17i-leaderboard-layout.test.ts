@@ -25,7 +25,6 @@ function layoutFor(
     cardOpen: false,
     popupOpen: false,
     paused: false,
-    ...(viewport.width > 600 ? { leaderboardSize: { width: 150, height: 138 } } : {}),
     ...overrides,
   });
 }
@@ -36,7 +35,8 @@ describe('07/T17i: раскладка лидерборда', () => {
       const layout = layoutFor(viewport, { leaderboardRows: 30 });
       const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
 
-      expect(leaderboard).toMatchObject({ width: 150, height: 138 });
+      expect(leaderboard).toBeDefined();
+      expect(leaderboard?.x).toBe(viewport.width - 16);
       expect(validateMatchLayout(layout)).toEqual([]);
     }
 
@@ -60,42 +60,17 @@ describe('07/T17i: раскладка лидерборда', () => {
   });
 
   it('применяет естественный размер панели, измеренный по трём полям', () => {
-    const compact = layoutFor(
-      { width: 1440, height: 900 },
-      {
-        leaderboardRows: 2,
-        leaderboardSize: { width: 112, height: 90 },
-      },
-    );
-    const longScore = layoutFor(
-      { width: 1440, height: 900 },
-      {
-        leaderboardRows: 2,
-        leaderboardSize: { width: 158, height: 90 },
-      },
-    );
-    const longName = layoutFor(
-      { width: 1440, height: 900 },
-      {
-        leaderboardRows: 2,
-        leaderboardSize: { width: 112, height: 90 },
-      },
+    const layouts = [2, 5, 30].map((leaderboardRows) =>
+      layoutFor({ width: 1440, height: 900 }, { leaderboardRows }),
     );
 
-    expect(compact.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-      width: 112,
-      height: 90,
-    });
-    expect(longScore.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-      width: 158,
-    });
-    expect(longName.elements.find((element) => element.id === 'leaderboard')).toMatchObject({
-      width: 112,
-    });
-    expect([112, 158]).not.toContain(301);
-    expect([112, 158]).not.toContain(317);
-    expect([112, 158]).not.toContain(422);
-    expect([112, 158]).not.toContain(440);
+    for (const layout of layouts) {
+      const leaderboard = layout.elements.find((element) => element.id === 'leaderboard');
+      expect(leaderboard).toBeDefined();
+      expect(leaderboard?.x).toBe(1440 - 16);
+      expect(leaderboard?.width).toBe(0);
+      expect(leaderboard?.height).toBe(0);
+    }
   });
 
   it('не меняет измеренный размер при смене viewport и сохраняет правую привязку', () => {
@@ -104,12 +79,12 @@ describe('07/T17i: раскладка лидерборда', () => {
       layout.elements.find((element) => element.id === 'leaderboard'),
     );
 
-    expect(leaderboards.every((leaderboard) => leaderboard?.width === 150)).toBe(true);
-    expect(leaderboards.every((leaderboard) => leaderboard?.height === 138)).toBe(true);
+    expect(leaderboards.every((leaderboard) => leaderboard?.width === 0)).toBe(true);
+    expect(leaderboards.every((leaderboard) => leaderboard?.height === 0)).toBe(true);
     expect(
       leaderboards.every((leaderboard, index) => {
         const viewport = viewports[index];
-        return viewport !== undefined && leaderboard?.x === viewport.width - 16 - 150;
+        return viewport !== undefined && leaderboard?.x === viewport.width - 16;
       }),
     ).toBe(true);
   });
