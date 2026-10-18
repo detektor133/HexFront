@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17w: повторный review вернул задачу — нужно проверить клик по пустой части `.strip` и восстановить/оформить замену независимой проверки приказов.
-- ArmyBar обрабатывает wheel/трекпад через `scrollLeft`; DOM-тест подтверждает изменение прокрутки и достижение конца переполненной ленты.
-- Клик проверен через реальный DOM-узел карты; layout-тест перенесён в `army-bar-layout.dom.test.tsx` проекта `client-dom`.
-- `pnpm verify --changed` зелёный; следующая задача после review — 07/T17t.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `apps/client/test/t17l-army-bar.dom.test.tsx`, `apps/client/test/army-bar-layout.dom.test.tsx`.
+- 07/T17t выполнена и ждёт review: HUD ПК сохраняет шесть метрик и приросты, налог показывает полный процент в одной кнопке, popup перепривязывается к фактической геометрии кнопки.
+- Изменены `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test/t17k-hud.dom.test.tsx`, `apps/client/test/t17t-hud-tax.dom.test.tsx`.
+- Приёмка покрыта DOM-тестом через `MatchPage → MatchSurface → Hud` для 1366×768, 1440×900, 1920×1080 и 2560×1440; проверены SVG, клики, фокус, зона 44×44 и ResizeObserver.
+- `pnpm verify --changed` зелёный: 99 тестов.
+- Следующая задача: 07/T17u.
+- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test/t17t-hud-tax.dom.test.tsx`.

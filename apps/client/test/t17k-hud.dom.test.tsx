@@ -197,14 +197,12 @@ describe('07/T17k: компактный HUD', () => {
     expect(hudCss).toMatch(
       /\.hud > \.settingsButton \{[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?\}/,
     );
-    expect(hudCss).toMatch(
-      /\.hud > \.taxWrap \{[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?\}/,
-    );
+    expect(hudCss).toMatch(/\.hud > \.slot,\s*\.hud > \.taxWrap \{[\s\S]*?flex: 1 1 0;/);
     expect(hudCss).toMatch(
       /\.settingsButton \{[\s\S]*?width: var\(--touch-target-min\);[\s\S]*?height: 44px;[\s\S]*?\}/,
     );
     expect(hudCss).toMatch(
-      /\.taxButton \{[\s\S]*?box-sizing: border-box;[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?width: var\(--touch-target-min\);[\s\S]*?height: var\(--touch-target-min\);[\s\S]*?\}/,
+      /\.taxButton \{[\s\S]*?box-sizing: border-box;[\s\S]*?flex: 1 1 auto;[\s\S]*?width: auto;[\s\S]*?height: auto;[\s\S]*?min-height: var\(--touch-target-min\);[\s\S]*?min-width: var\(--touch-target-min\);[\s\S]*?\}/,
     );
     expect(hudCss).toMatch(
       /@media \(max-width: 360px\) \{\s*\.hud \{\s*padding: 0 var\(--space-sm\);\s*\}/,

@@ -201,8 +201,14 @@ export function Hud(props: {
   useLayoutEffect(() => {
     const taxButton = taxButtonRef.current;
     if (!taxButton || !props.onTaxAnchor) return;
-    const rect = taxButton.getBoundingClientRect();
-    if (rect.width > 0) props.onTaxAnchor?.({ x: rect.left, y: rect.bottom });
+    const report = (): void => {
+      const rect = taxButton.getBoundingClientRect();
+      if (rect.width > 0) props.onTaxAnchor?.({ x: rect.left, y: rect.bottom });
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(taxButton);
+    return () => observer.disconnect();
   }, [props.onTaxAnchor]);
   useLayoutEffect(() => {
     const popup = taxPopupRef.current;

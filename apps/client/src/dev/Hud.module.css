@@ -24,10 +24,6 @@
   flex: 0 0 var(--touch-target-min);
 }
 
-.hud > .taxWrap {
-  flex: 0 0 var(--touch-target-min);
-}
-
 /* На 360 px узкие поля экономят место под обязательные цифры и приросты (ui.md «HUD»: без горизонтального скролла). */
 @media (max-width: 360px) {
   .hud {
@@ -124,9 +120,9 @@
   /* Подпись и значение — по центру кнопки, на одной линии с остальными слотами. */
   align-items: center;
   box-sizing: border-box;
-  flex: 0 0 var(--touch-target-min);
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
+  flex: 1 1 auto;
+  width: auto;
+  height: auto;
   min-height: var(--touch-target-min);
   min-width: var(--touch-target-min);
   padding: 0 var(--space-xs);
