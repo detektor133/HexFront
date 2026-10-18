@@ -72,14 +72,20 @@ describe('лидерборд', () => {
   });
 
   it('передаёт layout фактический размер панели после DOM-измерения', () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
-      new DOMRect(1274, 56, 150, 138),
-    );
+    const getBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValueOnce(new DOMRect(1274, 56, 150, 138))
+      .mockReturnValueOnce(new DOMRect(1250, 54, 174, 142));
     const onSize = vi.fn();
 
     render(<Leaderboard view={view()} onSize={onSize} />);
+    expect(onSize).toHaveBeenLastCalledWith({ width: 150, height: 138 });
 
-    expect(onSize).toHaveBeenCalledWith({ width: 150, height: 138 });
+    cleanup();
+    render(<Leaderboard view={view()} onSize={onSize} />);
+
+    expect(getBoundingClientRect).toHaveBeenCalledTimes(2);
+    expect(onSize).toHaveBeenLastCalledWith({ width: 174, height: 142 });
   });
 
   it('критерий 07/T17s: на ПК лидерборд видим без кнопки сворачивания', () => {

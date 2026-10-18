@@ -814,22 +814,22 @@ describe('приёмка T7: раскладка матча без перекры
   it('обновляет desktop-координату лидерборда после DOM-измерения панели', async () => {
     installLayoutMeasurements();
     prepareDomScene('', VIEWPORTS[2]);
+    let panelRect = {
+      x: 1274,
+      y: 56,
+      width: 150,
+      height: 138,
+      top: 56,
+      right: 1424,
+      bottom: 194,
+      left: 1274,
+    };
     const originalRect = HTMLElement.prototype.getBoundingClientRect;
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: HTMLElement,
     ) {
       if (this.className.toString().includes('panel')) {
-        return {
-          x: 1274,
-          y: 56,
-          width: 150,
-          height: 138,
-          top: 56,
-          right: 1424,
-          bottom: 194,
-          left: 1274,
-          toJSON: () => ({}),
-        };
+        return { ...panelRect, toJSON: () => ({}) };
       }
       return originalRect.call(this);
     });
@@ -844,5 +844,25 @@ describe('приёмка T7: раскладка матча без перекры
     expect(leaderboard.style.left).toBe('1274px');
     expect(leaderboard.style.width).toBe('');
     expect(leaderboard.style.height).toBe('');
+
+    cleanup();
+    panelRect = {
+      x: 1250,
+      y: 54,
+      width: 174,
+      height: 142,
+      top: 54,
+      right: 1424,
+      bottom: 196,
+      left: 1250,
+    };
+    render(createElement(MatchPage));
+    const resizedLeaderboard = await screen.findByRole('region', {
+      name: /Таблица лидеров|Leaderboard/u,
+    });
+
+    expect(resizedLeaderboard.style.left).toBe('1250px');
+    expect(resizedLeaderboard.style.width).toBe('');
+    expect(resizedLeaderboard.style.height).toBe('');
   });
 });
