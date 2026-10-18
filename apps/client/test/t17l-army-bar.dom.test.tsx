@@ -196,8 +196,13 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
     expect(strip).not.toBeNull();
     expect(content).not.toBeNull();
     expect(content?.children).toHaveLength(armyCount + 1);
-    expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*overflow-x:\s*auto/s);
-    expect(armyBarCss).toMatch(/\.strip\s*\{[^}]*pointer-events:\s*none/s);
+    const stripCss =
+      [...armyBarCss.matchAll(/\.strip\s*\{([^}]*)\}/g)]
+        .map((match) => match[1] ?? '')
+        .find((block) => block.includes('align-self')) ?? '';
+    expect(stripCss).toMatch(/overflow-x:\s*auto/);
+    expect(stripCss).toMatch(/pointer-events:\s*none/);
+    expect(stripCss).not.toMatch(/overflow-y:\s*(auto|scroll)/);
     for (const card of cards) {
       expect(card.className.toString()).toContain('card');
     }
