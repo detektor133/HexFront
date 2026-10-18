@@ -188,7 +188,7 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
     const strip = document.querySelector<HTMLElement>('[class*="strip"]');
     const content = document.querySelector<HTMLElement>('[class*="stripContent"]');
     if (!content) throw new Error('Содержимое ленты не найдено');
-    const cards = [...content.children].filter((child) =>
+    const cards = Array.from(content.children).filter((child) =>
       child.className.toString().includes('card'),
     );
     expect(cards).toHaveLength(armyCount);
@@ -229,7 +229,7 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
     const wheel = new WheelEvent('wheel', { bubbles: true, deltaX: 238, deltaY: 0 });
     strip.dispatchEvent(wheel);
     expect(wheel.defaultPrevented).toBe(false);
-    const cards = [...content.children].filter((child) =>
+    const cards = Array.from(content.children).filter((child) =>
       child.className.toString().includes('card'),
     );
     expect(cards[9]).toBeTruthy();

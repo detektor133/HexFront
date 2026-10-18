@@ -75,7 +75,42 @@ describe('область событий панели армий', () => {
     expect(onTool).toHaveBeenCalledWith({ tool: 'front', armyId: expect.any(Number) });
   });
 
-  it('сохраняет CSS-инварианты растянутой полосы и прозрачной пустой области', () => {
+  it('подтверждает DOM ArmyBar и CSS-инварианты растянутой полосы', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const view = engine.snapshot().view;
+    const onPick = vi.fn();
+    const onSelect = vi.fn();
+    const onTool = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+      },
+    );
+    render(
+      createElement(ArmyBar, {
+        view,
+        selected: view.armies[0]?.id ?? null,
+        partial: [],
+        onSelect,
+        send: vi.fn(),
+        onPick,
+        tool: null,
+        onTool,
+      }),
+    );
+
+    const domStrip = document.querySelector<HTMLElement>('[class*="strip"]');
+    const domCard = document.querySelector<HTMLElement>('[class*="card"]');
+    if (!domStrip || !domCard) throw new Error('DOM ArmyBar не смонтирован');
+    expect(domStrip.contains(domCard)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Reserve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Front' }));
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ hex: null }));
+    expect(onTool).toHaveBeenCalledWith({ tool: 'front', armyId: expect.any(Number) });
+
     const css = readFileSync(CSS, 'utf8');
     const strip =
       [...css.matchAll(/\.strip\s*\{([^}]*)\}/g)]

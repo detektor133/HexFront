@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17w: усилены DOM-приёмочные тесты ArmyBar; проверены сценарии 1/3/10 армий, переполнение, wheel, последняя карточка, карта, приказы и нижние кнопки.
-- `pnpm verify --changed` зелёный.
-- Следующая задача: 07/T17t.
-- Читать: блок T17t в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `docs/art/ui.md`.
+- 07/T17w: исправлен красный CI — `Array.from(content.children)` устраняет TS2488; тест ArmyBar проверяет DOM-сценарии 1/3/10, переполнение, wheel, последнюю карточку, карту, приказы и нижние кнопки.
+- `apps/client/test/army-bar-layout.test.ts` дополнен реальным рендером ArmyBar и кликами по DOM; CSS-инварианты сохранены.
+- `pnpm verify --changed` зелёный; нужен `$review 07/T17w` в новой сессии.
+- После review: 07/T17t.
+- Читать: `docs/stages/stage-07-playable-build.md` (T17w/T17t), `apps/client/test/t17l-army-bar.dom.test.tsx`, `apps/client/test/army-bar-layout.test.ts`.
