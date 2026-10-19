@@ -65,3 +65,11 @@
 ## Повторное ревью после 90408e84
 
 2026-10-19, HEAD `0fde665`: **ВОЗВРАТ**. Семь пунктов закрыты, проверка transitions закрыта частично: новый `panel-css.ts` пропускает допустимый порядок shorthand `ease 1s top/height/all` и правила внутри @media. Два пункта СПЕК с контрольными регрессиями сохранены в задаче; подробная сверка — `docs/reports/stage-07-t17u-review.md`. Код и тесты reviewer не менял. `pnpm verify --changed` зелёный; CI проверенного HEAD: success, https://github.com/detektor133/HexFront/actions/runs/39186504664.
+
+## Исправление возврата 2026-10-19
+
+- Усилены проверки реального пути `MatchPage → MatchSurface → layout → Leaderboard`: content-box преобразуется в полный внешний размер с padding/border, а изменение обеих осей влияет на расчёт.
+- Модель `ResizeObserver` T17q теперь различает внутреннее содержимое, padding/border и назначенную внешнюю высоту; повторные уведомления и изменение `view.armies` проверяют отсутствие роста и дрейфа ArmyBar/HexCard.
+- `panel-css.ts` рекурсивно разбирает CSSMediaRule и transition shorthand с timing-function; T17o проверяет overflow по обеим осям, сохраняя независимую прокрутку HexCard.
+- Leaderboard DOM-тест проверяет порядок score/id, общий ранг ничьих, неизменность игровых place, полный многозначный score и видимость h2/«Живы». T17j проверяет действующие inline-координаты того же узла без NaN.
+- 23 временные контрольные мутации дали RED, восстановленный набор — 34/34 теста; `pnpm verify --changed` — `verify: OK`.

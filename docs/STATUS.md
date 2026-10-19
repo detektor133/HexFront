@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u: повторное ревью HEAD `0fde665` — `ВОЗВРАТ`, задача `[ ]`; следующий шаг — `$task 07/T17u` по двум новым пунктам СПЕК.
-- Семь пунктов прошлого возврата закрыты. Новый helper `panel-css.ts` пропускает transition с timing-function перед top/height/all и вложенные правила @media; оба пробела подтверждены текстовым вызовом helper без изменения кода и тестов.
-- Полный список и проверки: `docs/reports/stage-07-t17u-review.md`; результат также сохранён под T17u в файле этапа.
-- `pnpm verify --changed` — зелёный; CI проверенного HEAD — success, run `39186504664`.
+- 07/T17u: возврат исправлен, задача `[~]`; следующий шаг — `$review 07/T17u` в новой сессии.
+- Усилены реальные DOM-проверки Leaderboard, ArmyBar/HexCard, overflow, transitions и налоговой привязки; добавлена проверка сортировки по score/id при конфликтующих игровых place.
+- Парсер CSS теперь проверяет shorthand в любом порядке и правила внутри `@media`; временные мутации всех восьми СПЕК дали RED, восстановленные проверки — GREEN.
+- `pnpm verify --changed` — `verify: OK` (build, types, lint, prettier, tests).
 - T17 остаётся `[ ]`: фактический вид проверяет владелец в раундах замечаний этапа.
-- Читать: блок T17u в `docs/stages/stage-07-playable-build.md`, `docs/reports/stage-07-t17u.md` и последний возврат в `docs/reports/stage-07-t17u-review.md`.
+- Читать: блок T17u в `docs/stages/stage-07-playable-build.md`, `docs/reports/stage-07-t17u.md`, `apps/client/test/panel-css.ts`.

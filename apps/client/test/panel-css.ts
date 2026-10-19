@@ -38,10 +38,17 @@ export function expectNoGeometryTransition(node: HTMLElement): void {
   let transition = '';
   let transitionProperty = '';
   let transitionDuration = '';
+  const collectDeclarations = (rules: CSSRuleList): CSSStyleDeclaration[] =>
+    Array.from(rules).flatMap((rule) => {
+      if (rule instanceof CSSStyleRule) {
+        return node.matches(rule.selectorText) ? [rule.style] : [];
+      }
+      return 'cssRules' in rule
+        ? collectDeclarations((rule as { readonly cssRules: CSSRuleList }).cssRules)
+        : [];
+    });
   const declarations = Array.from(document.styleSheets).flatMap((sheet) =>
-    Array.from(sheet.cssRules).flatMap((rule) =>
-      rule instanceof CSSStyleRule && node.matches(rule.selectorText) ? [rule.style] : [],
-    ),
+    collectDeclarations(sheet.cssRules),
   );
   for (const style of [...declarations, node.style]) {
     for (let index = 0; index < style.length; index += 1) {
@@ -58,10 +65,17 @@ export function expectNoGeometryTransition(node: HTMLElement): void {
   const shorthand = transition.split(/,(?![^()]*\))/u).map((part) => part.trim());
   const properties = transitionProperty
     ? transitionProperty.split(',').map((part) => part.trim())
-    : shorthand.map((part) => part.match(/^(all|none|[a-z-]+)/u)?.[1] ?? 'all');
+    : shorthand.map(
+        (part) =>
+          part.split(/\s+/u).find((token) => ['all', 'none', 'top', 'height'].includes(token)) ??
+          'all',
+      );
   const durations = transitionDuration
     ? transitionDuration.split(',').map((part) => Number.parseFloat(part))
-    : shorthand.map((part) => Number.parseFloat(part.match(/[\d.]+m?s/u)?.[0] ?? '0'));
+    : shorthand.map((part) => {
+        const duration = part.match(/(?:^|\s)([\d.]+)(ms|s)(?:\s|$)/u);
+        return duration ? Number.parseFloat(duration[1] ?? '0') : 0;
+      });
   properties.forEach((property, index) => {
     if (['all', 'top', 'height'].includes(property)) {
       expect(durations[index % durations.length], `${node.className}: ${property}`).toBe(0);

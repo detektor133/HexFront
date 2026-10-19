@@ -218,6 +218,43 @@ describe('лидерборд', () => {
     expect(within(row).getAllByRole('cell')[1]?.className).toContain('score');
   });
 
+  it('сортирует по очкам и id, считает общий ранг и не меняет игровые place', () => {
+    const source = view({
+      ranking: [
+        { id: 2, score: 40, place: 91 },
+        { id: 0, score: 70, place: 42 },
+        { id: 3, score: 40, place: 7 },
+        { id: 1, score: 70, place: 12 },
+      ],
+      players: Array.from({ length: 4 }, (_, id) => ({
+        id,
+        name: `Игрок ${id + 1}`,
+        gold: 0 as Fp,
+        taxTarget: 0 as Fp,
+        taxEffective: 0 as Fp,
+        status: 'alive' as const,
+      })),
+    });
+    const original = structuredClone(source.ranking);
+    render(<Leaderboard view={source} />);
+
+    const rows = screen.getAllByRole('row');
+    expect(rows.map((row) => within(row).getAllByRole('cell')[0]?.textContent)).toEqual([
+      'Игрок 1',
+      'Игрок 2',
+      'Игрок 3',
+      'Игрок 4',
+    ]);
+    expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
+      '1',
+      '1',
+      '3',
+      '3',
+    ]);
+    expect(source.ranking).toEqual(original);
+    expect(source.ranking.map((row) => row.place)).toEqual([91, 42, 7, 12]);
+  });
+
   it('критерий 07/T17i: при 30 игроках показывает не более пяти строк игроков', () => {
     const source = view();
     const largeView = {

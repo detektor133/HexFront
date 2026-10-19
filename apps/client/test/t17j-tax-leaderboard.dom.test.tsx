@@ -88,6 +88,9 @@ function readInlinePosition(element: HTMLElement): string[] {
   const { left, right, top, bottom, width, height } = element.style;
   expect(left || right).toMatch(/^-?\d+(?:\.\d+)?px$/u);
   expect(top || bottom).toMatch(/^-?\d+(?:\.\d+)?px$/u);
+  for (const value of [left, right, top, bottom, width, height]) {
+    if (value !== '') expect(Number.isFinite(Number.parseFloat(value))).toBe(true);
+  }
   return [left, right, top, bottom, width, height];
 }
 
@@ -118,11 +121,13 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
     const taxButton = screen.getByRole('button', { name: /Налог|Tax/u });
     const initialPosition = readInlinePosition(leaderboard);
     expect(initialPosition.slice(0, 2)).toEqual(['', '16px']);
+    expect(initialPosition[1]).toBe('16px');
 
     expect(leaderboard).toBeTruthy();
     fireEvent.click(taxButton);
-    expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
-    expect(readInlinePosition(leaderboard)).toEqual(initialPosition);
+    const openedLeaderboard = screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u });
+    expect(openedLeaderboard).toBe(leaderboard);
+    expect(readInlinePosition(openedLeaderboard)).toEqual(initialPosition);
     const slider = screen.getByRole('slider', { name: /Налог|Tax/u });
     fireEvent.change(screen.getByRole('slider', { name: /Налог|Tax/u }), {
       target: { value: '300' },

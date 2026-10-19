@@ -10,6 +10,7 @@ import leaderboardStyles from '../src/dev/Leaderboard.module.css';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
 const cssSources = [
+  readFileSync(join(process.cwd(), 'apps/client/src/dev/ArmyBar.module.css'), 'utf8'),
   readFileSync(join(process.cwd(), 'apps/client/src/dev/Leaderboard.module.css'), 'utf8'),
   readFileSync(join(process.cwd(), 'apps/client/src/dev/HexCard.module.css'), 'utf8'),
 ];
@@ -49,12 +50,12 @@ describe('07/T17o: прокрутка и движение панелей', () =>
         for (const overflow of [style.overflow, style.overflowX, style.overflowY]) {
           expect(['', 'visible']).toContain(overflow);
         }
-        expect(cssSources[0]).toMatch(/\.panel\s*\{[\s\S]*width:\s*max-content/u);
+        expect(cssSources[1]).toMatch(/\.panel\s*\{[\s\S]*width:\s*max-content/u);
       } else {
         expect(style.overflowY).toBe('auto');
         expect(style.scrollbarWidth).toBe('none');
-        expect(cssSources[1]).toMatch(/\.card\s*\{[\s\S]*width:\s*max-content/u);
-        expect(cssSources[1]).toMatch(/box-sizing:\s*border-box/u);
+        expect(cssSources[2]).toMatch(/\.card\s*\{[\s\S]*width:\s*max-content/u);
+        expect(cssSources[2]).toMatch(/box-sizing:\s*border-box/u);
         node.scrollTop = 40;
         expect(node.scrollTop).toBe(40);
       }
