@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- Сделано: T17al исправлена после возврата; DOM-тест монтирует реальный `EventFeed` с 1/2/3 событиями на шести viewport, а ландшафтная раскладка не прячет ленту за таблицей лидеров.
-- Проверено: целевой тест зелёный 22/22; RED при временном удалении `style` упал на всех шести viewport; `pnpm verify --changed` — зелёный.
-- Следующая задача: повторно проверить T17al через `$review 07/T17al`.
-- Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.dom.test.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`.
+- Сделано: T17al прошла повторное ревью; DOM-тест монтирует реальный `EventFeed` с 1/2/3 событиями на шести viewport, а ландшафтная раскладка не прячет ленту за таблицей лидеров.
+- Проверено: `pnpm verify --changed` — зелёный.
+- Следующая задача: 07/T17.
+- Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
