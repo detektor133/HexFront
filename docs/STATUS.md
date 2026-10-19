@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17zb исправлена: DOM-тест получает план склада через реальный `createLocalEngine().select()`.
+- 07/T17zb принята: DOM-тест получает план склада через реальный `createLocalEngine().select()`.
 - Проверены изолированный и подключённый склад, `path`, `cost`, preview, кнопка и команда `rebuildSupply`.
 - Контрольная мутация `rebuildSupplyPlan(...)` → `null` дала RED на assertion; рабочий код восстановлен.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
