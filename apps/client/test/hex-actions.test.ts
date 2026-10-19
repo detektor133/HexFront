@@ -13,7 +13,7 @@ const noGold = (cost: number): ConstructionCheck => ({
   timeS: 1000 as Fp,
 });
 const rule = (
-  reason: 'cityTooClose' | 'depotNeedsRoad' | 'notOwnHex' | 'popTooLow',
+  reason: 'cityTooClose' | 'depotTooClose' | 'notOwnHex' | 'popTooLow',
 ): ConstructionCheck => ({
   ok: false,
   reason,
@@ -26,7 +26,7 @@ const plain = (checks: Partial<Selection> = {}): Selection => ({
   foundCity: rule('cityTooClose'),
   improve: ok(20_000),
   fort: noGold(60_000),
-  depot: rule('depotNeedsRoad'),
+  depot: rule('depotTooClose'),
   recruit: [],
   ...checks,
 });
