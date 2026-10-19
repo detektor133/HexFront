@@ -97,7 +97,9 @@ describe('07/T17af: маркеры боя по целевому гексу', () 
         [targetCenterB.x, targetCenterB.y],
       ]),
     );
-    expect(battleOrgState(attackerA.org + attackerB.org, defenderA.org)).toBe(4);
+    expect(layer.battleMarkerState(targetA)).toBe(
+      battleOrgState(attackerA.org + attackerB.org, defenderA.org),
+    );
     layer.destroy();
   });
 });

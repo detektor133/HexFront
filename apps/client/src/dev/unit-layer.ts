@@ -54,6 +54,8 @@ export interface UnitLayer {
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
   cacheTelemetry(): UnitLayerCacheTelemetry;
+  /** Возвращает состояние маркера боя для целевого гекса или null, если маркера нет. */
+  battleMarkerState(targetHex: number): number | null;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
   /** Возвращает отряды фишки под мировой точкой, включая её текущую позицию. */
@@ -389,6 +391,9 @@ export function createUnitLayer(
 
   const layer: UnitLayer = {
     container,
+    battleMarkerState(targetHex) {
+      return battleMarkers.get(`${targetHex}`)?.object?.state ?? null;
+    },
     setView(v, p, nowMs) {
       view = v;
       picked = p;
