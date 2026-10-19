@@ -164,7 +164,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     !input.popupOpen &&
     (desktop || !input.leaderboardOpen || leaderboardFitsAboveBottomPanel);
   const showLeaderboard =
-    !input.paused && !cardOpenOnPhone(input, width, height) && (desktop || leaderboardFitsViewport);
+    !input.paused &&
+    !cardOpenOnPhone(input, width, height) &&
+    (desktop || (!landscapeWithoutSelection && leaderboardFitsViewport));
   if (showBottomPanel) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),
@@ -195,9 +197,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const eventVisible = eventHeight > 0 && eventHeight <= leftColumnBottom - eventTop;
   const tutorialY = leftColumnTop;
   const tutorialVisible = input.tutorialVisible && tutorialY + 48 <= leftColumnBottom;
-  const overlaysVisible =
-    !input.cardOpen && (desktop || !input.leaderboardOpen) && !input.popupOpen && !input.paused;
-  if (eventVisible && overlaysVisible) {
+  const eventOverlayVisible = !input.cardOpen && !input.popupOpen && !input.paused;
+  const tutorialOverlayVisible = eventOverlayVisible && (desktop || !input.leaderboardOpen);
+  if (eventVisible && eventOverlayVisible) {
     elements.push(
       layoutElement(
         'event-feed',
@@ -209,7 +211,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
       ),
     );
   }
-  if (tutorialVisible && overlaysVisible) {
+  if (tutorialVisible && tutorialOverlayVisible) {
     elements.push(layoutElement('left-column', 'left-column', edge, leftColumnTop, leftWidth, 48));
   }
   const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;

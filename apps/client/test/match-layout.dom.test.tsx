@@ -117,6 +117,7 @@ const matchRuntime = (
     readonly selectedHex?: number;
     readonly pickedUnits?: readonly number[];
     readonly army?: number | null;
+    readonly eventRows?: number;
   } = {},
 ): Record<string, unknown> => {
   const engine = createLocalEngine(tinyMapJson, 42, 2);
@@ -142,7 +143,19 @@ const matchRuntime = (
     paused: false,
     speed: 1,
     observerId: null,
-    events: [],
+    events: Array.from({ length: options.eventRows ?? 0 }, (_, index) => ({
+      id: `dom-event-${index}`,
+      event: {
+        t: 'commandRejected',
+        playerId: 0,
+        command: 'test',
+        reason: 'test',
+        auto: false,
+      },
+      hex: null,
+      important: false,
+      expiresAt: Number.MAX_SAFE_INTEGER,
+    })),
     workerTelemetry: null,
     snapshotTelemetry: () => ({ received: 0, collected: 0, live: 0 }),
     cacheTelemetry: () => ({
@@ -177,6 +190,7 @@ const matchRuntime = (
 function prepareDomScene(
   search = '',
   viewport: { readonly width: number; readonly height: number } = VIEWPORTS[0],
+  eventRows = 0,
 ): void {
   window.history.replaceState({}, '', `/match${search}`);
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
@@ -185,7 +199,11 @@ function prepareDomScene(
     useMapJson: () => ({ json: tinyMapJson, map: tinyMap }),
     useSandbox: () =>
       matchRuntime(
-        search === '?select=0' ? { selectedHex: 0 } : search === '?army=1' ? { army: 1 } : {},
+        search === '?select=0'
+          ? { selectedHex: 0, eventRows }
+          : search === '?army=1'
+            ? { army: 1, eventRows }
+            : { eventRows },
       ),
   }));
 }
@@ -543,6 +561,48 @@ describe('приёмка T7: раскладка матча без перекры
       paused: false,
     });
   });
+
+  it.each([
+    [1280, 720],
+    [1366, 768],
+    [1440, 900],
+    [1920, 1080],
+    [390, 844],
+    [844, 390],
+  ] as const)(
+    'монтирует EventFeed и выдерживает геометрию на viewport %ix%i',
+    async (width, height) => {
+      installLayoutMeasurements();
+      for (const eventRows of [1, 2, 3]) {
+        cleanup();
+        vi.resetModules();
+        prepareDomScene('', { width, height }, eventRows);
+        const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+        render(createElement(MatchPage));
+
+        const feed = screen.getByLabelText(/Лента событий|Event feed/u);
+        const dock = elementWithClass('dock');
+        const edge = width <= 600 || height <= 500 ? 8 : 16;
+        const gap = 8;
+        const feedRight =
+          Number.parseInt(feed.style.left, 10) + Number.parseInt(feed.style.width, 10);
+        const feedBottom =
+          Number.parseInt(feed.style.top, 10) + Number.parseInt(feed.style.height, 10);
+        const dockTop = Number.parseInt(dock.style.top, 10);
+
+        expect(feed.getAttribute('aria-label')).toMatch(/Лента событий|Event feed/u);
+        expect(feed.querySelectorAll('button')).toHaveLength(eventRows);
+        expect(feedRight).toBe(width - edge);
+        expect(feedBottom).toBe(dockTop - gap);
+        expect(feed.style.height).toBe(`${eventRows * 44}px`);
+        expect(Number.parseInt(feed.style.left, 10)).toBeGreaterThanOrEqual(0);
+        expect(Number.parseInt(feed.style.top, 10)).toBeGreaterThanOrEqual(0);
+        expect(feedRight).toBeLessThanOrEqual(width);
+        expect(feedBottom).toBeLessThanOrEqual(height);
+      }
+    },
+  );
 
   it('проверяет второй набор измерений через реальный MatchSurface', async () => {
     installLayoutMeasurements(SECOND_MEASURED_LAYOUT);

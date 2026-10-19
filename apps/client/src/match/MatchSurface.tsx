@@ -35,7 +35,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const [popupOpen, setPopupOpen] = useState(false);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(() => window.innerWidth > 600);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(
+    () => window.innerWidth > 600 && window.innerHeight > 500,
+  );
   const pauseController = useMemo(
     () =>
       createPauseController({

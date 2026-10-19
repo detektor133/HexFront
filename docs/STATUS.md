@@ -15,8 +15,7 @@
 
 ## Следующая сессия
 
-- Сделано: T17al возвращена на доработку; переводы, типизированный `eventLabel` и отдельная раскладка `event-feed` остаются в коде.
-- Проверено: `pnpm verify --changed` — зелёный; тест реального DOM-монтирования ленты отсутствует.
-- Следующая задача: исправить `СПЕК` возврата T17al и снова вызвать `$review 07/T17al`.
-- Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
-- Файлы: `apps/client/src/dev/EventFeed.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/i18n/dict.ts`, `apps/client/test/t17al-*`.
+- Сделано: T17al исправлена после возврата; DOM-тест монтирует реальный `EventFeed` с 1/2/3 событиями на шести viewport, а ландшафтная раскладка не прячет ленту за таблицей лидеров.
+- Проверено: целевой тест зелёный 22/22; RED при временном удалении `style` упал на всех шести viewport; `pnpm verify --changed` — зелёный.
+- Следующая задача: повторно проверить T17al через `$review 07/T17al`.
+- Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.dom.test.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`.
