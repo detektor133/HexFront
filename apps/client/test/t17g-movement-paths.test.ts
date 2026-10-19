@@ -15,7 +15,13 @@ const small = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
 ) as unknown;
 
-type Stroke = { readonly color?: string; readonly width?: number; readonly alpha?: number };
+type PathInstruction = { readonly action: string; readonly data: readonly unknown[] };
+type Stroke = {
+  readonly color?: string;
+  readonly width?: number;
+  readonly alpha?: number;
+  readonly path: readonly PathInstruction[];
+};
 
 function colorHex(value: unknown): string | undefined {
   if (typeof value === 'string') return value.toLowerCase();
@@ -61,6 +67,7 @@ function strokesOf(ground: Graphics): Stroke[] {
     const style = instruction.data.style as unknown;
     if (typeof style !== 'object' || style === null) return [];
     const value = style as { color?: unknown; width?: unknown; alpha?: unknown };
+    const path = instruction.data.path as { instructions?: readonly PathInstruction[] };
     const color = colorHex(value.color);
     const width = typeof value.width === 'number' ? value.width : undefined;
     const alpha = typeof value.alpha === 'number' ? value.alpha : undefined;
@@ -69,6 +76,7 @@ function strokesOf(ground: Graphics): Stroke[] {
         ...(color === undefined ? {} : { color }),
         ...(width === undefined ? {} : { width }),
         ...(alpha === undefined ? {} : { alpha }),
+        path: path.instructions ?? [],
       },
     ];
   });
@@ -92,8 +100,8 @@ function movementScene(): {
   const own = message.view.units.filter((unit) => unit.owner === message.view.playerId).slice(0, 2);
   const enemy = message.view.units.find((unit) => unit.owner !== message.view.playerId);
   if (own.length !== 2 || !enemy) throw new Error('нужны два своих и один чужой отряд');
-  const moving = own.map((unit) => {
-    const next = neighbors(hexFromId(unit.hex, loaded.map.width))[0];
+  const moving = own.map((unit, index) => {
+    const next = neighbors(hexFromId(unit.hex, loaded.map.width))[index];
     if (!next) throw new Error('для отряда нет соседнего гекса');
     return { ...unit, path: [hexId(next, loaded.map.width)] };
   });
@@ -142,12 +150,52 @@ describe('07/T17g: стрелки путей движения', () => {
     const scene = movementScene();
     const ground = groundOf(scene.layer);
     scene.layer.setView(scene.view, { hex: null, units: [scene.selectedId], target: null }, 0);
-    const selected = strokesOf(ground).filter(
-      (stroke) => stroke.color === lineOf(scene.view.playerId),
+    const own = strokesOf(ground).filter((stroke) => stroke.color === lineOf(scene.view.playerId));
+    const selectedUnit = scene.view.units.find((unit) => unit.id === scene.selectedId);
+    const otherUnit = scene.view.units.find(
+      (unit) => scene.ownIds.includes(unit.id) && unit.id !== scene.selectedId,
+    );
+    if (!selectedUnit || !otherUnit) throw new Error('нужны оба своих движущихся отряда');
+    const endpoint = (unit: typeof selectedUnit): { readonly x: number; readonly y: number } =>
+      hexCenter(
+        hexFromId(unit.path[unit.path.length - 1] ?? -1, scene.mapWidth),
+        tokens.map.hexRadius,
+      );
+    const selectedEnd = endpoint(selectedUnit);
+    const otherEnd = endpoint(otherUnit);
+    const isAt = (
+      data: readonly unknown[],
+      point: { readonly x: number; readonly y: number },
+    ): boolean =>
+      typeof data[0] === 'number' &&
+      typeof data[1] === 'number' &&
+      Math.hypot(data[0] - point.x, data[1] - point.y) <= 8;
+    const selectedPath = own.filter((stroke) =>
+      stroke.path.some(
+        (instruction) => instruction.action === 'lineTo' && isAt(instruction.data, selectedEnd),
+      ),
+    );
+    const selectedTip = own.filter((stroke) =>
+      stroke.path.some(
+        (instruction) => instruction.action === 'circle' && isAt(instruction.data, selectedEnd),
+      ),
+    );
+    const otherPath = own.filter((stroke) =>
+      stroke.path.some(
+        (instruction) => instruction.action === 'lineTo' && isAt(instruction.data, otherEnd),
+      ),
+    );
+    const otherTip = own.filter((stroke) =>
+      stroke.path.some(
+        (instruction) => instruction.action === 'circle' && isAt(instruction.data, otherEnd),
+      ),
     );
 
-    expect(selected).toHaveLength(2);
-    expect(selected.every((stroke) => stroke.alpha === 1)).toBe(true);
+    expect(selectedPath).toHaveLength(1);
+    expect(selectedTip).toHaveLength(1);
+    expect([...selectedPath, ...selectedTip].every((stroke) => stroke.alpha === 1)).toBe(true);
+    expect(otherPath).toHaveLength(0);
+    expect(otherTip).toHaveLength(0);
     scene.layer.destroy();
   });
 
@@ -167,11 +215,15 @@ describe('07/T17g: стрелки путей движения', () => {
     } as PlayerView;
     const ground = groundOf(scene.layer);
     scene.layer.setView(view, { hex: null, units: [], target: null }, 0);
-    const before = strokesOf(ground).filter((stroke) => stroke.color === tokens.status.danger);
+    const danger = colorHex(tokens.status.danger);
+    const before = strokesOf(ground).filter((stroke) => stroke.color === danger);
     scene.layer.setView(view, { hex: null, units: [artillery.id], target: null }, 0);
-    const after = strokesOf(ground).filter((stroke) => stroke.color === tokens.status.danger);
+    const after = strokesOf(ground).filter((stroke) => stroke.color === danger);
 
-    expect(after).toEqual(before);
+    expect(before).toHaveLength(1);
+    expect(after).toHaveLength(1);
+    expect(before[0]?.alpha).toBeDefined();
+    expect(after[0]?.alpha).toBe(before[0]?.alpha);
     scene.layer.destroy();
   });
 

@@ -120,4 +120,62 @@ describe('видимость линии фронта', () => {
       layer.destroy();
     }
   });
+
+  it('сохраняет хвосты наступления и alpha при выборе армии', () => {
+    const raw = JSON.parse(
+      readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
+    ) as unknown;
+    const loaded = loadMap(raw);
+    if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+    const engine = createLocalEngine(raw, 42, 3);
+    if ('errors' in engine) throw new Error(engine.errors.join('\n'));
+    const snapshot = engine.tick();
+    if (snapshot.t !== 'view') throw new Error('ожидался снимок вида');
+    const army = snapshot.view.armies[0];
+    if (!army) throw new Error('нужна армия для плана');
+    const edges = [edgeOf(0, 0), edgeOf(1, 0)];
+    const plan: PlanView = {
+      armyId: army.id,
+      kind: 'front',
+      edges,
+      hexes: [],
+      offensive: { edges, hexes: [], active: false, progressTick: 0, taken: [] },
+      zone: [],
+      stuck: false,
+      facing: edges,
+      lost: [],
+      startWanted: false,
+    };
+    const view = { ...snapshot.view, armies: [army], plans: [plan] };
+    const layer = createPlanLayer(loaded.map, tokens.map.hexRadius, () => ({ x: 0, y: 0 }));
+    const fills: Array<{ readonly color?: string; readonly alpha?: number }> = [];
+    const fill = vi.spyOn(GraphicsContext.prototype, 'fill').mockImplementation(function (
+      this: GraphicsContext,
+      ...args
+    ) {
+      const options = args[0];
+      if (typeof options === 'object' && options !== null) {
+        const value = options as { color?: string; alpha?: number };
+        fills.push(value);
+      }
+      return this;
+    });
+    const tails = (): Array<{ readonly color?: string; readonly alpha?: number }> =>
+      fills.filter(({ color }) => color === tokens.arrow.color);
+    try {
+      layer.setView(view, null, army.id, null, 1, 2);
+      const selected = [...tails()];
+      fills.length = 0;
+      layer.setView(view, null, null, null, 1, 2);
+      const unselected = [...tails()];
+
+      expect(selected.length).toBeGreaterThan(0);
+      expect(unselected).toHaveLength(selected.length);
+      expect(unselected.map(({ alpha }) => alpha)).toEqual(selected.map(({ alpha }) => alpha));
+      expect(selected.every(({ alpha }) => alpha !== undefined)).toBe(true);
+    } finally {
+      fill.mockRestore();
+      layer.destroy();
+    }
+  });
 });
