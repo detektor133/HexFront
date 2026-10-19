@@ -159,10 +159,9 @@ export function createUnitLayer(
   const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
 
   function drawBattleMarker(u: UnitView, v: PlayerView, pulse: number): void {
-    const key = `${u.hex}:${u.target}`;
+    const key = `${u.target}`;
     const attackers = v.units.filter(
-      (candidate) =>
-        candidate.hex === u.hex && candidate.target === u.target && candidate.order === 'attack',
+      (candidate) => candidate.target === u.target && candidate.order === 'attack',
     );
     const defenders = v.units.filter(
       (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
@@ -186,9 +185,8 @@ export function createUnitLayer(
       if (previous?.container) battles.removeChild(previous.container);
       if (current.container) battles.addChild(current.container);
     }
-    const a = center(u.hex);
-    const b = center(u.target);
-    current?.container?.position.set((a.x + b.x) / 2, (a.y + b.y) / 2);
+    const targetCenter = center(u.target);
+    current?.container?.position.set(targetCenter.x, targetCenter.y);
     current?.container?.scale.set(CHIP_WORLD * pulse);
   }
 
@@ -353,8 +351,8 @@ export function createUnitLayer(
     const pulse = battlePulseScale(nowMs, reducedMotion);
     const drawn = new Set<string>();
     for (const u of v.units) {
-      if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}:${u.target}`)) continue;
-      const key = `${u.hex}:${u.target}`;
+      if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.target}`)) continue;
+      const key = `${u.target}`;
       drawn.add(key);
       drawBattleMarker(u, v, pulse);
     }

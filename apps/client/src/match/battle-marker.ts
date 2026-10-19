@@ -77,6 +77,13 @@ function drawState(state: number | null, ownColor: string, enemyColor: string): 
       .stroke({ color: tokens.ui.surface, width: SECTOR_BORDER_PX });
   }
 
+  graphics
+    .moveTo(-MARKER_RADIUS_PX * 0.55, -MARKER_RADIUS_PX * 0.55)
+    .lineTo(MARKER_RADIUS_PX * 0.55, MARKER_RADIUS_PX * 0.55)
+    .moveTo(-MARKER_RADIUS_PX * 0.55, MARKER_RADIUS_PX * 0.55)
+    .lineTo(MARKER_RADIUS_PX * 0.55, -MARKER_RADIUS_PX * 0.55)
+    .stroke({ color: tokens.ui.ink, width: SECTOR_BORDER_PX });
+
   graphics.circle(0, 0, MARKER_RADIUS_PX).stroke({
     color: tokens.ui.ink,
     width: MARKER_BORDER_PX,
