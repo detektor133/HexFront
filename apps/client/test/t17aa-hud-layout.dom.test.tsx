@@ -124,19 +124,6 @@ describe('07/T17aa real Hud layout', () => {
       const taxButton = taxWrap?.querySelector<HTMLElement>('[class*="taxButton"]');
       if (!taxWrap || !taxButton) throw new Error('Налоговая кнопка не найдена');
       expect(slots).toHaveLength(5);
-      const hudRect = hud.getBoundingClientRect();
-      const assertInsideHud = (element: HTMLElement): void => {
-        const rect = element.getBoundingClientRect();
-        const elementWidth = measuredWidth(element, itemWidth);
-        if (rect.width > 0) {
-          expect(rect.left).toBeGreaterThanOrEqual(hudRect.left);
-          expect(rect.right).toBeLessThanOrEqual(hudRect.right);
-        } else {
-          expect(elementWidth).toBeLessThanOrEqual(viewportWidth);
-        }
-        expect(translateX(element)).toBe(0);
-      };
-
       const hudStyle = getComputedStyle(hud);
       const hudWidth = Number.parseFloat(hudStyle.width);
       const paddingLeft = Number.parseFloat(hudStyle.paddingLeft) || 16;
@@ -144,6 +131,7 @@ describe('07/T17aa real Hud layout', () => {
       const itemWidth = (hudWidth - paddingLeft - paddingRight) / 6;
       expect(hudWidth).toBe(viewportWidth);
       expect(Number.isFinite(itemWidth)).toBe(true);
+      const hudRect = hud.getBoundingClientRect();
 
       const translateX = (element: HTMLElement): number => {
         const style = getComputedStyle(element);
@@ -159,6 +147,32 @@ describe('07/T17aa real Hud layout', () => {
               ? Number.parseFloat(translated[1] ?? '0')
               : 0) + left
         );
+      };
+
+      const allocatedWidth = (element: HTMLElement): number => {
+        const parent = element.parentElement;
+        if (parent !== hud) {
+          return parent ? measuredWidth(parent, allocatedWidth(parent)) : viewportWidth;
+        }
+        if (
+          element.className.toString().includes('slot') ||
+          element.className.toString().includes('taxWrap')
+        ) {
+          return itemWidth;
+        }
+        const width = cssPixels(getComputedStyle(element).width);
+        return Number.isFinite(width) && width > 0 ? width : 44;
+      };
+
+      const assertInsideHud = (element: HTMLElement): void => {
+        const rect = element.getBoundingClientRect();
+        const elementWidth = measuredWidth(element, allocatedWidth(element));
+        expect(elementWidth).toBeLessThanOrEqual(allocatedWidth(element));
+        if (rect.width > 0) {
+          expect(rect.left).toBeGreaterThanOrEqual(hudRect.left);
+          expect(rect.right).toBeLessThanOrEqual(hudRect.right);
+        }
+        expect(translateX(element)).toBe(0);
       };
 
       const layoutBounds = (
