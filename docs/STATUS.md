@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- Сделано: T17al ждёт ревью; добавлены переводы всех `GameEvent['t']`, типизированный `eventLabel` и отдельная раскладка `event-feed`.
-- Проверено: лента не выходит за viewport, не пересекает leaderboard/bottom-panel; высоты 44/88/132 px; онбординг остаётся в `left-column`.
-- Следующая задача: `$review 07/T17al` в новой сессии.
+- Сделано: T17al возвращена на доработку; переводы, типизированный `eventLabel` и отдельная раскладка `event-feed` остаются в коде.
+- Проверено: `pnpm verify --changed` — зелёный; тест реального DOM-монтирования ленты отсутствует.
+- Следующая задача: исправить `СПЕК` возврата T17al и снова вызвать `$review 07/T17al`.
 - Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
 - Файлы: `apps/client/src/dev/EventFeed.tsx`, `apps/client/src/match/layout.ts`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/src/i18n/dict.ts`, `apps/client/test/t17al-*`.
