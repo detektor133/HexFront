@@ -114,6 +114,33 @@ describe('playerView', () => {
     expect(v.hexes.link[0]).toBe(0);
   });
 
+  it('фильтрует чужие стройки по текущей видимости и сохраняет свои', () => {
+    const s = scenario(
+      `
+        a  a  a  .  .  .  .  .  .
+        a  A1 a  b  b  b  b  B1 a
+        a  a  a  .  .  .  .  .  .
+      `,
+      {
+        legend: {
+          A1: city('A', 1, { capital: true }),
+          B1: city('B', 1, { capital: true }),
+          a: own('A'),
+          b: own('B'),
+        },
+      },
+    );
+    s.runTicks(1);
+    s.state.constructions.push(
+      { id: 100, owner: 1, hex: 3 + 1 * 9, kind: 'fort', progressTicks: 1, totalTicks: 10 },
+      { id: 101, owner: 1, hex: 5 + 1 * 9, kind: 'depot', progressTicks: 2, totalTicks: 10 },
+      { id: 102, owner: 0, hex: 6 + 2 * 9, kind: 'improve', progressTicks: 3, totalTicks: 10 },
+    );
+    expect(playerView(s.state, 0).constructions.map((construction) => construction.id)).toEqual([
+      100, 102,
+    ]);
+  });
+
   it('помечает изолированные узлы и города', () => {
     const s = scenario(MAP, { legend });
     s.setOwner(at(4, 1), null);

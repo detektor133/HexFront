@@ -290,15 +290,17 @@ export function playerView(
       taxEffective: p.taxEffective,
       status: p.status,
     })),
-    constructions: state.constructions.map((c) => ({
-      id: c.id,
-      owner: c.owner,
-      hex: c.hex,
-      kind: c.kind,
-      progressTicks: c.progressTicks,
-      totalTicks: c.totalTicks,
-      path: [...(c.path ?? [])],
-    })),
+    constructions: state.constructions
+      .filter((c) => c.owner === playerId || visible[c.hex] === 1)
+      .map((c) => ({
+        id: c.id,
+        owner: c.owner,
+        hex: c.hex,
+        kind: c.kind,
+        progressTicks: c.progressTicks,
+        totalTicks: c.totalTicks,
+        path: [...(c.path ?? [])],
+      })),
     recruits: state.recruits
       .filter((r) => r.owner === playerId)
       .map((r) => ({

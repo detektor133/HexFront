@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17ab принята ревью: агрегаты, индикаторы, локализация, порог организации и существующие состояния подтверждены.
+- 07/T17ac реализована: `playerView` фильтрует чужие стройки по `visible`, свои сохраняются.
+- Добавлен сценарный тест видимой/невидимой чужой и своей стройки в `packages/sim/test/player-view.test.ts`.
 - `pnpm verify --changed` — зелёный.
-- Следующая задача: `$task 07/T17ac`.
-- Читать: блок T17ac в `docs/stages/stage-07-playable-build.md`, `packages/sim/src/queries/player-view.ts`, `packages/sim/test/player-view.test.ts`.
+- Следующая задача: `$task 07/T17ad`.
+- Читать: блок T17ad в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/test`.

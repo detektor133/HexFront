@@ -741,7 +741,7 @@ OK: повторное ревью после `6dff84fd` — прежние пу�
   Исправлено: `armyStats` агрегирует `inBattle` и `encircled`; реальный DOM-тест проверяет активные и неактивные пары, локализованные title, порог организации и сохранение `warn`/`stuck`/`auto`; `pnpm verify --changed` — зелёный.
   Ревью: OK — критерии агрегатов, локализованных индикаторов, порога организации и сохранения существующих состояний подтверждены; `pnpm verify --changed` — зелёный.
 
-- [ ] **T17ac. Не показывать анимации строек врага в тумане войны** (`packages/sim/src/queries/player-view.ts`, `packages/sim/test/player-view.test.ts`, `apps/client/src/dev/economy-layer.ts`).
+- [~] **T17ac. Не показывать анимации строек врага в тумане войны** (`packages/sim/src/queries/player-view.ts`, `packages/sim/test/player-view.test.ts`, `apps/client/src/dev/economy-layer.ts`).
   `playerView` сейчас отдаёт клиенту все стройки всех игроков (`constructions: state.constructions.map(...)`), хотя для `recruits` ниже уже есть фильтр владельца. В функции уже вычислен `visible` (`vision.visible[playerId]`) — та же битовая маска, которой фильтруются здания и другие поля. Исправить только `constructions`: отдавать запись, если `c.owner === playerId` либо `visible[c.hex] === 1`. Свои стройки всегда видны, чужие — только пока гекс прямо сейчас виден; последнюю известную позицию для строек не сохранять. `recruits` и остальные фильтры не менять; клиентский `drawConstructionEffects`/`economy-layer.ts` не менять.
 
   *Файлы:* `packages/sim/src/queries/player-view.ts`, `packages/sim/test/player-view.test.ts`, при необходимости только тестовые фикстуры; клиентский рендер не изменять.
