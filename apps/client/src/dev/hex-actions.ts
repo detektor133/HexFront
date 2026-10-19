@@ -37,6 +37,17 @@ function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): He
   return null;
 }
 
+function rebuildAction(plan: NonNullable<Selection['rebuild']>, target: Command): HexAction | null {
+  if (!plan.ok) return null;
+  return {
+    kind: 'rebuild',
+    cost: plan.cost,
+    affordable: plan.affordable,
+    cmd: target,
+    previewPath: plan.path,
+  };
+}
+
 /**
  * Действия для карточки. Чужой или нейтральный гекс и гекс со стройкой — без действий.
  * @returns список в порядке показа
@@ -55,18 +66,13 @@ export function visibleActions(
     out.push(fromCheck('upgrade', city.upgrade, { t: 'upgradeCity', cityId: city.id }));
     const r = city.rebuild;
     if (r?.ok) {
-      out.push({
-        kind: 'rebuild',
-        cost: r.cost,
-        affordable: r.affordable,
-        cmd: { t: 'rebuildSupply', cityId: city.id },
-        previewPath: r.path,
-      });
+      out.push(rebuildAction(r, { t: 'rebuildSupply', cityId: city.id }));
     }
   } else {
     out.push(foundCityAction(s.foundCity, hex));
     out.push(fromCheck('improve', s.improve, { t: 'improve', hex }));
     out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
+    if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));
   }
   out.push(fromCheck('depot', s.depot, { t: 'build', hex, kind: 'depot' }));
   return out.filter((a): a is HexAction => a !== null);

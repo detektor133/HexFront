@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T17y |
+| Текущая задача | 07/T17zb |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-19 |
 
@@ -15,7 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17za исправлена: добавлен сценарий отказа `notIsolated` для склада в основной сети через публичный `rebuildSupplyPlan`.
+- 07/T17zb ждёт ревью: `Selection` передаёт план `rebuildSupplyPlan` для склада; карточка показывает кнопку только для изолированного склада и отправляет `{ t: 'rebuildSupply', hex }`.
+- Тесты `apps/client/test/hex-actions.test.ts` и `apps/client/test/t17m-hex-card.dom.test.tsx` проверяют preview path, цену, команду и скрытие для `notIsolated`.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
-- Следующая задача: `$task 07/T17zb`.
-- Читать: блок T17zb в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/hex-actions.ts`, `packages/sim/src/commands/rebuild-supply.ts`.
+- Следующая задача: `$task 07/T17aa`.
+- Читать: блок T17aa в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test`.

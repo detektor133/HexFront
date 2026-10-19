@@ -27,6 +27,7 @@ const plain = (checks: Partial<Selection> = {}): Selection => ({
   improve: ok(20_000),
   fort: noGold(60_000),
   depot: rule('depotTooClose'),
+  rebuild: null,
   recruit: [],
   ...checks,
 });
@@ -74,5 +75,27 @@ describe('действия карточки гекса', () => {
     } as unknown as NonNullable<Selection['city']>;
     const road = visibleActions(plain({ city }), 0, 0, false).find((a) => a.kind === 'rebuild');
     expect(road).toMatchObject({ kind: 'rebuild', previewPath: [5, 6, 7] });
+  });
+
+  it('показывает дорогу для изолированного склада и скрывает для подключённого', () => {
+    const plan = {
+      ok: true,
+      cityHex: 5,
+      path: [5, 6, 7],
+      toBuild: [6, 7],
+      cost: 20 as Fp,
+      affordable: true,
+    } as const;
+    const isolated = visibleActions(plain({ rebuild: plan }), 0, 0, false).find(
+      (a) => a.kind === 'rebuild',
+    );
+    expect(isolated).toMatchObject({
+      cmd: { t: 'rebuildSupply', hex: 5 },
+      previewPath: plan.path,
+      cost: plan.cost,
+    });
+    expect(
+      visibleActions(plain({ rebuild: { ok: false, reason: 'notIsolated' } }), 0, 0, false),
+    ).not.toContainEqual(expect.objectContaining({ kind: 'rebuild' }));
   });
 });

@@ -14,6 +14,8 @@ import {
   hexPopCap,
   botCommands,
   cityInfo,
+  rebuildSupplyPlan,
+  BUILDING,
   commanderCommands,
   createMatch,
   createBotTickContext,
@@ -70,14 +72,20 @@ function recruitOptions(state: MatchState, cityId: number): RecruitOption[] {
 
 function selectionOf(state: MatchState, hex: number): Selection {
   const city = state.cities.find((c) => c.hex === hex);
+  const info = city ? cityInfo(state, city.id) : null;
   return {
     hex,
     popCap: city ? cityPopCap(city.level) : hexPopCap(state, hex),
-    city: city ? cityInfo(state, city.id) : null,
+    city: info,
     foundCity: canFoundCity(state, HUMAN_ID, hex),
     improve: checkConstruction(state, HUMAN_ID, { t: 'improve', hex }),
     fort: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'fort' }),
     depot: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'depot' }),
+    rebuild:
+      info?.rebuild ??
+      (state.hexes.building[hex] === BUILDING.depot
+        ? rebuildSupplyPlan(state, HUMAN_ID, { hex })
+        : null),
     recruit: city?.owner === HUMAN_ID ? recruitOptions(state, city.id) : [],
   };
 }

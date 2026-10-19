@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, loadMap, type ConstructionCheck, type MapStatic } from '@hexfront/sim';
+import { hexFromId, loadMap, type ConstructionCheck, type Fp, type MapStatic } from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
@@ -296,6 +296,50 @@ describe('T17m: карточка клетки', () => {
     render(<HexCard s={prepared} view={message.view} map={mapResult.map} send={() => undefined} />);
     expect(getActionLabels()).toEqual(actionLabels(prepared));
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
+  });
+
+  it('показывает дорогу в карточке изолированного склада и скрывает для подключённого', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const initial = engine.snapshot();
+    const hex = initial.view.hexes.owner.findIndex(
+      (owner, id) => owner === 0 && !engine.state.cities.some((city) => city.hex === id),
+    );
+    if (hex < 0) throw new Error('свой гекс для карточки не найден');
+    engine.select(hex);
+    const selected = engine.snapshot();
+    if (!selected.selection) throw new Error('выбор клетки не создан');
+    const selection = {
+      ...selected.selection,
+      hex,
+      city: null,
+      rebuild: {
+        ok: true,
+        cityHex: hex,
+        path: [hex, hex + 1],
+        toBuild: [hex + 1],
+        cost: 15 as Fp,
+        affordable: true,
+      },
+    } as Selection;
+    const view = selected.view;
+    const send = vi.fn();
+    render(<HexCard s={selection} view={view} map={mapResult.map} send={send} />);
+    const button = screen.getByRole('button', { name: /Проложить дорогу/u });
+    expect(button).toBeTruthy();
+    act(() => button.click());
+    expect(send).toHaveBeenCalledWith({ t: 'rebuildSupply', hex });
+
+    cleanup();
+    render(
+      <HexCard
+        s={{ ...selection, rebuild: { ok: false, reason: 'notIsolated' } }}
+        view={view}
+        map={mapResult.map}
+        send={send}
+      />,
+    );
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });
 

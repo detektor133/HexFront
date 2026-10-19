@@ -6,6 +6,7 @@ import type {
   CityInfo,
   Fp,
   PlayerView,
+  RebuildPlan,
   RecruitCheck,
   RejectReason,
   UnitType,
@@ -36,6 +37,8 @@ export interface Selection {
   readonly improve: ConstructionCheck;
   readonly fort: ConstructionCheck;
   readonly depot: ConstructionCheck;
+  /** План дороги для изолированного склада; для города используется `city.rebuild`. */
+  readonly rebuild: RebuildPlan | null;
   /** Набор — только в своём городе; иначе пусто. */
   readonly recruit: readonly RecruitOption[];
 }
