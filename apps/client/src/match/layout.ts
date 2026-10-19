@@ -1,5 +1,12 @@
 export type MatchLayoutElementKind =
-  'hud' | 'left-column' | 'leaderboard' | 'bottom-panel' | 'card' | 'popup-menu' | 'pause-menu';
+  | 'hud'
+  | 'left-column'
+  | 'event-feed'
+  | 'leaderboard'
+  | 'bottom-panel'
+  | 'card'
+  | 'popup-menu'
+  | 'pause-menu';
 
 const HUD_MAX_WIDTH = 720;
 const LEADERBOARD_BORDER_WIDTH = 2;
@@ -176,28 +183,34 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
       ),
     );
   }
+  const eventFeedWidth = Math.min(280, Math.max(44, width - edge * 2));
   const leftWidth = Math.min(280, Math.max(44, width - leaderboardWidth - edge * 3));
   const eventHeight = Math.min(3, Math.max(0, input.eventRows)) * 44;
   const leftColumnTop = input.hudHeight + gap;
   const leftColumnBottom = bottomY - gap;
-  const eventVisible = eventHeight > 0 && leftColumnTop + eventHeight <= leftColumnBottom;
-  const tutorialY = leftColumnTop + (eventVisible ? eventHeight + gap : 0);
+  const eventFeedY = bottomY - gap - eventHeight;
+  const eventTop = showLeaderboard
+    ? Math.max(leftColumnTop, leaderboardY + effectiveLeaderboardHeight + gap)
+    : leftColumnTop;
+  const eventVisible = eventHeight > 0 && eventHeight <= leftColumnBottom - eventTop;
+  const tutorialY = leftColumnTop;
   const tutorialVisible = input.tutorialVisible && tutorialY + 48 <= leftColumnBottom;
-  const leftColumnVisible =
-    (eventVisible || tutorialVisible) &&
-    !input.cardOpen &&
-    (desktop || !input.leaderboardOpen) &&
-    !input.popupOpen &&
-    !input.paused;
-  if (leftColumnVisible) {
-    const tutorialHeight = tutorialVisible ? 48 : 0;
-    const leftColumnHeight = Math.min(
-      leftColumnBottom - leftColumnTop,
-      eventVisible ? eventHeight + (tutorialHeight > 0 ? gap + tutorialHeight : 0) : tutorialHeight,
-    );
+  const overlaysVisible =
+    !input.cardOpen && (desktop || !input.leaderboardOpen) && !input.popupOpen && !input.paused;
+  if (eventVisible && overlaysVisible) {
     elements.push(
-      layoutElement('left-column', 'left-column', edge, leftColumnTop, leftWidth, leftColumnHeight),
+      layoutElement(
+        'event-feed',
+        'event-feed',
+        width - edge - eventFeedWidth,
+        eventFeedY,
+        eventFeedWidth,
+        eventHeight,
+      ),
     );
+  }
+  if (tutorialVisible && overlaysVisible) {
+    elements.push(layoutElement('left-column', 'left-column', edge, leftColumnTop, leftWidth, 48));
   }
   const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
   if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {

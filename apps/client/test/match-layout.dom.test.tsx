@@ -58,6 +58,7 @@ const SECOND_MEASURED_LAYOUT: MeasuredLayout = {
 
 const LAYOUT_ELEMENT_IDS = [
   'left-column',
+  'event-feed',
   'leaderboard',
   'bottom-panel',
   'card',
@@ -246,7 +247,9 @@ function expectInlineRectangles(input: Parameters<typeof computeMatchLayout>[0])
                 ? 'dialog'
                 : element.id === 'pause-menu'
                   ? 'dialog'
-                  : element.id,
+                  : element.id === 'event-feed'
+                    ? 'event-feed'
+                    : element.id,
     );
     if (element.id === 'leaderboard' && node.style.left === '') {
       const edge = input.viewport.width <= 600 || input.viewport.height <= 500 ? 8 : 16;
@@ -320,7 +323,9 @@ function expectRenderedRectangles(input: Parameters<typeof computeMatchLayout>[0
               ? 'card'
               : element.id === 'popup-menu' || element.id === 'pause-menu'
                 ? 'dialog'
-                : element.id;
+                : element.id === 'event-feed'
+                  ? 'event-feed'
+                  : element.id;
     const node = elementWithClass(fragment);
     rendered.set(element.id, node);
     expect(getComputedStyle(node).display, element.id).not.toBe('none');

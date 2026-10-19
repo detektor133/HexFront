@@ -8,8 +8,33 @@ import { visibleEvents } from './event-feed.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 
+function assertNever(value: never): never {
+  throw new Error(`Неизвестное событие: ${String(value)}`);
+}
+
+export function eventLabel(event: GameEvent['t']): Parameters<typeof t>[0] {
+  switch (event) {
+    case 'cityCaptured':
+    case 'commandRejected':
+    case 'unitRecruited':
+    case 'recruitCancelled':
+    case 'unitDestroyed':
+    case 'unitRetreated':
+    case 'unitCapitulated':
+    case 'capitalMoved':
+    case 'playerEliminated':
+    case 'offensiveDone':
+    case 'matchWon':
+    case 'constructionDone':
+    case 'constructionCancelled':
+      return `event.${event}`;
+    default:
+      return assertNever(event);
+  }
+}
+
 function label(event: GameEvent): string {
-  return t(`event.${event.t}` as Parameters<typeof t>[0]);
+  return t(eventLabel(event.t));
 }
 
 export function EventFeed(props: {
