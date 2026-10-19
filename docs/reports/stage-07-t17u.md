@@ -68,6 +68,10 @@
 
 ## Исправление возврата 2026-10-19
 
+- Исправлен `panel-css.ts`: shorthand с timing-function распознаёт `top`, `height` и `all` в любом порядке; вложенные `CSSMediaRule` фильтруются по применимому `min/max-width`.
+- Контрольная добавленная media-регрессия дала RED в T17o/T17q (`top: expected 1 to be 0`), восстановленный CSS и helper дали GREEN: 12/12.
+- `pnpm verify --changed` запускается перед коммитом; фактическую геометрию опубликованной сборки проверяет владелец, потому что jsdom не вычисляет браузерную раскладку.
+
 - Усилены проверки реального пути `MatchPage → MatchSurface → layout → Leaderboard`: content-box преобразуется в полный внешний размер с padding/border, а изменение обеих осей влияет на расчёт.
 - Модель `ResizeObserver` T17q теперь различает внутреннее содержимое, padding/border и назначенную внешнюю высоту; повторные уведомления и изменение `view.armies` проверяют отсутствие роста и дрейфа ArmyBar/HexCard.
 - `panel-css.ts` рекурсивно разбирает CSSMediaRule и transition shorthand с timing-function; T17o проверяет overflow по обеим осям, сохраняя независимую прокрутку HexCard.

@@ -38,10 +38,23 @@ export function expectNoGeometryTransition(node: HTMLElement): void {
   let transition = '';
   let transitionProperty = '';
   let transitionDuration = '';
+  const mediaQueryApplies = (query: string, width: number): boolean => {
+    const minWidth = query.match(/\(\s*min-width\s*:\s*([\d.]+)px\s*\)/u);
+    const maxWidth = query.match(/\(\s*max-width\s*:\s*([\d.]+)px\s*\)/u);
+    const minimum = minWidth ? Number.parseFloat(minWidth[1] ?? '') : 0;
+    const maximum = maxWidth ? Number.parseFloat(maxWidth[1] ?? '') : Number.POSITIVE_INFINITY;
+    return width >= minimum && width <= maximum;
+  };
   const collectDeclarations = (rules: CSSRuleList): CSSStyleDeclaration[] =>
     Array.from(rules).flatMap((rule) => {
       if (rule instanceof CSSStyleRule) {
         return node.matches(rule.selectorText) ? [rule.style] : [];
+      }
+      if (rule instanceof CSSMediaRule) {
+        const applies = rule.media.mediaText
+          .split(',')
+          .some((query) => mediaQueryApplies(query, window.innerWidth));
+        if (!applies) return [];
       }
       return 'cssRules' in rule
         ? collectDeclarations((rule as { readonly cssRules: CSSRuleList }).cssRules)
@@ -65,11 +78,13 @@ export function expectNoGeometryTransition(node: HTMLElement): void {
   const shorthand = transition.split(/,(?![^()]*\))/u).map((part) => part.trim());
   const properties = transitionProperty
     ? transitionProperty.split(',').map((part) => part.trim())
-    : shorthand.map(
-        (part) =>
-          part.split(/\s+/u).find((token) => ['all', 'none', 'top', 'height'].includes(token)) ??
-          'all',
-      );
+    : shorthand.map((part) => {
+        const property = part
+          .split(/\s+/u)
+          .map((token) => token.toLowerCase())
+          .find((token) => ['all', 'none', 'top', 'height'].includes(token));
+        return property ?? 'all';
+      });
   const durations = transitionDuration
     ? transitionDuration.split(',').map((part) => Number.parseFloat(part))
     : shorthand.map((part) => {
