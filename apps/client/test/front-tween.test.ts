@@ -52,6 +52,17 @@ describe('плавный переход линии фронта (04/T13)', () =>
     expect(tweenRuns(from, to, 0.3)).toEqual(to);
   });
 
+  it('сопоставляет переставленные куски по ближайшим концам без скачка между участками', () => {
+    const from = [line(0, 0, 20), line(0, 100, 120)];
+    const to = [line(20, 100, 120), line(20, 0, 20)];
+    const mid = tweenRuns(from, to, 0.5);
+
+    expect(mid[0]?.[0]?.x).toBeCloseTo(100, 5);
+    expect(mid[1]?.[0]?.x).toBeCloseTo(0, 5);
+    expect(mid[0]?.[0]?.y).toBeCloseTo(10, 5);
+    expect(mid[1]?.[0]?.y).toBeCloseTo(10, 5);
+  });
+
   it('удаляет армии без фронта и сообщает размер кэша', () => {
     const tweens = createFrontTweens(false);
     const target = [line(0, 0, 100)];

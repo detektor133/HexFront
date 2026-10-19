@@ -67,6 +67,47 @@ const gap = (a: readonly Point[], b: readonly Point[]): number => {
   return Math.hypot(a0.x - b0.x, a0.y - b0.y) + Math.hypot(a1.x - b1.x, a1.y - b1.y);
 };
 
+function matchedSources(
+  from: readonly (readonly Point[])[],
+  to: readonly (readonly Point[])[],
+): readonly (readonly Point[])[] {
+  const used = new Set<number>();
+  const matches: Point[][] = [];
+  let bestCost = Number.POSITIVE_INFINITY;
+  let best: number[] = [];
+
+  function search(targetIndex: number, cost: number, sourceOrder: number[]): void {
+    if (targetIndex === to.length) {
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = [...sourceOrder];
+      }
+      return;
+    }
+    if (cost >= bestCost) return;
+    for (let sourceIndex = 0; sourceIndex < from.length; sourceIndex += 1) {
+      if (used.has(sourceIndex)) continue;
+      used.add(sourceIndex);
+      search(targetIndex + 1, cost + gap(from[sourceIndex] ?? [], to[targetIndex] ?? []), [
+        ...sourceOrder,
+        sourceIndex,
+      ]);
+      used.delete(sourceIndex);
+    }
+  }
+
+  search(0, 0, []);
+  for (const [targetIndex, sourceIndex] of best.entries()) {
+    const source = from[sourceIndex] ?? to[targetIndex] ?? [];
+    const target = to[targetIndex] ?? [];
+    matches[targetIndex] =
+      gap([...source].reverse(), target) < gap(source, target)
+        ? [...source].reverse()
+        : [...source];
+  }
+  return matches;
+}
+
 /**
  * Линия фронта между прежним и новым положением: каждый кусок пересэмплирован по длине, концы
  * идут к ближним концам нового куска (без перекручивания). Разное число кусков — сразу новая.
@@ -79,8 +120,9 @@ export function tweenRuns(
   p: number,
 ): Point[][] {
   if (p >= 1 || from.length !== to.length) return to.map((r) => [...r]);
+  const sources = matchedSources(from, to);
   return to.map((target, i) => {
-    const source = from[i] ?? target;
+    const source = sources[i] ?? target;
     const back = [...source].reverse();
     const a = resample(gap(back, target) < gap(source, target) ? back : source, SAMPLES);
     const b = resample(target, SAMPLES);

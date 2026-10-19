@@ -69,6 +69,27 @@ export interface PlanLayer {
 
 type FrontPlan = PlanView & { kind: 'front' };
 
+export interface FrontAppearance {
+  readonly alpha: number;
+  readonly detailShift: number;
+  readonly width: number;
+}
+
+export function frontAppearance(
+  selectedArmy: number | null,
+  armyId: number,
+  level: number,
+): FrontAppearance {
+  const selected = selectedArmy === armyId;
+  const index = Math.min(tokens.front.width.length - 1, Math.max(0, level));
+  const widthIndex = Math.min(tokens.front.width.length - 1, index + (selected ? 1 : 0));
+  return {
+    alpha: selected ? 1 : tokens.fog.memoryAlpha,
+    detailShift: selected ? 1 : 0,
+    width: tokens.front.width[widthIndex] ?? tokens.front.width[1] ?? 3,
+  };
+}
+
 /** Проверяет попадание указателя в линию наступления с допуском в экранных px. */
 export function isPointNearPath(
   point: Point,
@@ -106,7 +127,10 @@ export function createPlanLayer(
   let level: DetailLevel = 2;
   let hover: Point | null = null;
 
-  const width = (w: readonly number[]): number => (w[level - 1] ?? w[1] ?? 3) * k;
+  const width = (w: readonly number[], detailShift = 0): number => {
+    const index = Math.min(w.length - 1, Math.max(0, level - 1 + detailShift));
+    return (w[index] ?? w[1] ?? 3) * k;
+  };
   const runsOf = (edges: readonly EdgeId[]): Point[][] => edgeRuns(map, radius, edges);
 
   function polyline(pts: readonly Point[]): void {
@@ -116,8 +140,8 @@ export function createPlanLayer(
     for (const p of rest) g.lineTo(p.x, p.y);
   }
 
-  function drawFront(runs: readonly Point[][], color: string, alpha = 1): void {
-    const w = width(tokens.front.width);
+  function drawFront(runs: readonly Point[][], color: string, alpha = 1, detailShift = 0): void {
+    const w = width(tokens.front.width, detailShift);
     const style = { cap: 'round', join: 'round', alpha } as const;
     for (const r of runs) polyline(r);
     g.stroke({ ...style, color: tokens.front.casing, width: w + 2 * tokens.front.casingWidth * k });
@@ -346,7 +370,8 @@ export function createPlanLayer(
         const showForecastCard =
           p.armyId === selectedArmy && hover !== null && isPointNearPath(hover, paths, 14 * k);
         drawOffensive(v, p, showForecastCard);
-        drawFront(front, color);
+        const appearance = frontAppearance(selectedArmy, p.armyId, level - 1);
+        drawFront(front, color, appearance.alpha, appearance.detailShift);
         if (p.armyId === selectedArmy && !draft) {
           drawHandles(frontHandles({ map, view: v, radius }, p), color);
         }
