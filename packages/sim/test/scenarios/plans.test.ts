@@ -255,6 +255,9 @@ describe('линия фронта (CR-002)', () => {
     const army = armyOf(s, ids);
     const runA = edgeOf(hexOf(at(2, 0)), 0);
     const runB = edgeOf(hexOf(at(2, 4)), 0);
+    const runs = [[runA], [runB]];
+    expect(runs.every((run) => run.length > 0)).toBe(true);
+    expect(runs[0]?.some((edge) => runs[1]?.includes(edge))).toBe(false);
     s.state.plans.push({ armyId: army, kind: 'front', edges: [runA, runB], offensive: null });
     s.runSeconds(20);
     s.cmd('A', raw({ t: 'clearPlan', armyId: army, edges: [runA] }));

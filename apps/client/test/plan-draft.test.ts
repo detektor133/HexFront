@@ -23,7 +23,7 @@ import {
   tapCommand,
   type DraftContext,
 } from '../src/dev/plan-draft.ts';
-import { edgeMid, edgeRuns } from '../src/dev/plan-edges.ts';
+import { edgeMid, edgeRunIds, edgeRuns } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
 import { armyColor, relationColor } from '../src/theme/colors.ts';
@@ -124,9 +124,21 @@ describe('инструменты планов по граням (CR-004)', () =>
   });
 
   it('удаление и перерисовка затрагивают только выбранный кусок фронта', () => {
-    const far = border.find((e) => edgeRuns(map, R, [e0, e]).length === 2) ?? e0;
-    const replacement =
-      border.find((e) => e !== e0 && e !== far && edgeRuns(map, R, [e0, e]).length === 2) ?? far;
+    const far = border.find((e) => edgeRuns(map, R, [e0, e]).length === 2);
+    if (far === undefined) throw new Error('Не найден второй участок фронта');
+    const replacement = border.find(
+      (e) => e !== e0 && e !== far && edgeRuns(map, R, [e0, e]).length === 2,
+    );
+    if (replacement === undefined) throw new Error('Не найдено ребро для перерисовки');
+    const runs = edgeRunIds(map, R, [e0, far]);
+    expect(runs).toHaveLength(2);
+    const runA = runs[0];
+    const runB = runs[1];
+    expect(runA?.length).toBeGreaterThan(0);
+    expect(runB?.length).toBeGreaterThan(0);
+    expect(runA?.some((edge) => runB?.includes(edge))).toBe(false);
+    expect(runA).toEqual([e0]);
+    expect(runB).toEqual([far]);
     const plan = {
       armyId: 7,
       kind: 'front' as const,
