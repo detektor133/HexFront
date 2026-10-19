@@ -31,6 +31,25 @@ export const setMark = (stage: string, task: string, mark: TaskMark): string =>
   stage.replace(new RegExp(`^- \\[[^\\]]\\] \\*\\*${task}\\.`, 'm'), `- [${mark}] **${task}.`);
 export const closeAll = (stage: string): string => stage.replaceAll(/^- \[[ ~]\]/gm, '- [x]');
 
+/** Реальный reviewer при возврате сохраняет пункты в блоке задачи; фикстура делает то же. */
+const appendReviewReturn = (stage: string, task: string, answer: string): string => {
+  const items = answer
+    .split(/\r?\n/u)
+    .slice(1)
+    .filter((line) => /^\s*[-*]\s+\S/u.test(line))
+    .map((line) => `  ${line.trim()}`);
+  if (items.length === 0) return stage;
+  const escaped = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const heading = new RegExp(`^- \\[([^\\]]*)\\] \\*\\*${escaped}\\.`, 'mu');
+  const start = heading.exec(stage)?.index;
+  if (start === undefined) return stage;
+  const rest = stage.slice(start + 1);
+  const next = /^- \[[ x~]\] \*\*/mu.exec(rest)?.index;
+  const end = next === undefined ? stage.length : start + 1 + next;
+  const block = `  Возврат ревью:\n${items.join('\n')}\n`;
+  return `${stage.slice(0, end).trimEnd()}\n${block}${stage.slice(end)}`;
+};
+
 /** Что делает одна сессия codex. По умолчанию — коммит и push, если менялась отметка или файлы. */
 export interface Session {
   readonly mark?: TaskMark;
@@ -233,6 +252,11 @@ export async function runWorld(world: World): Promise<Outcome> {
       await writeFile(
         stagePath,
         setMark(await readFile(stagePath, 'utf8'), session.task, session.mark),
+      );
+    if (session.mark === ' ' && session.task && session.stage === undefined)
+      await writeFile(
+        stagePath,
+        appendReviewReturn(await readFile(stagePath, 'utf8'), session.task, session.answer),
       );
     if (session.stage !== undefined) await writeFile(stagePath, session.stage);
     if (session.status !== undefined) await writeFile(statusPath, session.status);

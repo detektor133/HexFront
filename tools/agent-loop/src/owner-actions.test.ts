@@ -234,22 +234,12 @@ describe('ответ владельца клавишей', () => {
   });
 });
 
-describe('повтор шага в цикле', () => {
-  it('исчерпанные круги: клавиша «дать ещё круги» — задача снова в работе без перезапуска цикла', async () => {
+describe('автоматическое продолжение кругов', () => {
+  it('исчерпанные круги не требуют клавиши владельца', async () => {
     const board = new Board(Date.now);
-    const seen: string[] = [];
-    board.onChange = () => {
-      const focus = board.focus;
-      if (focus === undefined || seen.length > 0) return;
-      seen.push(...board.focusActions.map((action) => `${action.key} ${action.label}`));
-      board.requestRetry(focus.name);
-    };
     const run = await runWorld({
       board,
       maxRounds: 1,
-      // Клавиша будит цикл из ожидания, как Enter.
-      polls: 1,
-      wake: true,
       sessions: [
         { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
         { task: 'T1j5-Б1', mark: ' ', answer: 'ВОЗВРАТ\n- нет теста' },
@@ -257,8 +247,9 @@ describe('повтор шага в цикле', () => {
         { task: 'T1j5-Б1', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(seen).toEqual(['П дать ещё круги', 'Л лог сессии']);
-    expect(run.lines).toContain('консоль: владелец просит повторить шаг');
+    expect(run.lines).toContain(
+      '1 ВОЗВРАТ подряд по 06/T1j5-Б1 — начинаю новый автоматический цикл',
+    );
     expect(board.totals.done).toBe(1);
   });
 });

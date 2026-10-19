@@ -177,15 +177,15 @@ describe('приёмочные тесты до кода ($spec)', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('то же замечание исполнителя к тестам после починки — ожидание владельца', async () => {
+  it('то же замечание исполнителя к тестам после починки — автоматическая пауза', async () => {
     const run = await runWorld({ spec: true, sessions: [SPEC, BROKEN, SPEC_FIX, BROKEN] });
     expect(run.prompts).toHaveLength(4);
     expect(run.lines).toContain(
-      'жду: $spec не исправил приёмочные тесты 06/T1j5-Б1 по тому же замечанию — нужен владелец',
+      'сбой: $spec не исправил приёмочные тесты 06/T1j5-Б1 по тому же замечанию — повторю автоматически — следующая попытка через 30 мин',
     );
   });
 
-  it('ожидание владельца с работой в дереве не запускает доделку на следующих шагах цикла', async () => {
+  it('автоматическая пауза с работой в дереве не запускает доделку раньше срока', async () => {
     // Задача пишется в память до сессии (на случай Ctrl+C): ожидание обязано её стереть,
     // иначе каждый шаг цикла снова запускал бы codex на том же дереве.
     const run = await runWorld({
@@ -196,7 +196,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     });
     expect(run.prompts).toHaveLength(4);
     expect(
-      run.lines.filter((line) => line.startsWith('жду: $spec не исправил приёмочные тесты')),
+      run.lines.filter((line) => line.startsWith('сбой: $spec не исправил приёмочные тесты')),
     ).toHaveLength(1);
   });
 
@@ -234,7 +234,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     // ответил «нельзя без изменения теста» без строки «СПЕК:».
     const stage = fixtureStage.replace(
       '  *Приёмка:* тесты.',
-      '  *Приёмка:* тесты.\n  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
+      '  *Приёмка:* тесты.\n  Возврат ревью:\n  - fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.',
     );
     const stuck: Session = {
       answer: 'T1 выполнить без изменения теста нельзя. Нужно разрешить дополнить тест.',
@@ -252,7 +252,8 @@ describe('приёмочные тесты до кода ($spec)', () => {
 
   // 2026-10-14, 07/T1: ревью вернуло задачу из-за приёмочного теста, цикл перезапустили —
   // замечание осталось только в блоке задачи, а `$next` со старым тестом взял 07/T2.
-  const RETURN = '  Возврат ревью: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.';
+  const RETURN_ITEM = 'СПЕК: fitness-own.test.ts:31-51 не проверяет штраф чужого игрока.';
+  const RETURN = `  Возврат ревью:\n  - ${RETURN_ITEM}`;
   const returned = fixtureStage.replace('  *Приёмка:* тесты.', `  *Приёмка:* тесты.\n${RETURN}`);
   const LOCKED = { spec: { '06/T1j5-Б1': { [TEST]: "it('старый тест', () => {});\n" } } };
 
@@ -274,7 +275,7 @@ describe('приёмочные тесты до кода ($spec)', () => {
     const run = await runWorld({
       spec: true,
       stage: returned,
-      state: { ...LOCKED, specRepairNotes: { '06/T1j5-Б1': [RETURN.trim()] } },
+      state: { ...LOCKED, specRepairNotes: { '06/T1j5-Б1': [RETURN_ITEM] } },
       sessions: [NEXT_DONE],
     });
     expect(run.prompts).toEqual([`$task 06/T1j5-Б1\n${LOCKED_LINE}`]);

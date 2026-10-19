@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17u усилена по возврату review: desktop-тест реального пути `MatchPage → MatchSurface → layout → Leaderboard` проверяет ширину и влияние полной высоты `contentRect` на `style.top` при popup.
-- RED: временная передача `height: 1` падает assertion `expected '8px' to be '236px'`; GREEN: восстановленная передача `rect.height` даёт 5/5 той же командой.
-- `pnpm verify --changed` — зелёный.
-- Следующая задача после повторного review: 07/T17, задача владельца.
-- Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.
+- Агентный цикл больше не решает по тексту ответа, выполнен ли возврат: T17u не блокируется ложным «файл не тронут» и идёт непосредственно на повторный review.
+- Результат review читается из stage; отсутствие записи, исчерпанные круги, повторный сбой spec/review и красный CI повторяются автоматически без Issue владельца.
+- Reviewer обязан перечислять все блокеры одним проходом; исполнитель, spec и reviewer используют `gpt-6.1-sol/high`.
+- Тесты цикла: 17 файлов, 256 тестов; typecheck зелёный.
+- Следующий шаг: повторный review 07/T17u, затем 07/T17 — задача владельца.
+- Читать: `tools/agent-loop/src/tasks.ts`, `tools/agent-loop/src/review.ts`, `tools/agent-loop/src/return-guard.ts`.

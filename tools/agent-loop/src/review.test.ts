@@ -49,13 +49,15 @@ describe('сходимость повторного ревью', () => {
     expect(run.lines).not.toContain(`ВОЗВРАТ ${TASK}, круг 2 из 3`);
   });
 
-  it('второй такой возврат подряд — ожидание владельца, а не новый круг исполнителя', async () => {
+  it('второй такой возврат подряд — автоматическая пауза, а не владелец', async () => {
     const run = await runWorld({
       reviewDiff: DIFF,
       sessions: [NEXT_DONE, FIRST_BACK, NEXT_DONE, back(UNCHANGED), back(UNCHANGED)],
     });
     expect(run.prompts).toHaveLength(5);
-    expect(run.lines.join('\n')).toContain(`ревью дважды вернуло ${TASK} только по строкам тестов`);
+    expect(run.lines.join('\n')).toContain(
+      `ревью дважды вернуло ${TASK} только по неизменённым строкам — повторю автоматически`,
+    );
   });
 
   it('СПЕК к изменённым строкам — обычный возврат исполнителю', async () => {
@@ -102,35 +104,38 @@ describe('сходимость повторного ревью', () => {
   });
 });
 
-describe('отметка, которую ревью забыло сменить', () => {
-  // 2026-10-16, 07/T17e и T17f: вердикт в ответе есть, а `[~]` в файле этапа остался.
+describe('результат, который reviewer не записал в stage', () => {
   const FORGOT_OK: Session = { answer: 'OK\nвсё подтверждено' };
   const FIX_X: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'Отметка исправлена.' };
 
-  it('OK без отметки [x]: одна короткая сессия правит отметку, задача готова', async () => {
+  it('повторяет review и принимает сохранённый [x]', async () => {
     const run = await runWorld({ sessions: [NEXT_DONE, FORGOT_OK, FIX_X] });
     expect(run.prompts).toHaveLength(3);
-    expect(run.prompts[2]).toContain('Исправление отметки после $review');
-    expect(run.prompts[2]).toContain('«- [x]»');
+    expect(run.prompts[2]).toContain('Предыдущая сессия не записала результат');
+    expect(run.prompts[2]).toContain('`- [x]`');
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
-  it('ВОЗВРАТ без отметки [ ]: отметка исправляется на [ ], круг идёт дальше', async () => {
+  it('повторяет review и принимает сохранённый возврат', async () => {
     const forgot: Session = { answer: 'ВОЗВРАТ\n- evaluate.ts:95 — штраф по чужим метрикам' };
-    const fix: Session = { task: 'T1j5-Б1', mark: ' ', answer: 'Отметка исправлена.' };
+    const fix: Session = {
+      task: 'T1j5-Б1',
+      mark: ' ',
+      answer: 'ВОЗВРАТ\n- evaluate.ts:95 — штраф по чужим метрикам',
+    };
     const run = await runWorld({ sessions: [NEXT_DONE, forgot, fix, NEXT_DONE, REVIEW_OK] });
-    expect(run.prompts[2]).toContain('«- [ ]»');
+    expect(run.prompts[2]).toContain('`- [ ]`');
     expect(run.lines).toContain(`ВОЗВРАТ ${TASK}, круг 1 из 3`);
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
-  it('просьба не помогла — ожидание владельца с понятной причиной, без третьей сессии', async () => {
+  it('повтор не помог — автоматическая пауза без владельца', async () => {
     const run = await runWorld({
       sessions: [NEXT_DONE, FORGOT_OK, { answer: 'Не смог.' }],
     });
     expect(run.prompts).toHaveLength(3);
     expect(run.lines.join('\n')).toContain(
-      'не совпадает с отметкой [~] даже после просьбы исправить',
+      'дважды не записал результат в stage — повторю автоматически',
     );
     expect(run.lines).not.toContain(`готово: ${TASK}`);
   });

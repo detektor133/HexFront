@@ -2,7 +2,6 @@
 import {
   backoff,
   checkPermissions,
-  firstLine,
   park,
   readStage,
   save,
@@ -11,6 +10,7 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { lastReturnItems } from './return-guard.ts';
 import {
   outOfScopeRemarks,
   rejectedReturnNote,
@@ -20,7 +20,7 @@ import {
   type ReviewScope,
 } from './review-scope.ts';
 import { specFiles, unlockedFiles } from './spec.ts';
-import { taskMark } from './stage-file.ts';
+import { taskBlock, taskMark } from './stage-file.ts';
 
 /** Вердикт `$review`: новая отметка задачи и ответ ревью (замечания к приёмочным тестам). */
 export interface Verdict {
@@ -53,29 +53,20 @@ async function reviewSession(
   const review = await session(context, 'review', lines.join('\n'));
   const checked = await afterReview(context, task, base, review);
   if (typeof checked === 'string') return checked;
-  return checked ?? fixMark(context, task, base, review.message);
+  return checked ?? repairReviewRecord(context, task, review.message);
 }
 
 type ReviewRun = Awaited<ReturnType<typeof session>>;
 
-/** Отметка файла этапа, которой требует вердикт: `OK` — `[x]`, `ВОЗВРАТ` — `[ ]`. */
-function verdictMark(message: string): Verdict['mark'] | undefined {
-  // Модель может оформить вердикт как `OK` или **OK**: значение имеют слово и отметка в файле.
-  const word = firstLine(message).replace(/[`*_]/g, '').trim();
-  if (/^OK(?![\p{L}\d])/u.test(word)) return 'x';
-  return word.startsWith('ВОЗВРАТ') ? ' ' : undefined;
-}
-
 /**
- * Проверки после сессии ревью. Вердикт — если ответ и отметка совпали; шаг цикла — если пора
- * ждать; `undefined` — вердикт есть, но отметка осталась `[~]` (ревью забыло её сменить).
+ * Проверки после сессии ревью. Источник вердикта — сохранённое состояние задачи, а не текст
+ * ответа модели: `[x]` означает OK, `[ ]` вместе с блоком возврата — ВОЗВРАТ.
  */
 async function afterReview(
   context: LoopContext,
   task: string,
   base: string,
   review: ReviewRun,
-  verdictText = review.message,
 ): Promise<Verdict | Step | undefined> {
   const { git } = context;
   if (review.failure !== undefined)
@@ -92,45 +83,47 @@ async function afterReview(
     return park(context, `review:${task}`, 'после $review дерево не чистое', review.message);
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
-  const mark = taskMark((await readStage(context.config.root)).stageText, task);
-  const wanted = verdictMark(verdictText);
-  if (wanted !== undefined && mark === wanted) return { mark: wanted, message: verdictText };
-  if (wanted !== undefined && mark === '~') return undefined;
-  return park(
-    context,
-    `review:${task}`,
-    `ответ $review «${firstLine(verdictText).replace(/[`*_]/g, '').trim()}» не совпадает с отметкой [${mark ?? '?'}]`,
-    review.message,
-  );
+  const stage = await readStage(context.config.root);
+  const mark = taskMark(stage.stageText, task);
+  if (mark === 'x') return { mark, message: 'OK' };
+  if (mark === ' ') {
+    const items = lastReturnItems(taskBlock(stage.stageText, task));
+    if (items.length > 0)
+      return { mark, message: ['ВОЗВРАТ', ...items.map((item) => `- ${item}`)].join('\n') };
+  }
+  return undefined;
 }
 
 /**
- * 2026-10-16, 07/T17e и T17f: ревью писало `ВОЗВРАТ` и `OK`, а отметку в файле этапа не меняло, и
- * цикл вставал. Одна короткая сессия правит только отметку; не помогла — ожидание владельца.
+ * Reviewer не сохранил машиночитаемое состояние в файле этапа. Новая сессия повторяет review и
+ * записывает результат; свободный текст прошлой сессии используется только как диагностика.
  */
-async function fixMark(
+async function repairReviewRecord(
   context: LoopContext,
   task: string,
-  base: string,
   message: string,
 ): Promise<Verdict | Step> {
-  const wanted = verdictMark(message) ?? ' ';
-  await context.say(`$review ${task}: вердикт есть, отметка [~] не сменена — прошу исправить`);
+  await context.say(
+    `$review ${task}: результат не записан в stage — повторяю review автоматически`,
+  );
+  const base = await head(context.git);
   const fix = await session(
     context,
     'review',
     [
-      `Исправление отметки после $review ${task}: задачу заново не проверяй.`,
-      `Твой вердикт: ${firstLine(message)}. В файле этапа отметка задачи ${task} осталась «- [~]».`,
-      `Замени в строке задачи ${task} «- [~]» на «- [${wanted}]», больше ничего не меняй, создай docs-коммит с трейлером «Этап: ${task}» и запушь ветку.`,
+      `$review ${task}`,
+      'Предыдущая сессия не записала результат в файл этапа.',
+      'Проверь задачу заново и обязательно сохрани одно из состояний:',
+      '- `- [x]` для OK;',
+      '- `- [ ]` и непустой последний блок `Возврат ревью:` для возврата.',
+      'Итоговый текст ответа не является протоколом оркестратора.',
     ].join('\n'),
   );
-  const checked = await afterReview(context, task, base, fix, message);
+  const checked = await afterReview(context, task, base, fix);
   if (checked === undefined)
-    return park(
+    return backoff(
       context,
-      `review:${task}`,
-      `ответ $review «${firstLine(message)}» не совпадает с отметкой [~] даже после просьбы исправить`,
+      `$review ${task} дважды не записал результат в stage — повторю автоматически`,
       message,
     );
   return checked;
@@ -160,7 +153,7 @@ async function remember(context: LoopContext, task: string, verdict: Verdict): P
 /**
  * `$review` в новой сессии; возвращает вердикт или шаг цикла. Повторное ревью получает строки,
  * изменённые после прошлого возврата; возврат только из «СПЕК:» к другим строкам тестов цикл
- * отклоняет и один раз просит ревью заново, второй такой — к владельцу.
+ * отклоняет и просит ревью заново; повторная ошибка reviewer уходит в автоматическую паузу.
  * @param note строка запроса сверх команды (повторное ревью после слияния ветки этапа).
  */
 export async function runReview(
@@ -182,10 +175,9 @@ export async function runReview(
     verdict = await reviewSession(context, task, [...notes, rejectedReturnNote(base, outside)]);
     if (typeof verdict === 'string') return verdict;
     if (rejected(verdict, scope).length > 0)
-      return park(
+      return backoff(
         context,
-        `review:${task}`,
-        `ревью дважды вернуло ${task} только по строкам тестов, которые не менялись после прошлого возврата — реши Issue «$decide»`,
+        `ревью дважды вернуло ${task} только по неизменённым строкам — повторю автоматически`,
         verdict.message,
       );
   }

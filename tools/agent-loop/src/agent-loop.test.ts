@@ -102,7 +102,7 @@ describe('круги $next → CI → $review', () => {
     expect(run.prompts[1]).toBe('$review 06/T1j5-Б1');
     expect(run.prompts[2]).toContain('$task 06/T1j5-Б1');
     expect(run.prompts[2]).toContain(REVIEW_BACK.answer);
-    expect(run.prompts[2]).toContain('ИСПРАВЛЕНО ПО РЕВЬЮ');
+    expect(run.prompts[2]).toContain('оркестратор не разбирает его текст');
     expect(run.prompts[3]).toBe('$review 06/T1j5-Б1');
     expect(run.lines).toContain('ВОЗВРАТ 06/T1j5-Б1, круг 1 из 3');
   });
@@ -124,13 +124,16 @@ describe('круги $next → CI → $review', () => {
     expect(run.prompts[0]).toContain('ОБЯЗАТЕЛЬНЫЙ ВОЗВРАТ REVIEWER');
   });
 
-  it('после maxRounds ВОЗВРАТ ждёт владельца и не начинает задачу заново', async () => {
+  it('после maxRounds начинает новый автоматический цикл без владельца', async () => {
     const run = await runWorld({
       maxRounds: 2,
-      sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_BACK],
+      sessions: [NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_BACK, NEXT_DONE, REVIEW_OK],
     });
-    expect(run.prompts).toHaveLength(4);
-    expect(run.lines).toContain('жду: 2 ВОЗВРАТ подряд по 06/T1j5-Б1 — нужно решение владельца');
+    expect(run.prompts).toHaveLength(6);
+    expect(run.lines).toContain(
+      '2 ВОЗВРАТ подряд по 06/T1j5-Б1 — начинаю новый автоматический цикл',
+    );
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('начинает с $review, если задача уже [~], но сначала проверяет CI её HEAD', async () => {
@@ -239,9 +242,9 @@ describe('круги $next → CI → $review', () => {
     expect(run.prompts).toEqual(['$task 06/T1j5-Б1 продолжить', '$review 06/T1j5-Б1']);
   });
 
-  it('ждёт владельца, если ответ ревью не совпадает с отметкой', async () => {
-    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, mark: ' ' }] });
-    expect(run.lines).toContain('жду: ответ $review «OK» не совпадает с отметкой [ ]');
+  it('использует сохранённую отметку, а не текст ответа reviewer', async () => {
+    const run = await runWorld({ sessions: [NEXT_DONE, { ...REVIEW_OK, answer: 'ВОЗВРАТ' }] });
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('при сбое codex делает паузу и больше сессий не запускает', async () => {

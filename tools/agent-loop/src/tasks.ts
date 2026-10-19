@@ -14,13 +14,8 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
-import {
-  lastReturnItems,
-  skippedPrompt,
-  skippedReturnItems,
-  withReviewFeedback,
-} from './return-guard.ts';
-import { remarkRefs } from './review-scope.ts';
+import { lastReturnItems, withReviewFeedback } from './return-guard.ts';
+import { remarkRefs, samePath } from './review-scope.ts';
 import { runReview } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
@@ -76,14 +71,18 @@ export const ciFixPrompt = (task: string, line: string): string =>
 const step = (value: Step): Work => ({ kind: 'step', step: value });
 
 /** Пути только из строк `СПЕК:` возврата: старый state мог уже забыть исходный список `$spec`. */
-const mentionedSpecFiles = (message: string): string[] => [
-  ...new Set(
-    message
-      .split(/\r?\n/u)
-      .filter((line) => SPEC_REMARK_RE.test(line))
-      .flatMap((line) => remarkRefs(line).map((ref) => ref.path)),
-  ),
-];
+const mentionedSpecFiles = (context: LoopContext, task: string, message: string): string[] => {
+  const known = specFiles(context, task);
+  return [
+    ...new Set(
+      message
+        .split(/\r?\n/u)
+        .filter((line) => SPEC_REMARK_RE.test(line))
+        .flatMap((line) => remarkRefs(line).map((ref) => ref.path))
+        .map((path) => known.find((candidate) => samePath(candidate, path)) ?? path),
+    ),
+  ];
+};
 
 /**
  * Миграция незакрытого возврата прежней версии цикла: восстанавливает активный handoff из блока
@@ -102,15 +101,12 @@ async function restoreReviewFeedback(context: LoopContext, task: string): Promis
   await save(context);
 }
 
-/** Скилл не выполнился: сбой codex — пауза, иначе ожидание владельца с ответом скилла. */
+/** Скилл не выполнился: технический сбой повторяется после паузы без участия владельца. */
 export const skillFailed = (
   context: LoopContext,
   prompt: string,
   result: SkillResult & { ok: false },
-) =>
-  result.codexFailed
-    ? backoff(context, `${prompt}: ${result.reason}`, result.message)
-    : park(context, `skill:${prompt}`, `${prompt} — ${result.reason}`, result.message);
+) => backoff(context, `${prompt}: ${result.reason}`, result.message);
 
 /** `$split` или `$accept`, о которых просит ответ работы; иначе задача ждёт владельца. */
 async function followUp(
@@ -178,11 +174,11 @@ async function repairSpec(
   const notes = state.specRepairNotes[task] ?? [];
   const note = remarks.trim();
   const reason = notes.includes(note)
-    ? `$spec не исправил приёмочные тесты ${task} по тому же замечанию — нужен владелец`
+    ? `$spec не исправил приёмочные тесты ${task} по тому же замечанию — повторю автоматически`
     : notes.length >= MAX_SPEC_REPAIRS
-      ? `приёмочные тесты ${task} чинились ${notes.length} раза и снова мешают — нужен владелец`
+      ? `приёмочные тесты ${task} чинились ${notes.length} раза и снова мешают — повторю автоматически`
       : undefined;
-  if (reason !== undefined) return step(await park(context, `spec:${task}`, reason, remarks));
+  if (reason !== undefined) return step(await backoff(context, reason, remarks));
   state.specRepairNotes = { ...state.specRepairNotes, [task]: [...notes, note] };
   await save(context);
   await context.say(`исполнитель: приёмочные тесты ${task} сломаны — их чинит $spec`);
@@ -330,7 +326,6 @@ export async function processTask(
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
-  let skipRetried = false;
   const writesSpec = options.spec ?? options.workPrompt === '$next';
   for (let round = 1; round <= config.maxRounds;) {
     if (needsWork && writesSpec) {
@@ -344,38 +339,16 @@ export async function processTask(
       : { kind: 'review' as const, task: current };
     if (work.kind === 'review') current = work.task;
     prompt = options.workPrompt;
-    // Файл пункта возврата не тронут — ревью вернёт то же самое: сначала один явный повтор работы.
-    const skipped =
-      needsWork && work.kind === 'review'
-        ? await skippedReturnItems(context, current, work.message ?? '')
-        : [];
-    if (skipped.length > 0) {
-      if (skipRetried)
-        return {
-          step: await park(
-            context,
-            `skip:${current}`,
-            `исполнитель не тронул файлы пунктов возврата ${current} даже после напоминания: ${skipped.join(' | ')} — Issue «$task ${current} <что делать>» или «$decide»`,
-          ),
-          done: false,
-        };
-      skipRetried = true;
-      await say(
-        `${current}: файлы пунктов возврата не тронуты — повторяю работу со списком пунктов`,
-      );
-      prompt = skippedPrompt(current, skipped);
-      continue;
-    }
     const checked = work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
     if (checked?.kind === 'step') return { step: checked.step, done: false };
     if (checked?.kind === 'again') {
       followUps += 1;
       if (followUps > MAX_FOLLOW_UPS)
         return {
-          step: await park(
+          step: await backoff(
             context,
-            `again:${current}`,
-            `CI или приёмка ${current} снова не прошли`,
+            `CI или приёмка ${current} снова не прошли — повторю автоматически`,
+            '',
           ),
           done: false,
         };
@@ -412,7 +385,7 @@ export async function processTask(
       SPEC_REMARK_RE.test(verdict.message) ||
       mentionsSpec(verdict.message, specFiles(context, current))
     )
-      await unlockSpec(context, current, mentionedSpecFiles(verdict.message));
+      await unlockSpec(context, current, mentionedSpecFiles(context, current, verdict.message));
     else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
     context.state.returnTotals = {
@@ -424,12 +397,8 @@ export async function processTask(
     needsWork = true;
     round += 1;
   }
-  return {
-    step: await park(
-      context,
-      `rounds:${current}`,
-      `${config.maxRounds} ВОЗВРАТ подряд по ${current}${totalNote(context, current)} — нужно решение владельца`,
-    ),
-    done: false,
-  };
+  await say(
+    `${config.maxRounds} ВОЗВРАТ подряд по ${current}${totalNote(context, current)} — начинаю новый автоматический цикл`,
+  );
+  return { step: 'worked', done: false };
 }

@@ -16,6 +16,7 @@ import {
   type Step,
 } from './context.ts';
 import { changedPaths, dirtyFiles, head } from './git.ts';
+import { lastReturnItems } from './return-guard.ts';
 import { taskBlock } from './stage-file.ts';
 
 /** Без роли spec в roles.json цикл работает по-старому: `$next` сам пишет тесты задачи. */
@@ -300,9 +301,8 @@ export const mentionsSpec = (text: string, files: readonly string[]): boolean =>
 
 /** Строки возврата ревью в блоке задачи, которые говорят о приёмочных тестах. */
 export const returnedForSpec = (block: string, files: readonly string[]): string =>
-  block
-    .split(/\r?\n/)
-    .filter((line) => /возврат/iu.test(line) && mentionsSpec(line, files))
+  lastReturnItems(block)
+    .filter((item) => mentionsSpec(item, files))
     .join('\n');
 
 /** Строки `СПЕК: …` ответа: замечания к приёмочным тестам. */
