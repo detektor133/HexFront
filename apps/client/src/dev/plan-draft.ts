@@ -27,7 +27,14 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { cornerPoint, edgeMid, nearestCorner, nearestEdge } from './plan-edges.ts';
+import {
+  cornerPoint,
+  edgeMid,
+  edgeRunIds,
+  edgeRuns,
+  nearestCorner,
+  nearestEdge,
+} from './plan-edges.ts';
 import { trajectoryPath } from './stroke-path.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 
@@ -43,6 +50,9 @@ export interface Draft {
   readonly corner: Corner | null;
   /** Наступление: последняя точка пальца (мир) — начало отрезка траектории. */
   readonly last?: Point;
+  /** Исходный участок фронта, который заменяется новой линией. */
+  readonly replaceEdges?: readonly EdgeId[];
+  readonly baseEdges?: readonly EdgeId[];
 }
 
 export interface DraftContext {
@@ -58,6 +68,22 @@ export const startDraft = (tool: Tool, armyId: number): Draft => ({
   hexes: [],
   corner: null,
 });
+
+function replaceRun(
+  base: readonly EdgeId[],
+  replaced: readonly EdgeId[],
+  next: readonly EdgeId[],
+): EdgeId[] {
+  const removed = new Set(replaced);
+  const out: EdgeId[] = [];
+  for (const edge of [
+    ...base.filter((x) => !removed.has(x)),
+    ...next.filter((x) => !removed.has(x)),
+  ]) {
+    if (!out.includes(edge)) out.push(edge);
+  }
+  return out;
+}
 
 const ground = (c: DraftContext): { map: MapStatic; hexes: { owner: Int16Array } } => ({
   map: c.map,
@@ -104,13 +130,29 @@ export function strokeAdd(c: DraftContext, d: Draft, world: Point): Draft {
   const e = nearestEdge(c.map, c.radius, world, (x) => ownBorder(c, x) !== null);
   if (e === null) return d;
   const x = ownBorder(c, e) as EdgeId;
-  return d.edges.at(-1) === x ? d : { ...d, edges: [...d.edges, x] };
+  if (d.edges.at(-1) === x) return d;
+  if (d.tool !== 'front' || d.replaceEdges !== undefined) return { ...d, edges: [...d.edges, x] };
+  const plan = c.view.plans.find(
+    (p): p is PlanView & { kind: 'front' } => p.armyId === d.armyId && p.kind === 'front',
+  );
+  if (!plan) return { ...d, edges: [...d.edges, x] };
+  const ids = edgeRunIds(c.map, c.radius, plan.edges);
+  const runs = edgeRuns(c.map, c.radius, plan.edges);
+  const runIndex = runs.findIndex((run) =>
+    run.some((p) => Math.hypot(p.x - world.x, p.y - world.y) <= c.radius * 0.6),
+  );
+  const replaceEdges = ids[runIndex];
+  return replaceEdges
+    ? { ...d, edges: [x], replaceEdges, baseEdges: plan.edges }
+    : { ...d, edges: [...d.edges, x] };
 }
 
 /** Отпустил палец: приказ по проведённой линии (или null, если линии нет). */
 export function finishCommand(d: Draft): Command | null {
   if (d.tool === 'front' && d.edges.length > 0) {
-    return { t: 'assignFront', armyId: d.armyId, edges: d.edges };
+    const edges =
+      d.replaceEdges && d.baseEdges ? replaceRun(d.baseEdges, d.replaceEdges, d.edges) : d.edges;
+    return { t: 'assignFront', armyId: d.armyId, edges };
   }
   if (d.tool === 'offensive' && d.edges.length > 0) {
     return { t: 'setOffensiveLine', armyId: d.armyId, edges: d.edges };
@@ -140,7 +182,17 @@ function hitPlan(c: DraftContext, world: Point): Command | null {
       );
       continue;
     }
-    near(p.edges.map(mid), { t: 'clearPlan', armyId: p.armyId });
+    const runs = edgeRuns(c.map, c.radius, p.edges);
+    const ids = edgeRunIds(c.map, c.radius, p.edges);
+    runs.forEach((run, i) => {
+      const edges = ids[i] ?? [];
+      near(
+        run,
+        edges.length === p.edges.length
+          ? { t: 'clearPlan', armyId: p.armyId }
+          : { t: 'clearPlan', armyId: p.armyId, edges },
+      );
+    });
     if (p.offensive) near(p.offensive.edges.map(mid), { t: 'clearOffensive', armyId: p.armyId });
   }
   return (best as { cmd: Command } | null)?.cmd ?? null;
@@ -167,7 +219,10 @@ export function tapCommand(c: DraftContext, d: Draft, world: Point): Command | n
 export function draftPath(c: DraftContext, d: Draft): { edges: EdgeId[]; hexes: number[] } {
   const g = ground(c);
   if (d.tool === 'front') {
-    return { edges: frontLinePath(g, c.view.playerId, d.edges) ?? [...d.edges], hexes: [] };
+    const path = frontLinePath(g, c.view.playerId, d.edges) ?? [...d.edges];
+    const edges =
+      d.replaceEdges && d.baseEdges ? replaceRun(d.baseEdges, d.replaceEdges, path) : path;
+    return { edges, hexes: [] };
   }
   if (d.tool === 'offensive') {
     return { edges: offensiveEdgePath(g, d.edges) ?? [...d.edges], hexes: [] };

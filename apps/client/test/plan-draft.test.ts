@@ -16,6 +16,7 @@ import {
 
 import {
   dragFrontEnd,
+  draftPath,
   finishCommand,
   startDraft,
   strokeAdd,
@@ -120,6 +121,36 @@ describe('инструменты планов по граням (CR-004)', () =>
     const far = border.find((e) => edgeHex(e) !== edgeHex(e0)) ?? e0;
     const chain = dragFrontEnd(c, [e0], 1, edgeMid(map, R, far));
     expect(edgeRuns(map, R, chain).length).toBe(1);
+  });
+
+  it('удаление и перерисовка затрагивают только выбранный кусок фронта', () => {
+    const far = border.find((e) => edgeRuns(map, R, [e0, e]).length === 2) ?? e0;
+    const replacement =
+      border.find((e) => e !== e0 && e !== far && edgeRuns(map, R, [e0, e]).length === 2) ?? far;
+    const plan = {
+      armyId: 7,
+      kind: 'front' as const,
+      edges: [e0, far],
+      hexes: [],
+      offensive: null,
+    };
+    const withPlan = {
+      ...view,
+      plans: [{ ...plan, zone: [], stuck: false, facing: [], lost: [], startWanted: false }],
+    };
+    const erase = tapCommand({ ...c, view: withPlan }, startDraft('erase', 7), edgeMid(map, R, e0));
+    expect(erase).toEqual({ t: 'clearPlan', armyId: 7, edges: [e0] });
+    let draft = strokeAdd({ ...c, view: withPlan }, startDraft('front', 7), edgeMid(map, R, e0));
+    draft = strokeAdd({ ...c, view: withPlan }, draft, edgeMid(map, R, replacement));
+    const replacedPath = draftPath({ ...c, view: withPlan }, draft).edges;
+    expect(replacedPath).toContain(far);
+    expect(replacedPath).toContain(replacement);
+    expect(replacedPath).not.toContain(draft.replaceEdges?.[0]);
+    expect(finishCommand(draft)).toEqual({
+      t: 'assignFront',
+      armyId: 7,
+      edges: [far, replacement],
+    });
   });
 });
 

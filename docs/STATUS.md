@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- T17ah принята: белая подложка линии фронта непрозрачна, цветная часть сохраняет `tokens.fog.memoryAlpha`.
-- `apps/client/test/plan-layer.test.ts` проверяет реальный `createPlanLayer(...).setView(...)`, назначенный `front`, цвет, ширину и альфы обоих слоёв.
-- `docs/art/style-guide.md` фиксирует непрозрачную подложку и полупрозрачность только цветной части в тумане.
+- 07/T17ai ждёт ревью: `clearPlan` удаляет подмножество `EdgeId`, а клиент выбирает и перерисовывает отдельный `edgeRun`.
+- Изменены симуляция команд планов, группировка рёбер клиента, черновик фронта и правило «Удалить» в `docs/gdd/07-controls.md`.
+- Тесты: `packages/sim/test/scenarios/plans.test.ts`, `apps/client/test/plan-draft.test.ts`.
 - `pnpm verify --changed` — зелёный.
-- Следующая задача: `$task 07/T17ai`.
-- Читать: блоки T17ai–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
+- Следующая задача: `$task 07/T17aj`.
+- Читать: блоки T17aj–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.

@@ -79,6 +79,27 @@ export function edgeRuns(map: MapStatic, radius: number, edges: readonly EdgeId[
   return runs;
 }
 
+/** Группы EdgeId, соответствующие ломаным, возвращаемым `edgeRuns`. */
+export function edgeRunIds(map: MapStatic, radius: number, edges: readonly EdgeId[]): EdgeId[][] {
+  const runs: EdgeId[][] = [];
+  const same = (a: Point, b: Point): boolean => Math.hypot(a.x - b.x, a.y - b.y) < radius * 0.05;
+  for (const edge of edges) {
+    const [a, b] = edgeEnds(map, radius, edge);
+    const run = runs.at(-1);
+    const last = run?.at(-1);
+    if (run && last !== undefined) {
+      const [la, lb] = edgeEnds(map, radius, last);
+      const joins = same(a, la) || same(a, lb) || same(b, la) || same(b, lb);
+      if (joins) {
+        run.push(edge);
+        continue;
+      }
+    }
+    runs.push([edge]);
+  }
+  return runs;
+}
+
 /** Точка угла гекса (между направлениями a и a+1) в мировых координатах. */
 export function cornerPoint(map: MapStatic, radius: number, c: Corner): Point {
   const [a, b] = edgeEnds(map, radius, edgeOf(c.hex, c.a));

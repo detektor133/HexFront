@@ -107,6 +107,11 @@ export function validatePlanCommand(
   if (cmd.t === 'assignFront') return validateFront(state, playerId, cmd);
   if (cmd.t === 'setDefenseLine') return validateLine(state, playerId, cmd.points);
   if (cmd.t === 'setOffensiveLine') return validateOffensive(state, cmd);
+  if (cmd.t === 'clearPlan' && cmd.edges !== undefined) {
+    const plan = state.plans.find((p) => p.armyId === cmd.armyId);
+    if (plan?.kind !== 'front' || cmd.edges.length === 0) return rejected('noFront');
+    if (cmd.edges.some((edge) => !plan.edges.includes(edge))) return rejected('badHex');
+  }
   if (cmd.t === 'startOffensive') return validateStart(state, playerId, cmd.armyId);
   return OK;
 }
@@ -116,6 +121,23 @@ export function removePlan(state: MatchState, armyId: number): void {
   const rest = state.plans.filter((p) => p.armyId !== armyId);
   state.plans.splice(0, state.plans.length, ...rest);
   for (const u of state.units) if (u.armyId === armyId) u.slot = -1;
+}
+
+/** Удаляет выбранный участок фронта и освобождает места, исключённые из оставшегося плана. */
+export function removePlanEdges(state: MatchState, armyId: number, edges: readonly EdgeId[]): void {
+  const index = state.plans.findIndex((p) => p.armyId === armyId);
+  const plan = state.plans[index];
+  if (plan?.kind !== 'front') return;
+  const removed = new Set(edges);
+  const rest = plan.edges.filter((edge) => !removed.has(edge));
+  if (rest.length === 0) return removePlan(state, armyId);
+  state.plans[index] = { ...plan, edges: rest };
+  const planHexSet = new Set(planHexes(state, state.plans[index] as ArmyPlan));
+  for (const unit of state.units) {
+    if (unit.armyId === armyId && unit.type !== 'artillery' && !planHexSet.has(unit.slot)) {
+      unit.slot = -1;
+    }
+  }
 }
 
 // Гексы линии наступления: у каждой грани — гекс ближе к фронту армии по пути, не пересекающему
@@ -159,7 +181,11 @@ function setPlan(state: MatchState, plan: ArmyPlan): void {
 
 /** Применяет команду плана. Вызывается только после успешной проверки. */
 export function executePlanCommand(state: MatchState, playerId: number, cmd: PlanCommand): void {
-  if (cmd.t === 'clearPlan') return removePlan(state, cmd.armyId);
+  if (cmd.t === 'clearPlan') {
+    return cmd.edges === undefined
+      ? removePlan(state, cmd.armyId)
+      : removePlanEdges(state, cmd.armyId, cmd.edges);
+  }
   if (cmd.t === 'clearOffensive') return setOffensive(state, cmd.armyId, null);
   if (cmd.t === 'startOffensive' || cmd.t === 'stopOffensive') {
     const i = state.plans.findIndex((p) => p.armyId === cmd.armyId);

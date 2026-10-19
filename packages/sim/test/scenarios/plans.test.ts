@@ -248,6 +248,25 @@ describe('линия фронта (CR-002)', () => {
     expect(s.state.plans).toHaveLength(0);
     expect(s.unitById(ids[0] ?? -1)?.hex).toBe(hex);
   });
+
+  it('clearPlan с рёбрами удаляет один участок и перераспределяет армию по оставшемуся', () => {
+    const s = scenario(BORDER, { legend });
+    const ids = infantry(s, 2);
+    const army = armyOf(s, ids);
+    const runA = edgeOf(hexOf(at(2, 0)), 0);
+    const runB = edgeOf(hexOf(at(2, 4)), 0);
+    s.state.plans.push({ armyId: army, kind: 'front', edges: [runA, runB], offensive: null });
+    s.runSeconds(20);
+    s.cmd('A', raw({ t: 'clearPlan', armyId: army, edges: [runA] }));
+    s.runSeconds(20);
+    const plan = s.state.plans.find((p) => p.armyId === army);
+    expect(plan?.kind === 'front' && plan.edges).toEqual([runB]);
+    expect(
+      s.state.units
+        .filter((unit) => unit.armyId === army && unit.type !== 'artillery')
+        .every((unit) => unit.slot === hexOf(at(2, 4))),
+    ).toBe(true);
+  });
 });
 
 describe('линия обороны (CR-002)', () => {
