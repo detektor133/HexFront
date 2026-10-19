@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TICKS_PER_S } from '../../src/balance.ts';
+import { DEPOT_MIN_DISTANCE, TICKS_PER_S } from '../../src/balance.ts';
 import { distance, offsetToAxial } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { canFoundCity } from '../../src/queries/city.ts';
@@ -212,7 +212,7 @@ describe('благоустройство', () => {
 describe('постройки', () => {
   it('укрепление: 60 золота, 10 с; не в городе', () => {
     const s = fresh();
-    const hex = cellAt(s, 2);
+    const hex = cellAt(s, 4);
     const id = hex.col + hex.row * s.state.map.width;
     s.cmd('A', build(hex, 'fort'));
     s.cmd('A', build(CAPITAL, 'fort'));
@@ -221,18 +221,62 @@ describe('постройки', () => {
     expect(s.state.hexes.building[id]).toBe(BUILDING.fort);
   });
 
-  it('склад — только на дорожном гексе', () => {
+  it('склад строится на своём гексе без дороги', () => {
     const s = fresh();
-    const hex = cellAt(s, 2);
+    const hex = cellAt(s, 4);
     const id = hex.col + hex.row * s.state.map.width;
-    s.cmd('A', build(hex, 'depot'));
-    s.runTicks(1);
-    expect(s.rejections()).toEqual(['depotNeedsRoad']);
-    s.state.hexes.road[id] = 1;
     s.cmd('A', build(hex, 'depot'));
     s.runSeconds(15);
     expect(s.state.hexes.building[id]).toBe(BUILDING.depot);
   });
+
+  it.each([
+    ['свой склад', 'depot', 0],
+    ['чужой склад', 'depot', 1],
+    ['нейтральный склад', 'depot', -1],
+    ['свой город', 'city', 0],
+    ['чужой город', 'city', 1],
+    ['нейтральный город', 'city', -1],
+  ] as const)(
+    'склад отклоняется ближе минимальной дистанции от %s и разрешён на границе',
+    (_name, kind, owner) => {
+      const s = fresh();
+      const candidate = cellAt(s, 5);
+      const findAtDistance = (distanceFromCandidate: number): At => {
+        const origin = offsetToAxial(candidate);
+        for (let row = 0; row < s.state.map.height; row += 1) {
+          for (let col = 0; col < s.state.map.width; col += 1) {
+            const site = at(col, row);
+            if (site.col === candidate.col && site.row === candidate.row) continue;
+            if (distance(offsetToAxial(site), origin) === distanceFromCandidate) return site;
+          }
+        }
+        throw new Error('нет гекса на нужной дистанции');
+      };
+      const near = findAtDistance(DEPOT_MIN_DISTANCE - 1);
+      const edge = findAtDistance(DEPOT_MIN_DISTANCE);
+      const place = (target: ReturnType<typeof scenario>, site: At): void => {
+        const id = site.col + site.row * target.state.map.width;
+        target.state.hexes.owner[id] = owner;
+        if (kind === 'depot') {
+          target.state.hexes.building[id] = BUILDING.depot;
+        } else {
+          const base = target.cityAt(CAPITAL);
+          if (!base) throw new Error('нет столицы');
+          target.state.cities.push({ ...base, id: 100 + id, hex: id, owner });
+        }
+      };
+      place(s, near);
+      s.cmd('A', build(candidate, 'depot'));
+      s.runTicks(1);
+      expect(s.rejections()).toEqual(['depotTooClose']);
+      const boundary = fresh();
+      place(boundary, edge);
+      boundary.cmd('A', build(candidate, 'depot'));
+      boundary.runTicks(1);
+      expect(boundary.rejections()).toEqual([]);
+    },
+  );
 
   it('одна постройка на гекс, благоустройство с ней совместимо', () => {
     const s = fresh();

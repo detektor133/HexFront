@@ -9,6 +9,7 @@ import {
   CITY_UPGRADE_COST,
   CITY_UPGRADE_TIME_S,
   DEPOT_COST,
+  DEPOT_MIN_DISTANCE,
   DEPOT_TIME_S,
   FORT_COST,
   FORT_TIME_S,
@@ -70,6 +71,21 @@ function tooCloseToCity(state: MatchState, hex: HexId): boolean {
   return sites.some((site) => distance(hexFromId(site, state.map.width), h) < CITY_MIN_DISTANCE);
 }
 
+function tooCloseToDepot(state: MatchState, hex: HexId): boolean {
+  const candidate = hexFromId(hex, state.map.width);
+  const sites = [
+    ...state.cities.map((c) => c.hex),
+    ...state.constructions.filter((c) => c.kind === 'foundCity').map((c) => c.hex),
+  ];
+  state.hexes.building.forEach((building, site) => {
+    if (building === BUILDING.depot) sites.push(site);
+  });
+  return sites.some(
+    (site) =>
+      site !== hex && distance(hexFromId(site, state.map.width), candidate) < DEPOT_MIN_DISTANCE,
+  );
+}
+
 function planFoundCity(state: MatchState, playerId: number, hex: HexId): PlanResult {
   const base = ownFreeHex(state, playerId, hex);
   if (base) return fail(base);
@@ -122,7 +138,7 @@ function planBuild(
     if (cityAt(state, hex)) return fail('fortInCity');
     return plan({ kind, hex, cost: FORT_COST, timeS: FORT_TIME_S });
   }
-  if (state.hexes.road[hex] !== 1) return fail('depotNeedsRoad');
+  if (tooCloseToDepot(state, hex)) return fail('depotTooClose');
   return plan({ kind, hex, cost: DEPOT_COST, timeS: DEPOT_TIME_S });
 }
 

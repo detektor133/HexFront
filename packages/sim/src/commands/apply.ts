@@ -27,7 +27,11 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'build':
       return validateConstruction(state, playerId, cmd);
     case 'rebuildSupply':
-      return validateRebuildSupply(state, playerId, cmd.cityId);
+      return validateRebuildSupply(
+        state,
+        playerId,
+        'cityId' in cmd ? { cityId: cmd.cityId } : { hex: cmd.hex },
+      );
     case 'recruit':
       return validateRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
     case 'move':
@@ -71,7 +75,11 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       startConstruction(state, playerId, cmd);
       return;
     case 'rebuildSupply':
-      startRebuildSupply(state, playerId, cmd.cityId);
+      startRebuildSupply(
+        state,
+        playerId,
+        'cityId' in cmd ? { cityId: cmd.cityId } : { hex: cmd.hex },
+      );
       return;
     case 'recruit':
       startRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);

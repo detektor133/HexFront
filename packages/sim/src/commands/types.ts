@@ -42,6 +42,7 @@ export type Command =
   | { readonly t: 'improve'; readonly hex: HexId }
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
+  | { readonly t: 'rebuildSupply'; readonly hex: HexId }
   | { readonly t: 'createArmy'; readonly name: string }
   | { readonly t: 'setAutoReinforce'; readonly on: boolean }
   /** Значок «А» на карточке армии (CR-006). */
@@ -75,7 +76,8 @@ export const REJECT_REASONS = [
   'maxLevel',
   'buildingExists',
   'fortInCity',
-  'depotNeedsRoad',
+  'depotTooClose',
+  'unknownDepot',
   'notIsolated',
   'noPath',
   'alreadyBuilding',

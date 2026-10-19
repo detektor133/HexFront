@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { NETWORK_RECALC_TICKS, SUPPLY_REBUILD_COST_PER_HEX } from '../../src/balance.ts';
+import { rebuildSupplyPlan } from '../../src/commands/rebuild-supply.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { hashState } from '../../src/state/hash.ts';
 import { isCityIsolated } from '../../src/state/network.ts';
+import { BUILDING } from '../../src/state/types.ts';
 import { ROAD_TICKS_PER_HEX } from '../../src/systems/road-construction.ts';
 import { at, city, own, rebuildSupply, road, scenario, type At } from '../scenario/dsl.ts';
 
@@ -55,6 +57,23 @@ describe('перестройка снабжения', () => {
     s.runTicks(toBuild * ROAD_TICKS_PER_HEX + NETWORK_RECALC_TICKS);
     expect(job(s)).toBeUndefined();
     expect(isolated(s, A2)).toBe(false);
+  });
+
+  it('изолированный склад получает тот же путь, цену и время дороги, что город', () => {
+    const s = scenario(MAP, { legend });
+    isolate(s);
+    const depotHex = 8 + 2 * s.state.map.width;
+    s.state.hexes.building[depotHex] = BUILDING.depot;
+    const plan = rebuildSupplyPlan(s.state, 0, { hex: depotHex });
+    expect(plan).toMatchObject({ ok: true });
+    if (!plan.ok) return;
+    expect(plan.toBuild.length).toBeGreaterThan(0);
+    expect(plan.cost).toBe(SUPPLY_REBUILD_COST_PER_HEX * plan.toBuild.length);
+    s.cmd('A', { t: 'raw', cmd: { t: 'rebuildSupply', hex: depotHex } });
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    expect(job(s)?.path).toEqual([...plan.toBuild].reverse());
+    expect(job(s)?.totalTicks).toBe(plan.toBuild.length * ROAD_TICKS_PER_HEX);
   });
 
   it('путь по уже проложенной дороге не оплачивается', () => {

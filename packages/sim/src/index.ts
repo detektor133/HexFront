@@ -23,7 +23,11 @@ export {
   foundCityCost,
   type ConstructionCheck,
 } from './commands/construction.ts';
-export { rebuildSupplyPlan, type RebuildPlan } from './commands/rebuild-supply.ts';
+export {
+  rebuildSupplyPlan,
+  type RebuildPlan,
+  type RebuildTarget,
+} from './commands/rebuild-supply.ts';
 export * from './queries/score.ts';
 export {
   unitLimit,

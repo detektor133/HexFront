@@ -156,6 +156,8 @@ export const FORT_DEF_MULT: Fp = fp(1.4);
 export const DEPOT_COST: Fp = fp(80);
 export const DEPOT_TIME_S: Fp = fp(15);
 export const DEPOT_RADIUS = 3;
+/** Минимальная дистанция до любого склада или города, гексов. */
+export const DEPOT_MIN_DISTANCE = 3;
 export const DEPOT_LOSS_MULT: Fp = fp(0.5);
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);

@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17y принято повторным review: стоимость сопоставления учитывает оба направления куска; тесты проверяют реальный `setView` → `drawFront`, alpha и ширину stroke для выбранной, остальных и отсутствующей выбранной армии.
-- Тест `tweenRuns` проверяет доли `p=0.25`, `0.5`, `0.75`, пересечения всех сегментов и ограничение перемещения концов; отдельный сценарий фиксирует выбор пары с учётом разворота.
-- `pnpm verify --changed` — зелёный; блокеров нет.
-- Следующая задача: `$task 07/T17za`.
-- Читать: блок T17za в `docs/stages/stage-07-playable-build.md`, `packages/sim/src/commands/construction.ts`, `docs/gdd/03-cities-buildings.md`, `docs/gdd/04-roads-supply.md`.
+- 07/T17za ждёт review: склад строится на своём свободном гексе без дороги; добавлены `DEPOT_MIN_DISTANCE` и причина `depotTooClose` для складов и городов любого владельца.
+- `rebuildSupply` принимает изолированный склад через `hex`, использует тот же A* путь, цену за гекс и очередь дороги, что и изолированный город; потеря цели учитывает склад.
+- Обновлены GDD 03/04/10 и тесты симуляции; `pnpm verify --changed` зелёный.
+- Следующая задача: `$task 07/T17zb`.
+- Читать: блок T17zb в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/hex-actions.ts`, `packages/sim/src/commands/rebuild-supply.ts`.
