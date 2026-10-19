@@ -144,7 +144,12 @@ export function createPlanLayer(
     const w = width(tokens.front.width, detailShift);
     const style = { cap: 'round', join: 'round', alpha } as const;
     for (const r of runs) polyline(r);
-    g.stroke({ ...style, color: tokens.front.casing, width: w + 2 * tokens.front.casingWidth * k });
+    g.stroke({
+      ...style,
+      alpha: 1,
+      color: tokens.front.casing,
+      width: w + 2 * tokens.front.casingWidth * k,
+    });
     for (const r of runs) polyline(r);
     g.stroke({ ...style, color, width: w });
   }

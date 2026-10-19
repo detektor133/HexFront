@@ -99,10 +99,16 @@ describe('видимость линии фронта', () => {
       layer.setView(view, null, selected.id, null, 1, 2);
       const selectedStroke = strokes.find(({ color }) => color === armyColor(selected.number));
       const otherStroke = strokes.find(({ color }) => color === armyColor(other.number));
+      const otherCasing = strokes.find(
+        ({ color, width }) =>
+          color === tokens.front.casing &&
+          width === tokens.front.width[1] + 2 * tokens.front.casingWidth,
+      );
       expect(selectedStroke?.width).toBe(tokens.front.width[2]);
       expect(selectedStroke?.alpha).toBe(1);
       expect(otherStroke?.width).toBe(tokens.front.width[1]);
       expect(otherStroke?.alpha).toBe(tokens.fog.memoryAlpha);
+      expect(otherCasing?.alpha).toBe(1);
 
       strokes.length = 0;
       layer.setView(view, null, null, null, 1, 2);
