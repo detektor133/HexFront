@@ -123,7 +123,7 @@ function movementScene(): {
 }
 
 describe('07/T17g: стрелки путей движения', () => {
-  it('Приёмка: рисует пути всех своих отрядов без выделения и не рисует путь чужого отряда', () => {
+  it('Приёмка: без выделения пути и наконечники не рисуются, путь чужого отряда не рисуется', () => {
     installCanvasStub();
     const scene = movementScene();
     const ground = groundOf(scene.layer);
@@ -132,31 +132,46 @@ describe('07/T17g: стрелки путей движения', () => {
     const ownStrokes = strokes.filter((stroke) => stroke.color === lineOf(scene.view.playerId));
 
     expect(scene.ownIds).toHaveLength(2);
-    expect(ownStrokes.length).toBeGreaterThanOrEqual(scene.ownIds.length);
+    expect(ownStrokes).toHaveLength(0);
     expect(strokes.some((stroke) => stroke.color === lineOf(scene.enemyOwner))).toBe(false);
     scene.layer.destroy();
   });
 
-  it('Приёмка: путь выделенного отряда имеет акцент относительно пути другого своего отряда', () => {
+  it('Приёмка: рисует путь и наконечник только выделенного отряда', () => {
     installCanvasStub();
     const scene = movementScene();
     const ground = groundOf(scene.layer);
-    scene.layer.setView(scene.view, { hex: null, units: [], target: null }, 0);
-    const normal = strokesOf(ground).filter(
-      (stroke) => stroke.color === lineOf(scene.view.playerId),
-    );
     scene.layer.setView(scene.view, { hex: null, units: [scene.selectedId], target: null }, 0);
     const selected = strokesOf(ground).filter(
       (stroke) => stroke.color === lineOf(scene.view.playerId),
     );
 
-    const normalWidth = Math.max(...normal.map((stroke) => stroke.width ?? 0));
-    const normalAlpha = Math.max(...normal.map((stroke) => stroke.alpha ?? 1));
-    expect(
-      selected.some(
-        (stroke) => (stroke.width ?? 0) > normalWidth || (stroke.alpha ?? 1) > normalAlpha,
+    expect(selected).toHaveLength(2);
+    expect(selected.every((stroke) => stroke.alpha === 1)).toBe(true);
+    scene.layer.destroy();
+  });
+
+  it('Приёмка: выбор отряда не меняет линию огня артиллерии', () => {
+    installCanvasStub();
+    const scene = movementScene();
+    const artillery = scene.view.units[0];
+    const target = scene.view.units.find((unit) => unit.owner !== scene.view.playerId);
+    if (!artillery || !target) throw new Error('нет отрядов для линии огня');
+    const view = {
+      ...scene.view,
+      units: scene.view.units.map((unit) =>
+        unit.id === artillery.id
+          ? { ...unit, type: 'artillery' as const, path: [], fireTarget: target.id }
+          : unit,
       ),
-    ).toBe(true);
+    } as PlayerView;
+    const ground = groundOf(scene.layer);
+    scene.layer.setView(view, { hex: null, units: [], target: null }, 0);
+    const before = strokesOf(ground).filter((stroke) => stroke.color === tokens.status.danger);
+    scene.layer.setView(view, { hex: null, units: [artillery.id], target: null }, 0);
+    const after = strokesOf(ground).filter((stroke) => stroke.color === tokens.status.danger);
+
+    expect(after).toEqual(before);
     scene.layer.destroy();
   });
 
@@ -164,7 +179,7 @@ describe('07/T17g: стрелки путей движения', () => {
     installCanvasStub();
     const scene = movementScene();
     const ground = groundOf(scene.layer);
-    scene.layer.setView(scene.view, { hex: null, units: [], target: null }, 0);
+    scene.layer.setView(scene.view, { hex: null, units: [scene.selectedId], target: null }, 0);
     const strokes = strokesOf(ground).filter(
       (stroke) => stroke.color === lineOf(scene.view.playerId),
     );
