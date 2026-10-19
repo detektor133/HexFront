@@ -607,7 +607,7 @@ OK: повторное ревью после `6dff84fd` — прежние пу�
 | T17ac: фильтрация чужих `constructions` по текущей видимости при сохранении своих | T17ac |
 | T17ad: путь отдельного отряда только у выбранного, без изменения артиллерии и хвостов наступления | T17ad |
 
-- [~] **T17x. Выбор отряда кликом и прямоугольной рамкой** (`apps/client/src/render/map-view.ts`, `apps/client/src/render/gesture.ts`, `apps/client/src/dev/sandbox-selection.ts`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/dev/order-hooks.ts`, `apps/client/src/match/MatchSurfaceRuntime.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test`).
+- [x] **T17x. Выбор отряда кликом и прямоугольной рамкой** (`apps/client/src/render/map-view.ts`, `apps/client/src/render/gesture.ts`, `apps/client/src/dev/sandbox-selection.ts`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/dev/order-hooks.ts`, `apps/client/src/match/MatchSurfaceRuntime.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test`).
   Два разных отчёта об одном классе проблем — ввод и выбор.
 
   **Клик по отряду регистрирует соседний гекс.** Сейчас весь pointer-pipeline устроен в два шага: `render/map-view.ts` переводит точку клика в `Hex` через `pixelToHex(world, opts.radius)` и зовёт `onTap(hex, kind, world)`; дальше `selectHex(view, picked, hex)` (`apps/client/src/dev/sandbox-selection.ts`) смотрит, есть ли свои отряды именно в этом `hex`, и либо выбирает их, либо выбирает гекс. Отдельного хит-теста по фишке отряда нет вообще — хотя сама логика `selectHex` (повторный тап по тем же отрядам снимает их и выбирает гекс, иначе выбирает отряды) уже реализует именно то поведение, которое просит владелец.
