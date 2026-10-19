@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17za ждёт review: сокращены тексты `depotTooClose` до шести слов в русско-английском словаре клиента после красного CI `check` на запуске 39217015566.
+- 07/T17za возвращена на доработку: нужен тест отказа для склада в основной сети; текущий тест проверяет только изолированный склад.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая задача: `$task 07/T17zb`.
 - Читать: блок T17zb в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/HexCard.tsx`, `apps/client/src/dev/hex-actions.ts`, `packages/sim/src/commands/rebuild-supply.ts`.
