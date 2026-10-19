@@ -48,9 +48,12 @@
 
 .slotText {
   display: inline-flex;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: baseline;
   gap: var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -126,11 +129,20 @@
   min-height: var(--touch-target-min);
   min-width: var(--touch-target-min);
   padding: 0 var(--space-xs);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  border: 0;
+  border-radius: 0;
+  background: none;
   font: inherit;
   cursor: pointer;
+}
+
+.hudInteractive:hover {
+  background: var(--ui-surface2);
+}
+
+.hudInteractive:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: -2px;
 }
 
 .popover {

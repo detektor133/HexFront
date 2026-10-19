@@ -105,7 +105,7 @@ function Settings(props: {
     <div className={styles.settingsWrap}>
       <IconButton
         type="button"
-        className={styles.settingsButton}
+        className={`${styles.settingsButton} ${styles.hudInteractive}`}
         label={t('settings.title')}
         aria-expanded={open}
         onClick={() =>
@@ -243,7 +243,7 @@ export function Hud(props: {
         <IconButton
           type="button"
           buttonRef={taxButtonRef}
-          className={styles.taxButton}
+          className={`${styles.taxButton} ${styles.hudInteractive}`}
           label={t('hud.tax')}
           aria-expanded={taxOpen}
           onClick={() =>
@@ -313,7 +313,7 @@ export function Hud(props: {
       {props.onPause && (
         <IconButton
           type="button"
-          className={styles.settingsButton}
+          className={`${styles.settingsButton} ${styles.hudInteractive}`}
           label={t('pause.title')}
           onClick={props.onPause}
         >
