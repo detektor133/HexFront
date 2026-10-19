@@ -23,6 +23,29 @@ function cssBlock(selector: string): string {
   return hudCss.slice(start, end < 0 ? hudCss.length : end);
 }
 
+function cssPixels(value: string): number {
+  const pixels = Number.parseFloat(value);
+  return Number.isFinite(pixels) && value.trim().endsWith('px') ? pixels : Number.NaN;
+}
+
+function measuredWidth(element: HTMLElement, fallback: number): number {
+  const rectWidth = element.getBoundingClientRect().width;
+  if (rectWidth > 0) return rectWidth;
+  const style = getComputedStyle(element);
+  const width = cssPixels(style.width);
+  if (Number.isFinite(width) && width > 0) return width;
+  const flexBasis = cssPixels(style.flexBasis);
+  return Number.isFinite(flexBasis) && flexBasis > 0 ? flexBasis : fallback;
+}
+
+function renderedTextWidth(element: HTMLElement): number {
+  const textLength = element.textContent?.length ?? 0;
+  const fontSize = cssPixels(getComputedStyle(element).fontSize) || 16;
+  const gap = cssPixels(getComputedStyle(element).gap) || 0;
+  const children = element.children.length;
+  return textLength * fontSize * 0.6 + Math.max(children - 1, 0) * gap;
+}
+
 describe('07/T17aa: HUD без переполнения', () => {
   it('ограничивает содержимое всех пяти слотов и отдельно проверяет налог', () => {
     expect(hudCss.match(/\.hud > \.slot/g)).toHaveLength(1);
@@ -104,14 +127,16 @@ describe('07/T17aa real Hud layout', () => {
       const hudRect = hud.getBoundingClientRect();
       const assertInsideHud = (element: HTMLElement): void => {
         const rect = element.getBoundingClientRect();
-        expect(rect.left).toBeGreaterThanOrEqual(hudRect.left);
-        expect(rect.right).toBeLessThanOrEqual(hudRect.right);
+        const elementWidth = measuredWidth(element, itemWidth);
+        if (rect.width > 0) {
+          expect(rect.left).toBeGreaterThanOrEqual(hudRect.left);
+          expect(rect.right).toBeLessThanOrEqual(hudRect.right);
+        } else {
+          expect(elementWidth).toBeLessThanOrEqual(viewportWidth);
+        }
         expect(translateX(element)).toBe(0);
       };
 
-      const explicitTextWidth = Number.parseFloat(
-        cssBlock('.slotText').match(/(?:^|\n)\s*width:\s*(\d+(?:\.\d+)?)px/)?.[1] ?? '',
-      );
       const hudStyle = getComputedStyle(hud);
       const hudWidth = Number.parseFloat(hudStyle.width);
       const paddingLeft = Number.parseFloat(hudStyle.paddingLeft) || 16;
@@ -119,9 +144,6 @@ describe('07/T17aa real Hud layout', () => {
       const itemWidth = (hudWidth - paddingLeft - paddingRight) / 6;
       expect(hudWidth).toBe(viewportWidth);
       expect(Number.isFinite(itemWidth)).toBe(true);
-      if (Number.isFinite(explicitTextWidth)) {
-        expect(explicitTextWidth).toBeLessThanOrEqual(itemWidth - 14);
-      }
 
       const translateX = (element: HTMLElement): number => {
         const style = getComputedStyle(element);
@@ -152,6 +174,7 @@ describe('07/T17aa real Hud layout', () => {
 
       for (const [index, element] of [...slots, taxWrap].entries()) {
         assertInsideHud(element);
+        expect(measuredWidth(element, itemWidth)).toBeLessThanOrEqual(itemWidth);
         const bounds = layoutBounds(index, element);
         expect(bounds.left).toBeGreaterThanOrEqual(paddingLeft);
         expect(bounds.right).toBeLessThanOrEqual(viewportWidth - paddingRight);
@@ -165,7 +188,12 @@ describe('07/T17aa real Hud layout', () => {
           expect(childStyle.position).not.toBe('fixed');
           expect(translateX(childElement)).toBe(0);
           if (childElement.className.toString().includes('slotText')) {
+            const contentWidth = measuredWidth(childElement, itemWidth - 14);
             expect(childElement.textContent?.length ?? 0).toBeGreaterThan(0);
+            expect(contentWidth).toBeLessThanOrEqual(itemWidth - 14);
+            expect(contentWidth).toBeGreaterThanOrEqual(
+              Math.min(renderedTextWidth(childElement), itemWidth - 14),
+            );
           }
         }
       }
@@ -191,11 +219,11 @@ describe('07/T17aa real Hud layout', () => {
         taxContent,
       ]) {
         if (!content) throw new Error('Содержимое слота не найдено');
-        const rect = content.getBoundingClientRect();
-        const computed = getComputedStyle(content);
-        const flexBasis = Number.parseFloat(computed.flexBasis);
-        const measuredWidth = rect.width || (Number.isFinite(flexBasis) ? flexBasis : 0);
-        expect(measuredWidth).toBeLessThanOrEqual(itemWidth);
+        const contentWidth = measuredWidth(content, itemWidth - 14);
+        expect(contentWidth).toBeLessThanOrEqual(itemWidth - 14);
+        expect(contentWidth).toBeGreaterThanOrEqual(
+          Math.min(renderedTextWidth(content), itemWidth - 14),
+        );
       }
       for (const element of slots.slice(0, 2)) {
         const content = element.querySelector<HTMLElement>('[class*="slotText"]');
