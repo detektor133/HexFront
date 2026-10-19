@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { planViews } from '../../src/queries/plan-view.ts';
 import { neediestArmy } from '../../src/state/armies.ts';
-import { edgeHex, edgeOf } from '../../src/state/edges.ts';
+import { edgeHex, edgeNeighbors, edgeOf, type EdgeId } from '../../src/state/edges.ts';
 import {
   assignFront,
   assignUnits,
@@ -55,6 +55,26 @@ const infantry = (s: S, n: number, where: At = at(0, 2)): number[] =>
 
 const hexesOf = (s: S, ids: readonly number[]): number[] =>
   ids.map((id) => s.unitById(id)?.hex ?? -1).sort((x, y) => x - y);
+
+function edgeRuns(s: S, edges: readonly EdgeId[]): EdgeId[][] {
+  const pending = new Set(edges);
+  const runs: EdgeId[][] = [];
+  while (pending.size > 0) {
+    const start = [...pending][0] as EdgeId;
+    const run: EdgeId[] = [start];
+    pending.delete(start);
+    for (let i = 0; i < run.length; i += 1) {
+      const edge = run[i] as EdgeId;
+      for (const neighbor of edgeNeighbors(s.state, edge)) {
+        if (!pending.has(neighbor)) continue;
+        pending.delete(neighbor);
+        run.push(neighbor);
+      }
+    }
+    runs.push(run);
+  }
+  return runs;
+}
 
 describe('линия фронта (CR-002)', () => {
   it('армия на всю границу: отряды расходятся по разным гексам фронта', () => {
@@ -255,19 +275,28 @@ describe('линия фронта (CR-002)', () => {
     const army = armyOf(s, ids);
     const runA = edgeOf(hexOf(at(2, 0)), 0);
     const runB = edgeOf(hexOf(at(2, 4)), 0);
-    const runs = [[runA], [runB]];
-    expect(runs.every((run) => run.length > 0)).toBe(true);
-    expect(runs[0]?.some((edge) => runs[1]?.includes(edge))).toBe(false);
-    s.state.plans.push({ armyId: army, kind: 'front', edges: [runA, runB], offensive: null });
+    const runs = edgeRuns(s, [runA, runB]);
+    expect(runs).toHaveLength(2);
+    const selectedRunA = runs[0] ?? [];
+    const selectedRunB = runs[1] ?? [];
+    expect(selectedRunA.length).toBeGreaterThan(0);
+    expect(selectedRunB.length).toBeGreaterThan(0);
+    expect(selectedRunA.some((edge) => selectedRunB.includes(edge))).toBe(false);
+    s.state.plans.push({
+      armyId: army,
+      kind: 'front',
+      edges: [...selectedRunA, ...selectedRunB],
+      offensive: null,
+    });
     s.runSeconds(20);
-    s.cmd('A', raw({ t: 'clearPlan', armyId: army, edges: [runA] }));
+    s.cmd('A', raw({ t: 'clearPlan', armyId: army, edges: selectedRunA }));
     s.runSeconds(20);
     const plan = s.state.plans.find((p) => p.armyId === army);
-    expect(plan?.kind === 'front' && plan.edges).toEqual([runB]);
+    expect(plan?.kind === 'front' && plan.edges).toEqual(selectedRunB);
     expect(
       s.state.units
         .filter((unit) => unit.armyId === army && unit.type !== 'artillery')
-        .every((unit) => unit.slot === hexOf(at(2, 4))),
+        .every((unit) => selectedRunB.some((edge) => edgeHex(edge) === unit.slot)),
     ).toBe(true);
   });
 });
