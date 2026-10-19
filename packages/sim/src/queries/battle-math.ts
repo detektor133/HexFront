@@ -60,7 +60,12 @@ export function hexDirection(map: MapStatic, from: HexId, to: HexId): number {
 }
 
 // Своя артиллерия (≥ ARTY_SUPPORT_MIN_SOLDIERS, не отступает) в радиусе ARTY_RANGE от цели.
-function supported(map: MapStatic, all: readonly Fighter[], owner: number, hex: HexId): boolean {
+export function isSupportedByArtillery(
+  map: MapStatic,
+  all: readonly Fighter[],
+  owner: number,
+  hex: HexId,
+): boolean {
   const target = hexFromId(hex, map.width);
   return all.some(
     (a) =>
@@ -87,7 +92,9 @@ export function attackContribution(
   const dir = hexDirection(map, f.hex, hex);
   if (dir >= 0 && ((map.rivers[f.hex] ?? 0) >> dir) & 1)
     base = fpMul(base as Fp, RIVER_ATTACK_MULT);
-  return supported(map, all, f.owner, hex) ? fpMul(base as Fp, ARTY_SUPPORT_BONUS) : base;
+  return isSupportedByArtillery(map, all, f.owner, hex)
+    ? fpMul(base as Fp, ARTY_SUPPORT_BONUS)
+    : base;
 }
 
 /**

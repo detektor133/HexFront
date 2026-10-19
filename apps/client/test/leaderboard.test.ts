@@ -71,6 +71,7 @@ function view(overrides: Partial<PlayerView>): PlayerView {
         armyId: null,
         path: [],
         fireTarget: -1,
+        artillerySupport: false,
       },
       {
         id: 2,
@@ -89,6 +90,7 @@ function view(overrides: Partial<PlayerView>): PlayerView {
         armyId: null,
         path: [],
         fireTarget: -1,
+        artillerySupport: false,
       },
     ],
     armies: [],

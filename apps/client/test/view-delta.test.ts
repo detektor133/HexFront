@@ -75,6 +75,7 @@ const delta = (events: DeltaMessage['d']['events'] = []): DeltaMessage => ({
           armyId: null,
           path: [],
           fireTarget: -1,
+          artillerySupport: false,
         },
       ],
       removed: [],

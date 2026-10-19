@@ -38,6 +38,7 @@ function unit(overrides: Partial<UnitView> = {}): UnitView {
     armyId: 1,
     path: [],
     fireTarget: -1,
+    artillerySupport: false,
     ...overrides,
   };
 }

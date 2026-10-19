@@ -1,6 +1,7 @@
 // Отряды и армии в снимке игрока. Туман войны — этап 04: пока видны все отряды, но скрытое
 // у чужих (снабжение, армия, путь) не передаётся (08-match.md, «Туман войны»).
 import type { UnitType } from '../balance.ts';
+import { isSupportedByArtillery } from './battle-math.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import type { MatchState, UnitOrder } from '../state/types.ts';
@@ -31,6 +32,8 @@ export interface UnitView {
   readonly path: readonly HexId[];
   /** Своя артиллерия: по кому бьёт сейчас, иначе -1. */
   readonly fireTarget: number;
+  /** Атакующий неартиллерийский отряд получает бонус от своей артиллерии. */
+  readonly artillerySupport: boolean;
 }
 
 /** Своя армия в снимке. */
@@ -66,6 +69,11 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         armyId: mine ? u.armyId : null,
         path: mine ? [...u.path] : [],
         fireTarget: mine ? u.fireTarget : -1,
+        artillerySupport:
+          mine &&
+          u.type !== 'artillery' &&
+          u.order === 'attack' &&
+          isSupportedByArtillery(state.map, state.units, u.owner, u.target),
       };
     });
 }

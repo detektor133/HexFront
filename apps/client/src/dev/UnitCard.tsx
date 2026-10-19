@@ -93,6 +93,26 @@ function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   );
 }
 
+function ArtilleryStatus({ unit }: { unit: UnitView }): React.JSX.Element | null {
+  const key: MessageKey | null =
+    unit.type === 'artillery'
+      ? unit.fireTarget >= 0
+        ? 'unit.artilleryFiring'
+        : 'unit.artilleryNoTarget'
+      : unit.artillerySupport
+        ? 'unit.artillerySupport'
+        : null;
+  return key ? (
+    <p
+      role="status"
+      aria-label={t(key)}
+      className={key === 'unit.artilleryNoTarget' ? styles.bad : styles.good}
+    >
+      {t(key)}
+    </p>
+  ) : null;
+}
+
 // Приказы выбранным отрядам: слить, в армию, фокус огня. Деление — только
 // вытягиванием из фишки (05-armies.md), кнопки «Разделить» нет.
 function Orders(props: {
@@ -168,6 +188,7 @@ export function UnitCard(props: {
       <div ref={contentRef} className={styles.cardBody}>
         <h2 className={styles.title}>{title}</h2>
         {units.length === 1 && <UnitRows u={first} view={view} />}
+        {units.length === 1 && <ArtilleryStatus unit={first} />}
         <Orders units={units} view={view} send={props.send} />
       </div>
     </section>
