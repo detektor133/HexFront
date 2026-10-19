@@ -55,12 +55,55 @@ describe('плавный переход линии фронта (04/T13)', () =>
   it('сопоставляет переставленные куски по ближайшим концам без скачка между участками', () => {
     const from = [line(0, 0, 20), line(0, 100, 120)];
     const to = [line(20, 100, 120), line(20, 0, 20)];
-    const mid = tweenRuns(from, to, 0.5);
-
-    expect(mid[0]?.[0]?.x).toBeCloseTo(100, 5);
-    expect(mid[1]?.[0]?.x).toBeCloseTo(0, 5);
-    expect(mid[0]?.[0]?.y).toBeCloseTo(10, 5);
-    expect(mid[1]?.[0]?.y).toBeCloseTo(10, 5);
+    const intersects = (
+      a: { x: number; y: number },
+      b: { x: number; y: number },
+      c: { x: number; y: number },
+      d: { x: number; y: number },
+    ): boolean => {
+      const cross = (
+        u: { x: number; y: number },
+        v: { x: number; y: number },
+        w: { x: number; y: number },
+      ): number => (v.x - u.x) * (w.y - u.y) - (v.y - u.y) * (w.x - u.x);
+      const abC = cross(a, b, c);
+      const abD = cross(a, b, d);
+      const cdA = cross(c, d, a);
+      const cdB = cross(c, d, b);
+      return abC * abD < 0 && cdA * cdB < 0;
+    };
+    const hasIntersection = (runs: readonly (readonly { x: number; y: number }[])[]): boolean => {
+      const segments = runs.flatMap((run) =>
+        run.slice(1).flatMap((end, i) => {
+          const start = run[i];
+          return start ? ([[start, end]] as const) : [];
+        }),
+      );
+      return segments.some(([a, b], i) =>
+        segments.slice(i + 1).some(([c, d]) => intersects(a, b, c, d)),
+      );
+    };
+    const expectedSource = [from[1] ?? [], from[0] ?? []];
+    for (const p of [0.25, 0.5, 0.75]) {
+      const tweened = tweenRuns(from, to, p);
+      expect(hasIntersection(tweened)).toBe(false);
+      for (let i = 0; i < tweened.length; i += 1) {
+        const actual = tweened[i] ?? [];
+        const source = expectedSource[i] ?? [];
+        const target = to[i] ?? [];
+        for (const [actualEnd, sourceEnd, targetEnd] of [
+          [actual[0], source[0], target[0]],
+          [actual.at(-1), source.at(-1), target.at(-1)],
+        ] as const) {
+          if (!actualEnd || !sourceEnd || !targetEnd) throw new Error('неполные концы куска');
+          expect(
+            Math.hypot(actualEnd.x - sourceEnd.x, actualEnd.y - sourceEnd.y),
+          ).toBeLessThanOrEqual(
+            Math.hypot(targetEnd.x - sourceEnd.x, targetEnd.y - sourceEnd.y) + 1e-8,
+          );
+        }
+      }
+    }
   });
 
   it('удаляет армии без фронта и сообщает размер кэша', () => {
@@ -73,5 +116,32 @@ describe('плавный переход линии фронта (04/T13)', () =>
 
     tweens.keep(new Set([1]));
     expect(tweens.cacheTelemetry()).toEqual({ byArmy: 1 });
+  });
+
+  it('учитывает разворот куска до выбора глобального соответствия', () => {
+    const from = [
+      [
+        { x: 54, y: 98 },
+        { x: 50, y: 57 },
+      ],
+      [
+        { x: 1, y: 25 },
+        { x: 91, y: 100 },
+      ],
+    ];
+    const to = [
+      [
+        { x: 37, y: 58 },
+        { x: 77, y: 89 },
+      ],
+      [
+        { x: 24, y: 41 },
+        { x: 28, y: 8 },
+      ],
+    ];
+    const mid = tweenRuns(from, to, 0.5);
+
+    expect(mid[0]?.[0]?.x).toBeCloseTo(43.5, 5);
+    expect(mid[1]?.[0]?.x).toBeCloseTo(57.5, 5);
   });
 });

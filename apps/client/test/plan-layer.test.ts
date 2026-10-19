@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
-import { frontAppearance, isPointNearPath } from '../src/dev/plan-layer.ts';
+import { GraphicsContext } from 'pixi.js';
+import { describe, expect, it, vi } from 'vitest';
+
+import { edgeOf, loadMap, type PlanView } from '@hexfront/sim';
+
+import { createPlanLayer, frontAppearance, isPointNearPath } from '../src/dev/plan-layer.ts';
+import { createLocalEngine } from '../src/local/engine.ts';
+import { armyColor } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 describe('прогноз у линии наступления', () => {
@@ -44,5 +51,73 @@ describe('видимость линии фронта', () => {
   it('при отсутствии выбора не выделяет ни одну армию', () => {
     expect(frontAppearance(null, 7, 1).alpha).toBe(tokens.fog.memoryAlpha);
     expect(frontAppearance(null, 7, 1).width).toBe(tokens.front.width[1]);
+  });
+
+  it('через setView передаёт фактические alpha и ширину stroke для выбранной и остальных армий', () => {
+    const raw = JSON.parse(
+      readFileSync(new URL('../../../packages/mapgen/maps/small.json', import.meta.url), 'utf8'),
+    ) as unknown;
+    const loaded = loadMap(raw);
+    if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
+    const engine = createLocalEngine(raw, 42, 3);
+    if ('errors' in engine) throw new Error(engine.errors.join('\n'));
+    const snapshot = engine.tick();
+    if (snapshot.t !== 'view') throw new Error('ожидался снимок вида');
+    const [selected] = snapshot.view.armies;
+    const edges = [edgeOf(0, 0), edgeOf(1, 0)];
+    const other = selected
+      ? { id: selected.id + 1000, number: selected.number + 1, name: 'Тестовая армия', auto: false }
+      : undefined;
+    if (!selected || !other) throw new Error('недостаточно данных для теста');
+    const plans: PlanView[] = [selected, other].map((army, index) => ({
+      armyId: army.id,
+      kind: 'front' as const,
+      edges: [edges[index] as number],
+      hexes: [],
+      offensive: null,
+      zone: [],
+      stuck: false,
+      facing: [],
+      lost: [],
+      startWanted: false,
+    }));
+    const view = { ...snapshot.view, armies: [selected, other], plans };
+    const layer = createPlanLayer(loaded.map, tokens.map.hexRadius, () => ({ x: 0, y: 0 }));
+    const strokes: Array<{ alpha?: number; width?: number; color?: string }> = [];
+    const stroke = vi.spyOn(GraphicsContext.prototype, 'stroke').mockImplementation(function (
+      this: GraphicsContext,
+      ...args
+    ) {
+      const options = args[0];
+      if (typeof options === 'object' && options !== null) {
+        const value = options as { alpha?: number; width?: number; color?: string };
+        strokes.push(value);
+      }
+      return this;
+    });
+    try {
+      layer.setView(view, null, selected.id, null, 1, 2);
+      const selectedStroke = strokes.find(({ color }) => color === armyColor(selected.number));
+      const otherStroke = strokes.find(({ color }) => color === armyColor(other.number));
+      expect(selectedStroke?.width).toBe(tokens.front.width[2]);
+      expect(selectedStroke?.alpha).toBe(1);
+      expect(otherStroke?.width).toBe(tokens.front.width[1]);
+      expect(otherStroke?.alpha).toBe(tokens.fog.memoryAlpha);
+
+      strokes.length = 0;
+      layer.setView(view, null, null, null, 1, 2);
+      const plainStrokes = strokes.filter(
+        ({ color }) => color === armyColor(selected.number) || color === armyColor(other.number),
+      );
+      expect(plainStrokes).toHaveLength(2);
+      expect(
+        plainStrokes.every(
+          ({ alpha, width }) => alpha === tokens.fog.memoryAlpha && width === tokens.front.width[1],
+        ),
+      ).toBe(true);
+    } finally {
+      stroke.mockRestore();
+      layer.destroy();
+    }
   });
 });

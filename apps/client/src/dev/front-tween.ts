@@ -67,6 +67,9 @@ const gap = (a: readonly Point[], b: readonly Point[]): number => {
   return Math.hypot(a0.x - b0.x, a0.y - b0.y) + Math.hypot(a1.x - b1.x, a1.y - b1.y);
 };
 
+const pairCost = (source: readonly Point[], target: readonly Point[]): number =>
+  Math.min(gap(source, target), gap([...source].reverse(), target));
+
 function matchedSources(
   from: readonly (readonly Point[])[],
   to: readonly (readonly Point[])[],
@@ -88,7 +91,7 @@ function matchedSources(
     for (let sourceIndex = 0; sourceIndex < from.length; sourceIndex += 1) {
       if (used.has(sourceIndex)) continue;
       used.add(sourceIndex);
-      search(targetIndex + 1, cost + gap(from[sourceIndex] ?? [], to[targetIndex] ?? []), [
+      search(targetIndex + 1, cost + pairCost(from[sourceIndex] ?? [], to[targetIndex] ?? []), [
         ...sourceOrder,
         sourceIndex,
       ]);
