@@ -44,6 +44,8 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
       { t: 'selection', at: { x: 10, y: 20 }, to: { x: 30, y: 50 }, phase: 'move' },
       { t: 'selection', at: { x: 10, y: 20 }, to: { x: 40, y: 60 }, phase: 'end' },
     ]);
+    const end = s.events.at(-1);
+    expect(end).toMatchObject({ t: 'selection', phase: 'end', to: { x: 40, y: 60 } });
   });
 
   it('не превращает обычное перетаскивание в рамку выбора', () => {

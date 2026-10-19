@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17x: ревью вернуло задачу; требуется тест реального `/match`-пути для клика по движущейся фишке и Shift-рамки.
-- `MatchSurfaceRuntime` использует hit-test слоя фишек для обычного тапа, а `Shift`-рамка и панорамирование без Shift сохранены.
-- Добавлена регрессия `t17g-movement-paths.test.ts` на позицию движущейся фишки; `sandbox-selection.test.ts` проверяет повторный тап и свободный гекс.
-- Задача отмечена `[ ]`; после исправления повторить `$review 07/T17x`.
-- Читать: блоки T17x и T17y в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/unit-layer.ts`, `apps/client/src/match/MatchSurfaceRuntime.tsx`.
+- 07/T17x: добавлен DOM-тест реального `/match`-пути для клика по движущейся фишке и Shift-рамки.
+- Тест проводит tap через `createGesture → onTap`, а рамку через `setSelection`; протяжка без Shift подтверждает pan.
+- Контрольные мутации reviewer воспроизведены: пустой `unitsAt` и отключённый `setSelection` дали RED; восстановленный код дал GREEN.
+- Задача отмечена `[~]`; следующая сессия — `$review 07/T17x`.
+- Читать: блок T17x в `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17x-selection.dom.test.tsx`, `apps/client/src/match/MatchSurfaceRuntime.tsx`.

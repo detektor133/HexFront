@@ -106,6 +106,7 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(
       selected.some((id) => view.units.find((u) => u.id === id)?.owner !== view.playerId),
     ).toBe(false);
+    expect(selected).toHaveLength(2);
   });
 });
 
