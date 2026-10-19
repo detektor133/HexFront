@@ -37,7 +37,6 @@ function installCanvasStub(): void {
 function createBattleScene(): {
   layer: ReturnType<typeof createUnitLayer>;
   mapWidth: number;
-  attackerHex: number;
   defenderHex: number;
 } {
   const loaded = loadMap(small);
@@ -73,7 +72,6 @@ function createBattleScene(): {
   return {
     layer,
     mapWidth: loaded.map.width,
-    attackerHex: own.hex,
     defenderHex: adjacentEnemy.hex,
   };
 }
@@ -107,12 +105,11 @@ describe('07/T17f: слой маркера боя', () => {
 
   it('Приёмка 2: фишки рядом с маркером боя не закрывают маркер', () => {
     installCanvasStub();
-    const { layer, mapWidth, attackerHex, defenderHex } = createBattleScene();
+    const { layer, mapWidth, defenderHex } = createBattleScene();
     const { battles, chips } = getBattleAndChipLayers(layer);
     const marker = battles.children[0];
     if (!(marker instanceof Container)) throw new Error('маркер боя не найден');
 
-    const attackerCenter = hexCenter(hexFromId(attackerHex, mapWidth), tokens.map.hexRadius);
     const defenderCenter = hexCenter(hexFromId(defenderHex, mapWidth), tokens.map.hexRadius);
     const adjacentChip = chips.children.find(
       (child) =>
@@ -121,8 +118,8 @@ describe('07/T17f: слой маркера боя', () => {
     );
     if (!adjacentChip) throw new Error('соседняя фишка боя не найдена');
 
-    expect(marker.position.x).toBeCloseTo((attackerCenter.x + defenderCenter.x) / 2);
-    expect(marker.position.y).toBeCloseTo((attackerCenter.y + defenderCenter.y) / 2);
+    expect(marker.position.x).toBeCloseTo(defenderCenter.x);
+    expect(marker.position.y).toBeCloseTo(defenderCenter.y);
     expect(marker.parent).toBe(battles);
     expect(adjacentChip.parent).toBe(chips);
 
