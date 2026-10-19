@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, hexId, loadMap, neighbors, type MapStatic } from '@hexfront/sim';
 
-import { selectUnitsInRect } from '../src/dev/sandbox-selection.ts';
+import type * as SandboxSelection from '../src/dev/sandbox-selection.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
@@ -114,7 +114,14 @@ describe('07/T17x: выбор через реальный путь /match', () =
       ...source.view,
       units: source.view.units.map((unit) =>
         unit.id === moving.id
-          ? { ...unit, path: [hexId(next, loaded.map.width)], moveTicks: 5, moveTotal: 10 }
+          ? {
+              ...unit,
+              armyId: null,
+              soldiers: 123_000 as typeof unit.soldiers,
+              path: [hexId(next, loaded.map.width)],
+              moveTicks: 9,
+              moveTotal: 10,
+            }
           : unit,
       ),
     };
@@ -123,8 +130,9 @@ describe('07/T17x: выбор через реальный путь /match', () =
       view,
       snapshot: { ...source.snapshot, view },
     };
-    let tap: TapHandler = () => undefined;
+    let tap: TapHandler | undefined;
     let mapStub: ReturnType<typeof mapViewStub> | undefined;
+    const selectUnitsSpy = vi.fn();
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => mapJson }) as Response),
@@ -151,6 +159,13 @@ describe('07/T17x: выбор через реальный путь /match', () =
         };
       },
     }));
+    vi.doMock('../src/dev/sandbox-selection.ts', async () => {
+      const actual = await vi.importActual<typeof SandboxSelection>(
+        '../src/dev/sandbox-selection.ts',
+      );
+      selectUnitsSpy.mockImplementation(actual.selectUnits);
+      return { ...actual, selectUnits: selectUnitsSpy };
+    });
     vi.doMock('../src/render/map-view.ts', () => ({
       createMapView: async (
         _host: HTMLElement,
@@ -170,15 +185,14 @@ describe('07/T17x: выбор через реальный путь /match', () =
     await waitFor(() => expect(tap).toBeDefined());
     const start = hexCenter(hexFromId(moving.hex, loaded.map.width), tokens.map.hexRadius);
     const finish = hexCenter(next, tokens.map.hexRadius);
-    const midpoint = { x: (start.x + finish.x) / 2, y: (start.y + finish.y) / 2 };
-    act(() => mapStub?.gesture.down(1, midpoint, 0, 0));
-    act(() => mapStub?.gesture.up(1, midpoint, 1));
-    const unitCard = (): Element | undefined =>
-      Array.from(document.querySelectorAll('section[aria-label]')).find(
-        (element) => element.getAttribute('aria-label') !== 'Таблица лидеров',
-      );
-    await waitFor(() => expect(unitCard()).toBeDefined());
-    expect(unitCard()?.getAttribute('aria-label')).toContain(formatSoldiers(moving.soldiers));
+    const current = {
+      x: start.x + (finish.x - start.x) * 0.9,
+      y: start.y + (finish.y - start.y) * 0.9,
+    };
+    act(() => mapStub?.gesture.down(1, current, 0, 0));
+    act(() => mapStub?.gesture.up(1, current, 1));
+    await waitFor(() => expect(selectUnitsSpy).toHaveBeenCalled());
+    expect(selectUnitsSpy.mock.calls.at(-1)?.[2]).toEqual([moving.id]);
   });
 
   it('Shift-протяжка проходит через setSelection, а протяжка без Shift только панорамирует', async () => {
@@ -188,10 +202,15 @@ describe('07/T17x: выбор через реальный путь /match', () =
     const source = engine.snapshot();
     const own = source.view.units.filter((unit) => unit.owner === source.view.playerId).slice(0, 2);
     if (own.length !== 2) throw new Error('нужны два своих отряда');
+    const selectedUnits = own.map((unit, index) => ({
+      ...unit,
+      armyId: null,
+      soldiers: (index === 0 ? 111_000 : 222_000) as typeof unit.soldiers,
+    }));
     const message: FromWorker = {
       ...source,
-      view: { ...source.view, units: own },
-      snapshot: { ...source.snapshot, view: { ...source.view, units: own } },
+      view: { ...source.view, units: selectedUnits },
+      snapshot: { ...source.snapshot, view: { ...source.view, units: selectedUnits } },
     };
     let mapStub: ReturnType<typeof mapViewStub> | undefined;
     vi.stubGlobal(
@@ -254,11 +273,13 @@ describe('07/T17x: выбор через реальный путь /match', () =
     act(() => mapStub?.gesture.move(2, second, 20));
     act(() => mapStub?.gesture.up(2, second, 40));
     expect(mapStub?.selectionPhases()).toEqual(['start', 'move', 'end']);
-    expect(
-      selectUnitsInRect(message.view, first, second, (hex) =>
-        hexCenter(hexFromId(hex, loaded.map.width), tokens.map.hexRadius),
-      ),
-    ).toEqual(own.map((unit) => unit.id));
+    const selectedCard = (): Element | null =>
+      document.querySelector('section[aria-label^="Выбрано"]');
+    await waitFor(() => expect(selectedCard()).toBeDefined());
+    const selectedLabel = selectedCard()?.getAttribute('aria-label');
+    expect(selectedLabel).toBeTruthy();
+    expect(selectedLabel).toContain('Выбрано отрядов: 2');
+    expect(selectedLabel).toContain(formatSoldiers(333_000));
     expect(mapStub?.panCount()).toBe(1);
   });
 });
