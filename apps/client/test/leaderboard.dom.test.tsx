@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, isInaccessible, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Fp, PlayerView } from '@hexfront/sim';
 
+import { installPanelStyles } from './panel-css.ts';
 import { Leaderboard } from '../src/dev/Leaderboard.tsx';
 
 type Ranking = readonly { readonly id: number; readonly score: number; readonly place: number }[];
@@ -66,35 +67,57 @@ const view = (overrides: Partial<RankingView> = {}): RankingView =>
   }) as RankingView;
 
 describe('лидерборд', () => {
+  let removeStyles: () => void;
+  beforeEach(() => {
+    removeStyles = installPanelStyles();
+  });
   afterEach(() => {
+    removeStyles();
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('передаёт layout фактический размер панели после DOM-измерения', () => {
-    let panelSize = { width: 150, height: 138 };
-    const getBoundingClientRect = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function (this: HTMLElement) {
-        if (!this.className.toString().includes('panel')) return new DOMRect();
-        return new DOMRect(0, 0, panelSize.width, panelSize.height);
-      });
-    const onSize = vi.fn();
+  it.each([false, true])(
+    'передаёт внешний размер панели из ResizeObserver (borderBoxSize: %s)',
+    (borderBox) => {
+      let panelSize = { width: 150, height: 138 };
+      class Observer {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element, options?: ResizeObserverOptions): void {
+          expect(options?.box).toBe('border-box');
+          this.callback(
+            [
+              {
+                target,
+                contentRect: new DOMRect(0, 0, panelSize.width - 14, panelSize.height - 14),
+                borderBoxSize: borderBox
+                  ? [{ inlineSize: panelSize.width, blockSize: panelSize.height }]
+                  : [],
+              } as unknown as ResizeObserverEntry,
+            ],
+            this as unknown as ResizeObserver,
+          );
+        }
+        disconnect(): void {}
+      }
+      vi.stubGlobal('ResizeObserver', Observer);
+      const onSize = vi.fn();
 
-    render(<Leaderboard view={view()} onSize={onSize} />);
-    expect(onSize).toHaveBeenLastCalledWith({ width: 150, height: 138 });
+      render(<Leaderboard view={view()} onSize={onSize} />);
+      expect(onSize).toHaveBeenLastCalledWith({ width: 150, height: 138 });
 
-    cleanup();
-    panelSize = { width: 174, height: 142 };
-    render(<Leaderboard view={view()} onSize={onSize} />);
+      cleanup();
+      panelSize = { width: 174, height: 142 };
+      render(<Leaderboard view={view()} onSize={onSize} />);
 
-    expect(getBoundingClientRect).toHaveBeenCalledTimes(2);
-    expect(onSize).toHaveBeenLastCalledWith({ width: 174, height: 142 });
-    expect(onSize.mock.calls.map(([size]) => size)).toEqual([
-      { width: 150, height: 138 },
-      { width: 174, height: 142 },
-    ]);
-  });
+      expect(onSize).toHaveBeenLastCalledWith({ width: 174, height: 142 });
+      expect(onSize.mock.calls.map(([size]) => size)).toEqual([
+        { width: 150, height: 138 },
+        { width: 174, height: 142 },
+      ]);
+    },
+  );
 
   it('критерий 07/T17s: на ПК лидерборд видим без кнопки сворачивания', () => {
     render(<Leaderboard view={view()} open={false} />);
@@ -102,6 +125,8 @@ describe('лидерборд', () => {
     expect(screen.getByRole('region', { name: 'Таблица лидеров' })).toBeTruthy();
     expect(screen.getByText('Таблица лидеров')).toBeTruthy();
     expect(screen.getByText('Живы: 6')).toBeTruthy();
+    expect(isInaccessible(screen.getByText('Таблица лидеров'))).toBe(false);
+    expect(isInaccessible(screen.getByText('Живы: 6'))).toBe(false);
     expect(screen.queryByRole('button')).toBeNull();
   });
 
@@ -156,6 +181,7 @@ describe('лидерборд', () => {
     const source = view();
     const namedView = {
       ...source,
+      ranking: [{ id: 0, score: 123456789, place: 6 }, ...source.ranking.slice(1)],
       players: source.players.map((player, id) =>
         id === 0 ? { ...player, name: 'Очень длинное имя игрока' } : player,
       ),
@@ -166,7 +192,18 @@ describe('лидерборд', () => {
     const [player] = within(screen.getAllByRole('row')[0] as HTMLElement).getAllByRole('cell');
     if (!player) throw new Error('Строка игрока не найдена');
     expect(player.className).toContain('player');
+    expect(player.textContent).toBe('Очень длинное имя игрока');
+    expect(player.title).toBe('Очень длинное имя игрока');
+    expect(getComputedStyle(player).textOverflow).toBe('ellipsis');
     const row = screen.getAllByRole('row')[0] as HTMLElement;
+    const score = within(row).getAllByRole('cell')[1];
+    expect(score?.textContent).toBe('123456789');
+    if (!score) throw new Error('Полный счёт не найден');
+    expect(getComputedStyle(score).textOverflow).not.toBe('ellipsis');
+    const scoreStyle = getComputedStyle(score);
+    for (const overflow of [scoreStyle.overflow, scoreStyle.overflowX, scoreStyle.overflowY]) {
+      expect(['', 'visible']).toContain(overflow);
+    }
     expect(within(row).getByRole('rowheader')).not.toBe(within(row).getAllByRole('cell')[1]);
     const stylesheet = readFileSync('apps/client/src/dev/Leaderboard.module.css', 'utf8');
     expect(stylesheet).toMatch(/text-overflow:\s*ellipsis/u);
@@ -185,11 +222,10 @@ describe('лидерборд', () => {
     const source = view();
     const largeView = {
       ...source,
-      ranking: Array.from({ length: 30 }, (_, id) => ({
-        id,
-        score: id < 2 ? 30 : id < 4 ? 20 : 10 - id,
-        place: id < 2 ? 1 : id < 4 ? 3 : id + 1,
-      })),
+      ranking: Array.from({ length: 30 }, (_, index) => {
+        const id = 29 - index;
+        return { id, score: id < 2 ? 30 : id < 4 ? 20 : 10 - id, place: index + 10 };
+      }),
       players: Array.from({ length: 30 }, (_, id) => ({
         id,
         gold: 0 as Fp,
@@ -199,6 +235,8 @@ describe('лидерборд', () => {
       })),
     } as RankingView;
 
+    const originalRanking = structuredClone(largeView.ranking);
+    const originalPlace = largeView.me.place;
     render(<Leaderboard view={largeView} />);
 
     expect(screen.getAllByRole('rowheader')).toHaveLength(5);
@@ -226,5 +264,7 @@ describe('лидерборд', () => {
       '3',
       '5',
     ]);
+    expect(largeView.ranking).toEqual(originalRanking);
+    expect(largeView.me.place).toBe(originalPlace);
   });
 });

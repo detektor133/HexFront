@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
+import { installPanelStyles } from './panel-css.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
@@ -97,12 +98,28 @@ function installMatchRuntime(): void {
 }
 
 let leaderboardResizeEvent: { width: number; height: number } = { width: 173, height: 139 };
+let taxAnchor: { x: number; y: number } | undefined;
+let removeStyles: () => void;
+beforeEach(() => {
+  removeStyles = installPanelStyles();
+});
 
 function installResizeObserver(): void {
   class ControlledResizeObserver {
     public constructor(private readonly callback: ResizeObserverCallback) {}
 
     public observe(target: Element): void {
+      if (
+        target.tagName === 'BUTTON' &&
+        /Налог|Tax/u.test(target.getAttribute('aria-label') ?? '')
+      ) {
+        // Якорь popup — управляемый вход; геометрия самой панели не подменяется.
+        Object.defineProperty(target, 'getBoundingClientRect', {
+          configurable: true,
+          value: () =>
+            new DOMRect(taxAnchor?.x ?? window.innerWidth - 200, taxAnchor?.y ?? 64, 44, 44),
+        });
+      }
       const size =
         target.getAttribute('aria-label') === 'Leaderboard'
           ? leaderboardResizeEvent
@@ -124,7 +141,9 @@ function installResizeObserver(): void {
 }
 
 afterEach(() => {
+  removeStyles();
   leaderboardResizeEvent = { width: 173, height: 139 };
+  taxAnchor = undefined;
   cleanup();
   vi.resetModules();
   vi.restoreAllMocks();
@@ -165,14 +184,6 @@ describe('07/T17i: раскладка лидерборда', () => {
     installMatchRuntime();
     installResizeObserver();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      if (this.tagName === 'BUTTON' && /Tax/u.test(this.getAttribute('aria-label') ?? '')) {
-        return new DOMRect(window.innerWidth - 200, 64, 44, 44);
-      }
-      return new DOMRect();
-    });
 
     for (const viewport of viewports.slice(0, 3)) {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
@@ -181,7 +192,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
       await waitFor(() => {
         expect(leaderboard?.style.left).toBe(
-          `${viewport.width - 16 - leaderboardResizeEvent.width}px`,
+          `${viewport.width - 16 - (leaderboardResizeEvent.width + 14)}px`,
         );
         expect(leaderboard?.style.width).toBe('');
         expect(leaderboard?.style.height).toBe('');
@@ -190,6 +201,14 @@ describe('07/T17i: раскладка лидерборда', () => {
       await waitFor(() => expect(leaderboard?.style.top).toBe('236px'));
       expect(document.querySelector('[aria-label="Leaderboard"] h2')).not.toBeNull();
       unmount();
+
+      leaderboardResizeEvent = { width: 173, height: 95 };
+      const paddedLeaderboard = render(createElement(MatchPage));
+      const paddedRegion = await screen.findByRole('region', { name: /Leaderboard/u });
+      fireEvent.click(screen.getByRole('button', { name: /Tax/u }));
+      // 95 px содержимого не пересекают popup на y=108; внешние 109 px пересекают.
+      await waitFor(() => expect(paddedRegion.style.top).toBe('236px'));
+      paddedLeaderboard.unmount();
 
       leaderboardResizeEvent = { width: 173, height: 1 };
       const shortLeaderboard = render(createElement(MatchPage));
@@ -200,14 +219,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       leaderboardResizeEvent = { width: 173, height: 139 };
     }
 
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      if (this.tagName === 'BUTTON' && /Налог|Tax/u.test(this.getAttribute('aria-label') ?? '')) {
-        return new DOMRect(220, 20, 44, 44);
-      }
-      return new DOMRect();
-    });
+    taxAnchor = { x: 220, y: 20 };
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 601 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
     const { unmount } = render(createElement(MatchPage));
@@ -220,7 +232,10 @@ describe('07/T17i: раскладка лидерборда', () => {
     const measuredLayout = layoutFor(
       { width: 601, height: 900 },
       {
-        leaderboardSize: leaderboardResizeEvent,
+        leaderboardSize: {
+          width: leaderboardResizeEvent.width + 14,
+          height: leaderboardResizeEvent.height + 14,
+        },
         popupOpen: true,
         popupAnchorY: 64,
         popupSize: { width: 260, height: 120 },
@@ -233,9 +248,9 @@ describe('07/T17i: раскладка лидерборда', () => {
     leaderboardResizeEvent = { width: 173, height: 1 };
     const shortLeaderboard = render(createElement(MatchPage));
     const shortLeaderboardRegion = await screen.findByRole('region', {
-      name: /РўР°Р±Р»РёС†Р° Р»РёРґРµСЂРѕРІ|Leaderboard/u,
+      name: /Таблица лидеров|Leaderboard/u,
     });
-    fireEvent.click(screen.getByRole('button', { name: /РќР°Р»РѕРі|Tax/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Налог|Tax/u }));
     await waitFor(() => expect(shortLeaderboardRegion.style.top).toBe('8px'));
     shortLeaderboard.unmount();
   });

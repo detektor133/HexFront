@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { expectNoGeometryTransition, installPanelStyles } from './panel-css.ts';
+import armyStyles from '../src/dev/ArmyBar.module.css';
+import cardStyles from '../src/dev/HexCard.module.css';
+import leaderboardStyles from '../src/dev/Leaderboard.module.css';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
 const cssSources = [
@@ -10,14 +14,13 @@ const cssSources = [
   readFileSync(join(process.cwd(), 'apps/client/src/dev/HexCard.module.css'), 'utf8'),
 ];
 
-function installPanelStyles(): HTMLStyleElement {
-  const style = document.createElement('style');
-  style.textContent = `:root { --motion-easing: cubic-bezier(0.22, 1, 0.36, 1); }\n${cssSources.join('\n')}`;
-  document.head.append(style);
-  return style;
-}
+let removeStyles: () => void;
+beforeEach(() => {
+  removeStyles = installPanelStyles();
+});
 
-function addScrollableNode(className: string): HTMLDivElement {
+function addScrollableNode(className: string | undefined): HTMLDivElement {
+  if (!className) throw new Error('Класс CSS-модуля не найден');
   const node = document.createElement('div');
   node.className = className;
   Object.defineProperties(node, {
@@ -29,40 +32,43 @@ function addScrollableNode(className: string): HTMLDivElement {
 }
 
 afterEach(() => {
-  document.head.querySelector('style')?.remove();
+  removeStyles();
   document.body.replaceChildren();
 });
 
 describe('07/T17o: прокрутка и движение панелей', () => {
-  it('скрывает нативный скроллбар, сохраняя переполненную прокрутку', () => {
-    installPanelStyles();
-
+  it('оставляет ПК-лидерборд без обрезания и прокрутки, сохраняя прокрутку HexCard', () => {
     for (const className of ['panel', 'card']) {
-      const node = addScrollableNode(className);
+      const node = addScrollableNode(
+        className === 'panel' ? leaderboardStyles.panel : cardStyles.card,
+      );
       const style = getComputedStyle(node);
 
       expect(node.scrollHeight).toBeGreaterThan(node.clientHeight);
       if (className === 'panel') {
-        expect(style.overflowY).not.toMatch(/auto|scroll/u);
+        for (const overflow of [style.overflow, style.overflowX, style.overflowY]) {
+          expect(['', 'visible']).toContain(overflow);
+        }
         expect(cssSources[0]).toMatch(/\.panel\s*\{[\s\S]*width:\s*max-content/u);
       } else {
         expect(style.overflowY).toBe('auto');
         expect(style.scrollbarWidth).toBe('none');
         expect(cssSources[1]).toMatch(/\.card\s*\{[\s\S]*width:\s*max-content/u);
         expect(cssSources[1]).toMatch(/box-sizing:\s*border-box/u);
+        node.scrollTop = 40;
+        expect(node.scrollTop).toBe(40);
       }
-
-      node.scrollTop = 40;
-      expect(node.scrollTop).toBe(40);
     }
   });
 
   it('не анимирует изменение высоты и позиции карточки и лидерборда', () => {
-    installPanelStyles();
-
-    for (const className of ['card', 'panel']) {
-      const transition = getComputedStyle(addScrollableNode(className)).transition;
-      expect(transition).not.toMatch(/top|height/u);
+    for (const className of [
+      cardStyles.card,
+      leaderboardStyles.panel,
+      armyStyles.dock,
+      armyStyles.content,
+    ]) {
+      expectNoGeometryTransition(addScrollableNode(className));
     }
   });
 

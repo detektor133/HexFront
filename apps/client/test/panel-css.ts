@@ -1,0 +1,70 @@
+import { readFileSync } from 'node:fs';
+
+import { expect } from 'vitest';
+
+import armyStyles from '../src/dev/ArmyBar.module.css';
+import cardStyles from '../src/dev/HexCard.module.css';
+import leaderboardStyles from '../src/dev/Leaderboard.module.css';
+
+/** Подключает исходные правила к тем же классам, которые выдаёт Vitest для CSS-модулей. */
+export function installPanelStyles(): () => void {
+  const sheets = [
+    ['ArmyBar', armyStyles],
+    ['HexCard', cardStyles],
+    ['Leaderboard', leaderboardStyles],
+  ] as const;
+  const tokens = readFileSync('apps/client/src/theme/tokens.css', 'utf8');
+  const variables = new Map(
+    [...tokens.matchAll(/(--[\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]),
+  );
+  const nodes = sheets.map(([name, classes]) => {
+    const node = document.createElement('style');
+    node.textContent = readFileSync(`apps/client/src/dev/${name}.module.css`, 'utf8')
+      .replace(/\.([a-zA-Z_][\w-]*)/gu, (selector, local: string) =>
+        classes[local] ? `.${classes[local]}` : selector,
+      )
+      .replace(
+        /var\((--[\w-]+)\)/gu,
+        (value, variable: string) => variables.get(variable) ?? value,
+      );
+    document.head.append(node);
+    return node;
+  });
+  return () => nodes.forEach((node) => node.remove());
+}
+
+/** jsdom возвращает duration=0s даже при shorthand «top 1s»; читаем применённые объявления CSSOM. */
+export function expectNoGeometryTransition(node: HTMLElement): void {
+  let transition = '';
+  let transitionProperty = '';
+  let transitionDuration = '';
+  const declarations = Array.from(document.styleSheets).flatMap((sheet) =>
+    Array.from(sheet.cssRules).flatMap((rule) =>
+      rule instanceof CSSStyleRule && node.matches(rule.selectorText) ? [rule.style] : [],
+    ),
+  );
+  for (const style of [...declarations, node.style]) {
+    for (let index = 0; index < style.length; index += 1) {
+      const property = style[index];
+      if (property === 'transition') {
+        transition = style.getPropertyValue(property);
+        transitionProperty = '';
+        transitionDuration = '';
+      }
+      if (property === 'transition-property') transitionProperty = style.getPropertyValue(property);
+      if (property === 'transition-duration') transitionDuration = style.getPropertyValue(property);
+    }
+  }
+  const shorthand = transition.split(/,(?![^()]*\))/u).map((part) => part.trim());
+  const properties = transitionProperty
+    ? transitionProperty.split(',').map((part) => part.trim())
+    : shorthand.map((part) => part.match(/^(all|none|[a-z-]+)/u)?.[1] ?? 'all');
+  const durations = transitionDuration
+    ? transitionDuration.split(',').map((part) => Number.parseFloat(part))
+    : shorthand.map((part) => Number.parseFloat(part.match(/[\d.]+m?s/u)?.[0] ?? '0'));
+  properties.forEach((property, index) => {
+    if (['all', 'top', 'height'].includes(property)) {
+      expect(durations[index % durations.length], `${node.className}: ${property}`).toBe(0);
+    }
+  });
+}

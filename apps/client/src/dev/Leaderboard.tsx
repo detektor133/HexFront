@@ -49,13 +49,33 @@ export function Leaderboard({
     const panel = panelRef.current;
     if (!panel || !onSize) return;
     const report = (entries: readonly ResizeObserverEntry[] = []): void => {
-      const observedRect = entries[0]?.contentRect;
-      const rect = observedRect ?? panel.getBoundingClientRect();
+      const entry = entries[0];
+      const borderBox = entry?.borderBoxSize?.[0];
+      const style = getComputedStyle(panel);
+      const px = (value: string): number => Number.parseFloat(value) || 0;
+      const rect = borderBox
+        ? { width: borderBox.inlineSize, height: borderBox.blockSize }
+        : entry
+          ? {
+              width:
+                entry.contentRect.width +
+                px(style.paddingLeft) +
+                px(style.paddingRight) +
+                px(style.borderLeftWidth) +
+                px(style.borderRightWidth),
+              height:
+                entry.contentRect.height +
+                px(style.paddingTop) +
+                px(style.paddingBottom) +
+                px(style.borderTopWidth) +
+                px(style.borderBottomWidth),
+            }
+          : panel.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) onSize({ width: rect.width, height: rect.height });
     };
     report();
     const observer = new ResizeObserver(report);
-    observer.observe(panel);
+    observer.observe(panel, { box: 'border-box' });
     return () => observer.disconnect();
   }, [onSize]);
   const me = rows.find((row) => row.playerId === view.playerId);

@@ -84,13 +84,11 @@ interface Rect {
   readonly height: number;
 }
 
-function readInlineRect(element: HTMLElement): Rect {
-  return {
-    x: Number.parseFloat(element.style.left),
-    y: Number.parseFloat(element.style.top),
-    width: Number.parseFloat(element.style.width),
-    height: Number.parseFloat(element.style.height),
-  };
+function readInlinePosition(element: HTMLElement): string[] {
+  const { left, right, top, bottom, width, height } = element.style;
+  expect(left || right).toMatch(/^-?\d+(?:\.\d+)?px$/u);
+  expect(top || bottom).toMatch(/^-?\d+(?:\.\d+)?px$/u);
+  return [left, right, top, bottom, width, height];
 }
 
 function overlaps(first: Rect, second: Rect): boolean {
@@ -118,23 +116,24 @@ describe('07/T17j: налог не скрывает лидерборд', () => {
     render(<MatchPage />);
     const leaderboard = screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u });
     const taxButton = screen.getByRole('button', { name: /Налог|Tax/u });
-    const initialRect = readInlineRect(leaderboard);
+    const initialPosition = readInlinePosition(leaderboard);
+    expect(initialPosition.slice(0, 2)).toEqual(['', '16px']);
 
     expect(leaderboard).toBeTruthy();
     fireEvent.click(taxButton);
     expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
-    expect(readInlineRect(leaderboard)).toEqual(initialRect);
+    expect(readInlinePosition(leaderboard)).toEqual(initialPosition);
     const slider = screen.getByRole('slider', { name: /Налог|Tax/u });
     fireEvent.change(screen.getByRole('slider', { name: /Налог|Tax/u }), {
       target: { value: '300' },
     });
     expect(sentCommands).toContainEqual({ t: 'setTax', rate: 300 });
     expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
-    expect(readInlineRect(leaderboard)).toEqual(initialRect);
+    expect(readInlinePosition(leaderboard)).toEqual(initialPosition);
     fireEvent.click(taxButton);
     expect(screen.queryByRole('dialog', { name: /Налог|Tax/u })).toBeNull();
     expect(screen.getByRole('region', { name: /Таблица лидеров|Leaderboard/u })).toBe(leaderboard);
-    expect(readInlineRect(leaderboard)).toEqual(initialRect);
+    expect(readInlinePosition(leaderboard)).toEqual(initialPosition);
     expect(slider).toBeTruthy();
   });
 

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, isInaccessible, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Fp, PlayerView } from '@hexfront/sim';
 
+import { installPanelStyles } from './panel-css.ts';
 import { Leaderboard } from '../src/dev/Leaderboard.tsx';
 
 type RankingView = PlayerView & {
@@ -67,7 +68,12 @@ function view(): RankingView {
 }
 
 describe('07/T17d: таблица лидеров', () => {
+  let removeStyles: () => void;
+  beforeEach(() => {
+    removeStyles = installPanelStyles();
+  });
   afterEach(() => {
+    removeStyles();
     cleanup();
   });
 
@@ -94,6 +100,7 @@ describe('07/T17d: таблица лидеров', () => {
     render(<Leaderboard view={view()} />);
 
     expect(screen.getByText('Живы: 4')).toBeTruthy();
+    expect(isInaccessible(screen.getByText('Живы: 4'))).toBe(false);
     expect(screen.queryByText(/из/iu)).toBeNull();
   });
 
@@ -101,5 +108,6 @@ describe('07/T17d: таблица лидеров', () => {
     render(<Leaderboard view={view()} />);
 
     expect(screen.getAllByText('Таблица лидеров')).toHaveLength(1);
+    expect(isInaccessible(screen.getByText('Таблица лидеров'))).toBe(false);
   });
 });
