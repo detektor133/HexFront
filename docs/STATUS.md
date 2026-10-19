@@ -15,6 +15,8 @@
 
 ## Следующая сессия
 
-- Следующая задача: `$task 07/T17ak`.
-- Читать: блоки T17ak–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
-- Читать: блоки T17ak–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
+- Сделано: T17ak реализована; добавлены расчёт центроидов территорий и подписи государств/ботов на detail 1.
+- Проверено: нейтральные гексы и игроки без территории не создают подпись; detail 2 и 3 очищают слой.
+- Следующая задача: `$task 07/T17al`.
+- Читать: блоки T17al–T17 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
+- Файлы T17ak: `apps/client/src/dev/territory-labels.ts`, `apps/client/src/dev/economy-layer.ts`, `apps/client/test/territory-labels.test.ts`, `apps/client/test/territory-layer.test.ts`.

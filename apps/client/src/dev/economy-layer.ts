@@ -26,6 +26,11 @@ import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
 import type { SplitOverlay } from './split-drag.ts';
+import {
+  buildTerritoryLabels,
+  drawTerritoryLabels,
+  territoryLabelsKey,
+} from './territory-labels.ts';
 import { createUnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
@@ -84,6 +89,7 @@ const NOTHING: SandboxSelection = { hex: null, units: [], target: null };
 export interface EconomyLayer {
   readonly container: Container;
   readonly top: Container;
+  readonly territoryLabels: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
   cacheTelemetry(): UnitLayerCacheTelemetry & {
@@ -258,7 +264,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const planLayer = createPlanLayer(map, radius, center);
   // Плашка прогноза — поверх фишек.
   const plates = new Container();
-  top.addChild(borders, fog, planLayer.container, marks, labels, unitLayer.container, plates);
+  const territoryLabels = new Container();
+  top.addChild(
+    borders,
+    fog,
+    planLayer.container,
+    marks,
+    labels,
+    territoryLabels,
+    unitLayer.container,
+    plates,
+  );
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
   let draft: Draft | null = null;
@@ -277,6 +293,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const capturesByHex = new Map<number, { readonly started: number; readonly color: string }>();
   const cityFlashes = new Map<number, { readonly started: number; readonly color: string }>();
   let labelsKey = '';
+  let territoryKey = '';
 
   const chunkGraphics = (
     layer: Map<string, Graphics>,
@@ -516,6 +533,13 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         radius,
       );
     }
+    const nextTerritoryLabels = buildTerritoryLabels(v, map.width, radius);
+    const nextTerritoryKey = territoryLabelsKey(nextTerritoryLabels, scale, level);
+    if (nextTerritoryKey !== territoryKey) {
+      territoryKey = nextTerritoryKey;
+      territoryLabels.removeChildren().forEach((child) => child.destroy());
+      drawTerritoryLabels(territoryLabels, nextTerritoryLabels, scale, level);
+    }
     if (selected.hex !== null) {
       marks
         .poly(hexPolygon(center(selected.hex), radius))
@@ -576,6 +600,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   return {
     container,
     top,
+    territoryLabels,
     update(s, l) {
       const levelChanged = level !== l;
       scale = s;
