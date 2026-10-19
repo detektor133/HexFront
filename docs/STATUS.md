@@ -15,9 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17aj ждёт review: ПКМ по реальной карточке `ArmyBar` выбирает её `armyId` и отменяет браузерное меню.
-- Карта сохраняет прежнее поведение: `unitsAt()` возвращает всю тесную фишку и не различает армии на одном гексе.
-- Тест: `apps/client/test/army-bar-selection.dom.test.tsx`, два сценария GREEN.
+- 07/T17aj возвращена на исправление приёмочного теста: проверка карты не проходит через `MatchSurfaceRuntime.onTap` и `selectUnits`.
+- Проверка ПКМ по реальной карточке `ArmyBar` проходит; нужно подтвердить реальный путь выбора тесной фишки без различения армий.
+- Тест: `apps/client/test/army-bar-selection.dom.test.tsx`, сценарий ПКМ GREEN; сценарий карты недостаточен.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача: `$task 07/T17ak`.
 - Читать: блоки T17ak–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
