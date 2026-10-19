@@ -1,6 +1,6 @@
 {
-  "next": { "model": "gpt-6.1-sol", "reasoningEffort": "high" },
-  "review": { "model": "gpt-6.1-sol", "reasoningEffort": "high" },
-  "spec": { "model": "gpt-6.1-sol", "reasoningEffort": "high" },
-  "plan": { "model": "gpt-6.1-sol", "reasoningEffort": "medium" }
+  "next": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
+  "review": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
+  "spec": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
+  "plan": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" }
 }
