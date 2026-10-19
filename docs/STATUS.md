@@ -15,9 +15,10 @@
 
 ## Следующая сессия
 
-- 07/T17aa исправлена: тест монтирует реальный `Hud` с длинными population/rate/gold.
-- Тест измеряет `getBoundingClientRect()` HUD, пяти `.slot`, `.taxButton` и всех дочерних элементов на 1280, 1366, 1440 и 1920.
-- Контрольная мутация `.slot` с `min-width: 1000px` дала RED; восстановленный CSS дал GREEN.
+- 07/T17aa исправлена: DOM-тест монтирует реальный `Hud` через `createLocalEngine` с длинными population/rate/gold.
+- Тест измеряет границы `.hud`, каждого из пяти `.slot`, `.taxButton`, `.slotText` и всех дочерних элементов на 1280, 1366, 1440 и 1920.
+- Контрольная мутация `.slot { min-width: 1000px; }` дала RED по ширине слота; восстановленный CSS дал GREEN.
+- Исправлен CI typecheck: `gold` передаётся как `Fp`, callback `getBoundingClientRect` получил тип `this: Element`.
 - `pnpm verify --changed` зелёный.
 - Следующая задача: `$task 07/T17ab`.
 - Читать: блок T17ab в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `packages/sim/src/queries/unit-view.ts`, `apps/client/test`.

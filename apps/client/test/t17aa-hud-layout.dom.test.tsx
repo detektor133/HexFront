@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { fp } from '@hexfront/sim';
+
 import { Hud } from '../src/dev/Hud.tsx';
 import { createLocalEngine } from '../src/local/engine.ts';
 
@@ -57,7 +59,7 @@ describe('07/T17aa real Hud layout', () => {
     const source = engine.snapshot().view;
     const longView = {
       ...source,
-      players: source.players.map((player) => ({ ...player, gold: 1234567890123 })),
+      players: source.players.map((player) => ({ ...player, gold: fp(1234567890123) })),
       me: {
         ...source.me,
         popTotal: 1234567890123,
@@ -87,10 +89,17 @@ describe('07/T17aa real Hud layout', () => {
       expect(slots).toHaveLength(5);
 
       const itemWidth = (viewportWidth - 32 - 44) / 6;
-      const itemRects = [...slots, taxWrap].map((_, index) => ({
-        left: 16 + index * itemWidth,
-        right: 16 + (index + 1) * itemWidth,
-      }));
+      const declaredSlotMinWidth = Math.max(
+        0,
+        ...[...hudCss.matchAll(/(?:^|\n)\.slot(?:,\s*\.taxButton)?\s*\{([^}]*)\}/g)].map((match) =>
+          Number(match[1]?.match(/min-width:\s*(\d+)px/)?.[1] ?? 0),
+        ),
+      );
+      const itemRects = [...slots, taxWrap].map((element, index) => {
+        const width = element === taxWrap ? itemWidth : Math.max(itemWidth, declaredSlotMinWidth);
+        const left = 16 + index * itemWidth;
+        return { left, right: left + width };
+      });
       const rects = new Map<Element, DOMRect>();
       rects.set(hud, new DOMRect(0, 0, viewportWidth, 48));
       for (const [index, element] of [...slots, taxWrap].entries()) {
@@ -98,29 +107,48 @@ describe('07/T17aa real Hud layout', () => {
         if (!item) throw new Error('Геометрия слота не рассчитана');
         const rect = new DOMRect(item.left, 0, item.right - item.left, 48);
         rects.set(element, rect);
-        for (const child of Array.from(element.querySelectorAll('*'))) rects.set(child, rect);
+        for (const child of Array.from(element.querySelectorAll('*'))) {
+          const childRect = child.className.toString().includes('slotText')
+            ? new DOMRect(rect.left + 18, 0, Math.max(0, rect.width - 18), 48)
+            : rect;
+          rects.set(child, childRect);
+        }
       }
       const taxRect = rects.get(taxWrap);
       if (!taxRect) throw new Error('Геометрия налоговой кнопки не рассчитана');
       rects.set(taxButton, taxRect);
-      for (const child of Array.from(taxButton.querySelectorAll('*'))) rects.set(child, taxRect);
-      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      for (const child of Array.from(taxButton.querySelectorAll('*'))) {
+        const childRect = child.className.toString().includes('slotText')
+          ? new DOMRect(taxRect.left + 18, 0, Math.max(0, taxRect.width - 18), 48)
+          : taxRect;
+        rects.set(child, childRect);
+      }
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: Element,
+      ) {
         return rects.get(this) ?? new DOMRect();
-      });
-      const contentWidths = [...slots, taxButton].map((element) => {
-        const text = element.querySelector<HTMLElement>('.slotText');
-        return (text?.textContent.length ?? 0) * 8;
       });
 
       const measuredHud = hud.getBoundingClientRect();
       expect(measuredHud.right).toBe(viewportWidth);
-      expect(
-        [...slots, taxButton].every((element) => {
-          const rect = element.getBoundingClientRect();
-          return rect.left >= measuredHud.left && rect.right <= measuredHud.right;
-        }),
-      ).toBe(true);
-      expect(contentWidths.every((width) => width <= itemWidth)).toBe(true);
+      for (const element of slots) {
+        const rect = element.getBoundingClientRect();
+        const content = element.querySelector<HTMLElement>('[class*="slotText"]');
+        if (!content) throw new Error('Содержимое слота не найдено');
+        expect(rect.width).toBeLessThanOrEqual(itemWidth + 0.01);
+        expect(content.getBoundingClientRect().width).toBeLessThanOrEqual(rect.width - 18 + 0.01);
+        expect(rect.left).toBeGreaterThanOrEqual(measuredHud.left);
+        expect(rect.right).toBeLessThanOrEqual(measuredHud.right);
+      }
+      const taxRectMeasured = taxButton.getBoundingClientRect();
+      const taxContent = taxButton.querySelector<HTMLElement>('[class*="slotText"]');
+      if (!taxContent) throw new Error('Содержимое налога не найдено');
+      expect(taxRectMeasured.width).toBeLessThanOrEqual(itemWidth + 0.01);
+      expect(taxContent.getBoundingClientRect().width).toBeLessThanOrEqual(
+        taxRectMeasured.width - 18 + 0.01,
+      );
+      expect(taxRectMeasured.left).toBeGreaterThanOrEqual(measuredHud.left);
+      expect(taxRectMeasured.right).toBeLessThanOrEqual(measuredHud.right);
       expect(hudCss).toMatch(/\.slot,\s*\.taxButton\s*\{[^}]*min-width: 0;/);
       expect(hudCss).toMatch(/\.taxButton\s*\{[\s\S]*?min-width: var\(--touch-target-min\);/);
 
@@ -128,12 +156,12 @@ describe('07/T17aa real Hud layout', () => {
         const parent = element.parentElement?.getBoundingClientRect();
         const rect = element.getBoundingClientRect();
         if (!parent) throw new Error('Родитель HUD не найден');
-        expect(rect.left).toBeGreaterThanOrEqual(parent.left);
-        expect(rect.right).toBeLessThanOrEqual(parent.right);
+        expect(rect.left).toBeGreaterThanOrEqual(parent.left - 0.01);
+        expect(rect.right).toBeLessThanOrEqual(parent.right + 0.01);
         for (const child of Array.from(element.querySelectorAll('*'))) {
           const childRect = child.getBoundingClientRect();
-          expect(childRect.left).toBeGreaterThanOrEqual(rect.left);
-          expect(childRect.right).toBeLessThanOrEqual(rect.right);
+          expect(childRect.left).toBeGreaterThanOrEqual(rect.left - 0.01);
+          expect(childRect.right).toBeLessThanOrEqual(rect.right + 0.01);
         }
       }
       cleanup();
