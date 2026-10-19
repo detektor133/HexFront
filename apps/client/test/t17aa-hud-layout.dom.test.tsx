@@ -88,35 +88,54 @@ describe('07/T17aa real Hud layout', () => {
       if (!taxWrap || !taxButton) throw new Error('Налоговая кнопка не найдена');
       expect(slots).toHaveLength(5);
 
-      const itemWidth = (viewportWidth - 32 - 44) / 6;
       const explicitTextWidth = Number.parseFloat(
         cssBlock('.slotText').match(/(?:^|\n)\s*width:\s*(\d+(?:\.\d+)?)px/)?.[1] ?? '',
       );
+      const hudStyle = getComputedStyle(hud);
+      const hudWidth = Number.parseFloat(hudStyle.width);
+      const paddingLeft = Number.parseFloat(hudStyle.paddingLeft) || 16;
+      const paddingRight = Number.parseFloat(hudStyle.paddingRight) || 16;
+      const itemWidth = (hudWidth - paddingLeft - paddingRight) / 6;
+      expect(hudWidth).toBe(viewportWidth);
+      expect(Number.isFinite(itemWidth)).toBe(true);
       if (Number.isFinite(explicitTextWidth)) {
         expect(explicitTextWidth).toBeLessThanOrEqual(itemWidth - 14);
       }
-      const contentWidth = (element: HTMLElement): number | null => {
-        const width = Number.parseFloat(getComputedStyle(element).width);
-        return Number.isFinite(width) ? width : null;
+
+      const translateX = (element: HTMLElement): number => {
+        const style = getComputedStyle(element);
+        const transform = style.transform.match(
+          /^matrix\([^,]+,\s*[^,]+,\s*[^,]+,\s*[^,]+,\s*([^,]+),/,
+        );
+        const left = style.left === 'auto' || style.left === '' ? 0 : Number.parseFloat(style.left);
+        return (transform ? Number.parseFloat(transform[1] ?? '0') : 0) + left;
       };
-      const hudWidth = Number.parseFloat(getComputedStyle(hud).width);
-      expect(hudWidth).toBe(viewportWidth);
+
+      const layoutBounds = (
+        index: number,
+        element: HTMLElement,
+      ): { left: number; right: number } => ({
+        left: paddingLeft + index * itemWidth + translateX(element),
+        right: paddingLeft + (index + 1) * itemWidth + translateX(element),
+      });
+      expect(hudCss).not.toMatch(
+        /\.slot,\s*\.taxButton\s*\{[^}]*?(?:transform|position|left|right)\s*:/s,
+      );
 
       for (const [index, element] of [...slots, taxWrap].entries()) {
-        const expectedLeft = 16 + index * itemWidth;
-        const expectedRight = expectedLeft + itemWidth;
-        expect(expectedLeft).toBeGreaterThanOrEqual(16);
-        expect(expectedRight).toBeLessThanOrEqual(viewportWidth - 16);
-        expect(contentWidth(element)).toBeNull();
+        const bounds = layoutBounds(index, element);
+        expect(bounds.left).toBeGreaterThanOrEqual(paddingLeft);
+        expect(bounds.right).toBeLessThanOrEqual(viewportWidth - paddingRight);
+        expect(getComputedStyle(element).position).toBe('static');
 
         for (const child of Array.from(element.querySelectorAll('*'))) {
           const childElement = child as HTMLElement;
-          const width = contentWidth(childElement);
+          const childStyle = getComputedStyle(childElement);
+          expect(childStyle.position).not.toBe('fixed');
+          expect(childStyle.position).not.toBe('absolute');
+          expect(translateX(childElement)).toBe(0);
           if (childElement.className.toString().includes('slotText')) {
             expect(childElement.textContent?.length ?? 0).toBeGreaterThan(0);
-            if (width !== null) expect(width).toBeLessThanOrEqual(itemWidth - 14);
-          } else if (width !== null) {
-            expect(width).toBeLessThanOrEqual(itemWidth);
           }
         }
       }
