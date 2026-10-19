@@ -16,7 +16,7 @@ import {
 
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
-import { CHIP_WORLD, cityChipShift } from './chip-place.ts';
+import { CHIP_WORLD, chipHalf, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
@@ -56,6 +56,8 @@ export interface UnitLayer {
   cacheTelemetry(): UnitLayerCacheTelemetry;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
+  /** Возвращает отряды фишки под мировой точкой, включая её текущую позицию. */
+  unitsAt(world: Point): readonly number[];
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -401,6 +403,17 @@ export function createUnitLayer(
     },
     chipAt(hex) {
       return base(hex);
+    },
+    unitsAt(world) {
+      const halfHeight = chipHalf();
+      for (const entry of entries) {
+        if (entry.units.length === 0) continue;
+        const at = drawnAt.get(entry.key) ?? entry.at(1);
+        if (Math.abs(world.x - at.x) <= radius && Math.abs(world.y - at.y) <= halfHeight) {
+          return entry.units;
+        }
+      }
+      return [];
     },
     setScale(scale) {
       k = 1 / scale;

@@ -23,6 +23,7 @@ import {
   NOTHING_PICKED,
   orderHex,
   selectHex,
+  selectUnits,
   selectUnitsInRect,
   type Picked,
 } from '../dev/sandbox-selection.ts';
@@ -345,7 +346,14 @@ export function useSandbox(
       }
       const hex = hexId(h, map.width);
       if (input.tap(world, kind) || input.onHandle(world)) return;
-      if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
+      if (kind === 'select') {
+        const hit = layerRef.current?.unitsAt(world) ?? [];
+        return pick(
+          hit.length > 0
+            ? selectUnits(current, pickedRef.current, hit)
+            : selectHex(current, pickedRef.current, hex),
+        );
+      }
       order(hex);
     };
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.

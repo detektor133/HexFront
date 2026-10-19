@@ -66,6 +66,18 @@ export function selectHex(view: PlayerView, picked: Picked, hex: number): Picked
   return { hex, units: [], target: null };
 }
 
+/** Выбирает отряды, найденные hit-test фишки, сохраняя семантику повторного тапа. */
+export function selectUnits(view: PlayerView, picked: Picked, ids: readonly number[]): Picked {
+  const units = view.units
+    .filter((u) => ids.includes(u.id) && u.owner === view.playerId && u.order !== 'retreat')
+    .map((u) => u.id);
+  if (units.length === 0) return selectHex(view, picked, picked.hex ?? -1);
+  const same = units.every((id) => picked.units.includes(id));
+  if (!same) return { hex: null, units, target: null };
+  const first = view.units.find((u) => u.id === units[0]);
+  return { hex: first?.hex ?? null, units: [], target: null };
+}
+
 /** Армии выбранных отрядов: выбранная целиком и затронутые частично. */
 export interface ArmySelection {
   readonly whole: number | null;

@@ -105,6 +105,7 @@ export interface EconomyLayer {
    */
   setOrderTarget(t: OrderTarget | null): void;
   chipAt(hex: number): Point;
+  unitsAt(world: Point): readonly number[];
   frame(nowMs: number): void;
   destroy(): void;
 }
@@ -615,6 +616,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     chipAt(hex) {
       return unitLayer.chipAt(hex);
+    },
+    unitsAt(world) {
+      return unitLayer.unitsAt(world);
     },
     setSelectedArmy(id) {
       selectedArmy = id;

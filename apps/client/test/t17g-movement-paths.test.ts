@@ -80,6 +80,7 @@ function movementScene(): {
   readonly selectedId: number;
   readonly ownIds: readonly number[];
   readonly enemyOwner: number;
+  readonly mapWidth: number;
 } {
   const loaded = loadMap(small);
   if (!loaded.ok) throw new Error(loaded.errors.join('; '));
@@ -117,6 +118,7 @@ function movementScene(): {
     selectedId: moving[0]?.id ?? -1,
     ownIds: moving.map((unit) => unit.id),
     enemyOwner: enemy.owner,
+    mapWidth: loaded.map.width,
   };
 }
 
@@ -183,6 +185,29 @@ describe('07/T17g: стрелки путей движения', () => {
     for (let index = 0; index < 50; index += 1) scene.layer.setView(scene.view, picked, index);
 
     expect(strokesOf(ground)).toHaveLength(firstCount);
+    scene.layer.destroy();
+  });
+
+  it('T17x: hit-test движущейся фишки использует её текущую позицию', () => {
+    installCanvasStub();
+    const scene = movementScene();
+    const moving = scene.view.units.find((unit) => unit.id === scene.selectedId);
+    if (!moving) throw new Error('движущийся отряд не найден');
+    const next = moving.path[0];
+    if (next === undefined) throw new Error('путь отряда пуст');
+    const start = hexCenter(hexFromId(moving.hex, scene.mapWidth), tokens.map.hexRadius);
+    const finish = hexCenter(hexFromId(next, scene.mapWidth), tokens.map.hexRadius);
+    const view = {
+      ...scene.view,
+      units: scene.view.units.map((unit) =>
+        unit.id === moving.id ? { ...unit, moveTicks: 5, moveTotal: 10 } : unit,
+      ),
+    } as PlayerView;
+    scene.layer.setView(view, { hex: null, units: [], target: null }, 0);
+    const midpoint = { x: (start.x + finish.x) / 2, y: (start.y + finish.y) / 2 };
+
+    expect(scene.layer.unitsAt(midpoint)).toContain(scene.selectedId);
+    expect(scene.layer.unitsAt(start)).not.toContain(scene.selectedId);
     scene.layer.destroy();
   });
 });

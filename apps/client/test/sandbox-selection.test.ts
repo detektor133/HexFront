@@ -9,6 +9,7 @@ import {
   NOTHING_PICKED,
   orderHex,
   selectHex,
+  selectUnits,
   selectUnitsInRect,
 } from '../src/dev/sandbox-selection.ts';
 import { lang } from '../src/i18n/dict.ts';
@@ -45,6 +46,26 @@ describe('песочница: выбор и приказы как в HoI4', () =
     const p = selectHex(view, NOTHING_PICKED, home);
     expect(selectHex(view, p, free)).toEqual({ hex: free, units: [], target: null });
     expect(selectHex(view, p, home).units).toEqual([]);
+  });
+
+  it('тап по движущейся фишке выбирает её отряды, а повторный тап — исходный гекс', () => {
+    const moving = mine[0];
+    if (!moving) throw new Error('нет своего отряда');
+    const next = selectUnits(view, NOTHING_PICKED, [moving.id]);
+    expect(next).toEqual({ hex: null, units: [moving.id], target: null });
+    expect(selectUnits(view, next, [moving.id])).toEqual({
+      hex: moving.hex,
+      units: [],
+      target: null,
+    });
+  });
+
+  it('первый тап по гексу без своих отрядов выбирает сам гекс', () => {
+    expect(selectHex(view, NOTHING_PICKED, free)).toEqual({
+      hex: free,
+      units: [],
+      target: null,
+    });
   });
 
   it('приказ (долгий тап / ПКМ) по свободному гексу — «идти» выбранным', () => {
