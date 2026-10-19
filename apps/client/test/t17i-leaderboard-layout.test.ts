@@ -96,7 +96,7 @@ function installMatchRuntime(): void {
   }));
 }
 
-const LEADERBOARD_RESIZE_EVENT = { width: 173, height: 139 } as const;
+let leaderboardResizeEvent: { width: number; height: number } = { width: 173, height: 139 };
 
 function installResizeObserver(): void {
   class ControlledResizeObserver {
@@ -105,7 +105,7 @@ function installResizeObserver(): void {
     public observe(target: Element): void {
       const size =
         target.getAttribute('aria-label') === 'Leaderboard'
-          ? LEADERBOARD_RESIZE_EVENT
+          ? leaderboardResizeEvent
           : { width: 0, height: 0 };
       this.callback(
         [
@@ -124,6 +124,7 @@ function installResizeObserver(): void {
 }
 
 afterEach(() => {
+  leaderboardResizeEvent = { width: 173, height: 139 };
   cleanup();
   vi.resetModules();
   vi.restoreAllMocks();
@@ -172,7 +173,7 @@ describe('07/T17i: раскладка лидерборда', () => {
       await waitFor(() => {
         const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
         expect(leaderboard?.style.left).toBe(
-          `${viewport.width - 16 - LEADERBOARD_RESIZE_EVENT.width}px`,
+          `${viewport.width - 16 - leaderboardResizeEvent.width}px`,
         );
         expect(leaderboard?.style.width).toBe('');
         expect(leaderboard?.style.height).toBe('');
@@ -181,7 +182,9 @@ describe('07/T17i: раскладка лидерборда', () => {
       unmount();
     }
 
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
       if (this.tagName === 'BUTTON' && /Налог|Tax/u.test(this.getAttribute('aria-label') ?? '')) {
         return new DOMRect(220, 20, 44, 44);
       }
@@ -199,7 +202,7 @@ describe('07/T17i: раскладка лидерборда', () => {
     const measuredLayout = layoutFor(
       { width: 601, height: 900 },
       {
-        leaderboardSize: LEADERBOARD_RESIZE_EVENT,
+        leaderboardSize: leaderboardResizeEvent,
         popupOpen: true,
         popupAnchorY: 64,
         popupSize: { width: 260, height: 120 },
@@ -208,6 +211,15 @@ describe('07/T17i: раскладка лидерборда', () => {
     expect(measuredLayout.elements.find((element) => element.id === 'leaderboard')?.y).toBe(192);
     await waitFor(() => expect(leaderboard.style.top).toBe('192px'));
     unmount();
+
+    leaderboardResizeEvent = { width: 173, height: 1 };
+    const shortLeaderboard = render(createElement(MatchPage));
+    const shortLeaderboardRegion = await screen.findByRole('region', {
+      name: /РўР°Р±Р»РёС†Р° Р»РёРґРµСЂРѕРІ|Leaderboard/u,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /РќР°Р»РѕРі|Tax/u }));
+    await waitFor(() => expect(shortLeaderboardRegion.style.top).toBe('8px'));
+    shortLeaderboard.unmount();
   });
 
   it('сохраняет правую привязку и не зависит от числа игроков', () => {

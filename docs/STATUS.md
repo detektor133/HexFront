@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17u повторно исправлена по возврату review: реальный путь проверяет `contentRect.width` и `contentRect.height`; высота меняет `style.top` лидерборда при открытии налога.
-- Сохранены проверка ширины, мобильные проверки и RED/GREEN-доказательство высоты.
+- 07/T17u исправлена по CI и возврату review: тест аннотирует `this: HTMLElement` и проверяет влияние `contentRect.height` на реальный `style.top` при двух DOM-измерениях.
+- RED: временная высота `0` падает assertion; GREEN: восстановленная передача `size.height` даёт 5/5.
 - `pnpm verify --changed` — зелёный.
-- Следующая задача после review: 07/T17, задача владельца.
+- Следующая задача после повторного review: 07/T17, задача владельца.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

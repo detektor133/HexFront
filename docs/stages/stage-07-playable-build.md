@@ -516,6 +516,9 @@
 - `apps/client/test/t17i-leaderboard-layout.test.ts:99-118,174-176`: добавлена проверка влияния `contentRect.height` на вертикальный расчёт `layout` при сохранённой проверке ширины и реальном пути `MatchPage → MatchSurface → Leaderboard`. RED: временная высота `LEADERBOARD_LAYOUT_EVENT.height = 0` дала падение assertion `expected 56 to be 192`; команда `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts`. GREEN: восстановленная высота `139` дала 5/5 той же командой.
 - Повторное исправление того же пункта: `apps/client/test/t17i-leaderboard-layout.test.ts` проверяет полный путь `MatchPage → MatchSurface → layout → Leaderboard`; после `contentRect = 173×139` и открытия налога `style.top` равен `192px`, а расчёт `layout` подтверждает тот же `y`. RED: временная регрессия `contentRect.height = 0` дала assertion `expected '' to be '1177px'` в проверке `style.left`; команда `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts`. GREEN: восстановление `height = 139` дало 5/5 той же командой.
 
+Возврат review после коммита `ba5acf7`:
+- СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:99-118,174-176` — проверка сохранена на реальном пути `MatchPage → MatchSurface → layout → Leaderboard`: один и тот же DOM-сценарий сравнивает вертикальный результат при `contentRect.height = 139` (`style.top = 192px`) и `contentRect.height = 1` (`style.top = 8px`), поэтому правильная ширина без передачи высоты больше не даёт зелёный тест; добавлена аннотация `this: HTMLElement` для CI typecheck. RED: временная передача `contentRect.height = 0` дала падение assertion `expected '' to be '1177px'`; команда `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts`. GREEN: восстановленная передача `size.height` дала 5/5 той же командой.
+
 ### Трассировка раунда T17p–T17u
 
 | Исходный пункт владельца | Подзадача |
