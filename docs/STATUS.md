@@ -15,7 +15,7 @@
 
 ## Следующая сессия
 
-- 07/T17aa исправлена: DOM-тест реального `Hud` учитывает CSS-размеры и длину отрендеренных значений при нулевых DOMRect; временная регрессия `width: 1000px` дала RED.
-- `pnpm verify --changed` зелёный; задача отмечена `- [~]` и ждёт повторного ревью.
+- 07/T17aa возвращена: fallback теста при нулевом DOMRect проверяет дочерние элементы только относительно viewport и пропускает широкую `.settingsButton`.
+- `pnpm verify --changed` зелёный; задача отмечена `- [ ]` и ждёт исправления приёмочного теста.
 - Следующая задача: `$task 07/T17ab`.
 - Читать: блок T17ab в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `packages/sim/src/queries/unit-view.ts`, `apps/client/test`.
