@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17u исправлена по CI и возврату review: тест аннотирует `this: HTMLElement` и проверяет влияние `contentRect.height` на реальный `style.top` при двух DOM-измерениях.
-- RED: временная высота `0` падает assertion; GREEN: восстановленная передача `size.height` даёт 5/5.
+- 07/T17u усилена по возврату review: desktop-тест реального пути `MatchPage → MatchSurface → layout → Leaderboard` проверяет ширину и влияние полной высоты `contentRect` на `style.top` при popup.
+- RED: временная передача `height: 1` падает assertion `expected '8px' to be '236px'`; GREEN: восстановленная передача `rect.height` даёт 5/5 той же командой.
 - `pnpm verify --changed` — зелёный.
 - Следующая задача после повторного review: 07/T17, задача владельца.
 - Читать: `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17i-leaderboard-layout.test.ts`.

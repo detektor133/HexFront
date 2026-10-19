@@ -165,21 +165,39 @@ describe('07/T17i: раскладка лидерборда', () => {
     installMatchRuntime();
     installResizeObserver();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.tagName === 'BUTTON' && /Tax/u.test(this.getAttribute('aria-label') ?? '')) {
+        return new DOMRect(window.innerWidth - 200, 64, 44, 44);
+      }
+      return new DOMRect();
+    });
 
     for (const viewport of viewports.slice(0, 3)) {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport.width });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewport.height });
       const { unmount } = render(createElement(MatchPage));
+      const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
       await waitFor(() => {
-        const leaderboard = document.querySelector<HTMLElement>('[class*="panel"]');
         expect(leaderboard?.style.left).toBe(
           `${viewport.width - 16 - leaderboardResizeEvent.width}px`,
         );
         expect(leaderboard?.style.width).toBe('');
         expect(leaderboard?.style.height).toBe('');
       });
+      fireEvent.click(screen.getByRole('button', { name: /Tax/u }));
+      await waitFor(() => expect(leaderboard?.style.top).toBe('236px'));
       expect(document.querySelector('[aria-label="Leaderboard"] h2')).not.toBeNull();
       unmount();
+
+      leaderboardResizeEvent = { width: 173, height: 1 };
+      const shortLeaderboard = render(createElement(MatchPage));
+      const shortRegion = await screen.findByRole('region', { name: /Leaderboard/u });
+      fireEvent.click(screen.getByRole('button', { name: /Tax/u }));
+      await waitFor(() => expect(shortRegion.style.top).toBe('8px'));
+      shortLeaderboard.unmount();
+      leaderboardResizeEvent = { width: 173, height: 139 };
     }
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (

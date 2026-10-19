@@ -519,6 +519,10 @@
 Возврат review после коммита `ba5acf7`:
 - СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:99-118,174-176` — проверка сохранена на реальном пути `MatchPage → MatchSurface → layout → Leaderboard`: один и тот же DOM-сценарий сравнивает вертикальный результат при `contentRect.height = 139` (`style.top = 192px`) и `contentRect.height = 1` (`style.top = 8px`), поэтому правильная ширина без передачи высоты больше не даёт зелёный тест; добавлена аннотация `this: HTMLElement` для CI typecheck. RED: временная передача `contentRect.height = 0` дала падение assertion `expected '' to be '1177px'`; команда `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts`. GREEN: восстановленная передача `size.height` дала 5/5 той же командой.
 
+ИСПРАВЛЕНО ПО РЕВЬЮ:
+- СПЕК: `apps/client/test/t17i-leaderboard-layout.test.ts:99-118,174-176` → изменён исходный файл `apps/client/test/t17i-leaderboard-layout.test.ts`: desktop-путь `MatchPage → MatchSurface → layout → Leaderboard` теперь проверяет ширину через `style.left` и влияние полной высоты через popup: `contentRect.height = 139` даёт `style.top = 236px`, а `height = 1` — `style.top = 8px`; проверены 1366×768, 1440×900 и 1920×1080. RED: временная регрессия в `apps/client/src/dev/Leaderboard.tsx` передавала `height: 1`, команда `pnpm exec vitest run apps/client/test/t17i-leaderboard-layout.test.ts`, assertion `expected '8px' to be '236px'`. GREEN: восстановлена передача `rect.height`, та же команда — 5/5.`
+- Проверяющая команда: `pnpm verify --changed` — `verify: OK` (build, types, lint, prettier, tests).
+
 ### Трассировка раунда T17p–T17u
 
 | Исходный пункт владельца | Подзадача |
