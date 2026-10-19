@@ -1,10 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, loadMap, type ConstructionCheck, type Fp, type MapStatic } from '@hexfront/sim';
+import {
+  BUILDING,
+  hexFromId,
+  hexId,
+  inBounds,
+  loadMap,
+  neighbors,
+  type ConstructionCheck,
+  type MapStatic,
+} from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
@@ -300,45 +309,67 @@ describe('T17m: карточка клетки', () => {
   });
 
   it('показывает дорогу в карточке изолированного склада и скрывает для подключённого', () => {
-    const engine = createLocalEngine(mapJson, 42, 2);
-    if ('errors' in engine) throw new Error(engine.errors.join('; '));
-    const initial = engine.snapshot();
-    const hex = initial.view.hexes.owner.findIndex(
-      (owner, id) => owner === 0 && !engine.state.cities.some((city) => city.hex === id),
+    const isolatedEngine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in isolatedEngine) throw new Error(isolatedEngine.errors.join('; '));
+    const isolatedCapital = isolatedEngine.state.cities.find(
+      (city) => city.id === isolatedEngine.state.players[0]?.capitalCityId,
     );
-    if (hex < 0) throw new Error('свой гекс для карточки не найден');
-    engine.select(hex);
-    const selected = engine.snapshot();
-    if (!selected.selection) throw new Error('выбор клетки не создан');
-    const selection = {
-      ...selected.selection,
-      hex,
-      city: null,
-      rebuild: {
-        ok: true,
-        cityHex: hex,
-        path: [hex, hex + 1],
-        toBuild: [hex + 1],
-        cost: 15 as Fp,
-        affordable: true,
-      },
-    } as Selection;
+    if (!isolatedCapital) throw new Error('столица игрока не найдена');
+    const isolatedHex = neighbors(hexFromId(isolatedCapital.hex, mapResult.map.width))
+      .filter((point) => inBounds(point, mapResult.map.width, mapResult.map.height))
+      .map((point) => hexId(point, mapResult.map.width))
+      .find((id) => !isolatedEngine.state.cities.some((city) => city.hex === id));
+    if (isolatedHex === undefined) throw new Error('гекс для изолированного склада не найден');
+    isolatedEngine.state.hexes.owner[isolatedHex] = 0;
+    isolatedEngine.state.hexes.building[isolatedHex] = BUILDING.depot;
+    isolatedEngine.select(isolatedHex);
+    const selected = isolatedEngine.snapshot();
+    const selection = selected.selection;
+    if (!selection?.rebuild?.ok) throw new Error('реальный план изолированного склада не создан');
+    const plan = selection.rebuild;
     const view = selected.view;
     const send = vi.fn();
-    render(<HexCard s={selection} view={view} map={mapResult.map} send={send} />);
-    const button = screen.getByRole('button', { name: /Проложить дорогу/u });
-    expect(button).toBeTruthy();
-    act(() => button.click());
-    expect(send).toHaveBeenCalledWith({ t: 'rebuildSupply', hex });
-
-    cleanup();
+    const onRoadPreview = vi.fn();
     render(
       <HexCard
-        s={{ ...selection, rebuild: { ok: false, reason: 'notIsolated' } }}
+        s={selection}
         view={view}
         map={mapResult.map}
         send={send}
+        onRoadPreview={onRoadPreview}
       />,
+    );
+    const button = screen.getByRole('button', { name: /Проложить дорогу/u });
+    expect(button).toBeTruthy();
+    const action = visibleActions(selection, 0, 0, false).find((item) => item.kind === 'rebuild');
+    expect(action).toMatchObject({ previewPath: plan.path, cost: plan.cost });
+    fireEvent.mouseEnter(button);
+    expect(onRoadPreview).toHaveBeenCalledWith(plan.path);
+    act(() => button.click());
+    expect(send).toHaveBeenCalledWith({ t: 'rebuildSupply', hex: isolatedHex });
+
+    cleanup();
+    const connectedEngine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in connectedEngine) throw new Error(connectedEngine.errors.join('; '));
+    const connectedCapital = connectedEngine.state.cities.find(
+      (city) => city.id === connectedEngine.state.players[0]?.capitalCityId,
+    );
+    if (!connectedCapital) throw new Error('столица игрока не найдена');
+    const connectedHex = neighbors(hexFromId(connectedCapital.hex, mapResult.map.width))
+      .filter((point) => inBounds(point, mapResult.map.width, mapResult.map.height))
+      .map((point) => hexId(point, mapResult.map.width))
+      .find((id) => !connectedEngine.state.cities.some((city) => city.hex === id));
+    if (connectedHex === undefined) throw new Error('гекс для подключённого склада не найден');
+    connectedEngine.state.hexes.owner[connectedHex] = 0;
+    connectedEngine.state.hexes.road[connectedHex] = 1;
+    connectedEngine.state.hexes.building[connectedHex] = BUILDING.depot;
+    connectedEngine.select(connectedHex);
+    const connected = connectedEngine.snapshot();
+    if (!connected.selection?.rebuild || connected.selection.rebuild.ok) {
+      throw new Error('реальный подключённый склад не вернул notIsolated');
+    }
+    render(
+      <HexCard s={connected.selection} view={connected.view} map={mapResult.map} send={send} />,
     );
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });

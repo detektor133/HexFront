@@ -15,8 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17zb возвращена на доработку: DOM-тест подменяет `Selection` и не проверяет, что `createLocalEngine` передаёт план склада из `rebuildSupplyPlan`.
-- Исполнитель должен добавить проверку реального engine-пути для изолированного и подключённого склада; UI-проверки кнопки, preview path, цены и команды сохранить.
+- 07/T17zb исправлена: DOM-тест получает план склада через реальный `createLocalEngine().select()`.
+- Проверены изолированный и подключённый склад, `path`, `cost`, preview, кнопка и команда `rebuildSupply`.
+- Контрольная мутация `rebuildSupplyPlan(...)` → `null` дала RED на assertion; рабочий код восстановлен.
 - `pnpm verify --changed` зелёный: build, types, lint, prettier и tests.
 - Следующая задача: `$task 07/T17aa`.
 - Читать: блок T17aa в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/Hud.tsx`, `apps/client/src/dev/Hud.module.css`, `apps/client/test`.
