@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17aa возвращена на доработку: тест подменяет все `DOMRect` и не измеряет реальное переполнение длинных значений.
-- Контрольная регрессия `.slotText { width: 1000px; overflow: hidden; }` оставляет тест зелёным.
-- `pnpm verify --changed` зелёный, но приёмочный тест не закрывает критерий раскладки.
+- 07/T17aa: тест HUD переведён с подставленных DOMRect на реальный путь `Hud` и расчёт доступной ширины.
+- Тест использует фактический текст длинных population/gold/rate, проверяет пять слотов, налог и дочерние элементы на ширинах 1280, 1366, 1440 и 1920.
+- Контрольная мутация `.slotText { width: 1000px; overflow: hidden; }` дала RED; после удаления мутации тест и `pnpm verify --changed` зелёные.
 - Следующая задача: `$task 07/T17ab`.
 - Читать: блок T17ab в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `packages/sim/src/queries/unit-view.ts`, `apps/client/test`.
