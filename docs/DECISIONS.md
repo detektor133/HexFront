@@ -2,6 +2,8 @@
 
 - 2026-10-19 · 07/T17af · `$plan` уточнил измеримость суммы `attackerOrg`: приёмочный тест фиксирует `org` атакующих и защитника и сверяет наблюдаемое состояние маркера с `battleOrgState` от суммы, дополнительно проверяя позицию на гексе цели и раздельные маркеры для разных целей; исходные критерии не изменены · `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17af-battle-marker.test.ts` · Этап: 07/infra
 
+- 2026-10-19 · 07/T17al · `$plan` уточнил измеримость раскладки ленты и онбординга: добавлены четыре ПК- и два мобильных viewport, отступы `space.lg`/`space.sm`, зазор над `bottom-panel`, высоты 44/88/132 px и точные условия сохранения `left-column`; исходные критерии не изменены · `docs/stages/stage-07-playable-build.md`, `apps/client/test/match-layout.dom.test.tsx` · Этап: 07/infra
+
 - 2026-10-19 · 07/T17ae · `$plan` остановлен вопросом: задача требует новый раздел `construction` с точными арт-токенами, но размеры, толщины, отступы, заливки и уровни детализации для знаков `fort`/`depot`/`improvement` не определены в документации; самостоятельно выдумывать их запрещено · `docs/QUESTIONS.md`, `docs/stages/stage-07-playable-build.md` · Этап: 07/infra
 
 - 2026-10-19 · 07/T17ae–T17al · Раунд 6 замечаний владельца: восемь задач добавлены перед T17; П.2 отложен до следующего плейтеста и записан открытым вопросом; П.10 не превращён в задачу без уточнённого визуального запроса · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/QUESTIONS.md`, `docs/art/ui.md`, `docs/art/style-guide.md`, `docs/art/tokens.json`, `docs/gdd/06-combat.md`, `docs/gdd/07-controls.md` · Этап: 07
