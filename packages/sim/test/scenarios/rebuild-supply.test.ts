@@ -42,6 +42,17 @@ describe('перестройка снабжения', () => {
     expect(s.rejections()).toEqual(['notIsolated']);
   });
 
+  it('склад в основной сети — отказ notIsolated через публичный план', () => {
+    const s = scenario(MAP, { legend });
+    s.runTicks(1);
+    const depotHex = 3 + s.state.map.width;
+    s.state.hexes.building[depotHex] = BUILDING.depot;
+    expect(rebuildSupplyPlan(s.state, 0, { hex: depotHex })).toEqual({
+      ok: false,
+      reason: 'notIsolated',
+    });
+  });
+
   it('изолированный город: путь в обход, цена 15 × гексов без дороги, связь восстанавливается', () => {
     const s = scenario(MAP, { legend });
     isolate(s);
