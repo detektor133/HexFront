@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17aa возвращена на доработку: новый текст требует фактические DOM-границы пяти `.slot`, `.taxButton` и всех дочерних элементов HUD, а тест считает идеальную сетку и пропускает ширину содержимого и элементы вне слотов.
-- Контрольные мутации `flex-basis: 1000px` у `.slotText`, `width: 1000px` у `.taxButton` и смещение `.settingsWrap` оставляют тест зелёным.
-- Целевой тест зелёный, но приёмка не закрыта; `pnpm verify --changed` не запускался.
+- 07/T17aa исправлена: DOM-тест измеряет границы пяти `.slot`, `.taxButton` и всех потомков HUD, включая `.settingsWrap`, паузу и `victoryHold`.
+- Контрольные мутации `flex-basis: 1000px`, `width/flex: 1000px` и `translateX(1000px)` дали RED; восстановленный тест дал GREEN.
+- `pnpm verify --changed` зелёный; задача отмечена `- [~]` и ждёт повторного review.
 - Следующая задача: `$task 07/T17ab`.
 - Читать: блок T17ab в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `packages/sim/src/queries/unit-view.ts`, `apps/client/test`.
