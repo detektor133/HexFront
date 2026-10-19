@@ -2,6 +2,7 @@ import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   ORG_MAX,
+  OFFENSIVE_STOP_ORG,
   type ArmyView,
   type Command,
   type PlayerView,
@@ -27,6 +28,8 @@ export interface ArmyStats {
   readonly org: number;
   readonly supply: number;
   readonly starving: number;
+  readonly fighting: boolean;
+  readonly encircled: number;
 }
 
 /** Считает сводку по своим отрядам армии. */
@@ -38,6 +41,8 @@ export function armyStats(units: readonly UnitView[]): ArmyStats {
     org: avg((u) => u.org) / ORG_MAX,
     supply: avg((u) => u.supplyLevel ?? FULL) / FULL,
     starving: units.filter((u) => u.starving === true).length,
+    fighting: units.some((u) => u.inBattle === true),
+    encircled: units.filter((u) => u.encircled === true).length,
   };
 }
 
@@ -90,6 +95,19 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   warn: <path d="M10 3 L18 17 H2 Z M10 8 V12 M10 14.5 V15" />,
+  fighting: (
+    <>
+      <line x1="4" y1="4" x2="16" y2="16" />
+      <line x1="16" y1="4" x2="4" y2="16" />
+    </>
+  ),
+  encircled: (
+    <>
+      <circle cx="10" cy="10" r="6" />
+      <line x1="10" y1="2" x2="10" y2="5" />
+      <line x1="10" y1="15" x2="10" y2="18" />
+    </>
+  ),
   reserve: (
     <>
       <circle cx="7" cy="7" r="3" />
@@ -263,6 +281,16 @@ function ArmyCard(props: {
                 {props.name}
               </button>
             )}
+            {stats.fighting && (
+              <span title={t('army.fighting')}>
+                <Icon name="fighting" className={styles.fightingIcon} />
+              </span>
+            )}
+            {stats.encircled > 0 && (
+              <span title={t('army.encircled')}>
+                <Icon name="encircled" className={styles.encircledIcon} />
+              </span>
+            )}
             {stats.starving > 0 && (
               <span title={t('army.starving').replace('{n}', String(stats.starving))}>
                 <Icon name="warn" className={styles.alarmIcon} />
@@ -274,7 +302,14 @@ function ArmyCard(props: {
               </span>
             )}
           </span>
-          <Meter icon="org" label="army.org" share={stats.org} color={tokens.chip.org} />
+          <Meter
+            icon="org"
+            label="army.org"
+            share={stats.org}
+            color={
+              stats.org < OFFENSIVE_STOP_ORG / ORG_MAX ? tokens.status.danger : tokens.chip.org
+            }
+          />
           <Meter
             icon="supply"
             label="army.supply"

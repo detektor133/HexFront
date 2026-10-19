@@ -3,7 +3,7 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-| Текущая задача | 07/T17aa |
+| Текущая задача | 07/T17ab |
 | Ветка | `stage-07` |
 | Последнее обновление | 2026-10-19 |
 
@@ -15,8 +15,8 @@
 
 ## Следующая сессия
 
-- 07/T17aa: fallback теста при нулевом DOMRect сравнивает ширину каждого элемента с областью его HUD-ячейки или родителя.
-- Контрольная мутация широкой `.settingsButton` дала RED; рабочий тест и `pnpm verify --changed` — GREEN.
-- Задача отмечена `- [~]` и ждёт повторного review.
-- Следующая задача: `$task 07/T17ab`.
-- Читать: блок T17ab в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/ArmyBar.tsx`, `packages/sim/src/queries/unit-view.ts`, `apps/client/test`.
+- 07/T17ab: добавлены агрегаты `fighting` и `encircled`, две локализованные иконки и порог `OFFENSIVE_STOP_ORG / ORG_MAX` для организации.
+- Приёмочные проверки в `apps/client/test/t17ab-army-status.dom.test.tsx` покрывают пустой/смешанный набор, активные и неактивные состояния, `warn`, `stuck`, `auto` и опасный цвет полоски.
+- Задача отмечена `- [~]` и ждёт review.
+- Следующая задача: `$task 07/T17ac`.
+- Читать: блок T17ac в `docs/stages/stage-07-playable-build.md`, `packages/sim/src/queries/player-view.ts`, `packages/sim/test/player-view.test.ts`.

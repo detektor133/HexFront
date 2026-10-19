@@ -313,6 +313,21 @@
   stroke-linejoin: round;
 }
 
+.fightingIcon,
+.encircledIcon {
+  width: var(--space-lg);
+  height: 16px;
+  fill: none;
+  stroke: var(--ui-ink2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.encircledIcon {
+  stroke: var(--status-encircled);
+}
+
 .stuckIcon {
   width: var(--space-lg);
   height: 16px;

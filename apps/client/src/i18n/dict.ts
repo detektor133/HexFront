@@ -264,6 +264,8 @@ const ru = {
   'army.supply': 'Снабж.',
   'army.starving': 'Истощение: {n} отр.',
   'army.stuck': 'Упёрлись',
+  'army.fighting': 'В бою',
+  'army.encircled': 'В окружении',
   'recruit.queue': 'Набор',
 } as const;
 
@@ -533,6 +535,8 @@ const en: Record<MessageKey, string> = {
   'army.supply': 'Supply',
   'army.starving': 'Attrition: {n} units',
   'army.stuck': 'Stalled',
+  'army.fighting': 'In battle',
+  'army.encircled': 'Encircled',
   'recruit.queue': 'Recruiting',
 };
 
