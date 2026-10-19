@@ -245,6 +245,10 @@ function ArmyCard(props: {
   };
   const cancel = (): void => setEditing(false);
   const select = (): void => props.onClick();
+  const selectFromContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+    select();
+  };
   return (
     <div className={`${styles.card} ${frame}`}>
       <div
@@ -253,6 +257,7 @@ function ArmyCard(props: {
         className={styles.pick}
         aria-pressed={props.selected}
         onClick={select}
+        onContextMenu={selectFromContextMenu}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') select();
         }}

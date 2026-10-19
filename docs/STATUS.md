@@ -15,10 +15,9 @@
 
 ## Следующая сессия
 
-- 07/T17ai принята повторным review после `1db1636`: симуляционный тест формирует участки через `edgeRuns` и проверяет два непустых непересекающихся результата.
-- После удаления `runA` тест проверяет точный состав `runB` и перераспределение неартиллерийских отрядов только на оставшийся участок.
-- Целевые тесты `packages/sim/test/scenarios/plans.test.ts` и `apps/client/test/plan-draft.test.ts`: 29 тестов GREEN.
-- Обе временные мутации подготовки участков дали assertion RED; мутации не сохранены.
+- 07/T17aj ждёт review: ПКМ по реальной карточке `ArmyBar` выбирает её `armyId` и отменяет браузерное меню.
+- Карта сохраняет прежнее поведение: `unitsAt()` возвращает всю тесную фишку и не различает армии на одном гексе.
+- Тест: `apps/client/test/army-bar-selection.dom.test.tsx`, два сценария GREEN.
 - `pnpm verify --changed` — зелёный.
-- Следующая задача: `$task 07/T17aj`.
-- Читать: блоки T17aj–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
+- Следующая задача: `$task 07/T17ak`.
+- Читать: блоки T17ak–T17al в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
