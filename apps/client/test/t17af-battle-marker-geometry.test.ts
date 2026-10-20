@@ -27,12 +27,17 @@ describe('геометрия маркера боя (07/T17af)', () => {
     const polygons: number[][] = [];
     const fills: unknown[] = [];
     const strokes: unknown[] = [];
+    const operations: Array<{ kind: 'moveTo' | 'lineTo' | 'poly' | 'stroke' }> = [];
     const originalPoly = GraphicsContext.prototype.poly;
     const originalFill = GraphicsContext.prototype.fill;
     const originalStroke = GraphicsContext.prototype.stroke;
+    const originalMoveTo = GraphicsContext.prototype.moveTo;
+    const originalLineTo = GraphicsContext.prototype.lineTo;
     const poly = vi.spyOn(GraphicsContext.prototype, 'poly');
     const fill = vi.spyOn(GraphicsContext.prototype, 'fill');
     const stroke = vi.spyOn(GraphicsContext.prototype, 'stroke');
+    const moveTo = vi.spyOn(GraphicsContext.prototype, 'moveTo');
+    const lineTo = vi.spyOn(GraphicsContext.prototype, 'lineTo');
     poly.mockImplementation(function (this: GraphicsContext, ...args) {
       const points = args[0];
       if (
@@ -41,7 +46,9 @@ describe('геометрия маркера боя (07/T17af)', () => {
       ) {
         polygons.push([...points]);
       }
-      return originalPoly.apply(this, args as Parameters<typeof originalPoly>);
+      const result = originalPoly.apply(this, args as Parameters<typeof originalPoly>);
+      operations.push({ kind: 'poly' });
+      return result;
     });
     fill.mockImplementation(function (this: GraphicsContext, ...args) {
       fills.push(args[0]);
@@ -49,7 +56,16 @@ describe('геометрия маркера боя (07/T17af)', () => {
     });
     stroke.mockImplementation(function (this: GraphicsContext, ...args) {
       strokes.push(args[0]);
+      operations.push({ kind: 'stroke' });
       return originalStroke.apply(this, args);
+    });
+    moveTo.mockImplementation(function (this: GraphicsContext, ...args) {
+      operations.push({ kind: 'moveTo' });
+      return originalMoveTo.apply(this, args);
+    });
+    lineTo.mockImplementation(function (this: GraphicsContext, ...args) {
+      operations.push({ kind: 'lineTo' });
+      return originalLineTo.apply(this, args);
     });
 
     const marker = createBattleMarker();
@@ -57,6 +73,8 @@ describe('геометрия маркера боя (07/T17af)', () => {
     poly.mockRestore();
     fill.mockRestore();
     stroke.mockRestore();
+    moveTo.mockRestore();
+    lineTo.mockRestore();
 
     expect(polygons).toHaveLength(18);
     expect(polygons.slice(0, 2)).toHaveLength(2);
@@ -70,6 +88,24 @@ describe('геометрия маркера боя (07/T17af)', () => {
           strokeStyle.color === tokens.ui.ink,
       ),
     ).toHaveLength(9);
+    let bladeCount = 0;
+    let secondBladeIndex: number | null = null;
+    for (const [index, operation] of operations.entries()) {
+      if (operation.kind === 'poly') {
+        bladeCount += 1;
+        if (bladeCount % 2 === 0) secondBladeIndex = index;
+        continue;
+      }
+      if (operation.kind !== 'stroke') continue;
+      if (secondBladeIndex !== null) {
+        expect(
+          operations
+            .slice(secondBladeIndex + 1, index)
+            .some(({ kind }) => kind === 'moveTo' || kind === 'lineTo'),
+        ).toBe(false);
+        secondBladeIndex = null;
+      }
+    }
 
     const axes = [
       { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
@@ -86,6 +122,8 @@ describe('геометрия маркера боя (07/T17af)', () => {
       if (!axis) throw new Error('Ось клинка отсутствует');
       expect(distance(points[0][0], points[0][1])).toBeCloseTo(BLADE_LENGTH_PX, 6);
       expect(distance(points[2][0], points[2][1])).toBeCloseTo(BLADE_LENGTH_PX, 6);
+      expect(dot(points[0][0], points[0][1], axis.x, axis.y)).toBeCloseTo(BLADE_LENGTH_PX, 6);
+      expect(dot(points[2][0], points[2][1], axis.x, axis.y)).toBeCloseTo(-BLADE_LENGTH_PX, 6);
       expect(dot(points[1][0], points[1][1], axis.x, axis.y)).toBeCloseTo(0, 6);
       expect(dot(points[3][0], points[3][1], axis.x, axis.y)).toBeCloseTo(0, 6);
       expect(distance(points[1][0], points[1][1])).toBeCloseTo(BLADE_WIDTH_PX / 2, 6);
