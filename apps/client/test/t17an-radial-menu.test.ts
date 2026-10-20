@@ -13,8 +13,10 @@ import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { createGesture, RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
-import type * as MapViewModule from '../src/render/map-view.ts';
+import type { createMapView } from '../src/render/map-view.ts';
 import { tokens } from '../src/theme/tokens.ts';
+
+type MapViewModule = { createMapView: typeof createMapView };
 
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
@@ -50,7 +52,10 @@ vi.mock('../src/render/map-view.ts', async () => {
       harness.onTap = onTap ?? null;
       harness.onDoubleTap = onDoubleTap ?? null;
       const layer = options.midLayer?.(map, options.radius);
-      harness.world = layer?.chipAt(236) ?? { x: 100, y: 100 };
+      const layerWithChipAt = layer as unknown as {
+        chipAt?: (id: number) => { x: number; y: number };
+      };
+      harness.world = layerWithChipAt.chipAt?.(236) ?? { x: 100, y: 100 };
       Object.defineProperty(layer, 'unitsAt', { configurable: true, value: () => [6] });
       harness.mapGesture = createGesture(
         {
@@ -236,7 +241,10 @@ describe('07/T17an: радиальное меню', () => {
     const assign = screen.getByRole('menuitem', { name: /to army/i });
     const root = menuPoint(assign, menu);
     fireEvent.pointerMove(card, { pointerId: 2, clientX: root.x, clientY: root.y });
-    const child = screen.getAllByRole('menuitem')[0];
+    const child = screen
+      .getAllByRole('menuitem')
+      .find((item) => item.getAttribute('aria-label')?.toLowerCase() !== 'reserve');
+    if (!child) throw new Error('Дочерний сектор assignUnits не отрендерен');
     const target = menuPoint(child, menu);
     fireEvent.pointerUp(card, { pointerId: 2, clientX: target.x, clientY: target.y });
     expect(harness.commands).toContainEqual({
