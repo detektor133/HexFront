@@ -186,6 +186,14 @@ function fakeCodex(git: Git, world: StreamsWorld) {
       const again = /Повторное ревью/.test(prompt) && stage.includes(`- [x] **${short}.`);
       if (verdict === 'OK' && again) return { code: 0, answer: 'OK' };
       await markFile(cwd, short, verdict === 'OK' ? 'x' : ' ');
+      if (verdict !== 'OK') {
+        const marked = await readFile(join(cwd, STAGE_FILE), 'utf8');
+        const block = new RegExp(`(^- \\[ \\] \\*\\*${short}\\.[\\s\\S]*?)(?=\\n- \\[|$)`, 'm');
+        await writeFile(
+          join(cwd, STAGE_FILE),
+          marked.replace(block, '$1\n  Возврат ревью:\n  - пункт — файл:1 — не так'),
+        );
+      }
       await commit(cwd, `docs(docs): ревью ${short}`, task);
       return { code: 0, answer: verdict === 'OK' ? 'OK' : 'ВОЗВРАТ\n- пункт — файл:1 — не так' };
     }

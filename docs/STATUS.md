@@ -16,7 +16,8 @@
 
 ## Следующая сессия
 
-- Текущая задача: 07/T23 — исправление красного slow.
-- Сделано: ускорено сравнение typed arrays в `apps/client/src/local/view-delta.ts`; `pnpm verify --changed` — зелёный. Ревью возвращено: workflow `slow/tests` на `643f919` красный.
-- Следующая задача: 07/T23 — исправить падение `pnpm test:all` в workflow `slow/tests`.
+- Текущая задача: 07/T23 — ждёт повторного ревью после исправления красного slow.
+- Сделано: фикстура reviewer в `tools/agent-loop/src/streams-world.ts` записывает блок `Возврат ревью:` перед коммитом возврата; `pnpm verify --changed` — зелёный.
+- Приёмка: причина падения исправлена в тестовой фикстуре; зелёный `slow/tests` проверит CI на новом коммите.
+- Следующая задача: 07/T17am.
 - Читать: блок T17am в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-layer.ts`, тесты линий фронта.
