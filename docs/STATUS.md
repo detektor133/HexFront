@@ -3,8 +3,8 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-- Исправлено: 07/T17an — приёмочные тесты проходят реальный путь `ArmyBar → MatchSurface → useSandbox → send`, но повторное ревью вернуло три недостатка покрытия `MapView` и артиллерийского radial-сценария.
-- Проверено: `pnpm verify --changed` — зелёный; задача ждёт исправления возврата ревью.
+- Исправлено: 07/T17an — приёмочные тесты проходят реальный путь `ArmyBar → MatchSurface → useSandbox → send`, артиллерийский radial и отмену вне секторов.
+- Проверено: `pnpm verify --changed` — зелёный; повторное ревью вернуло недостаточное покрытие реального `MapView` и точного payload ПКМ.
 - Следующая задача: 07/T17.
 - Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `MatchSurfaceRuntime.tsx`, `ArmyBar.tsx`, `map-view.ts`, тесты T17an/T17m.
 Очередь: 07/T17af → 07/T17am → 07/T17an → 07/T17 → 07/T18
@@ -18,5 +18,5 @@
 
 - Сделано: исправлен обязательный возврат 07/T17an; тест проверяет корневые assignUnits/bombard, payload bombard, отмену вне секторов и input через attachInput.
 - Проверки: pnpm verify --changed — зелёный; RED-проверки трёх регрессий падали assertion и после восстановления стали зелёными.
-- Следующая задача: 07/T17.
+- Следующая задача: 07/T17an — исправить возврат повторного ревью.
 - Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.
