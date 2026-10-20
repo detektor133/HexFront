@@ -17,6 +17,7 @@ import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
+import { buildRadialActions, sectorAt, type RadialMenuState } from '../dev/radial-menu.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
@@ -112,6 +113,7 @@ interface Sandbox {
   setDockHeight(height: number): void;
   setHudHeight(height: number): void;
   pixiTelemetry(): PixiTelemetry;
+  readonly radial: RadialMenuState | null;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -144,6 +146,8 @@ export function useSandbox(
   );
   const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
+  const [radial, setRadial] = useState<RadialMenuState | null>(null);
+  const radialRef = useRef<RadialMenuState | null>(null);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
   const hudHeightRef = useRef(0);
@@ -196,6 +200,10 @@ export function useSandbox(
     layerRef.current?.setRoadPreview(path);
   }, []);
   const setArmyRef = useRef(setArmy);
+  const setRadialState = (next: RadialMenuState | null): void => {
+    radialRef.current = next;
+    setRadial(next);
+  };
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
     () =>
@@ -356,6 +364,16 @@ export function useSandbox(
       }
       order(hex);
     };
+    const onDoubleTap = (h: { q: number; r: number }, world: Point): void => {
+      const current = viewRef.current;
+      if (!current || !inBounds(h, map.width, map.height)) return;
+      const hit = layerRef.current?.unitsAt(world) ?? [];
+      if (hit.length === 0) return;
+      const next = selectUnits(current, pickedRef.current, hit);
+      pick(next);
+      const unit = current.units.find((candidate) => hit.includes(candidate.id));
+      mapViewRef.current?.centerOn(hexFromId(unit?.hex ?? hexId(h, map.width), map.width));
+    };
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
     const order = (hex: number): void => {
       const current = viewRef.current;
@@ -384,7 +402,7 @@ export function useSandbox(
         return layer;
       },
     };
-    void createMapView(host, map, options, () => {}, onTap).then((v) => {
+    void createMapView(host, map, options, () => {}, onTap, onDoubleTap).then((v) => {
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
@@ -394,6 +412,43 @@ export function useSandbox(
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
+      v.setRadialHooks?.({
+        canOpen(world) {
+          const current = viewRef.current;
+          if (!current || toolRef.current || pickedRef.current.units.length === 0) return false;
+          return pickedRef.current.units.some((id) => {
+            const unit = current.units.find((candidate) => candidate.id === id);
+            const center = unit ? layerRef.current?.chipAt(unit.hex) : undefined;
+            return (
+              center !== undefined &&
+              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
+            );
+          });
+        },
+        action(_world, screen, phase) {
+          const current = viewRef.current;
+          if (!current) return;
+          if (phase === 'start') {
+            const units = pickedRef.current.units
+              .map((id) => current.units.find((unit) => unit.id === id))
+              .filter((unit): unit is NonNullable<typeof unit> => unit !== undefined);
+            const actions = buildRadialActions(units, current);
+            setRadialState({ center: screen, actions, active: actions });
+            return;
+          }
+          const state = radialRef.current;
+          if (!state) return;
+          const active = sectorAt(state, screen);
+          if (phase === 'move' && active?.children) {
+            setRadialState({ ...state, active: active.children });
+          } else if (phase === 'end') {
+            if (active?.command) match.send(active.command);
+            setRadialState(null);
+          } else if (phase === 'cancel') {
+            setRadialState(null);
+          }
+        },
+      });
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
         const units = viewRef.current
@@ -442,6 +497,7 @@ export function useSandbox(
       layerRef.current = null;
       mapViewRef.current = null;
       eventsRef.current = [];
+      setRadialState(null);
     };
   }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
 
@@ -460,6 +516,7 @@ export function useSandbox(
     observerId,
     events,
     workerTelemetry: workerTelemetryRef.current,
+    radial,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {

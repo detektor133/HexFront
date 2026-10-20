@@ -480,7 +480,8 @@ describe('T17m: карточка клетки', () => {
         onPick={() => undefined}
       />,
     );
-    expect(screen.getByRole('group', { name: 'В армию' })).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'В армию' })).toBeNull();
+    expect(screen.getByText('Организованность')).toBeTruthy();
   });
 
   it.each([

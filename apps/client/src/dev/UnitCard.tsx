@@ -15,8 +15,6 @@ import { measureCardHeight } from './card-measurement.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
-import { armyColor } from '../theme/colors.ts';
-import { IconButton } from '../ui/icon-button.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -24,56 +22,6 @@ function Row(props: { label: string; value: string }): React.JSX.Element {
       <dt>{props.label}</dt>
       <dd>{props.value}</dd>
     </>
-  );
-}
-
-function Button(props: { label: string; onClick: () => void }): React.JSX.Element {
-  return (
-    <div className={styles.action}>
-      <button type="button" className={styles.button} onClick={props.onClick}>
-        <span>{props.label}</span>
-      </button>
-    </div>
-  );
-}
-
-// Иконка «Слить» 20×20 (линия 2, round): два пути сходятся в один (art/ui.md, иконки действий).
-function MergeIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 20 20" className={styles.icon} aria-hidden="true">
-      <polyline points="4,4 10,10 16,4" />
-      <line x1="10" y1="10" x2="10" y2="17" />
-    </svg>
-  );
-}
-
-// «В армию» — плашки армий с закладкой цвета и «Резерв»; плашка армии, где сейчас все выбранные
-// отряды, в золотой рамке. Тап — перевести отряды (assignUnits).
-function ArmyPlates(props: {
-  units: readonly UnitView[];
-  view: PlayerView;
-  send: (cmd: Command) => void;
-}): React.JSX.Element {
-  const { units, view, send } = props;
-  const ids = units.map((u) => u.id);
-  const current = units.every((u) => u.armyId === units[0]?.armyId) ? units[0]?.armyId : undefined;
-  const plate = (armyId: number | null, label: string, color: string | null): React.JSX.Element => (
-    <button
-      key={armyId ?? 'reserve'}
-      type="button"
-      className={`${styles.plate} ${current === armyId ? styles.plateOn : ''}`}
-      aria-pressed={current === armyId}
-      onClick={() => send({ t: 'assignUnits', unitIds: ids, armyId })}
-    >
-      {color && <span className={styles.plateBand} style={{ background: color }} />}
-      <span>{label}</span>
-    </button>
-  );
-  return (
-    <div className={styles.plates} role="group" aria-label={t('unit.toArmy')}>
-      {view.armies.map((a) => plate(a.id, armyName(a), armyColor(a.number)))}
-      {plate(null, t('army.reserve'), null)}
-    </div>
   );
 }
 
@@ -111,42 +59,6 @@ function ArtilleryStatus({ unit }: { unit: UnitView }): React.JSX.Element | null
       {t(key)}
     </p>
   ) : null;
-}
-
-// Приказы выбранным отрядам: слить, в армию, фокус огня. Деление — только
-// вытягиванием из фишки (05-armies.md), кнопки «Разделить» нет.
-function Orders(props: {
-  units: readonly UnitView[];
-  view: PlayerView;
-  send: (cmd: Command) => void;
-}): React.JSX.Element {
-  const { units, view, send } = props;
-  const ids = units.map((u) => u.id);
-  const [first] = units;
-  const sameStack =
-    units.length > 1 && units.every((u) => u.hex === first?.hex && u.type === first?.type);
-  return (
-    <>
-      {sameStack && (
-        <div className={styles.action}>
-          <IconButton
-            label={t('unit.merge')}
-            className={styles.iconButton}
-            onClick={() => send({ t: 'merge', unitIds: ids })}
-          >
-            <MergeIcon />
-          </IconButton>
-        </div>
-      )}
-      {units.length === 1 && first?.type === 'artillery' && (
-        <Button
-          label={t('unit.autoTarget')}
-          onClick={() => send({ t: 'bombard', unitId: first.id, targetUnitId: null })}
-        />
-      )}
-      <ArmyPlates units={units} view={view} send={send} />
-    </>
-  );
 }
 
 /** Карточка выбранных отрядов песочницы: состав и приказы (атака — без подтверждения, 04/T16). */
@@ -189,7 +101,6 @@ export function UnitCard(props: {
         <h2 className={styles.title}>{title}</h2>
         {units.length === 1 && <UnitRows u={first} view={view} />}
         {units.length === 1 && <ArtilleryStatus unit={first} />}
-        <Orders units={units} view={view} send={props.send} />
       </div>
     </section>
   );
