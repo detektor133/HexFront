@@ -16,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: исправлен обязательный возврат 07/T17an; тест проверяет корневые assignUnits/bombard, payload bombard, отмену вне секторов и input через attachInput.
-- Проверки: pnpm verify --changed — зелёный; RED-проверки трёх регрессий падали assertion и после восстановления стали зелёными.
-- Следующая задача: 07/T17an — исправить возврат повторного ревью и снова проверить.
+- Сделано: исправлен возврат 07/T17an; тест radial использует настоящий `createMapView` и его canvas/input.
+- Проверки: `pnpm verify --changed` — зелёный; четыре временные мутации возврата дали assertion RED и после восстановления GREEN.
+- Следующая задача: 07/T17.
 - Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.

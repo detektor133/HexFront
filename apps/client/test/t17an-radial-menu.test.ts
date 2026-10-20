@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
+import { Container } from 'pixi.js';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,80 +13,65 @@ import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
-import { createGesture, RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
-import { attachInput } from '../src/render/map-view.ts';
-import type { createMapView } from '../src/render/map-view.ts';
+import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
+import { hexCenter } from '../src/render/hex-geometry.ts';
+import { createMapView } from '../src/render/map-view.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
-type MapViewModule = { createMapView: typeof createMapView };
+vi.mock('pixi.js', async (importOriginal) => {
+  const pixi = await importOriginal<Record<string, unknown>>();
+  const PixiContainer = pixi.Container as typeof Container;
+  class TestApplication {
+    readonly canvas = document.createElement('canvas');
+    readonly stage = new PixiContainer();
+    readonly ticker = {
+      callbacks: [] as Array<(ticker: { deltaMS: number; FPS: number }) => void>,
+      add: (callback: (ticker: { deltaMS: number; FPS: number }) => void): void => {
+        this.ticker.callbacks.push(callback);
+      },
+    };
+    readonly renderer = { texture: { managedTextures: [] as readonly unknown[] } };
+    screen = { width: 390, height: 844 };
+    constructor() {
+      (globalThis as Record<string, unknown>).__lastTestApplication = this;
+      Object.defineProperty(this.canvas, 'getBoundingClientRect', {
+        value: () => ({ left: 0, top: 0 }),
+      });
+      Object.defineProperty(this.canvas, 'setPointerCapture', { value: vi.fn() });
+    }
+    async init(options: {
+      readonly resizeTo: { clientWidth?: number; clientHeight?: number };
+    }): Promise<void> {
+      this.screen = {
+        width: options.resizeTo.clientWidth || 390,
+        height: options.resizeTo.clientHeight || 844,
+      };
+    }
+    destroy(): void {}
+  }
+  return { ...pixi, Application: TestApplication };
+});
 
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
 const loaded = loadMap(mapJson);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+const testMap = loaded.map;
 
 const harness = vi.hoisted(() => ({
   commands: [] as Command[],
-  onTap: null as
-    | ((
-        hex: { q: number; r: number },
-        kind: 'select' | 'order',
-        world: { x: number; y: number },
-      ) => void)
-    | null,
-  onDoubleTap: null as
-    ((hex: { q: number; r: number }, world: { x: number; y: number }) => void) | null,
-  mapGesture: null as ReturnType<typeof createGesture> | null,
   mapCanvas: null as HTMLCanvasElement | null,
-  detachInput: null as (() => void) | null,
-  tapHex: { q: 1, r: 1 },
+  app: null as {
+    canvas: HTMLCanvasElement;
+    stage: Container;
+    ticker: { callbacks: Array<(ticker: { deltaMS: number; FPS: number }) => void> };
+  } | null,
   world: { x: 100, y: 100 },
   centerOn: vi.fn(),
-  doubleTaps: 0,
   artillery: false,
+  unitHex: 0,
 }));
-
-vi.mock('../src/render/map-view.ts', async () => {
-  const actual = await vi.importActual<MapViewModule>('../src/render/map-view.ts');
-  return {
-    ...actual,
-    createMapView: vi.fn(async (...args: Parameters<typeof actual.createMapView>) => {
-      const [, map, options, , onTap, onDoubleTap] = args;
-      harness.onTap = onTap ?? null;
-      harness.onDoubleTap = onDoubleTap ?? null;
-      const layer = options.midLayer?.(map, options.radius);
-      const layerWithChipAt = layer as unknown as {
-        chipAt?: (id: number) => { x: number; y: number };
-      };
-      harness.world = layerWithChipAt.chipAt?.(236) ?? { x: 100, y: 100 };
-      Object.defineProperty(layer, 'unitsAt', { configurable: true, value: () => [6] });
-      return {
-        configure: vi.fn(),
-        setScale: vi.fn(),
-        setBottomInset: vi.fn(),
-        setTopInset: vi.fn(),
-        setStroke: vi.fn(),
-        setSelection: vi.fn(),
-        setGrab: vi.fn(),
-        setOrderHooks: vi.fn(),
-        setRadialHooks: vi.fn(),
-        cancel: vi.fn(),
-        sceneStats: () => ({
-          objects: 0,
-          text: 0,
-          graphics: 0,
-          graphicsInstructions: [],
-          graphicsDetails: [],
-          textures: 0,
-          canvasTextTextures: null,
-        }),
-        centerOn: harness.centerOn,
-        destroy: vi.fn(() => layer?.destroy()),
-      } as unknown as Awaited<ReturnType<typeof actual.createMapView>>;
-    }),
-  };
-});
 
 class TestWorker {
   public onmessage: ((event: MessageEvent) => void) | null = null;
@@ -99,6 +85,7 @@ class TestWorker {
     const engine = createLocalEngine(message.map, message.seed ?? 42, message.players ?? 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const snapshot = engine.snapshot();
+    harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
     if (harness.artillery)
       for (const unit of snapshot.view.units) (unit as { type: string }).type = 'artillery';
     if (harness.artillery) {
@@ -153,7 +140,18 @@ async function renderSurface(): Promise<void> {
   );
   render(createElement(MatchSurface, { debug: true }));
   await waitFor(() => expect(armyCard()).toBeTruthy());
-  connectRealMapInput();
+  const app = (globalThis as Record<string, unknown>).__lastTestApplication as typeof harness.app;
+  if (!app) throw new Error('Pixi Application не создан');
+  app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+  harness.app = app;
+  harness.mapCanvas = app.canvas;
+  const world = app.stage.children[0];
+  if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+  const point = hexCenter(hexFromId(harness.unitHex, testMap.width), tokens.map.hexRadius);
+  harness.world = {
+    x: world.position.x + point.x * world.scale.x,
+    y: world.position.y + point.y * world.scale.y,
+  };
 }
 
 function menuPoint(item: HTMLElement, menu: HTMLElement): { x: number; y: number } {
@@ -161,36 +159,6 @@ function menuPoint(item: HTMLElement, menu: HTMLElement): { x: number; y: number
     x: Number.parseFloat(menu.style.left) + Number.parseFloat(item.style.left),
     y: Number.parseFloat(menu.style.top) + Number.parseFloat(item.style.top),
   };
-}
-
-function connectRealMapInput(): void {
-  const canvas = document.createElement('canvas');
-  Object.defineProperty(canvas, 'getBoundingClientRect', { value: () => ({ left: 0, top: 0 }) });
-  Object.defineProperty(canvas, 'setPointerCapture', { value: vi.fn() });
-  harness.mapCanvas = canvas;
-  harness.mapGesture = createGesture(
-    {
-      drawing: () => false,
-      press: () => undefined,
-      release: () => undefined,
-      canHold: () => false,
-      canRadial: () => false,
-      cancelZone: () => false,
-      inside: () => true,
-    },
-    (event) => {
-      if (event.t === 'tap') harness.onTap?.(harness.tapHex, event.kind, event.at);
-      if (event.t === 'doubleTap') {
-        harness.doubleTaps += 1;
-        harness.onDoubleTap?.(harness.tapHex, event.at);
-      }
-    },
-  );
-  harness.detachInput = attachInput(canvas, harness.mapGesture, {
-    zoom: () => undefined,
-    pressed: () => undefined,
-    idle: () => undefined,
-  });
 }
 
 beforeEach(() => {
@@ -211,17 +179,12 @@ beforeEach(() => {
     removeEventListener: vi.fn(),
   }));
   harness.commands.length = 0;
-  harness.onTap = null;
-  harness.onDoubleTap = null;
-  harness.mapGesture = null;
   harness.mapCanvas = null;
-  harness.detachInput?.();
-  harness.detachInput = null;
-  harness.tapHex = { q: 1, r: 1 };
+  harness.app = null;
   harness.centerOn.mockReset();
   harness.artillery = false;
-  harness.doubleTaps = 0;
   harness.world = { x: 100, y: 100 };
+  harness.unitHex = 0;
 });
 
 afterEach(() => {
@@ -290,43 +253,72 @@ describe('07/T17an: радиальное меню', () => {
   });
 
   it('проводит двойной тап MapView до выделения и анимированного centerOn', async () => {
-    await renderSurface();
-    if (!harness.mapGesture) throw new Error('MapView не создал жестовую машину');
-    const point = harness.world;
-    harness.tapHex = hexFromId(236, loaded.map.width);
-    connectRealMapInput();
-    if (!harness.mapCanvas) throw new Error('MapView input is not connected');
-    fireEvent.pointerDown(harness.mapCanvas, {
-      button: 0,
-      pointerId: 1,
-      clientX: point.x,
-      clientY: point.y,
+    const host = {
+      clientWidth: 390,
+      clientHeight: 844,
+      appendChild: (node: Node): Node => document.body.appendChild(node),
+    } as unknown as HTMLElement;
+    const target = { q: 2, r: 2 };
+    const layer = {
+      container: new Container(),
+      update: (): void => undefined,
+      chipAt: (): { x: number; y: number } => hexCenter(target, tokens.map.hexRadius),
+      unitsAt: (): readonly number[] => [6],
+      destroy: (): void => undefined,
+    };
+    let mapView: Awaited<ReturnType<typeof createMapView>> | null = null;
+    const tapped = vi.fn((hex: { q: number; r: number }, world: { x: number; y: number }) => {
+      mapView?.centerOn(hex, tokens.motion.map);
+      return { hex, world };
     });
-    fireEvent.pointerUp(harness.mapCanvas, { pointerId: 1, clientX: point.x, clientY: point.y });
-    fireEvent.pointerDown(harness.mapCanvas, {
-      button: 0,
-      pointerId: 1,
-      clientX: point.x,
-      clientY: point.y,
-    });
-    fireEvent.pointerUp(harness.mapCanvas, { pointerId: 1, clientX: point.x, clientY: point.y });
-    expect(harness.doubleTaps).toBe(1);
-    await waitFor(() =>
-      expect(harness.centerOn).toHaveBeenCalledWith(expect.any(Object), tokens.motion.map),
+    mapView = await createMapView(
+      host,
+      testMap,
+      { radius: tokens.map.hexRadius, midLayer: () => layer },
+      () => undefined,
+      undefined,
+      tapped,
     );
+    const centerOn = vi.spyOn(mapView, 'centerOn');
+    const app = (globalThis as Record<string, unknown>).__lastTestApplication as typeof harness.app;
+    if (!app) throw new Error('Pixi Application не создан');
+    app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+    const worldLayer = app.stage.children[0];
+    if (!(worldLayer instanceof Container)) throw new Error('Слой мира MapView не создан');
+    const chip = hexCenter(target, tokens.map.hexRadius);
+    const point = {
+      x: worldLayer.position.x + chip.x * worldLayer.scale.x,
+      y: worldLayer.position.y + chip.y * worldLayer.scale.y,
+    };
+    const canvas = app.canvas;
+    fireEvent.pointerDown(canvas, {
+      button: 0,
+      pointerId: 1,
+      clientX: point.x,
+      clientY: point.y,
+    });
+    fireEvent.pointerUp(canvas, { pointerId: 1, clientX: point.x, clientY: point.y });
+    fireEvent.pointerDown(canvas, {
+      button: 0,
+      pointerId: 1,
+      clientX: point.x,
+      clientY: point.y,
+    });
+    fireEvent.pointerUp(canvas, { pointerId: 1, clientX: point.x, clientY: point.y });
+    expect(tapped).toHaveBeenCalledWith(
+      target,
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(centerOn).toHaveBeenCalledWith(target, tokens.motion.map);
+    mapView.destroy();
   });
 
   it('отправляет ПКМ через MapView без открытия radial', async () => {
     await renderSurface();
-    if (!harness.mapGesture) throw new Error('MapView не создал жестовую машину');
     const card = armyCard();
     fireEvent.click(card);
     await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
-    const point = harness.world;
-    harness.tapHex = hexFromId(236, loaded.map.width);
-    const unitHex = hexFromId(236, loaded.map.width);
-    harness.tapHex = { q: unitHex.q + 1, r: unitHex.r };
-    connectRealMapInput();
+    const point = { x: 100, y: 100 };
     if (!harness.mapCanvas) throw new Error('MapView input is not connected');
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 2,
@@ -336,7 +328,7 @@ describe('07/T17an: радиальное меню', () => {
     });
     fireEvent.pointerUp(harness.mapCanvas, { pointerId: 2, clientX: point.x, clientY: point.y });
     await waitFor(() => expect(harness.commands).toHaveLength(1));
-    expect(harness.commands[0]).toMatchObject({ t: 'move' });
+    expect(harness.commands[0]).toEqual({ t: 'move', unitIds: [6, 7], to: 33 });
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
