@@ -16,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: исправлены четыре прошлых СПЕК, но тест T17an всё ещё обходит реальный `MapView` для double tap и ПКМ и не проверяет полный артиллерийский radial-сценарий.
-- Проверки: `pnpm verify --changed` зелёный.
-- Следующая задача: исправить последний блок «Возврат ревью» в 07/T17an.
-- Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17an-radial-menu.test.ts`.
+- Сделано: исправлен обязательный возврат 07/T17an; тест проверяет корневые assignUnits/bombard, payload bombard, отмену вне секторов и input через attachInput.
+- Проверки: pnpm verify --changed — зелёный; RED-проверки трёх регрессий падали assertion и после восстановления стали зелёными.
+- Следующая задача: 07/T17.
+- Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.

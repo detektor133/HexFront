@@ -427,7 +427,7 @@ interface InputHandlers {
 }
 
 // DOM-события указателя → машина жестов (render/gesture.ts); колесо — зум.
-function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandlers): () => void {
+export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandlers): () => void {
   const local = (e: PointerEvent | WheelEvent): Point => {
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
