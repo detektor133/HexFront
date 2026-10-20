@@ -13,7 +13,16 @@ describe('объём задачи для потоков', () => {
       after: ['T2', 'T3'],
     });
     expect(taskScope('- [ ] **T1. Х**\n  *После:* —\n')).toEqual({ after: [] });
+    expect(taskScope('- [ ] **T1. Х**\n  *После:* нет.\n')).toEqual({ after: [] });
     expect(taskScope('- [ ] **T1. Х**\n')).toEqual({});
+  });
+
+  it('не пропускает дочернюю задачу перед задачей владельца из-за «После: нет.»', () => {
+    const stage = [
+      '- [ ] **T17am. Дочерняя задача**\n  *Файлы:* `apps/client/src/dev/plan-layer.ts`\n  *После:* нет.\n',
+      '- [ ] **T17. Раунд замечаний**, задача владельца.\n',
+    ].join('\n');
+    expect(selectStreamTask(status('07/T17am → 07/T17'), stage, [])).toBe('07/T17am');
   });
 
   it('пересечение путей и glob — с запасом, но разные файлы и каталоги не пересекаются', () => {

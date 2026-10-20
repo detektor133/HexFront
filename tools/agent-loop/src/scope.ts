@@ -19,13 +19,17 @@ const splitList = (value: string): string[] =>
     .map((item) => item.trim().replace(/^`|`$/g, '').trim())
     .filter((item) => item !== '' && item !== '—');
 
+const hasNoDependencies = (value: string): boolean => /^нет(?:[.;]|\s|$)/iu.test(value.trim());
+
 /** @returns объём задачи по строкам `*Файлы:*` и `*После:*` её блока. */
 export function taskScope(block: string): TaskScope {
   const files = fieldValue(block, 'Файлы');
   const after = fieldValue(block, 'После');
   return {
     ...(files === undefined ? {} : { files: splitList(files) }),
-    ...(after === undefined ? {} : { after: splitList(after).map(shortTask) }),
+    ...(after === undefined
+      ? {}
+      : { after: hasNoDependencies(after) ? [] : splitList(after).map(shortTask) }),
   };
 }
 
