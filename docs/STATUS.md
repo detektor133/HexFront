@@ -17,6 +17,6 @@
 ## Следующая сессия
 
 - Текущая задача: 07/T23 — исправление красного slow.
-- Сделано: ускорено сравнение typed arrays в `apps/client/src/local/view-delta.ts`; `pnpm verify --changed` — зелёный.
-- Следующая задача: 07/T17am — штрихи-«расчёска» на линии фронта.
+- Сделано: ускорено сравнение typed arrays в `apps/client/src/local/view-delta.ts`; `pnpm verify --changed` — зелёный. Ревью возвращено: workflow `slow/tests` на `643f919` красный.
+- Следующая задача: 07/T23 — исправить падение `pnpm test:all` в workflow `slow/tests`.
 - Читать: блок T17am в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-layer.ts`, тесты линий фронта.
