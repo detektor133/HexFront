@@ -88,24 +88,36 @@ describe('геометрия маркера боя (07/T17af)', () => {
           strokeStyle.color === tokens.ui.ink,
       ),
     ).toHaveLength(9);
-    let bladeCount = 0;
-    let secondBladeIndex: number | null = null;
-    for (const [index, operation] of operations.entries()) {
-      if (operation.kind === 'poly') {
-        bladeCount += 1;
-        if (bladeCount % 2 === 0) secondBladeIndex = index;
-        continue;
-      }
-      if (operation.kind !== 'stroke') continue;
-      if (secondBladeIndex !== null) {
-        expect(
-          operations
-            .slice(secondBladeIndex + 1, index)
-            .some(({ kind }) => kind === 'moveTo' || kind === 'lineTo'),
-        ).toBe(false);
-        secondBladeIndex = null;
-      }
+    const firstBladeIndex = operations.findIndex(({ kind }) => kind === 'poly');
+    const secondBladeIndex = operations.findIndex(
+      ({ kind }, index) => kind === 'poly' && index > firstBladeIndex,
+    );
+    const lastStrokeBeforeBlades = operations.findLastIndex(
+      ({ kind }, index) => kind === 'stroke' && index < firstBladeIndex,
+    );
+    const firstStrokeAfterBlades = operations.findIndex(
+      ({ kind }, index) => kind === 'stroke' && index > secondBladeIndex,
+    );
+    expect(lastStrokeBeforeBlades).toBeGreaterThanOrEqual(0);
+    expect(firstBladeIndex).toBeGreaterThan(lastStrokeBeforeBlades);
+    expect(secondBladeIndex).toBeGreaterThan(firstBladeIndex);
+    expect(firstStrokeAfterBlades).toBeGreaterThan(secondBladeIndex);
+    const preBladePathIndexes = operations
+      .slice(0, firstBladeIndex)
+      .map((operation, index) => ({ operation, index }))
+      .filter(({ operation }) => operation.kind === 'moveTo' || operation.kind === 'lineTo')
+      .map(({ index }) => index);
+    expect(preBladePathIndexes).toHaveLength(4);
+    for (const pathIndex of preBladePathIndexes) {
+      expect(
+        operations.slice(pathIndex + 1, firstBladeIndex).some(({ kind }) => kind === 'stroke'),
+      ).toBe(true);
     }
+    expect(
+      operations
+        .slice(lastStrokeBeforeBlades + 1, firstStrokeAfterBlades)
+        .some(({ kind }) => kind === 'moveTo' || kind === 'lineTo'),
+    ).toBe(false);
 
     const axes = [
       { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
