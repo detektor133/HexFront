@@ -3,8 +3,9 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-- Возврат: 07/T17an — после изменения теста остаются непокрыты удержание на фишке карты через реальный `MapView`/runtime и выделение при двойном тапе через runtime; проверка полного payload ПКМ исправлена.
-- Проверено: целевые тесты 17/17; `pnpm verify --changed` — зелёный.
+- 07/T17an исправлена по возврату: map long-press и двойной тап проверяются через смонтированный `MatchSurface`/runtime.
+- `slow`: coverage отделено от полного функционального прогона и считается только для `packages/sim`.
+- Проверено: T17an 9/9; `pnpm verify --changed` — зелёный.
 - Следующая задача: 07/T17.
 - Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `MatchSurfaceRuntime.tsx`, `ArmyBar.tsx`, `map-view.ts`, тесты T17an/T17m.
 Очередь: 07/T17af → 07/T17am → 07/T17an → 07/T17 → 07/T18
@@ -16,8 +17,8 @@
 
 ## Следующая сессия
 
-- Сделано: 07/T17an повторно проверена; возврат reviewer сохранён из-за непокрытого map long-press и отдельного тестового wiring двойного тапа.
-- Двойной тап и ПКМ через canvas/input `MapView` проходят, но не подтверждают передачу callback из `MatchSurfaceRuntime`.
-- Проверки: `pnpm verify --changed` — зелёный; затронутый тест 8/8.
-- Следующее действие: исправить возврат 07/T17an.
+- Сделано: 07/T17an исправлена по двум последним пунктам reviewer; задача `[~]`.
+- `slow` больше не включает V8 coverage для несвязанных проектов; покрытие `sim` запускается отдельно.
+- Проверки: `pnpm verify --changed` — зелёный; T17an 9/9.
+- Следующее действие: повторить `$review 07/T17an`.
 - Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.
