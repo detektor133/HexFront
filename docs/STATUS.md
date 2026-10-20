@@ -16,10 +16,8 @@
 
 ## Следующая сессия
 
-- Сделано: 07/T17an повторно исправлена по возврату reviewer.
-- Двойной тап проходит через реальный canvas/input `MapView`, проверяет выбор юнита и точный `centerOn(hex, tokens.motion.map)`.
-- ПКМ проходит через `MapView` с координатами hex назначения и проверяет полный payload команды.
-- Временные мутации четырёх СПЕК дали RED по assertion; восстановленный код дал GREEN.
+- Сделано: 07/T17an повторно проверена; возврат reviewer сохранён из-за непокрытого map long-press и отдельного тестового wiring двойного тапа.
+- Двойной тап и ПКМ через canvas/input `MapView` проходят, но не подтверждают передачу callback из `MatchSurfaceRuntime`.
 - Проверки: `pnpm verify --changed` — зелёный; затронутый тест 8/8.
-- Следующая задача: 07/T17.
+- Следующее действие: исправить возврат 07/T17an.
 - Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.
