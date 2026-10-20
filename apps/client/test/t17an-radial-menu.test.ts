@@ -13,6 +13,7 @@ import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
+import { createDoubleTapHandler } from '../src/match/MatchSurfaceRuntime.tsx';
 import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
 import { createMapView } from '../src/render/map-view.ts';
@@ -161,6 +162,14 @@ function menuPoint(item: HTMLElement, menu: HTMLElement): { x: number; y: number
   };
 }
 
+function screenPointForHex(hexId: number, world: Container): { x: number; y: number } {
+  const point = hexCenter(hexFromId(hexId, testMap.width), tokens.map.hexRadius);
+  return {
+    x: world.position.x + point.x * world.scale.x,
+    y: world.position.y + point.y * world.scale.y,
+  };
+}
+
 beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
     configurable: true,
@@ -267,9 +276,25 @@ describe('07/T17an: радиальное меню', () => {
       destroy: (): void => undefined,
     };
     let mapView: Awaited<ReturnType<typeof createMapView>> | null = null;
-    const tapped = vi.fn((hex: { q: number; r: number }, world: { x: number; y: number }) => {
-      mapView?.centerOn(hex, tokens.motion.map);
-      return { hex, world };
+    let picked: { hex: number | null; units: readonly number[]; target: number | null } = {
+      hex: null,
+      units: [],
+      target: null,
+    };
+    const view = { units: [{ id: 6, hex: 6 }] } as unknown as Parameters<
+      typeof createDoubleTapHandler
+    >[0]['getView'] extends () => infer T
+      ? NonNullable<T>
+      : never;
+    const tapped = createDoubleTapHandler({
+      getView: () => view,
+      map: testMap,
+      getPicked: () => picked,
+      getHit: () => [6],
+      pick: (next) => {
+        picked = next;
+      },
+      centerOn: (hex, durationMs) => mapView?.centerOn(hex, durationMs),
     });
     mapView = await createMapView(
       host,
@@ -285,11 +310,7 @@ describe('07/T17an: радиальное меню', () => {
     app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
     const worldLayer = app.stage.children[0];
     if (!(worldLayer instanceof Container)) throw new Error('Слой мира MapView не создан');
-    const chip = hexCenter(target, tokens.map.hexRadius);
-    const point = {
-      x: worldLayer.position.x + chip.x * worldLayer.scale.x,
-      y: worldLayer.position.y + chip.y * worldLayer.scale.y,
-    };
+    const point = screenPointForHex(6, worldLayer);
     const canvas = app.canvas;
     fireEvent.pointerDown(canvas, {
       button: 0,
@@ -305,11 +326,8 @@ describe('07/T17an: радиальное меню', () => {
       clientY: point.y,
     });
     fireEvent.pointerUp(canvas, { pointerId: 1, clientX: point.x, clientY: point.y });
-    expect(tapped).toHaveBeenCalledWith(
-      target,
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-    );
-    expect(centerOn).toHaveBeenCalledWith(target, tokens.motion.map);
+    expect(picked).toEqual({ hex: null, units: [6], target: null });
+    expect(centerOn).toHaveBeenCalledWith(hexFromId(6, testMap.width), tokens.motion.map);
     mapView.destroy();
   });
 
@@ -318,7 +336,10 @@ describe('07/T17an: радиальное меню', () => {
     const card = armyCard();
     fireEvent.click(card);
     await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
-    const point = { x: 100, y: 100 };
+    const world = harness.app?.stage.children[0];
+    if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+    const destinationHex = 33;
+    const point = screenPointForHex(destinationHex, world);
     if (!harness.mapCanvas) throw new Error('MapView input is not connected');
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 2,
@@ -328,7 +349,7 @@ describe('07/T17an: радиальное меню', () => {
     });
     fireEvent.pointerUp(harness.mapCanvas, { pointerId: 2, clientX: point.x, clientY: point.y });
     await waitFor(() => expect(harness.commands).toHaveLength(1));
-    expect(harness.commands[0]).toEqual({ t: 'move', unitIds: [6, 7], to: 33 });
+    expect(harness.commands[0]).toEqual({ t: 'move', unitIds: [6, 7], to: destinationHex });
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
