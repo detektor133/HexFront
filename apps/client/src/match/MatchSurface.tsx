@@ -234,6 +234,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           tool={sb.tool}
           onTool={sb.setTool}
           style={styleFor('bottom-panel')}
+          onRadial={sb.radialForArmy}
         />
       )}
       {(loaded === 'error' || sb.error) && (

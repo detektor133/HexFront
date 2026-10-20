@@ -43,7 +43,7 @@ import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
-import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
+import { createMapView, type MapView, type RadialHooks, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -73,6 +73,57 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
 
 type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
 type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
+export type RadialPhase = 'start' | 'move' | 'end' | 'cancel';
+
+export function createRadialActionHandler(options: {
+  getView: () => PlayerView | null;
+  send: (command: Command) => void;
+  getState: () => RadialMenuState | null;
+  setState: (state: RadialMenuState | null) => void;
+}): (armyId: number, screen: Point, phase: RadialPhase) => void {
+  return (armyId, screen, phase): void => {
+    const view = options.getView();
+    if (!view) return;
+    if (phase === 'start') {
+      const actions = buildRadialActions(
+        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
+        view,
+      );
+      options.setState({ center: screen, actions, active: actions });
+      return;
+    }
+    const state = options.getState();
+    if (!state) return;
+    const active = sectorAt(state, screen);
+    if (phase === 'move' && active?.children)
+      options.setState({ ...state, active: active.children });
+    if (phase === 'end') {
+      if (active?.command) options.send(active.command);
+      options.setState(null);
+    }
+    if (phase === 'cancel') options.setState(null);
+  };
+}
+
+export function focusUnitOnDoubleTap(options: {
+  view: PlayerView;
+  map: MapStatic;
+  hex: { readonly q: number; readonly r: number };
+  picked: Picked;
+  hit: readonly number[];
+  pick: (picked: Picked) => void;
+  centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
+}): void {
+  const { view, map, hit } = options;
+  if (hit.length === 0) return;
+  const next = selectUnits(view, options.picked, hit);
+  options.pick(next);
+  const unit = view.units.find((candidate) => hit.includes(candidate.id));
+  options.centerOn(
+    hexFromId(unit?.hex ?? hexId(options.hex, map.width), map.width),
+    tokens.motion.map,
+  );
+}
 type PlayerColorId = (typeof tokens.players.palette)[number]['id'];
 
 const NICKNAME_KEY = 'hexfront.nickname';
@@ -114,6 +165,7 @@ interface Sandbox {
   setHudHeight(height: number): void;
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
+  radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -204,6 +256,15 @@ export function useSandbox(
     radialRef.current = next;
     setRadial(next);
   };
+  const radialForArmy = useCallback(
+    createRadialActionHandler({
+      getView: () => viewRef.current,
+      send: (command) => matchRef.current?.send(command),
+      getState: () => radialRef.current,
+      setState: setRadialState,
+    }),
+    [],
+  );
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
     () =>
@@ -369,10 +430,15 @@ export function useSandbox(
       if (!current || !inBounds(h, map.width, map.height)) return;
       const hit = layerRef.current?.unitsAt(world) ?? [];
       if (hit.length === 0) return;
-      const next = selectUnits(current, pickedRef.current, hit);
-      pick(next);
-      const unit = current.units.find((candidate) => hit.includes(candidate.id));
-      mapViewRef.current?.centerOn(hexFromId(unit?.hex ?? hexId(h, map.width), map.width));
+      focusUnitOnDoubleTap({
+        view: current,
+        map,
+        hex: h,
+        picked: pickedRef.current,
+        hit,
+        pick,
+        centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),
+      });
     };
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
     const order = (hex: number): void => {
@@ -412,7 +478,7 @@ export function useSandbox(
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => input.grab(world) ?? splitGrab(world));
       v.setOrderHooks(hooks);
-      v.setRadialHooks?.({
+      const radialHooks: RadialHooks = {
         canOpen(world) {
           const current = viewRef.current;
           if (!current || toolRef.current || pickedRef.current.units.length === 0) return false;
@@ -426,29 +492,10 @@ export function useSandbox(
           });
         },
         action(_world, screen, phase) {
-          const current = viewRef.current;
-          if (!current) return;
-          if (phase === 'start') {
-            const units = pickedRef.current.units
-              .map((id) => current.units.find((unit) => unit.id === id))
-              .filter((unit): unit is NonNullable<typeof unit> => unit !== undefined);
-            const actions = buildRadialActions(units, current);
-            setRadialState({ center: screen, actions, active: actions });
-            return;
-          }
-          const state = radialRef.current;
-          if (!state) return;
-          const active = sectorAt(state, screen);
-          if (phase === 'move' && active?.children) {
-            setRadialState({ ...state, active: active.children });
-          } else if (phase === 'end') {
-            if (active?.command) match.send(active.command);
-            setRadialState(null);
-          } else if (phase === 'cancel') {
-            setRadialState(null);
-          }
+          radialForArmy(armyRef.current ?? -1, screen, phase);
         },
-      });
+      };
+      v.setRadialHooks?.(radialHooks);
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
         const units = viewRef.current
@@ -517,6 +564,7 @@ export function useSandbox(
     events,
     workerTelemetry: workerTelemetryRef.current,
     radial,
+    radialForArmy,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {

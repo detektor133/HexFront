@@ -96,7 +96,7 @@ export interface MapView {
   /** Оставляет HUD вне области, к которой привязаны границы камеры. */
   setTopInset(px: number): void;
   /** Ставит гекс в центр экрана (в пределах границ карты). */
-  centerOn(hex: Hex): void;
+  centerOn(hex: Hex, durationMs?: number): void;
   /**
    * Режим рисования: один палец или ЛКМ с зажатием ведут линию, два пальца, колесо и
    * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
@@ -166,6 +166,8 @@ export async function createMapView(
   let cam: Camera = fitCamera(cameraView(), bounds);
   let drawnScale = 0;
   let velocity: Velocity | null = null;
+  let centerAnimation: { from: Camera; to: Camera; elapsedMs: number; durationMs: number } | null =
+    null;
   let pressed = 0;
   let stroking = false;
   let hooks: OrderHooks | null = null;
@@ -193,6 +195,18 @@ export async function createMapView(
 
   app.ticker.add((ticker) => {
     mid?.frame?.(performance.now());
+    if (centerAnimation) {
+      centerAnimation.elapsedMs += ticker.deltaMS;
+      const progress = Math.min(1, centerAnimation.elapsedMs / centerAnimation.durationMs);
+      cam = {
+        scale:
+          centerAnimation.from.scale +
+          (centerAnimation.to.scale - centerAnimation.from.scale) * progress,
+        x: centerAnimation.from.x + (centerAnimation.to.x - centerAnimation.from.x) * progress,
+        y: centerAnimation.from.y + (centerAnimation.to.y - centerAnimation.from.y) * progress,
+      };
+      if (progress >= 1) centerAnimation = null;
+    }
     if (velocity && pressed === 0) {
       const v = velocity;
       cam = panBy(
@@ -312,10 +326,10 @@ export async function createMapView(
       );
       drawnScale = 0;
     },
-    centerOn(hex) {
+    centerOn(hex, durationMs = 0) {
       const p = hexCenter(hex, opts.radius);
       const v = cameraView();
-      cam = clampCamera(
+      const target = clampCamera(
         {
           scale: cam.scale,
           x: v.width / 2 - p.x * cam.scale,
@@ -324,6 +338,8 @@ export async function createMapView(
         cameraView(),
         bounds,
       );
+      centerAnimation = durationMs > 0 ? { from: cam, to: target, elapsedMs: 0, durationMs } : null;
+      if (durationMs <= 0) cam = target;
     },
     setGrab(fn) {
       grab = fn;

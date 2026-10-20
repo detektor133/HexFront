@@ -454,6 +454,12 @@ describe('T17m: карточка клетки', () => {
       (owner, index) => owner === -1 && initial.view.hexes.visible[index] === 0,
     );
     const unit = initial.view.units.find((item) => item.owner === 0);
+    const cardView = {
+      ...initial.view,
+      units: initial.view.units.map((item) =>
+        item.id === unit?.id ? { ...item, type: 'artillery' as const, fireTarget: -1 } : item,
+      ),
+    };
     if (neutralHex < 0 || !unit) throw new Error('нейтральный гекс или свой отряд не найден');
 
     engine.select(neutralHex);
@@ -473,7 +479,7 @@ describe('T17m: карточка клетки', () => {
 
     render(
       <UnitCard
-        view={message.view}
+        view={cardView}
         map={mapResult.map}
         picked={{ hex: null, units: [unit.id], target: null }}
         send={() => undefined}
@@ -482,6 +488,11 @@ describe('T17m: карточка клетки', () => {
     );
     expect(screen.queryByRole('group', { name: 'В армию' })).toBeNull();
     expect(screen.getByText('Организованность')).toBeTruthy();
+    expect(document.querySelector('dl')).not.toBeNull();
+    expect(screen.queryByRole('status')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /merge/i })).toBeNull();
+    expect(screen.queryByTestId('merge-icon')).toBeNull();
+    expect(screen.queryByText(/Резерв/)).toBeNull();
   });
 
   it.each([

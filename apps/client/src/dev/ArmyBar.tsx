@@ -229,10 +229,16 @@ function ArmyCard(props: {
   onAuto: () => void;
   onRename: (name: string) => void;
   onClick: () => void;
+  onRadial?: (
+    screen: { readonly x: number; readonly y: number },
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ) => void;
 }): React.JSX.Element {
   const { stats, run } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
+  const radialTimer = useRef<number | null>(null);
+  const radialStarted = useRef(false);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -245,6 +251,29 @@ function ArmyCard(props: {
   };
   const cancel = (): void => setEditing(false);
   const select = (): void => props.onClick();
+  const radialPoint = (event: React.PointerEvent): { readonly x: number; readonly y: number } => ({
+    x: event.clientX,
+    y: event.clientY,
+  });
+  const startRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!props.onRadial || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    radialTimer.current = window.setTimeout(() => {
+      radialStarted.current = true;
+      props.onRadial?.(radialPoint(event), 'start');
+    }, 400);
+  };
+  const moveRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (radialStarted.current) props.onRadial?.(radialPoint(event), 'move');
+  };
+  const endRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+    radialTimer.current = null;
+    if (radialStarted.current) {
+      props.onRadial?.(radialPoint(event), 'end');
+      radialStarted.current = false;
+    }
+  };
   const selectFromContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
     event.preventDefault();
     select();
@@ -257,6 +286,15 @@ function ArmyCard(props: {
         className={styles.pick}
         aria-pressed={props.selected}
         onClick={select}
+        onPointerDown={startRadial}
+        onPointerMove={moveRadial}
+        onPointerUp={endRadial}
+        onPointerCancel={(event) => {
+          if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+          radialTimer.current = null;
+          if (radialStarted.current) props.onRadial?.(radialPoint(event), 'cancel');
+          radialStarted.current = false;
+        }}
         onContextMenu={selectFromContextMenu}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') select();
@@ -368,6 +406,11 @@ export function ArmyBar(props: {
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
+  onRadial?: (
+    armyId: number,
+    screen: { readonly x: number; readonly y: number },
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ) => void;
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
   const { onHeight } = props;
@@ -406,6 +449,7 @@ export function ArmyBar(props: {
     event.currentTarget.scrollLeft += delta;
   };
   const reserve = mine.filter((u) => u.armyId === null);
+  const onRadial = props.onRadial;
   const runOf = (a: ArmyView) => {
     const p = view.plans.find((x) => x.armyId === a.id);
     const front = p?.kind === 'front';
@@ -476,6 +520,16 @@ export function ArmyBar(props: {
                   onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
+                  {...(onRadial
+                    ? {
+                        onRadial: (
+                          screen: { readonly x: number; readonly y: number },
+                          phase: 'start' | 'move' | 'end' | 'cancel',
+                        ) => {
+                          onRadial(a.id, screen, phase);
+                        },
+                      }
+                    : {})}
                 />
               );
             })}
