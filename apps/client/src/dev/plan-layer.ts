@@ -90,6 +90,46 @@ export function frontAppearance(
   };
 }
 
+/** Возвращает поперечные штрихи по полилинии; длины указаны в мировых px. */
+export function frontTickSegments(
+  points: readonly Point[],
+  tickLength: number,
+  tickSpacing: number,
+): Point[][] {
+  if (points.length < 2 || tickLength <= 0 || tickSpacing <= 0) return [];
+  const lengths: number[] = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1] as Point;
+    const b = points[i] as Point;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    lengths.push(length);
+    total += length;
+  }
+  const ticks: Point[][] = [];
+  for (let distance = 0; distance <= total; distance += tickSpacing) {
+    let offset = distance;
+    let segment = 0;
+    while (segment < lengths.length - 1 && offset > (lengths[segment] ?? 0)) {
+      offset -= lengths[segment] ?? 0;
+      segment += 1;
+    }
+    const a = points[segment] as Point;
+    const b = points[segment + 1] as Point;
+    const length = lengths[segment] ?? 0;
+    if (length === 0) continue;
+    const x = a.x + ((b.x - a.x) * Math.min(offset, length)) / length;
+    const y = a.y + ((b.y - a.y) * Math.min(offset, length)) / length;
+    const nx = (-(b.y - a.y) / length) * (tickLength / 2);
+    const ny = ((b.x - a.x) / length) * (tickLength / 2);
+    ticks.push([
+      { x: x - nx, y: y - ny },
+      { x: x + nx, y: y + ny },
+    ]);
+  }
+  return ticks;
+}
+
 /** Проверяет попадание указателя в линию наступления с допуском в экранных px. */
 export function isPointNearPath(
   point: Point,
@@ -152,6 +192,17 @@ export function createPlanLayer(
     });
     for (const r of runs) polyline(r);
     g.stroke({ ...style, color, width: w });
+    const ticks = runs.flatMap((run) =>
+      frontTickSegments(run, tokens.front.tickLength * k, tokens.front.tickSpacing * k),
+    );
+    for (const tick of ticks) {
+      const [a, b] = tick;
+      if (!a || !b) continue;
+      g.moveTo(a.x, a.y).lineTo(b.x, b.y);
+    }
+    if (ticks.length > 0) {
+      g.stroke({ ...style, color, width: tokens.front.tickWidth * k });
+    }
   }
 
   function drawHandles(points: readonly Point[], color: string): void {

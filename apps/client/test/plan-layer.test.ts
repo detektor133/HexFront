@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { edgeOf, loadMap, type PlanView } from '@hexfront/sim';
 
-import { createPlanLayer, frontAppearance, isPointNearPath } from '../src/dev/plan-layer.ts';
+import {
+  createPlanLayer,
+  frontAppearance,
+  frontTickSegments,
+  isPointNearPath,
+} from '../src/dev/plan-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { armyColor } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
@@ -32,6 +37,27 @@ describe('прогноз у линии наступления', () => {
 });
 
 describe('видимость линии фронта', () => {
+  it('строит штрихи по всей длине и перпендикулярно горизонтальному участку', () => {
+    const segments = frontTickSegments(
+      [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      5,
+      10,
+    );
+
+    expect(segments).toHaveLength(11);
+    for (const segment of segments) {
+      const [a, b] = segment;
+      if (!a || !b) throw new Error('штрих должен иметь две точки');
+      const { x: ax, y: ay } = a;
+      const { x: bx, y: by } = b;
+      expect(Math.hypot(bx - ax, by - ay)).toBe(5);
+      expect((bx - ax) * 1 + (by - ay) * 0).toBe(0);
+    }
+  });
+
   it('выделяет выбранную армию alpha=1 и соседней шириной', () => {
     const appearance = frontAppearance(7, 7, 1);
 
@@ -99,6 +125,13 @@ describe('видимость линии фронта', () => {
       layer.setView(view, null, selected.id, null, 1, 2);
       const selectedStroke = strokes.find(({ color }) => color === armyColor(selected.number));
       const otherStroke = strokes.find(({ color }) => color === armyColor(other.number));
+      const selectedTicks = strokes.filter(
+        ({ color, width }) =>
+          color === armyColor(selected.number) && width === tokens.front.tickWidth,
+      );
+      const otherTicks = strokes.filter(
+        ({ color, width }) => color === armyColor(other.number) && width === tokens.front.tickWidth,
+      );
       const otherCasing = strokes.find(
         ({ color, width }) =>
           color === tokens.front.casing &&
@@ -108,12 +141,18 @@ describe('видимость линии фронта', () => {
       expect(selectedStroke?.alpha).toBe(1);
       expect(otherStroke?.width).toBe(tokens.front.width[1]);
       expect(otherStroke?.alpha).toBe(tokens.fog.memoryAlpha);
+      expect(selectedTicks.length).toBeGreaterThan(0);
+      expect(selectedTicks.every(({ alpha }) => alpha === 1)).toBe(true);
+      expect(otherTicks.length).toBeGreaterThan(0);
+      expect(otherTicks.every(({ alpha }) => alpha === tokens.fog.memoryAlpha)).toBe(true);
       expect(otherCasing?.alpha).toBe(1);
 
       strokes.length = 0;
       layer.setView(view, null, null, null, 1, 2);
       const plainStrokes = strokes.filter(
-        ({ color }) => color === armyColor(selected.number) || color === armyColor(other.number),
+        ({ color, width }) =>
+          (color === armyColor(selected.number) || color === armyColor(other.number)) &&
+          width !== tokens.front.tickWidth,
       );
       expect(plainStrokes).toHaveLength(2);
       expect(
