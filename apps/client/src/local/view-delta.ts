@@ -17,12 +17,13 @@ function equalValue(left: unknown, right: unknown): boolean {
   }
   if (ArrayBuffer.isView(left) || ArrayBuffer.isView(right)) {
     if (!ArrayBuffer.isView(left) || !ArrayBuffer.isView(right)) return false;
-    const leftValues = Array.from(left as unknown as ArrayLike<unknown>);
-    const rightValues = Array.from(right as unknown as ArrayLike<unknown>);
-    if (leftValues.length !== rightValues.length) {
-      return false;
+    const leftValues = left as unknown as ArrayLike<unknown>;
+    const rightValues = right as unknown as ArrayLike<unknown>;
+    if (leftValues.length !== rightValues.length) return false;
+    for (let index = 0; index < leftValues.length; index += 1) {
+      if (!equalValue(leftValues[index], rightValues[index])) return false;
     }
-    return leftValues.every((value, index) => equalValue(value, rightValues[index]));
+    return true;
   }
   if (Array.isArray(left) || Array.isArray(right)) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
