@@ -3,12 +3,11 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-- 07/T17an принята: map long-press и двойной тап идут через смонтированный `MatchSurface`/runtime; тест фиксирует центр меню, payload и точную длительность фокуса камеры.
-- `slow`: coverage отделено от полного функционального прогона и считается только для `packages/sim`.
-- Проверено: T17an 9/9; `pnpm verify --changed` — зелёный.
-- Следующая задача: 07/T17.
-- Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `MatchSurfaceRuntime.tsx`, `ArmyBar.tsx`, `map-view.ts`, тесты T17an/T17m.
-Очередь: 07/T17af → 07/T17am → 07/T17an → 07/T17 → 07/T18
+| Текущая задача | 07/T17am |
+| Ветка | `stage-07` |
+| Последнее обновление | 2026-10-20 |
+
+Очередь: 07/T17am → 07/T17 → 07/T18
 
 ## Блокеры и открытые вопросы
 
@@ -17,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: повторное ревью 07/T17an принято; тест фиксирует точную длительность анимации камеры.
-- Проверки: `pnpm verify --changed` — зелёный; тесты проходят через реальный canvas `MapView`/`attachInput` и runtime.
-- Следующее действие: ждать `$done 07/T17` владельца; T17 остаётся задачей владельца.
-- Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.
+- Текущая задача: 07/T17am — штрихи-«расчёска» на линии фронта.
+- Предыдущая задача: 07/T17an принята; `pnpm verify --changed` — зелёный.
+- После T17am: владелец завершает 07/T17 через `$done 07/T17`.
+- Читать: блок T17am в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-layer.ts`, тесты линий фронта.
