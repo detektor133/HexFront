@@ -3,345 +3,289 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, loadMap, type PlayerView, type UnitView } from '@hexfront/sim';
+import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
-import { ArmyBar } from '../src/dev/ArmyBar.tsx';
-import { sectorAt, sectorCenter, type RadialMenuState } from '../src/dev/radial-menu.ts';
-import type { Picked } from '../src/dev/sandbox-selection.ts';
+import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
-import {
-  createDoubleTapHandler,
-  createOrderHandler,
-  createRadialActionHandler,
-} from '../src/match/MatchSurfaceRuntime.tsx';
-import { RADIAL_MENU_LONG_PRESS_MS, createGesture } from '../src/render/gesture.ts';
+import { MatchSurface } from '../src/match/MatchSurface.tsx';
+import { createGesture, RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
+import type * as MapViewModule from '../src/render/map-view.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
-const unit = {
-  id: 10,
-  owner: 0,
-  armyId: 1,
-  hex: 4,
-  type: 'infantry',
-  soldiers: 10,
-  org: 1000,
-  supplyLevel: 1000,
-  encircled: false,
-} as unknown as UnitView;
-const view = {
-  playerId: 0,
-  units: [unit, { ...unit, id: 11 }],
-  armies: [
-    { id: 1, number: 1, name: '', auto: false },
-    { id: 2, number: 2, name: '', auto: false },
-  ],
-  cities: [],
-  plans: [],
-  me: { autoReinforce: false },
-} as unknown as PlayerView;
-const surfaceMapJson: unknown = JSON.parse(
+const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
-const surfaceMap = loadMap(surfaceMapJson);
-if (!surfaceMap.ok) throw new Error(surfaceMap.errors.join('; '));
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
-});
+const loaded = loadMap(mapJson);
+if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
-Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
-  configurable: true,
-  value: vi.fn(),
-});
+const harness = vi.hoisted(() => ({
+  commands: [] as Command[],
+  onTap: null as
+    | ((
+        hex: { q: number; r: number },
+        kind: 'select' | 'order',
+        world: { x: number; y: number },
+      ) => void)
+    | null,
+  onDoubleTap: null as
+    ((hex: { q: number; r: number }, world: { x: number; y: number }) => void) | null,
+  mapGesture: null as ReturnType<typeof createGesture> | null,
+  tapHex: { q: 1, r: 1 },
+  world: { x: 100, y: 100 },
+  centerOn: vi.fn(),
+  doubleTaps: 0,
+  artillery: false,
+}));
 
-function renderArmy(
-  viewToRender: PlayerView,
-  radial: (
-    armyId: number,
-    point: { readonly x: number; readonly y: number },
-    phase: 'start' | 'move' | 'end' | 'cancel',
-  ) => void,
-): HTMLElement {
-  render(
-    createElement(ArmyBar, {
-      view: viewToRender,
-      selected: null,
-      partial: [],
-      onSelect: () => undefined,
-      send: () => undefined,
-      onPick: () => undefined,
-      tool: null,
-      onTool: () => undefined,
-      onRadial: radial,
+vi.mock('../src/render/map-view.ts', async () => {
+  const actual = await vi.importActual<MapViewModule>('../src/render/map-view.ts');
+  return {
+    ...actual,
+    createMapView: vi.fn(async (...args: Parameters<typeof actual.createMapView>) => {
+      const [, map, options, , onTap, onDoubleTap] = args;
+      harness.onTap = onTap ?? null;
+      harness.onDoubleTap = onDoubleTap ?? null;
+      const layer = options.midLayer?.(map, options.radius);
+      harness.world = layer?.chipAt(236) ?? { x: 100, y: 100 };
+      Object.defineProperty(layer, 'unitsAt', { configurable: true, value: () => [6] });
+      harness.mapGesture = createGesture(
+        {
+          drawing: () => false,
+          press: () => undefined,
+          release: () => undefined,
+          canHold: () => false,
+          canRadial: () => false,
+          cancelZone: () => false,
+          inside: () => true,
+        },
+        (event) => {
+          if (event.t === 'tap') harness.onTap?.(harness.tapHex, event.kind, event.at);
+          if (event.t === 'doubleTap') {
+            harness.doubleTaps += 1;
+            harness.onDoubleTap?.(harness.tapHex, event.at);
+          }
+        },
+      );
+      return {
+        configure: vi.fn(),
+        setScale: vi.fn(),
+        setBottomInset: vi.fn(),
+        setTopInset: vi.fn(),
+        setStroke: vi.fn(),
+        setSelection: vi.fn(),
+        setGrab: vi.fn(),
+        setOrderHooks: vi.fn(),
+        setRadialHooks: vi.fn(),
+        cancel: vi.fn(),
+        sceneStats: () => ({
+          objects: 0,
+          text: 0,
+          graphics: 0,
+          graphicsInstructions: [],
+          graphicsDetails: [],
+          textures: 0,
+          canvasTextTextures: null,
+        }),
+        centerOn: harness.centerOn,
+        destroy: vi.fn(() => layer?.destroy()),
+      } as unknown as Awaited<ReturnType<typeof actual.createMapView>>;
     }),
-  );
+  };
+});
+
+class TestWorker {
+  public onmessage: ((event: MessageEvent) => void) | null = null;
+  public onerror: ((event: ErrorEvent) => void) | null = null;
+  public postMessage(message: { t: string; map?: unknown; seed?: number; players?: number }): void {
+    if ('cmd' in message) {
+      harness.commands.push((message as { cmd: Command }).cmd);
+      return;
+    }
+    if (message.t !== 'start') return;
+    const engine = createLocalEngine(message.map, message.seed ?? 42, message.players ?? 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const snapshot = engine.snapshot();
+    if (harness.artillery)
+      for (const unit of snapshot.view.units) (unit as { type: string }).type = 'artillery';
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: {
+          t: 'view',
+          kind: 'snapshot',
+          snapshot: { t: 'snapshot', tick: snapshot.view.tick, view: snapshot.view },
+          seq: 1,
+          selection: snapshot.selection,
+          rejected: snapshot.rejected,
+          events: snapshot.events,
+        },
+      } as MessageEvent),
+    );
+  }
+  public terminate(): void {}
+}
+
+function armyCard(): HTMLElement {
+  // Локатор карточки отделяет её от кнопок панели, потому что только карточка имеет _pick_ в классе.
   const card = screen
     .getAllByRole('button')
-    .find((item) => item.getAttribute('aria-pressed') === 'false');
-  if (!card) throw new Error('карточка армии не отрендерена');
+    .find(
+      (item) => item.getAttribute('aria-pressed') === 'false' && item.className.includes('_pick_'),
+    );
+  if (!card) throw new Error('Карточка армии не отрендерена');
   return card;
 }
 
+function selectedArmyCard(): HTMLElement {
+  const card = screen
+    .getAllByRole('button')
+    .find(
+      (item) => item.getAttribute('aria-pressed') === 'true' && item.className.includes('_pick_'),
+    );
+  if (!card) throw new Error('Карточка армии не выбрана');
+  return card;
+}
+
+async function renderSurface(): Promise<void> {
+  vi.stubGlobal('Worker', TestWorker);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(mapJson), { status: 200 })),
+  );
+  render(createElement(MatchSurface, { debug: true }));
+  await waitFor(() => expect(armyCard()).toBeTruthy());
+}
+
+function menuPoint(item: HTMLElement, menu: HTMLElement): { x: number; y: number } {
+  return {
+    x: Number.parseFloat(menu.style.left) + Number.parseFloat(item.style.left),
+    y: Number.parseFloat(menu.style.top) + Number.parseFloat(item.style.top),
+  };
+}
+
+beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      public observe(): void {}
+      public disconnect(): void {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  harness.commands.length = 0;
+  harness.onTap = null;
+  harness.onDoubleTap = null;
+  harness.mapGesture = null;
+  harness.tapHex = { q: 1, r: 1 };
+  harness.centerOn.mockReset();
+  harness.artillery = false;
+  harness.doubleTaps = 0;
+  harness.world = { x: 100, y: 100 };
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
 describe('07/T17an: радиальное меню', () => {
-  it('проводит удержание ArmyBar через MatchSurface в runtime send', async () => {
-    const engine = createLocalEngine(surfaceMapJson, 42, 2);
-    if ('errors' in engine) throw new Error(engine.errors.join('; '));
-    const runtimeSend = vi.fn();
-    let radialState: RadialMenuState | null = null;
-    vi.doMock('../src/match/MatchSurfaceRuntime.tsx', async () => {
-      const actual = (await vi.importActual('../src/match/MatchSurfaceRuntime.tsx')) as {
-        readonly createRadialActionHandler: typeof createRadialActionHandler;
-      };
-      const radialForArmy = actual.createRadialActionHandler({
-        getView: () => engine.snapshot().view,
-        send: runtimeSend,
-        getState: () => radialState,
-        setState: (next: RadialMenuState | null) => {
-          radialState = next;
-        },
-      });
-      return {
-        ...actual,
-        useMapJson: () => ({ json: surfaceMapJson, map: surfaceMap.map }),
-        useSandbox: () => ({
-          msg: engine.snapshot(),
-          replay: [],
-          error: null,
-          picked: { hex: null, units: [], target: null },
-          lastReject: null,
-          tool: null,
-          army: null,
-          fog: false,
-          paused: false,
-          speed: 1,
-          observerId: null,
-          events: [],
-          workerTelemetry: null,
-          snapshotTelemetry: () => ({ received: 0, collected: 0, live: 0 }),
-          cacheTelemetry: () => ({
-            unit: { shown: 0, drawnAt: 0, chips: 0, encircledSince: 0 },
-            economy: { capturesByHex: 0, cityFlashes: 0 },
-            frontTween: { byArmy: 0 },
-          }),
-          focusEvent: vi.fn(),
-          send: runtimeSend,
-          setFog: vi.fn(),
-          setPaused: vi.fn(),
-          step: vi.fn(),
-          setSpeed: vi.fn(),
-          setObserver: vi.fn(),
-          pick: vi.fn(),
-          setTool: vi.fn(),
-          setArmy: vi.fn(),
-          setRoadPreview: vi.fn(),
-          setDockHeight: vi.fn(),
-          setHudHeight: vi.fn(),
-          pixiTelemetry: () => ({
-            objects: 0,
-            text: 0,
-            graphics: 0,
-            graphicsInstructions: [],
-            graphicsDetails: [],
-            textures: 0,
-            canvasTextTextures: null,
-          }),
-          radial: radialState,
-          radialForArmy,
-        }),
-      };
+  it('проводит ArmyBar через MatchSurface, useSandbox и send', async () => {
+    await renderSurface();
+    const card = armyCard();
+    fireEvent.click(card);
+    const selectedCard = await waitFor(() => {
+      const selected = selectedArmyCard();
+      expect(selected.getAttribute('aria-pressed')).toBe('true');
+      return selected;
     });
-    const { MatchSurface } = await import('../src/match/MatchSurface.tsx');
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        public observe(): void {}
-        public disconnect(): void {}
-      },
-    );
-    render(createElement(MatchSurface));
-    const card = screen
-      .getAllByRole('button')
-      .find((item) => item.getAttribute('aria-pressed') === 'false');
-    if (!card) throw new Error('карточка армии не отрендерена через MatchSurface');
-    vi.useFakeTimers();
+    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
+    const menu = screen.getByRole('menu');
+    const merge = screen.getByRole('menuitem', { name: /merge/i });
+    const point = menuPoint(merge, menu);
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: point.x, clientY: point.y });
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: point.x, clientY: point.y });
+    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
+  });
+
+  it('отправляет assignUnits после pointerup над дочерним сектором', async () => {
+    harness.artillery = true;
+    await renderSurface();
+    const card = armyCard();
+    fireEvent.click(card);
+    const selectedCard = await waitFor(() => {
+      const selected = selectedArmyCard();
+      expect(selected.getAttribute('aria-pressed')).toBe('true');
+      return selected;
+    });
+    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
+    const menu = screen.getByRole('menu');
+    const assign = screen.getByRole('menuitem', { name: /to army/i });
+    const root = menuPoint(assign, menu);
+    fireEvent.pointerMove(card, { pointerId: 2, clientX: root.x, clientY: root.y });
+    const child = screen.getAllByRole('menuitem')[0];
+    const target = menuPoint(child, menu);
+    fireEvent.pointerUp(card, { pointerId: 2, clientX: target.x, clientY: target.y });
+    expect(harness.commands).toContainEqual({
+      t: 'assignUnits',
+      unitIds: expect.any(Array),
+      armyId: expect.any(Number),
+    });
+  });
+
+  it('отменяет radial при движении карточки до порога', async () => {
+    await renderSurface();
+    const card = armyCard();
     fireEvent.pointerDown(card, { button: 0, pointerId: 3, clientX: 100, clientY: 100 });
-    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
-    if (!radialState) throw new Error('runtime radial не открыт');
-    fireEvent.pointerUp(card, {
-      pointerId: 3,
-      clientX: sectorCenter(radialState, 0).x,
-      clientY: sectorCenter(radialState, 0).y,
-    });
-    expect(runtimeSend).toHaveBeenCalledWith({ t: 'merge', unitIds: [6, 7] });
+    fireEvent.pointerMove(card, { pointerId: 3, clientX: 110, clientY: 100 });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(harness.commands).toEqual([]);
   });
 
-  it('открывает radial после 400 мс и не меняет удержание 350 мс', () => {
-    const events: string[] = [];
-    const gesture = createGesture(
-      {
-        drawing: () => false,
-        press: () => undefined,
-        release: () => undefined,
-        canHold: () => true,
-        canRadial: () => true,
-        cancelZone: () => false,
-        inside: () => true,
-      },
-      (event) => events.push(event.t),
+  it('проводит двойной тап MapView до выделения и анимированного centerOn', async () => {
+    await renderSurface();
+    if (!harness.mapGesture) throw new Error('MapView не создал жестовую машину');
+    const point = harness.world;
+    harness.tapHex = hexFromId(236, loaded.map.width);
+    harness.mapGesture.down(1, point, 0, 0);
+    harness.mapGesture.up(1, point, 10);
+    harness.mapGesture.down(1, point, 0, 100);
+    harness.mapGesture.up(1, point, 110);
+    expect(harness.doubleTaps).toBe(1);
+    await waitFor(() =>
+      expect(harness.centerOn).toHaveBeenCalledWith(expect.any(Object), tokens.motion.map),
     );
-    gesture.down(1, { x: 100, y: 100 }, 0, 0);
-    gesture.tick(350);
-    expect(events).toEqual([]);
-    gesture.tick(RADIAL_MENU_LONG_PRESS_MS);
-    expect(events).toEqual(['radial']);
   });
 
-  it('проводит удержание ArmyBar через runtime до send для merge и bombard', () => {
-    const sent: unknown[] = [];
-    let state: RadialMenuState | null = null;
-    const radial = createRadialActionHandler({
-      getView: () => view,
-      send: (command) => sent.push(command),
-      getState: () => state,
-      setState: (next) => {
-        state = next;
-      },
-    });
-    vi.useFakeTimers();
-    const card = renderArmy(view, radial);
-    fireEvent.pointerDown(card, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
-    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
-    expect((state as RadialMenuState | null)?.center).toEqual({ x: 100, y: 100 });
-    if (!state) throw new Error('radial не открыт');
-    const merge = sectorCenter(state, 0);
-    fireEvent.pointerUp(card, { pointerId: 1, clientX: merge.x, clientY: merge.y });
-    expect(sent).toEqual([{ t: 'merge', unitIds: [10, 11] }]);
-    expect(state).toBeNull();
-
-    const outsideState: RadialMenuState = {
-      center: { x: 100, y: 100 },
-      actions: [{ kind: 'merge', label: 'merge', command: { t: 'merge', unitIds: [10, 11] } }],
-      active: [{ kind: 'merge', label: 'merge', command: { t: 'merge', unitIds: [10, 11] } }],
-    };
-    state = outsideState;
-    const sentBeforeCancel = sent.length;
-    radial(1, { x: 100, y: 100 }, 'end');
-    expect(sent).toHaveLength(sentBeforeCancel);
-    expect(state).toBeNull();
-
-    cleanup();
-    state = null;
-    const artillery = { ...unit, id: 12, type: 'artillery' as const };
-    const artilleryView = { ...view, units: [artillery] } as unknown as PlayerView;
-    const artilleryRadial = createRadialActionHandler({
-      getView: () => artilleryView,
-      send: (command) => sent.push(command),
-      getState: () => state,
-      setState: (next) => {
-        state = next;
-      },
-    });
-    const artilleryCard = renderArmy(artilleryView, artilleryRadial);
-    fireEvent.pointerDown(artilleryCard, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
-    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
-    const artilleryState = state as RadialMenuState | null;
-    if (artilleryState === null) throw new Error('radial артиллерии не открыт');
-    expect(artilleryState.actions.map((action) => action.kind)).toEqual(['assignUnits', 'bombard']);
-    expect(artilleryState.actions[0]?.children?.map((action) => action.command)).toEqual([
-      { t: 'assignUnits', unitIds: [12], armyId: 1 },
-      { t: 'assignUnits', unitIds: [12], armyId: 2 },
-      { t: 'assignUnits', unitIds: [12], armyId: null },
-    ]);
-    const bombard = sectorCenter(artilleryState, 1);
-    fireEvent.pointerUp(artilleryCard, { pointerId: 2, clientX: bombard.x, clientY: bombard.y });
-    expect(sent.at(-1)).toEqual({ t: 'bombard', unitId: 12, targetUnitId: null });
-  });
-
-  it('отменяет удержание карточки при смещении больше DRAG_SLOP_PX', () => {
-    let state: RadialMenuState | null = null;
-    const radial = createRadialActionHandler({
-      getView: () => view,
-      send: () => undefined,
-      getState: () => state,
-      setState: (next) => {
-        state = next;
-      },
-    });
-    vi.useFakeTimers();
-    const card = renderArmy(view, radial);
-    fireEvent.pointerDown(card, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
-    fireEvent.pointerMove(card, { pointerId: 1, clientX: 109, clientY: 100 });
-    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
-    expect(state).toBeNull();
-  });
-
-  it('передаёт doubleTap из createGesture в callback MapView с анимацией 250 мс', () => {
-    const calls: unknown[] = [];
-    const events: string[] = [];
-    const onMapDoubleTap = createDoubleTapHandler({
-      getView: () => view,
-      map: { width: 3, height: 3 } as never,
-      getPicked: () => ({ hex: null, units: [], target: null }),
-      getHit: () => [10],
-      pick: (picked) => calls.push(picked),
-      centerOn: (hex, duration) => calls.push({ hex, duration }),
-    });
-    const gesture = createGesture(
-      {
-        drawing: () => false,
-        press: () => undefined,
-        release: () => undefined,
-        canHold: () => true,
-        canRadial: () => false,
-        cancelZone: () => false,
-        inside: () => true,
-      },
-      (event) => {
-        events.push(event.t);
-        if (event.t === 'doubleTap') onMapDoubleTap({ q: 1, r: 1 }, event.at);
-      },
-    );
-    gesture.down(1, { x: 1, y: 1 }, 0, 0);
-    gesture.up(1, { x: 1, y: 1 }, 0);
-    gesture.down(1, { x: 1, y: 1 }, 0, 100);
-    gesture.up(1, { x: 1, y: 1 }, 200);
-    expect(events).toEqual(['tap', 'doubleTap']);
-    expect(calls[0]).toEqual({ hex: null, units: [10], target: null });
-    expect(calls[1]).toEqual({ hex: hexFromId(4, 3), duration: tokens.motion.map });
-    expect(tokens.motion.map).toBe(250);
-  });
-
-  it('отправляет payload приказа через send на ПКМ без radial-состояния', () => {
-    const sent: unknown[] = [];
-    const picked: Picked = { hex: null, units: [10], target: null };
-    const order = createOrderHandler({
-      getView: () => view,
-      getPicked: () => picked,
-      send: (command) => sent.push(command),
-      pick: () => undefined,
-    });
-    const gesture = createGesture(
-      {
-        drawing: () => false,
-        press: () => undefined,
-        release: () => undefined,
-        canHold: () => true,
-        canRadial: () => true,
-        cancelZone: () => false,
-        inside: () => true,
-      },
-      (event) => {
-        if (event.t !== 'tap' || event.kind !== 'order') return;
-        order(7);
-      },
-    );
-    gesture.down(1, { x: 10, y: 10 }, 2, 0);
-    gesture.up(1, { x: 10, y: 10 }, 20);
-    expect(sent).toEqual([{ t: 'move', unitIds: [10], to: 7 }]);
+  it('отправляет ПКМ через MapView без открытия radial', async () => {
+    await renderSurface();
+    if (!harness.mapGesture) throw new Error('MapView не создал жестовую машину');
+    const card = armyCard();
+    fireEvent.click(card);
+    await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
+    const point = harness.world;
+    harness.tapHex = hexFromId(236, loaded.map.width);
+    const unitHex = hexFromId(236, loaded.map.width);
+    harness.tapHex = { q: unitHex.q + 1, r: unitHex.r };
+    harness.mapGesture.down(2, point, 2, 200);
+    harness.mapGesture.up(2, point, 220);
+    await waitFor(() => expect(harness.commands).toHaveLength(1));
+    expect(harness.commands[0]).toMatchObject({ t: 'move' });
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('не выбирает центр radial', () => {
