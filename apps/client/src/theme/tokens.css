@@ -84,6 +84,10 @@
   --city-label-size-2: 11;
   --city-label-size-3: 13;
   --city-label-halo: 3;
+  --construction-size: 0.3;
+  --construction-improvement-size: 0.15;
+  --construction-outline: 1.5;
+  --construction-fill: #FFFFFF;
   --relation-own: #2E7D32;
   --relation-ally: #1F5FB8;
   --relation-enemy: #C62828;
@@ -102,6 +106,9 @@
   --front-casing: #FFFFFF;
   --front-casing-width: 1.5;
   --front-handle-radius: 7;
+  --front-tick-length: 5;
+  --front-tick-spacing: 10;
+  --front-tick-width: 1.5;
   --arrow-color: #E8590C;
   --arrow-width-1: 2.5;
   --arrow-width-2: 3;

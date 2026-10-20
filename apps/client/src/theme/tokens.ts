@@ -192,6 +192,12 @@ export const tokens = {
     ],
     "labelHalo": 3
   },
+  "construction": {
+    "size": 0.3,
+    "improvementSize": 0.15,
+    "outline": 1.5,
+    "fill": "#FFFFFF"
+  },
   "relation": {
     "own": "#2E7D32",
     "ally": "#1F5FB8",
@@ -220,7 +226,10 @@ export const tokens = {
     ],
     "casing": "#FFFFFF",
     "casingWidth": 1.5,
-    "handleRadius": 7
+    "handleRadius": 7,
+    "tickLength": 5,
+    "tickSpacing": 10,
+    "tickWidth": 1.5
   },
   "arrow": {
     "color": "#E8590C",

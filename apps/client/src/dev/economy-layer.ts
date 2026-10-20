@@ -22,6 +22,7 @@ import type {
   UnitLayerCacheTelemetry,
 } from './cache-telemetry.ts';
 import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
+import { drawConstructions } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
@@ -507,6 +508,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
+    drawConstructions(
+      marks,
+      Array.from(v.hexes.building, (building, hex) => ({
+        at: center(hex),
+        color: playerLine(v.hexes.owner[hex] ?? -1),
+        building,
+        improvement: v.hexes.improvement[hex] ?? 0,
+      })),
+      k,
+      radius,
+    );
     const nextLabelsKey = cityLabelsKey(
       v.cities.map((c) => ({
         at: center(c.hex),
