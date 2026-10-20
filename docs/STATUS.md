@@ -16,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: T17ae подключила процедурные знаки fort, depot и improvement к реальному `createEconomyLayer(...).setView(...)`; токены сгенерированы через `pnpm tokens`, приёмочный тест проверяет формы, цвет владельца, пустой гекс и память тумана.
-- Проверено: `pnpm verify --changed` — зелёный.
+- Сделано: T17ae усилила приёмочный тест реального `createEconomyLayer(...).setView(...)`: проверяются радиусы вершин fort/depot через `tokens.construction.size` и обводки всех трёх знаков через `construction.outline`/`construction.fill`.
+- Проверено: целевой тест зелёный; контрольная мутация `buildingRadius = hexRadius * 0.1` дала RED на assertion радиуса; восстановленный код прошёл `pnpm verify --changed`.
 - Следующая задача: 07/T17af.
 - Читать: блоки T17af и T17am в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/construction-glyphs.ts`, `apps/client/src/dev/economy-layer.ts`, `apps/client/test/construction-glyphs.test.ts`, `docs/art/tokens.json`, `docs/art/style-guide.md`.
