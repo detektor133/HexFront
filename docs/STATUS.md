@@ -3,8 +3,8 @@
 | Поле | Значение |
 | --- | --- |
 | Текущий этап | 07 — Играбельная сборка и интерфейс |
-- Исправлено: 07/T17an — приёмочные тесты проходят реальный путь `ArmyBar → MatchSurface → useSandbox → send`, вложенный `assignUnits`, double tap через MapView и ПКМ через runtime.
-- Проверено: `pnpm verify --changed` — зелёный; задача ждёт повторного ревью.
+- Исправлено: 07/T17an — приёмочные тесты проходят реальный путь `ArmyBar → MatchSurface → useSandbox → send`, но повторное ревью вернуло три недостатка покрытия `MapView` и артиллерийского radial-сценария.
+- Проверено: `pnpm verify --changed` — зелёный; задача ждёт исправления возврата ревью.
 - Следующая задача: 07/T17.
 - Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `MatchSurfaceRuntime.tsx`, `ArmyBar.tsx`, `map-view.ts`, тесты T17an/T17m.
 Очередь: 07/T17af → 07/T17am → 07/T17an → 07/T17 → 07/T18
@@ -16,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: исправлены все четыре СПЕК возврата 07/T17an; тесты больше не подменяют runtime, отправляют вложенный `assignUnits`, проходят двойной тап через MapView и ПКМ через runtime.
-- Проверки: `pnpm verify --changed` зелёный; исправлена строгая типизация T17an-теста, четыре временные RED-мутации дали assertion и восстановлены.
-- Следующая задача: 07/T17.
-- Читать: блок T17 в `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md`, `docs/DECISIONS.md`.
+- Сделано: исправлены четыре прошлых СПЕК, но тест T17an всё ещё обходит реальный `MapView` для double tap и ПКМ и не проверяет полный артиллерийский radial-сценарий.
+- Проверки: `pnpm verify --changed` зелёный.
+- Следующая задача: исправить последний блок «Возврат ревью» в 07/T17an.
+- Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17an-radial-menu.test.ts`.
