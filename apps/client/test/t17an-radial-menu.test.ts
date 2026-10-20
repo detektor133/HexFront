@@ -14,9 +14,9 @@ import { cityChipShift } from '../src/dev/chip-place.ts';
 import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
+import { clampCamera } from '../src/render/camera.ts';
 import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
-import { hexCenter } from '../src/render/hex-geometry.ts';
-import type * as MapViewModule from '../src/render/map-view.ts';
+import { hexCenter, mapBounds } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 vi.mock('pixi.js', async (importOriginal) => {
@@ -67,29 +67,13 @@ const harness = vi.hoisted(() => ({
     canvas: HTMLCanvasElement;
     stage: Container;
     ticker: { callbacks: Array<(ticker: { deltaMS: number; FPS: number }) => void> };
+    screen: { width: number; height: number };
   } | null,
   world: { x: 100, y: 100 },
-  centerOn: vi.fn(),
   artillery: false,
   unitHex: 0,
   unitCityLevel: null as number | null,
 }));
-
-vi.mock('../src/render/map-view.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof MapViewModule>();
-  return {
-    ...actual,
-    createMapView: async (...args: Parameters<typeof actual.createMapView>) => {
-      const view = await actual.createMapView(...args);
-      const centerOn = view.centerOn.bind(view);
-      view.centerOn = (hex, durationMs): void => {
-        harness.centerOn(hex, durationMs);
-        centerOn(hex, durationMs);
-      };
-      return view;
-    },
-  };
-});
 
 class TestWorker {
   public onmessage: ((event: MessageEvent) => void) | null = null;
@@ -214,7 +198,6 @@ beforeEach(() => {
   harness.commands.length = 0;
   harness.mapCanvas = null;
   harness.app = null;
-  harness.centerOn.mockReset();
   harness.artillery = false;
   harness.world = { x: 100, y: 100 };
   harness.unitHex = 0;
@@ -318,38 +301,81 @@ describe('07/T17an: радиальное меню', () => {
 
   it('проводит двойной тап MapView через runtime до выбора и centerOn', async () => {
     await renderSurface();
-    if (!harness.mapCanvas) throw new Error('MapView input is not connected');
-    harness.centerOn.mockReset();
+    if (!harness.mapCanvas || !harness.app) throw new Error('MapView input is not connected');
     let nowMs = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => nowMs);
+    const world = harness.app.stage.children[0];
+    if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+    fireEvent.wheel(harness.mapCanvas, {
+      deltaY: -100,
+      clientX: harness.world.x,
+      clientY: harness.world.y,
+    });
+    harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+    const unitCenter = hexCenter(hexFromId(harness.unitHex, testMap.width), tokens.map.hexRadius);
+    const tapPoint = {
+      x: world.position.x + unitCenter.x * world.scale.x,
+      y:
+        world.position.y +
+        (unitCenter.y +
+          (harness.unitCityLevel === null
+            ? 0
+            : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius))) *
+          world.scale.y,
+    };
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 0,
       pointerId: 4,
-      clientX: harness.world.x,
-      clientY: harness.world.y,
+      clientX: tapPoint.x,
+      clientY: tapPoint.y,
     });
     fireEvent.pointerUp(harness.mapCanvas, {
       pointerId: 4,
-      clientX: harness.world.x,
-      clientY: harness.world.y,
+      clientX: tapPoint.x,
+      clientY: tapPoint.y,
     });
+    const fromScale = world.scale.x;
     await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
     nowMs = 100;
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 0,
       pointerId: 4,
-      clientX: harness.world.x,
-      clientY: harness.world.y,
+      clientX: tapPoint.x,
+      clientY: tapPoint.y,
     });
     fireEvent.pointerUp(harness.mapCanvas, {
       pointerId: 4,
-      clientX: harness.world.x,
-      clientY: harness.world.y,
+      clientX: tapPoint.x,
+      clientY: tapPoint.y,
     });
-    expect(harness.centerOn).toHaveBeenCalledWith(
-      hexFromId(harness.unitHex, testMap.width),
-      tokens.motion.map,
+    harness.app.ticker.callbacks.forEach((callback) =>
+      callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
     );
+    const target = hexCenter(hexFromId(harness.unitHex, testMap.width), tokens.map.hexRadius);
+    const expectedCamera = clampCamera(
+      {
+        scale: fromScale,
+        x: harness.app.screen.width / 2 - target.x * fromScale,
+        y: harness.app.screen.height / 2 - target.y * fromScale,
+      },
+      harness.app.screen,
+      mapBounds(testMap.width, testMap.height, tokens.map.hexRadius),
+    );
+    const expectedFinal = {
+      x: Math.round(expectedCamera.x) + target.x * expectedCamera.scale,
+      y: Math.round(expectedCamera.y) + target.y * expectedCamera.scale,
+    };
+    expect({
+      x: world.position.x + target.x * world.scale.x,
+      y: world.position.y + target.y * world.scale.y,
+    }).not.toEqual(expectedFinal);
+    harness.app.ticker.callbacks.forEach((callback) =>
+      callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
+    );
+    expect({
+      x: world.position.x + target.x * world.scale.x,
+      y: world.position.y + target.y * world.scale.y,
+    }).toEqual(expectedFinal);
   });
 
   it('отправляет ПКМ через MapView без открытия radial', async () => {

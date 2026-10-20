@@ -17,8 +17,8 @@
 
 ## Следующая сессия
 
-- Сделано: повторное ревью 07/T17an выявило отсутствие проверки центра map-меню; задача `[ ]`.
-- `slow` больше не включает V8 coverage для несвязанных проектов; покрытие `sim` запускается отдельно.
-- Проверки: `pnpm verify --changed` — зелёный; T17an 9/9.
-- Следующее действие: исправить СПЕК и повторить `$review 07/T17an`.
+- Сделано: 07/T17an переведена в `[~]`; тест двойного тапа и ПКМ проходит через реальный canvas `MapView`/`attachInput` и runtime.
+- Исправлено: проверены точный hex камеры, длительность `tokens.motion.map` и полный payload приказа с hex назначения.
+- Проверки: RED→GREEN мутации callback doubleTap, длительности, order и hex; `pnpm verify --changed` — зелёный; T17an 9/9.
+- Следующее действие: запустить `$review 07/T17an` в новой сессии.
 - Читать: блок T17an в docs/stages/stage-07-playable-build.md, apps/client/test/t17an-radial-menu.test.ts, apps/client/src/render/map-view.ts.
