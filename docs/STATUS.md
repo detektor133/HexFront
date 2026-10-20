@@ -16,7 +16,7 @@
 
 ## Следующая сессия
 
-- Сделано: T17ae усилила приёмочный тест реального `createEconomyLayer(...).setView(...)`: проверяются радиусы вершин fort/depot через `tokens.construction.size` и обводки всех трёх знаков через `construction.outline`/`construction.fill`.
-- Проверено: целевой тест зелёный; контрольная мутация `buildingRadius = hexRadius * 0.1` дала RED на assertion радиуса; восстановленный код прошёл `pnpm verify --changed`.
-- Следующая задача: 07/T17af.
-- Читать: блоки T17af и T17am в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/construction-glyphs.ts`, `apps/client/src/dev/economy-layer.ts`, `apps/client/test/construction-glyphs.test.ts`, `docs/art/tokens.json`, `docs/art/style-guide.md`.
+- Сделано: T17af сохранила один маркер на целевой гекс и переработала крест в два скрещённых клинка `poly` с заданными длиной, шириной, углами и заливкой.
+- Проверено: `t17af-battle-marker.test.ts` подтверждает один маркер на цель, сумму `org` и две позиции; геометрический тест дал RED на старом кресте и GREEN после исправления; `pnpm verify --changed` зелёный.
+- Следующая задача: 07/T17am.
+- Читать: блоки T17am и T17an в `docs/stages/stage-07-playable-build.md`, связанные файлы задачи T17am и `docs/art/tokens.json`.
