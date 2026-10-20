@@ -16,8 +16,8 @@
 
 ## Следующая сессия
 
-- Сделано: повторное ревью 07/T17an подтвердило общий порог radial и отмену таймера `ArmyBar` при смещении больше `DRAG_SLOP_PX`.
-- Тесты: `pnpm verify --changed` зелёный, но приёмка возвращена — тесты удержания, doubleTap и ПКМ обходят реальные wiring-пути, а отпускание вне секторов и точный набор артиллерийских секторов не проверяются.
-- Блокер: исправить `apps/client/test/t17an-radial-menu.test.ts` по последнему блоку «Возврат ревью» в задаче 07/T17an.
-- Следующая задача: 07/T17.
-- Читать: блок T17 в `docs/stages/stage-07-playable-build.md`, изменённые файлы T17an и `docs/STATUS.md`.
+- Сделано: исправлен возврат 07/T17an; ArmyBar проверен через MatchSurface и runtime, добавлены проверки отмены radial, артиллерийских корневых действий, double tap и ПКМ.
+- Код: добавлены типизированные runtime-обработчики `createDoubleTapHandler` и `createOrderHandler`; рабочий payload отправляется через `send`.
+- Проверки: четыре временные мутации возврата дали `RED`, восстановленный код дал `GREEN`; `pnpm verify --changed` зелёный.
+- Следующая задача: `$review 07/T17an` в новой сессии.
+- Читать: блок T17an в `docs/stages/stage-07-playable-build.md`, `MatchSurfaceRuntime.tsx`, `t17an-radial-menu.test.ts`.

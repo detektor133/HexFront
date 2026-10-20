@@ -124,6 +124,46 @@ export function focusUnitOnDoubleTap(options: {
     tokens.motion.map,
   );
 }
+
+export function createDoubleTapHandler(options: {
+  getView: () => PlayerView | null;
+  map: MapStatic;
+  getPicked: () => Picked;
+  getHit: (world: Point) => readonly number[];
+  pick: (picked: Picked) => void;
+  centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
+}): (hex: { readonly q: number; readonly r: number }, world: Point) => void {
+  return (hex, world): void => {
+    const view = options.getView();
+    if (!view || !inBounds(hex, options.map.width, options.map.height)) return;
+    const hit = options.getHit(world);
+    if (hit.length === 0) return;
+    focusUnitOnDoubleTap({
+      view,
+      map: options.map,
+      hex,
+      picked: options.getPicked(),
+      hit,
+      pick: options.pick,
+      centerOn: options.centerOn,
+    });
+  };
+}
+
+export function createOrderHandler(options: {
+  getView: () => PlayerView | null;
+  getPicked: () => Picked;
+  send: (command: Command) => void;
+  pick: (picked: Picked) => void;
+}): (hex: number) => void {
+  return (hex): void => {
+    const view = options.getView();
+    if (!view) return;
+    const next = orderHex(view, options.getPicked(), hex);
+    if (next.cmd) options.send(next.cmd);
+    options.pick(next.picked);
+  };
+}
 type PlayerColorId = (typeof tokens.players.palette)[number]['id'];
 
 const NICKNAME_KEY = 'hexfront.nickname';
@@ -425,29 +465,21 @@ export function useSandbox(
       }
       order(hex);
     };
-    const onDoubleTap = (h: { q: number; r: number }, world: Point): void => {
-      const current = viewRef.current;
-      if (!current || !inBounds(h, map.width, map.height)) return;
-      const hit = layerRef.current?.unitsAt(world) ?? [];
-      if (hit.length === 0) return;
-      focusUnitOnDoubleTap({
-        view: current,
-        map,
-        hex: h,
-        picked: pickedRef.current,
-        hit,
-        pick,
-        centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),
-      });
-    };
+    const onDoubleTap = createDoubleTapHandler({
+      getView: () => viewRef.current,
+      map,
+      getPicked: () => pickedRef.current,
+      getHit: (world) => layerRef.current?.unitsAt(world) ?? [],
+      pick,
+      centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),
+    });
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
-    const order = (hex: number): void => {
-      const current = viewRef.current;
-      if (!current) return;
-      const next = orderHex(current, pickedRef.current, hex);
-      if (next.cmd) match.send(next.cmd);
-      pick(next.picked);
-    };
+    const order = createOrderHandler({
+      getView: () => viewRef.current,
+      getPicked: () => pickedRef.current,
+      send: (command) => match.send(command),
+      pick,
+    });
     const hooks = createOrderHooks({
       map,
       radius: tokens.map.hexRadius,
