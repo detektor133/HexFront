@@ -17,6 +17,7 @@ import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { DRAG_SLOP_PX, RADIAL_MENU_LONG_PRESS_MS } from '../render/gesture.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -239,6 +240,7 @@ function ArmyCard(props: {
   const [draft, setDraft] = useState(props.rawName);
   const radialTimer = useRef<number | null>(null);
   const radialStarted = useRef(false);
+  const radialStart = useRef<{ readonly x: number; readonly y: number } | null>(null);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -258,12 +260,24 @@ function ArmyCard(props: {
   const startRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!props.onRadial || event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    radialStart.current = radialPoint(event);
     radialTimer.current = window.setTimeout(() => {
       radialStarted.current = true;
       props.onRadial?.(radialPoint(event), 'start');
-    }, 400);
+    }, RADIAL_MENU_LONG_PRESS_MS);
   };
   const moveRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const start = radialStart.current;
+    if (
+      !radialStarted.current &&
+      start !== null &&
+      Math.hypot(event.clientX - start.x, event.clientY - start.y) > DRAG_SLOP_PX
+    ) {
+      if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+      radialTimer.current = null;
+      radialStart.current = null;
+      return;
+    }
     if (radialStarted.current) props.onRadial?.(radialPoint(event), 'move');
   };
   const endRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -273,6 +287,7 @@ function ArmyCard(props: {
       props.onRadial?.(radialPoint(event), 'end');
       radialStarted.current = false;
     }
+    radialStart.current = null;
   };
   const selectFromContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
     event.preventDefault();
@@ -294,6 +309,7 @@ function ArmyCard(props: {
           radialTimer.current = null;
           if (radialStarted.current) props.onRadial?.(radialPoint(event), 'cancel');
           radialStarted.current = false;
+          radialStart.current = null;
         }}
         onContextMenu={selectFromContextMenu}
         onKeyDown={(event) => {

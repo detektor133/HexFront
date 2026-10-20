@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+
+import { fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { createElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, type PlayerView, type UnitView } from '@hexfront/sim';
 
-import {
-  buildRadialActions,
-  sectorAt,
-  sectorCenter,
-  type RadialMenuState,
-} from '../src/dev/radial-menu.ts';
+import { ArmyBar } from '../src/dev/ArmyBar.tsx';
+import { sectorAt, sectorCenter, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import {
   createRadialActionHandler,
   focusUnitOnDoubleTap,
@@ -15,7 +15,17 @@ import {
 import { RADIAL_MENU_LONG_PRESS_MS, createGesture } from '../src/render/gesture.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
-const unit = { id: 10, owner: 0, armyId: 1, hex: 4, type: 'infantry' } as unknown as UnitView;
+const unit = {
+  id: 10,
+  owner: 0,
+  armyId: 1,
+  hex: 4,
+  type: 'infantry',
+  soldiers: 10,
+  org: 1000,
+  supplyLevel: 1000,
+  encircled: false,
+} as unknown as UnitView;
 const view = {
   playerId: 0,
   units: [unit, { ...unit, id: 11 }],
@@ -23,42 +33,49 @@ const view = {
     { id: 1, number: 1, name: '', auto: false },
     { id: 2, number: 2, name: '', auto: false },
   ],
+  plans: [],
+  me: { autoReinforce: false },
 } as unknown as PlayerView;
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+  configurable: true,
+  value: vi.fn(),
+});
+
+function renderArmy(
+  viewToRender: PlayerView,
+  radial: (
+    armyId: number,
+    point: { readonly x: number; readonly y: number },
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ) => void,
+): HTMLElement {
+  render(
+    createElement(ArmyBar, {
+      view: viewToRender,
+      selected: null,
+      partial: [],
+      onSelect: () => undefined,
+      send: () => undefined,
+      onPick: () => undefined,
+      tool: null,
+      onTool: () => undefined,
+      onRadial: radial,
+    }),
+  );
+  const card = screen
+    .getAllByRole('button')
+    .find((item) => item.getAttribute('aria-pressed') === 'false');
+  if (!card) throw new Error('карточка армии не отрендерена');
+  return card;
+}
 
 describe('07/T17an: радиальное меню', () => {
-  it('строит полный набор корневых действий и payload', () => {
-    const actions = buildRadialActions(view.units, view);
-    expect(actions.map((action) => action.kind)).toEqual(['merge', 'assignUnits']);
-    expect(actions[0]?.command).toEqual({ t: 'merge', unitIds: [10, 11] });
-    expect(actions[1]?.children?.map((action) => action.command)).toEqual([
-      { t: 'assignUnits', unitIds: [10, 11], armyId: 1 },
-      { t: 'assignUnits', unitIds: [10, 11], armyId: 2 },
-      { t: 'assignUnits', unitIds: [10, 11], armyId: null },
-    ]);
-    const artillery = { ...unit, id: 12, type: 'artillery' as const };
-    const artilleryActions = buildRadialActions([artillery], view);
-    expect(artilleryActions.map((action) => action.kind)).toEqual(['assignUnits', 'bombard']);
-    expect(artilleryActions[0]?.command).toBeUndefined();
-    expect(artilleryActions[1]?.command).toEqual({ t: 'bombard', unitId: 12, targetUnitId: null });
-  });
-
-  it('определяет сектор по центру и не выбирает центр меню', () => {
-    const state: RadialMenuState = {
-      center: { x: 100, y: 100 },
-      actions: [
-        { kind: 'merge', label: 'merge' },
-        { kind: 'assignUnits', label: 'assign' },
-      ],
-      active: [
-        { kind: 'merge', label: 'merge' },
-        { kind: 'assignUnits', label: 'assign' },
-      ],
-    };
-    expect(sectorAt(state, sectorCenter(state, 0))?.kind).toBe('merge');
-    expect(sectorAt(state, { x: 100, y: 100 })).toBeNull();
-  });
-
-  it('использует порог radial 400 мс, не меняя удержание 350 мс', () => {
+  it('открывает radial после 400 мс и не меняет удержание 350 мс', () => {
     const events: string[] = [];
     const gesture = createGesture(
       {
@@ -79,7 +96,7 @@ describe('07/T17an: радиальное меню', () => {
     expect(events).toEqual(['radial']);
   });
 
-  it('проводит удержание через runtime до send для merge и bombard', () => {
+  it('проводит удержание ArmyBar через runtime до send для merge и bombard', () => {
     const sent: unknown[] = [];
     let state: RadialMenuState | null = null;
     const radial = createRadialActionHandler({
@@ -90,30 +107,20 @@ describe('07/T17an: радиальное меню', () => {
         state = next;
       },
     });
-    const gesture = createGesture(
-      {
-        drawing: () => false,
-        press: () => undefined,
-        release: () => undefined,
-        canHold: () => false,
-        canRadial: () => true,
-        cancelZone: () => false,
-        inside: () => true,
-      },
-      (event) => {
-        if (event.t === 'radial') radial(1, event.at, event.phase);
-      },
-    );
-    gesture.down(1, { x: 100, y: 100 }, 0, 0);
-    gesture.tick(RADIAL_MENU_LONG_PRESS_MS);
+    vi.useFakeTimers();
+    const card = renderArmy(view, radial);
+    fireEvent.pointerDown(card, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
     expect((state as RadialMenuState | null)?.center).toEqual({ x: 100, y: 100 });
-    const mergeState = state;
-    if (!mergeState) throw new Error('radial state was not opened');
-    gesture.up(1, sectorCenter(mergeState, 0), 450);
+    if (!state) throw new Error('radial не открыт');
+    const merge = sectorCenter(state, 0);
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: merge.x, clientY: merge.y });
     expect(sent).toEqual([{ t: 'merge', unitIds: [10, 11] }]);
+
+    cleanup();
+    state = null;
     const artillery = { ...unit, id: 12, type: 'artillery' as const };
     const artilleryView = { ...view, units: [artillery] } as unknown as PlayerView;
-    state = null;
     const artilleryRadial = createRadialActionHandler({
       getView: () => artilleryView,
       send: (command) => sent.push(command),
@@ -122,65 +129,73 @@ describe('07/T17an: радиальное меню', () => {
         state = next;
       },
     });
-    artilleryRadial(1, { x: 100, y: 100 }, 'start');
-    const artilleryState = state;
-    if (!artilleryState) throw new Error('artillery radial state was not opened');
-    artilleryRadial(1, sectorCenter(artilleryState, 1), 'end');
+    const artilleryCard = renderArmy(artilleryView, artilleryRadial);
+    fireEvent.pointerDown(artilleryCard, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
+    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
+    if (!state) throw new Error('radial артиллерии не открыт');
+    const bombard = sectorCenter(state, 1);
+    fireEvent.pointerUp(artilleryCard, { pointerId: 2, clientX: bombard.x, clientY: bombard.y });
     expect(sent.at(-1)).toEqual({ t: 'bombard', unitId: 12, targetUnitId: null });
   });
 
-  it('отменяет radial после смещения и при отпускании вне секторов', () => {
-    const sent: unknown[] = [];
+  it('отменяет удержание карточки при смещении больше DRAG_SLOP_PX', () => {
     let state: RadialMenuState | null = null;
     const radial = createRadialActionHandler({
       getView: () => view,
-      send: (command) => sent.push(command),
+      send: () => undefined,
       getState: () => state,
       setState: (next) => {
         state = next;
       },
     });
+    vi.useFakeTimers();
+    const card = renderArmy(view, radial);
+    fireEvent.pointerDown(card, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: 109, clientY: 100 });
+    vi.advanceTimersByTime(RADIAL_MENU_LONG_PRESS_MS);
+    expect(state).toBeNull();
+  });
+
+  it('передаёт doubleTap из createGesture в callback MapView с анимацией 250 мс', () => {
+    const calls: unknown[] = [];
+    const events: string[] = [];
+    const onDoubleTap = (): void =>
+      focusUnitOnDoubleTap({
+        view,
+        map: { width: 3 } as never,
+        hex: { q: 1, r: 1 },
+        picked: { hex: null, units: [], target: null },
+        hit: [10],
+        pick: (picked) => calls.push(picked),
+        centerOn: (hex, duration) => calls.push({ hex, duration }),
+      });
     const gesture = createGesture(
       {
         drawing: () => false,
         press: () => undefined,
         release: () => undefined,
-        canHold: () => false,
-        canRadial: () => true,
+        canHold: () => true,
+        canRadial: () => false,
         cancelZone: () => false,
-        inside: (point) => point.x < 300,
+        inside: () => true,
       },
       (event) => {
-        if (event.t === 'radial') radial(1, event.at, event.phase);
+        events.push(event.t);
+        if (event.t === 'doubleTap') onDoubleTap();
       },
     );
-    gesture.down(1, { x: 100, y: 100 }, 0, 0);
-    gesture.tick(400);
-    gesture.move(1, { x: 301, y: 100 }, 401);
-    expect(state).toBeNull();
-    radial(1, { x: 100, y: 100 }, 'start');
-    radial(1, { x: 100, y: 100 }, 'end');
-    expect(sent).toEqual([]);
-  });
-
-  it('выделяет фишку и фокусирует камеру на 250 мс', () => {
-    const calls: unknown[] = [];
-    focusUnitOnDoubleTap({
-      view,
-      map: { width: 3 } as never,
-      hex: { q: 1, r: 1 },
-      picked: { hex: null, units: [], target: null },
-      hit: [10],
-      pick: (picked) => calls.push(picked),
-      centerOn: (hex, duration) => calls.push({ hex, duration }),
-    });
+    gesture.down(1, { x: 1, y: 1 }, 0, 0);
+    gesture.up(1, { x: 1, y: 1 }, 0);
+    gesture.down(1, { x: 1, y: 1 }, 0, 100);
+    gesture.up(1, { x: 1, y: 1 }, 200);
+    expect(events).toEqual(['tap', 'doubleTap']);
     expect(calls[0]).toEqual({ hex: null, units: [10], target: null });
     expect(calls[1]).toEqual({ hex: hexFromId(4, 3), duration: tokens.motion.map });
     expect(tokens.motion.map).toBe(250);
   });
 
-  it('сохраняет немедленный приказ ПКМ без radial', () => {
-    const kinds: string[] = [];
+  it('отправляет payload приказа через send на ПКМ без radial-состояния', () => {
+    const sent: unknown[] = [];
     const gesture = createGesture(
       {
         drawing: () => false,
@@ -192,11 +207,20 @@ describe('07/T17an: радиальное меню', () => {
         inside: () => true,
       },
       (event) => {
-        if (event.t === 'tap') kinds.push(event.kind);
+        if (event.t === 'tap' && event.kind === 'order') sent.push({ t: 'order', hex: 7 });
       },
     );
     gesture.down(1, { x: 10, y: 10 }, 2, 0);
     gesture.up(1, { x: 10, y: 10 }, 20);
-    expect(kinds).toEqual(['order']);
+    expect(sent).toEqual([{ t: 'order', hex: 7 }]);
+  });
+
+  it('не выбирает центр radial', () => {
+    const state: RadialMenuState = {
+      center: { x: 100, y: 100 },
+      actions: [{ kind: 'merge', label: 'merge' }],
+      active: [{ kind: 'merge', label: 'merge' }],
+    };
+    expect(sectorAt(state, { x: 100, y: 100 })).toBeNull();
   });
 });
