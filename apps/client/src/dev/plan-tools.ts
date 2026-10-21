@@ -9,6 +9,7 @@ import {
   frontHandles,
   startDraft,
   strokeAdd,
+  strokeSegment,
   tapCommand,
   type Draft,
   type DraftContext,
@@ -49,6 +50,7 @@ const HANDLE_HIT = 0.45;
 /** Создаёт обработчики ввода инструментов планов. */
 export function createPlanInput(deps: PlanInputDeps): PlanInput {
   let draft: Draft | null = null;
+  let lastStrokePoint: Point | null = null;
   const show = (d: Draft | null): void => {
     draft = d;
     deps.setDraft(d);
@@ -57,20 +59,32 @@ export function createPlanInput(deps: PlanInputDeps): PlanInput {
     const t = deps.tool();
     const c = deps.context();
     if (!t || !c) return;
-    if (phase === 'start') show(startDraft(t.tool, t.armyId));
-    if (phase === 'cancel') return show(null);
+    if (phase === 'start') {
+      lastStrokePoint = world;
+      show(startDraft(t.tool, t.armyId));
+    }
+    if (phase === 'cancel') {
+      lastStrokePoint = null;
+      return show(null);
+    }
     if (!draft) return;
-    const next = strokeAdd(c, draft, world);
+    const next =
+      lastStrokePoint === null
+        ? strokeAdd(c, draft, world)
+        : strokeSegment(c, draft, lastStrokePoint, world);
+    lastStrokePoint = world;
     if (next !== draft) show(next);
     if (phase !== 'end') return;
     const cmd = draft ? finishCommand(draft) : null;
     if (cmd) deps.send(cmd);
+    lastStrokePoint = null;
     show(null);
     deps.setTool(null);
   };
   return {
     stroke,
     cancel() {
+      lastStrokePoint = null;
       show(null);
     },
     tap(world, kind) {

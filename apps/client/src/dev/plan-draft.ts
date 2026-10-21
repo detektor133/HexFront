@@ -147,6 +147,36 @@ export function strokeAdd(c: DraftContext, d: Draft, world: Point): Draft {
     : { ...d, edges: [...d.edges, x] };
 }
 
+function strokePointAccepted(c: DraftContext, d: Draft, world: Point): boolean {
+  if (d.tool === 'line') {
+    const h = hexUnder(c, world);
+    return (
+      h >= 0 && c.map.terrain[h] !== TERRAIN.water && c.view.hexes.owner[h] === c.view.playerId
+    );
+  }
+  if (d.tool === 'front') {
+    return nearestEdge(c.map, c.radius, world, (x) => ownBorder(c, x) !== null) !== null;
+  }
+  return true;
+}
+
+/** Добавляет все допустимые точки между двумя событиями движения указателя. */
+export function strokeSegment(c: DraftContext, d: Draft, from: Point, to: Point): Draft {
+  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+  const steps = Math.max(1, Math.ceil(distance / (c.radius * 0.5)));
+  if (!strokePointAccepted(c, d, from)) return d;
+  let next = strokeAdd(c, d, from);
+  for (let i = 1; i <= steps; i += 1) {
+    const point = {
+      x: from.x + ((to.x - from.x) * i) / steps,
+      y: from.y + ((to.y - from.y) * i) / steps,
+    };
+    if (!strokePointAccepted(c, next, point)) break;
+    next = strokeAdd(c, next, point);
+  }
+  return next;
+}
+
 /** Отпустил палец: приказ по проведённой линии (или null, если линии нет). */
 export function finishCommand(d: Draft): Command | null {
   if (d.tool === 'front' && d.edges.length > 0) {
