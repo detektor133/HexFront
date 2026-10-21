@@ -37,6 +37,27 @@ function renderHud(width: number): HTMLElement {
   return hud;
 }
 
+function getApplicableDeclarations(node: Element, width: number): CSSStyleDeclaration[] {
+  const applies = (query: string): boolean => {
+    const maxWidth = query.match(/\(max-width:\s*(\d+)px\)/u)?.[1];
+    const minWidth = query.match(/\(min-width:\s*(\d+)px\)/u)?.[1];
+    return (!maxWidth || width <= Number(maxWidth)) && (!minWidth || width >= Number(minWidth));
+  };
+  const collect = (rules: CSSRuleList): CSSStyleDeclaration[] =>
+    Array.from(rules).flatMap((rule) => {
+      if (rule instanceof CSSStyleRule) {
+        return node.matches(rule.selectorText) ? [rule.style] : [];
+      }
+      if (rule instanceof CSSMediaRule && !applies(rule.conditionText)) return [];
+      return 'cssRules' in rule ? collect((rule as CSSGroupingRule).cssRules) : [];
+    });
+  return Array.from(document.styleSheets)
+    .filter(
+      (sheet) => sheet.ownerNode instanceof HTMLStyleElement && sheet.ownerNode.dataset.t17aqHudCss,
+    )
+    .flatMap((sheet) => collect(sheet.cssRules));
+}
+
 afterEach(() => {
   cleanup();
   document.querySelector('[data-t17aq-hud-css]')?.remove();
@@ -102,10 +123,27 @@ describe('07/T17aq: верхняя панель без переполнения'
     expect(screen.getByRole('dialog', { name: 'Налог' })).toBeTruthy();
   });
 
-  it('на 360 px оставляет одну строку без горизонтального скролла и сохраняет приросты', () => {
+  it('на 360 px применяет мобильные ограничения, сохраняет одну строку и приросты', () => {
     const hud = renderHud(360);
-    expect(getComputedStyle(hud).flexWrap).toBe('nowrap');
-    expect(hud.scrollWidth).toBeLessThanOrEqual(hud.clientWidth || 360);
+    const hudDeclarations = getApplicableDeclarations(hud, 360);
+    expect(
+      hudDeclarations.some((style) => style.padding === 'var(--space-xs) var(--space-xs)'),
+    ).toBe(true);
+    expect(hudDeclarations.some((style) => style.flexWrap === 'nowrap')).toBe(true);
+    const metricGroup = hud.querySelector<HTMLElement>('[class*="slot"]');
+    const slotText = metricGroup?.querySelector<HTMLElement>('[class*="slotText"]');
+    expect(metricGroup).not.toBeNull();
+    expect(slotText).not.toBeNull();
+    const metricDeclarations = getApplicableDeclarations(metricGroup as HTMLElement, 360);
+    const textDeclarations = getApplicableDeclarations(slotText as HTMLElement, 360);
+    expect(
+      metricDeclarations.some(
+        (style) => /^1 1 0(?:px)?$/u.test(style.flex) && /^0(?:px)?$/u.test(style.minWidth),
+      ),
+    ).toBe(true);
+    expect(metricDeclarations.some((style) => style.gap === '2px')).toBe(true);
+    expect(textDeclarations.some((style) => style.transform === 'scaleX(0.6)')).toBe(true);
+    expect(textDeclarations.some((style) => /^0(?:px)?$/u.test(style.gap))).toBe(true);
     expect(
       Array.from(hud.children).filter((element) => element.className.toString().includes('slot')),
     ).toHaveLength(5);
