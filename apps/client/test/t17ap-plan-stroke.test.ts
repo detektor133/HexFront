@@ -23,7 +23,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { edgeMid } from '../src/dev/plan-edges.ts';
+import { edgeMid, nearestEdge } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { hexCenter } from '../src/render/hex-geometry.ts';
@@ -188,6 +188,90 @@ function findLineScenario(
   throw new Error('Не найдена удалённая линия обороны из трёх гексов');
 }
 
+function findBlockedFrontScenario(
+  map: MapStatic,
+  view: PlayerView,
+): {
+  points: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+  prefix: EdgeId[];
+  suffix: EdgeId;
+} {
+  const borders = borderEdges({ map, hexes: view.hexes }, view.playerId);
+  const sameEdge = (left: EdgeId, right: EdgeId): boolean => {
+    const leftCorners = edgeCorners(left);
+    const rightCorners = edgeCorners(right);
+    return leftCorners.every((leftCorner) =>
+      rightCorners.some(
+        (rightCorner) => leftCorner.hex === rightCorner.hex && leftCorner.a === rightCorner.a,
+      ),
+    );
+  };
+  const acceptedEdge = (point: { x: number; y: number }): EdgeId | null => {
+    const edge = nearestEdge(map, radius, point, (candidate) =>
+      borders.some((border) => sameEdge(border, candidate)),
+    );
+    return edge === null ? null : (borders.find((border) => sameEdge(border, edge)) ?? null);
+  };
+  const candidates = borders.map((edge) => {
+    const center = edgeMid(map, radius, edge);
+    return [-0.75, -0.375, 0, 0.375, 0.75]
+      .flatMap((x) =>
+        [-0.75, -0.375, 0, 0.375, 0.75].map((y) => ({
+          x: center.x + x * radius,
+          y: center.y + y * radius,
+        })),
+      )
+      .filter((point) => acceptedEdge(point) === edge);
+  });
+  for (const first of borders) {
+    for (const last of borders) {
+      if (first === last) continue;
+      for (const start of candidates[borders.indexOf(first)] ?? []) {
+        for (const end of candidates[borders.indexOf(last)] ?? []) {
+          let blocked = false;
+          let invalidPoint: { x: number; y: number } | null = null;
+          let prefix: EdgeId[] = [];
+          let suffix: EdgeId | null = null;
+          const steps = Math.max(
+            1,
+            Math.ceil(Math.hypot(end.x - start.x, end.y - start.y) / (radius * 0.5)),
+          );
+          for (let index = 0; index <= steps; index += 1) {
+            const point = {
+              x: start.x + ((end.x - start.x) * index) / steps,
+              y: start.y + ((end.y - start.y) * index) / steps,
+            };
+            const edge = acceptedEdge(point);
+            if (edge === null) {
+              blocked = true;
+              invalidPoint ??= point;
+              continue;
+            }
+            if (!blocked) {
+              if (prefix.at(-1) !== edge) prefix = [...prefix, edge];
+            } else if (!prefix.includes(edge)) {
+              suffix = edge;
+              break;
+            }
+          }
+          if (invalidPoint !== null && suffix !== null && prefix.length > 0) {
+            const beyond = {
+              x: start.x + (invalidPoint.x - start.x) * 1.25,
+              y: start.y + (invalidPoint.y - start.y) * 1.25,
+            };
+            return {
+              points: [start, beyond, end],
+              prefix,
+              suffix: borders[4] as EdgeId,
+            };
+          }
+        }
+      }
+    }
+  }
+  throw new Error('Не найден фронт с запрещённым промежуточным участком');
+}
+
 async function renderSurface(): Promise<{
   readonly map: MapStatic;
   readonly view: PlayerView;
@@ -306,47 +390,25 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     ).toBe(true);
   });
 
-  it('не создаёт мост через запрет и отменяет непустой жест без send', async () => {
+  it('не создаёт мост через запрет во фронте и отменяет непустой жест без send', async () => {
     const { map, view, world } = await renderSurface();
     await selectArmy();
-    await chooseTool(/Оборона|Defense/);
-    const scenario = findLineScenario(map, view);
-    const firstHex = scenario.hexes[0] as number;
-    const invalidHex = map.terrain.findIndex((terrain) => terrain === TERRAIN.water);
-    if (invalidHex < 0) throw new Error('В карте нет запрещённого водного гекса');
-    const invalid = hexCenter(hexFromId(invalidHex, map.width), radius);
-    const lastHex = scenario.hexes[2] as number;
-    stroke(
-      [
-        scenario.points[0] as { x: number; y: number },
-        invalid,
-        hexCenter(hexFromId(lastHex, map.width), radius),
-      ],
-      world,
-    );
-    expect(harness.commands).toEqual([
-      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [firstHex] },
-    ]);
-    const defenseCommand = harness.commands[0];
-    if (defenseCommand?.t !== 'setDefenseLine') throw new Error('Ожидалась линия обороны');
-    expect(defenseCommand.points).not.toContain(lastHex);
+    await chooseTool(/Фронт|Front/);
+    const scenario = findBlockedFrontScenario(map, view);
+    stroke(scenario.points, world);
+    const frontCommand = harness.commands[0];
+    if (frontCommand?.t !== 'assignFront') throw new Error('Ожидался приказ фронта');
+    expect(frontCommand.edges[0]).toBe(scenario.prefix[0]);
+    expect(frontCommand.edges).not.toContain(scenario.suffix);
     expect(harness.commands[0]).not.toEqual({
-      t: 'setDefenseLine',
+      t: 'assignFront',
       armyId: view.armies[0]?.id,
-      points: scenario.hexes,
+      edges: [scenario.prefix[0], scenario.suffix],
     });
 
     harness.commands = [];
-    await chooseTool(/Оборона|Defense/);
-    stroke(
-      [
-        scenario.points[0] as { x: number; y: number },
-        hexCenter(hexFromId(scenario.hexes[1] as number, map.width), radius),
-        scenario.points[1] as { x: number; y: number },
-      ],
-      world,
-      true,
-    );
+    await chooseTool(/Фронт|Front/);
+    stroke([scenario.points[0], scenario.points[1]], world, true);
     expect(harness.commands).toEqual([]);
   });
 });
