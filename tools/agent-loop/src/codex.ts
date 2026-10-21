@@ -3,7 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { prepareProcessArguments, type CommandResult, type RunCommand } from './process.ts';
+import type { CommandResult, RunCommand } from './process.ts';
 
 interface RoleConfig {
   readonly model?: string;
@@ -117,7 +117,7 @@ export async function runCodex(
   try {
     result = await settings.runCommand(
       'codex',
-      prepareProcessArguments([
+      [
         'exec',
         '--dangerously-bypass-approvals-and-sandbox',
         ...(roleConfig.model ? ['--model', roleConfig.model] : []),
@@ -128,7 +128,7 @@ export async function runCodex(
         '--cd',
         settings.root,
         '-',
-      ]),
+      ],
       {
         cwd: settings.root,
         // Роль задаётся явно: унаследованный AGENT_ROLE не должен ограничить или расширить сессию.

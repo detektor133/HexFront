@@ -5,11 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { head, makeGit, mergedIntoMain, syncWithOrigin, type Git } from './git.ts';
-import { defaultRunCommand, prepareProcessArguments, type RunCommand } from './process.ts';
-
-// На Windows команда идёт через cmd: пути временных папок с пробелом нужно взять в кавычки.
-const run: RunCommand = (command, args, options) =>
-  defaultRunCommand(command, prepareProcessArguments(args), options);
+import { defaultRunCommand } from './process.ts';
 
 const roots: string[] = [];
 
@@ -24,10 +20,10 @@ async function repos(): Promise<{
   const bare = join(root, 'origin.git');
   const mine = join(root, 'mine');
   const other = join(root, 'other');
-  const shell = makeGit(run, root);
+  const shell = makeGit(defaultRunCommand, root);
   await shell.run(['init', '--bare', '-b', 'main', bare]);
   await shell.run(['clone', bare, mine]);
-  const gitMine = makeGit(run, mine);
+  const gitMine = makeGit(defaultRunCommand, mine);
   for (const args of [
     ['config', 'user.email', 'loop@test'],
     ['config', 'user.name', 'loop'],
@@ -39,7 +35,7 @@ async function repos(): Promise<{
   ])
     await gitMine.run(args);
   await shell.run(['clone', '-b', 'stage-06', bare, other]);
-  const gitOther = makeGit(run, other);
+  const gitOther = makeGit(defaultRunCommand, other);
   await gitOther.run(['config', 'user.email', 'other@test']);
   await gitOther.run(['config', 'user.name', 'other']);
   await gitOther.run(['config', 'core.hooksPath', 'no-hooks']);
@@ -65,6 +61,21 @@ afterEach(async () => {
 // сотни миллисекунд, поэтому 5 с по умолчанию проверяли бы скорость ПК, а не код
 // (2026-10-14: $stage-close 06 остановился на таймауте). Предел — защита от зависания.
 describe('сведение ветки с origin на настоящем git', { timeout: 60_000 }, () => {
+  it('передаёт сообщение коммита с пробелами одним аргументом', async () => {
+    const { mine } = await repos();
+    await mine.run([
+      'commit',
+      '--allow-empty',
+      '-m',
+      'docs(docs): завершена 07/T17ap',
+      '-m',
+      'Этап: 07/T17ap',
+    ]);
+    expect(await mine.run(['log', '-1', '--pretty=%B'])).toBe(
+      'docs(docs): завершена 07/T17ap\n\nЭтап: 07/T17ap',
+    );
+  });
+
   it('отставшую ветку подтягивает, ушедшую вперёд пушит', async () => {
     const { mine, other, dirs } = await repos();
     await commitFile(other, dirs[1] ?? '', 'a.txt', 'a');

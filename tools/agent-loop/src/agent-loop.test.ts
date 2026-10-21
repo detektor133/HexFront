@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultRunCommand, prepareProcessArguments } from './agent-loop.ts';
+import { defaultRunCommand } from './agent-loop.ts';
 import {
   closedStageBranch,
   commandTask,
@@ -53,11 +53,9 @@ describe('разбор файла этапа', () => {
 describe('запуск процесса', () => {
   it('передаёт спецсимволы через stdin без изменений', async () => {
     const input = 'строка "кавычки" $next & | > <\nвторая строка';
-    const result = await defaultRunCommand(
-      'node',
-      prepareProcessArguments(['-e', 'process.stdin.pipe(process.stdout)']),
-      { input },
-    );
+    const result = await defaultRunCommand('node', ['-e', 'process.stdin.pipe(process.stdout)'], {
+      input,
+    });
     expect(result.stdout).toBe(input);
   });
 });

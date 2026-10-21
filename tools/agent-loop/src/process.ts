@@ -19,9 +19,6 @@ export type RunCommand = (
 export const quoteWindowsArgument = (argument: string): string =>
   `"${argument.replaceAll('"', '\\"')}"`;
 
-export const prepareProcessArguments = (args: readonly string[]): readonly string[] =>
-  process.platform === 'win32' ? args.map(quoteWindowsArgument) : args;
-
 /**
  * На Windows команда идёт через cmd, и `kill` остановил бы только cmd, а codex продолжил бы
  * писать в дерево параллельно со следующей сессией. Поэтому дерево процессов — через taskkill.
@@ -51,10 +48,15 @@ export function stopAllCommands(): void {
 const runProcess: RunCommand = (command, args, options = {}) =>
   new Promise((resolve) => {
     // cmd получает одну строку: так node и делал со списком аргументов, но список с shell
-    // печатал предупреждение DEP0190 поверх панели консоли. Кавычки — prepareProcessArguments.
+    // печатал предупреждение DEP0190 поверх панели консоли. Экранирование здесь нельзя
+    // оставлять вызывающему коду: иначе один забытый вызов превращает текст в аргументы Git.
     const child =
       process.platform === 'win32'
-        ? spawn([command, ...args].join(' '), { cwd: options.cwd, env: options.env, shell: true })
+        ? spawn([command, ...args.map(quoteWindowsArgument)].join(' '), {
+            cwd: options.cwd,
+            env: options.env,
+            shell: true,
+          })
         : spawn(command, args, { cwd: options.cwd, env: options.env });
     running.add(child);
     if (options.input !== undefined) child.stdin.end(options.input);

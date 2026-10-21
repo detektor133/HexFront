@@ -37,7 +37,6 @@ import { processTask, resumePrompt } from './tasks.ts';
 export { type AgentConfig } from './context.ts';
 export {
   defaultRunCommand,
-  prepareProcessArguments,
   quoteWindowsArgument,
   type CommandResult,
   type RunCommand,
