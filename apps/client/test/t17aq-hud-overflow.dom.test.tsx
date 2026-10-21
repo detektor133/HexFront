@@ -19,7 +19,7 @@ function renderHud(width: number): HTMLElement {
   const style = document.createElement('style');
   style.dataset.t17aqHudCss = 'true';
   style.textContent = hudCss.replace(
-    /\.(hud|slot|taxWrap|taxButton|slotText|rate|value|settingsButton)\b/gu,
+    /\.(hud|slot|taxWrap|taxButton|slotText|rate|value|settingsWrap|settingsButton)\b/gu,
     '[class*="$1"]',
   );
   document.head.append(style);
@@ -125,9 +125,6 @@ describe('07/T17aq: верхняя панель без переполнения'
 
   it('на 360 px применяет мобильные ограничения, сохраняет одну строку и приросты', () => {
     const hud = renderHud(360);
-    expect(hud.scrollWidth).toBeLessThanOrEqual(360);
-    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(360);
-    expect(document.body.scrollWidth).toBeLessThanOrEqual(360);
     const hudDeclarations = getApplicableDeclarations(hud, 360);
     expect(
       hudDeclarations.some((style) => style.padding === 'var(--space-xs) var(--space-xs)'),
@@ -150,6 +147,26 @@ describe('07/T17aq: верхняя панель без переполнения'
     expect(
       Array.from(hud.children).filter((element) => element.className.toString().includes('slot')),
     ).toHaveLength(5);
+    const flexibleGroups = Array.from(hud.children).filter(
+      (element) =>
+        element.className.toString().includes('slot') ||
+        element.className.toString().includes('taxWrap'),
+    );
+    expect(flexibleGroups).toHaveLength(6);
+    for (const group of flexibleGroups) {
+      const declarations = getApplicableDeclarations(group, 360);
+      expect(
+        declarations.some(
+          (style) => /^1 1 0(?:px)?$/u.test(style.flex) && /^0(?:px)?$/u.test(style.minWidth),
+        ),
+      ).toBe(true);
+    }
+    const settingsWrap = hud.querySelector<HTMLElement>('[class*="settingsWrap"]');
+    expect(settingsWrap).not.toBeNull();
+    const settingsDeclarations = getApplicableDeclarations(settingsWrap as HTMLElement, 360);
+    expect(settingsDeclarations.some((style) => style.flex === '0 0 var(--touch-target-min)')).toBe(
+      true,
+    );
     expect(hud.querySelectorAll('[class*="rate"]').length).toBeGreaterThanOrEqual(2);
     expect(hud.textContent).toContain('%');
     expect(hud.textContent).toMatch(/#\d+/u);
