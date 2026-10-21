@@ -12,8 +12,10 @@ import {
   borderEdges,
   defenseLinePath,
   edgeCorners,
+  flipEdge,
   hexFromId,
   hexId,
+  isBorderEdge,
   loadMap,
   neighbors,
   TERRAIN,
@@ -192,25 +194,26 @@ function findBlockedFrontScenario(
   map: MapStatic,
   view: PlayerView,
 ): {
-  points: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+  points: [
+    { x: number; y: number },
+    { x: number; y: number },
+    { x: number; y: number },
+    { x: number; y: number },
+  ];
   prefix: EdgeId[];
   suffix: EdgeId;
 } {
-  const borders = borderEdges({ map, hexes: view.hexes }, view.playerId);
-  const sameEdge = (left: EdgeId, right: EdgeId): boolean => {
-    const leftCorners = edgeCorners(left);
-    const rightCorners = edgeCorners(right);
-    return leftCorners.every((leftCorner) =>
-      rightCorners.some(
-        (rightCorner) => leftCorner.hex === rightCorner.hex && leftCorner.a === rightCorner.a,
-      ),
-    );
-  };
+  const ground = { map, hexes: view.hexes };
+  const borders = borderEdges(ground, view.playerId);
   const acceptedEdge = (point: { x: number; y: number }): EdgeId | null => {
-    const edge = nearestEdge(map, radius, point, (candidate) =>
-      borders.some((border) => sameEdge(border, candidate)),
-    );
-    return edge === null ? null : (borders.find((border) => sameEdge(border, edge)) ?? null);
+    const canonical = (candidate: EdgeId): EdgeId | null => {
+      if (isBorderEdge(ground, view.playerId, candidate)) return candidate;
+      const flipped = flipEdge(ground, candidate);
+      return flipped >= 0 && isBorderEdge(ground, view.playerId, flipped) ? flipped : null;
+    };
+    const edge = nearestEdge(map, radius, point, (candidate) => canonical(candidate) !== null);
+    if (edge === null) return null;
+    return canonical(edge);
   };
   const candidates = borders.map((edge) => {
     const center = edgeMid(map, radius, edge);
@@ -223,50 +226,49 @@ function findBlockedFrontScenario(
       )
       .filter((point) => acceptedEdge(point) === edge);
   });
-  for (const first of borders) {
-    for (const last of borders) {
-      if (first === last) continue;
-      for (const start of candidates[borders.indexOf(first)] ?? []) {
-        for (const end of candidates[borders.indexOf(last)] ?? []) {
-          let blocked = false;
-          let invalidPoint: { x: number; y: number } | null = null;
-          let prefix: EdgeId[] = [];
-          let suffix: EdgeId | null = null;
-          const steps = Math.max(
-            1,
-            Math.ceil(Math.hypot(end.x - start.x, end.y - start.y) / (radius * 0.5)),
-          );
-          for (let index = 0; index <= steps; index += 1) {
-            const point = {
-              x: start.x + ((end.x - start.x) * index) / steps,
-              y: start.y + ((end.y - start.y) * index) / steps,
-            };
-            const edge = acceptedEdge(point);
-            if (edge === null) {
-              blocked = true;
-              invalidPoint ??= point;
-              continue;
-            }
-            if (!blocked) {
-              if (prefix.at(-1) !== edge) prefix = [...prefix, edge];
-            } else if (!prefix.includes(edge)) {
-              suffix = edge;
-              break;
-            }
-          }
-          if (invalidPoint !== null && suffix !== null && prefix.length > 0) {
-            const beyond = {
-              x: start.x + (invalidPoint.x - start.x) * 1.25,
-              y: start.y + (invalidPoint.y - start.y) * 1.25,
-            };
-            return {
-              points: [start, beyond, end],
-              prefix,
-              suffix,
-            };
-          }
-        }
-      }
+  const trace = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    initial: readonly EdgeId[],
+  ): { prefix: EdgeId[]; invalid: { x: number; y: number } | null } => {
+    const prefix = [...initial];
+    const steps = Math.max(
+      1,
+      Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / (radius * 0.25)),
+    );
+    for (let index = 0; index <= steps; index += 1) {
+      const point = {
+        x: from.x + ((to.x - from.x) * index) / steps,
+        y: from.y + ((to.y - from.y) * index) / steps,
+      };
+      const edge = acceptedEdge(point);
+      if (edge === null) return { prefix, invalid: point };
+      if (prefix.at(-1) !== edge) prefix.push(edge);
+    }
+    return { prefix, invalid: null };
+  };
+  const invalidPoints = Array.from({ length: map.width * map.height }, (_, hex) =>
+    hexCenter(hexFromId(hex, map.width), radius),
+  ).filter((point) => acceptedEdge(point) === null);
+  for (const [index, first] of borders.entries()) {
+    const points = candidates[index] ?? [];
+    const start = edgeMid(map, radius, first);
+    const armed = points.find(
+      (point) => Math.hypot(point.x - start.x, point.y - start.y) >= radius * 0.25,
+    );
+    if (armed === undefined) continue;
+    const armedTrace = trace(start, armed, []);
+    if (armedTrace.invalid !== null || armedTrace.prefix.length !== 1) continue;
+    for (const invalid of invalidPoints) {
+      const blockedTrace = trace(armed, invalid, armedTrace.prefix);
+      const suffix = borders.find((edge) => !blockedTrace.prefix.includes(edge));
+      if (blockedTrace.invalid === null || blockedTrace.prefix.length !== 1 || suffix === undefined)
+        continue;
+      return {
+        points: [start, armed, invalid, edgeMid(map, radius, suffix)],
+        prefix: blockedTrace.prefix,
+        suffix,
+      };
     }
   }
   throw new Error('Не найден фронт с запрещённым промежуточным участком');
