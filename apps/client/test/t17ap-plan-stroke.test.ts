@@ -188,6 +188,34 @@ function findLineScenario(
   throw new Error('Не найдена удалённая линия обороны из трёх гексов');
 }
 
+function findBlockedLineScenario(
+  map: MapStatic,
+  view: PlayerView,
+): { points: Array<{ x: number; y: number }>; first: number; last: number } {
+  const own = view.hexes.owner
+    .map((owner, id) => (owner === view.playerId && map.terrain[id] !== TERRAIN.water ? id : -1))
+    .filter((id) => id >= 0);
+  for (const first of own)
+    for (let last = 0; last < map.terrain.length; last += 1) {
+      if (first === last || map.terrain[last] === TERRAIN.water) continue;
+      const originalOwner = view.hexes.owner[last];
+      view.hexes.owner[last] = view.playerId;
+      const path = defenseLinePath({ map, hexes: view.hexes }, view.playerId, [first, last]);
+      view.hexes.owner[last] = originalOwner as number;
+      if (path === null) {
+        return {
+          points: [
+            hexCenter(hexFromId(first, map.width), radius),
+            hexCenter(hexFromId(last, map.width), radius),
+          ],
+          first,
+          last,
+        };
+      }
+    }
+  throw new Error('Не найден недопустимый участок линии обороны');
+}
+
 function blockedFrontScenario(): {
   points: [
     { x: number; y: number },
@@ -328,6 +356,23 @@ describe('07/T17ap: непрерывный росчерк планов чере�
           ),
       ),
     ).toBe(true);
+  });
+
+  it('не отправляет линию обороны через недопустимый участок', async () => {
+    const { map, view, world } = await renderSurface();
+    await selectArmy();
+    await chooseTool(/Оборона|Defense/);
+    const scenario = findBlockedLineScenario(map, view);
+    const originalOwner = view.hexes.owner[scenario.last];
+    view.hexes.owner[scenario.last] = view.playerId;
+    expect(
+      defenseLinePath({ map, hexes: view.hexes }, view.playerId, [scenario.first, scenario.last]),
+    ).toBe(null);
+    stroke([...scenario.points, scenario.points[0] as { x: number; y: number }], world);
+    view.hexes.owner[scenario.last] = originalOwner as number;
+    expect(harness.commands).toEqual([
+      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [scenario.first] },
+    ]);
   });
 
   it('не создаёт мост через запрет во фронте и отменяет непустой жест без send', async () => {
