@@ -2,6 +2,7 @@
 import {
   agentName,
   backoff,
+  checkPermissions,
   firstLine,
   park,
   readStage,
@@ -13,7 +14,7 @@ import {
   type SkillResult,
   type Step,
 } from './context.ts';
-import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { changedPaths, dirtyFiles, head, syncWithOrigin } from './git.ts';
 import { runPlan } from './plan.ts';
 import { lastReturnItems, withReviewFeedback } from './return-guard.ts';
 import { runReview } from './review.ts';
@@ -206,21 +207,40 @@ async function ciBeforeReview(context: LoopContext, task: string): Promise<Work 
 
 /** Автор тестов работает после принятия кода и не получает возвраты исполнителя. */
 async function runTestAuthor(context: LoopContext, task: string): Promise<Work> {
+  const base = await head(context.git);
   const feedback = context.state.testFeedback[task];
   const prompt = [
     `$tests ${task}`,
     'Ты отдельный автор тестов. Код уже принят reviewer.',
-    'Пиши и коммить только тесты реальных путей, критериев и краёв; код продукта не меняй.',
+    'Пиши только тесты реальных путей, критериев и краёв; код продукта не меняй.',
+    'Тест может быть красным, если он выявил дефект кода: это нормальная передача reviewer тестов.',
     'Возврат `ТЕСТ:` исправляешь ты. Дефект `КОД:` получает исполнитель, не ты.',
     ...(feedback === undefined ? [] : ['ВОЗВРАТ REVIEWER ТЕСТОВ:', feedback]),
   ].join('\n');
   const result = await session(context, 'test', prompt);
   if (result.failure !== undefined)
     return step(await backoff(context, `$tests ${task}: ${result.failure}`, result.message));
-  if ((await dirtyFiles(context.git)) !== '')
-    return step(
-      await backoff(context, `$tests ${task} оставил незакоммиченные файлы`, result.message),
-    );
+  if ((await dirtyFiles(context.git)) !== '') {
+    if (!(await checkPermissions(context, base, context.definitions.specPaths)))
+      return step(
+        await park(
+          context,
+          `tests:${task}`,
+          `$tests ${task} изменил файлы вне разрешённых тестов`,
+          result.message,
+        ),
+      );
+    const paths = await changedPaths(context.git);
+    await context.git.run(['add', '--', ...paths]);
+    await context.git.run([
+      'commit',
+      '-m',
+      `test(infra): добавлены проверки ${task}`,
+      '-m',
+      `Этап: ${task}`,
+    ]);
+    await context.say(`$tests ${task}: тесты закоммичены циклом`);
+  }
   const unsynced = await syncWithOrigin(context.git, true);
   if (unsynced !== undefined) return step(await park(context, `sync:${task}`, unsynced));
   context.state.testPhase = { ...context.state.testPhase, [task]: 'review' };

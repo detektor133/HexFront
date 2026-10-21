@@ -281,7 +281,12 @@ export async function runWorld(world: World): Promise<Outcome> {
       }
     }
     if (session.push !== false) origin = head;
-    files = session.files ?? ['docs/stages/stage-06-bots-balance.md'];
+    files = session.files ?? [
+      ...(session.mark !== undefined || session.stage !== undefined
+        ? ['docs/stages/stage-06-bots-balance.md']
+        : []),
+      ...Object.keys(session.writes ?? {}),
+    ];
     dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
@@ -334,6 +339,18 @@ export async function runWorld(world: World): Promise<Outcome> {
     if (sub === 'push') {
       pushes += 1;
       origin = head;
+      return ok();
+    }
+    if (sub === 'add') return ok();
+    if (sub === 'commit') {
+      head += 1;
+      snapshots.set(head, await readFile(stagePath, 'utf8'));
+      for (const path of tracked) {
+        const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
+        if (text === undefined) committed.delete(path);
+        else committed.set(path, text);
+      }
+      dirty = '';
       return ok();
     }
     if (sub === 'merge-base') {

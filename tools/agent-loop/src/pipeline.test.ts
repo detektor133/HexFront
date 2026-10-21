@@ -74,6 +74,26 @@ describe('конвейер кода и тестов', () => {
     ]);
   });
 
+  it('сам коммитит тест автора и передаёт его reviewer, даже если автор не закоммитил', async () => {
+    const tests: Session = {
+      answer: 'Тест написан и выявил дефект.',
+      writes: { 'packages/sim/test/task.test.ts': "it('путь', () => {});\n" },
+    };
+    const review: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'Тесты приняты.' };
+    const run = await runWorld({
+      test: true,
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      state: { testPhase: { '06/T1j5-Б1': 'write' } },
+      sessions: [tests, review],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$tests 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.pushes).toBe(1);
+  });
+
   it('загружает старые поля ручного $spec без влияния на очередь', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hexfront-state-'));
     try {
