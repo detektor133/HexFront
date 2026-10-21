@@ -204,6 +204,32 @@ async function ciBeforeReview(context: LoopContext, task: string): Promise<Work 
   return step(await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''));
 }
 
+/** Автор тестов работает после принятия кода и не получает возвраты исполнителя. */
+async function runTestAuthor(context: LoopContext, task: string): Promise<Work> {
+  const feedback = context.state.testFeedback[task];
+  const prompt = [
+    `$tests ${task}`,
+    'Код уже принят reviewer. Пиши и коммить только тесты реальных путей и краёв.',
+    'Возврат тестов исправляешь ты; код продукта не меняй.',
+    ...(feedback === undefined ? [] : ['ВОЗВРАТ REVIEWER ТЕСТОВ:', feedback]),
+  ].join('\n');
+  const result = await session(context, 'test', prompt);
+  if (result.failure !== undefined)
+    return step(await backoff(context, `$tests ${task}: ${result.failure}`, result.message));
+  if ((await dirtyFiles(context.git)) !== '')
+    return step(
+      await backoff(context, `$tests ${task} оставил незакоммиченные файлы`, result.message),
+    );
+  const unsynced = await syncWithOrigin(context.git, true);
+  if (unsynced !== undefined) return step(await park(context, `sync:${task}`, unsynced));
+  context.state.testPhase = { ...context.state.testPhase, [task]: 'review' };
+  context.state.testFeedback = Object.fromEntries(
+    Object.entries(context.state.testFeedback).filter(([key]) => key !== task),
+  );
+  await save(context);
+  return { kind: 'review', task, message: result.message };
+}
+
 /**
  * Круги одной задачи, не больше maxRounds ВОЗВРАТ. `workPrompt` — `$next` для очереди
  * или `$task NN/Tn` для Issue; `resume` — начать с доделки незакоммиченной работы.
@@ -227,12 +253,18 @@ export async function processTask(
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
   for (let round = 1; round <= config.maxRounds;) {
-    const work = needsWork
-      ? await runWork(context, current, prompt, accepted)
-      : { kind: 'review' as const, task: current };
+    const testingEnabled = context.definitions.roles.test !== undefined;
+    const phase = testingEnabled ? context.state.testPhase[current] : undefined;
+    const work =
+      phase === 'write'
+        ? await runTestAuthor(context, current)
+        : needsWork
+          ? await runWork(context, current, prompt, accepted)
+          : { kind: 'review' as const, task: current };
     if (work.kind === 'review') current = work.task;
     prompt = options.workPrompt;
-    const checked = work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
+    const checked =
+      !testingEnabled && work.kind === 'review' ? await ciBeforeReview(context, work.task) : work;
     if (checked?.kind === 'step') return { step: checked.step, done: false };
     if (checked?.kind === 'again') {
       followUps += 1;
@@ -249,11 +281,44 @@ export async function processTask(
       needsWork = true;
       continue;
     }
-    const verdict = await runReview(context, current);
+    const reviewingTests = testingEnabled && context.state.testPhase[current] === 'review';
+    const verdict = await runReview(
+      context,
+      current,
+      testingEnabled
+        ? reviewingTests
+          ? 'Режим reviewer тестов: проверь покрытие, реальные пути и края. Возврат теста начинай «ТЕСТ:», дефект продукта — «КОД:». Код и тесты не изменяй.'
+          : 'Режим reviewer кода: проверь реальный путь и критерии продукта. Тесты пока не проверяй.'
+        : '',
+    );
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
+      if (!reviewingTests && testingEnabled) {
+        context.state.testPhase = { ...context.state.testPhase, [current]: 'write' };
+        await save(context);
+        await say(`код ${current} принят — передаю отдельному автору тестов`);
+        needsWork = false;
+        continue;
+      }
+      const ci = testingEnabled ? await ciBeforeReview(context, current) : undefined;
+      if (ci?.kind === 'step') return { step: ci.step, done: false };
+      if (ci?.kind === 'again') {
+        context.state.testPhase = Object.fromEntries(
+          Object.entries(context.state.testPhase).filter(([key]) => key !== current),
+        );
+        await save(context);
+        prompt = ci.prompt ?? ciFixPrompt(current, 'CI красный');
+        needsWork = true;
+        continue;
+      }
       context.state.reviewFeedback = Object.fromEntries(
         Object.entries(context.state.reviewFeedback).filter(([key]) => key !== current),
+      );
+      context.state.testPhase = Object.fromEntries(
+        Object.entries(context.state.testPhase).filter(([key]) => key !== current),
+      );
+      context.state.testFeedback = Object.fromEntries(
+        Object.entries(context.state.testFeedback).filter(([key]) => key !== current),
       );
       context.state.returnTotals = Object.fromEntries(
         Object.entries(context.state.returnTotals).filter(([key]) => key !== current),
@@ -266,12 +331,33 @@ export async function processTask(
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
     }
-    // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
-    // который владеет тестами, исправляет проверку и код в следующем атомарном изменении.
-    context.state.reviewFeedback = {
-      ...context.state.reviewFeedback,
-      [current]: verdict.message,
-    };
+    if (reviewingTests) {
+      const items = lastReturnItems(
+        taskBlock((await readStage(context.config.root)).stageText, current),
+      );
+      const codeItems = items.filter((item) => item.startsWith('КОД:'));
+      if (codeItems.length === 0) {
+        context.state.testFeedback = { ...context.state.testFeedback, [current]: verdict.message };
+        context.state.testPhase = { ...context.state.testPhase, [current]: 'write' };
+        await save(context);
+        await say(`ВОЗВРАТ тестов ${current} — возвращаю автору тестов`);
+        needsWork = false;
+        continue;
+      }
+      context.state.reviewFeedback = {
+        ...context.state.reviewFeedback,
+        [current]: ['ВОЗВРАТ', ...codeItems.map((item) => `- ${item}`)].join('\n'),
+      };
+      context.state.testPhase = Object.fromEntries(
+        Object.entries(context.state.testPhase).filter(([key]) => key !== current),
+      );
+      await say(`дефект кода ${current} найден тестами — возвращаю исполнителю`);
+    } else {
+      context.state.reviewFeedback = {
+        ...context.state.reviewFeedback,
+        [current]: verdict.message,
+      };
+    }
     config.board?.count('returns');
     context.state.returnTotals = {
       ...context.state.returnTotals,

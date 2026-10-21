@@ -2,5 +2,6 @@
   "next": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
   "review": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
   "spec": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
+  "test": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" },
   "plan": { "model": "gpt-5.6-luna", "reasoningEffort": "medium" }
 }

@@ -78,6 +78,8 @@ export interface World {
   readonly lint?: readonly string[];
   /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
   readonly spec?: boolean;
+  /** В roles.json есть отдельный автор тестов после ревью кода. */
+  readonly test?: boolean;
   /** В roles.json есть роль plan: цикл проверяет текст задачи перед работой над ней. */
   readonly plan?: boolean;
   /** Память прошлого запуска цикла (`state.json`). */
@@ -171,6 +173,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       next: { model: 'luna', reasoningEffort: 'medium' },
       review: { reasoningEffort: 'medium' },
       ...(world.spec === true ? { spec: { reasoningEffort: 'medium' } } : {}),
+      ...(world.test === true ? { test: { reasoningEffort: 'medium' } } : {}),
       ...(world.plan === true ? { plan: { reasoningEffort: 'medium' } } : {}),
     }),
   );

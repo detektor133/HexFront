@@ -50,6 +50,10 @@ export interface LoopState {
   specUnlocked: Record<string, string[]>;
   /** Совместимость ручного `$spec` с его прежними незавершёнными запусками. */
   specRepairNotes: Record<string, string[]>;
+  /** Фаза после принятия кода: автор тестов либо ревью тестов. */
+  testPhase: Record<string, 'write' | 'review'>;
+  /** Возврат reviewer тестов, который получает только автор тестов. */
+  testFeedback: Record<string, string>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
   /**
@@ -89,6 +93,8 @@ export async function loadState(root: string): Promise<LoopState> {
     spec: {},
     specUnlocked: {},
     specRepairNotes: {},
+    testPhase: {},
+    testFeedback: {},
     pullRequests: {},
     reviewReturns: {},
     reviewFeedback: {},
