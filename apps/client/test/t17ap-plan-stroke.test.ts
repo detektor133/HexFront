@@ -311,15 +311,21 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     await selectArmy();
     await chooseTool(/Оборона|Defense/);
     const scenario = findLineScenario(map, view);
-    const invalidHex = map.terrain.findIndex(
-      (terrain, id) => terrain !== TERRAIN.water && view.hexes.owner[id] !== view.playerId,
-    );
+    const firstHex = scenario.hexes[0] as number;
+    const invalidHex = map.terrain.findIndex((terrain) => terrain === TERRAIN.water);
     if (invalidHex < 0) throw new Error('В карте нет запрещённого водного гекса');
     const invalid = hexCenter(hexFromId(invalidHex, map.width), radius);
-    const middle = hexCenter(hexFromId(scenario.hexes[1] as number, map.width), radius);
-    stroke([scenario.points[0] as { x: number; y: number }, middle, invalid], world);
+    const lastHex = scenario.hexes[2] as number;
+    stroke(
+      [
+        scenario.points[0] as { x: number; y: number },
+        invalid,
+        hexCenter(hexFromId(lastHex, map.width), radius),
+      ],
+      world,
+    );
     expect(harness.commands).toEqual([
-      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: scenario.hexes.slice(0, 2) },
+      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [firstHex, lastHex] },
     ]);
     expect(harness.commands[0]).not.toEqual({
       t: 'setDefenseLine',
@@ -332,7 +338,7 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     stroke(
       [
         scenario.points[0] as { x: number; y: number },
-        middle,
+        hexCenter(hexFromId(scenario.hexes[1] as number, map.width), radius),
         scenario.points[1] as { x: number; y: number },
       ],
       world,
