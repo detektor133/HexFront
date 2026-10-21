@@ -73,6 +73,8 @@ describe('07/T17aq: верхняя панель без переполнения'
       );
       expect(groups).toHaveLength(8);
       const hudRect = hud.getBoundingClientRect();
+      expect(hudRect.width).toBeGreaterThan(0);
+      expect(hudRect.height).toBeGreaterThan(0);
       let previousRight = hudRect.left;
       for (const group of groups) {
         const isMetricGroup =
@@ -89,14 +91,14 @@ describe('07/T17aq: верхняя панель без переполнения'
           expect(growth?.textContent).not.toBe('');
         }
         const rect = group.getBoundingClientRect();
-        expect(rect.width).toBeGreaterThanOrEqual(0);
+        expect(rect.width).toBeGreaterThan(0);
+        expect(rect.height).toBeGreaterThan(0);
         expect(rect.right).toBeLessThanOrEqual(hudRect.right);
         expect(rect.left).toBeGreaterThanOrEqual(previousRight);
         const children = isMetricGroup ? [value, growth] : [];
         for (const child of children) {
           if (!child) continue;
           const childRect = child.getBoundingClientRect();
-          if (childRect.width === 0 && childRect.height === 0) continue;
           expect(childRect.width).toBeGreaterThan(0);
           expect(childRect.height).toBeGreaterThan(0);
           expect(childRect.left).toBeGreaterThanOrEqual(rect.left);
