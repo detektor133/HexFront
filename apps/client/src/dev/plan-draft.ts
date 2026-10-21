@@ -48,6 +48,7 @@ export interface Draft {
   readonly hexes: readonly number[];
   /** Наступление: последний угол, до которого довели линию (путь идёт по углам гексов). */
   readonly corner: Corner | null;
+  readonly strokeBlocked?: boolean;
   /** Наступление: последняя точка пальца (мир) — начало отрезка траектории. */
   readonly last?: Point;
   /** Исходный участок фронта, который заменяется новой линией. */
@@ -162,13 +163,14 @@ function strokePointAccepted(c: DraftContext, d: Draft, world: Point): boolean {
 
 /** Добавляет все допустимые точки между двумя событиями движения указателя. */
 export function strokeSegment(c: DraftContext, d: Draft, from: Point, to: Point): Draft {
+  if (d.strokeBlocked) return d;
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
   const steps = Math.max(1, Math.ceil(distance / (c.radius * 0.5)));
-  if (!strokePointAccepted(c, d, from)) return d;
+  if (!strokePointAccepted(c, d, from)) return { ...d, strokeBlocked: true };
   let next = strokeAdd(c, d, from);
   if (d.tool === 'line') {
     const target = hexUnder(c, to);
-    if (!strokePointAccepted(c, next, to)) return next;
+    if (!strokePointAccepted(c, next, to)) return { ...next, strokeBlocked: true };
     const last = next.hexes.at(-1);
     if (last === undefined || last === target) return next;
     const path = defenseLinePath(ground(c), c.view.playerId, [last, target]);

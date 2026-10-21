@@ -325,8 +325,11 @@ describe('07/T17ap: непрерывный росчерк планов чере�
       world,
     );
     expect(harness.commands).toEqual([
-      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [firstHex, lastHex] },
+      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [firstHex] },
     ]);
+    const defenseCommand = harness.commands[0];
+    if (defenseCommand?.t !== 'setDefenseLine') throw new Error('Ожидалась линия обороны');
+    expect(defenseCommand.points).not.toContain(lastHex);
     expect(harness.commands[0]).not.toEqual({
       t: 'setDefenseLine',
       armyId: view.armies[0]?.id,
