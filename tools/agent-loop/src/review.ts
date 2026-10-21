@@ -39,7 +39,7 @@ async function reviewSession(
   const review = await session(context, 'review', lines.join('\n'));
   const checked = await afterReview(context, task, base, review);
   if (typeof checked === 'string') return checked;
-  return checked ?? repairReviewRecord(context, task, review.message);
+  return checked ?? repairReviewRecord(context, task, review.message, notes);
 }
 
 type ReviewRun = Awaited<ReturnType<typeof session>>;
@@ -88,6 +88,7 @@ async function repairReviewRecord(
   context: LoopContext,
   task: string,
   message: string,
+  notes: readonly string[],
 ): Promise<Verdict | Step> {
   await context.say(
     `$review ${task}: результат не записан в stage — повторяю review автоматически`,
@@ -98,10 +99,12 @@ async function repairReviewRecord(
     'review',
     [
       `$review ${task}`,
+      ...notes,
       'Предыдущая сессия не записала результат в файл этапа.',
       'Проверь задачу заново и обязательно сохрани одно из состояний:',
       '- `- [x]` для OK;',
       '- `- [ ]` и непустой последний блок `Возврат ревью:` для возврата.',
+      'Измени именно строку заголовка задачи без ведущих пробелов; не заменяй отметку текстом отчёта.',
       'Итоговый текст ответа не является протоколом оркестратора.',
     ].join('\n'),
   );

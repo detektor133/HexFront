@@ -116,6 +116,18 @@ describe('результат, который reviewer не записал в sta
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
+  it('сохраняет режим code-review при исправлении отсутствующей отметки', async () => {
+    const tests: Session = { answer: 'Тесты добавлены.', commit: true };
+    const testReview: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'Тесты приняты.' };
+    const run = await runWorld({
+      test: true,
+      sessions: [NEXT_DONE, FORGOT_OK, FIX_X, tests, testReview],
+    });
+
+    expect(run.prompts[2]).toContain('Режим reviewer кода');
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toContain('$tests 06/T1j5-Б1');
+  });
+
   it('повторяет review и принимает сохранённый возврат', async () => {
     const forgot: Session = { answer: 'ВОЗВРАТ\n- evaluate.ts:95 — штраф по чужим метрикам' };
     const fix: Session = {
