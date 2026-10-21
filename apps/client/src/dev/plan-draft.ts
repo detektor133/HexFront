@@ -181,7 +181,7 @@ export function strokeSegment(c: DraftContext, d: Draft, from: Point, to: Point)
       x: from.x + ((to.x - from.x) * i) / steps,
       y: from.y + ((to.y - from.y) * i) / steps,
     };
-    if (!strokePointAccepted(c, next, point)) break;
+    if (!strokePointAccepted(c, next, point)) return { ...next, strokeBlocked: true };
     next = strokeAdd(c, next, point);
   }
   return next;
