@@ -12,6 +12,25 @@ const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
 
+function cssPixels(value: string): number {
+  const pixels = Number.parseFloat(value);
+  return Number.isFinite(pixels) && value.trim().endsWith('px') ? pixels : 0;
+}
+
+function measuredChildSize(element: HTMLElement | SVGElement): { width: number; height: number } {
+  const rect = element.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) return { width: rect.width, height: rect.height };
+  const style = getComputedStyle(element);
+  const fontSize = cssPixels(style.fontSize) || 16;
+  const width = Math.max(
+    cssPixels(style.width),
+    cssPixels(style.inlineSize),
+    (element.textContent?.length ?? 0) * fontSize * 0.6,
+  );
+  const height = Math.max(cssPixels(style.height), cssPixels(style.blockSize), fontSize);
+  return { width, height };
+}
+
 function renderHud(width: number): HTMLElement {
   const engine = createLocalEngine(mapJson, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
@@ -69,6 +88,17 @@ describe('07/T17aq: верхняя панель без переполнения'
         expect(rect.width).toBeGreaterThanOrEqual(0);
         expect(rect.right).toBeLessThanOrEqual(hudRect.right);
         expect(rect.left).toBeGreaterThanOrEqual(previousRight);
+        for (const child of [icon, value, growth]) {
+          if (!child) continue;
+          const childRect = child.getBoundingClientRect();
+          const childSize = measuredChildSize(child);
+          expect(childSize.width).toBeGreaterThan(0);
+          expect(childSize.height).toBeGreaterThan(0);
+          if (childRect.width > 0 && rect.width > 0) {
+            expect(childRect.left).toBeGreaterThanOrEqual(rect.left);
+            expect(childRect.right).toBeLessThanOrEqual(rect.right);
+          }
+        }
         previousRight = rect.right;
       }
       expect(hud.scrollWidth).toBeLessThanOrEqual(hud.clientWidth || width);
