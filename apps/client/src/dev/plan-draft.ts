@@ -174,7 +174,9 @@ export function strokeSegment(c: DraftContext, d: Draft, from: Point, to: Point)
     const last = next.hexes.at(-1);
     if (last === undefined || last === target) return next;
     const path = defenseLinePath(ground(c), c.view.playerId, [last, target]);
-    return path ? { ...next, hexes: [...next.hexes, ...path.slice(1)] } : next;
+    return path
+      ? { ...next, hexes: [...next.hexes, ...path.slice(1)] }
+      : { ...next, strokeBlocked: true };
   }
   for (let i = 1; i <= steps; i += 1) {
     const point = {
