@@ -144,6 +144,30 @@ describe('07/T17aq: верхняя панель без переполнения'
     expect(metricDeclarations.some((style) => style.gap === '2px')).toBe(true);
     expect(textDeclarations.some((style) => style.transform === 'scaleX(0.6)')).toBe(true);
     expect(textDeclarations.some((style) => /^0(?:px)?$/u.test(style.gap))).toBe(true);
+    const taxWrap = hud.querySelector<HTMLElement>('[class*="taxWrap"]');
+    const taxButton = hud.querySelector<HTMLElement>('[class*="taxButton"]');
+    expect(taxWrap).not.toBeNull();
+    expect(taxButton).not.toBeNull();
+    const taxWrapDeclarations = getApplicableDeclarations(taxWrap as HTMLElement, 360);
+    const taxButtonDeclarations = getApplicableDeclarations(taxButton as HTMLElement, 360);
+    const getEffective = (
+      declarations: CSSStyleDeclaration[],
+      property: 'minWidth' | 'padding',
+    ): string =>
+      [...declarations].reverse().find((style) => style[property] !== '')?.[property] ?? '';
+    expect(getEffective(taxWrapDeclarations, 'minWidth')).toMatch(/^0(?:px)?$/u);
+    expect(getEffective(taxWrapDeclarations, 'padding')).toBe('');
+    expect(getEffective(taxButtonDeclarations, 'minWidth')).toBe('var(--touch-target-min)');
+    expect(
+      taxButtonDeclarations
+        .map((style) => style.padding)
+        .filter((padding) => padding !== '')
+        .every((padding) =>
+          /^(?:0(?:px)? (?:2px|var\(--space-(?:xs|sm|md|lg)\))|var\(--space-(?:xs|md)\)(?: var\(--space-xs\))?|0|2px)$/u.test(
+            padding,
+          ),
+        ),
+    ).toBe(true);
     expect(
       Array.from(hud.children).filter((element) => element.className.toString().includes('slot')),
     ).toHaveLength(5);
