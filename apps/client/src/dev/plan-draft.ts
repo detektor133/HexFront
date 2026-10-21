@@ -166,6 +166,14 @@ export function strokeSegment(c: DraftContext, d: Draft, from: Point, to: Point)
   const steps = Math.max(1, Math.ceil(distance / (c.radius * 0.5)));
   if (!strokePointAccepted(c, d, from)) return d;
   let next = strokeAdd(c, d, from);
+  if (d.tool === 'line') {
+    const target = hexUnder(c, to);
+    if (!strokePointAccepted(c, next, to)) return next;
+    const last = next.hexes.at(-1);
+    if (last === undefined || last === target) return next;
+    const path = defenseLinePath(ground(c), c.view.playerId, [last, target]);
+    return path ? { ...next, hexes: [...next.hexes, ...path.slice(1)] } : next;
+  }
   for (let i = 1; i <= steps; i += 1) {
     const point = {
       x: from.x + ((to.x - from.x) * i) / steps,

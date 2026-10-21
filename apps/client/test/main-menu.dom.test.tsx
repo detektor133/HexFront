@@ -55,6 +55,7 @@ function fakeMapView(): mapViewModule.MapView {
     setSelection: vi.fn(),
     setScale: vi.fn(),
     centerOn: vi.fn(),
+    setStroke: vi.fn(),
   } as unknown as mapViewModule.MapView;
 }
 

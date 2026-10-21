@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   borderEdges,
+  defenseLinePath,
   edgeCorners,
   hexFromId,
   hexId,
@@ -66,7 +67,7 @@ vi.mock('pixi.js', async (importOriginal) => {
 });
 
 const mapJson: unknown = JSON.parse(
-  readFileSync(join(process.cwd(), 'packages/mapgen/maps/small.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'packages/mapgen/maps/europe.json'), 'utf8'),
 );
 const radius = tokens.map.hexRadius;
 
@@ -144,16 +145,6 @@ function continuousEdges(edges: readonly EdgeId[]): boolean {
   );
 }
 
-function adjacentHexes(map: MapStatic, points: readonly number[]): boolean {
-  return points.every(
-    (point, index) =>
-      index === 0 ||
-      neighbors(hexFromId(points[index - 1] as number, map.width)).some(
-        (hex) => hexId(hex, map.width) === point,
-      ),
-  );
-}
-
 function findFrontScenario(
   map: MapStatic,
   view: PlayerView,
@@ -164,7 +155,10 @@ function findFrontScenario(
       for (const third of edges) {
         const candidate = [first, second, third];
         if (new Set(candidate).size === 3 && continuousEdges(candidate)) {
-          return { points: candidate.map((edge) => edgeMid(map, radius, edge)), edges: candidate };
+          return {
+            points: [edgeMid(map, radius, first), edgeMid(map, radius, third)],
+            edges: candidate,
+          };
         }
       }
   throw new Error('Не найден непрерывный фронт из трёх граней');
@@ -177,15 +171,21 @@ function findLineScenario(
   const own = view.hexes.owner
     .map((owner, id) => (owner === view.playerId && map.terrain[id] !== TERRAIN.water ? id : -1))
     .filter((id) => id >= 0);
-  for (const first of own)
-    for (const second of own)
-      for (const third of own) {
-        const hexes = [first, second, third];
-        if (new Set(hexes).size === 3 && adjacentHexes(map, hexes)) {
-          return { points: hexes.map((id) => hexCenter(hexFromId(id, map.width), radius)), hexes };
-        }
+  for (const first of own) {
+    for (const last of own) {
+      const path = defenseLinePath({ map, hexes: view.hexes }, view.playerId, [first, last]);
+      if (path && path.length >= 3) {
+        return {
+          points: [
+            hexCenter(hexFromId(first, map.width), radius),
+            hexCenter(hexFromId(last, map.width), radius),
+          ],
+          hexes: path,
+        };
       }
-  throw new Error('Не найдена линия обороны из трёх соседних гексов');
+    }
+  }
+  throw new Error('Не найдена удалённая линия обороны из трёх гексов');
 }
 
 async function renderSurface(): Promise<{
@@ -271,8 +271,18 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     expect(harness.commands).toEqual([
       { t: 'assignFront', armyId: view.armies[0]?.id, edges: scenario.edges },
     ]);
-    expect(scenario.edges.length).toBeGreaterThanOrEqual(3);
-    expect(continuousEdges(scenario.edges)).toBe(true);
+    expect(scenario.edges).toEqual([scenario.edges[0], scenario.edges[1], scenario.edges[2]]);
+    expect(
+      scenario.edges.every(
+        (edge, index) =>
+          index === 0 ||
+          edgeCorners(edge).some((corner) =>
+            edgeCorners(scenario.edges[index - 1] as EdgeId).some(
+              (previous) => previous.hex === corner.hex && previous.a === corner.a,
+            ),
+          ),
+      ),
+    ).toBe(true);
   });
 
   it('передаёт удалённую линию обороны со всеми промежуточными гексами', async () => {
@@ -285,7 +295,15 @@ describe('07/T17ap: непрерывный росчерк планов чере�
       { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: scenario.hexes },
     ]);
     expect(scenario.hexes.length).toBeGreaterThanOrEqual(3);
-    expect(adjacentHexes(map, scenario.hexes)).toBe(true);
+    expect(
+      scenario.hexes.every(
+        (point, index) =>
+          index === 0 ||
+          neighbors(hexFromId(scenario.hexes[index - 1] as number, map.width)).some(
+            (hex) => hexId(hex, map.width) === point,
+          ),
+      ),
+    ).toBe(true);
   });
 
   it('не создаёт мост через запрет и отменяет непустой жест без send', async () => {
@@ -293,15 +311,13 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     await selectArmy();
     await chooseTool(/Оборона|Defense/);
     const scenario = findLineScenario(map, view);
-    const invalid = { x: -radius * 2, y: -radius * 2 };
-    stroke(
-      [
-        scenario.points[0] as { x: number; y: number },
-        invalid,
-        scenario.points[1] as { x: number; y: number },
-      ],
-      world,
+    const invalidHex = map.terrain.findIndex(
+      (terrain, id) => terrain !== TERRAIN.water && view.hexes.owner[id] !== view.playerId,
     );
+    if (invalidHex < 0) throw new Error('В карте нет запрещённого водного гекса');
+    const invalid = hexCenter(hexFromId(invalidHex, map.width), radius);
+    const middle = hexCenter(hexFromId(scenario.hexes[1] as number, map.width), radius);
+    stroke([scenario.points[0] as { x: number; y: number }, middle, invalid], world);
     expect(harness.commands).toEqual([
       { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: scenario.hexes.slice(0, 2) },
     ]);
@@ -313,7 +329,15 @@ describe('07/T17ap: непрерывный росчерк планов чере�
 
     harness.commands = [];
     await chooseTool(/Оборона|Defense/);
-    stroke(scenario.points, world, true);
+    stroke(
+      [
+        scenario.points[0] as { x: number; y: number },
+        middle,
+        scenario.points[1] as { x: number; y: number },
+      ],
+      world,
+      true,
+    );
     expect(harness.commands).toEqual([]);
   });
 });
