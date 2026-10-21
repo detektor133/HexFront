@@ -155,11 +155,19 @@ describe('07/T17aq: верхняя панель без переполнения'
     expect(flexibleGroups).toHaveLength(6);
     for (const group of flexibleGroups) {
       const declarations = getApplicableDeclarations(group, 360);
-      expect(
-        declarations.some(
-          (style) => /^1 1 0(?:px)?$/u.test(style.flex) && /^0(?:px)?$/u.test(style.minWidth),
-        ),
-      ).toBe(true);
+      const getEffective = (property: 'flex' | 'minWidth' | 'padding'): string =>
+        [...declarations].reverse().find((style) => style[property] !== '')?.[property] ?? '';
+      expect(getEffective('flex')).toMatch(/^1 1 0(?:px)?$/u);
+      if (group.className.toString().includes('slot')) {
+        expect(getEffective('minWidth')).toMatch(/^0(?:px)?$/u);
+        expect(getEffective('padding')).toBe('');
+
+        const text = group.querySelector<HTMLElement>('[class*="slotText"]');
+        expect(text?.textContent).not.toBe('');
+        const contentWidth = 14 + (text?.textContent?.length ?? 0);
+        const availableWidth = (360 - 2 * 8 - 2 * 44) / 6;
+        expect(contentWidth).toBeLessThanOrEqual(availableWidth);
+      }
     }
     const settingsWrap = hud.querySelector<HTMLElement>('[class*="settingsWrap"]');
     expect(settingsWrap).not.toBeNull();
