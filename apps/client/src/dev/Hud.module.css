@@ -158,6 +158,20 @@
   box-shadow: var(--shadow-hard);
 }
 
+@media (min-width: 601px) {
+  .hud > :where(.slot, .taxWrap) {
+    flex: 0 1 auto;
+    min-width: max-content;
+  }
+
+  .slotText {
+    flex: 0 0 auto;
+    min-width: max-content;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 .slider {
   width: 100%;
   accent-color: var(--ui-ink);
@@ -279,6 +293,16 @@
 
   .value {
     font-size: var(--font-size-body);
+  }
+
+  .hud > :where(.slot, .taxWrap) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .slotText {
+    flex: 0 1 auto;
+    overflow: visible;
   }
 
   .taxButton {
