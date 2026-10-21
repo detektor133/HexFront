@@ -66,16 +66,16 @@ describe('видимость линии фронта', () => {
     expect(appearance.detailShift).toBe(1);
   });
 
-  it('приглушает остальные армии и не меняет их ширину', () => {
+  it('оставляет невыбранную армию полной и не меняет её ширину', () => {
     const appearance = frontAppearance(7, 8, 1);
 
-    expect(appearance.alpha).toBe(tokens.fog.memoryAlpha);
+    expect(appearance.alpha).toBe(1);
     expect(appearance.width).toBe(tokens.front.width[1]);
     expect(appearance.detailShift).toBe(0);
   });
 
   it('при отсутствии выбора не выделяет ни одну армию', () => {
-    expect(frontAppearance(null, 7, 1).alpha).toBe(tokens.fog.memoryAlpha);
+    expect(frontAppearance(null, 7, 1).alpha).toBe(1);
     expect(frontAppearance(null, 7, 1).width).toBe(tokens.front.width[1]);
   });
 
@@ -95,18 +95,32 @@ describe('видимость линии фронта', () => {
       ? { id: selected.id + 1000, number: selected.number + 1, name: 'Тестовая армия', auto: false }
       : undefined;
     if (!selected || !other) throw new Error('недостаточно данных для теста');
-    const plans: PlanView[] = [selected, other].map((army, index) => ({
-      armyId: army.id,
-      kind: 'front' as const,
-      edges: [edges[index] as number],
-      hexes: [],
-      offensive: null,
-      zone: [],
-      stuck: false,
-      facing: [],
-      lost: [],
-      startWanted: false,
-    }));
+    const plans: PlanView[] = [selected, other].flatMap((army, index) => [
+      {
+        armyId: army.id,
+        kind: 'front' as const,
+        edges: [edges[index] as number],
+        hexes: [],
+        offensive: null,
+        zone: [],
+        stuck: false,
+        facing: [],
+        lost: [],
+        startWanted: false,
+      },
+      {
+        armyId: army.id,
+        kind: 'line' as const,
+        edges: [],
+        hexes: [index],
+        offensive: null,
+        zone: [],
+        stuck: false,
+        facing: [],
+        lost: [],
+        startWanted: false,
+      },
+    ]);
     const view = { ...snapshot.view, armies: [selected, other], plans };
     const layer = createPlanLayer(loaded.map, tokens.map.hexRadius, () => ({ x: 0, y: 0 }));
     const strokes: Array<{ alpha?: number; width?: number; color?: string }> = [];
@@ -140,26 +154,33 @@ describe('видимость линии фронта', () => {
       expect(selectedStroke?.width).toBe(tokens.front.width[2]);
       expect(selectedStroke?.alpha).toBe(1);
       expect(otherStroke?.width).toBe(tokens.front.width[1]);
-      expect(otherStroke?.alpha).toBe(tokens.fog.memoryAlpha);
+      expect(otherStroke?.alpha).toBe(1);
       expect(selectedTicks.length).toBeGreaterThan(0);
       expect(selectedTicks.every(({ alpha }) => alpha === 1)).toBe(true);
       expect(otherTicks.length).toBeGreaterThan(0);
-      expect(otherTicks.every(({ alpha }) => alpha === tokens.fog.memoryAlpha)).toBe(true);
+      expect(otherTicks.every(({ alpha }) => alpha === 1)).toBe(true);
       expect(otherCasing?.alpha).toBe(1);
+
+      for (const army of [selected, other]) {
+        const armyStrokes = strokes.filter(
+          ({ alpha, color, width }) =>
+            color === armyColor(army.number) &&
+            alpha !== undefined &&
+            width !== tokens.front.tickWidth,
+        );
+        expect(armyStrokes.length).toBeGreaterThanOrEqual(2);
+        expect(armyStrokes.every(({ alpha }) => alpha === 1)).toBe(true);
+      }
 
       strokes.length = 0;
       layer.setView(view, null, null, null, 1, 2);
       const plainStrokes = strokes.filter(
         ({ color, width }) =>
           (color === armyColor(selected.number) || color === armyColor(other.number)) &&
-          width !== tokens.front.tickWidth,
+          width === tokens.front.width[1],
       );
-      expect(plainStrokes).toHaveLength(2);
-      expect(
-        plainStrokes.every(
-          ({ alpha, width }) => alpha === tokens.fog.memoryAlpha && width === tokens.front.width[1],
-        ),
-      ).toBe(true);
+      expect(plainStrokes).toHaveLength(4);
+      expect(plainStrokes.every(({ alpha }) => alpha === 1)).toBe(true);
     } finally {
       stroke.mockRestore();
       layer.destroy();

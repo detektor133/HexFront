@@ -84,7 +84,7 @@ export function frontAppearance(
   const index = Math.min(tokens.front.width.length - 1, Math.max(0, level));
   const widthIndex = Math.min(tokens.front.width.length - 1, index + (selected ? 1 : 0));
   return {
-    alpha: selected ? 1 : tokens.fog.memoryAlpha,
+    alpha: 1,
     detailShift: selected ? 1 : 0,
     width: tokens.front.width[widthIndex] ?? tokens.front.width[1] ?? 3,
   };
