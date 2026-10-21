@@ -12,10 +12,8 @@ import {
   borderEdges,
   defenseLinePath,
   edgeCorners,
-  flipEdge,
   hexFromId,
   hexId,
-  isBorderEdge,
   loadMap,
   neighbors,
   TERRAIN,
@@ -25,7 +23,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { edgeMid, nearestEdge } from '../src/dev/plan-edges.ts';
+import { edgeMid } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { hexCenter } from '../src/render/hex-geometry.ts';
@@ -190,10 +188,7 @@ function findLineScenario(
   throw new Error('Не найдена удалённая линия обороны из трёх гексов');
 }
 
-function findBlockedFrontScenario(
-  map: MapStatic,
-  view: PlayerView,
-): {
+function blockedFrontScenario(): {
   points: [
     { x: number; y: number },
     { x: number; y: number },
@@ -203,75 +198,18 @@ function findBlockedFrontScenario(
   prefix: EdgeId[];
   suffix: EdgeId;
 } {
-  const ground = { map, hexes: view.hexes };
-  const borders = borderEdges(ground, view.playerId);
-  const acceptedEdge = (point: { x: number; y: number }): EdgeId | null => {
-    const canonical = (candidate: EdgeId): EdgeId | null => {
-      if (isBorderEdge(ground, view.playerId, candidate)) return candidate;
-      const flipped = flipEdge(ground, candidate);
-      return flipped >= 0 && isBorderEdge(ground, view.playerId, flipped) ? flipped : null;
-    };
-    const edge = nearestEdge(map, radius, point, (candidate) => canonical(candidate) !== null);
-    if (edge === null) return null;
-    return canonical(edge);
+  // Фиксированные координаты europe.json: допустимый префикс, внутренняя запрещённая точка,
+  // затем допустимый суффикс. Поиск этой геометрии в каждом тесте превышал лимит CI.
+  return {
+    points: [
+      { x: 2085, y: 1948.5571585149867 },
+      { x: 2077.5, y: 1948.5571585149867 },
+      { x: 2250, y: 1645.4482671904332 },
+      { x: 2085, y: 1965.8776665906755 },
+    ],
+    prefix: [26407 as EdgeId],
+    suffix: 26406 as EdgeId,
   };
-  const candidates = borders.map((edge) => {
-    const center = edgeMid(map, radius, edge);
-    return [-0.75, -0.375, 0, 0.375, 0.75]
-      .flatMap((x) =>
-        [-0.75, -0.375, 0, 0.375, 0.75].map((y) => ({
-          x: center.x + x * radius,
-          y: center.y + y * radius,
-        })),
-      )
-      .filter((point) => acceptedEdge(point) === edge);
-  });
-  const trace = (
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    initial: readonly EdgeId[],
-  ): { prefix: EdgeId[]; invalid: { x: number; y: number } | null } => {
-    const prefix = [...initial];
-    const steps = Math.max(
-      1,
-      Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / (radius * 0.25)),
-    );
-    for (let index = 0; index <= steps; index += 1) {
-      const point = {
-        x: from.x + ((to.x - from.x) * index) / steps,
-        y: from.y + ((to.y - from.y) * index) / steps,
-      };
-      const edge = acceptedEdge(point);
-      if (edge === null) return { prefix, invalid: point };
-      if (prefix.at(-1) !== edge) prefix.push(edge);
-    }
-    return { prefix, invalid: null };
-  };
-  const invalidPoints = Array.from({ length: map.width * map.height }, (_, hex) =>
-    hexCenter(hexFromId(hex, map.width), radius),
-  ).filter((point) => acceptedEdge(point) === null);
-  for (const [index, first] of borders.entries()) {
-    const points = candidates[index] ?? [];
-    const start = edgeMid(map, radius, first);
-    const armed = points.find(
-      (point) => Math.hypot(point.x - start.x, point.y - start.y) >= radius * 0.25,
-    );
-    if (armed === undefined) continue;
-    const armedTrace = trace(start, armed, []);
-    if (armedTrace.invalid !== null || armedTrace.prefix.length !== 1) continue;
-    for (const invalid of invalidPoints) {
-      const blockedTrace = trace(armed, invalid, armedTrace.prefix);
-      const suffix = borders.find((edge) => !blockedTrace.prefix.includes(edge));
-      if (blockedTrace.invalid === null || blockedTrace.prefix.length !== 1 || suffix === undefined)
-        continue;
-      return {
-        points: [start, armed, invalid, edgeMid(map, radius, suffix)],
-        prefix: blockedTrace.prefix,
-        suffix,
-      };
-    }
-  }
-  throw new Error('Не найден фронт с запрещённым промежуточным участком');
 }
 
 async function renderSurface(): Promise<{
@@ -393,10 +331,10 @@ describe('07/T17ap: непрерывный росчерк планов чере�
   });
 
   it('не создаёт мост через запрет во фронте и отменяет непустой жест без send', async () => {
-    const { map, view, world } = await renderSurface();
+    const { view, world } = await renderSurface();
     await selectArmy();
     await chooseTool(/Фронт|Front/);
-    const scenario = findBlockedFrontScenario(map, view);
+    const scenario = blockedFrontScenario();
     stroke(scenario.points, world);
     const frontCommand = harness.commands[0];
     if (frontCommand?.t !== 'assignFront') throw new Error('Ожидался приказ фронта');
