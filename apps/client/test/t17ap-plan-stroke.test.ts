@@ -262,7 +262,7 @@ function findBlockedFrontScenario(
             return {
               points: [start, beyond, end],
               prefix,
-              suffix: borders[4] as EdgeId,
+              suffix,
             };
           }
         }
@@ -398,7 +398,7 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     stroke(scenario.points, world);
     const frontCommand = harness.commands[0];
     if (frontCommand?.t !== 'assignFront') throw new Error('Ожидался приказ фронта');
-    expect(frontCommand.edges[0]).toBe(scenario.prefix[0]);
+    expect(frontCommand.edges).toEqual(scenario.prefix);
     expect(frontCommand.edges).not.toContain(scenario.suffix);
     expect(harness.commands[0]).not.toEqual({
       t: 'assignFront',
