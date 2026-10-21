@@ -15,13 +15,13 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import { applyLimitRequest, applyRetries, runStreams, streamLimit } from './dispatcher.ts';
-import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
+import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
 import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
+import { specFiles } from './spec.ts';
 import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
@@ -32,8 +32,7 @@ import {
   taskMark,
 } from './stage-file.ts';
 import { loadState } from './state.ts';
-import { processTask } from './tasks.ts';
-import { streamWorkLeft } from './worktree.ts';
+import { processTask, resumePrompt } from './tasks.ts';
 
 export { type AgentConfig } from './context.ts';
 export {
@@ -47,10 +46,28 @@ export {
 /** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
 async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   const { state, config } = context;
+  if (state.activeTask?.phase === 'finalize')
+    return (
+      await processTask(context, state.activeTask.task, {
+        mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
+        workPrompt: state.activeTask.workPrompt,
+      })
+    ).step;
+  if (state.activeTask?.phase === 'work') {
+    const paths = await changedPaths(context.git);
+    const specs = new Set(specFiles(context, state.activeTask.task));
+    if (paths.length > 0 && paths.every((path) => specs.has(path)))
+      return (
+        await processTask(context, state.activeTask.task, {
+          mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
+          workPrompt: state.activeTask.workPrompt,
+        })
+      ).step;
+  }
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
-    return (await processTask(context, state.resume, { mark, workPrompt: '$next', resume: true }))
-      .step;
+    const workPrompt = [resumePrompt(state.resume), state.resumeNote].filter(Boolean).join('\n');
+    return (await processTask(context, state.resume, { mark, workPrompt, resume: true })).step;
   }
   const issue = await processIssues(context, true);
   if (issue !== undefined) return issue;
@@ -91,6 +108,14 @@ async function tick(context: LoopContext): Promise<Step> {
     delete state.waitingAnswer;
     await save(context);
   }
+  // Локальные коммиты активной задачи нельзя push-ить до финального review.
+  if (state.activeTask !== undefined)
+    return (
+      await processTask(context, state.activeTask.task, {
+        mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
+        workPrompt: `$task ${state.activeTask.task}`,
+      })
+    ).step;
   const unsynced = await syncWithOrigin(git, true);
   if (unsynced !== undefined) return park(context, 'sync', unsynced);
   // Ветка, дерево и синхронизация в порядке: их ожидание снято.
@@ -106,19 +131,6 @@ async function tick(context: LoopContext): Promise<Step> {
   if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
-  const pendingTests = Object.keys(state.testPhase).find(
-    (task) => taskBlock(stage.stageText, task) !== '',
-  );
-  if (pendingTests !== undefined) {
-    await context.say(`продолжаю фазу тестов ${pendingTests} после перезапуска`);
-    return (
-      await processTask(context, pendingTests, {
-        // Код уже принят; mark не должен снова запускать исполнителя.
-        mark: '~',
-        workPrompt: `$task ${pendingTests}`,
-      })
-    ).step;
-  }
   const selected = await selectPlannedTask(context, stage);
   if (selected === undefined) return closeStage(context, await readStage(config.root));
   if (typeof selected === 'string') return selected;
@@ -218,7 +230,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     state: await loadState(config.root),
     say: await openLog(config),
   };
-  if (config.board !== undefined) config.board.limit = () => streamLimit(context);
+  if (config.board !== undefined) config.board.limit = () => 1;
   if (config.dryRun) {
     await describe(context);
     return 0;
@@ -233,21 +245,12 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     context.state.streams = config.streams;
     await save(context);
   }
+  context.state.streams = 1;
+  await save(context);
   await context.say(
-    `старт: кругов на задачу ≤ ${config.maxRounds}, потоков до ${streamLimit(context)}, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
+    `старт: последовательный режим в ветке этапа, Issues ${config.github ? `${config.github.repo}, метка agent` : 'не читаются (нет GITHUB_TOKEN)'}`,
   );
-  for (;;) {
-    // Начатая в потоке работа доделывается потоками, даже если предел уже 1.
-    const streams =
-      streamLimit(context) > 1 || (await streamWorkLeft(config.runCommand, config.root));
-    const result = streams ? await runStreams(context) : await runSingle(context);
-    if (result !== 'switch') return result;
-    await context.say(
-      streamLimit(context) > 1
-        ? `режим: до ${streamLimit(context)} задач одновременно`
-        : 'режим: одна задача в главном каталоге',
-    );
-  }
+  return runSingle(context);
 }
 
 /** Цикл оборвался, пока работа задачи была отложена на время Issue: она возвращается в дерево. */
@@ -261,24 +264,11 @@ async function recoverShelved(context: LoopContext): Promise<void> {
   await context.say(`работа ${back.task} возвращена из git stash после обрыва цикла`);
 }
 
-/** Предел вырос, а своей незаконченной работы в главном каталоге нет — пора в потоки. */
-async function switchToStreams(context: LoopContext): Promise<boolean> {
-  return (
-    streamLimit(context) > 1 &&
-    context.state.resume === undefined &&
-    (await dirtyFiles(context.git)) === ''
-  );
-}
-
-/** Цикл по одной задаче в главном каталоге. @returns код выхода или 'switch' в потоки. */
-async function runSingle(context: LoopContext): Promise<number | 'switch'> {
+/** Цикл по одной задаче в ветке этапа. */
+async function runSingle(context: LoopContext): Promise<number> {
   const { config } = context;
   let waiting = false;
   for (;;) {
-    // Предел, поднятый Issue или клавишами, переводит в потоки до следующей задачи.
-    await applyLimitRequest(context);
-    await applyRetries(context);
-    if (await switchToStreams(context)) return 'switch';
     let step: Step;
     try {
       step = await tick(context);

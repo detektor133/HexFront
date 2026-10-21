@@ -50,25 +50,7 @@ export interface LoopContext {
   readonly state: LoopState;
   /** Строка в консоль и в протокол `.ai-logs/agent-loop-<дата>.md`. */
   readonly say: (line: string) => Promise<void>;
-  /** Задача идёт в параллельном потоке: свой каталог (worktree) и своя ветка. */
-  readonly stream?: StreamInfo;
 }
-export interface StreamInfo {
-  /** Имя потока в протоколе: `w1`. */
-  readonly name: string;
-  readonly task: string;
-  /** Ветка задачи: `agent/07-T2`. */
-  readonly branch: string;
-  /** Причина отмены (текст задачи изменился); undefined — работать дальше. */
-  readonly cancelled: () => string | undefined;
-}
-
-/** Поток отменён между сессиями: его ветка отбрасывается, задача начнётся заново. */
-export class StreamCancelled extends Error {}
-
-/** Строка запроса сессии потока: скиллы сверяют ветку с ней, а не с «Веткой» STATUS. */
-export const streamNote = (stream: StreamInfo): string =>
-  `Поток ${stream.name}: ветка ${stream.branch} вместо ветки этапа из STATUS. docs/STATUS.md не меняй; push — ветки ${stream.branch}.`;
 
 const CI_TIMEOUT_MS = 660_000;
 /** Пауза после сбоя codex (обычно кончился лимит), мс. */
@@ -81,7 +63,7 @@ const RETRY_MS = 30 * 60_000;
 export const selfClearing = (key: string): boolean => /^(dirty|branch|sync|slow:.+)$/u.test(key);
 
 /** Имя агента на панели: поток `wN` или главный каталог. */
-export const agentName = (context: LoopContext): string => context.stream?.name ?? MAIN_AGENT;
+export const agentName = (_context: LoopContext): string => MAIN_AGENT;
 
 export const firstLine = (text: string): string => text.trim().split(/\r?\n/, 1)[0] ?? '';
 export const lastLines = (text: string, count = 15): string =>
@@ -162,15 +144,11 @@ export async function session(
   locked: readonly string[] = [],
 ): Promise<Session> {
   const title = firstLine(prompt);
-  const { stream } = context;
-  const cancelled = stream?.cancelled();
-  if (cancelled !== undefined) throw new StreamCancelled(cancelled);
   const { board } = context.config;
   const started = context.config.now();
   board?.begin(agentName(context), title);
   await context.say(`→ ${title} (новая сессия codex)`);
-  const full = stream === undefined ? prompt : `${prompt}\n${streamNote(stream)}`;
-  const result = await runCodex(context.config, context.definitions, role, full, locked);
+  const result = await runCodex(context.config, context.definitions, role, prompt, locked);
   board?.count('sessions');
   board?.count('sessionMs', context.config.now() - started);
   board?.end(

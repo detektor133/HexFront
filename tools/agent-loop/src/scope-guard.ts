@@ -4,7 +4,13 @@
 // Ревью это заметило, но только как недостаточное закрытие критерия, не как нарушение масштаба.
 import { globToRegExp } from './context.ts';
 import type { Git } from './git.ts';
-import { touchedPaths } from './return-guard.ts';
+
+/** Пути из `git diff --name-status`; при переименовании учитываются старый и новый. */
+const touchedPaths = (nameStatus: string): string[] =>
+  nameStatus
+    .split(/\r?\n/u)
+    .flatMap((line) => line.split('\t').slice(1))
+    .filter(Boolean);
 
 /** Пути, которые обычная задача трогать не должна: это код и настройка самого цикла. */
 const FORBIDDEN_GLOBS = ['tools/agent-loop/**', '.codex/**', 'tools/agent-loop/permissions.json'];

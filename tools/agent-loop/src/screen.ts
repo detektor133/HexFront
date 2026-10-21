@@ -2,7 +2,6 @@
 // функция от модели Board и размера окна — терминал и клавиши в console-ui.ts.
 import { MAIN_AGENT, type AgentView, type Board, type LogLine } from './board.ts';
 import { chars, clean, clockText, duration, fit, wrap } from './screen-text.ts';
-import { MAX_STREAMS } from './state.ts';
 
 const STYLES = {
   bold: '1',
@@ -187,31 +186,18 @@ function agentLine(frame: Frame, agent: AgentRow, now: number): string {
   ]);
 }
 
-/** Строки агентов и пустые места потоков до предела: видно, сколько ещё можно запустить. */
-function agentRows(board: Board, now: number): AgentRow[] {
-  const agents: AgentRow[] = [...board.agents()];
+/** Единственный исполнитель и его текущее состояние. */
+function agentRows(board: Board): AgentRow[] {
+  const agents: AgentRow[] = board.agents().filter((agent) => agent.name === MAIN_AGENT);
   if (agents.length === 0)
     agents.push({ name: MAIN_AGENT, phase: 'idle', text: 'запускается…', since: board.startedAt });
-  const limit = Math.min(MAX_STREAMS, board.limit());
-  if (limit > 1)
-    for (let index = 1; index <= limit; index += 1) {
-      const name = `w${index}`;
-      if (!agents.some((agent) => agent.name === name))
-        agents.push({ name, phase: 'idle', text: 'без задачи', since: now, slot: true });
-    }
-  const order = (name: string): number =>
-    name === MAIN_AGENT ? 0 : Number(name.replace(/^w/u, '')) || MAX_STREAMS + 1;
-  return agents.sort((a, b) => order(a.name) - order(b.name));
+  return agents;
 }
 
 function agentsSection(frame: Frame, board: Board, rows: readonly AgentRow[]): string[] {
   const now = board.time;
-  const pending = board.pendingLimit;
-  const title: Span[] = [
-    ['АГЕНТЫ', 'bold'],
-    [` · работают ${board.working} · можно до ${board.limit()} одновременно`],
-    ...(pending === undefined ? [] : [[` → станет ${pending}`, 'yellow'] as Span]),
-  ];
+  const working = rows.filter((agent) => agent.phase === 'work').length;
+  const title: Span[] = [['АГЕНТ', 'bold'], [` · работает ${working}`]];
   const what = frame.inner - COLUMNS.name - COLUMNS.task - COLUMNS.phase - COLUMNS.time - 4;
   return [
     rule(frame, ['├', '┤'], title),
@@ -312,30 +298,21 @@ function journalSection(frame: Frame, board: Board, height: number): string[] {
 }
 
 function footer(frame: Frame, board: Board): string[] {
-  const pending = board.pendingLimit;
   const last = board.lastLog;
   const status: Span[] =
     board.notice !== ''
       ? [[board.notice, 'cyan']]
-      : pending !== undefined
-        ? [[`Агентов станет ${pending}, как только цикл закончит текущий шаг`, 'yellow']]
-        : last !== undefined
-          ? [
-              ['Лог последней сессии codex: ', 'dim'],
-              [`${last.agent} ${last.path}`, 'dim'],
-            ]
-          : [];
+      : last !== undefined
+        ? [
+            ['Лог последней сессии codex: ', 'dim'],
+            [`${last.agent} ${last.path}`, 'dim'],
+          ]
+        : [];
   const key = (name: string, text: string): Span[] => [[`[${name}]`, 'bold'], [` ${text}  `]];
   return [
     rule(frame, ['├', '┤'], []),
     line(frame, status),
-    line(frame, [
-      ...key('+', 'больше агентов'),
-      ...key('-', 'меньше'),
-      ...key(`1-${MAX_STREAMS}`, 'сколько'),
-      ...key('Enter', 'проверить сейчас'),
-      ...key('Q', 'выход'),
-    ]),
+    line(frame, [...key('Enter', 'проверить сейчас'), ...key('Q', 'выход')]),
   ];
 }
 
@@ -372,7 +349,7 @@ export function renderFrame(
     ],
   );
   const tail = [...footer(frame, board), rule(frame, ['╰', '╯'], [])];
-  const table = agentsSection(frame, board, agentRows(board, board.time));
+  const table = agentsSection(frame, board, agentRows(board));
   // Причина ожидания сокращается, пока под ней остаётся журнал: низкое окно с 4 потоками.
   let head: string[] = [];
   for (let reason = REASON_LINES; reason >= 1; reason -= 1) {

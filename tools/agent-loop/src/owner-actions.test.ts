@@ -1,18 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { describe, expect, it, vi } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
 import { parseKey, performAction, type ActionDeps } from './console-ui.ts';
-import type { LoopContext } from './context.ts';
-import { applyRetries } from './dispatcher.ts';
 import type { GithubClient } from './github.ts';
 import { actionKey, issueUrl, waitActions } from './owner-actions.ts';
-import { loadState, saveState } from './state.ts';
-import { runWorld } from './test-world.ts';
-import { slotDir } from './worktree.ts';
 
 const REPO = 'detektor133/HexFront';
 const SLOW_RED =
@@ -110,7 +101,7 @@ describe('действия ожидания', () => {
       'Л',
     ]);
     expect(parseKey('g', 1)).toEqual({ kind: 'action', key: 'П' });
-    expect(parseKey('2', 1)).toEqual({ kind: 'limit', value: 2 });
+    expect(parseKey('2', 1)).toBeUndefined();
     expect(parseKey('q', 1)).toEqual({ kind: 'quit', force: false });
     expect(parseKey('gp', 1)).toBeUndefined();
     expect(parseKey('x', 1)).toBeUndefined();
@@ -231,90 +222,5 @@ describe('ответ владельца клавишей', () => {
     await performAction('П', run.value);
     expect(run.notices.at(-1)).toMatch(/ничего не делает/u);
     expect(board.takeRetries()).toEqual([]);
-  });
-});
-
-describe('автоматическое продолжение кругов', () => {
-  it('исчерпанные круги не требуют клавиши владельца', async () => {
-    const board = new Board(Date.now);
-    const run = await runWorld({
-      board,
-      maxRounds: 1,
-      sessions: [
-        { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
-        { task: 'T1j5-Б1', mark: ' ', answer: 'ВОЗВРАТ\n- нет теста' },
-        { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
-        { task: 'T1j5-Б1', mark: 'x', answer: 'OK' },
-      ],
-    });
-    expect(run.lines).toContain(
-      '1 ВОЗВРАТ подряд по 06/T1j5-Б1 — начинаю новый автоматический цикл',
-    );
-    expect(board.totals.done).toBe(1);
-  });
-});
-
-describe('повтор неудачной доделки', () => {
-  it('ожидание «доделка не закончена» после повтора снова доделывает задачу, а не ждёт по грязному дереву', async () => {
-    const base = await mkdtemp(join(tmpdir(), 'retry-'));
-    try {
-      const board = new Board(() => 0);
-      const context = {
-        config: { root: base, board },
-        state: {
-          ...(await loadState(base)),
-          parked: { key: 'resume:07/T2', head: 'abc', reason: 'доделка 07/T2 не закончена' },
-        },
-        say: () => Promise.resolve(),
-      } as unknown as LoopContext;
-      board.requestRetry(MAIN_AGENT);
-      await applyRetries(context);
-      expect(context.state.parked).toBeUndefined();
-      expect(context.state.resume).toBe('07/T2');
-      expect(board.agents()[0]).toMatchObject({
-        phase: 'idle',
-        text: 'повторяю по просьбе владельца',
-      });
-    } finally {
-      await rm(base, { recursive: true, force: true });
-    }
-  });
-});
-
-describe('повтор шага потока', () => {
-  it('ждущий поток забывает ожидание в своей памяти и запускается заново; работающий не трогается', async () => {
-    const base = await mkdtemp(join(tmpdir(), 'retry-'));
-    const root = join(base, 'repo');
-    try {
-      const dir = slotDir(root, 1);
-      await saveState(dir, {
-        ...(await loadState(dir)),
-        parked: { key: 'rounds:07/T2', head: 'abc', reason: '3 ВОЗВРАТ' },
-      });
-      const board = new Board(() => 0);
-      const lines: string[] = [];
-      const context = {
-        config: { root, board },
-        state: await loadState(root),
-        say: (line: string) => {
-          lines.push(line);
-          return Promise.resolve();
-        },
-      } as unknown as LoopContext;
-      const waiting = { index: 1, task: '07/T2', waitHead: 'abc' };
-      const running = { index: 2, task: '07/T3', waitHead: 'abc', running: Promise.resolve() };
-      board.requestRetry('w1');
-      board.requestRetry('w2');
-      await applyRetries(context, [waiting, running]);
-      expect(waiting.waitHead).toBeUndefined();
-      expect((await loadState(dir)).parked).toBeUndefined();
-      expect(running.waitHead).toBe('abc');
-      expect(lines).toEqual([
-        'консоль: владелец просит повторить шаг потока w1 (07/T2)',
-        'консоль: w2 уже не ждёт — повторять нечего',
-      ]);
-    } finally {
-      await rm(base, { recursive: true, force: true });
-    }
   });
 });

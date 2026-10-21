@@ -40,10 +40,29 @@ describe('права агентной роли', () => {
     expect(JSON.parse(output).hookSpecificOutput.permissionDecision).toBe('deny');
   });
 
-  it('разрешает reviewer писать файл этапа, STATUS и .ai-logs', () => {
-    expect(runHook('reviewer', 'echo x > docs/stages/stage-06-bots-balance.md')).toBe('');
-    expect(runHook('reviewer', 'echo x > docs/STATUS.md')).toBe('');
+  it('reviewer не меняет stage и STATUS, но может писать служебный лог', () => {
+    expect(
+      JSON.parse(runHook('reviewer', 'echo x > docs/stages/stage-06-bots-balance.md'))
+        .hookSpecificOutput.permissionDecision,
+    ).toBe('deny');
+    expect(
+      JSON.parse(runHook('reviewer', 'echo x > docs/STATUS.md')).hookSpecificOutput
+        .permissionDecision,
+    ).toBe('deny');
     expect(runHook('reviewer', 'Set-Content -Path .ai-logs/commit.txt -Value x')).toBe('');
+  });
+
+  it('блокирует push из любой рабочей сессии', () => {
+    const output = execFileSync('node', ['.codex/hooks/agent-permissions.mjs'], {
+      cwd: process.cwd(),
+      env: { ...process.env, AGENT_ROLE: '', AGENT_NO_PUSH: '1' },
+      input: JSON.stringify({
+        tool_name: 'Bash',
+        tool_input: { command: 'git push origin stage-07' },
+      }),
+      encoding: 'utf8',
+    });
+    expect(JSON.parse(output).hookSpecificOutput.permissionDecision).toBe('deny');
   });
 
   it('запрещает reviewer перенаправлять вывод в тесты', () => {

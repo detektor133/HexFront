@@ -61,18 +61,16 @@ describe('кадр консоли', () => {
     );
     expect(lines.at(-1)).toMatch(/^╰─+╯$/u);
     const titles = lines.filter((line) => line.startsWith('├─ ')).map((line) => line.split(' ')[1]);
-    expect(titles).toEqual(['АГЕНТЫ', 'ЭТАП', 'ЗА', 'ЖУРНАЛ']);
+    expect(titles).toEqual(['АГЕНТ', 'ЭТАП', 'ЗА', 'ЖУРНАЛ']);
   });
 
-  it('агенты: что делает словами, задача, время; пустые места потоков до предела', () => {
+  it('показывает только последовательного главного агента', () => {
     const { board, advance } = sampleBoard();
     advance(12 * 60_000);
     const text = renderFrame(board, 100, 30, false).join('\n');
     expect(text).toMatch(/главный\s+07\/T1\s+● работает\s+пишет код \(\$task 07\/T1\)\s+12 мин/u);
-    expect(text).toMatch(/w2\s+07\/T4\s+● работает\s+ждёт CI на GitHub/u);
-    expect(text).toMatch(/w1\s+—\s+○ свободен\s+без задачи\s+│/u);
-    expect(text).toMatch(/w3\s+—\s+○ свободен/u);
-    expect(text).toContain('работают 2 · можно до 3 одновременно');
+    expect(text).not.toContain('w2');
+    expect(text).toContain('АГЕНТ · работает 1');
   });
 
   it('один агент — без пустых мест потоков', () => {
@@ -163,7 +161,7 @@ describe('кадр консоли', () => {
     const { board } = sampleBoard();
     const lines = renderFrame(board, 80, MIN_HEIGHT, false);
     expect(lines).toHaveLength(MIN_HEIGHT);
-    expect(lines.join('\n')).not.toContain('ЭТАП');
+    expect(lines.join('\n')).toContain('ЭТАП 07');
     expect(lines.at(-1)).toMatch(/^╰/u);
   });
 
@@ -175,12 +173,12 @@ describe('кадр консоли', () => {
     for (const line of lines) expect(cells(line)).toBe(MIN_WIDTH - 1);
   });
 
-  it('просьба о числе агентов видна до применения', () => {
+  it('старый запрос числа агентов не попадает в экран', () => {
     const { board } = sampleBoard();
     board.requestLimit(4);
     const text = renderFrame(board, 100, 30, false).join('\n');
-    expect(text).toContain('→ станет 4');
-    expect(text).toContain('Агентов станет 4, как только цикл закончит текущий шаг');
+    expect(text).not.toContain('→ станет');
+    expect(text).not.toContain('Агентов станет');
     board.notice = 'Проверяю Issues и main сейчас';
     expect(renderFrame(board, 100, 30, false).join('\n')).toContain(
       'Проверяю Issues и main сейчас',
@@ -287,11 +285,11 @@ describe('слова и форматы экрана', () => {
 });
 
 describe('клавиши консоли', () => {
-  it('число агентов, проверка и выход — в обеих раскладках', () => {
-    expect(parseKey('+', 2)).toEqual({ kind: 'limit', value: 3 });
-    expect(parseKey('=', 2)).toEqual({ kind: 'limit', value: 3 });
-    expect(parseKey('-', 2)).toEqual({ kind: 'limit', value: 1 });
-    expect(parseKey('3', 1)).toEqual({ kind: 'limit', value: 3 });
+  it('проверка и выход работают, управление потоками удалено', () => {
+    expect(parseKey('+', 1)).toBeUndefined();
+    expect(parseKey('=', 1)).toBeUndefined();
+    expect(parseKey('-', 1)).toBeUndefined();
+    expect(parseKey('3', 1)).toBeUndefined();
     expect(parseKey('\r', 1)).toEqual({ kind: 'wake' });
     expect(parseKey('к', 1)).toEqual({ kind: 'wake' });
     expect(parseKey('q', 1)).toEqual({ kind: 'quit', force: false });

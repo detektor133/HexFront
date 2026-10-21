@@ -14,12 +14,11 @@ interface RoleConfig {
  * `spec` — `$spec`, только приёмочные тесты до кода; `plan` — `$plan`, только проверка текста
  * задачи перед исполнителем (файл этапа, STATUS, QUESTIONS, DECISIONS).
  */
-export type Role = 'next' | 'review' | 'spec' | 'test' | 'plan';
+export type Role = 'next' | 'review' | 'spec' | 'plan';
 export interface AgentDefinitions {
   /** Роли `spec` и `plan` необязательны: без них в roles.json цикл работает по-старому. */
   readonly roles: Readonly<Record<'next' | 'review', RoleConfig>> & {
     readonly spec?: RoleConfig;
-    readonly test?: RoleConfig;
     readonly plan?: RoleConfig;
   };
   readonly reviewerPaths: readonly string[];
@@ -69,7 +68,6 @@ export async function loadAgentDefinitions(root: string): Promise<AgentDefinitio
       next: roles.next,
       review: roles.review,
       ...(roles.spec ? { spec: roles.spec } : {}),
-      ...(roles.test ? { test: roles.test } : {}),
       ...(roles.plan ? { plan: roles.plan } : {}),
     },
     reviewerPaths: permissions.reviewer ?? [],
@@ -103,11 +101,9 @@ export async function runCodex(
   const roleConfig =
     role === 'spec'
       ? definitions.roles.spec
-      : role === 'test'
-        ? definitions.roles.test
-        : role === 'plan'
-          ? definitions.roles.plan
-          : definitions.roles[role];
+      : role === 'plan'
+        ? definitions.roles.plan
+        : definitions.roles[role];
   if (roleConfig === undefined) throw new Error(`В roles.json нет роли ${role}`);
   const outputDir = await mkdtemp(join(tmpdir(), 'hexfront-agent-'));
   const outputFile = join(outputDir, 'last-message.txt');
@@ -139,14 +135,9 @@ export async function runCodex(
         env: {
           ...process.env,
           ...settings.env,
+          AGENT_NO_PUSH: '1',
           AGENT_ROLE:
-            role === 'review'
-              ? 'reviewer'
-              : role === 'spec' || role === 'test'
-                ? 'spec'
-                : role === 'plan'
-                  ? role
-                  : '',
+            role === 'review' ? 'reviewer' : role === 'spec' ? 'spec' : role === 'plan' ? role : '',
           AGENT_LOCKED: locked.join('\n'),
         },
         input: prompt,

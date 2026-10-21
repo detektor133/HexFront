@@ -50,7 +50,7 @@ const appendReviewReturn = (stage: string, task: string, answer: string): string
   return `${stage.slice(0, end).trimEnd()}\n${block}${stage.slice(end)}`;
 };
 
-/** Что делает одна сессия codex. По умолчанию — коммит и push, если менялась отметка или файлы. */
+/** Что делает одна сессия codex. Push возможен только при явном `push: true`. */
 export interface Session {
   readonly mark?: TaskMark;
   readonly task?: string;
@@ -251,12 +251,17 @@ export async function runWorld(world: World): Promise<Outcome> {
     out.codexArguments.push(args);
     const session = sessions.shift();
     if (!session) throw new Error(`лишний вызов codex: ${input}`);
-    if (session.mark && session.task)
+    if (env?.AGENT_ROLE !== 'reviewer' && session.mark && session.task)
       await writeFile(
         stagePath,
         setMark(await readFile(stagePath, 'utf8'), session.task, session.mark),
       );
-    if (session.mark === ' ' && session.task && session.stage === undefined)
+    if (
+      env?.AGENT_ROLE !== 'reviewer' &&
+      session.mark === ' ' &&
+      session.task &&
+      session.stage === undefined
+    )
       await writeFile(
         stagePath,
         appendReviewReturn(await readFile(stagePath, 'utf8'), session.task, session.answer),
@@ -270,7 +275,8 @@ export async function runWorld(world: World): Promise<Outcome> {
       tracked.add(path);
     }
     const changed =
-      session.mark !== undefined || session.stage !== undefined || session.status !== undefined;
+      env?.AGENT_ROLE !== 'reviewer' &&
+      (session.mark !== undefined || session.stage !== undefined || session.status !== undefined);
     if (session.commit ?? changed) {
       head += 1;
       snapshots.set(head, await readFile(stagePath, 'utf8'));
@@ -280,9 +286,10 @@ export async function runWorld(world: World): Promise<Outcome> {
         else committed.set(path, text);
       }
     }
-    if (session.push !== false) origin = head;
+    if (session.push === true) origin = head;
     files = session.files ?? [
-      ...(session.mark !== undefined || session.stage !== undefined
+      ...(env?.AGENT_ROLE !== 'reviewer' &&
+      (session.mark !== undefined || session.stage !== undefined)
         ? ['docs/stages/stage-06-bots-balance.md']
         : []),
       ...Object.keys(session.writes ?? {}),
@@ -321,6 +328,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       return text === undefined ? { code: 128, stdout: '', stderr: 'нет коммита' } : ok(text);
     }
     if (sub === 'diff' && args.includes('--name-status')) return ok(world.reviewFiles ?? '');
+    if (sub === 'diff' && args.includes('--cached')) return ok();
     if (sub === 'diff' && first === '-M') return ok(world.reviewDiff ?? '');
     if (sub === 'show') {
       const text = committed.get(first?.replace(/^HEAD:/, '') ?? '');
@@ -332,7 +340,8 @@ export async function runWorld(world: World): Promise<Outcome> {
     }
     if (sub === 'remote') return ok('https://github.com/detektor133/HexFront.git');
     if (sub === 'log') return ok(world.headTrailer ?? '');
-    if (sub === 'rev-parse') return ok(`c${first?.startsWith('origin/') ? origin : head}`);
+    if (sub === 'rev-parse')
+      return ok(`c${first?.startsWith('origin/') ? origin : first === 'HEAD^' ? head - 1 : head}`);
     if (sub === 'diff' && first === '--quiet')
       return { ...ok(), code: world.merged === true ? 0 : 1 };
     if (sub === 'diff') return ok(files.join('\n'));

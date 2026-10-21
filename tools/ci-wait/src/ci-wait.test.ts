@@ -16,8 +16,10 @@ const textResponse = (value: string): HttpResponse => ({
   text: async (): Promise<string> => value,
 });
 
-const run = (status: string, conclusion: string | null = null): unknown => ({
+const run = (status: string, conclusion: string | null = null) => ({
   id: 42,
+  run_number: 2,
+  run_attempt: 1,
   head_sha: 'abc123',
   status,
   conclusion,
@@ -62,13 +64,15 @@ describe('ожидание GitHub Actions', () => {
     ]);
   });
 
-  it('выбирает завершённый run, если API вернул несколько run для SHA', async () => {
+  it('ждёт последний run SHA, а не принимает старый завершённый', async () => {
     const responses = [
       jsonResponse({
         workflow_runs: [
           run('in_progress'),
           {
             id: 43,
+            run_number: 1,
+            run_attempt: 1,
             head_sha: 'abc123',
             status: 'completed',
             conclusion: 'success',
@@ -76,18 +80,59 @@ describe('ожидание GitHub Actions', () => {
           },
         ],
       }),
+      jsonResponse({ workflow_runs: [run('completed', 'success')] }),
     ];
     const output: string[] = [];
+    let now = 0;
 
     const code = await waitForCi({
       repo: 'acme/game',
       sha: 'abc123',
       fetchFn: async (): Promise<HttpResponse> => responses.shift() ?? jsonResponse({}),
+      sleep: async (ms: number): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
       writeLine: (line: string) => output.push(line),
     });
 
     expect(code).toBe(0);
-    expect(output).toEqual(['success https://github.com/acme/game/actions/runs/43']);
+    expect(output).toEqual([
+      'pending https://github.com/acme/game/actions/runs/42 0',
+      'success https://github.com/acme/game/actions/runs/42',
+    ]);
+  });
+
+  it('ждёт последнюю попытку run_number после rerun', async () => {
+    const old = run('completed', 'success') as Record<string, unknown>;
+    const retried = {
+      ...old,
+      id: 44,
+      run_attempt: 2,
+      status: 'in_progress',
+      conclusion: null,
+      html_url: 'https://github.com/acme/game/actions/runs/44',
+    };
+    const responses = [
+      jsonResponse({ workflow_runs: [old, retried] }),
+      jsonResponse({ workflow_runs: [{ ...retried, status: 'completed', conclusion: 'success' }] }),
+    ];
+    const output: string[] = [];
+    let now = 0;
+
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => responses.shift() ?? jsonResponse({}),
+      sleep: async (ms: number): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
+      writeLine: (line: string) => output.push(line),
+    });
+
+    expect(code).toBe(0);
+    expect(output[0]).toContain('/44');
   });
 
   it('при failure печатает имя job, последние 30 строк лога и итог', async () => {
@@ -157,9 +202,9 @@ describe('ожидание GitHub Actions', () => {
     expect(code).toBe(1);
     expect(delays).toEqual([30_000, 30_000]);
     expect(output).toEqual([
-      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 0',
-      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 30',
-      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123 60',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123&event=push 0',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123&event=push 30',
+      'pending https://api.github.com/repos/acme/game/actions/workflows/ci.yml/runs?head_sha=abc123&event=push 60',
       'failure run=not-found sha=abc123',
     ]);
   });
@@ -257,14 +302,18 @@ describe('ожидание GitHub Actions', () => {
 
 describe('выбор workflow', () => {
   it.each([
-    [undefined, false, ['/actions/workflows/ci.yml/runs?head_sha=abc123&per_page=10']],
-    ['slow.yml', false, ['/actions/workflows/slow.yml/runs?head_sha=abc123&per_page=10']],
+    [undefined, false, ['/actions/workflows/ci.yml/runs?head_sha=abc123&event=push&per_page=10']],
+    [
+      'slow.yml',
+      false,
+      ['/actions/workflows/slow.yml/runs?head_sha=abc123&event=push&per_page=10'],
+    ],
     [
       undefined,
       true,
       [
-        '/actions/workflows/ci.yml/runs?head_sha=abc123&per_page=10',
-        '/actions/runs?head_sha=abc123&per_page=50',
+        '/actions/workflows/ci.yml/runs?head_sha=abc123&event=push&per_page=10',
+        '/actions/runs?head_sha=abc123&event=push&per_page=50',
       ],
     ],
   ])('workflow %s (остальные: %s) опрашивает свои прогоны', async (workflow, all, paths) => {
@@ -276,6 +325,16 @@ describe('выбор workflow', () => {
       otherWorkflows: all,
       fetchFn: async (url: string): Promise<HttpResponse> => {
         urls.push(url);
+        if (url.includes('/actions/runs?'))
+          return jsonResponse({
+            workflow_runs: [
+              {
+                ...run('completed', 'success'),
+                id: 7,
+                path: '.github/workflows/pages.yml',
+              },
+            ],
+          });
         return jsonResponse({ workflow_runs: [run('completed', 'success')] });
       },
       writeLine: () => undefined,
@@ -296,6 +355,22 @@ describe('остальные workflow того же SHA', () => {
     path,
   });
   const CI = other(42, '.github/workflows/ci.yml', 'completed', 'success');
+
+  it('не объявляет успех, пока обязательный pages.yml не создан', async () => {
+    const output: string[] = [];
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      otherWorkflows: true,
+      once: true,
+      fetchFn: async (url: string): Promise<HttpResponse> =>
+        jsonResponse({ workflow_runs: url.includes('/actions/workflows/') ? [CI] : [CI] }),
+      writeLine: (line: string) => output.push(line),
+    });
+
+    expect(code).toBe(3);
+    expect(output[0]).toMatch(/^pending /u);
+  });
 
   const waitWith = async (all: unknown[][]) => {
     const output: string[] = [];
@@ -338,6 +413,16 @@ describe('остальные workflow того же SHA', () => {
       'pending https://github.com/acme/game/actions/runs/7 0',
       'success https://github.com/acme/game/actions/runs/42',
     ]);
+  });
+
+  it('не принимает отменённый обязательный workflow без успешной новой попытки', async () => {
+    const { code, output } = await waitWith([
+      [other(7, '.github/workflows/pages.yml', 'completed', 'cancelled'), CI],
+      [other(8, '.github/workflows/pages.yml', 'completed', 'success'), CI],
+    ]);
+
+    expect(code).toBe(0);
+    expect(output[0]).toMatch(/^pending /u);
   });
 
   it('slow.yml, отменённые и старые прогоны того же файла не решают', async () => {

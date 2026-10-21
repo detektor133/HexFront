@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 const role = process.env.AGENT_ROLE;
+const noPush = process.env.AGENT_NO_PUSH === '1';
 // Приёмочные тесты задачи: агентный цикл передаёт их исполнителю, менять их нельзя никакой роли.
 const locked = (process.env.AGENT_LOCKED ?? '')
   .split(/\r?\n/)
   .map((line) => line.trim())
   .filter(Boolean);
-if (!role && locked.length === 0) process.exit(0);
+if (!role && locked.length === 0 && !noPush) process.exit(0);
 
 function readJson(path) {
   try {
@@ -92,10 +93,12 @@ const event = (() => {
   }
 })();
 const input = event.tool_input ?? {};
-const targets =
-  event.tool_name === 'Bash'
-    ? bashTargets(typeof input.command === 'string' ? input.command : '')
-    : patchTargets(input);
+const command = typeof input.command === 'string' ? input.command : '';
+if (noPush && event.tool_name === 'Bash' && /(?:^|[;&|]\s*)git\s+push(?:\s|$)/iu.test(command))
+  deny(
+    'рабочая сессия не может делать git push: push выполняет оркестратор после финального review',
+  );
+const targets = event.tool_name === 'Bash' ? bashTargets(command) : patchTargets(input);
 const denied = targets.filter((target) => !allowed(target));
 if (denied.length > 0)
   deny(

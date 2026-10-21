@@ -11,6 +11,8 @@ const NEXT_DONE: Session = {
 const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё подтверждено' };
 const FIXED: Session = { answer: 'slow починен', commit: true };
 const RED = 'failure job=tests https://slow/2';
+const commands = (prompts: readonly string[]): string[] =>
+  prompts.map((prompt) => prompt.split('\n')[0] ?? '');
 const RED_RUN = 'failure job=tests https://github.com/detektor133/HexFront/actions/runs/77/job/1';
 
 describe('workflow slow (все тесты)', () => {
@@ -19,7 +21,7 @@ describe('workflow slow (все тесты)', () => {
       sessions: [NEXT_DONE, REVIEW_OK],
       slow: ['pending https://slow/2 40'],
     });
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
     expect(run.slowCalls[0]).toBe('--workflow=slow.yml --once');
   });
 
@@ -29,9 +31,9 @@ describe('workflow slow (все тесты)', () => {
       slow: [RED],
       headTrailer: '06/T1e\n',
     });
-    expect(run.prompts).toEqual([
+    expect(commands(run.prompts)).toEqual([
       `$task 06/T1e CI красный: slow ${RED}`,
-      '$next',
+      '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
     expect(run.lines).toContain(`красный slow (все тесты): ${RED} — исправляет 06/T1e`);
@@ -45,7 +47,7 @@ describe('workflow slow (все тесты)', () => {
       headTrailer: '06/infra\n',
     });
     expect(run.reruns).toEqual([77]);
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
     expect(run.lines.some((line) => line.includes('Claude'))).toBe(false);
   });
 
@@ -79,7 +81,7 @@ describe('workflow slow (все тесты)', () => {
       headTrailer: '06\n',
       state: { slowBug: 'abc' },
     });
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
   });
 
   it('красный slow, перезапущенный на GitHub, зеленеет на том же HEAD — цикл продолжает сам', async () => {
@@ -93,7 +95,7 @@ describe('workflow slow (все тесты)', () => {
       polls: 1,
       wake: true,
     });
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
   });
 
   it('перезапущенный прогон ещё идёт — ожидание снято: баннер не зовёт владельца, работа идёт', async () => {
@@ -108,7 +110,7 @@ describe('workflow slow (все тесты)', () => {
       wake: true,
     });
     expect(run.lines.some((line) => line.startsWith('ожидание снялось само: slow:'))).toBe(true);
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
     // Дальше очередь может ждать владельца по другой причине, но не по красному slow.
     expect(board.agents().find((agent) => agent.name === MAIN_AGENT)?.text).not.toMatch(
       /красный slow/u,
@@ -143,7 +145,7 @@ describe('workflow slow (все тесты)', () => {
       sessions: [NEXT_DONE, REVIEW_OK],
       slow: ['error сеть: TypeError: fetch failed'],
     });
-    expect(run.prompts).toEqual(['$next', '$review 06/T1j5-Б1']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
   });
 });
 

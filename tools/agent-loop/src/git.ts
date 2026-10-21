@@ -23,6 +23,12 @@ export function makeGit(runCommand: RunCommand, root: string): Git {
 
 export const currentBranch = (git: Git): Promise<string> => git.run(['branch', '--show-current']);
 export const head = (git: Git): Promise<string> => git.run(['rev-parse', 'HEAD']);
+/** SHA опубликованной ветки без сетевого запроса; fetch до начала задачи обновляет этот ref. */
+export async function remoteHead(git: Git): Promise<string> {
+  const branch = await currentBranch(git);
+  const result = await git.attempt(['rev-parse', `origin/${branch}`]);
+  return result.code === 0 ? result.stdout.trim() : '';
+}
 /** @returns вывод `git status --porcelain`; пустая строка — дерево чистое. */
 export const dirtyFiles = (git: Git): Promise<string> => git.run(['status', '--porcelain']);
 

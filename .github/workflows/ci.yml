@@ -18,12 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      # Пуш только служебных docs (отметки этапа, STATUS, отчёты) наследует CI предыдущего пуша.
+      # Пуш только служебных docs получает собственный зелёный workflow текущего SHA без сборки.
       - id: scope
         run: node --experimental-strip-types tools/ci-wait/src/docs-only.ts
         env:
           BEFORE_SHA: ${{ github.event.before }}
-          GITHUB_TOKEN: ${{ github.token }}
       - if: steps.scope.outputs.mode == 'full'
         uses: pnpm/action-setup@v4
       - if: steps.scope.outputs.mode == 'full'

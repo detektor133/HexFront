@@ -16,7 +16,7 @@ import {
   type StageState,
   type Step,
 } from './context.ts';
-import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
 import { verifyPlanTransition } from './requirements.ts';
 import { isOwnerTask, selectTask, taskBlock, taskMark, type TaskMark } from './stage-file.ts';
 
@@ -43,6 +43,7 @@ export interface PlanOutcome {
 export async function runPlan(context: LoopContext, task: string): Promise<PlanOutcome | Step> {
   const { git, definitions } = context;
   const base = await head(git);
+  const published = await remoteHead(git);
   const before = await readStage(context.config.root);
   const result = await session(context, 'plan', planPrompt(task));
   if (result.failure !== undefined)
@@ -54,6 +55,8 @@ export async function runPlan(context: LoopContext, task: string): Promise<PlanO
       `$plan ${task} оставил незакоммиченные файлы — проверь`,
       result.message,
     );
+  if ((await remoteHead(git)) !== published)
+    return park(context, `push:${task}`, `$plan ${task} изменила origin до финального review`);
   if (!(await checkPermissions(context, base, definitions.planPaths)))
     return park(
       context,
@@ -61,7 +64,7 @@ export async function runPlan(context: LoopContext, task: string): Promise<PlanO
       `$plan ${task} вышел за свои права (изменил файлы вне permissions.json) — проверь коммит`,
       result.message,
     );
-  const unsynced = await syncWithOrigin(git, true);
+  const unsynced = await syncWithOrigin(git, false);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   const outcome = OUTCOME_RE.exec(result.message)?.[1];
   if (outcome === undefined)
@@ -123,7 +126,7 @@ export async function selectPlannedTask(
     const mark = taskMark(stage.stageText, task) ?? ' ';
     // Задача владельца не уходит исполнителю: plan её не проверяет, tick() сам ждёт владельца.
     if (mark !== ' ' || !planEnabled(context) || isOwnerTask(taskBlock(stage.stageText, task)))
-      return { task, mark, workPrompt: '$next' };
+      return { task, mark, workPrompt: `$task ${task}` };
     const planned = await runPlan(context, task);
     if (typeof planned === 'string') return planned;
     stage = await readStage(config.root);

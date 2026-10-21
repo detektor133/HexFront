@@ -8,6 +8,8 @@ import { closeAll, fixtureStage, fixtureStatus, issue, runWorld, setMark } from 
 
 const ownerParked = setMark(fixtureStage, 'T1j5-Б1', 'x');
 const DECIDE = '$decide\nT1i выполнена владельцем.\nВторая строка решения дословно.';
+const commands = (prompts: readonly string[]): string[] =>
+  prompts.map((prompt) => prompt.split('\n')[0] ?? '');
 
 describe('команда в теле Issue', () => {
   it('читает команду первой строки и оставляет тело дословно', () => {
@@ -23,13 +25,13 @@ describe('команда в теле Issue', () => {
     });
   });
 
-  it('$streams N — число задач одновременно от 1 до 4', () => {
-    expect(parseIssueCommand('$streams 2')).toEqual({
+  it('$streams больше 1 отклоняется', () => {
+    expect(parseIssueCommand('$streams 1')).toEqual({
       skill: 'streams',
-      count: 2,
-      prompt: '$streams 2',
+      count: 1,
+      prompt: '$streams 1',
     });
-    for (const body of ['$streams', '$streams 0', '$streams 5', '$streams два', '$streams 1.5'])
+    for (const body of ['$streams', '$streams 0', '$streams 2', '$streams два', '$streams 1.5'])
       expect(parseIssueCommand(body)).toHaveProperty('error');
   });
 
@@ -184,7 +186,7 @@ describe('Issues в цикле', () => {
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts).toEqual(['$plan 06/T2', '$task 06/T2', '$review 06/T2']);
+    expect(commands(run.prompts)).toEqual(['$plan 06/T2', '$task 06/T2', '$review 06/T2']);
     expect(run.locked).toEqual(['', '', '']);
     expect(run.closed).toEqual([24]);
   });
@@ -262,9 +264,10 @@ describe('Issues в цикле', () => {
       sessions: [
         { task: 'T2', mark: '~', answer: 'Готово' },
         { task: 'T2', mark: 'x', answer: 'OK' },
+        { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts).toEqual(['$task 06/T2', '$review 06/T2']);
+    expect(commands(run.prompts)).toEqual(['$task 06/T2', '$review 06/T2']);
     expect(run.closed).toEqual([9]);
   });
 
@@ -275,13 +278,15 @@ describe('Issues в цикле', () => {
       issues: [issue(12, body)],
       sessions: [
         { task: 'T2', mark: '~', answer: 'Готово' },
-        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- MainMenu.tsx:41 — фон не рисуется' },
+        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- КОД: фон не рисуется, MainMenu.tsx:41' },
         { task: 'T2', mark: '~', answer: 'Готово' },
+        { task: 'T2', mark: 'x', answer: 'OK' },
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
     expect(run.prompts[0]).toBe(body);
-    expect(run.prompts[2]).toContain('Первым — живой фон меню');
+    expect(run.prompts[2]).toContain('КОД: фон не рисуется');
+    expect(run.prompts[2]).not.toContain('Первым — живой фон меню');
     expect(run.closed).toEqual([12]);
   });
 
@@ -290,13 +295,12 @@ describe('Issues в цикле', () => {
       stage: setMark(ownerParked, 'T2', '~'),
       issues: [issue(13, '$review 06/T2\nпосмотри внимательнее')],
       sessions: [
-        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- a.ts:1 — нет проверки' },
+        { task: 'T2', mark: ' ', answer: 'ВОЗВРАТ\n- КОД: нет проверки, a.ts:1' },
         { task: 'T2', mark: '~', answer: 'Готово' },
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts[1]).toContain('$task 06/T2 исправить возврат ревью');
-    expect(run.prompts[1]).toContain('a.ts:1 — нет проверки');
+    expect(run.prompts[1]).toContain('$review 06/T2');
   });
 
   it('при грязном дереве (работа владельца) исполняет только $done', async () => {
@@ -311,7 +315,11 @@ describe('Issues в цикле', () => {
       ],
     });
     // Затем очередь идёт дальше: T1i закрыта, следующая — T1e.
-    expect(run.prompts).toEqual(['$done 06/T1i 30 поколений, веса лучшей особи', DECIDE, '$next']);
+    expect(run.prompts).toEqual([
+      '$done 06/T1i 30 поколений, веса лучшей особи',
+      DECIDE,
+      '$task 06/T1e',
+    ]);
     expect(run.closed).toEqual([11, 10]);
   });
 });
@@ -359,7 +367,7 @@ describe('закрытие этапа', () => {
         { answer: 'дошла до 07/T1', commit: false },
       ],
     });
-    expect(run.prompts).toEqual(['$stage-close', '$next']);
+    expect(run.prompts).toEqual(['$stage-close', '$task 07/T1']);
     expect(run.lines).toContain('новый этап: ветка stage-07');
   });
 

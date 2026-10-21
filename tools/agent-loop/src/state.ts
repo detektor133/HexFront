@@ -3,9 +3,33 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 /** Больше потоков не даёт выигрыша: упор в общие файлы, зависимости задач и лимит codex. */
-export const MAX_STREAMS = 4;
+export const MAX_STREAMS = 1;
+
+export interface PendingFinding {
+  readonly kind: 'КОД' | 'ТЕСТ';
+  readonly text: string;
+}
+
+export interface ActiveTask {
+  readonly task: string;
+  readonly base: string;
+  /** origin ветки до локальных plan/spec/code-коммитов задачи. */
+  readonly remoteBase?: string;
+  /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
+  readonly workPrompt: string;
+  phase: 'work' | 'review' | 'target-review' | 'ci' | 'finalize' | 'docs-ci';
+  findings: PendingFinding[];
+  /** HEAD и origin до рабочей сессии: по ним восстанавливается коммит после обрыва процесса. */
+  workAttempt?: { readonly head: string; readonly remote: string };
+  /** После исправления теста продолжить исходную работу, которая ещё не создала коммит. */
+  resumeWorkAfterFindings?: boolean;
+  /** Проверенный кодовый HEAD, который должен быть родителем служебного docs-коммита. */
+  codeHead?: string;
+}
 
 export interface LoopState {
+  /** Единственная активная задача: её локальные коммиты не push-ятся до финального review. */
+  activeTask?: ActiveTask;
   /** Сколько задач может идти одновременно (Issue `$streams N` или `--streams N`); нет — 1. */
   streams?: number;
   /** Недоделка: сессия этой задачи оборвалась с незакоммиченной работой. */
@@ -50,28 +74,8 @@ export interface LoopState {
   specUnlocked: Record<string, string[]>;
   /** Совместимость ручного `$spec` с его прежними незавершёнными запусками. */
   specRepairNotes: Record<string, string[]>;
-  /** Фаза после принятия кода: автор тестов либо ревью тестов. */
-  testPhase: Record<string, 'write' | 'review'>;
-  /** Возврат reviewer тестов, который получает только автор тестов. */
-  testFeedback: Record<string, string>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
-  /**
-   * Коммит последнего ВОЗВРАТ ревью по задаче: от него повторное ревью видит изменённые строки
-   * (review-scope.ts). Живёт до `[x]` задачи.
-   */
-  reviewReturns: Record<string, string>;
-  /**
-   * Дословный последний ВОЗВРАТ ревью по задаче. Следующая сессия исполнителя получает его
-   * напрямую; файл этапа остаётся историей, но больше не служит единственным каналом передачи.
-   * Живёт до `[x]` задачи.
-   */
-  reviewFeedback: Record<string, string>;
-  /**
-   * Сколько раз ревью вернуло задачу за все запуски цикла: лимит кругов считается на запуск, а это
-   * число показывает владельцу, сколько возвратов уже было. Живёт до `[x]` задачи.
-   */
-  returnTotals: Record<string, number>;
   /**
    * Задачи, которые `plan` заблокировал вопросом в `docs/QUESTIONS.md`, по задаче — снимок её
    * блока на момент блокировки. Пока блок не изменился, цикл не зовёт `plan` снова и выбирает
@@ -93,12 +97,7 @@ export async function loadState(root: string): Promise<LoopState> {
     spec: {},
     specUnlocked: {},
     specRepairNotes: {},
-    testPhase: {},
-    testFeedback: {},
     pullRequests: {},
-    reviewReturns: {},
-    reviewFeedback: {},
-    returnTotals: {},
     planBlocked: {},
   };
   const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
@@ -108,11 +107,36 @@ export async function loadState(root: string): Promise<LoopState> {
   if (text === '') return empty;
   const saved = JSON.parse(text) as Partial<LoopState>;
   // Старый `specRewrite` больше не даёт исполнителю править тесты: его не мигрируем.
-  const { specRewrite, ...current } = saved as Partial<LoopState> & {
+  const {
+    specRewrite,
+    testPhase,
+    testFeedback,
+    reviewReturns,
+    reviewFeedback,
+    returnTotals,
+    ...current
+  } = saved as Partial<LoopState> & {
     readonly specRewrite?: unknown;
+    readonly testPhase?: unknown;
+    readonly testFeedback?: unknown;
+    readonly reviewReturns?: unknown;
+    readonly reviewFeedback?: unknown;
+    readonly returnTotals?: unknown;
   };
-  void specRewrite;
-  return { ...empty, ...current };
+  void [specRewrite, testPhase, testFeedback, reviewReturns, reviewFeedback, returnTotals];
+  const activeTask = current.activeTask;
+  return {
+    ...empty,
+    ...current,
+    ...(activeTask === undefined
+      ? {}
+      : {
+          activeTask: {
+            ...activeTask,
+            workPrompt: activeTask.workPrompt ?? `$task ${activeTask.task}`,
+          },
+        }),
+  };
 }
 
 export async function saveState(root: string, state: LoopState): Promise<void> {

@@ -30,7 +30,7 @@ describe('вопрос исполнителя при недоделанной р
     expect(run.prompts[3]).toMatch(
       /^\$task 06\/T1j5-Б1 продолжить\nПока работа ждала, владелец ответил Issue #12 \(\$decide 06\/T1j5-Б1: старый тест заменить\)/u,
     );
-    expect(run.prompts[4]).toBe('$review 06/T1j5-Б1');
+    expect(run.prompts[4]?.split('\n')[0]).toBe('$review 06/T1j5-Б1');
     expect(run.closed).toContain(12);
     // Коммит ответа ждёт только `ci.yml`: workflow, сломанный задачей, не держит запись решения.
     expect(run.ciArgs[0]).toBe('');

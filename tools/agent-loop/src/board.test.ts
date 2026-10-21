@@ -94,21 +94,18 @@ describe('модель экрана', () => {
     expect(board.tail(0)).toEqual([]);
   });
 
-  it('число агентов с клавиатуры — от 1 до 4, читается циклом один раз', () => {
+  it('последовательный режим фиксирует одного агента', () => {
     const board = new Board(clock().now);
-    expect(board.requestLimit(9)).toBe(4);
-    expect(board.pendingLimit).toBe(4);
-    expect(board.shownLimit).toBe(4);
-    expect(board.takeLimit()).toBe(4);
+    expect(board.requestLimit(9)).toBe(1);
+    expect(board.pendingLimit).toBeUndefined();
+    expect(board.shownLimit).toBe(1);
     expect(board.takeLimit()).toBeUndefined();
     expect(board.requestLimit(0)).toBe(1);
   });
 
-  it('просьба, равная текущему пределу, снимает прежнюю', () => {
+  it('старый запрос потоков не меняет предел', () => {
     const board = new Board(clock().now);
-    board.limit = () => 2;
     board.requestLimit(3);
-    board.requestLimit(2);
     expect(board.pendingLimit).toBeUndefined();
     expect(board.takeLimit()).toBeUndefined();
   });
@@ -129,11 +126,11 @@ describe('модель экрана в цикле', () => {
     await runWorld({
       board,
       sessions: [
-        { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
-        { task: 'T1j5-Б1', mark: 'x', answer: 'OK' },
+        { answer: 'Готово', commit: true, push: false },
+        { answer: 'OK', push: false },
       ],
     });
-    expect(board.totals).toMatchObject({ done: 1, returns: 0, sessions: 2, ciGreen: 1, ciRed: 0 });
+    expect(board.totals).toMatchObject({ done: 1, returns: 0, sessions: 2, ciGreen: 2, ciRed: 0 });
     expect(board.agents()[0]).toMatchObject({ name: MAIN_AGENT });
     expect(board.agents()[0]?.phase).not.toBe('work');
   });
@@ -143,10 +140,11 @@ describe('модель экрана в цикле', () => {
     await runWorld({
       board,
       sessions: [
-        { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
-        { task: 'T1j5-Б1', mark: ' ', answer: 'ВОЗВРАТ\n- нет теста' },
-        { task: 'T1j5-Б1', mark: '~', answer: 'Готово' },
-        { task: 'T1j5-Б1', mark: 'x', answer: 'OK' },
+        { answer: 'Готово', commit: true, push: false },
+        { answer: 'ВОЗВРАТ\n- КОД: нет теста, packages/sim/src/task.ts:1', push: false },
+        { answer: 'Исправлено', commit: true, push: false },
+        { answer: 'OK', push: false },
+        { answer: 'OK', push: false },
       ],
     });
     expect(board.totals.returns).toBe(1);

@@ -33,6 +33,14 @@ export function taskMark(stageText: string, task: string): TaskMark | undefined 
   return mark === ' ' || mark === '~' || mark === 'x' || mark === '—' ? mark : undefined;
 }
 
+/** @returns текст этапа с новой отметкой ровно одной существующей задачи. */
+export function setTaskMark(stageText: string, task: string, mark: TaskMark): string {
+  const id = escapeRegExp(shortId(task));
+  const pattern = new RegExp(`^- \\[[^\\]]\\] (\\*\\*${id}\\.)`, 'm');
+  if (!pattern.test(stageText)) throw new Error(`задача ${task} не найдена в файле этапа`);
+  return stageText.replace(pattern, `- [${mark}] $1`);
+}
+
 /**
  * @returns номера задач из строки «Очередь» по порядку. Пояснения в строке
  * («после мержа PR…») номерами не считаются.

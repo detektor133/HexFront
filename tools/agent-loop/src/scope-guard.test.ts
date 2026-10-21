@@ -70,10 +70,10 @@ describe('сторож в цикле', () => {
   });
 
   it('обычная работа без правок цикла идёт на ревью как раньше', async () => {
-    const ok: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё подтверждено' };
+    const ok: Session = { answer: 'OK\nвсё подтверждено', push: false };
     const run = await runWorld({
       reviewFiles: 'M\tapps/client/src/Hud.tsx\n',
-      sessions: [{ task: 'T1j5-Б1', mark: '~', answer: 'Готово.' }, ok],
+      sessions: [{ answer: 'Готово.', commit: true, push: false }, ok],
     });
     expect(run.lines).toContain(`готово: ${TASK}`);
   });

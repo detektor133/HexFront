@@ -7,7 +7,6 @@ import type { GithubClient } from './github.ts';
 import { actionKey, openExternal, type ActionKey } from './owner-actions.ts';
 import { stopAllCommands } from './process.ts';
 import { renderFrame } from './screen.ts';
-import { MAX_STREAMS } from './state.ts';
 
 /** Как часто перечитывать STATUS и файл этапа для раздела этапа, мс. */
 const STAGE_REFRESH_MS = 15_000;
@@ -32,7 +31,6 @@ const SCREEN_ON = `${ESC}?1049h${ESC}?25l${ESC}2J`;
 const SCREEN_OFF = `${ESC}0m${ESC}?25h${ESC}?1049l`;
 
 export type KeyAction =
-  | { readonly kind: 'limit'; readonly value: number }
   | { readonly kind: 'wake' }
   | { readonly kind: 'action'; readonly key: ActionKey }
   | { readonly kind: 'quit'; readonly force: boolean };
@@ -43,15 +41,11 @@ export type KeyAction =
  * Кусок ввода длиннее одной клавиши — вставка текста, а не команда: иначе две «й» в вставленной
  * строке оборвали бы все сессии codex.
  */
-export function parseKey(chunk: string, limit: number): KeyAction | undefined {
+export function parseKey(chunk: string, _limit: number): KeyAction | undefined {
   if (chunk.includes('\u0003')) return { kind: 'quit', force: true };
   const key = chunk === '\r\n' ? '\r' : chunk;
   if (Array.from(key).length !== 1) return undefined;
   if (/^[qQйЙ]$/u.test(key)) return { kind: 'quit', force: false };
-  if (/^[+=]$/u.test(key)) return { kind: 'limit', value: limit + 1 };
-  if (/^[-_−]$/u.test(key)) return { kind: 'limit', value: limit - 1 };
-  if (new RegExp(`^[1-${MAX_STREAMS}]$`, 'u').test(key))
-    return { kind: 'limit', value: Number(key) };
   if (/^[\r\nrRкК]$/u.test(key)) return { kind: 'wake' };
   const action = actionKey(key);
   return action === undefined ? undefined : { kind: 'action', key: action };
@@ -246,14 +240,7 @@ export function createConsoleUi(
       screen.say('Нажми Q ещё раз, чтобы выйти: идущие сессии codex прервутся');
       return;
     }
-    if (action.kind === 'limit') {
-      const limit = board.requestLimit(action.value);
-      screen.say(
-        board.pendingLimit === undefined
-          ? `Агентов и так до ${limit}`
-          : `Агентов станет до ${limit}, как только цикл закончит текущий шаг`,
-      );
-    } else if (action.kind === 'action') {
+    if (action.kind === 'action') {
       performAction(action.key, {
         board,
         github,

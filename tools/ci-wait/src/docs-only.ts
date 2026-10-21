@@ -1,10 +1,7 @@
-// Шаг CI: пуш, который меняет только служебные docs (отметки этапа, STATUS, отчёты), не гоняет
-// `pnpm check` повторно, а наследует результат CI предыдущего пуша. Так зелёный CI на HEAD
-// по-прежнему означает зелёный код, а docs-коммит ревью проверяется за секунды, а не за 5 минут.
+// Шаг CI: пуш, который меняет только служебные docs, завершает workflow текущего SHA успешно
+// без повторного `pnpm check`. Кодовый родитель уже проверен оркестратором до docs-коммита.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-
-import { waitForCi } from './ci-wait.ts';
 
 /** Файлы, которые не читает ни один тест, линтер или генератор (`docs/` вне prettier и eslint). */
 const DOCS_ONLY_RE =
@@ -44,27 +41,15 @@ const gitDiff = (before: string, sha: string): readonly string[] | undefined => 
   }
 };
 
-/** @returns файл workflow из `GITHUB_WORKFLOW_REF` (`owner/repo/.github/workflows/ci.yml@ref`). */
-export function workflowFile(ref: string | undefined): string | undefined {
-  return ref?.split('@', 1)[0]?.split('/').at(-1) || undefined;
-}
-
 async function main(): Promise<number> {
   const sha = process.env.GITHUB_SHA ?? '';
   const before = process.env.BEFORE_SHA;
   const mode = decideMode({ event: process.env.GITHUB_EVENT_NAME, before, sha, diff: gitDiff });
   console.log(`mode=${mode}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\n`);
-  if (mode === 'full' || before === undefined) return 0;
-  // Результат своего workflow: `ci` наследует быстрый прогон, `slow` — прогон всех тестов.
-  const workflow = workflowFile(process.env.GITHUB_WORKFLOW_REF);
-  console.log(`только служебные docs: результат берётся из ${workflow ?? 'CI'} ${before}`);
-  return waitForCi({
-    repo: process.env.GITHUB_REPOSITORY ?? '',
-    sha: before,
-    ...(workflow === undefined ? {} : { workflow }),
-    ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}),
-  });
+  if (mode === 'docs')
+    console.log(`только служебные docs: workflow подтверждает текущий SHA ${sha}`);
+  return 0;
 }
 
 if (process.argv[1]?.endsWith('docs-only.ts')) {

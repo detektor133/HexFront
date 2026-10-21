@@ -16,6 +16,9 @@ interface WorkflowRun {
   readonly status: string;
   readonly conclusion: string | null;
   readonly html_url: string;
+  readonly run_number?: number;
+  readonly run_attempt?: number;
+  readonly created_at?: string;
   /** Путь файла workflow, `.github/workflows/pages.yml`. */
   readonly path?: string;
 }
@@ -112,13 +115,27 @@ const findFailedJob = (jobs: readonly WorkflowJob[]): WorkflowJob | undefined =>
 
 /** Workflow, который цикл ждёт отдельно и не дожидается в CI задачи: все тесты идут долго. */
 const SEPARATE_WORKFLOWS = ['slow.yml'];
+/** Workflow, без которых `--all-workflows` не может объявить push зелёным. */
+const REQUIRED_WORKFLOWS = ['pages.yml'];
 /** Отменённый прогон — не поломка: его заменил прогон нового push или его отменил человек. */
 const IGNORED_CONCLUSIONS = new Set(['cancelled']);
+
+const runOrder = (run: WorkflowRun): readonly [number, number, number] => [
+  run.run_number ?? 0,
+  run.run_attempt ?? 0,
+  run.id,
+];
+
+const newerRun = (left: WorkflowRun, right: WorkflowRun): number => {
+  const a = runOrder(left);
+  const b = runOrder(right);
+  return b[0] - a[0] || b[1] - a[1] || b[2] - a[2];
+};
 
 /** Последние прогоны остальных workflow SHA: по одному на файл, без основного и отдельных. */
 const otherRuns = (runs: readonly WorkflowRun[], main: WorkflowRun): WorkflowRun[] => {
   const seen = new Set<string>();
-  return runs.filter((run) => {
+  return [...runs].sort(newerRun).filter((run) => {
     const path = run.path ?? String(run.id);
     if (run.id === main.id || run.path === main.path || seen.has(path)) return false;
     seen.add(path);
@@ -127,8 +144,7 @@ const otherRuns = (runs: readonly WorkflowRun[], main: WorkflowRun): WorkflowRun
 };
 
 const findRun = (runs: readonly WorkflowRun[], sha: string): WorkflowRun | undefined =>
-  runs.find((run) => run.head_sha === sha && run.status === 'completed') ??
-  runs.find((run) => run.head_sha === sha);
+  [...runs].filter((run) => run.head_sha === sha).sort(newerRun)[0];
 
 const printFailedRun = async (
   fetchFn: FetchFn,
@@ -176,13 +192,14 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const apiBase = `https://api.github.com/repos/${options.repo}`;
   // Прогоны только своего workflow: иначе ожидание быстрого CI взяло бы прогон `slow`.
-  const runsUrl = `${apiBase}/actions/workflows/${options.workflow ?? DEFAULT_WORKFLOW}/runs?head_sha=${encodeURIComponent(options.sha)}`;
+  const query = `head_sha=${encodeURIComponent(options.sha)}&event=push`;
+  const runsUrl = `${apiBase}/actions/workflows/${options.workflow ?? DEFAULT_WORKFLOW}/runs?${query}`;
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'hexfront-ci-wait',
     'X-GitHub-Api-Version': '2022-11-28',
   };
-  const allRunsUrl = `${apiBase}/actions/runs?head_sha=${encodeURIComponent(options.sha)}`;
+  const allRunsUrl = `${apiBase}/actions/runs?${query}`;
   const checkOthers = options.otherWorkflows === true;
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
 
@@ -221,7 +238,16 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
         );
         if (failed) return printFailedRun(fetchFn, apiBase, headers, failed, writeLine);
         pendingOther = others.find((run) => run.status !== 'completed');
-        if (pendingOther === undefined) {
+        const missingRequired = REQUIRED_WORKFLOWS.filter(
+          (name) =>
+            !others.some(
+              (run) =>
+                run.path?.endsWith(`/${name}`) &&
+                run.status === 'completed' &&
+                run.conclusion === 'success',
+            ),
+        );
+        if (pendingOther === undefined && missingRequired.length === 0) {
           writeLine(`success ${lastRun.html_url}`);
           return 0;
         }

@@ -10,6 +10,8 @@ const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK\nвсё п
 const PLAN_UNTOUCHED: Session = {
   answer: 'Текст достаточный, числа и путь есть.\nPLAN: не трогал',
 };
+const commands = (prompts: readonly string[]): string[] =>
+  prompts.map((prompt) => prompt.split('\n')[0] ?? '');
 
 describe('роль plan перед исполнением задачи', () => {
   it('принимает уточнение отдельным блоком без изменения исходного текста', () => {
@@ -71,12 +73,12 @@ describe('роль plan перед исполнением задачи', () => {
 
   it('без роли plan в roles.json цикл работает по-старому', async () => {
     const run = await runWorld({ sessions: [NEXT_DONE, REVIEW_OK] });
-    expect(run.prompts).toEqual(['$next', `$review ${TASK}`]);
+    expect(commands(run.prompts)).toEqual([`$task ${TASK}`, `$review ${TASK}`]);
   });
 
   it('текст уже годный — plan его не трогает, задача идёт исполнителю как обычно', async () => {
     const run = await runWorld({ plan: true, sessions: [PLAN_UNTOUCHED, NEXT_DONE, REVIEW_OK] });
-    expect(run.prompts).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
     expect(run.roles).toEqual(['plan', '', 'reviewer']);
     expect(run.lines).toContain(`$plan ${TASK}: не трогал`);
     expect(run.lines).toContain(`готово: ${TASK}`);
@@ -98,7 +100,7 @@ describe('роль plan перед исполнением задачи', () => {
       files: ['docs/stages/stage-06-bots-balance.md', 'docs/DECISIONS.md'],
     };
     const run = await runWorld({ plan: true, sessions: [planFix, NEXT_DONE, REVIEW_OK] });
-    expect(run.prompts).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
     expect(run.lines).toContain(`$plan ${TASK}: уточнено`);
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
@@ -132,7 +134,7 @@ describe('роль plan перед исполнением задачи', () => {
       maxRounds: 1,
       sessions: [planSplit, workDone, reviewOk, planB, { answer: 'Готово.', commit: false }],
     });
-    expect(run.prompts.slice(0, 4)).toEqual([
+    expect(commands(run.prompts).slice(0, 4)).toEqual([
       `$plan ${TASK}`,
       '$task 06/T1j5-Б1a',
       '$review 06/T1j5-Б1a',
@@ -219,7 +221,7 @@ describe('роль plan перед исполнением задачи', () => {
       state: { planBlocked: { [TASK]: stale } },
       sessions: [PLAN_UNTOUCHED, NEXT_DONE, REVIEW_OK],
     });
-    expect(run.prompts).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
