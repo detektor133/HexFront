@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { loadState } from './state.ts';
-import { runWorld, type Session } from './test-world.ts';
+import { fixtureStage, runWorld, setMark, type Session } from './test-world.ts';
 
 describe('конвейер кода и тестов', () => {
   it('отделяет код от тестов и проверяет тесты до финального CI', async () => {
@@ -56,6 +56,22 @@ describe('конвейер кода и тестов', () => {
     const repair = run.prompts.find((prompt) => prompt.includes('ОБЯЗАТЕЛЬНЫЙ ВОЗВРАТ REVIEWER'));
     expect(repair).toContain('КОД: п. 2');
     expect(repair).not.toContain('ТЕСТ:');
+  });
+
+  it('после перезапуска продолжает автора тестов, а не выбирает новую задачу', async () => {
+    const tests: Session = { answer: 'Тесты добавлены.', commit: true };
+    const review: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'Тесты приняты.' };
+    const run = await runWorld({
+      test: true,
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      state: { testPhase: { '06/T1j5-Б1': 'write' } },
+      sessions: [tests, review],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$tests 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
   });
 
   it('загружает старые поля ручного $spec без влияния на очередь', async () => {

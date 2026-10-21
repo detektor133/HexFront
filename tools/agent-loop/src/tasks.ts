@@ -209,8 +209,9 @@ async function runTestAuthor(context: LoopContext, task: string): Promise<Work> 
   const feedback = context.state.testFeedback[task];
   const prompt = [
     `$tests ${task}`,
-    'Код уже принят reviewer. Пиши и коммить только тесты реальных путей и краёв.',
-    'Возврат тестов исправляешь ты; код продукта не меняй.',
+    'Ты отдельный автор тестов. Код уже принят reviewer.',
+    'Пиши и коммить только тесты реальных путей, критериев и краёв; код продукта не меняй.',
+    'Возврат `ТЕСТ:` исправляешь ты. Дефект `КОД:` получает исполнитель, не ты.',
     ...(feedback === undefined ? [] : ['ВОЗВРАТ REVIEWER ТЕСТОВ:', feedback]),
   ].join('\n');
   const result = await session(context, 'test', prompt);

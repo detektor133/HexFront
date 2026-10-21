@@ -106,6 +106,19 @@ async function tick(context: LoopContext): Promise<Step> {
   if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
+  const pendingTests = Object.keys(state.testPhase).find(
+    (task) => taskBlock(stage.stageText, task) !== '',
+  );
+  if (pendingTests !== undefined) {
+    await context.say(`продолжаю фазу тестов ${pendingTests} после перезапуска`);
+    return (
+      await processTask(context, pendingTests, {
+        // Код уже принят; mark не должен снова запускать исполнителя.
+        mark: '~',
+        workPrompt: `$task ${pendingTests}`,
+      })
+    ).step;
+  }
   const selected = await selectPlannedTask(context, stage);
   if (selected === undefined) return closeStage(context, await readStage(config.root));
   if (typeof selected === 'string') return selected;
