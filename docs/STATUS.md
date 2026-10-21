@@ -16,8 +16,8 @@
 
 ## Следующая сессия
 
-- 07/T17ao выполнена: невыбранные фронты и линии обороны рисуются цветом армии с `alpha = 1`; выбор меняет только ручки и ширину фронта.
-- Тест `apps/client/test/plan-layer.test.ts` проверяет четыре отрисовки через реальный `createPlanLayer(...).setView(...)`.
-- Следующая задача: 07/T17ap — непрерывное рисование фронта и линии обороны.
-- Читать: блок T17ap в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-draft.ts`, `apps/client/src/dev/plan-edges.ts`, `apps/client/src/match/MatchSurfaceRuntime.tsx`.
+- 07/T17ao возвращена на доработку: тест не проверяет отсутствие ручек у невыбранного фронта и геометрию/зубцы линии обороны.
+- `pnpm verify --changed` — зелёный; после исправления нужны проверки реального `createPlanLayer(...).setView(...)` для этих свойств.
+- Следующая сессия: 07/T17ao.
+- Читать: блок T17ao в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-layer.ts`, `apps/client/test/plan-layer.test.ts`.
 - Последняя проверка: `pnpm verify --changed` — зелёный.
