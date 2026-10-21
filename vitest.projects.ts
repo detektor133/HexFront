@@ -39,7 +39,6 @@ export const SLOW_TESTS = [
   'apps/client/test/view-delta-memory.test.ts',
   'tools/evolve/src/index.test.ts',
   'tools/replay/src/acceptance.test.ts',
-  'tools/agent-loop/src/streams.test.ts',
 ] as const;
 
 const SLOW_TEST_TIMEOUT_MS = 120_000;
