@@ -504,11 +504,13 @@ export function useSandbox(
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      const currentTool = toolRef.current;
+      v.setStroke(currentTool && currentTool.tool !== 'erase' ? input.stroke : null);
       if (viewRef.current) applyStartCameraToView(viewRef.current);
       v.setBottomInset(dockHeightRef.current);
       v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
-      v.setGrab((world) => input.grab(world) ?? splitGrab(world));
+      v.setGrab((world) => (toolRef.current ? null : (input.grab(world) ?? splitGrab(world))));
       v.setOrderHooks(hooks);
       const radialHooks: RadialHooks = {
         canOpen(world) {

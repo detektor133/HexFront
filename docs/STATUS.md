@@ -16,10 +16,10 @@
 
 ## Следующая сессия
 
-- 07/T17ap возвращена на доработку: приёмочные тесты не проходят реальный путь `MapView.attachInput → MatchSurfaceRuntime → send` и не проверяют удалённые точки, недопустимый участок и полный payload.
-- Фронт и линия обороны используют существующие `assignFront` и `setDefenseLine`; отмена очищает черновик без отправки.
-- Тест `apps/client/test/t17ap-plan-stroke.test.ts` проверяет быстрый росчерк по фронту и линии обороны, payload при отпускании и отмену.
-- `pnpm verify --changed` — зелёный.
-- Следующая сессия: `$review 07/T17ap`, затем 07/T17aq.
-- Читать: блок T17ap в `docs/stages/stage-07-playable-build.md`, `apps/client/src/dev/plan-draft.ts`, `apps/client/src/dev/plan-tools.ts`, `apps/client/test/t17ap-plan-stroke.test.ts`.
-- Последняя проверка: `pnpm verify --changed` — зелёный.
+- 07/T17ap исправлена: acceptance-тесты монтируют MatchSurface и проходят путь MapView.attachInput → MatchSurfaceRuntime → send.
+- Реальные canvas-сценарии проверяют точные assignFront и setDefenseLine, удалённые точки, соседние переходы, запрет без моста и отмену без send.
+- MatchSurfaceRuntime применяет выбранный инструмент после создания MapView и не передаёт grab в split-drag во время рисования.
+- Временные мутации wiring, split-grab и payload дали RED; восстановленный код прошёл GREEN.
+- Следующая сессия: $review 07/T17ap, затем 07/T17aq.
+- Читать: блок T17ap в docs/stages/stage-07-playable-build.md, apps/client/src/match/MatchSurfaceRuntime.tsx, apps/client/test/t17ap-plan-stroke.test.ts.
+- Последняя проверка: pnpm verify --changed — зелёный.
