@@ -206,6 +206,7 @@ function findBlockedLineScenario(
         return {
           points: [
             hexCenter(hexFromId(first, map.width), radius),
+            hexCenter(hexFromId(4478, map.width), radius),
             hexCenter(hexFromId(last, map.width), radius),
           ],
           first,
@@ -371,8 +372,13 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     stroke([...scenario.points, scenario.points[0] as { x: number; y: number }], world);
     view.hexes.owner[scenario.last] = originalOwner as number;
     expect(harness.commands).toEqual([
-      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [scenario.first] },
+      { t: 'setDefenseLine', armyId: view.armies[0]?.id, points: [scenario.first, 4477, 4478] },
     ]);
+    expect(harness.commands[0]).not.toEqual({
+      t: 'setDefenseLine',
+      armyId: view.armies[0]?.id,
+      points: [scenario.first, 4477, 4478, scenario.last],
+    });
   });
 
   it('не создаёт мост через запрет во фронте и отменяет непустой жест без send', async () => {
