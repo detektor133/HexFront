@@ -14,31 +14,11 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, syncWithOrigin } from './git.ts';
+import { runPlan } from './plan.ts';
 import { lastReturnItems, withReviewFeedback } from './return-guard.ts';
-import { remarkRefs, samePath } from './review-scope.ts';
 import { runReview } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { waitForAnswer, withAnswer } from './shelve.ts';
-import {
-  adoptOwnerSpec,
-  forgetSpec,
-  mentionsSpec,
-  pendingSpecReturn,
-  placeSpec,
-  prepareSpec,
-  returnedForSpec,
-  SPEC_REMARK_RE,
-  specRemarks,
-  setSpecAside,
-  specEnabled,
-  specFiles,
-  specViolation,
-  unlockedFiles,
-  unlockSpec,
-  withSpec,
-  withUnlocked,
-  writeSpec,
-} from './spec.ts';
 import { commandTask, reviewTasks, taskBlock } from './stage-file.ts';
 
 /** Итог сессии работы: задача на ревью, повторить работу или шаг цикла. */
@@ -55,9 +35,6 @@ export interface TaskRun {
 /** Сколько раз за круги одной задачи цикл сам повторяет работу после `$accept` или красного CI. */
 const MAX_FOLLOW_UPS = 2;
 
-/** Сколько раз за задачу `$spec` чинит тесты по разным замечаниям исполнителя. */
-const MAX_SPEC_REPAIRS = 3;
-
 /** Сколько всего возвратов было за все запуски цикла, если больше кругов одного запуска. */
 const totalNote = (context: LoopContext, task: string): string => {
   const total = context.state.returnTotals[task] ?? 0;
@@ -69,20 +46,6 @@ export const resumePrompt = (task: string): string => `$task ${task} продо�
 export const ciFixPrompt = (task: string, line: string): string =>
   `$task ${task} CI красный: ${line}`;
 const step = (value: Step): Work => ({ kind: 'step', step: value });
-
-/** Пути только из строк `СПЕК:` возврата: старый state мог уже забыть исходный список `$spec`. */
-const mentionedSpecFiles = (context: LoopContext, task: string, message: string): string[] => {
-  const known = specFiles(context, task);
-  return [
-    ...new Set(
-      message
-        .split(/\r?\n/u)
-        .filter((line) => SPEC_REMARK_RE.test(line))
-        .flatMap((line) => remarkRefs(line).map((ref) => ref.path))
-        .map((path) => known.find((candidate) => samePath(candidate, path)) ?? path),
-    ),
-  ];
-};
 
 /**
  * Миграция незакрытого возврата прежней версии цикла: восстанавливает активный handoff из блока
@@ -159,37 +122,6 @@ async function followUp(
   );
 }
 
-/**
- * Исполнитель остановился на сломанном приёмочном тесте: `$spec` чинит тест по его замечанию,
- * работа исполнителя остаётся в дереве и продолжается. Разные замечания (окружение, потом
- * нехватка проверки) чинятся по очереди; то же замечание снова — `$spec` его не исправил.
- */
-async function repairSpec(
-  context: LoopContext,
-  task: string,
-  remarks: string,
-  accepted: Set<string>,
-): Promise<Work> {
-  const { state } = context;
-  const notes = state.specRepairNotes[task] ?? [];
-  const note = remarks.trim();
-  const reason = notes.includes(note)
-    ? `$spec не исправил приёмочные тесты ${task} по тому же замечанию — повторю автоматически`
-    : notes.length >= MAX_SPEC_REPAIRS
-      ? `приёмочные тесты ${task} чинились ${notes.length} раза и снова мешают — повторю автоматически`
-      : undefined;
-  if (reason !== undefined) return step(await backoff(context, reason, remarks));
-  state.specRepairNotes = { ...state.specRepairNotes, [task]: [...notes, note] };
-  await save(context);
-  await context.say(`исполнитель: приёмочные тесты ${task} сломаны — их чинит $spec`);
-  await placeSpec(context, task);
-  const stop = await writeSpec(context, task, `Исполнитель задачи:\n${remarks}`);
-  if (stop !== undefined) return step(stop);
-  state.resume = task;
-  await save(context);
-  return runWork(context, task, resumePrompt(task), accepted);
-}
-
 /** Сессия работы над задачей; незакоммиченная работа доделывается одной сессией `продолжить`. */
 async function runWork(
   context: LoopContext,
@@ -198,19 +130,11 @@ async function runWork(
   accepted: Set<string>,
 ): Promise<Work> {
   const { git, state } = context;
-  // До сессии: тест, исправленный владельцем, — не нарушение исполнителя (`$task` из Issue
-  // идёт без `placeSpec`).
-  await adoptOwnerSpec(context, task);
-  const locked = specFiles(context, task);
-  const unlocked = unlockedFiles(context, task);
   const base = await head(git);
   // Приёмочные тесты написаны для этой задачи: `$next` выбрал бы задачу сам, и 2026-10-14
   // исполнитель с тестами 07/T1 взял 07/T2. Задача с тестами идёт по номеру.
   const pinned =
-    prompt === '$next' &&
-    (locked.length > 0 || unlocked !== undefined || state.reviewFeedback[task] !== undefined)
-      ? `$task ${task}`
-      : prompt;
+    prompt === '$next' && state.reviewFeedback[task] !== undefined ? `$task ${task}` : prompt;
   // Оборванная сессия (Ctrl+C, сбой ПК) оставляет работу в дереве: перезапуск её доделает.
   // Только когда задача известна заранее: `$next` без тестов выбирает её сам.
   if (pinned !== '$next') {
@@ -218,32 +142,12 @@ async function runWork(
     await save(context);
   }
   const full = withReviewFeedback(
-    withUnlocked(
-      withSpec(await withAnswer(context, pinned, resumePrompt(task)), task, locked),
-      task,
-      unlocked,
-    ),
+    await withAnswer(context, pinned, resumePrompt(task)),
     task,
     state.reviewFeedback[task],
   );
-  const work = await session(context, 'next', full, locked);
-  // Исполнитель не может менять закрытые приёмочные тесты. Их поломку (lint, окружение) по строке
-  // `СПЕК:` исполнителя чинит $spec; возврат ревью о тесте в блоке задачи их открывает
-  // исполнителю. Строка возврата остаётся в блоке до коммита задачи.
-  if (work.failure === undefined && locked.length > 0 && (await head(git)) === base) {
-    const own = specRemarks(work.message);
-    if (own !== '') return repairSpec(context, task, own, accepted);
-    const { stageText } = await readStage(context.config.root);
-    const returned = returnedForSpec(taskBlock(stageText, task), locked).trim();
-    if (returned !== '' && !(state.specRepairNotes[task] ?? []).includes(returned)) {
-      await unlockSpec(context, task);
-      state.resume = task;
-      await save(context);
-      return runWork(context, task, resumePrompt(task), accepted);
-    }
-  }
-  // Остановка с вопросом оставляет в дереве только приёмочные тесты: они вернутся к работе.
-  const dirty = (await dirtyFiles(git)) !== '' && !(await setSpecAside(context, task));
+  const work = await session(context, 'next', full);
+  const dirty = (await dirtyFiles(git)) !== '';
   if (work.failure !== undefined) {
     if (dirty) state.resume = task;
     else delete state.resume;
@@ -285,8 +189,6 @@ async function runWork(
     context.config.board?.task(agentName(context), review);
     await context.say(`${firstLine(prompt)} взял ${review} вместо ${task}`);
   }
-  const violation = await specViolation(context, review);
-  if (violation !== undefined) return step(await park(context, `spec:${review}`, violation));
   return { kind: 'review', task: review, message: work.message };
 }
 
@@ -313,8 +215,6 @@ export async function processTask(
     readonly mark: string;
     readonly workPrompt: string;
     readonly resume?: boolean;
-    /** Писать приёмочные тесты `$spec` до работы; Issue с `$task` передаёт true явно. */
-    readonly spec?: boolean;
   },
 ): Promise<TaskRun> {
   const { config, say } = context;
@@ -326,14 +226,7 @@ export async function processTask(
   let needsWork = options.resume === true || options.mark !== '~';
   let prompt = options.resume === true ? resumePrompt(task) : options.workPrompt;
   let followUps = 0;
-  const writesSpec = options.spec ?? options.workPrompt === '$next';
   for (let round = 1; round <= config.maxRounds;) {
-    if (needsWork && writesSpec) {
-      if (round === 1 && prompt === options.workPrompt && specEnabled(context))
-        await pendingSpecReturn(context, current);
-      const stop = await prepareSpec(context, current, prompt === options.workPrompt);
-      if (stop !== undefined) return { step: stop, done: false };
-    }
     const work = needsWork
       ? await runWork(context, current, prompt, accepted)
       : { kind: 'review' as const, task: current };
@@ -359,7 +252,6 @@ export async function processTask(
     const verdict = await runReview(context, current);
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (verdict.mark === 'x') {
-      await forgetSpec(context, current);
       context.state.reviewFeedback = Object.fromEntries(
         Object.entries(context.state.reviewFeedback).filter(([key]) => key !== current),
       );
@@ -374,19 +266,12 @@ export async function processTask(
       await say(`готово: ${current}`);
       return { step: 'worked', done: true };
     }
-    // Ревью нашло, что приёмочные тесты не совпадают с задачей: их исправляет исполнитель.
     // 2026-10-14, 07/T1: ревью написало о нехватке в приёмочном тесте без `СПЕК:`, и исполнитель,
-    // которому тест менять нельзя, встал. Ссылка на файл теста — тоже замечание к тестам.
+    // который владеет тестами, исправляет проверку и код в следующем атомарном изменении.
     context.state.reviewFeedback = {
       ...context.state.reviewFeedback,
       [current]: verdict.message,
     };
-    if (
-      SPEC_REMARK_RE.test(verdict.message) ||
-      mentionsSpec(verdict.message, specFiles(context, current))
-    )
-      await unlockSpec(context, current, mentionedSpecFiles(context, current, verdict.message));
-    else if (specEnabled(context)) await pendingSpecReturn(context, current);
     config.board?.count('returns');
     context.state.returnTotals = {
       ...context.state.returnTotals,
@@ -394,6 +279,16 @@ export async function processTask(
     };
     await save(context);
     await say(`ВОЗВРАТ ${current}, круг ${round} из ${config.maxRounds}`);
+    if (round === config.maxRounds) {
+      await say(
+        `${config.maxRounds} ВОЗВРАТ подряд по ${current}${totalNote(context, current)} — начинаю новый автоматический цикл`,
+      );
+      if (context.definitions.roles.plan === undefined) return { step: 'worked', done: false };
+      const planned = await runPlan(context, current);
+      if (typeof planned === 'string') return { step: planned, done: false };
+      await say(`$plan ${current}: повторные возвраты разобраны, продолжаю очередь автоматически`);
+      return { step: 'worked', done: false };
+    }
     needsWork = true;
     round += 1;
   }

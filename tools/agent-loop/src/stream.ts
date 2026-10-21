@@ -74,7 +74,6 @@ async function work(context: LoopContext, task: string): Promise<Step | 'done'> 
   const run = await processTask(context, task, {
     mark,
     workPrompt: `$task ${task}`,
-    spec: true,
     resume,
   });
   return run.done ? 'done' : run.step;

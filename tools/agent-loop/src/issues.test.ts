@@ -173,29 +173,19 @@ describe('Issues в цикле', () => {
     expect(run.comments[0]).toContain('вне permissions.json');
   });
 
-  it('$task из Issue проходит $plan и $spec до реализации', async () => {
+  it('$task из Issue проходит $plan перед реализацией без автоматического $spec', async () => {
     const run = await runWorld({
       stage: ownerParked,
       plan: true,
-      spec: true,
       issues: [issue(24, '$task 06/T2')],
       sessions: [
         { answer: 'PLAN: не трогал' },
-        {
-          answer: 'Тесты написаны',
-          writes: { 'apps/client/test/accept.test.ts': 'export {};\n' },
-          commit: false,
-        },
         { task: 'T2', mark: '~', answer: 'Готово' },
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts.slice(0, 3)).toEqual([
-      '$plan 06/T2',
-      '$spec 06/T2',
-      expect.stringContaining('$task 06/T2'),
-    ]);
-    expect(run.locked[2]).toContain('apps/client/test/accept.test.ts');
+    expect(run.prompts).toEqual(['$plan 06/T2', '$task 06/T2', '$review 06/T2']);
+    expect(run.locked).toEqual(['', '', '']);
     expect(run.closed).toEqual([24]);
   });
 

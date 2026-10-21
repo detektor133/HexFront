@@ -16,7 +16,7 @@ import {
   type Step,
 } from './context.ts';
 import { applyLimitRequest, applyRetries, runStreams, streamLimit } from './dispatcher.ts';
-import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
+import { currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
@@ -47,24 +47,6 @@ export {
 /** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
 async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   const { state, config } = context;
-  // Приёмочные тесты кладутся в дерево прямо перед работой над своей задачей: прерванную
-  // до этой версии цикла сессию (Ctrl+C) они называют без `--resume`.
-  // Пути по одному файлу: новый каталог с тестами `git status` иначе показал бы одной строкой.
-  const changed = new Set(await changedPaths(context.git));
-  const placed = Object.entries(state.spec).filter(([, spec]) => {
-    const paths = Object.keys(spec);
-    return paths.length > 0 && paths.every((path) => changed.has(path));
-  });
-  const [only, ...others] = placed;
-  // Ожидание владельца тоже оставляет тесты в дереве: доделка — только после перезапуска цикла.
-  if (
-    state.resume === undefined &&
-    state.parked === undefined &&
-    state.waitingAnswer === undefined &&
-    only &&
-    others.length === 0
-  )
-    state.resume = only[0];
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
     return (await processTask(context, state.resume, { mark, workPrompt: '$next', resume: true }))

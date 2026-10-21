@@ -206,7 +206,7 @@ async function runTaskIssue(
   // Текст владельца под командой — часть поручения: 2026-10-15, 07/T13 (#21) исполнитель получил
   // только `$task 07/T13` и не увидел, что первым делать живой фон меню.
   const workPrompt = command.skill === 'task' ? command.prompt : `$task ${task}`;
-  const run = await processTask(context, task, { mark, workPrompt, spec: true });
+  const run = await processTask(context, task, { mark, workPrompt });
   if (run.done)
     return finish(
       context,

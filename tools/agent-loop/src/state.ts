@@ -44,18 +44,12 @@ export interface LoopState {
   slowRerun?: string;
   /** HEAD, на котором цикл записал красный `slow` багом через `$bug`; снимается зелёным. */
   slowBug?: string;
-  /**
-   * Замечания исполнителя к приёмочным тестам, по которым `$spec` уже чинил их, по задаче:
-   * то же замечание снова или слишком много починок — к владельцу.
-   */
-  specRepairNotes: Record<string, string[]>;
-  /** Приёмочные тесты `$spec` по задаче: путь → содержимое; исполнитель коммитит их без изменений. */
+  /** Ручной `$spec`: снимки тестов. Автоматическая очередь это поле не читает. */
   spec: Record<string, Record<string, string>>;
-  /**
-   * Приёмочные тесты, открытые возвратом ревью «СПЕК:», по задаче: пути файлов. Их исправляет
-   * исполнитель, `$spec` заново их не пишет; запись живёт до `[x]` задачи.
-   */
+  /** Совместимость ручного `$spec` с его прежними незавершёнными запусками. */
   specUnlocked: Record<string, string[]>;
+  /** Совместимость ручного `$spec` с его прежними незавершёнными запусками. */
+  specRepairNotes: Record<string, string[]>;
   /** PR закрытого этапа по ветке. */
   pullRequests: Record<string, string>;
   /**
@@ -92,9 +86,9 @@ export async function loadState(root: string): Promise<LoopState> {
     answeredIssues: [],
     recentIssues: {},
     slowFixes: [],
-    specRepairNotes: {},
     spec: {},
     specUnlocked: {},
+    specRepairNotes: {},
     pullRequests: {},
     reviewReturns: {},
     reviewFeedback: {},
@@ -106,18 +100,13 @@ export async function loadState(root: string): Promise<LoopState> {
     throw error;
   });
   if (text === '') return empty;
-  const { specRewrite, ...saved } = JSON.parse(text) as Partial<LoopState> & {
-    readonly specRewrite?: Record<string, { readonly files: Record<string, string> }>;
+  const saved = JSON.parse(text) as Partial<LoopState>;
+  // Старый `specRewrite` больше не даёт исполнителю править тесты: его не мигрируем.
+  const { specRewrite, ...current } = saved as Partial<LoopState> & {
+    readonly specRewrite?: unknown;
   };
-  // Просьбы переписать тесты прежней версии цикла: теперь эти тесты исправляет исполнитель.
-  const rewrites = Object.entries(specRewrite ?? {}).map(
-    ([task, rewrite]) => [task, Object.keys(rewrite.files)] as const,
-  );
-  return {
-    ...empty,
-    ...saved,
-    specUnlocked: { ...saved.specUnlocked, ...Object.fromEntries(rewrites) },
-  };
+  void specRewrite;
+  return { ...empty, ...current };
 }
 
 export async function saveState(root: string, state: LoopState): Promise<void> {

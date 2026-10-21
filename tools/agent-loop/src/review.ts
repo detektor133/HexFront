@@ -19,7 +19,6 @@ import {
   scopeNote,
   type ReviewScope,
 } from './review-scope.ts';
-import { specFiles, unlockedFiles } from './spec.ts';
 import { taskBlock, taskMark } from './stage-file.ts';
 
 /** Вердикт `$review`: новая отметка задачи и ответ ревью (замечания к приёмочным тестам). */
@@ -36,20 +35,7 @@ async function reviewSession(
 ): Promise<Verdict | Step> {
   const { git } = context;
   const base = await head(git);
-  const files = specFiles(context, task);
-  const unlocked = unlockedFiles(context, task);
-  const lines = [
-    `$review ${task}`,
-    ...notes,
-    ...(files.length === 0
-      ? []
-      : [`Приёмочные тесты задачи, написанные $spec до кода: ${files.join(', ')}`]),
-    ...(unlocked === undefined
-      ? []
-      : [
-          `Приёмочные тесты задачи исправлял исполнитель по возврату «СПЕК:»${unlocked.length === 0 ? '' : `: ${unlocked.join(', ')}`} — сверь их с текстом задачи заново`,
-        ]),
-  ];
+  const lines = [`$review ${task}`, ...notes];
   const review = await session(context, 'review', lines.join('\n'));
   const checked = await afterReview(context, task, base, review);
   if (typeof checked === 'string') return checked;
