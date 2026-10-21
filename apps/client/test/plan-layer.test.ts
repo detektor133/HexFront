@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { edgeOf, loadMap, type PlanView } from '@hexfront/sim';
 
+import { frontHandles } from '../src/dev/plan-draft.ts';
 import {
   createPlanLayer,
   frontAppearance,
@@ -95,6 +96,7 @@ describe('видимость линии фронта', () => {
       ? { id: selected.id + 1000, number: selected.number + 1, name: 'Тестовая армия', auto: false }
       : undefined;
     if (!selected || !other) throw new Error('недостаточно данных для теста');
+    const centers = (hex: number): { x: number; y: number } => ({ x: hex * 30 + 10, y: 20 });
     const plans: PlanView[] = [selected, other].flatMap((army, index) => [
       {
         armyId: army.id,
@@ -112,7 +114,7 @@ describe('видимость линии фронта', () => {
         armyId: army.id,
         kind: 'line' as const,
         edges: [],
-        hexes: [index],
+        hexes: index === 0 ? [0, 1] : [2, 3],
         offensive: null,
         zone: [],
         stuck: false,
@@ -122,9 +124,11 @@ describe('видимость линии фронта', () => {
       },
     ]);
     const view = { ...snapshot.view, armies: [selected, other], plans };
-    const layer = createPlanLayer(loaded.map, tokens.map.hexRadius, () => ({ x: 0, y: 0 }));
+    const layer = createPlanLayer(loaded.map, tokens.map.hexRadius, centers);
     const strokes: Array<{ alpha?: number; width?: number; color?: string }> = [];
-    const stroke = vi.spyOn(GraphicsContext.prototype, 'stroke').mockImplementation(function (
+    const circles: Array<{ x: number; y: number; radius: number }> = [];
+    const paths: Array<{ kind: 'move' | 'line'; x: number; y: number }> = [];
+    vi.spyOn(GraphicsContext.prototype, 'stroke').mockImplementation(function (
       this: GraphicsContext,
       ...args
     ) {
@@ -133,6 +137,31 @@ describe('видимость линии фронта', () => {
         const value = options as { alpha?: number; width?: number; color?: string };
         strokes.push(value);
       }
+      return this;
+    });
+    vi.spyOn(GraphicsContext.prototype, 'circle').mockImplementation(function (
+      this: GraphicsContext,
+      x: number,
+      y: number,
+      radius: number,
+    ) {
+      circles.push({ x, y, radius });
+      return this;
+    });
+    vi.spyOn(GraphicsContext.prototype, 'moveTo').mockImplementation(function (
+      this: GraphicsContext,
+      x: number,
+      y: number,
+    ) {
+      paths.push({ kind: 'move', x, y });
+      return this;
+    });
+    vi.spyOn(GraphicsContext.prototype, 'lineTo').mockImplementation(function (
+      this: GraphicsContext,
+      x: number,
+      y: number,
+    ) {
+      paths.push({ kind: 'line', x, y });
       return this;
     });
     try {
@@ -161,6 +190,61 @@ describe('видимость линии фронта', () => {
       expect(otherTicks.every(({ alpha }) => alpha === 1)).toBe(true);
       expect(otherCasing?.alpha).toBe(1);
 
+      const selectedFront = plans.find(
+        (plan): plan is PlanView & { kind: 'front' } =>
+          plan.armyId === selected.id && plan.kind === 'front',
+      );
+      if (!selectedFront) throw new Error('нужен фронт выбранной армии');
+      const expectedHandles = frontHandles(
+        { map: loaded.map, view, radius: tokens.map.hexRadius },
+        selectedFront,
+      );
+      const handleCircles = circles.filter(({ radius }) => radius === tokens.front.handleRadius);
+      expect(handleCircles).toHaveLength(expectedHandles.length);
+      expect(handleCircles).toEqual(
+        expect.arrayContaining(
+          expectedHandles.map(({ x, y }) => ({ x, y, radius: tokens.front.handleRadius })),
+        ),
+      );
+
+      const pathPairs = paths.flatMap(
+        (
+          path,
+          index,
+        ): Array<
+          [
+            { kind: 'move' | 'line'; x: number; y: number },
+            { kind: 'move' | 'line'; x: number; y: number },
+          ]
+        > => {
+          const next = paths[index + 1];
+          return path.kind === 'move' && next?.kind === 'line' ? [[path, next]] : [];
+        },
+      );
+      expect(pathPairs).toEqual(
+        expect.arrayContaining([
+          [
+            { kind: 'move', x: centers(0).x, y: centers(0).y },
+            { kind: 'line', x: centers(1).x, y: centers(1).y },
+          ],
+        ]),
+      );
+      const teeth = pathPairs.filter(
+        ([from, to]) =>
+          from.y === centers(0).y &&
+          to.y !== from.y &&
+          (from.x === centers(0).x + tokens.armies.defenseTeeth.spacing / 2 ||
+            from.x === centers(0).x + tokens.armies.defenseTeeth.spacing * 1.5),
+      );
+      expect(teeth).toHaveLength(2);
+      expect(
+        teeth.every(
+          ([from, to]) =>
+            Math.abs(to.y - from.y) ===
+            tokens.armies.defenseTeeth.length + tokens.front.width[1] / 2,
+        ),
+      ).toBe(true);
+
       for (const army of [selected, other]) {
         const armyStrokes = strokes.filter(
           ({ alpha, color, width }) =>
@@ -182,7 +266,7 @@ describe('видимость линии фронта', () => {
       expect(plainStrokes).toHaveLength(4);
       expect(plainStrokes.every(({ alpha }) => alpha === 1)).toBe(true);
     } finally {
-      stroke.mockRestore();
+      vi.restoreAllMocks();
       layer.destroy();
     }
   });
