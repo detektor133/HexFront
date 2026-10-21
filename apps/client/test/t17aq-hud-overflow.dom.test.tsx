@@ -125,6 +125,9 @@ describe('07/T17aq: верхняя панель без переполнения'
 
   it('на 360 px применяет мобильные ограничения, сохраняет одну строку и приросты', () => {
     const hud = renderHud(360);
+    expect(hud.scrollWidth).toBeLessThanOrEqual(360);
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(360);
+    expect(document.body.scrollWidth).toBeLessThanOrEqual(360);
     const hudDeclarations = getApplicableDeclarations(hud, 360);
     expect(
       hudDeclarations.some((style) => style.padding === 'var(--space-xs) var(--space-xs)'),
