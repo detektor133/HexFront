@@ -72,7 +72,7 @@ export async function runPlan(
     );
   const unsynced = await syncWithOrigin(git, false);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
-  const outcome = OUTCOME_RE.exec(result.message)?.[1];
+  const outcome = OUTCOME_RE.exec(result.message)?.[1] as PlanOutcome['outcome'] | undefined;
   if (outcome === undefined)
     return park(
       context,

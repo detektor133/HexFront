@@ -38,8 +38,9 @@ const TEST_REPAIR_RE = /^РЕМОНТ:\s*(ИСПРАВЛЕНО|КОД|НЕПРО
 
 export function parseTestRepair(message: string): TestRepairOutcome | undefined {
   const match = TEST_REPAIR_RE.exec(message);
-  if (match?.[1] === 'ИСПРАВЛЕНО') return { kind: 'fixed' };
-  const detail = match?.[2]?.trim();
+  if (!match) return undefined;
+  if (match[1] === 'ИСПРАВЛЕНО') return { kind: 'fixed' };
+  const detail = match[2]?.trim();
   if (!detail) return undefined;
   return match[1] === 'КОД' ? { kind: 'code', detail } : { kind: 'untestable', detail };
 }

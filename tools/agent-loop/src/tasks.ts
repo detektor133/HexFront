@@ -18,6 +18,7 @@ import {
 } from './context.ts';
 import { diagnoseFinding, findingPrompt, runTestFix } from './finding-repair.ts';
 import { currentBranch, dirtyFiles, head, remoteHead } from './git.ts';
+import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
@@ -147,6 +148,13 @@ async function recoverCommittedWork(
       return park(context, `scope:${task}`, scopeViolation(task, forbidden));
   }
   return undefined;
+}
+
+async function changedPathsBetween(context: LoopContext, base: string): Promise<string[]> {
+  return (await context.git.run(['diff', '--name-only', `${base}..HEAD`]))
+    .split(/\r?\n/u)
+    .map((path) => path.trim())
+    .filter(Boolean);
 }
 
 async function headFile(context: LoopContext, path: string): Promise<string> {
