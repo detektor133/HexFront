@@ -131,7 +131,13 @@ describe('последовательный конвейер задачи', () =>
     expect(run.verifyCalls).toBe(1);
   });
 
-  it('не отправляет красный repair-spec на review и не повторяет его автоматически', async () => {
+  it('даёт repair-spec вторую попытку после своего красного verify, затем не повторяет и не шлёт на review', async () => {
+    const specFix: Session = {
+      answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+      writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
+      commit: true,
+      push: false,
+    };
     const run = await runWorld({
       spec: true,
       sessions: [
@@ -142,21 +148,56 @@ describe('последовательный конвейер задачи', () =>
         },
         codeCommit(),
         review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        {
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
-          commit: true,
-          push: false,
-        },
+        specFix,
+        specFix,
       ],
-      verify: ['verify: FAIL'],
+      verify: ['verify: FAIL', 'verify: FAIL'],
     });
 
     expect(run.prompts.filter((prompt) => prompt.startsWith('$review'))).toHaveLength(1);
-    expect(run.verifyCalls).toBe(1);
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
+    expect(run.verifyCalls).toBe(2);
     expect(run.lines).toContain(
-      'жду: 06/T1j5-Б1: repair-$spec оставил красный verify --changed; повтор и review запрещены',
+      'repair-$spec 06/T1j5-Б1: заявил ИСПРАВЛЕНО, но verify --changed красный — даю вторую попытку',
     );
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1: repair-$spec второй раз подряд оставил красный verify --changed; повтор и review запрещены',
+    );
+  });
+
+  it('если вторая попытка repair-spec зелёная, уходит на узкий review как обычно', async () => {
+    const specFix: Session = {
+      answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+      writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
+      commit: true,
+      push: false,
+    };
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        specFix,
+        specFix,
+        review('OK'),
+      ],
+      verify: ['verify: FAIL', 'verify: OK'],
+    });
+
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
+    expect(run.verifyCalls).toBe(2);
+    expect(run.lines).toContain(
+      'repair-$spec 06/T1j5-Б1: заявил ИСПРАВЛЕНО, но verify --changed красный — даю вторую попытку',
+    );
+    expect(run.lines).not.toContain(
+      expect.stringContaining('repair-$spec второй раз подряд оставил красный'),
+    );
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
   it('передаёт красный усиленный тест кодеру без лишнего review', async () => {

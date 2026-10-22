@@ -126,10 +126,23 @@ const changedPathsBetween = async (context: LoopContext, base: string): Promise<
     .map((path) => path.trim())
     .filter(Boolean);
 
+/** Хвост ошибки verify для повторного промпта $spec: без шума, но с конкретной строкой TS/assert. */
+const verifyFailureSummary = (stdout: string, stderr: string): string =>
+  [stdout, stderr]
+    .filter(Boolean)
+    .join('\n')
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => /error|FAIL|AssertionError|Expected|Received/iu.test(line))
+    .slice(-8)
+    .join('\n');
+
 export async function runTestFix(
   context: LoopContext,
   task: string,
   finding: ReviewFinding,
+  /** Вторая попытка после своего же красного verify --changed; третья запрещена. */
+  attempt = 1,
 ): Promise<Step | 'rerouted' | undefined> {
   const base = await head(context.git);
   const published = await remoteHead(context.git);
@@ -172,13 +185,30 @@ export async function runTestFix(
     cwd: context.config.root,
     timeoutMs: context.config.maxMinutes * 60_000,
   });
-  if (verified.code !== 0)
+  if (verified.code !== 0) {
+    if (attempt < 2) {
+      await context.say(
+        `repair-$spec ${task}: заявил ИСПРАВЛЕНО, но verify --changed красный — даю вторую попытку`,
+      );
+      return runTestFix(
+        context,
+        task,
+        {
+          ...finding,
+          text:
+            `${finding.text}\nПредыдущая попытка заявила РЕМОНТ: ИСПРАВЛЕНО, но ` +
+            `pnpm verify --changed оказался красным:\n${verifyFailureSummary(verified.stdout, verified.stderr)}`,
+        },
+        attempt + 1,
+      );
+    }
     return park(
       context,
       `test-fix:${task}`,
-      `${task}: repair-$spec оставил красный verify --changed; повтор и review запрещены`,
+      `${task}: repair-$spec второй раз подряд оставил красный verify --changed; повтор и review запрещены`,
       `${verified.stdout}\n${verified.stderr}`,
     );
+  }
   return undefined;
 }
 
