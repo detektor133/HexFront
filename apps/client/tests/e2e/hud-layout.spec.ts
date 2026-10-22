@@ -118,3 +118,29 @@ for (const width of WIDTHS) {
     expect(result).toEqual([]);
   });
 }
+
+test('@layout кнопка налога меняет backgroundColor при наведении', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto('/match?map=small');
+  const taxButton = page.locator('button[class*="taxButton"]');
+  await expect(taxButton).toBeVisible();
+
+  const initialBackgroundColor = await taxButton.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  await taxButton.hover();
+  const hoveredColors = await taxButton.evaluate((element) => {
+    const expected = document.createElement('span');
+    expected.style.backgroundColor = 'var(--ui-surface2)';
+    document.body.append(expected);
+    const expectedBackgroundColor = getComputedStyle(expected).backgroundColor;
+    expected.remove();
+    return {
+      actualBackgroundColor: getComputedStyle(element).backgroundColor,
+      expectedBackgroundColor,
+    };
+  });
+
+  expect(hoveredColors.actualBackgroundColor).not.toBe(initialBackgroundColor);
+  expect(hoveredColors.actualBackgroundColor).toBe(hoveredColors.expectedBackgroundColor);
+});
