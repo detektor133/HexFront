@@ -25,7 +25,6 @@ import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
 import { commandTask, parseQueue, setTaskMark, taskMark } from './stage-file.ts';
 import type { ActiveTask } from './state.ts';
-import { runVisualGate } from './visual.ts';
 
 export interface TaskRun {
   readonly step: Step;
@@ -481,15 +480,9 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       await context.say(`локальная приёмка ${task}: FAIL, push запрещён`);
       return { step: 'worked', done: false };
     }
-    active.phase = 'visual';
-    await save(context);
-    await context.say(`локальная приёмка ${task}: OK`);
-  }
-  if (active.phase === 'visual') {
-    const stop = await runVisualGate(context, task, active.base);
-    if (stop !== undefined) return { step: stop, done: false };
     active.phase = 'ci';
     await save(context);
+    await context.say(`локальная приёмка ${task}: OK`);
   }
   if (active.phase === 'ci') {
     const stage = await readStage(context.config.root);

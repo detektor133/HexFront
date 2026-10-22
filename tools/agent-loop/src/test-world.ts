@@ -74,8 +74,6 @@ export interface World {
   readonly ci?: readonly string[];
   /** Ответы обязательного локального gate перед push; без значения — зелёный. */
   readonly prePush?: readonly string[];
-  /** Ответы `pnpm test:e2e:visual` (визуальный гейт перед push); без значения — зелёный. */
-  readonly visual?: readonly string[];
   /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
   readonly verify?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
@@ -144,7 +142,6 @@ export interface Outcome {
   prePushCalls: number;
   /** Число push к моменту каждого запуска pre-push gate. */
   readonly pushesAtPrePush: number[];
-  visualCalls: number;
   verifyCalls: number;
   /** Вызовы `pnpm exec` (eslint, prettier) с аргументами. */
   readonly execs: string[];
@@ -199,7 +196,6 @@ export async function runWorld(world: World): Promise<Outcome> {
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
   const prePush = [...(world.prePush ?? [])];
-  const visual = [...(world.visual ?? [])];
   const verify = [...(world.verify ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
@@ -219,7 +215,6 @@ export async function runWorld(world: World): Promise<Outcome> {
     ciCalls: 0,
     prePushCalls: 0,
     pushesAtPrePush: [],
-    visualCalls: 0,
     verifyCalls: 0,
     slowCalls: [],
     reruns: [],
@@ -479,11 +474,6 @@ export async function runWorld(world: World): Promise<Outcome> {
           out.pushesAtPrePush.push(pushes);
           const line = prePush.shift() ?? 'pre-push: OK';
           return { code: line.startsWith('pre-push: OK') ? 0 : 1, stdout: line, stderr: '' };
-        }
-        if (command === 'pnpm' && args[0] === 'test:e2e:visual') {
-          out.visualCalls += 1;
-          const line = visual.shift() ?? 'visual: OK';
-          return { code: line.startsWith('visual: OK') ? 0 : 1, stdout: line, stderr: '' };
         }
         if (command === 'pnpm' && args[0] === 'verify') {
           out.verifyCalls += 1;
