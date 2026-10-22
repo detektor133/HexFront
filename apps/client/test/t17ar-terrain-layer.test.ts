@@ -31,6 +31,7 @@ const desertCoordinates: Array<ReadonlyArray<readonly [number, number, number, n
 function recordPatternCalls(): {
   readonly circles: ReturnType<typeof vi.spyOn>;
   readonly curves: ReturnType<typeof vi.spyOn>;
+  readonly fills: ReturnType<typeof vi.spyOn>;
   readonly lines: ReturnType<typeof vi.spyOn>;
   readonly moves: ReturnType<typeof vi.spyOn>;
   readonly strokes: ReturnType<typeof vi.spyOn>;
@@ -38,6 +39,7 @@ function recordPatternCalls(): {
   return {
     circles: vi.spyOn(GraphicsContext.prototype, 'circle'),
     curves: vi.spyOn(GraphicsContext.prototype, 'quadraticCurveTo'),
+    fills: vi.spyOn(GraphicsContext.prototype, 'fill'),
     lines: vi.spyOn(GraphicsContext.prototype, 'lineTo'),
     moves: vi.spyOn(GraphicsContext.prototype, 'moveTo'),
     strokes: vi.spyOn(GraphicsContext.prototype, 'stroke'),
@@ -188,6 +190,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
     calls.circles.mockClear();
     calls.curves.mockClear();
+    calls.fills.mockClear();
     calls.lines.mockClear();
     calls.moves.mockClear();
     calls.strokes.mockClear();
@@ -196,6 +199,23 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       layer.update(scale, 3);
 
       expectPhysicalCoordinates(calls, scale);
+      expect(calls.fills).toHaveBeenCalledWith(tokens.map.terrain.forestInk);
+      const patternColors = calls.strokes.mock.calls
+        .map((args: unknown[]) => args[0])
+        .filter(
+          (style: unknown): style is { color: string; width: number } =>
+            typeof style === 'object' &&
+            style !== null &&
+            'color' in style &&
+            'width' in style &&
+            (style as { width: number }).width === tokens.map.patternWidth / scale,
+        )
+        .map((style: { color: string; width: number }) => style.color);
+      expect(patternColors).toEqual([
+        tokens.map.terrain.hillInk,
+        tokens.map.terrain.mountainInk,
+        tokens.map.terrain.desertInk,
+      ]);
       const patternStroke = calls.strokes.mock.calls.find((args: unknown[]) => {
         const [style] = args;
         return style && typeof style === 'object' && 'color' in style;
@@ -203,6 +223,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       expect(patternStroke?.[0]).toMatchObject({ width: tokens.map.patternWidth / scale });
       calls.circles.mockClear();
       calls.curves.mockClear();
+      calls.fills.mockClear();
       calls.lines.mockClear();
       calls.moves.mockClear();
       calls.strokes.mockClear();
