@@ -72,6 +72,21 @@ export const lastLines = (text: string, count = 15): string =>
 export const save = (context: LoopContext): Promise<void> =>
   saveState(context.config.root, context.state);
 
+function showParked(context: LoopContext, key: string, reason: string): void {
+  const board = context.config.board;
+  if (board === undefined) return;
+  const agent = agentName(context);
+  const task = context.state.activeTask?.task;
+  if (task !== undefined) board.task(agent, task);
+  const row = board.agents().find((candidate) => candidate.name === agent);
+  if (row?.phase === 'wait' && row.text === firstLine(reason)) return;
+  board.wait(
+    agent,
+    reason,
+    waitActions(key, reason, selfClearing(key), context.config.github?.repo),
+  );
+}
+
 /**
  * Ожидание владельца: причина печатается один раз, та же причина при том же HEAD
  * больше сессий не запускает. Новый коммит (Issue, pull) снимает ожидание.
@@ -90,15 +105,12 @@ export async function park(
   delete context.state.resume;
   if (parked?.key === key && parked.head === current) {
     if (resumed) await save(context);
+    showParked(context, key, reason);
     return 'idle';
   }
   context.state.parked = { key, head: current, reason };
   await save(context);
-  context.config.board?.wait(
-    agentName(context),
-    reason,
-    waitActions(key, reason, selfClearing(key), context.config.github?.repo),
-  );
+  showParked(context, key, reason);
   await context.say(`жду: ${reason}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
   return 'idle';

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { Board, MAIN_AGENT } from './board.ts';
 import { loadState } from './state.ts';
 import { fixtureStage, runWorld, setMark, type Session } from './test-world.ts';
 
@@ -200,7 +201,9 @@ describe('последовательный конвейер задачи', () =>
 
   it('не запускает роль повторно для припаркованной активной задачи', async () => {
     const reason = '06/T1j5-Б1: критерий требует решения владельца после диагностики plan';
+    const board = new Board(() => 0);
     const run = await runWorld({
+      board,
       plan: true,
       state: {
         activeTask: {
@@ -218,6 +221,11 @@ describe('последовательный конвейер задачи', () =>
 
     expect(run.prompts).toEqual([]);
     expect(run.lines).not.toContain(`жду: ${reason}`);
+    expect(board.agents().find((agent) => agent.name === MAIN_AGENT)).toMatchObject({
+      phase: 'wait',
+      task: '06/T1j5-Б1',
+      text: reason,
+    });
   });
 
   it('останавливает задачу, если исполнитель push-нул до review', async () => {

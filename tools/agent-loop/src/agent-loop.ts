@@ -110,7 +110,7 @@ async function tick(context: LoopContext): Promise<Step> {
   const { parked } = state;
   if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) {
     const issue = await processIssues(context, false);
-    return issue ?? 'idle';
+    return issue ?? park(context, parked.key, parked.reason);
   }
   // Локальные коммиты активной задачи нельзя push-ить до финального review.
   if (state.activeTask !== undefined)
