@@ -159,8 +159,8 @@
 
 @media (min-width: 601px) {
   .hud > :is(.slot, .taxWrap) {
-    flex: 0 1 auto;
-    min-width: max-content;
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .slotText {
@@ -300,8 +300,8 @@
   }
 
   .slotText {
-    flex: 0 1 auto;
-    overflow: visible;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .taxButton {
