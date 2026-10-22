@@ -87,7 +87,7 @@ function jittered(cell: HexCell, radius: number): Point {
 // Лес — три кроны треугольником; заливка масштабируется вместе с картой.
 function snap(value: number, scale: number): number {
   const dpr = globalThis.devicePixelRatio ?? 1;
-  return Math.round(value * scale * dpr) / (scale * dpr);
+  return Math.round(value * scale * dpr) / dpr / scale;
 }
 
 function drawCrowns(g: Graphics, c: Point, radius: number, scale: number): void {
