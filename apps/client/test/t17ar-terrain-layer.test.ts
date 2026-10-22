@@ -62,56 +62,62 @@ function expectPhysicalCoordinates(
 
 describe('T17ar: процедурные паттерны рельефа', () => {
   it('Приёмка: лес на detail === 3 пересобирается на масштабах 1,5 и map.zoom.max', () => {
-    for (const scale of SCALES) {
-      const calls = recordPatternCalls();
-      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-      calls.circles.mockClear();
+    const calls = recordPatternCalls();
+    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
+    calls.circles.mockClear();
 
+    for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
       expect(calls.circles).toHaveBeenCalledTimes(3);
-      layer.destroy();
-      vi.restoreAllMocks();
+      calls.circles.mockClear();
     }
+
+    layer.destroy();
+    vi.restoreAllMocks();
   });
 
   it('Приёмка: холмы на detail === 3 пересобираются на масштабах 1,5 и map.zoom.max', () => {
-    for (const scale of SCALES) {
-      const calls = recordPatternCalls();
-      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-      calls.curves.mockClear();
+    const calls = recordPatternCalls();
+    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
+    calls.curves.mockClear();
 
+    for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
       expect(calls.curves).toHaveBeenCalled();
-      layer.destroy();
-      vi.restoreAllMocks();
+      calls.curves.mockClear();
     }
+
+    layer.destroy();
+    vi.restoreAllMocks();
   });
 
   it('Приёмка: горы на detail === 3 пересобираются на масштабах 1,5 и map.zoom.max', () => {
-    for (const scale of SCALES) {
-      const calls = recordPatternCalls();
-      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-      calls.lines.mockClear();
+    const calls = recordPatternCalls();
+    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
+    calls.lines.mockClear();
 
+    for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
       expect(calls.lines).toHaveBeenCalled();
-      layer.destroy();
-      vi.restoreAllMocks();
+      calls.lines.mockClear();
     }
+
+    layer.destroy();
+    vi.restoreAllMocks();
   });
 
   it('Приёмка: пустыня на detail === 3 пересобирается на масштабах 1,5 и map.zoom.max', () => {
-    for (const scale of SCALES) {
-      const calls = recordPatternCalls();
-      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-      calls.curves.mockClear();
+    const calls = recordPatternCalls();
+    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
+    calls.curves.mockClear();
 
+    for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
@@ -122,21 +128,23 @@ describe('T17ar: процедурные паттерны рельефа', () => 
         return Math.hypot(endX - desertCenter.x, endY - desertCenter.y) < tokens.map.hexRadius;
       });
       expect(desertCurves).toHaveLength(4);
-      layer.destroy();
-      vi.restoreAllMocks();
+      calls.curves.mockClear();
     }
+
+    layer.destroy();
+    vi.restoreAllMocks();
   });
 
   it('Приёмка: координаты конечных точек после учёта devicePixelRatio — целые физические пиксели, а ширина линии — tokens.map.patternWidth экранных px', () => {
     Object.defineProperty(globalThis, 'devicePixelRatio', { configurable: true, value: DPR });
-    for (const scale of SCALES) {
-      const calls = recordPatternCalls();
-      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-      calls.circles.mockClear();
-      calls.curves.mockClear();
-      calls.lines.mockClear();
-      calls.strokes.mockClear();
+    const calls = recordPatternCalls();
+    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
+    calls.circles.mockClear();
+    calls.curves.mockClear();
+    calls.lines.mockClear();
+    calls.strokes.mockClear();
 
+    for (const scale of SCALES) {
       layer.update(scale, 3);
 
       expectPhysicalCoordinates(calls, scale);
@@ -145,9 +153,14 @@ describe('T17ar: процедурные паттерны рельефа', () => 
         return style && typeof style === 'object' && 'color' in style;
       });
       expect(patternStroke?.[0]).toMatchObject({ width: tokens.map.patternWidth / scale });
-      layer.destroy();
-      vi.restoreAllMocks();
+      calls.circles.mockClear();
+      calls.curves.mockClear();
+      calls.lines.mockClear();
+      calls.strokes.mockClear();
     }
+
+    layer.destroy();
+    vi.restoreAllMocks();
   });
 
   it('Правило родителя: слой не использует Texture, canvas-растер или кэширование ранее созданного паттерна', () => {
