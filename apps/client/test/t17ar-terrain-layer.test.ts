@@ -108,6 +108,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const calls = recordPatternCalls();
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
     calls.curves.mockClear();
+    const hillsCoordinates: Array<ReadonlyArray<readonly [number, number, number, number]>> = [];
 
     for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
@@ -120,9 +121,16 @@ describe('T17ar: процедурные паттерны рельефа', () => 
         return Math.hypot(endX - hillsCenter.x, endY - hillsCenter.y) < tokens.map.hexRadius;
       });
       expect(hillsCurves).toHaveLength(2);
+      hillsCoordinates.push(
+        hillsCurves.map(
+          (args: unknown[]) =>
+            [Number(args[0]), Number(args[1]), Number(args[2]), Number(args[3])] as const,
+        ),
+      );
       calls.curves.mockClear();
     }
 
+    expect(hillsCoordinates[0]).not.toEqual(hillsCoordinates[1]);
     layer.destroy();
     vi.restoreAllMocks();
   });
