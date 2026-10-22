@@ -319,6 +319,7 @@
 @media (max-width: 360px) {
   .slotText {
     gap: 0;
+    overflow: visible;
     transform: scaleX(0.6);
     transform-origin: center;
   }
