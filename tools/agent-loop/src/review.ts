@@ -2,7 +2,7 @@
 import { backoff, session, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, remoteHead } from './git.ts';
 
-export type FindingKind = 'КОД' | 'ТЕСТ';
+export type FindingKind = 'КОД' | 'ТЕСТ' | 'ПЛАН';
 
 export interface ReviewFinding {
   readonly kind: FindingKind;
@@ -14,7 +14,7 @@ export type Verdict =
   | { readonly ok: true; readonly findings: readonly [] }
   | { readonly ok: false; readonly findings: readonly ReviewFinding[] };
 
-const FINDING_RE = /^\s*[-*]\s*(КОД|ТЕСТ):\s*(.+)$/u;
+const FINDING_RE = /^\s*[-*]\s*(КОД|ТЕСТ|ПЛАН):\s*(.+)$/u;
 
 /** @returns структурированный ответ reviewer или undefined при нарушении протокола. */
 export function parseReviewVerdict(message: string): Verdict | undefined {

@@ -24,7 +24,8 @@ import { isOwnerTask, selectTask, taskBlock, taskMark, type TaskMark } from './s
 export const planEnabled = (context: LoopContext): boolean =>
   context.definitions.roles.plan !== undefined;
 
-export const planPrompt = (task: string): string => `$plan ${task}`;
+export const planPrompt = (task: string, note = ''): string =>
+  [`$plan ${task}`, note].filter(Boolean).join('\n');
 
 /** Первая строка ответа `plan`: что сделано с текстом задачи (см. `.agents/skills/plan/SKILL.md`). */
 // Без \b: в JS \b считает границу по [A-Za-z0-9_], кириллица — не «словесный» символ, и граница
@@ -34,18 +35,23 @@ const OUTCOME_RE = /^PLAN:\s*(не трогал|уточнено|разбито|
 /** `blocked` — вопрос записан в `docs/QUESTIONS.md`, задачу исполнителю передавать нельзя. */
 export interface PlanOutcome {
   readonly blocked: boolean;
+  readonly outcome: 'не трогал' | 'уточнено' | 'разбито' | 'вопрос';
 }
 
 /**
  * Одна сессия `plan` над задачей очереди.
  * @returns шаг цикла при остановке, или исход: можно передавать задачу `$task` дальше или нет.
  */
-export async function runPlan(context: LoopContext, task: string): Promise<PlanOutcome | Step> {
+export async function runPlan(
+  context: LoopContext,
+  task: string,
+  note = '',
+): Promise<PlanOutcome | Step> {
   const { git, definitions } = context;
   const base = await head(git);
   const published = await remoteHead(git);
   const before = await readStage(context.config.root);
-  const result = await session(context, 'plan', planPrompt(task));
+  const result = await session(context, 'plan', planPrompt(task, note));
   if (result.failure !== undefined)
     return backoff(context, `$plan ${task}: ${result.failure}`, result.message);
   if ((await dirtyFiles(git)) !== '')
@@ -84,7 +90,7 @@ export async function runPlan(context: LoopContext, task: string): Promise<PlanO
       result.message,
     );
   await context.say(`$plan ${task}: ${outcome}`);
-  return { blocked: outcome === 'вопрос' };
+  return { blocked: outcome === 'вопрос', outcome };
 }
 
 export interface PlannedQueueTask {

@@ -50,7 +50,7 @@ describe('последовательный конвейер задачи', () =>
       push: false,
     };
     const testFix: Session = {
-      answer: 'Исправлен второй пункт.',
+      answer: 'Исправлен второй пункт.\nРЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
       writes: { 'packages/sim/test/task.test.ts': "it('край', () => {});\n" },
       commit: true,
       push: false,
@@ -90,6 +90,112 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[5]).toContain('ТЕСТ: критерий 2');
     expect(run.prompts[4]).toContain('Узкая проверка');
     expect(run.prompts[7]).toContain('Финальный полный review');
+    expect(run.verifyCalls).toBe(1);
+  });
+
+  it('не отправляет красный repair-spec на review и не повторяет его автоматически', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        {
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
+          commit: true,
+          push: false,
+        },
+      ],
+      verify: ['verify: FAIL'],
+    });
+
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$review'))).toHaveLength(1);
+    expect(run.verifyCalls).toBe(1);
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1: repair-$spec оставил красный verify --changed; повтор и review запрещены',
+    );
+  });
+
+  it('передаёт красный усиленный тест кодеру без лишнего review', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест не ловит переполнение'),
+        {
+          answer:
+            'РЕМОНТ: КОД — усиленный тест выявил переполнение\nСПЕК: packages/sim/test/task.test.ts',
+          writes: { 'packages/sim/test/task.test.ts': "it('переполнение', () => {});\n" },
+          commit: true,
+          push: false,
+        },
+        codeCommit('Исправлено переполнение.'),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$spec 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$spec 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[4]).toContain('КОД: усиленный тест выявил переполнение');
+    expect(run.verifyCalls).toBe(0);
+  });
+
+  it('после первого повторного возврата зовёт plan, после второго останавливается', async () => {
+    const finding = 'ТЕСТ: тест не проверяет границы';
+    const run = await runWorld({
+      spec: true,
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'target-review',
+          findings: [{ kind: 'ТЕСТ', text: finding }],
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${finding}`),
+        { answer: 'PLAN: не трогал', push: false },
+        {
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+          writes: { 'packages/sim/test/task.test.ts': "it('границы', () => {});\n" },
+          commit: true,
+          push: false,
+        },
+        review(`ВОЗВРАТ\n- ${finding}`),
+      ],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+      '$spec 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1: один пункт дважды не принят узким review; автоматический повтор запрещён',
+    );
   });
 
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
@@ -111,7 +217,7 @@ describe('последовательный конвейер задачи', () =>
         },
         { answer: 'СПЕК: packages/sim/test/task.test.ts:1 — проверяется неверное значение' },
         {
-          answer: 'Тест исправлен.',
+          answer: 'Тест исправлен.\nРЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
           writes: { 'packages/sim/test/task.test.ts': "it('верный критерий', () => {});\n" },
           commit: true,
           push: false,

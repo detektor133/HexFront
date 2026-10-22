@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 export const MAX_STREAMS = 1;
 
 export interface PendingFinding {
-  readonly kind: 'КОД' | 'ТЕСТ';
+  readonly kind: 'КОД' | 'ТЕСТ' | 'ПЛАН';
   readonly text: string;
 }
 
@@ -19,6 +19,8 @@ export interface ActiveTask {
   readonly workPrompt: string;
   phase: 'work' | 'review' | 'target-review' | 'ci' | 'finalize' | 'docs-ci';
   findings: PendingFinding[];
+  /** Неудачные узкие review текущего пункта; первый зовёт plan, второй останавливает цикл. */
+  findingRetries?: number;
   /** HEAD и origin до рабочей сессии: по ним восстанавливается коммит после обрыва процесса. */
   workAttempt?: { readonly head: string; readonly remote: string };
   /** После исправления теста продолжить исходную работу, которая ещё не создала коммит. */

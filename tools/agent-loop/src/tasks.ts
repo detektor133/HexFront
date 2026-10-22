@@ -16,8 +16,8 @@ import {
   type SkillResult,
   type Step,
 } from './context.ts';
+import { diagnoseFinding, findingPrompt, runTestFix } from './finding-repair.ts';
 import { currentBranch, dirtyFiles, head, remoteHead } from './git.ts';
-import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
@@ -37,14 +37,6 @@ export const skillFailed = (
   prompt: string,
   result: SkillResult & { ok: false },
 ): Promise<Step> => backoff(context, `${prompt}: ${result.reason}`, result.message);
-
-const findingPrompt = (task: string, finding: ReviewFinding): string =>
-  [
-    finding.kind === 'КОД' ? `$task ${task}` : `$spec ${task}`,
-    'Исправь ровно один пункт reviewer; остальные пункты этой задачи тебе не переданы:',
-    finding.text,
-    'Создай локальный атомарный коммит. Не меняй отметку задачи, STATUS и не push.',
-  ].join('\n');
 
 async function followUp(context: LoopContext, task: string, message: string): Promise<Step> {
   const specRemark = message
@@ -124,38 +116,6 @@ async function runProductWork(
       return park(context, `scope:${task}`, scopeViolation(task, forbidden), result.message);
   }
   return undefined;
-}
-
-async function runTestFix(
-  context: LoopContext,
-  task: string,
-  finding: ReviewFinding,
-): Promise<Step | undefined> {
-  const base = await head(context.git);
-  const published = await remoteHead(context.git);
-  const result = await session(context, 'spec', findingPrompt(task, finding));
-  if (result.failure !== undefined)
-    return backoff(context, `$spec ${task}: ${result.failure}`, result.message);
-  if ((await remoteHead(context.git)) !== published)
-    return park(context, `push:${task}`, `${task}: $spec изменила origin до review`);
-  if ((await dirtyFiles(context.git)) !== '')
-    return backoff(context, `$spec ${task} оставил незакоммиченные файлы`, result.message);
-  if ((await head(context.git)) === base) return followUp(context, task, result.message);
-  if (!(await checkPermissions(context, base, context.definitions.specPaths)))
-    return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`, result.message);
-  const paths = await changedPathsBetween(context, base);
-  const saved = { ...(context.state.spec[task] ?? {}) };
-  for (const path of paths) saved[path] = await readFile(join(context.config.root, path), 'utf8');
-  context.state.spec[task] = saved;
-  await save(context);
-  return undefined;
-}
-
-async function changedPathsBetween(context: LoopContext, base: string): Promise<string[]> {
-  return (await context.git.run(['diff', '--name-only', `${base}..HEAD`]))
-    .split(/\r?\n/u)
-    .map((path) => path.trim())
-    .filter(Boolean);
 }
 
 async function recoverCommittedWork(
@@ -277,6 +237,10 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   const { task } = active;
   if (active.phase === 'work') {
     const finding = active.findings[0];
+    if (finding?.kind === 'ПЛАН') {
+      const step = await diagnoseFinding(context, task, finding);
+      return { step, done: false };
+    }
     if (active.workAttempt !== undefined && (await head(context.git)) !== active.workAttempt.head) {
       const stop = await recoverCommittedWork(
         context,
@@ -300,6 +264,12 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
               task,
               finding === undefined ? active.workPrompt : findingPrompt(task, finding),
             );
+      if (stop === 'rerouted') {
+        delete active.workAttempt;
+        active.findingRetries = 0;
+        await save(context);
+        return { step: 'worked', done: false };
+      }
       if (stop !== undefined) {
         delete active.workAttempt;
         await save(context);
@@ -320,16 +290,45 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (!verdict.ok) {
       context.config.board?.count('returns');
+      if (targeted) {
+        active.findingRetries = (active.findingRetries ?? 0) + 1;
+        if (active.findingRetries >= 2)
+          return {
+            step: await park(
+              context,
+              `repeat:${task}`,
+              `${task}: один пункт дважды не принят узким review; автоматический повтор запрещён`,
+              verdict.findings.map((item) => item.text).join('\n'),
+            ),
+            done: false,
+          };
+        active.findings = [...verdict.findings, ...active.findings.slice(1)];
+        await save(context);
+        await context.say(
+          `узкий review ${task}: пункт не принят, запускаю диагностику plan перед повтором`,
+        );
+        const step = await diagnoseFinding(
+          context,
+          task,
+          active.findings[0] as ReviewFinding,
+          true,
+        );
+        return { step, done: false };
+      }
       active.findings = targeted
         ? [...verdict.findings, ...active.findings.slice(1)]
         : [...verdict.findings];
+      active.findingRetries = 0;
       active.phase = 'work';
       await save(context);
-      await context.say(`review ${task}: ${active.findings.length} пунктов, исправляется первый`);
+      await context.say(
+        `финальный review ${task}: ${active.findings.length} пунктов, исправляется первый`,
+      );
       return { step: 'worked', done: false };
     }
     if (targeted) {
       active.findings = active.findings.slice(1);
+      active.findingRetries = 0;
       if (active.findings.length === 0 && active.resumeWorkAfterFindings === true) {
         delete active.resumeWorkAfterFindings;
         active.phase = 'work';
@@ -337,6 +336,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         active.phase = active.findings.length === 0 ? 'review' : 'work';
       }
       await save(context);
+      await context.say(`узкий review ${task}: OK, осталось ${active.findings.length} пунктов`);
       return { step: 'worked', done: false };
     }
     active.phase = 'ci';

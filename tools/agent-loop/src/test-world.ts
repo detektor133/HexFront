@@ -72,6 +72,8 @@ export interface Session {
 export interface World {
   readonly sessions: readonly Session[];
   readonly ci?: readonly string[];
+  /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
+  readonly verify?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
   readonly slow?: readonly string[];
   /** Ответы eslint по приёмочным тестам по порядку; без значения или `ok` — чисто. */
@@ -135,6 +137,7 @@ export interface Outcome {
   readonly pulls: string[];
   pushes: number;
   ciCalls: number;
+  verifyCalls: number;
   /** Вызовы `pnpm exec` (eslint, prettier) с аргументами. */
   readonly execs: string[];
   /** Вызовы `ci:wait` для workflow `slow` с аргументами. */
@@ -187,6 +190,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   );
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
+  const verify = [...(world.verify ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
   const issues = [...(world.issues ?? [])];
@@ -203,6 +207,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     pulls: [],
     pushes: 0,
     ciCalls: 0,
+    verifyCalls: 0,
     slowCalls: [],
     reruns: [],
     ciArgs: [],
@@ -435,6 +440,11 @@ export async function runWorld(world: World): Promise<Outcome> {
       ...(world.resume === undefined ? {} : { resume: world.resume }),
       github,
       runCommand: async (command, args, options) => {
+        if (command === 'pnpm' && args[0] === 'verify') {
+          out.verifyCalls += 1;
+          const line = verify.shift() ?? 'verify: OK';
+          return { code: line.startsWith('verify: OK') ? 0 : 1, stdout: line, stderr: '' };
+        }
         if (command === 'pnpm' && args.includes('--workflow=slow.yml')) {
           out.slowCalls.push(args.slice(1).join(' '));
           const line = slow.shift() ?? 'success https://slow/1';
