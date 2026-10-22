@@ -31,14 +31,31 @@ for (const width of WIDTHS) {
         previousRight = rect.right;
 
         const metric = group.className.includes('slot') || group.className.includes('taxWrap');
+        const childRects: DOMRect[] = [];
         for (const child of metric
           ? group.querySelectorAll<HTMLElement>('svg, [class*="slotText"], [class*="rate"]')
           : []) {
           const childRect = child.getBoundingClientRect();
+          childRects.push(childRect);
           if (childRect.width <= 0 || childRect.height <= 0)
             errors.push(`дочерний элемент группы ${index} имеет нулевой размер`);
           if (childRect.left < rect.left || childRect.right > rect.right)
             errors.push(`дочерний элемент группы ${index} выходит за группу`);
+        }
+        for (let first = 0; first < childRects.length; first += 1) {
+          for (let second = first + 1; second < childRects.length; second += 1) {
+            const firstRect = childRects[first];
+            const secondRect = childRects[second];
+            if (!firstRect || !secondRect) continue;
+            if (
+              firstRect.left < secondRect.right &&
+              firstRect.right > secondRect.left &&
+              firstRect.top < secondRect.bottom &&
+              firstRect.bottom > secondRect.top
+            ) {
+              errors.push(`child elements in group ${index} overlap`);
+            }
+          }
         }
       }
       return errors;
