@@ -128,15 +128,25 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const calls = recordPatternCalls();
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
     calls.lines.mockClear();
+    const mountainsCenter = hexCenter(hexFromId(3, loaded.map.width), tokens.map.hexRadius);
+    const mountainCoordinates: Array<ReadonlyArray<readonly [number, number]>> = [];
 
     for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
-      expect(calls.lines).toHaveBeenCalled();
+      const coordinates = calls.lines.mock.calls
+        .map((args: unknown[]) => [Number(args[0]), Number(args[1])] as const)
+        .filter(
+          ([x, y]) =>
+            Math.hypot(x - mountainsCenter.x, y - mountainsCenter.y) < tokens.map.hexRadius,
+        );
+      expect(coordinates).not.toHaveLength(0);
+      mountainCoordinates.push(coordinates);
       calls.lines.mockClear();
     }
 
+    expect(mountainCoordinates[0]).not.toEqual(mountainCoordinates[1]);
     layer.destroy();
     vi.restoreAllMocks();
   });
