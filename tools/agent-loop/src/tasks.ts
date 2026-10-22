@@ -215,6 +215,24 @@ async function finishTask(context: LoopContext, task: string): Promise<Step | un
   return undefined;
 }
 
+async function rememberPublished(
+  context: LoopContext,
+  task: string,
+  published: string,
+): Promise<void> {
+  const active = context.state.activeTask;
+  let changed = false;
+  if (active?.task === task && active.remoteBase !== published) {
+    active.remoteBase = published;
+    changed = true;
+  }
+  if (context.state.parked?.key === `sync:${task}`) {
+    delete context.state.parked;
+    changed = true;
+  }
+  if (changed) await save(context);
+}
+
 async function publishReviewed(
   context: LoopContext,
   task: string,
@@ -226,7 +244,10 @@ async function publishReviewed(
     return backoff(context, `${task}: не удалось обновить origin/${branch}`, fetched.stderr.trim());
   const local = await head(context.git);
   const remote = await remoteHead(context.git);
-  if (remote === local) return undefined;
+  if (remote === local) {
+    await rememberPublished(context, task, local);
+    return undefined;
+  }
   if (remote !== expectedRemote)
     return park(
       context,
@@ -236,6 +257,7 @@ async function publishReviewed(
   const pushed = await context.git.attempt(['push', 'origin', branch]);
   if (pushed.code !== 0)
     return backoff(context, `${task}: push проверенного HEAD не прошёл`, pushed.stderr.trim());
+  await rememberPublished(context, task, local);
   return undefined;
 }
 

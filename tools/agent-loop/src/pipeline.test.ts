@@ -262,6 +262,43 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('после красного CI повторно публикует исправленный HEAD без ложного конфликта origin', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('OK'),
+        codeCommit('Исправлен красный CI.'),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: [
+        'failure job=check https://ci/failed',
+        'success https://ci/fixed',
+        'success https://ci/docs',
+      ],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$spec 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[3]).toContain('КОД: CI точного SHA красный');
+    expect(run.pushes).toBe(3);
+    expect(run.ciCalls).toBe(3);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+    expect(run.lines).not.toContain(expect.stringContaining('автоматический rebase запрещён'));
+  });
+
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
     const run = await runWorld({ sessions: [{ ...codeCommit(), push: true }] });
 

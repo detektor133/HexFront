@@ -13,8 +13,8 @@ export interface PendingFinding {
 export interface ActiveTask {
   readonly task: string;
   readonly base: string;
-  /** origin ветки до локальных plan/spec/code-коммитов задачи. */
-  readonly remoteBase?: string;
+  /** Последний SHA этой задачи, успешно опубликованный в origin. */
+  remoteBase?: string;
   /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
   readonly workPrompt: string;
   phase: 'work' | 'review' | 'target-review' | 'ci' | 'finalize' | 'docs-ci';
