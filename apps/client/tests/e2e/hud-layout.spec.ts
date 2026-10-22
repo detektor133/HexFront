@@ -96,6 +96,13 @@ for (const width of WIDTHS) {
             }
           }
         }
+        for (const slotText of metric
+          ? group.querySelectorAll<HTMLElement>(':scope > [class*="slotText"]')
+          : []) {
+          if (slotText.scrollWidth > slotText.clientWidth) {
+            errors.push(`текст слота группы ${index} обрезан по ширине`);
+          }
+        }
         const taxButton = group.querySelector<HTMLElement>(':scope > [class*="taxButton"]');
         const taxButtonRect = taxButton?.getBoundingClientRect();
         const taxContents = taxButton
