@@ -110,7 +110,13 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
-      expect(calls.curves).toHaveBeenCalled();
+      const hillsCenter = hexCenter(hexFromId(2, loaded.map.width), tokens.map.hexRadius);
+      const hillsCurves = calls.curves.mock.calls.filter((args: unknown[]) => {
+        const endX = Number(args[2]);
+        const endY = Number(args[3]);
+        return Math.hypot(endX - hillsCenter.x, endY - hillsCenter.y) < tokens.map.hexRadius;
+      });
+      expect(hillsCurves).toHaveLength(2);
       calls.curves.mockClear();
     }
 
