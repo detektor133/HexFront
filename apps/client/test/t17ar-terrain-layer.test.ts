@@ -138,7 +138,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       const coordinates = calls.lines.mock.calls
         .map((args: unknown[]) => [Number(args[0]), Number(args[1])] as const)
         .filter(
-          ([x, y]) =>
+          ([x, y]: readonly [number, number]) =>
             Math.hypot(x - mountainsCenter.x, y - mountainsCenter.y) < tokens.map.hexRadius,
         );
       expect(coordinates).not.toHaveLength(0);
