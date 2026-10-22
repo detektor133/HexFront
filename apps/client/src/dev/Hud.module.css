@@ -306,7 +306,7 @@
 
   .taxButton {
     min-height: var(--touch-target-min);
-    min-inline-size: 0;
+    min-inline-size: var(--touch-target-min);
     padding: 0 2px;
   }
 
