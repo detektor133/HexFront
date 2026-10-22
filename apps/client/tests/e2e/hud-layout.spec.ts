@@ -50,14 +50,27 @@ for (const width of WIDTHS) {
             )
           : []) {
           const childRect = child.getBoundingClientRect();
-          const style = getComputedStyle(child);
+          let effectivelyVisible = true;
+          for (
+            let ancestor: HTMLElement | null = child;
+            ancestor && ancestor !== group;
+            ancestor = ancestor.parentElement
+          ) {
+            const style = getComputedStyle(ancestor);
+            if (
+              style.display === 'none' ||
+              style.visibility === 'hidden' ||
+              Number(style.opacity) === 0
+            ) {
+              effectivelyVisible = false;
+              break;
+            }
+          }
           if (
             childRect.width <= 0 ||
             childRect.height <= 0 ||
             child.getClientRects().length === 0 ||
-            style.display === 'none' ||
-            style.visibility === 'hidden' ||
-            style.opacity === '0'
+            !effectivelyVisible
           ) {
             errors.push(`значение ${child.className} группы ${index} не видно`);
           }
