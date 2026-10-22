@@ -371,16 +371,28 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       context.config.board?.count('returns');
       if (targeted) {
         active.findingRetries = (active.findingRetries ?? 0) + 1;
-        if (active.findingRetries >= 2)
-          return {
-            step: await park(
-              context,
-              `repeat:${task}`,
-              `${task}: один пункт дважды не принят узким review; автоматический повтор запрещён`,
-              verdict.findings.map((item) => item.text).join('\n'),
-            ),
-            done: false,
-          };
+        if (active.findingRetries >= 2) {
+          const streak = active.fixStreak;
+          const rejected = active.findings[0];
+          active.findings = [
+            {
+              kind: 'ПЛАН',
+              text:
+                `ПЛАН: узкий review дважды не принял один и тот же пункт по задаче ${task}` +
+                (streak !== undefined
+                  ? ` (файл ${streak.file} патчится ${streak.count} раз(а) подряд в этой задаче)`
+                  : '') +
+                ` — реши, нужен ли цельный редизайн механизма вместо продолжения точечных попыток. Отклонённый пункт: ${rejected?.text ?? ''}`,
+            },
+          ];
+          active.findingRetries = 0;
+          active.phase = 'work';
+          await save(context);
+          await context.say(
+            `узкий review ${task}: пункт дважды не принят — зову plan оценить переделку перед остановкой`,
+          );
+          return { step: 'worked', done: false };
+        }
         active.findings = [...verdict.findings, ...active.findings.slice(1)];
         await save(context);
         await context.say(
