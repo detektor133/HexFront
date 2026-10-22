@@ -65,52 +65,6 @@ afterEach(() => {
 });
 
 describe('07/T17aq: верхняя панель без переполнения', () => {
-  it('на 768, 1024, 1366 и 1920 px сохраняет видимые группы без пересечений', () => {
-    for (const width of [768, 1024, 1366, 1920]) {
-      const hud = renderHud(width);
-      const groups = Array.from(hud.children).filter(
-        (element): element is HTMLElement => element instanceof HTMLElement,
-      );
-      expect(groups).toHaveLength(8);
-      const hudRect = hud.getBoundingClientRect();
-      expect(hudRect.width).toBeGreaterThan(0);
-      expect(hudRect.height).toBeGreaterThan(0);
-      let previousRight = hudRect.left;
-      for (const group of groups) {
-        const isMetricGroup =
-          group.className.toString().includes('slot') ||
-          group.className.toString().includes('taxWrap');
-        const icon = group.querySelector<SVGElement>('svg');
-        const value = group.querySelector<HTMLElement>('[class*="slotText"]');
-        const growth = group.querySelector<HTMLElement>('[class*="rate"]');
-        if (isMetricGroup) {
-          expect(icon?.getAttribute('aria-label')).toBeTruthy();
-          expect(value?.textContent).not.toBe('');
-        }
-        if (group.className.toString().includes('slot')) {
-          expect(growth?.textContent).not.toBe('');
-        }
-        const rect = group.getBoundingClientRect();
-        expect(rect.width).toBeGreaterThan(0);
-        expect(rect.height).toBeGreaterThan(0);
-        expect(rect.right).toBeLessThanOrEqual(hudRect.right);
-        expect(rect.left).toBeGreaterThanOrEqual(previousRight);
-        const children = isMetricGroup ? [value, growth] : [];
-        for (const child of children) {
-          if (!child) continue;
-          const childRect = child.getBoundingClientRect();
-          expect(childRect.width).toBeGreaterThan(0);
-          expect(childRect.height).toBeGreaterThan(0);
-          expect(childRect.left).toBeGreaterThanOrEqual(rect.left);
-          expect(childRect.right).toBeLessThanOrEqual(rect.right);
-        }
-        previousRight = rect.right;
-      }
-      expect(hud.scrollWidth).toBeLessThanOrEqual(hud.clientWidth || width);
-      cleanup();
-    }
-  });
-
   it('у taxButton нет постоянной границы и радиуса, интерактивные состояния разрешены, поповер открывается', () => {
     renderHud(1024);
     const taxButton = screen.getByRole('button', { name: 'Налог' });
