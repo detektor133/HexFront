@@ -31,12 +31,14 @@ function recordPatternCalls(): {
   readonly circles: ReturnType<typeof vi.spyOn>;
   readonly curves: ReturnType<typeof vi.spyOn>;
   readonly lines: ReturnType<typeof vi.spyOn>;
+  readonly moves: ReturnType<typeof vi.spyOn>;
   readonly strokes: ReturnType<typeof vi.spyOn>;
 } {
   return {
     circles: vi.spyOn(GraphicsContext.prototype, 'circle'),
     curves: vi.spyOn(GraphicsContext.prototype, 'quadraticCurveTo'),
     lines: vi.spyOn(GraphicsContext.prototype, 'lineTo'),
+    moves: vi.spyOn(GraphicsContext.prototype, 'moveTo'),
     strokes: vi.spyOn(GraphicsContext.prototype, 'stroke'),
   };
 }
@@ -47,6 +49,7 @@ function expectPhysicalCoordinates(
 ): void {
   const factor = scale * DPR;
   const endpoints = [
+    ...calls.moves.mock.calls.map((args: unknown[]) => [args[0], args[1]]),
     ...calls.circles.mock.calls.map((args: unknown[]) => [args[0], args[1]]),
     ...calls.curves.mock.calls.map((args: unknown[]) => [args[2], args[3]]),
     ...calls.lines.mock.calls.map((args: unknown[]) => [args[0], args[1]]),
