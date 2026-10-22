@@ -3,18 +3,19 @@ import { readFileSync } from 'node:fs';
 import { GraphicsContext } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { loadMap } from '@hexfront/sim';
+import { hexFromId, loadMap } from '@hexfront/sim';
 
 import { detailLevel } from '../src/render/camera.ts';
+import { hexCenter } from '../src/render/hex-geometry.ts';
 import { createTerrainLayer } from '../src/render/terrain-layer.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 const loaded = loadMap({
   version: 1,
   id: 't17ar-terrain-patterns',
-  width: 4,
+  width: 5,
   height: 1,
-  terrain: 'AQIDBA==',
+  terrain: 'AQIDBAU=',
   features: [],
   riverEdges: [],
   roads: 'AA==',
@@ -111,7 +112,13 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
-      expect(calls.curves).toHaveBeenCalled();
+      const desertCenter = hexCenter(hexFromId(4, loaded.map.width), tokens.map.hexRadius);
+      const desertCurves = calls.curves.mock.calls.filter((args: unknown[]) => {
+        const endX = Number(args[2]);
+        const endY = Number(args[3]);
+        return Math.hypot(endX - desertCenter.x, endY - desertCenter.y) < tokens.map.hexRadius;
+      });
+      expect(desertCurves).toHaveLength(4);
       layer.destroy();
       vi.restoreAllMocks();
     }
