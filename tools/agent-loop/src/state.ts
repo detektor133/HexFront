@@ -5,8 +5,10 @@ import { dirname, join } from 'node:path';
 /** Больше потоков не даёт выигрыша: упор в общие файлы, зависимости задач и лимит codex. */
 export const MAX_STREAMS = 1;
 
+export type FindingKind = 'КОД' | 'ТЕСТ' | 'ПЛАН' | 'ПЕРЕДЕЛАТЬ';
+
 export interface PendingFinding {
-  readonly kind: 'КОД' | 'ТЕСТ' | 'ПЛАН';
+  readonly kind: FindingKind;
   readonly text: string;
 }
 
@@ -17,7 +19,8 @@ export interface ActiveTask {
   remoteBase?: string;
   /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
   readonly workPrompt: string;
-  phase: 'work' | 'review' | 'target-review' | 'pre-push' | 'ci' | 'finalize' | 'docs-ci';
+  phase:
+    'work' | 'review' | 'target-review' | 'pre-push' | 'visual' | 'ci' | 'finalize' | 'docs-ci';
   findings: PendingFinding[];
   /** Неудачные узкие review текущего пункта; первый зовёт plan, второй останавливает цикл. */
   findingRetries?: number;
@@ -27,6 +30,15 @@ export interface ActiveTask {
   resumeWorkAfterFindings?: boolean;
   /** Проверенный кодовый HEAD, который должен быть родителем служебного docs-коммита. */
   codeHead?: string;
+  /**
+   * Подряд точечных рабочих патчей одного продуктового файла в рамках этой задачи. Сбрасывается
+   * при зелёном финальном review и при переходе на `ПЕРЕДЕЛАТЬ`; растёт на каждом патче того же
+   * файла. При достижении порога следующий дефект review в этом же файле уходит через `plan`
+   * с вопросом «переделать целиком или патчи оправданы», а не ещё одним точечным патчем.
+   */
+  fixStreak?: { readonly file: string; readonly count: number };
+  /** Подряд красных CI точного SHA этой задачи: второй подряд зовёт `plan`, а не новый патч вслепую. */
+  ciRetries?: number;
 }
 
 export interface LoopState {

@@ -17,8 +17,13 @@ import type { ReviewFinding } from './review.ts';
 
 export const findingPrompt = (task: string, finding: ReviewFinding): string =>
   [
-    finding.kind === 'КОД' ? `$task ${task}` : `$spec ${task}`,
-    'Исправь ровно один пункт reviewer; остальные пункты этой задачи тебе не переданы:',
+    finding.kind === 'ТЕСТ' ? `$spec ${task}` : `$task ${task}`,
+    finding.kind === 'ПЕРЕДЕЛАТЬ'
+      ? 'Это не точечный патч: план решил, что механизм нужно переписать целиком одним ' +
+        'согласованным решением, потому что подряд несколько точечных патчей одного файла не ' +
+        'закрыли задачу по существу. Не добавляй ещё один частный костыль поверх старых — замени ' +
+        'сам подход (раскладку/алгоритм), сохранив приёмку задачи.'
+      : 'Исправь ровно один пункт reviewer; остальные пункты этой задачи тебе не переданы:',
     finding.text,
     ...(finding.kind === 'ТЕСТ'
       ? [
@@ -75,6 +80,17 @@ export async function diagnoseFinding(
       await save(context);
     }
     await context.say(`${task}: технический блокер передан исполнителю, владелец не требуется`);
+    return 'worked';
+  }
+  if (planned.outcome === 'переделать') {
+    if (active !== undefined) {
+      active.findings[0] = { kind: 'ПЕРЕДЕЛАТЬ', text: `ПЕРЕДЕЛАТЬ: ${planned.detail}` };
+      active.findingRetries = 0;
+      delete active.fixStreak;
+      active.phase = 'work';
+      await save(context);
+    }
+    await context.say(`${task}: plan решил переделать механизм целиком — ${planned.detail}`);
     return 'worked';
   }
   if (planned.outcome === 'уточнено' || planned.outcome === 'разбито') {

@@ -74,6 +74,8 @@ export interface World {
   readonly ci?: readonly string[];
   /** Ответы обязательного локального gate перед push; без значения — зелёный. */
   readonly prePush?: readonly string[];
+  /** Ответы `pnpm test:e2e:visual` (визуальный гейт перед push); без значения — зелёный. */
+  readonly visual?: readonly string[];
   /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
   readonly verify?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
@@ -142,6 +144,7 @@ export interface Outcome {
   prePushCalls: number;
   /** Число push к моменту каждого запуска pre-push gate. */
   readonly pushesAtPrePush: number[];
+  visualCalls: number;
   verifyCalls: number;
   /** Вызовы `pnpm exec` (eslint, prettier) с аргументами. */
   readonly execs: string[];
@@ -196,6 +199,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
   const prePush = [...(world.prePush ?? [])];
+  const visual = [...(world.visual ?? [])];
   const verify = [...(world.verify ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
@@ -215,6 +219,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     ciCalls: 0,
     prePushCalls: 0,
     pushesAtPrePush: [],
+    visualCalls: 0,
     verifyCalls: 0,
     slowCalls: [],
     reruns: [],
@@ -236,6 +241,17 @@ export async function runWorld(world: World): Promise<Outcome> {
         : ` M ${world.dirty}`;
   let files: readonly string[] = [];
   let pushes = 0;
+  // Файлы каждого коммита codex-сессии по номеру HEAD: `git diff --name-only A..B` считает их
+  // объединением по диапазону, как настоящий git, а не только файлами последней сессии.
+  const commitFiles = new Map<number, readonly string[]>();
+  const resolveCommit = (ref: string): number =>
+    ref === 'HEAD' ? head : ref.startsWith('origin/') ? origin : commit(ref);
+  const unionFiles = (fromCommit: number, toCommit: number): string[] => {
+    const set = new Set<string>();
+    for (let n = fromCommit + 1; n <= toCommit; n += 1)
+      for (const path of commitFiles.get(n) ?? []) set.add(path);
+    return [...set];
+  };
   // Файл этапа на каждом коммите: повторное ревью сравнивает текст задачи с коммитом возврата.
   const snapshots = new Map<number, string>([[0, await readFile(stagePath, 'utf8')]]);
   // Файлы сессий вне файлов этапа: что лежит на диске и что закоммичено в HEAD.
@@ -290,7 +306,8 @@ export async function runWorld(world: World): Promise<Outcome> {
     const changed =
       env?.AGENT_ROLE !== 'reviewer' &&
       (session.mark !== undefined || session.stage !== undefined || session.status !== undefined);
-    if (session.commit ?? changed) {
+    const committing = session.commit ?? changed;
+    if (committing) {
       head += 1;
       snapshots.set(head, await readFile(stagePath, 'utf8'));
       for (const path of tracked) {
@@ -307,6 +324,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         : []),
       ...Object.keys(session.writes ?? {}),
     ];
+    if (committing) commitFiles.set(head, files);
     dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
@@ -341,6 +359,14 @@ export async function runWorld(world: World): Promise<Outcome> {
       return text === undefined ? { code: 128, stdout: '', stderr: 'нет коммита' } : ok(text);
     }
     if (sub === 'diff' && args.includes('--name-status')) return ok(world.reviewFiles ?? '');
+    if (sub === 'diff' && first === '--name-only') {
+      const [fromRef, toRef] = (args[2] ?? '').split('..');
+      return ok(
+        fromRef !== undefined && toRef !== undefined
+          ? unionFiles(resolveCommit(fromRef), resolveCommit(toRef)).join('\n')
+          : files.join('\n'),
+      );
+    }
     if (sub === 'diff' && args.includes('--cached')) return ok();
     if (sub === 'diff' && first === '-M') return ok(world.reviewDiff ?? '');
     if (sub === 'show') {
@@ -453,6 +479,11 @@ export async function runWorld(world: World): Promise<Outcome> {
           out.pushesAtPrePush.push(pushes);
           const line = prePush.shift() ?? 'pre-push: OK';
           return { code: line.startsWith('pre-push: OK') ? 0 : 1, stdout: line, stderr: '' };
+        }
+        if (command === 'pnpm' && args[0] === 'test:e2e:visual') {
+          out.visualCalls += 1;
+          const line = visual.shift() ?? 'visual: OK';
+          return { code: line.startsWith('visual: OK') ? 0 : 1, stdout: line, stderr: '' };
         }
         if (command === 'pnpm' && args[0] === 'verify') {
           out.verifyCalls += 1;

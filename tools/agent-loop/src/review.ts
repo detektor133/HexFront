@@ -1,8 +1,9 @@
 // Reviewer только читает локальный diff. Вердикт хранит оркестратор, stage-файл reviewer не меняет.
 import { backoff, session, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, remoteHead } from './git.ts';
+import type { FindingKind } from './state.ts';
 
-export type FindingKind = 'КОД' | 'ТЕСТ' | 'ПЛАН';
+export type { FindingKind };
 
 export interface ReviewFinding {
   readonly kind: FindingKind;

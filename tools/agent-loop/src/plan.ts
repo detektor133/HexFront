@@ -31,12 +31,13 @@ export const planPrompt = (task: string, note = ''): string =>
 // Без \b: в JS \b считает границу по [A-Za-z0-9_], кириллица — не «словесный» символ, и граница
 // после последней кириллической буквы (конец слова → конец строки, оба «несловесные») не находится.
 const OUTCOME_RE =
-  /^PLAN:\s*(не трогал|уточнено|разбито|вопрос|инфраструктура)(?:\s*[—-]\s*(.+))?\s*$/imu;
+  /^PLAN:\s*(не трогал|уточнено|разбито|вопрос|инфраструктура|переделать)(?:\s*[—-]\s*(.+))?\s*$/imu;
 
 /** `blocked` — вопрос записан в `docs/QUESTIONS.md`, задачу исполнителю передавать нельзя. */
 export interface PlanOutcome {
   readonly blocked: boolean;
-  readonly outcome: 'не трогал' | 'уточнено' | 'разбито' | 'вопрос' | 'инфраструктура';
+  readonly outcome:
+    'не трогал' | 'уточнено' | 'разбито' | 'вопрос' | 'инфраструктура' | 'переделать';
   readonly detail?: string;
 }
 
@@ -77,7 +78,10 @@ export async function runPlan(
   const match = OUTCOME_RE.exec(result.message);
   const outcome = match?.[1] as PlanOutcome['outcome'] | undefined;
   const detail = match?.[2]?.trim();
-  if (outcome === undefined || (outcome === 'инфраструктура' && !detail))
+  if (
+    outcome === undefined ||
+    ((outcome === 'инфраструктура' || outcome === 'переделать') && !detail)
+  )
     return park(
       context,
       `plan:${task}`,

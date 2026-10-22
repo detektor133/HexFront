@@ -1,6 +1,6 @@
 // Последовательный автомат задачи: spec → локальная работа → review → пункты по одному → push → CI.
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import {
   backoff,
@@ -24,10 +24,40 @@ import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
 import { commandTask, parseQueue, setTaskMark, taskMark } from './stage-file.ts';
+import type { ActiveTask } from './state.ts';
+import { runVisualGate } from './visual.ts';
 
 export interface TaskRun {
   readonly step: Step;
   readonly done: boolean;
+}
+
+/** Подряд точечных патчей одного продуктового файла, после которых зовётся plan (не ещё патч). */
+export const REDESIGN_STREAK = 3;
+
+/** Первый продуктовый (не тестовый) файл `apps/client/src` в списке изменённых путей коммита. */
+export function dominantProductFile(paths: readonly string[]): string | undefined {
+  return paths.find(
+    (path) =>
+      /^apps\/client\/src\//u.test(path) &&
+      !/\.test\.[tj]sx?$/u.test(path) &&
+      !/\/tests?\//u.test(path),
+  );
+}
+
+/** Обновляет счётчик подряд патчей одного файла этим рабочим кругом; другой файл — сбрасывает его. */
+export function updateFixStreak(active: ActiveTask, touched: readonly string[]): void {
+  const file = dominantProductFile(touched);
+  if (file === undefined) return;
+  active.fixStreak =
+    active.fixStreak?.file === file
+      ? { file, count: active.fixStreak.count + 1 }
+      : { file, count: 1 };
+}
+
+/** Упоминает ли пункт review файл текущей серии патчей (по имени файла, без пути). */
+export function mentionsStreakFile(text: string, file: string): boolean {
+  return text.includes(file) || text.includes(basename(file));
 }
 
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
@@ -322,7 +352,10 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         return { step: stop, done: false };
       }
     }
+    const roundBase = active.workAttempt?.head;
     delete active.workAttempt;
+    if (roundBase !== undefined)
+      updateFixStreak(active, await changedPathsBetween(context, roundBase));
     active.phase = finding === undefined ? 'review' : 'target-review';
     await save(context);
   }
@@ -361,9 +394,37 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         );
         return { step, done: false };
       }
-      active.findings = targeted
+      const nextFindings = targeted
         ? [...verdict.findings, ...active.findings.slice(1)]
         : [...verdict.findings];
+      const streak = active.fixStreak;
+      const first = nextFindings[0];
+      if (
+        !targeted &&
+        streak !== undefined &&
+        streak.count >= REDESIGN_STREAK &&
+        first !== undefined &&
+        mentionsStreakFile(first.text, streak.file)
+      ) {
+        active.findings = [
+          {
+            kind: 'ПЛАН',
+            text:
+              `ПЛАН: файл ${streak.file} точечно патчился ${streak.count} раз(а) подряд в задаче ` +
+              `${task}, и финальный review всё равно находит там новый дефект — реши, нужен ли ` +
+              `цельный редизайн механизма вместо очередного точечного патча. Свежий пункт review: ${first.text}`,
+          },
+          ...nextFindings.slice(1),
+        ];
+        active.findingRetries = 0;
+        active.phase = 'work';
+        await save(context);
+        await context.say(
+          `финальный review ${task}: файл ${streak.file} патчится уже ${streak.count}-й раз подряд — зову plan оценить переделку`,
+        );
+        return { step: 'worked', done: false };
+      }
+      active.findings = nextFindings;
       active.findingRetries = 0;
       active.phase = 'work';
       await save(context);
@@ -385,6 +446,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       await context.say(`узкий review ${task}: OK, осталось ${active.findings.length} пунктов`);
       return { step: 'worked', done: false };
     }
+    delete active.fixStreak;
     active.phase = 'pre-push';
     await save(context);
   }
@@ -407,9 +469,15 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       await context.say(`локальная приёмка ${task}: FAIL, push запрещён`);
       return { step: 'worked', done: false };
     }
-    active.phase = 'ci';
+    active.phase = 'visual';
     await save(context);
     await context.say(`локальная приёмка ${task}: OK`);
+  }
+  if (active.phase === 'visual') {
+    const stop = await runVisualGate(context, task, active.base);
+    if (stop !== undefined) return { step: stop, done: false };
+    active.phase = 'ci';
+    await save(context);
   }
   if (active.phase === 'ci') {
     const stage = await readStage(context.config.root);
@@ -427,11 +495,22 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         done: false,
       };
     if (ci.verdict === 'red') {
-      active.findings = [{ kind: 'КОД', text: `КОД: CI точного SHA красный — ${ci.line}` }];
+      active.ciRetries = (active.ciRetries ?? 0) + 1;
+      active.findings = [
+        active.ciRetries >= 2
+          ? {
+              kind: 'ПЛАН',
+              text:
+                `ПЛАН: CI красный второй раз подряд по задаче ${task} — очередной точечный патч ` +
+                `уже не помог один раз; реши, нужен ли цельный пересмотр решения. Последний провал: ${ci.line}`,
+            }
+          : { kind: 'КОД', text: `КОД: CI точного SHA красный — ${ci.line}` },
+      ];
       active.phase = 'work';
       await save(context);
       return { step: 'worked', done: false };
     }
+    delete active.ciRetries;
     active.codeHead = await head(context.git);
     active.phase = 'finalize';
     await save(context);
