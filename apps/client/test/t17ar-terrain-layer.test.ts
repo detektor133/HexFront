@@ -65,15 +65,18 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const calls = recordPatternCalls();
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
     calls.circles.mockClear();
+    const forestCoordinates: Array<ReadonlyArray<ReadonlyArray<number>>> = [];
 
     for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
       expect(calls.circles).toHaveBeenCalledTimes(3);
+      forestCoordinates.push(calls.circles.mock.calls.map(([x, y]) => [Number(x), Number(y)]));
       calls.circles.mockClear();
     }
 
+    expect(forestCoordinates[0]).not.toEqual(forestCoordinates[1]);
     layer.destroy();
     vi.restoreAllMocks();
   });
