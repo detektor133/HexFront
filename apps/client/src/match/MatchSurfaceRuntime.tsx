@@ -201,8 +201,8 @@ interface Sandbox {
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
   setRoadPreview(path: readonly number[] | null): void;
-  setDockHeight(height: number): void;
-  setHudHeight(height: number): void;
+  setDockHeight(height: number, leaderboardWidth?: number): void;
+  setHudHeight(height: number, leaderboardWidth?: number): void;
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
   radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
@@ -243,6 +243,7 @@ export function useSandbox(
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
   const hudHeightRef = useRef(0);
+  const rightInsetRef = useRef(0);
   const observerIdRef = useRef<number | null>(null);
   const workerTelemetryRef = useRef<WorkerTelemetry | null>(null);
   const snapshotTelemetryRef = useRef<SnapshotTelemetry | null>(null);
@@ -509,6 +510,7 @@ export function useSandbox(
       if (viewRef.current) applyStartCameraToView(viewRef.current);
       v.setBottomInset(dockHeightRef.current);
       v.setTopInset(hudHeightRef.current);
+      v.setTopInset(hudHeightRef.current, rightInsetRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => (toolRef.current ? null : (input.grab(world) ?? splitGrab(world))));
       v.setOrderHooks(hooks);
@@ -615,13 +617,18 @@ export function useSandbox(
     setTool,
     setArmy,
     setRoadPreview,
-    setDockHeight(height) {
+    setDockHeight(height, leaderboardWidth) {
       dockHeightRef.current = height;
+      if (leaderboardWidth !== undefined) rightInsetRef.current = leaderboardWidth + 24;
       mapViewRef.current?.setBottomInset(height);
+      if (leaderboardWidth !== undefined) {
+        mapViewRef.current?.setTopInset(hudHeightRef.current, rightInsetRef.current);
+      }
     },
-    setHudHeight(height) {
+    setHudHeight(height, leaderboardWidth) {
       hudHeightRef.current = height;
-      mapViewRef.current?.setTopInset(height);
+      if (leaderboardWidth !== undefined) rightInsetRef.current = leaderboardWidth + 24;
+      mapViewRef.current?.setTopInset(height, rightInsetRef.current);
     },
     pixiTelemetry() {
       return (

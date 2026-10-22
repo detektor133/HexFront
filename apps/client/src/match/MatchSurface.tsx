@@ -110,6 +110,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
     paused: pauseState.menuOpen,
   });
+  useEffect(() => {
+    if (leaderboardSize === undefined) return;
+    sb.setDockHeight(dockH, leaderboardSize.width);
+  }, [dockH, leaderboardSize, sb]);
   const dockHeightSetter = useRef(sb.setDockHeight);
   dockHeightSetter.current = sb.setDockHeight;
   const handleArmyBarHeight = useMemo(

@@ -94,7 +94,7 @@ export interface MapView {
   /** Оставляет нижнюю панель вне области, к которой привязаны границы камеры. */
   setBottomInset(px: number): void;
   /** Оставляет HUD вне области, к которой привязаны границы камеры. */
-  setTopInset(px: number): void;
+  setTopInset(px: number, rightInset?: number): void;
   /** Ставит гекс в центр экрана (в пределах границ карты). */
   centerOn(hex: Hex, durationMs?: number): void;
   /**
@@ -162,7 +162,11 @@ export async function createMapView(
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
   let topInset = 0;
   let bottomInset = 0;
-  const cameraView = (): Viewport => insetViewport(view(), topInset, bottomInset);
+  let rightInset = 0;
+  const cameraView = (): Viewport => ({
+    ...insetViewport(view(), topInset, bottomInset),
+    width: Math.max(0, view().width - rightInset),
+  });
   let cam: Camera = fitCamera(cameraView(), bounds);
   let drawnScale = 0;
   let velocity: Velocity | null = null;
@@ -406,8 +410,9 @@ export async function createMapView(
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
-    setTopInset(px) {
+    setTopInset(px, right = rightInset) {
       topInset = Math.max(0, px);
+      rightInset = Math.max(0, right);
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
