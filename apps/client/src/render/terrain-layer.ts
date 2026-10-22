@@ -85,19 +85,24 @@ function jittered(cell: HexCell, radius: number): Point {
 }
 
 // Лес — три кроны треугольником; заливка масштабируется вместе с картой.
-function drawCrowns(g: Graphics, c: Point, radius: number): void {
+function snap(value: number, scale: number): number {
+  const dpr = globalThis.devicePixelRatio ?? 1;
+  return Math.round(value * scale * dpr) / (scale * dpr);
+}
+
+function drawCrowns(g: Graphics, c: Point, radius: number, scale: number): void {
   const s = radius * CROWN_SPREAD;
   for (const [dx, dy] of [
     [0, -0.6],
     [-0.8, 0.45],
     [0.8, 0.45],
   ] as const) {
-    g.circle(c.x + dx * s, c.y + dy * s, radius * CROWN_RADIUS);
+    g.circle(snap(c.x + dx * s, scale), snap(c.y + dy * s, scale), radius * CROWN_RADIUS);
   }
 }
 
 // Холмы — две дуги-«горба», правая чуть ниже.
-function addHills(g: Graphics, c: Point, radius: number): void {
+function addHills(g: Graphics, c: Point, radius: number, scale: number): void {
   const w = radius * HILL_HALF_WIDTH;
   const h = radius * HILL_HEIGHT;
   for (const [dx, dy] of [
@@ -106,34 +111,52 @@ function addHills(g: Graphics, c: Point, radius: number): void {
   ] as const) {
     const x = c.x + dx * w * 1.6;
     const y = c.y + dy * radius;
-    g.moveTo(x - w, y).quadraticCurveTo(x, y - h * 2, x + w, y);
+    g.moveTo(snap(x - w, scale), snap(y, scale)).quadraticCurveTo(
+      snap(x, scale),
+      snap(y - h * 2, scale),
+      snap(x + w, scale),
+      snap(y, scale),
+    );
   }
 }
 
 // Горы — пик и штриховка теневого (правого) склона.
-function addMountain(g: Graphics, c: Point, radius: number): void {
+function addMountain(g: Graphics, c: Point, radius: number, scale: number): void {
   const w = radius * PEAK_HALF_WIDTH;
   const top = c.y - radius * PEAK_TOP;
   const base = c.y + radius * PEAK_BASE;
-  g.moveTo(c.x - w, base)
-    .lineTo(c.x, top)
-    .lineTo(c.x + w, base);
+  g.moveTo(snap(c.x - w, scale), snap(base, scale))
+    .lineTo(snap(c.x, scale), snap(top, scale))
+    .lineTo(snap(c.x + w, scale), snap(base, scale));
   for (let i = 1; i <= HATCH_LINES; i += 1) {
     const t = i / (HATCH_LINES + 1);
-    g.moveTo(c.x + w * t, top + (base - top) * t).lineTo(c.x + w * t - w * HATCH_SLANT, base);
+    g.moveTo(snap(c.x + w * t, scale), snap(top + (base - top) * t, scale)).lineTo(
+      snap(c.x + w * t - w * HATCH_SLANT, scale),
+      snap(base, scale),
+    );
   }
 }
 
 // Пустыня — две строки ряби.
-function addRipple(g: Graphics, c: Point, radius: number): void {
+function addRipple(g: Graphics, c: Point, radius: number, scale: number): void {
   const half = radius * RIPPLE_HALF;
   const a = radius * RIPPLE_AMPLITUDE;
   for (const dy of [-0.5, 0.5]) {
     const y = c.y + dy * radius * RIPPLE_STEP * 2;
     const x0 = c.x - half + dy * half * 0.4;
-    g.moveTo(x0, y)
-      .quadraticCurveTo(x0 + half * 0.5, y - a * 2, x0 + half, y)
-      .quadraticCurveTo(x0 + half * 1.5, y + a * 2, x0 + half * 2, y);
+    g.moveTo(snap(x0, scale), snap(y, scale))
+      .quadraticCurveTo(
+        snap(x0 + half * 0.5, scale),
+        snap(y - a * 2, scale),
+        snap(x0 + half, scale),
+        snap(y, scale),
+      )
+      .quadraticCurveTo(
+        snap(x0 + half * 1.5, scale),
+        snap(y + a * 2, scale),
+        snap(x0 + half * 2, scale),
+        snap(y, scale),
+      );
   }
 }
 
@@ -193,12 +216,16 @@ function drawGrid(cells: readonly HexCell[], radius: number): Graphics {
   return g;
 }
 
-function drawCrownLayer(cells: readonly HexCell[], radius: number): Graphics {
-  const g = new Graphics();
+function drawCrownLayer(
+  g: Graphics,
+  cells: readonly HexCell[],
+  radius: number,
+  scale: number,
+): void {
   for (const cell of cells) {
-    if (cell.terrain === TERRAIN.forest) drawCrowns(g, jittered(cell, radius), radius);
+    if (cell.terrain === TERRAIN.forest) drawCrowns(g, jittered(cell, radius), radius, scale);
   }
-  return g.fill(T.forestInk);
+  g.fill(T.forestInk);
 }
 
 export interface TerrainLayer {
@@ -222,11 +249,13 @@ export function createTerrainLayer(
   const grid = drawGrid(cells, radius);
   const base = new Container();
   base.addChild(drawFills(cells, radius), rivers, grid);
+  const crowns = new Graphics();
   const lines = new Graphics();
   const overlay = new Container();
-  overlay.addChild(drawCrownLayer(cells, radius), lines, drawCoast(map, cells, radius, waterEdge));
+  overlay.addChild(crowns, lines, drawCoast(map, cells, radius, waterEdge));
 
   const byTerrain = (t: number): HexCell[] => cells.filter((c) => c.terrain === t);
+  const forest = byTerrain(TERRAIN.forest);
   const hills = byTerrain(TERRAIN.hills);
   const mountains = byTerrain(TERRAIN.mountains);
   const deserts = byTerrain(TERRAIN.desert);
@@ -237,9 +266,6 @@ export function createTerrainLayer(
         .map((d) => hexEdge(cell.center, radius, d)),
     ),
   );
-  base.cacheAsTexture(true);
-  overlay.cacheAsTexture(true);
-
   return {
     base,
     overlay,
@@ -250,12 +276,14 @@ export function createTerrainLayer(
         cap: 'round',
         join: 'round',
       } as const;
+      crowns.clear();
+      drawCrownLayer(crowns, forest, radius, scale);
       lines.clear();
-      for (const c of hills) addHills(lines, jittered(c, radius), radius);
+      for (const c of hills) addHills(lines, jittered(c, radius), radius, scale);
       lines.stroke({ ...style, color: T.hillInk });
-      for (const c of mountains) addMountain(lines, jittered(c, radius), radius);
+      for (const c of mountains) addMountain(lines, jittered(c, radius), radius, scale);
       lines.stroke({ ...style, color: T.mountainInk });
-      for (const c of deserts) addRipple(lines, jittered(c, radius), radius);
+      for (const c of deserts) addRipple(lines, jittered(c, radius), radius, scale);
       lines.stroke({ ...style, color: T.desertInk });
       rivers.clear();
       for (const chain of riverChains) drawSmooth(rivers, chain);
@@ -264,8 +292,6 @@ export function createTerrainLayer(
       grid.visible = level >= M.hexGridVisibleFromZoom;
     },
     destroy() {
-      base.cacheAsTexture(false);
-      overlay.cacheAsTexture(false);
       base.destroy({ children: true, context: true });
       overlay.destroy({ children: true, context: true });
     },
