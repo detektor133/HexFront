@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
@@ -41,6 +43,13 @@ describe('слои рельефа карты', () => {
 
     expect(layer.base.children).toHaveLength(3);
     expect(layer.overlay.children).toHaveLength(3);
+    const mapViewSource = readFileSync(
+      new URL('../src/render/map-view.ts', import.meta.url),
+      'utf8',
+    );
+    expect(mapViewSource).toMatch(
+      /const mount = \(\): void => \{\s*world\.addChild\(layer\.base\);[\s\S]*?world\.addChild\(layer\.overlay\);/u,
+    );
     expect(detailLevel(0.5)).toBe(1);
     expect(detailLevel(1)).toBe(2);
     expect(detailLevel(2)).toBe(3);
