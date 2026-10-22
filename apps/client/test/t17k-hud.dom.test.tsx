@@ -207,9 +207,7 @@ describe('07/T17k: компактный HUD', () => {
     expect(hudCss).toMatch(
       /@media \(max-width: 360px\) \{\s*\.hud \{\s*padding: 0 var\(--space-sm\);\s*\}/,
     );
-    expect(hudCss).toMatch(
-      /\.slotText \{[\s\S]*?transform: scaleX\(0\.6\);[\s\S]*?transform-origin: center;/,
-    );
+    expect(hudCss).toMatch(/\.taxWrap \.taxButton \{[\s\S]*?inline-size: 100%;[\s\S]*?\}/);
     expect(hudCss).not.toContain('overflow-x: hidden;');
   });
 });

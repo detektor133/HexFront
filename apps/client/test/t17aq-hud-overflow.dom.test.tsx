@@ -148,8 +148,12 @@ describe('07/T17aq: верхняя панель без переполнения'
       ),
     ).toBe(true);
     expect(metricDeclarations.some((style) => style.gap === '2px')).toBe(true);
-    expect(textDeclarations.some((style) => style.transform === 'scaleX(0.6)')).toBe(true);
-    expect(textDeclarations.some((style) => /^0(?:px)?$/u.test(style.gap))).toBe(true);
+    // Текст значений не искажается масштабом: transform ломает раскладку (box остаётся прежней
+    // ширины), поэтому ширину под кнопку налога даёт inline-size: 100% на самой кнопке, а не
+    // визуальное сжатие текста.
+    expect(
+      textDeclarations.every((style) => style.transform === '' || style.transform === 'none'),
+    ).toBe(true);
     const taxWrap = hud.querySelector<HTMLElement>('[class*="taxWrap"]');
     const taxButton = hud.querySelector<HTMLElement>('[class*="taxButton"]');
     expect(taxWrap).not.toBeNull();
@@ -158,15 +162,14 @@ describe('07/T17aq: верхняя панель без переполнения'
     const taxButtonDeclarations = getApplicableDeclarations(taxButton as HTMLElement, 360);
     const getEffective = (
       declarations: CSSStyleDeclaration[],
-      property: 'flexBasis' | 'flexShrink' | 'minInlineSize' | 'minWidth' | 'padding',
+      property: 'inlineSize' | 'minInlineSize' | 'minWidth' | 'padding',
     ): string =>
       [...declarations].reverse().find((style) => style[property] !== '')?.[property] ?? '';
     expect(getEffective(taxWrapDeclarations, 'minWidth')).toMatch(/^0(?:px)?$/u);
     expect(getEffective(taxWrapDeclarations, 'minInlineSize')).toBe('var(--touch-target-min)');
-    expect(getEffective(taxWrapDeclarations, 'flexBasis')).toBe('var(--touch-target-min)');
-    expect(getEffective(taxWrapDeclarations, 'flexShrink')).toBe('0');
     expect(getEffective(taxWrapDeclarations, 'padding')).toBe('');
     expect(getEffective(taxButtonDeclarations, 'minWidth')).toBe('var(--touch-target-min)');
+    expect(getEffective(taxButtonDeclarations, 'inlineSize')).toBe('100%');
     expect(
       taxButtonDeclarations
         .map((style) => style.padding)

@@ -327,21 +327,21 @@
 }
 
 @media (max-width: 360px) {
+  /*
+   * Раньше taxWrap был зафиксирован на 44px (flex-basis + flex-shrink: 0), а кнопка внутри
+   * не была ограничена этой шириной (одна лишь .taxWrap без display:flex не сжимает дочернюю
+   * кнопку) — кнопка оставалась по размеру своего контента и вываливалась за родителя.
+   * transform: scaleX(0.6) на тексте не чинил это: transform не меняет раскладку (box той же
+   * ширины, что и без масштаба), только визуально сжимал — отсюда искажённый, но всё равно
+   * переполненный текст. taxWrap остаётся обычным гибким слотом с тем же нижним порогом 44px,
+   * что и у других слотов, а кнопка явно привязана к его ширине — переполнять нечему.
+   */
   .hud > .taxWrap {
     min-inline-size: var(--touch-target-min);
-    flex-basis: var(--touch-target-min);
-    flex-shrink: 0;
   }
 
-  .slotText {
-    gap: 0;
-    overflow: visible;
-    transform: scaleX(0.6);
-    transform-origin: center;
-  }
-
-  .taxButton .slotText {
-    transform-origin: left center;
+  .taxWrap .taxButton {
+    inline-size: 100%;
   }
 }
 

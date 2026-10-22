@@ -187,3 +187,31 @@ test('@layout кнопка налога меняет backgroundColor при на
   expect(hoveredColors.actualBackgroundColor).not.toBe(initialBackgroundColor);
   expect(hoveredColors.actualBackgroundColor).toBe(hoveredColors.expectedBackgroundColor);
 });
+
+// Геометрические проверки выше не видят вырожденный способ уложиться в границы: сжать текст
+// transform'ом. transform не меняет раскладку (box той же ширины), только рисует иначе, поэтому
+// такой "фикс" рект-ассерты не ловят — только явная проверка computed transform.
+for (const width of WIDTHS) {
+  test(`@layout HUD ${width} px: значения и иконки не искажены масштабом`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/match?map=small');
+    const hud = page.getByRole('banner');
+    await expect(hud).toBeVisible();
+
+    const distorted = await hud.evaluate((element) => {
+      const nodes = element.querySelectorAll<HTMLElement>(
+        '[class*="slotText"], [class*="value"], [class*="rate"], [class*="metricIcon"]',
+      );
+      const bad: string[] = [];
+      for (const node of nodes) {
+        const transform = getComputedStyle(node).transform;
+        if (transform !== 'none' && transform !== '') {
+          bad.push(`${Array.from(node.classList).join('.')}: ${transform}`);
+        }
+      }
+      return bad;
+    });
+
+    expect(distorted).toEqual([]);
+  });
+}
