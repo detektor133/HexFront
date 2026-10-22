@@ -3,18 +3,27 @@ name: slow
 # Все тесты, включая тяжёлые (SLOW_TESTS в vitest.projects.ts), и покрытие sim.
 # Идёт параллельно с ci.yml на каждый push; агентный цикл его не ждёт перед ревью,
 # красный прогон ставит исправление первым, `$stage-close` требует его зелёным.
+#
+# 2026-10-22: один последовательный job (`vitest run` всех проектов, затем отдельно покрытие
+# sim) занимал ~13 минут и растёт с каждым новым тяжёлым тестом. `maxWorkers: 1` в
+# vitest.all.config.ts не трогаем — часть тяжёлых тестов меряет реальное время выполнения, и
+# конкуренция воркеров на двухъядерном раннере делает их случайно падающими. Вместо воркеров
+# внутри одного job — параллельные job по проектам (матрица) плюс покрытие отдельным job:
+# GitHub даёт каждому job свой раннер, поэтому они идут одновременно, а не по очереди.
 on:
   push:
     branches: [main, 'stage-*']
   pull_request:
 
 jobs:
-  tests:
+  scope:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     permissions:
       contents: read
       actions: read
+    outputs:
+      mode: ${{ steps.scope.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,14 +36,49 @@ jobs:
         run: node --experimental-strip-types tools/ci-wait/src/docs-only.ts
         env:
           BEFORE_SHA: ${{ github.event.before }}
-      - if: steps.scope.outputs.mode == 'full'
-        uses: pnpm/action-setup@v4
-      - if: steps.scope.outputs.mode == 'full'
-        uses: actions/setup-node@v4
+
+  tests:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          # Группы подобраны по замеру (2026-10-22): sim и client — самые тяжёлые и примерно
+          # равны друг другу, остальное заметно легче. Новый тяжёлый тест, добавленный в один
+          # проект, растит только его шард — не все четыре; шард можно переразбить при перекосе.
+          - name: sim
+            projects: --project sim
+          - name: client
+            projects: --project client --project client-dom
+          - name: rest
+            projects: >-
+              --project protocol --project mapgen --project server --project balance
+              --project replay --project ai-check --project commit-check --project ci-wait
+              --project tokens --project telemetry --project agent-loop --project evolve
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - if: steps.scope.outputs.mode == 'full'
-        run: pnpm install --frozen-lockfile
-      - if: steps.scope.outputs.mode == 'full'
-        run: pnpm test:all
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:all:projects ${{ matrix.shard.projects }}
+
+  coverage:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:all:coverage
