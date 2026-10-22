@@ -142,6 +142,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     calls.circles.mockClear();
     calls.curves.mockClear();
     calls.lines.mockClear();
+    calls.moves.mockClear();
     calls.strokes.mockClear();
 
     for (const scale of SCALES) {
@@ -156,6 +157,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       calls.circles.mockClear();
       calls.curves.mockClear();
       calls.lines.mockClear();
+      calls.moves.mockClear();
       calls.strokes.mockClear();
     }
 
