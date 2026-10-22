@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
 import { loadState } from './state.ts';
-import { fixtureStage, runWorld, setMark, type Session } from './test-world.ts';
+import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
 
 const codeCommit = (answer = 'Код готов.'): Session => ({
   answer,
@@ -236,6 +236,63 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[4]).toContain('узкий review дважды не принял один и тот же пункт');
     expect(run.lines).toContain(
       'жду: 06/T1j5-Б1: plan не изменил повторно отклонённый пункт; автоматический повтор той же роли запрещён',
+    );
+  });
+
+  it('второй подряд отказ узкого review может закончиться не остановкой, а разбиением задачи', async () => {
+    const finding = 'КОД: неверный путь';
+    const split = fixtureStage.replace(
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1a. Часть первая** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1b. Часть вторая** (tools/evolve).\n  *Проверка:* интеграция.',
+    );
+    const splitStatus = fixtureStatus.replace(
+      'Очередь: 06/T1j5-Б1 → 06/T1i → 06/T1e',
+      'Очередь: 06/T1j5-Б1a → 06/T1j5-Б1b → 06/T1i → 06/T1e',
+    );
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'target-review',
+          findings: [{ kind: 'КОД', text: finding }],
+          findingRetries: 1,
+          fixStreak: { file: 'apps/client/src/dev/Hud.module.css', count: 3 },
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${finding}`),
+        {
+          answer: 'Объём на деле больше одной подсистемы — разбита на 2 подзадачи.\nPLAN: разбито',
+          stage: split,
+          status: splitStatus,
+          commit: true,
+          files: ['docs/stages/stage-06-bots-balance.md', 'docs/STATUS.md', 'docs/DECISIONS.md'],
+        },
+        review('OK'),
+        { answer: 'Текст первой подзадачи достаточен.\nPLAN: не трогал' },
+      ],
+      maxRounds: 1,
+    });
+
+    // Разбиение не отменяет уже закоммиченную работу исходной задачи: её review проходит
+    // дальше обычным порядком (pre-push → CI → docs-коммит), а очередь уже ведёт на первую
+    // подзадачу — цикл успевает начать и её проверку текста роль plan в рамках того же прогона.
+    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('узкий review дважды не принял один и тот же пункт');
+    expect(run.prompts[1]).toContain('Hud.module.css патчится 3 раз(а) подряд');
+    expect(run.lines).toContain('$plan 06/T1j5-Б1: разбито');
+    expect(run.lines).not.toContain(
+      expect.stringContaining('автоматический повтор той же роли запрещён'),
     );
   });
 
