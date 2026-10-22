@@ -18,7 +18,7 @@ import {
   type Step,
 } from './context.ts';
 import { diagnoseFinding, findingPrompt, runTestFix } from './finding-repair.ts';
-import { currentBranch, dirtyFiles, head, remoteHead } from './git.ts';
+import { changedPaths, currentBranch, dirtyFiles, head, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
@@ -85,12 +85,27 @@ export const skillFailed = (
   result: SkillResult & { ok: false },
 ): Promise<Step> => backoff(context, `${prompt}: ${result.reason}`, result.message);
 
+/**
+ * Сессия сообщила `СПЕК:` без коммита — её попытка кода брошена по её же словам. Черновые правки
+ * продуктовых файлов (не залоченные тесты задачи), если остались на диске, отбрасываются: иначе
+ * следующий тик цикла увидит грязное дерево вне залоченных файлов и запаркуется «дерево не
+ * чистое» мимо уже обработанного `СПЕК:` — цикл выглядит зависшим сразу после старта.
+ */
+async function discardStraySpecAttempt(context: LoopContext, task: string): Promise<void> {
+  const locked = new Set(specFiles(context, task));
+  const stray = (await changedPaths(context.git)).filter((path) => !locked.has(path));
+  if (stray.length === 0) return;
+  await context.git.attempt(['checkout', '--', ...stray]);
+  await context.git.attempt(['clean', '-f', '--', ...stray]);
+}
+
 async function followUp(context: LoopContext, task: string, message: string): Promise<Step> {
   const specRemark = message
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .find((line) => line.startsWith('СПЕК:'));
   if (specRemark !== undefined && context.state.activeTask?.task === task) {
+    await discardStraySpecAttempt(context, task);
     if (context.state.activeTask.findings.length === 0)
       context.state.activeTask.resumeWorkAfterFindings = true;
     context.state.activeTask.findings = [

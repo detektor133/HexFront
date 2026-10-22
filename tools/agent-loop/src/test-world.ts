@@ -390,6 +390,24 @@ export async function runWorld(world: World): Promise<Outcome> {
       return ok();
     }
     if (sub === 'add') return ok();
+    if (sub === 'checkout' && args.includes('--')) {
+      const paths = args.slice(args.indexOf('--') + 1);
+      for (const path of paths) {
+        const saved = committed.get(path);
+        if (saved !== undefined) await writeFile(join(root, path), saved);
+      }
+      return ok();
+    }
+    if (sub === 'clean' && args.includes('-f')) {
+      const dashIndex = args.indexOf('--');
+      const paths = dashIndex >= 0 ? args.slice(dashIndex + 1) : [];
+      for (const path of paths) {
+        if (committed.has(path)) continue;
+        tracked.delete(path);
+        await rm(join(root, path), { force: true }).catch(() => {});
+      }
+      return ok();
+    }
     if (sub === 'commit') {
       head += 1;
       snapshots.set(head, await readFile(stagePath, 'utf8'));

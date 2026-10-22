@@ -296,6 +296,52 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('СПЕК без коммита откатывает чужую правку продукта — следующий тик не паркует «дерево не чистое»', async () => {
+    const specPath = 'apps/client/test/t17ar-terrain-layer.test.ts';
+    const strayPath = 'apps/client/src/render/terrain-layer.ts';
+    const run = await runWorld({
+      spec: true,
+      state: {
+        spec: { '06/T1j5-Б1': { [specPath]: "it('критерий', () => {});\n" } },
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [
+        {
+          answer: `СПЕК: ${specPath}:10 — строгая типизация падает на неявных \`any\` в callback-параметрах.`,
+          writes: { [strayPath]: 'export const broken = true;\n' },
+          push: false,
+        },
+        {
+          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${specPath}`,
+          writes: { [specPath]: "it('критерий', (value: number) => {});\n" },
+          commit: true,
+          push: false,
+        },
+        review('OK'),
+        codeCommit('Код готов после фикса теста.'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$spec 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).not.toContain(expect.stringContaining('дерево не чистое'));
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('не запускает роль повторно для припаркованной активной задачи', async () => {
     const reason = '06/T1j5-Б1: критерий требует решения владельца после диагностики plan';
     const board = new Board(() => 0);
