@@ -69,6 +69,10 @@ describe('07/T17aq: верхняя панель без переполнения'
     renderHud(1024);
     const taxButton = screen.getByRole('button', { name: 'Налог' });
     expect(hudCss).toMatch(/\.taxButton\s*\{[\s\S]*?border: 0;/u);
+    const borderLeft = [...getApplicableDeclarations(taxButton, 1024)]
+      .reverse()
+      .find((style) => style.borderLeft !== '')?.borderLeft;
+    expect(borderLeft).toMatch(/^0(?:px)?$/u);
     expect(hudCss).toMatch(/\.taxButton\s*\{[\s\S]*?border-radius: 0;/u);
     expect(hudCss).toMatch(/\.hudInteractive:hover\s*\{[\s\S]*?background: var\(--ui-surface2\);/u);
     expect(hudCss).toMatch(
