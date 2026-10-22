@@ -323,7 +323,7 @@
 
   .slotText {
     gap: 0;
-    overflow: visible;
+    overflow: hidden;
     transform: scaleX(0.6);
     transform-origin: center;
   }
