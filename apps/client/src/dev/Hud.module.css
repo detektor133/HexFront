@@ -84,6 +84,9 @@
 
 .value {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-ui-family);
   font-weight: 500;
   font-size: var(--font-size-hud-value);
@@ -108,6 +111,9 @@
 .rate,
 .rateBad {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
