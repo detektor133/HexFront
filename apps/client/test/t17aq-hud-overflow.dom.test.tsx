@@ -19,7 +19,7 @@ function renderHud(width: number): HTMLElement {
   const style = document.createElement('style');
   style.dataset.t17aqHudCss = 'true';
   style.textContent = hudCss.replace(
-    /\.(hud|slot|taxWrap|taxButton|slotText|rate|value|settingsWrap|settingsButton)\b/gu,
+    /\.(hud|slot|taxWrap|taxButton|slotText|rate|value|settingsWrap|settingsButton|hudInteractive)\b/gu,
     '[class*="$1"]',
   );
   document.head.append(style);
@@ -58,6 +58,51 @@ function getApplicableDeclarations(node: Element, width: number): CSSStyleDeclar
     .flatMap((sheet) => collect(sheet.cssRules));
 }
 
+function getStateDeclarations(
+  node: Element,
+  state: 'hover' | 'focus-visible',
+  width: number,
+): CSSStyleDeclaration[] {
+  const collect = (rules: CSSRuleList): CSSStyleDeclaration[] =>
+    Array.from(rules).flatMap((rule) => {
+      if (rule instanceof CSSStyleRule) {
+        const stateSelector = `:${state}`;
+        return rule.selectorText
+          .split(',')
+          .filter((selector) => selector.includes(stateSelector))
+          .some((selector) => node.matches(selector.replace(stateSelector, '')))
+          ? [rule.style]
+          : [];
+      }
+      if (rule instanceof CSSMediaRule) {
+        const maxWidth = rule.conditionText.match(/\(max-width:\s*(\d+)px\)/u)?.[1];
+        const minWidth = rule.conditionText.match(/\(min-width:\s*(\d+)px\)/u)?.[1];
+        if ((maxWidth && width > Number(maxWidth)) || (minWidth && width < Number(minWidth))) {
+          return [];
+        }
+      }
+      return 'cssRules' in rule ? collect((rule as CSSGroupingRule).cssRules) : [];
+    });
+  return Array.from(document.styleSheets)
+    .filter(
+      (sheet) => sheet.ownerNode instanceof HTMLStyleElement && sheet.ownerNode.dataset.t17aqHudCss,
+    )
+    .flatMap((sheet) => collect(sheet.cssRules));
+}
+
+function getLastStateValue(
+  node: Element,
+  state: 'hover' | 'focus-visible',
+  property: 'background' | 'outline' | 'outlineOffset',
+  width: number,
+): string {
+  return (
+    [...getStateDeclarations(node, state, width)]
+      .reverse()
+      .find((style) => style[property] !== '')?.[property] ?? ''
+  );
+}
+
 afterEach(() => {
   cleanup();
   document.querySelector('[data-t17aq-hud-css]')?.remove();
@@ -74,10 +119,11 @@ describe('07/T17aq: верхняя панель без переполнения'
       .find((style) => style.borderLeft !== '')?.borderLeft;
     expect(borderLeft).toMatch(/^0(?:px)?$/u);
     expect(hudCss).toMatch(/\.taxButton\s*\{[\s\S]*?border-radius: 0;/u);
-    expect(hudCss).toMatch(/\.hudInteractive:hover\s*\{[\s\S]*?background: var\(--ui-surface2\);/u);
-    expect(hudCss).toMatch(
-      /\.hudInteractive:focus-visible\s*\{[\s\S]*?outline: 2px solid var\(--selection-color\);/u,
+    expect(getLastStateValue(taxButton, 'hover', 'background', 1024)).toBe('var(--ui-surface2)');
+    expect(getLastStateValue(taxButton, 'focus-visible', 'outline', 1024)).toBe(
+      '2px solid var(--selection-color)',
     );
+    expect(getLastStateValue(taxButton, 'focus-visible', 'outlineOffset', 1024)).toBe('-2px');
     expect(taxButton.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(taxButton);
     expect(screen.getByRole('dialog', { name: 'Налог' })).toBeTruthy();
