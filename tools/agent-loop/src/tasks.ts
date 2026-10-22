@@ -465,7 +465,14 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       active.findingRetries = 0;
       if (active.findings.length === 0 && active.resumeWorkAfterFindings === true) {
         delete active.resumeWorkAfterFindings;
-        active.phase = 'work';
+        // Если за время починки точек уже появился продуктовый коммит (не только тест), бросовый
+        // повторный вызов голого workPrompt почти наверняка получит «уже реализована» без
+        // изменений: реальная работа прошла через цепочку КОД/ТЕСТ-пунктов, а не через исходный
+        // промпт. Финальный review проверит всё сразу вместо повторного обращения с тем же текстом.
+        const locked = new Set(specFiles(context, task));
+        const touched = await changedPathsBetween(context, active.base);
+        const hasProductCommit = touched.some((path) => !locked.has(path));
+        active.phase = hasProductCommit ? 'review' : 'work';
       } else {
         active.phase = active.findings.length === 0 ? 'review' : 'work';
       }

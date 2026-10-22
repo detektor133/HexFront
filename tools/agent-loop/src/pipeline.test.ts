@@ -342,6 +342,41 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('после продуктового коммита через цепочку точек идёт на финальный review, не на голый workPrompt', async () => {
+    // 07/T17ar, 2026-10-22: resumeWorkAfterFindings был выставлен на самом первом СПЕК, затем
+    // reroute на КОД и настоящий продуктовый коммит закрыли задачу целиком через цепочку точек —
+    // но когда findings опустели, флаг всё равно звал голый workPrompt; исполнитель отвечал
+    // «уже реализована», коммита не было, и цикл парковался на «не создала локальный коммит»,
+    // хотя задача была полностью готова и прошла review.
+    // resumeWorkAfterFindings выставляется первым возвратом «СПЕК:» (finding-repair.ts) и
+    // переживает весь остаток цепочки точек; здесь он уже стоит, а единственная оставшаяся точка —
+    // обычный КОД-пункт из прежнего reroute, чтобы не завязываться на точный путь $spec/reroute.
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: лес не рисует ожидаемые круги' }],
+          resumeWorkAfterFindings: true,
+        },
+      },
+      sessions: [codeCommit('Продуктовый фикс готов.'), review('OK'), review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
+    expect(run.lines).not.toContain(expect.stringContaining('не создала локальный коммит'));
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('не запускает роль повторно для припаркованной активной задачи', async () => {
     const reason = '06/T1j5-Б1: критерий требует решения владельца после диагностики plan';
     const board = new Board(() => 0);
