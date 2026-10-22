@@ -198,6 +198,27 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('не запускает роль повторно для припаркованной активной задачи', async () => {
+    const reason = '06/T1j5-Б1: критерий требует решения владельца после диагностики plan';
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'ПЛАН', text: 'ПЛАН: jsdom не вычисляет геометрию CSS' }],
+        },
+        parked: { key: 'plan:06/T1j5-Б1', head: 'c0', reason },
+      },
+      sessions: [],
+    });
+
+    expect(run.prompts).toEqual([]);
+    expect(run.lines).not.toContain(`жду: ${reason}`);
+  });
+
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
     const run = await runWorld({ sessions: [{ ...codeCommit(), push: true }] });
 

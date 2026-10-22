@@ -107,6 +107,11 @@ async function tick(context: LoopContext): Promise<Step> {
     delete state.waitingAnswer;
     await save(context);
   }
+  const { parked } = state;
+  if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) {
+    const issue = await processIssues(context, false);
+    return issue ?? 'idle';
+  }
   // Локальные коммиты активной задачи нельзя push-ить до финального review.
   if (state.activeTask !== undefined)
     return (
@@ -126,8 +131,6 @@ async function tick(context: LoopContext): Promise<Step> {
   const stage = await readStage(config.root);
   const closed = closedStageBranch(stage.status);
   if (closed !== undefined) return closedStage(context, closed);
-  const { parked } = state;
-  if (parked && !selfClearing(parked.key) && parked.head === (await head(git))) return 'idle';
   const slow = await slowGate(context);
   if (slow !== undefined) return slow;
   const selected = await selectPlannedTask(context, stage);
