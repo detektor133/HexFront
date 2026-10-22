@@ -154,13 +154,15 @@ export async function session(
   role: Role,
   prompt: string,
   locked: readonly string[] = [],
+  /** Снимки, приложенные как изображения (`codex exec -i`), не пути текстом в промпте. */
+  images: readonly string[] = [],
 ): Promise<Session> {
   const title = firstLine(prompt);
   const { board } = context.config;
   const started = context.config.now();
   board?.begin(agentName(context), title);
   await context.say(`→ ${title} (новая сессия codex)`);
-  const result = await runCodex(context.config, context.definitions, role, prompt, locked);
+  const result = await runCodex(context.config, context.definitions, role, prompt, locked, images);
   board?.count('sessions');
   board?.count('sessionMs', context.config.now() - started);
   board?.end(

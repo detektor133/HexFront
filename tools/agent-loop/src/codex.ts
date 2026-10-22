@@ -97,6 +97,8 @@ export async function runCodex(
   prompt: string,
   /** Приёмочные тесты, которые сессия не может менять (`AGENT_LOCKED` для хука прав). */
   locked: readonly string[] = [],
+  /** Снимки, приложенные к промпту как изображения (`codex exec -i <file>...`), не пути текстом. */
+  images: readonly string[] = [],
 ): Promise<Session> {
   const roleConfig =
     role === 'spec'
@@ -120,6 +122,7 @@ export async function runCodex(
       [
         'exec',
         '--dangerously-bypass-approvals-and-sandbox',
+        ...(images.length > 0 ? ['-i', ...images] : []),
         ...(roleConfig.model ? ['--model', roleConfig.model] : []),
         '-c',
         `model_reasoning_effort=${roleConfig.reasoningEffort}`,

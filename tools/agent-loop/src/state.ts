@@ -19,7 +19,8 @@ export interface ActiveTask {
   remoteBase?: string;
   /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
   readonly workPrompt: string;
-  phase: 'work' | 'review' | 'target-review' | 'pre-push' | 'ci' | 'finalize' | 'docs-ci';
+  phase:
+    'work' | 'review' | 'target-review' | 'pre-push' | 'visual' | 'ci' | 'finalize' | 'docs-ci';
   findings: PendingFinding[];
   /** Неудачные узкие review текущего пункта; первый зовёт plan, второй останавливает цикл. */
   findingRetries?: number;
