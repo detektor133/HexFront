@@ -158,10 +158,13 @@ describe('07/T17aq: верхняя панель без переполнения'
     const taxButtonDeclarations = getApplicableDeclarations(taxButton as HTMLElement, 360);
     const getEffective = (
       declarations: CSSStyleDeclaration[],
-      property: 'minWidth' | 'padding',
+      property: 'flexBasis' | 'flexShrink' | 'minInlineSize' | 'minWidth' | 'padding',
     ): string =>
       [...declarations].reverse().find((style) => style[property] !== '')?.[property] ?? '';
     expect(getEffective(taxWrapDeclarations, 'minWidth')).toMatch(/^0(?:px)?$/u);
+    expect(getEffective(taxWrapDeclarations, 'minInlineSize')).toBe('var(--touch-target-min)');
+    expect(getEffective(taxWrapDeclarations, 'flexBasis')).toBe('var(--touch-target-min)');
+    expect(getEffective(taxWrapDeclarations, 'flexShrink')).toBe('0');
     expect(getEffective(taxWrapDeclarations, 'padding')).toBe('');
     expect(getEffective(taxButtonDeclarations, 'minWidth')).toBe('var(--touch-target-min)');
     expect(
