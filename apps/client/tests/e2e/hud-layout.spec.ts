@@ -44,6 +44,45 @@ for (const width of WIDTHS) {
           if (childRect.left < rect.left || childRect.right > rect.right)
             errors.push(`дочерний элемент группы ${index} выходит за группу`);
         }
+        for (const child of metric
+          ? group.querySelectorAll<HTMLElement>(
+              ':scope > [class*="slotText"] > [class*="value"], :scope > [class*="slotText"] > [class*="rate"]',
+            )
+          : []) {
+          const childRect = child.getBoundingClientRect();
+          const style = getComputedStyle(child);
+          if (
+            childRect.width <= 0 ||
+            childRect.height <= 0 ||
+            child.getClientRects().length === 0 ||
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            style.opacity === '0'
+          ) {
+            errors.push(`значение ${child.className} группы ${index} не видно`);
+          }
+          for (
+            let ancestor = child.parentElement;
+            ancestor && ancestor !== group;
+            ancestor = ancestor.parentElement
+          ) {
+            const ancestorStyle = getComputedStyle(ancestor);
+            const clips = ['hidden', 'clip', 'scroll', 'auto'].some(
+              (overflow) =>
+                ancestorStyle.overflowX === overflow || ancestorStyle.overflowY === overflow,
+            );
+            if (!clips) continue;
+            const ancestorRect = ancestor.getBoundingClientRect();
+            if (
+              childRect.left < ancestorRect.left ||
+              childRect.right > ancestorRect.right ||
+              childRect.top < ancestorRect.top ||
+              childRect.bottom > ancestorRect.bottom
+            ) {
+              errors.push(`значение ${child.className} группы ${index} обрезано`);
+            }
+          }
+        }
         for (let first = 0; first < childRects.length; first += 1) {
           for (let second = first + 1; second < childRects.length; second += 1) {
             const firstRect = childRects[first];
