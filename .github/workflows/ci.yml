@@ -34,8 +34,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: steps.scope.outputs.mode == 'full'
         run: pnpm check
+      # Без кэша каждый прогон скачивал Chromium заново — почти 8 минут из полных 10 для этого
+      # job. Кэш лежит по версии @playwright/test: другая версия — другой браузер, другой ключ.
       - if: steps.scope.outputs.mode == 'full'
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/client/package.json') }}
+      - if: steps.scope.outputs.mode == 'full' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @hexfront/client exec playwright install --with-deps chromium
+      - if: steps.scope.outputs.mode == 'full' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @hexfront/client exec playwright install-deps chromium
       - if: steps.scope.outputs.mode == 'full'
         run: pnpm test:e2e:layout
 
