@@ -34,7 +34,7 @@ for (const width of WIDTHS) {
         const childRects: DOMRect[] = [];
         for (const child of metric
           ? group.querySelectorAll<HTMLElement>(
-              ':scope > svg, :scope > [class*="slotText"], :scope > [class*="rate"]',
+              ':scope > svg, :scope > [class*="slotText"], :scope > [class*="rate"], :scope > [class*="taxButton"]',
             )
           : []) {
           const childRect = child.getBoundingClientRect();
@@ -46,7 +46,7 @@ for (const width of WIDTHS) {
         }
         for (const child of metric
           ? group.querySelectorAll<HTMLElement>(
-              ':scope > [class*="slotText"] > [class*="value"], :scope > [class*="slotText"] > [class*="rate"]',
+              ':scope > [class*="slotText"] > [class*="value"], :scope > [class*="slotText"] > [class*="rate"], :scope > [class*="taxButton"] > svg, :scope > [class*="taxButton"] > [class*="value"], :scope > [class*="taxButton"] > [class*="rate"]',
             )
           : []) {
           const childRect = child.getBoundingClientRect();
@@ -93,6 +93,42 @@ for (const width of WIDTHS) {
               childRect.bottom > ancestorRect.bottom
             ) {
               errors.push(`значение ${child.className} группы ${index} обрезано`);
+            }
+          }
+        }
+        const taxButton = group.querySelector<HTMLElement>(':scope > [class*="taxButton"]');
+        const taxButtonRect = taxButton?.getBoundingClientRect();
+        const taxContents = taxButton
+          ? Array.from(taxButton.children).filter(
+              (child): child is Element => child instanceof Element,
+            )
+          : [];
+        for (const child of taxContents) {
+          const childRect = child.getBoundingClientRect();
+          if (!taxButtonRect) continue;
+          if (childRect.width <= 0 || childRect.height <= 0)
+            errors.push(`содержимое кнопки налога группы ${index} имеет нулевой размер`);
+          if (
+            childRect.left < taxButtonRect.left ||
+            childRect.right > taxButtonRect.right ||
+            childRect.top < taxButtonRect.top ||
+            childRect.bottom > taxButtonRect.bottom
+          ) {
+            errors.push(`содержимое кнопки налога группы ${index} выходит за кнопку`);
+          }
+        }
+        for (let first = 0; first < taxContents.length; first += 1) {
+          for (let second = first + 1; second < taxContents.length; second += 1) {
+            const firstRect = taxContents[first]?.getBoundingClientRect();
+            const secondRect = taxContents[second]?.getBoundingClientRect();
+            if (!firstRect || !secondRect) continue;
+            if (
+              firstRect.left < secondRect.right &&
+              firstRect.right > secondRect.left &&
+              firstRect.top < secondRect.bottom &&
+              firstRect.bottom > secondRect.top
+            ) {
+              errors.push(`содержимое кнопки налога группы ${index} пересекается`);
             }
           }
         }
