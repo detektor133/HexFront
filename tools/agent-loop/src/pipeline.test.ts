@@ -36,8 +36,45 @@ describe('последовательный конвейер задачи', () =>
     ]);
     expect(run.roles).toEqual(['spec', '', 'reviewer']);
     expect(run.pushes).toBe(2);
+    expect(run.prePushCalls).toBe(1);
     expect(run.ciCalls).toBe(2);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('красный локальный gate возвращает дефект без push и повторяет gate после исправления', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review('OK'),
+        codeCommit('Исправлена ошибка локальной приёмки.'),
+        review('OK'),
+        review('OK'),
+      ],
+      prePush: [
+        [
+          'pre-push: FAIL',
+          ...Array.from({ length: 14 }, (_, index) => `шум ${index}`),
+          '+ "дочерний элемент группы 2 выходит за группу"',
+          ...Array.from({ length: 8 }, (_, index) => `хвост ${index}`),
+        ].join('\n'),
+        'pre-push: OK',
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[2]).toContain('КОД: локальная приёмка перед push красная');
+    expect(run.prompts[2]).toContain('дочерний элемент группы 2 выходит за группу');
+    expect(run.prePushCalls).toBe(2);
+    expect(run.pushesAtPrePush).toEqual([0, 0]);
+    expect(run.pushes).toBe(2);
+    expect(run.ciCalls).toBe(2);
   });
 
   it('выдаёт дефекты по одному и после каждого запускает узкий review', async () => {

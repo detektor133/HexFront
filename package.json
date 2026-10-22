@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:e2e": "pnpm --filter @hexfront/client exec playwright test",
     "test:e2e:layout": "pnpm --filter @hexfront/client exec playwright test --project=desktop --workers=1 --pass-with-no-tests --grep @layout",
+    "verify:prepush": "pnpm check && pnpm test:e2e:layout --reporter=dot",
     "test:all": "vitest run --config vitest.all.config.ts && vitest run --coverage --config vitest.coverage.config.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm depcheck && pnpm tokens --check && pnpm -r --if-present build && pnpm test",
     "format": "prettier --write .",

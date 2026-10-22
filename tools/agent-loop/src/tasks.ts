@@ -6,6 +6,7 @@ import {
   backoff,
   checkPermissions,
   firstLine,
+  lastLines,
   park,
   readStage,
   runSkill,
@@ -32,6 +33,21 @@ export interface TaskRun {
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
 export const ciFixPrompt = (task: string, line: string): string =>
   `$task ${task} CI красный: ${line}`;
+
+const prePushFailure = (stdout: string, stderr: string): string => {
+  const output = [stdout, stderr].filter(Boolean).join('\n');
+  const lines = output
+    .split(/\r?\n/gu)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const signals = lines.filter((line) =>
+    /(?:\bFAIL(?:ED)?\b|\bError\b|\berror\b|Expected|Received|^[+-]\s)/iu.test(line),
+  );
+  const summary = [...signals.slice(-8), ...lines.slice(-6)].filter(
+    (line, index, all) => all.indexOf(line) === index,
+  );
+  return (summary.length > 0 ? summary.join(' | ') : lastLines(output, 12)).slice(0, 2_000);
+};
 
 export const skillFailed = (
   context: LoopContext,
@@ -369,8 +385,31 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       await context.say(`узкий review ${task}: OK, осталось ${active.findings.length} пунктов`);
       return { step: 'worked', done: false };
     }
+    active.phase = 'pre-push';
+    await save(context);
+  }
+  if (active.phase === 'pre-push') {
+    await context.say(`… локальная приёмка ${task}`);
+    const result = await context.config.runCommand('pnpm', ['verify:prepush'], {
+      cwd: context.config.root,
+      timeoutMs: 20 * 60_000,
+    });
+    if (result.code !== 0) {
+      active.findings = [
+        {
+          kind: 'КОД',
+          text: `КОД: локальная приёмка перед push красная — ${prePushFailure(result.stdout, result.stderr)}`,
+        },
+      ];
+      active.findingRetries = 0;
+      active.phase = 'work';
+      await save(context);
+      await context.say(`локальная приёмка ${task}: FAIL, push запрещён`);
+      return { step: 'worked', done: false };
+    }
     active.phase = 'ci';
     await save(context);
+    await context.say(`локальная приёмка ${task}: OK`);
   }
   if (active.phase === 'ci') {
     const stage = await readStage(context.config.root);
