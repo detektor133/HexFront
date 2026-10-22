@@ -26,6 +26,7 @@ if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
 const SCALES = [1.5, tokens.map.zoom.max] as const;
 const DPR = 2;
+const desertCoordinates: Array<ReadonlyArray<readonly [number, number, number, number]>> = [];
 
 function recordPatternCalls(): {
   readonly circles: ReturnType<typeof vi.spyOn>;
@@ -167,9 +168,16 @@ describe('T17ar: процедурные паттерны рельефа', () => 
         return Math.hypot(endX - desertCenter.x, endY - desertCenter.y) < tokens.map.hexRadius;
       });
       expect(desertCurves).toHaveLength(4);
+      desertCoordinates.push(
+        desertCurves.map(
+          (args: unknown[]) =>
+            [Number(args[0]), Number(args[1]), Number(args[2]), Number(args[3])] as const,
+        ),
+      );
       calls.curves.mockClear();
     }
 
+    expect(desertCoordinates[0]).not.toEqual(desertCoordinates[1]);
     layer.destroy();
     vi.restoreAllMocks();
   });
