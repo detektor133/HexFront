@@ -33,7 +33,9 @@ for (const width of WIDTHS) {
         const metric = group.className.includes('slot') || group.className.includes('taxWrap');
         const childRects: DOMRect[] = [];
         for (const child of metric
-          ? group.querySelectorAll<HTMLElement>('svg, [class*="slotText"], [class*="rate"]')
+          ? group.querySelectorAll<HTMLElement>(
+              ':scope > svg, :scope > [class*="slotText"], :scope > [class*="rate"]',
+            )
           : []) {
           const childRect = child.getBoundingClientRect();
           childRects.push(childRect);
