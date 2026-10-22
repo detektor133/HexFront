@@ -65,18 +65,38 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const calls = recordPatternCalls();
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
     calls.circles.mockClear();
-    const forestCoordinates: Array<ReadonlyArray<ReadonlyArray<number>>> = [];
+    const forestCoordinates: Array<ReadonlyArray<readonly [number, number]>> = [];
 
     for (const scale of SCALES) {
       layer.update(scale, detailLevel(scale));
 
       expect(detailLevel(scale)).toBe(3);
       expect(calls.circles).toHaveBeenCalledTimes(3);
-      forestCoordinates.push(calls.circles.mock.calls.map(([x, y]) => [Number(x), Number(y)]));
+      forestCoordinates.push(
+        calls.circles.mock.calls.map(
+          (args: unknown[]) => [Number(args[0]), Number(args[1])] as const,
+        ),
+      );
       calls.circles.mockClear();
     }
 
-    expect(forestCoordinates[0]).not.toEqual(forestCoordinates[1]);
+    const lowZoomCoordinates = forestCoordinates[0] ?? [];
+    const maxZoomCoordinates = forestCoordinates[1] ?? [];
+    expect(lowZoomCoordinates).toHaveLength(maxZoomCoordinates.length);
+    lowZoomCoordinates.forEach((coordinate, index) => {
+      expect(coordinate).not.toEqual(maxZoomCoordinates[index]);
+    });
+    expect(
+      lowZoomCoordinates.map(([x, y]) => [
+        Math.round(x * SCALES[0] * DPR),
+        Math.round(y * SCALES[0] * DPR),
+      ]),
+    ).not.toEqual(
+      maxZoomCoordinates.map(([x, y]) => [
+        Math.round(x * SCALES[1] * DPR),
+        Math.round(y * SCALES[1] * DPR),
+      ]),
+    );
     layer.destroy();
     vi.restoreAllMocks();
   });
