@@ -329,6 +329,7 @@
 @media (max-width: 360px) {
   .taxWrap {
     min-inline-size: var(--touch-target-min);
+    flex-shrink: 0;
   }
 
   .slotText {
