@@ -1,5 +1,4 @@
-// PreToolUse-хук: запрещает ручной запуск dev-сервера и Playwright.
-// Скрипт pnpm probe:memory вызывает Playwright сам и не блокируется.
+// PreToolUse-хук: запрещает ручной браузер; разрешает только проектные автоматические команды.
 import { readFileSync } from 'node:fs';
 
 let event = {};
@@ -23,11 +22,12 @@ const forbidden = [
   /\bvite(\s|"|$)/,
 ];
 
-const hit = forbidden.find((re) => re.test(command));
+const automated = /\bpnpm\s+(?:run\s+)?(?:probe:memory|test:e2e(?::layout)?)\b/.test(command);
+const hit = automated ? undefined : forbidden.find((re) => re.test(command));
 if (hit) {
   process.stderr.write(
     'Запрещено правилами проекта: ручной dev-сервер и Playwright. ' +
-      'Проверяй через pnpm verify и читай его текстовый вывод.\n',
+      'Используй pnpm test:e2e:layout или pnpm probe:memory.\n',
   );
   process.exit(2);
 }

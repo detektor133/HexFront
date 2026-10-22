@@ -84,6 +84,23 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
+  it('технический блокер передаёт исполнителю без ожидания владельца', async () => {
+    const run = await runWorld({
+      plan: true,
+      sessions: [
+        { answer: 'PLAN: инфраструктура — реальную CSS-геометрию проверить через Playwright' },
+        NEXT_DONE,
+        REVIEW_OK,
+      ],
+    });
+
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(run.prompts[1]).toContain(
+      'Сначала устрани технический блокер без участия владельца: реальную CSS-геометрию проверить через Playwright',
+    );
+    expect(run.lines).not.toContain(expect.stringContaining('ждёт ответа владельца'));
+  });
+
   it('plan уточняет формулировку без ослабления — исполнитель получает новый текст той же задачи', async () => {
     const clarified = setMark(
       fixtureStage.replace(

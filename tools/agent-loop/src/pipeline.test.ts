@@ -228,6 +228,40 @@ describe('последовательный конвейер задачи', () =>
     });
   });
 
+  it('диагностика plan передаёт технический блокер кодеру без владельца', async () => {
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'ПЛАН', text: 'ПЛАН: jsdom не вычисляет геометрию CSS' }],
+        },
+      },
+      sessions: [
+        { answer: 'PLAN: инфраструктура — геометрию проверить через Playwright' },
+        codeCommit('Добавлен браузерный тест геометрии.'),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$plan 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('КОД: устранить технический блокер без участия владельца');
+    expect(run.lines).toContain(
+      '06/T1j5-Б1: технический блокер передан исполнителю, владелец не требуется',
+    );
+  });
+
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
     const run = await runWorld({ sessions: [{ ...codeCommit(), push: true }] });
 

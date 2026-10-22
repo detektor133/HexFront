@@ -1,6 +1,6 @@
 {
   "reviewer": [".ai-logs/**"],
-  "spec": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", ".ai-logs/**"],
+  "spec": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/test/**", ".ai-logs/**"],
   "plan": [
     "docs/stages/**",
     "docs/STATUS.md",

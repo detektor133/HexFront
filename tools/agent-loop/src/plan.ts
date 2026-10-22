@@ -30,12 +30,14 @@ export const planPrompt = (task: string, note = ''): string =>
 /** Первая строка ответа `plan`: что сделано с текстом задачи (см. `.agents/skills/plan/SKILL.md`). */
 // Без \b: в JS \b считает границу по [A-Za-z0-9_], кириллица — не «словесный» символ, и граница
 // после последней кириллической буквы (конец слова → конец строки, оба «несловесные») не находится.
-const OUTCOME_RE = /^PLAN:\s*(не трогал|уточнено|разбито|вопрос)(?![а-яё])/imu;
+const OUTCOME_RE =
+  /^PLAN:\s*(не трогал|уточнено|разбито|вопрос|инфраструктура)(?:\s*[—-]\s*(.+))?\s*$/imu;
 
 /** `blocked` — вопрос записан в `docs/QUESTIONS.md`, задачу исполнителю передавать нельзя. */
 export interface PlanOutcome {
   readonly blocked: boolean;
-  readonly outcome: 'не трогал' | 'уточнено' | 'разбито' | 'вопрос';
+  readonly outcome: 'не трогал' | 'уточнено' | 'разбито' | 'вопрос' | 'инфраструктура';
+  readonly detail?: string;
 }
 
 /**
@@ -72,8 +74,10 @@ export async function runPlan(
     );
   const unsynced = await syncWithOrigin(git, false);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
-  const outcome = OUTCOME_RE.exec(result.message)?.[1] as PlanOutcome['outcome'] | undefined;
-  if (outcome === undefined)
+  const match = OUTCOME_RE.exec(result.message);
+  const outcome = match?.[1] as PlanOutcome['outcome'] | undefined;
+  const detail = match?.[2]?.trim();
+  if (outcome === undefined || (outcome === 'инфраструктура' && !detail))
     return park(
       context,
       `plan:${task}`,
@@ -90,7 +94,11 @@ export async function runPlan(
       result.message,
     );
   await context.say(`$plan ${task}: ${outcome}`);
-  return { blocked: outcome === 'вопрос', outcome };
+  return {
+    blocked: outcome === 'вопрос',
+    outcome,
+    ...(detail === undefined ? {} : { detail }),
+  };
 }
 
 export interface PlannedQueueTask {
@@ -144,7 +152,10 @@ export async function selectPlannedTask(
       return {
         task: next,
         mark: taskMark(stage.stageText, next) ?? ' ',
-        workPrompt: `$task ${next}`,
+        workPrompt:
+          planned.outcome === 'инфраструктура'
+            ? `$task ${next}\nСначала устрани технический блокер без участия владельца: ${planned.detail}`
+            : `$task ${next}`,
       };
     }
     state.planBlocked = { ...state.planBlocked, [task]: taskBlock(stage.stageText, task) };

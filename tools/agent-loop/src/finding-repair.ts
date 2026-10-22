@@ -64,6 +64,19 @@ export async function diagnoseFinding(
       `${task}: критерий требует решения владельца после диагностики plan`,
     );
   const active = context.state.activeTask;
+  if (planned.outcome === 'инфраструктура') {
+    if (active !== undefined) {
+      active.findings[0] = {
+        kind: 'КОД',
+        text: `КОД: устранить технический блокер без участия владельца — ${planned.detail}`,
+      };
+      active.findingRetries = 0;
+      active.phase = 'work';
+      await save(context);
+    }
+    await context.say(`${task}: технический блокер передан исполнителю, владелец не требуется`);
+    return 'worked';
+  }
   if (planned.outcome === 'уточнено' || planned.outcome === 'разбито') {
     if (active !== undefined) {
       active.findings = [];
