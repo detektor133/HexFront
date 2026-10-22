@@ -782,6 +782,26 @@ describe('приёмка T7: раскладка матча без перекры
     });
   });
 
+  it('на низком экране не накладывает ленту событий на подсказку', () => {
+    const layout = computeMatchLayout({
+      viewport: { width: 321, height: 320 },
+      hudHeight: 88,
+      bottomPanelHeight: 178,
+      eventRows: 3,
+      tutorialVisible: true,
+      leaderboardOpen: false,
+      leaderboardRows: 6,
+      cardHeight: 120,
+      cardOpen: false,
+      popupOpen: false,
+      paused: false,
+    });
+
+    expect(validateMatchLayout(layout)).toEqual([]);
+    expect(layout.elements.some((element) => element.id === 'left-column')).toBe(true);
+    expect(layout.elements.some((element) => element.id === 'event-feed')).toBe(false);
+  });
+
   it('не нарушает границы при произвольном экране и наборе флагов', () => {
     fc.assert(
       fc.property(

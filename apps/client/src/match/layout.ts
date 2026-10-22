@@ -186,25 +186,29 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
     );
   }
   const eventFeedWidth = Math.min(280, Math.max(44, width - edge * 2));
+  const eventFeedX = width - edge - eventFeedWidth;
   const leftWidth = Math.min(280, Math.max(44, width - leaderboardWidth - edge * 3));
   const eventHeight = Math.min(3, Math.max(0, input.eventRows)) * 44;
   const leftColumnTop = input.hudHeight + gap;
   const leftColumnBottom = bottomY - gap;
   const eventFeedY = bottomY - gap - eventHeight;
-  const eventTop = showLeaderboard
-    ? Math.max(leftColumnTop, leaderboardY + effectiveLeaderboardHeight + gap)
-    : leftColumnTop;
-  const eventVisible = eventHeight > 0 && eventHeight <= leftColumnBottom - eventTop;
   const tutorialY = leftColumnTop;
   const tutorialVisible = input.tutorialVisible && tutorialY + 48 <= leftColumnBottom;
   const eventOverlayVisible = !input.cardOpen && !input.popupOpen && !input.paused;
   const tutorialOverlayVisible = eventOverlayVisible && (desktop || !input.leaderboardOpen);
+  const eventTop = Math.max(
+    showLeaderboard ? leaderboardY + effectiveLeaderboardHeight + gap : leftColumnTop,
+    tutorialVisible && tutorialOverlayVisible && edge + leftWidth > eventFeedX
+      ? tutorialY + 48 + gap
+      : leftColumnTop,
+  );
+  const eventVisible = eventHeight > 0 && eventHeight <= leftColumnBottom - eventTop;
   if (eventVisible && eventOverlayVisible) {
     elements.push(
       layoutElement(
         'event-feed',
         'event-feed',
-        width - edge - eventFeedWidth,
+        eventFeedX,
         eventFeedY,
         eventFeedWidth,
         eventHeight,
