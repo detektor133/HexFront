@@ -524,7 +524,14 @@ export function SandboxSurface({
         {...(view ? { localPlayerId: view.playerId } : {})}
         now={performance.now()}
         onFocus={sb.focusEvent}
-        style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}
+        style={
+          {
+            '--observer-h': `${observerH}px`,
+            right: 'var(--space-lg)',
+            bottom: 'calc(var(--dock-h, 0px) + var(--space-sm))',
+            width: 'min(280px, calc(100% - 2 * var(--space-lg)))',
+          } as React.CSSProperties
+        }
       />
       {view && (
         <Hud
