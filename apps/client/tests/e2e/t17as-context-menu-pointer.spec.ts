@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { cityChipShift } from '../../src/dev/chip-place.ts';
+import { clampCamera } from '../../src/render/camera.ts';
 import { RADIAL_MENU_LONG_PRESS_MS } from '../../src/render/gesture.ts';
+import { hexCenter, mapBounds } from '../../src/render/hex-geometry.ts';
+import { tokens } from '../../src/theme/tokens.ts';
 
 /**
  * Матч (и каждый `page.reload()`) стартует в режиме наблюдателя «Whole map» (observerId=null)
@@ -11,56 +15,132 @@ async function selectHumanPlayer(page: Page): Promise<void> {
   await page.getByRole('combobox', { name: /Observer|Наблюдатель/i }).selectOption('0');
 }
 
-function playerCapitalPoint(
+type T17asView = {
+  playerId: number;
+  cities: Array<{ hex: number; owner: number; isCapital: boolean }>;
+  units: Array<{
+    id: number;
+    owner: number;
+    hex: number;
+    type: string;
+    path: number[];
+    moveTicks: number;
+    moveTotal: number;
+  }>;
+};
+
+function installT17asTrace(): void {
+  const commands: unknown[] = [];
+  (window as Window & { __t17asCommands?: unknown[] }).__t17asCommands = commands;
+  const workerOnMessage = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage');
+  if (!workerOnMessage?.set) throw new Error('Не найден Worker.onmessage');
+  Object.defineProperty(Worker.prototype, 'onmessage', {
+    configurable: workerOnMessage.configurable,
+    enumerable: workerOnMessage.enumerable,
+    get: workerOnMessage.get,
+    set(handler: ((this: Worker, event: MessageEvent) => void) | null): void {
+      workerOnMessage.set?.call(
+        this,
+        handler
+          ? (event: MessageEvent): void => {
+              const message = event.data as {
+                view?: T17asView;
+                snapshot?: { view?: T17asView };
+              };
+              const view = message.view ?? message.snapshot?.view;
+              if (view) {
+                const state = window as Window & {
+                  __t17asFirstView?: T17asView;
+                  __t17asView?: T17asView;
+                };
+                state.__t17asFirstView ??= view;
+                state.__t17asView = view;
+              }
+              handler.call(this, event);
+            }
+          : null,
+      );
+    },
+  });
+  const postMessage = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function postMessageWithTrace(message: unknown): void {
+    if (
+      typeof message === 'object' &&
+      message !== null &&
+      't' in message &&
+      message.t === 'command'
+    ) {
+      const command = 'cmd' in message ? message.cmd : undefined;
+      if (command) commands.push(command);
+    }
+    postMessage.call(this, message);
+  };
+}
+
+async function readT17asView(page: Page): Promise<T17asView> {
+  return page.evaluate(() => {
+    const state = window as Window & { __t17asFirstView?: T17asView; __t17asView?: T17asView };
+    const view = state.__t17asFirstView ?? state.__t17asView;
+    if (!view) throw new Error('Стартовый снимок игрока не получен');
+    return view;
+  });
+}
+
+function playerUnitPoint(
   canvas: { x: number; y: number; width: number; height: number },
   hud: { y: number; height: number },
   dock: { y: number },
   leaderboard: { width: number },
-  q: number,
-  r: number,
+  capitalHex: number,
+  unit: T17asView['units'][number],
 ): { x: number; y: number } {
-  const radius = 20;
-  const worldWidth = radius * 1.5 * 39 + radius * 2;
-  const worldHeight = radius * Math.sqrt(3) * 29 + radius * Math.sqrt(3);
-  const top = Math.max(canvas.y, hud.y + hud.height);
-  const bottom = Math.min(canvas.y + canvas.height, dock.y);
-  const viewWidth = canvas.width - leaderboard.width - 24;
-  const viewHeight = bottom - top;
-  const scale = Math.min(canvas.width / worldWidth, canvas.height / worldHeight);
-  const cameraX = Math.min(
-    radius * scale,
-    Math.max(viewWidth - (worldWidth - radius * 2) * scale, 0),
+  const radius = tokens.map.hexRadius;
+  const scale = tokens.map.zoom.detailThresholds[1] ?? tokens.map.zoom.max;
+  const world = mapBounds(39, 29, radius);
+  const hexPoint = (hex: number): { x: number; y: number } => {
+    const q = hex % 39;
+    const r = Math.floor(hex / 39) - Math.floor((q + (q & 1)) / 2);
+    const point = hexCenter({ q, r }, radius);
+    return hex === capitalHex ? { x: point.x, y: point.y + cityChipShift(1, radius) } : point;
+  };
+  const city = hexPoint(capitalHex);
+  const start = hexPoint(unit.hex);
+  const next = unit.path[0] === undefined ? start : hexPoint(unit.path[0]);
+  const progress = unit.moveTotal > 0 ? unit.moveTicks / unit.moveTotal : 0;
+  const unitPoint = {
+    x: start.x + (next.x - start.x) * progress,
+    y: start.y + (next.y - start.y) * progress,
+  };
+  const bottomInset = canvas.y + canvas.height - dock.y;
+  const topInset = hud.y + hud.height - canvas.y;
+  const rightInset = leaderboard.width + 24;
+  let camera = clampCamera(
+    { scale, x: canvas.width / 2 - city.x * scale, y: canvas.height / 2 - city.y * scale },
+    { width: canvas.width, height: canvas.height },
+    world,
   );
-  const cameraY = Math.min(
-    top + radius * Math.sqrt(3) * scale,
-    Math.max(top + viewHeight - (worldHeight - radius * Math.sqrt(3)) * scale, 0),
+  camera = clampCamera(camera, { width: canvas.width, height: canvas.height - bottomInset }, world);
+  camera = clampCamera(
+    {
+      ...camera,
+    },
+    {
+      width: canvas.width - rightInset,
+      height: canvas.height - topInset - bottomInset,
+      top: topInset,
+    },
+    world,
   );
   return {
-    x: cameraX + radius * 1.5 * q * scale,
-    y: cameraY + radius * Math.sqrt(3) * (r + q / 2) * scale,
+    x: canvas.x + camera.x + unitPoint.x * scale,
+    y: canvas.y + camera.y + unitPoint.y * scale,
   };
 }
 
 test('@layout T17as: pointerdown на canvas, удержание, pointermove в HTML-кнопку и pointerup отправляют merge', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const commands: unknown[] = [];
-    (window as Window & { __t17asCommands?: unknown[] }).__t17asCommands = commands;
-    const postMessage = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function postMessageWithTrace(message: unknown): void {
-      if (
-        typeof message === 'object' &&
-        message !== null &&
-        't' in message &&
-        message.t === 'command'
-      ) {
-        const command = 'cmd' in message ? message.cmd : undefined;
-        if (command) commands.push(command);
-      }
-      postMessage.call(this, message);
-    };
-  });
+  await page.addInitScript(installT17asTrace);
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/match?debug=1&map=small&speed=0');
@@ -78,37 +158,47 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     .boundingBox();
   if (!hudBounds || !dockBounds || !leaderboardBounds)
     throw new Error('Рабочая область карты не имеет границ');
+  const view = await readT17asView(page);
+  const first = view.units.find((unit) => unit.owner === view.playerId);
+  if (!first) throw new Error('У игрока нет стартового отряда');
+  const capitalHex = view.cities.find(
+    (city) => city.owner === view.playerId && city.isCapital,
+  )?.hex;
+  if (capitalHex === undefined) throw new Error('Столица игрока не найдена');
+  const expectedUnitIds = view.units
+    .filter(
+      (unit) => unit.owner === view.playerId && unit.hex === first.hex && unit.type === first.type,
+    )
+    .map((unit) => unit.id);
+  const capital = playerUnitPoint(
+    bounds,
+    hudBounds,
+    dockBounds,
+    leaderboardBounds,
+    capitalHex,
+    first,
+  );
   const mergeButton = page.getByRole('menuitem', { name: /Слить|Merge/i });
   let pressPoint: { x: number; y: number } | undefined;
   let opened = false;
-  for (const [q, r] of [
-    [5, 0],
-    [20, -5],
-    [34, -14],
-    [5, 16],
-    [22, 11],
-    [34, 2],
+  for (const offset of [
+    [0, 0],
+    [-8, 0],
+    [8, 0],
+    [0, -8],
+    [0, 8],
   ]) {
-    const capital = playerCapitalPoint(bounds, hudBounds, dockBounds, leaderboardBounds, q, r);
-    for (const [offsetX, offsetY] of [
-      [0, 0],
-      [-8, 0],
-      [8, 0],
-      [0, -8],
-      [0, 8],
-    ]) {
-      const point = { x: capital.x + offsetX, y: capital.y + offsetY };
-      pressPoint = point;
-      await page.mouse.move(point.x, point.y);
-      await page.mouse.down();
-      await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
-      if (await mergeButton.isVisible().catch(() => false)) {
-        opened = true;
-        break;
-      }
-      await page.mouse.up();
+    const [offsetX, offsetY] = offset;
+    const point = { x: capital.x + offsetX, y: capital.y + offsetY };
+    pressPoint = point;
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down();
+    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
+    if (await mergeButton.isVisible().catch(() => false)) {
+      opened = true;
+      break;
     }
-    if (opened) break;
+    await page.mouse.up();
   }
   expect(opened).toBe(true);
   if (!pressPoint) throw new Error('Точка нажатия не зафиксирована');
@@ -129,34 +219,18 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     .poll(() =>
       page.evaluate(
         () =>
-          (window as Window & { __t17asCommands?: Array<{ t?: string }> }).__t17asCommands?.some(
-            (command) => command.t === 'merge',
-          ) ?? false,
+          (
+            window as Window & { __t17asCommands?: Array<{ t?: string; unitIds?: number[] }> }
+          ).__t17asCommands?.find((command) => command.t === 'merge') ?? null,
       ),
     )
-    .toBe(true);
+    .toEqual({ t: 'merge', unitIds: expectedUnitIds });
 });
 
 test('@layout T17as: pointer-сценарии через canvas отправляют assignUnits, split и bombard', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const commands: unknown[] = [];
-    (window as Window & { __t17asCommands?: unknown[] }).__t17asCommands = commands;
-    const postMessage = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function postMessageWithTrace(message: unknown): void {
-      if (
-        typeof message === 'object' &&
-        message !== null &&
-        't' in message &&
-        message.t === 'command'
-      ) {
-        const command = 'cmd' in message ? message.cmd : undefined;
-        if (command) commands.push(command);
-      }
-      postMessage.call(this, message);
-    };
-  });
+  await page.addInitScript(installT17asTrace);
   await page.setViewportSize({ width: 1440, height: 900 });
   // bombard нужна артиллерия: отдельный явный флаг, не завязка на debug (07/T17as, docs/QUESTIONS.md).
   await page.goto('/match?debug=1&map=small&speed=0&fixture=artillery');
@@ -200,25 +274,30 @@ test('@layout T17as: pointer-сценарии через canvas отправля
       .boundingBox();
     if (!hudBounds || !dockBounds || !leaderboardBounds)
       throw new Error('Рабочая область карты не имеет границ');
-    for (const [q, r] of [
-      [5, 0],
-      [20, -5],
-      [34, -14],
-      [5, 16],
-      [22, 11],
-      [34, 2],
+    const view = await readT17asView(page);
+    const first = view.units.find((unit) => unit.owner === view.playerId);
+    if (!first) throw new Error('У игрока нет стартового отряда');
+    const capitalHex = view.cities.find(
+      (city) => city.owner === view.playerId && city.isCapital,
+    )?.hex;
+    if (capitalHex === undefined) throw new Error('Столица игрока не найдена');
+    const capital = playerUnitPoint(
+      bounds,
+      hudBounds,
+      dockBounds,
+      leaderboardBounds,
+      capitalHex,
+      first,
+    );
+    for (const [offsetX, offsetY] of [
+      [0, 0],
+      [-8, 0],
+      [8, 0],
+      [0, -8],
+      [0, 8],
     ]) {
-      const capital = playerCapitalPoint(bounds, hudBounds, dockBounds, leaderboardBounds, q, r);
-      for (const [offsetX, offsetY] of [
-        [0, 0],
-        [-8, 0],
-        [8, 0],
-        [0, -8],
-        [0, 8],
-      ]) {
-        if (await openMenu(capital.x + offsetX, capital.y + offsetY)) return;
-        await page.mouse.up();
-      }
+      if (await openMenu(capital.x + offsetX, capital.y + offsetY)) return;
+      await page.mouse.up();
     }
     throw new Error('Контекстное меню фишки не найдено в центре карты');
   };
