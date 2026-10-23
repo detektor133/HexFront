@@ -72,6 +72,8 @@ const harness = vi.hoisted(() => ({
   } | null,
   unitHex: 0,
   unitCityLevel: null as number | null,
+  selectedUnitIds: [] as number[],
+  availableArmyIds: [] as number[],
 }));
 
 class TestWorker {
@@ -114,6 +116,10 @@ class TestWorker {
     }
     harness.unitHex = view.units[0]?.hex ?? 0;
     harness.unitCityLevel = view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
+    harness.selectedUnitIds = view.units
+      .filter((unit) => unit.owner === view.playerId && unit.hex === harness.unitHex)
+      .map((unit) => unit.id);
+    harness.availableArmyIds = view.armies.map((army) => army.id);
     queueMicrotask(() =>
       this.onmessage?.({
         data: {
@@ -216,6 +222,8 @@ beforeEach(() => {
   harness.canvas = null;
   harness.app = null;
   harness.unitCityLevel = null;
+  harness.selectedUnitIds = [];
+  harness.availableArmyIds = [];
 });
 
 afterEach(() => {
@@ -251,14 +259,17 @@ describe('07/T17as: контекстное меню фишки отряда', ()
       expect(command).toBeDefined();
       if (command?.t === 'split') {
         expect(command.unitId).toBeTypeOf('number');
+        expect(harness.selectedUnitIds).toContain(command.unitId);
         expect(command.soldiers).toBeGreaterThan(0);
       } else if (command?.t === 'merge') {
-        expect(command.unitIds.length).toBeGreaterThan(0);
+        expect(command.unitIds).toEqual(harness.selectedUnitIds);
       } else if (command?.t === 'assignUnits') {
-        expect(command.unitIds.length).toBeGreaterThan(0);
+        expect(command.unitIds).toEqual(harness.selectedUnitIds);
         expect(command).toHaveProperty('armyId');
+        if (command.armyId !== null) expect(harness.availableArmyIds).toContain(command.armyId);
       } else if (command?.t === 'bombard') {
         expect(command.unitId).toBeTypeOf('number');
+        expect(harness.selectedUnitIds).toContain(command.unitId);
         expect(command.targetUnitId).toBeNull();
       } else {
         throw new Error(`Неожиданный тип команды: ${command?.t ?? 'нет команды'}`);
