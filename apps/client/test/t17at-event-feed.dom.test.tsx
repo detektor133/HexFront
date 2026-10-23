@@ -75,6 +75,7 @@ describe('07/T17at: DOM ленты событий', () => {
 
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Город потерян' })).toBeNull();
     const captureButton = buttons[0];
     expect(captureButton).toBeDefined();
     if (!captureButton) return;
