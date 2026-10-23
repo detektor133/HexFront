@@ -96,10 +96,10 @@ function playerUnitPoint(
 ): { x: number; y: number } {
   const radius = tokens.map.hexRadius;
   const scale = tokens.map.zoom.detailThresholds[1] ?? tokens.map.zoom.max;
-  const world = mapBounds(39, 29, radius);
+  const world = mapBounds(40, 30, radius);
   const hexPoint = (hex: number): { x: number; y: number } => {
-    const q = hex % 39;
-    const r = Math.floor(hex / 39) - Math.floor((q + (q & 1)) / 2);
+    const q = hex % 40;
+    const r = Math.floor(hex / 40) - Math.floor((q + (q & 1)) / 2);
     const point = hexCenter({ q, r }, radius);
     return hex === capitalHex ? { x: point.x, y: point.y + cityChipShift(1, radius) } : point;
   };
