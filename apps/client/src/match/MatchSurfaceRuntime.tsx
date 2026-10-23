@@ -17,7 +17,7 @@ import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import { buildRadialActions, type RadialAction, type RadialMenuState } from '../dev/radial-menu.ts';
+import { buildRadialActions, sectorAt, type RadialMenuState } from '../dev/radial-menu.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
@@ -42,7 +42,6 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import type { RadialContext } from '../render/gesture.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type RadialHooks, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
@@ -81,23 +80,28 @@ export function createRadialActionHandler(options: {
   send: (command: Command) => void;
   getState: () => RadialMenuState | null;
   setState: (state: RadialMenuState | null) => void;
-}): (context: RadialContext | null, screen: Point, phase: RadialPhase) => void {
-  return (context, screen, phase): void => {
+}): (armyId: number, screen: Point, phase: RadialPhase) => void {
+  return (armyId, screen, phase): void => {
     const view = options.getView();
     if (!view) return;
     if (phase === 'start') {
-      if (!context) return;
       const actions = buildRadialActions(
-        view.units.filter(
-          (unit) => unit.owner === view.playerId && context.unitIds.includes(unit.id),
-        ),
+        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
         view,
       );
       options.setState({ center: screen, actions, active: actions });
       return;
     }
-    // После открытия жест передан DOM-меню: отпускание указателя не выбирает сектор.
-    if (phase === 'end' || phase === 'cancel') options.setState(null);
+    const state = options.getState();
+    if (!state) return;
+    const active = sectorAt(state, screen);
+    if (phase === 'move' && active?.children)
+      options.setState({ ...state, active: active.children });
+    if (phase === 'end') {
+      if (active?.command) options.send(active.command);
+      options.setState(null);
+    }
+    if (phase === 'cancel') options.setState(null);
   };
 }
 
@@ -201,8 +205,7 @@ interface Sandbox {
   setHudHeight(height: number, leaderboardWidth?: number): void;
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
-  radialForUnit(context: RadialContext | null, screen: Point, phase: RadialPhase): void;
-  radialAction(action: RadialAction): void;
+  radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -290,11 +293,11 @@ export function useSandbox(
     layerRef.current?.setRoadPreview(path);
   }, []);
   const setArmyRef = useRef(setArmy);
-  const setRadialState = useCallback((next: RadialMenuState | null): void => {
+  const setRadialState = (next: RadialMenuState | null): void => {
     radialRef.current = next;
     setRadial(next);
-  }, []);
-  const radialForUnit = useCallback(
+  };
+  const radialForArmy = useCallback(
     createRadialActionHandler({
       getView: () => viewRef.current,
       send: (command) => matchRef.current?.send(command),
@@ -302,19 +305,6 @@ export function useSandbox(
       setState: setRadialState,
     }),
     [],
-  );
-  const radialAction = useCallback(
-    (action: RadialAction): void => {
-      const state = radialRef.current;
-      if (!state) return;
-      if (action.children) {
-        setRadialState({ ...state, active: action.children });
-        return;
-      }
-      if (action.command) matchRef.current?.send(action.command);
-      setRadialState(null);
-    },
-    [setRadialState],
   );
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
@@ -446,11 +436,6 @@ export function useSandbox(
           setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
         ),
         autoCommand: setup.autoCommand ?? localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
-        // Отдельный флаг, а не завязка на debug: стартовый стек одинаковых отрядов (без фикстуры)
-        // нужен сценариям merge, артиллерия — только тем, кто её явно просит (07/T17as).
-        ...(new URLSearchParams(window.location.search).get('fixture') === 'artillery'
-          ? { fixture: 'artillery' as const }
-          : {}),
       },
     );
     setPlayerPalette(
@@ -520,11 +505,6 @@ export function useSandbox(
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
-      // Только для E2E под debug: тест читает реальную камеру вместо пересборки формулы вручную
-      // (порядок setBottomInset/setTopInset сдвигает камеру, это не одна чистая формула).
-      if (debug)
-        (window as Window & { __t17asCamera?: () => unknown }).__t17asCamera = () =>
-          v.debugCamera?.();
       const currentTool = toolRef.current;
       v.setStroke(currentTool && currentTool.tool !== 'erase' ? input.stroke : null);
       if (viewRef.current) applyStartCameraToView(viewRef.current);
@@ -537,36 +517,18 @@ export function useSandbox(
       const radialHooks: RadialHooks = {
         canOpen(world) {
           const current = viewRef.current;
-          if (!current || toolRef.current) return null;
-          const hit = layerRef.current?.unitsAt(world) ?? [];
-          const unit = current.units.find((candidate) => {
-            if (candidate.owner !== current.playerId || candidate.order === 'retreat') return false;
-            if (hit.includes(candidate.id)) return true;
-            const center = layerRef.current?.chipAt(candidate.hex);
+          if (!current || toolRef.current || pickedRef.current.units.length === 0) return false;
+          return pickedRef.current.units.some((id) => {
+            const unit = current.units.find((candidate) => candidate.id === id);
+            const center = unit ? layerRef.current?.chipAt(unit.hex) : undefined;
             return (
               center !== undefined &&
-              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius
+              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
             );
           });
-          if (!unit) return null;
-          if (!pickedRef.current.units.includes(unit.id))
-            pick(selectUnits(current, pickedRef.current, [unit.id]));
-          const unitIds = hit.filter((id) =>
-            current.units.some(
-              (candidate) =>
-                candidate.id === id &&
-                candidate.owner === current.playerId &&
-                candidate.order !== 'retreat',
-            ),
-          );
-          return {
-            unitId: unit.id,
-            unitIds: unitIds.length > 0 ? unitIds : [unit.id],
-            hex: unit.hex,
-          };
         },
-        action(context, _world, screen, phase) {
-          radialForUnit(context, screen, phase);
+        action(_world, screen, phase) {
+          radialForArmy(armyRef.current ?? -1, screen, phase);
         },
       };
       v.setRadialHooks?.(radialHooks);
@@ -605,7 +567,6 @@ export function useSandbox(
         setTool(null);
         return;
       }
-      setRadialState(null);
       pick(NOTHING_PICKED);
     };
     window.addEventListener('keydown', onKey);
@@ -639,8 +600,7 @@ export function useSandbox(
     events,
     workerTelemetry: workerTelemetryRef.current,
     radial,
-    radialForUnit,
-    radialAction,
+    radialForArmy,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {

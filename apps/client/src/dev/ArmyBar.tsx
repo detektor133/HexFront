@@ -17,6 +17,7 @@ import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { DRAG_SLOP_PX, RADIAL_MENU_LONG_PRESS_MS } from '../render/gesture.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -229,10 +230,17 @@ function ArmyCard(props: {
   onAuto: () => void;
   onRename: (name: string) => void;
   onClick: () => void;
+  onRadial?: (
+    screen: { readonly x: number; readonly y: number },
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ) => void;
 }): React.JSX.Element {
   const { stats, run } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
+  const radialTimer = useRef<number | null>(null);
+  const radialStarted = useRef(false);
+  const radialStart = useRef<{ readonly x: number; readonly y: number } | null>(null);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -245,6 +253,42 @@ function ArmyCard(props: {
   };
   const cancel = (): void => setEditing(false);
   const select = (): void => props.onClick();
+  const radialPoint = (event: React.PointerEvent): { readonly x: number; readonly y: number } => ({
+    x: event.clientX,
+    y: event.clientY,
+  });
+  const startRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!props.onRadial || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    radialStart.current = radialPoint(event);
+    radialTimer.current = window.setTimeout(() => {
+      radialStarted.current = true;
+      props.onRadial?.(radialPoint(event), 'start');
+    }, RADIAL_MENU_LONG_PRESS_MS);
+  };
+  const moveRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const start = radialStart.current;
+    if (
+      !radialStarted.current &&
+      start !== null &&
+      Math.hypot(event.clientX - start.x, event.clientY - start.y) > DRAG_SLOP_PX
+    ) {
+      if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+      radialTimer.current = null;
+      radialStart.current = null;
+      return;
+    }
+    if (radialStarted.current) props.onRadial?.(radialPoint(event), 'move');
+  };
+  const endRadial = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+    radialTimer.current = null;
+    if (radialStarted.current) {
+      props.onRadial?.(radialPoint(event), 'end');
+      radialStarted.current = false;
+    }
+    radialStart.current = null;
+  };
   const selectFromContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
     event.preventDefault();
     select();
@@ -257,6 +301,16 @@ function ArmyCard(props: {
         className={styles.pick}
         aria-pressed={props.selected}
         onClick={select}
+        onPointerDown={startRadial}
+        onPointerMove={moveRadial}
+        onPointerUp={endRadial}
+        onPointerCancel={(event) => {
+          if (radialTimer.current !== null) window.clearTimeout(radialTimer.current);
+          radialTimer.current = null;
+          if (radialStarted.current) props.onRadial?.(radialPoint(event), 'cancel');
+          radialStarted.current = false;
+          radialStart.current = null;
+        }}
         onContextMenu={selectFromContextMenu}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') select();
@@ -368,6 +422,11 @@ export function ArmyBar(props: {
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
+  onRadial?: (
+    armyId: number,
+    screen: { readonly x: number; readonly y: number },
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ) => void;
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
   const { onHeight } = props;
@@ -406,6 +465,7 @@ export function ArmyBar(props: {
     event.currentTarget.scrollLeft += delta;
   };
   const reserve = mine.filter((u) => u.armyId === null);
+  const onRadial = props.onRadial;
   const runOf = (a: ArmyView) => {
     const p = view.plans.find((x) => x.armyId === a.id);
     const front = p?.kind === 'front';
@@ -476,6 +536,16 @@ export function ArmyBar(props: {
                   onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
+                  {...(onRadial
+                    ? {
+                        onRadial: (
+                          screen: { readonly x: number; readonly y: number },
+                          phase: 'start' | 'move' | 'end' | 'cancel',
+                        ) => {
+                          onRadial(a.id, screen, phase);
+                        },
+                      }
+                    : {})}
                 />
               );
             })}

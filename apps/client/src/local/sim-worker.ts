@@ -69,7 +69,6 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     msg.bots,
     msg.fog,
     msg.playerName ?? '',
-    msg.fixture,
   );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });

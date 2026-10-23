@@ -18,13 +18,7 @@ import {
   type Velocity,
   type Viewport,
 } from './camera.ts';
-import {
-  createGesture,
-  type Gesture,
-  type RadialContext,
-  type StrokePhase,
-  type TapKind,
-} from './gesture.ts';
+import { createGesture, type Gesture, type StrokePhase, type TapKind } from './gesture.ts';
 import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
@@ -79,13 +73,8 @@ export interface OrderHooks {
 }
 
 export interface RadialHooks {
-  canOpen(world: Point): RadialContext | null;
-  action(
-    context: RadialContext,
-    world: Point,
-    screen: Point,
-    phase: 'start' | 'move' | 'end' | 'cancel',
-  ): void;
+  canOpen(world: Point): boolean;
+  action(world: Point, screen: Point, phase: 'start' | 'move' | 'end' | 'cancel'): void;
 }
 
 /** Росчерк: точка в мировых координатах карты. */
@@ -127,13 +116,6 @@ export interface MapView {
   cancel(): void;
   /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
   sceneStats(): PixiSceneStats;
-  /**
-   * Текущая камера (масштаб и смещение) без побочных эффектов — только для E2E-тестов под
-   * debug: перевод мировых координат в экранные зависит от порядка вызовов setTopInset/
-   * setBottomInset (каждый сдвигает камеру, чтобы сохранить центр при смене инсета), и ручное
-   * повторение этой последовательности в тесте разъезжается с реальной камерой.
-   */
-  debugCamera?(): Camera;
   destroy(): void;
 }
 
@@ -191,11 +173,9 @@ export async function createMapView(
   let centerAnimation: { from: Camera; to: Camera; elapsedMs: number; durationMs: number } | null =
     null;
   let pressed = 0;
-  let activePointerId: number | null = null;
   let stroking = false;
   let hooks: OrderHooks | null = null;
   let radialHooks: RadialHooks | null = null;
-  let radialHandedOff = false;
   let stroke: StrokeHandler | null = null;
   let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
@@ -257,7 +237,7 @@ export async function createMapView(
         grabbed = null;
       },
       canHold: () => stroke === null && (hooks?.canHold() ?? false),
-      canRadial: (at) => radialHooks?.canOpen(toWorld(at)) ?? null,
+      canRadial: (at) => radialHooks?.canOpen(toWorld(at)) ?? false,
       cancelZone: (at) => hooks?.cancelZone(toWorld(at)) ?? false,
       inside: (at) => at.x >= 0 && at.y >= 0 && at.x <= view().width && at.y <= view().height,
     },
@@ -301,28 +281,7 @@ export async function createMapView(
         hooks?.hold(toWorld(e.at), e.phase);
       } else if (e.t === 'radial') {
         velocity = null;
-        if (e.phase === 'start') {
-          radialHooks?.action(e.context, toWorld(e.at), e.viewportAt, e.phase);
-          if (
-            activePointerId !== null &&
-            typeof app.canvas.releasePointerCapture === 'function' &&
-            (typeof app.canvas.hasPointerCapture !== 'function' ||
-              app.canvas.hasPointerCapture(activePointerId))
-          ) {
-            app.canvas.releasePointerCapture(activePointerId);
-          }
-          radialHandedOff = true;
-        } else if (
-          !radialHandedOff ||
-          (typeof globalThis.document?.elementFromPoint === 'function' &&
-            !globalThis.document
-              .elementFromPoint(e.viewportAt.x, e.viewportAt.y)
-              ?.closest('[role="menu"]') &&
-            (e.phase === 'end' || e.phase === 'cancel'))
-        ) {
-          radialHooks?.action(e.context, toWorld(e.at), e.viewportAt, e.phase);
-        }
-        if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
+        radialHooks?.action(toWorld(e.at), e.at, e.phase);
       } else if (e.t === 'doubleTap') {
         const world = toWorld(e.at);
         onDoubleTap?.(pixelToHex(world, opts.radius), world);
@@ -333,9 +292,8 @@ export async function createMapView(
   );
   const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
-    pressed: (n, pointerId) => {
+    pressed: (n) => {
       pressed = n;
-      activePointerId = n === 0 ? null : (pointerId ?? activePointerId);
       if (n > 0) velocity = null;
     },
     idle: (ms) => {
@@ -434,9 +392,6 @@ export async function createMapView(
           : null,
       };
     },
-    debugCamera() {
-      return cam;
-    },
     setStroke(handler) {
       if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');
       stroking = false;
@@ -451,25 +406,13 @@ export async function createMapView(
       cam = zoomAt(cam, scale / cam.scale, v.width / 2, v.height / 2, v, bounds);
     },
     setBottomInset(px) {
-      const previousCenterY = (topInset + view().height - bottomInset) / 2;
       bottomInset = Math.max(0, px);
-      const nextCenterY = (topInset + view().height - bottomInset) / 2;
-      cam = { ...cam, y: cam.y + nextCenterY - previousCenterY };
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
     setTopInset(px, right = rightInset) {
-      const previousCenterX = (view().width - rightInset) / 2;
-      const previousCenterY = (topInset + view().height - bottomInset) / 2;
       topInset = Math.max(0, px);
       rightInset = Math.max(0, right);
-      const nextCenterX = (view().width - rightInset) / 2;
-      const nextCenterY = (topInset + view().height - bottomInset) / 2;
-      cam = {
-        ...cam,
-        x: cam.x + nextCenterX - previousCenterX,
-        y: cam.y + nextCenterY - previousCenterY,
-      };
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
@@ -483,7 +426,7 @@ export async function createMapView(
 interface InputHandlers {
   zoom(factor: number, at: Point): void;
   /** Сколько указателей нажато (инерция — только когда ни одного). */
-  pressed(n: number, pointerId?: number): void;
+  pressed(n: number): void;
   /** Палец отпущен после паузы дольше ms — инерции нет. */
   idle(ms: number): void;
 }
@@ -498,33 +441,18 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   const down = (e: PointerEvent): void => {
     canvas.setPointerCapture(e.pointerId);
     count += 1;
-    const at = local(e);
-    h.pressed(count, e.pointerId);
-    g.down(e.pointerId, at, e.button, performance.now(), e.shiftKey, {
-      x: e.clientX,
-      y: e.clientY,
-    });
+    h.pressed(count);
+    g.down(e.pointerId, local(e), e.button, performance.now(), e.shiftKey);
   };
   const move = (e: PointerEvent): void => {
-    if (count === 0) {
-      h.idle(0);
-      return g.hover(local(e));
-    }
-    g.move(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
+    if (count === 0) return g.hover(local(e));
+    g.move(e.pointerId, local(e), performance.now());
   };
   const up = (e: PointerEvent): void => {
     count = Math.max(0, count - 1);
-    g.up(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
-    h.pressed(count, e.pointerId);
+    g.up(e.pointerId, local(e), performance.now());
+    h.pressed(count);
     if (count === 0) h.idle(INERTIA_MAX_PAUSE_MS);
-  };
-  const releasedUp = (e: PointerEvent): void => {
-    if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
-    up(e);
-  };
-  const releasedMove = (e: PointerEvent): void => {
-    if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
-    g.move(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
   };
   const leave = (): void => {
     if (count === 0) g.hover(null);
@@ -539,9 +467,6 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
-  globalThis.document?.addEventListener('pointermove', releasedMove);
-  globalThis.document?.addEventListener('pointerup', releasedUp);
-  globalThis.document?.addEventListener('pointercancel', releasedUp);
   canvas.addEventListener('pointerleave', leave);
   canvas.addEventListener('wheel', wheel, { passive: false });
   // Правая кнопка — приказ, контекстное меню браузера над картой не нужно.
@@ -553,9 +478,6 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);
     canvas.removeEventListener('pointercancel', up);
-    globalThis.document?.removeEventListener('pointermove', releasedMove);
-    globalThis.document?.removeEventListener('pointerup', releasedUp);
-    globalThis.document?.removeEventListener('pointercancel', releasedUp);
     canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('wheel', wheel);
   };

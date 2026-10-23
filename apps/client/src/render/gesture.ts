@@ -17,12 +17,6 @@ export type StrokePhase = 'start' | 'move' | 'end' | 'cancel';
 /** Тап выбирает; ПКМ — приказ сразу (07-controls.md, как в HoI4). */
 export type TapKind = 'select' | 'order';
 
-export interface RadialContext {
-  readonly unitId: number;
-  readonly unitIds: readonly number[];
-  readonly hex: number;
-}
-
 export type GestureEvent =
   | { readonly t: 'tap'; readonly at: Point; readonly kind: TapKind }
   | { readonly t: 'pan'; readonly dx: number; readonly dy: number }
@@ -42,8 +36,6 @@ export type GestureEvent =
   | {
       readonly t: 'radial';
       readonly at: Point;
-      readonly viewportAt: Point;
-      readonly context: RadialContext;
       readonly phase: 'start' | 'move' | 'end' | 'cancel';
     }
   | { readonly t: 'doubleTap'; readonly at: Point }
@@ -58,7 +50,7 @@ export interface GestureDeps {
   release(): void;
   /** Удержание — приказ: выбраны отряды и инструмент не включён. */
   canHold(): boolean;
-  canRadial?(at: Point): RadialContext | null;
+  canRadial?(at: Point): boolean;
   /** Точка на фишке выбранных отрядов — палец, вернувшийся туда, отменяет приказ. */
   cancelZone(at: Point): boolean;
   /** Точка на экране (за краем — отмена приказа). */
@@ -66,16 +58,9 @@ export interface GestureDeps {
 }
 
 export interface Gesture {
-  down(
-    id: number,
-    at: Point,
-    button: number,
-    ms: number,
-    shift?: boolean,
-    viewportAt?: Point,
-  ): void;
-  move(id: number, at: Point, ms: number, viewportAt?: Point): void;
-  up(id: number, at: Point, ms: number, viewportAt?: Point): void;
+  down(id: number, at: Point, button: number, ms: number, shift?: boolean): void;
+  move(id: number, at: Point, ms: number): void;
+  up(id: number, at: Point, ms: number): void;
   /** Отменяет активный жест без выполнения действия. */
   cancel(): void;
   /** Проверка удержания без событий указателя (таймер). */
@@ -104,8 +89,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   let downMs = 0;
   let button = 0;
   let shift = false;
-  let radialContext: RadialContext | null = null;
-  let radialViewportAt: Point = { x: 0, y: 0 };
   // Приказ удержанием: палец уходил с фишки выбранных отрядов (возврат на неё — отмена).
   let leftZone = false;
   let lastTap: { readonly at: Point; readonly ms: number } | null = null;
@@ -125,21 +108,14 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   };
 
   return {
-    down(id, at, btn, ms, withShift = false, viewportAt = at) {
+    down(id, at, btn, ms, withShift = false) {
       active.set(id, at);
       if (active.size > 1) {
         // Второй палец — всегда карта: росчерк, деление и приказ удержанием отменяются.
         if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
         if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
         if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
-        if (mode === 'radial' && radialContext)
-          emit({
-            t: 'radial',
-            at: last,
-            viewportAt: radialViewportAt,
-            context: radialContext,
-            phase: 'cancel',
-          });
+        if (mode === 'radial') emit({ t: 'radial', at: last, phase: 'cancel' });
         if (mode === 'pressed') deps.release();
         mode = 'multi';
         return;
@@ -150,12 +126,11 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       downMs = ms;
       button = btn;
       shift = withShift && btn === 0;
-      radialViewportAt = viewportAt;
       leftZone = false;
       if (btn === 0 && !shift) deps.press(at);
     },
 
-    move(id, at, ms, _viewportAt = radialViewportAt) {
+    move(id, at, ms) {
       const prev = active.get(id);
       if (!prev) return;
       const before = pinch();
@@ -179,14 +154,12 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         return;
       }
       if (mode === 'radial') {
-        if (radialContext)
-          emit({
-            t: 'radial',
-            at,
-            viewportAt: radialViewportAt,
-            context: radialContext,
-            phase: 'move',
-          });
+        if (!deps.inside(at)) {
+          emit({ t: 'radial', at, phase: 'cancel' });
+          mode = 'held';
+          return;
+        }
+        emit({ t: 'radial', at, phase: 'move' });
         return;
       }
       if (mode === 'held') return;
@@ -211,24 +184,14 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       else if (mode === 'panning') emit({ t: 'pan', dx: at.x - prev.x, dy: at.y - prev.y });
     },
 
-    up(id, at, ms, viewportAt = radialViewportAt) {
+    up(id, at, ms) {
       if (!active.has(id)) return;
       active.delete(id);
       if (mode === 'pressed') this.tick(ms);
       if (mode === 'stroking') emit({ t: 'stroke', at, phase: 'end' });
       else if (mode === 'selecting') emit({ t: 'selection', at: start, to: at, phase: 'end' });
       else if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'end' });
-      else if (mode === 'radial' && radialContext)
-        emit({
-          t: 'radial',
-          at,
-          // Отпускание решает исход (решение владельца, 2026-10-23): реальная точка отпускания,
-          // а не замороженная на удержании — иначе отмена увести-и-отпустить в пустоту не
-          // отличима от отпускания на кнопке (map-view.ts проверяет elementFromPoint именно тут).
-          viewportAt,
-          context: radialContext,
-          phase: 'end',
-        });
+      else if (mode === 'radial') emit({ t: 'radial', at, phase: 'end' });
       else if (mode === 'pressed') {
         deps.release();
         if (
@@ -251,14 +214,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
       if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
       if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
-      if (mode === 'radial' && radialContext)
-        emit({
-          t: 'radial',
-          at: last,
-          viewportAt: radialViewportAt,
-          context: radialContext,
-          phase: 'cancel',
-        });
+      if (mode === 'radial') emit({ t: 'radial', at: last, phase: 'cancel' });
       if (mode === 'pressed') deps.release();
       active.clear();
       mode = 'idle';
@@ -266,19 +222,12 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
 
     tick(ms) {
       if (mode !== 'pressed' || button !== 0 || ms - downMs < HOLD_MS) return;
-      const nextRadialContext = deps.canRadial?.(start) ?? null;
-      if (nextRadialContext && ms - downMs < RADIAL_MENU_LONG_PRESS_MS) return;
-      if (nextRadialContext) {
+      const radialAvailable = deps.canRadial?.(start) ?? false;
+      if (radialAvailable && ms - downMs < RADIAL_MENU_LONG_PRESS_MS) return;
+      if (radialAvailable) {
         deps.release();
         mode = 'radial';
-        radialContext = nextRadialContext;
-        emit({
-          t: 'radial',
-          at: start,
-          viewportAt: radialViewportAt,
-          context: nextRadialContext,
-          phase: 'start',
-        });
+        emit({ t: 'radial', at: start, phase: 'start' });
         return;
       }
       if (!deps.canHold()) return;

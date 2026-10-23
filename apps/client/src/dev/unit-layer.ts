@@ -408,14 +408,11 @@ export function createUnitLayer(
       return base(hex);
     },
     unitsAt(world) {
-      const halfHeight = Math.max(chipHalf(), radius * 0.5);
+      const halfHeight = chipHalf();
       for (const entry of entries) {
         if (entry.units.length === 0) continue;
         const at = drawnAt.get(entry.key) ?? entry.at(1);
-        const target = entry.at(1);
-        const hit = (point: Point): boolean =>
-          Math.abs(world.x - point.x) <= radius && Math.abs(world.y - point.y) <= halfHeight;
-        if (hit(at) || hit(target)) {
+        if (Math.abs(world.x - at.x) <= radius && Math.abs(world.y - at.y) <= halfHeight) {
           return entry.units;
         }
       }

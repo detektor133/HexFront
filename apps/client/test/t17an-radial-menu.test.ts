@@ -71,8 +71,6 @@ const harness = vi.hoisted(() => ({
   } | null,
   world: { x: 100, y: 100 },
   artillery: false,
-  compatibleStack: false,
-  stackUnitIds: [] as number[],
   unitHex: 0,
   unitCityLevel: null as number | null,
 }));
@@ -99,14 +97,6 @@ class TestWorker {
         0,
         1,
       );
-    }
-    if (harness.compatibleStack) {
-      const firstUnit = snapshot.view.units[0];
-      if (!firstUnit) throw new Error('В снимке нет отряда для фикстуры слияния');
-      const nextId = Math.max(...snapshot.view.units.map((unit) => unit.id)) + 1;
-      const stackedUnit = { ...firstUnit, id: nextId };
-      (snapshot.view as { units: typeof snapshot.view.units }).units = [firstUnit, stackedUnit];
-      harness.stackUnitIds = [firstUnit.id, stackedUnit.id];
     }
     queueMicrotask(() =>
       this.onmessage?.({
@@ -209,8 +199,6 @@ beforeEach(() => {
   harness.mapCanvas = null;
   harness.app = null;
   harness.artillery = false;
-  harness.compatibleStack = false;
-  harness.stackUnitIds.length = 0;
   harness.world = { x: 100, y: 100 };
   harness.unitHex = 0;
   harness.unitCityLevel = null;
@@ -224,7 +212,7 @@ afterEach(() => {
 });
 
 describe('07/T17an: радиальное меню', () => {
-  it('не открывает radial при удержании выбранной карточки ArmyBar', async () => {
+  it('проводит ArmyBar через MatchSurface, useSandbox и send', async () => {
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
@@ -234,12 +222,16 @@ describe('07/T17an: радиальное меню', () => {
       return selected;
     });
     fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(harness.commands).toEqual([]);
+    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
+    const menu = screen.getByRole('menu');
+    const merge = screen.getByRole('menuitem', { name: /merge/i });
+    const point = menuPoint(merge, menu);
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: point.x, clientY: point.y });
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: point.x, clientY: point.y });
+    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
   });
 
-  it('не открывает radial при удержании артиллерийской карточки ArmyBar', async () => {
+  it('отправляет assignUnits после pointerup над дочерним сектором', async () => {
     harness.artillery = true;
     await renderSurface();
     const card = armyCard();
@@ -250,9 +242,22 @@ describe('07/T17an: радиальное меню', () => {
       return selected;
     });
     fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(harness.commands).toEqual([]);
+    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
+    const menu = screen.getByRole('menu');
+    const assign = screen.getByRole('menuitem', { name: /to army/i });
+    const root = menuPoint(assign, menu);
+    fireEvent.pointerMove(card, { pointerId: 2, clientX: root.x, clientY: root.y });
+    const child = screen
+      .getAllByRole('menuitem')
+      .find((item) => item.getAttribute('aria-label')?.toLowerCase() !== 'reserve');
+    if (!child) throw new Error('Дочерний сектор assignUnits не отрендерен');
+    const target = menuPoint(child, menu);
+    fireEvent.pointerUp(card, { pointerId: 2, clientX: target.x, clientY: target.y });
+    expect(harness.commands).toContainEqual({
+      t: 'assignUnits',
+      unitIds: expect.any(Array),
+      armyId: expect.any(Number),
+    });
   });
 
   it('отменяет radial при движении карточки до порога', async () => {
@@ -266,7 +271,6 @@ describe('07/T17an: радиальное меню', () => {
   });
 
   it('проводит удержание фишки MapView через runtime до send', async () => {
-    harness.compatibleStack = true;
     await renderSurface();
     fireEvent.click(armyCard());
     await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
@@ -280,24 +284,19 @@ describe('07/T17an: радиальное меню', () => {
     await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
     harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
     const menu = await screen.findByRole('menu');
-    const mergeItem = screen.getByRole('menuitem', { name: /merge/i });
-    const point = menuPoint(mergeItem, menu);
+    const merge = screen.getByRole('menuitem', { name: /merge/i });
+    const point = menuPoint(merge, menu);
     fireEvent.pointerMove(harness.mapCanvas, {
       pointerId: 1,
       clientX: point.x,
       clientY: point.y,
     });
-    fireEvent.pointerUp(mergeItem, {
+    fireEvent.pointerUp(harness.mapCanvas, {
       pointerId: 1,
       clientX: point.x,
       clientY: point.y,
     });
-    expect(harness.commands).toContainEqual({
-      t: 'merge',
-      unitIds: expect.arrayContaining(harness.stackUnitIds),
-    });
-    const mergeCommand = harness.commands.find((command) => command.t === 'merge');
-    expect(mergeCommand?.unitIds).toHaveLength(2);
+    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
   });
 
   it('проводит двойной тап MapView через runtime до выбора и centerOn', async () => {
@@ -410,43 +409,40 @@ describe('07/T17an: радиальное меню', () => {
     expect(sectorAt(state, { x: 100, y: 100 })).toBeNull();
   });
 
-  it('не открывает radial при удержании артиллерийской карточки ArmyBar', async () => {
+  it('проверяет точный корневой набор artillery и payload bombard', async () => {
     harness.artillery = true;
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
-    const selectedCard = await waitFor(() => {
-      const selected = selectedArmyCard();
-      expect(selected.getAttribute('aria-pressed')).toBe('true');
-      return selected;
-    });
+    const selectedCard = await waitFor(() => selectedArmyCard());
     fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 6, clientX: 100, clientY: 100 });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(harness.commands).toEqual([]);
+    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
+    const menu = screen.getByRole('menu');
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(2);
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(
+      expect.arrayContaining(['To army', 'Auto fire']),
+    );
+    expect(screen.queryByRole('menuitem', { name: /merge/i })).toBeNull();
+    const bombard = screen.getByRole('menuitem', { name: 'Auto fire' });
+    const point = menuPoint(bombard, menu);
+    fireEvent.pointerMove(selectedCard, { pointerId: 6, clientX: point.x, clientY: point.y });
+    fireEvent.pointerUp(selectedCard, { pointerId: 6, clientX: point.x, clientY: point.y });
+    expect(harness.commands).toContainEqual({
+      t: 'bombard',
+      unitId: expect.any(Number),
+      targetUnitId: null,
+    });
   });
 
   it('отменяет radial при отпускании вне секторов без send', async () => {
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
-    await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
-    if (!harness.mapCanvas || !harness.app) throw new Error('MapView input is not connected');
-    fireEvent.pointerDown(harness.mapCanvas, {
-      button: 0,
-      pointerId: 7,
-      clientX: harness.world.x,
-      clientY: harness.world.y,
-    });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
-    harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+    const selectedCard = await waitFor(() => selectedArmyCard());
+    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 7, clientX: 100, clientY: 100 });
     await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
-    fireEvent.pointerDown(document.body, { pointerId: 7, clientX: 0, clientY: 0 });
-    fireEvent.pointerUp(document.body, {
-      pointerId: 7,
-      clientX: 0,
-      clientY: 0,
-    });
+    fireEvent.pointerUp(selectedCard, { pointerId: 7, clientX: 100, clientY: 100 });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(harness.commands).toEqual([]);
   });

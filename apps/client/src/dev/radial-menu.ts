@@ -1,16 +1,9 @@
-import {
-  FRONT_SPLIT_MIN,
-  MAX_UNITS_PER_HEX,
-  type Command,
-  type Fp,
-  type PlayerView,
-  type UnitView,
-} from '@hexfront/sim';
+import type { Command, PlayerView, UnitView } from '@hexfront/sim';
 
 import { armyName } from './army-name.ts';
 import type { Point } from '../render/hex-geometry.ts';
 
-export type RadialActionKind = 'merge' | 'assignUnits' | 'split' | 'bombard';
+export type RadialActionKind = 'merge' | 'assignUnits' | 'bombard';
 
 export interface RadialAction {
   readonly kind: RadialActionKind;
@@ -53,26 +46,6 @@ export function buildRadialActions(
       },
     ],
   });
-  const splitUnit = units.find(
-    (unit) =>
-      unit.type !== 'artillery' &&
-      unit.soldiers >= 2 * FRONT_SPLIT_MIN &&
-      unit.order !== 'retreat' &&
-      unit.moveTotal === 0 &&
-      view.units.filter((candidate) => candidate.owner === unit.owner && candidate.hex === unit.hex)
-        .length < MAX_UNITS_PER_HEX,
-  );
-  if (splitUnit) {
-    actions.push({
-      kind: 'split',
-      command: {
-        t: 'split',
-        unitId: splitUnit.id,
-        soldiers: Math.floor(splitUnit.soldiers / 2) as Fp,
-      },
-      label: 'unit.split',
-    });
-  }
   if (units.length === 1 && first?.type === 'artillery') {
     actions.push({
       kind: 'bombard',

@@ -151,13 +151,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      {sb.radial && (
-        <RadialMenu
-          state={sb.radial}
-          onAction={sb.radialAction}
-          onClose={() => sb.radialForUnit(null, sb.radial?.center ?? { x: 0, y: 0 }, 'cancel')}
-        />
-      )}
+      {sb.radial && <RadialMenu state={sb.radial} />}
       {styleFor('event-feed') && (
         <EventFeed
           items={sb.events}
@@ -244,6 +238,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           tool={sb.tool}
           onTool={sb.setTool}
           style={styleFor('bottom-panel')}
+          onRadial={sb.radialForArmy}
         />
       )}
       {(loaded === 'error' || sb.error) && (

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DRAG_SLOP_PX,
   HOLD_MS,
-  RADIAL_MENU_LONG_PRESS_MS,
   createGesture,
   type GestureDeps,
   type GestureEvent,
@@ -14,23 +13,17 @@ type Pt = { x: number; y: number };
 interface Setup {
   readonly events: GestureEvent[];
   readonly g: ReturnType<typeof createGesture>;
-  readonly state: {
-    drawing: boolean;
-    canHold: boolean;
-    radial: boolean;
-    zone: (p: Pt) => boolean;
-  };
+  readonly state: { drawing: boolean; canHold: boolean; zone: (p: Pt) => boolean };
 }
 
 function setup(over: Partial<Setup['state']> = {}): Setup {
   const events: GestureEvent[] = [];
-  const state = { drawing: false, canHold: true, radial: false, zone: (_: Pt) => false, ...over };
+  const state = { drawing: false, canHold: true, zone: (_: Pt) => false, ...over };
   const deps: GestureDeps = {
     drawing: () => state.drawing,
     press: () => undefined,
     release: () => undefined,
     canHold: () => state.canHold,
-    canRadial: () => (state.radial ? { unitId: 1, unitIds: [1], hex: 2 } : null),
     cancelZone: (p) => state.zone(p),
     inside: (p) => p.x >= 0 && p.y >= 0 && p.x <= 1000 && p.y <= 800,
   };
@@ -101,25 +94,6 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     expect(s.events.at(-1)).toMatchObject({ t: 'hold', phase: 'end', at: { x: 200, y: 150 } });
     // Ведение пальца при удержании не двигает карту.
     expect(kinds(s)).not.toContain('pan');
-  });
-
-  it('radial открывается в точке удержания, но закрывается по реальной точке отпускания', () => {
-    // Решение владельца, 2026-10-23: отпускание решает исход — увести указатель в пустоту и
-    // отпустить равносильно отмене, увести на кнопку и отпустить — наведению на неё. Открытие
-    // (start) и ведение (move) остаются на точке удержания — меню не плавает за пальцем.
-    const s = setup({ radial: true });
-    const anchor = { x: 11, y: 22 };
-    const releasedAt = { x: 55, y: 66 };
-    s.g.down(1, { x: 100, y: 100 }, 0, 0, false, anchor);
-    s.g.tick(RADIAL_MENU_LONG_PRESS_MS);
-    s.g.move(1, { x: 200, y: 150 }, RADIAL_MENU_LONG_PRESS_MS + 10, { x: 33, y: 44 });
-    s.g.up(1, { x: 300, y: 250 }, RADIAL_MENU_LONG_PRESS_MS + 20, releasedAt);
-
-    expect(s.events.filter((event) => event.t === 'radial')).toEqual([
-      expect.objectContaining({ phase: 'start', viewportAt: anchor }),
-      expect.objectContaining({ phase: 'move', viewportAt: anchor }),
-      expect.objectContaining({ phase: 'end', viewportAt: releasedAt }),
-    ]);
   });
 
   it('сдвиг больше 8 px до 350 мс — не приказ: карта (или деление со своей фишки)', () => {

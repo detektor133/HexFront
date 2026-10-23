@@ -20,14 +20,10 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
   const bots = Array.from({ length: map.players }, (_, playerId) => playerId).filter(
     (playerId) => watch || playerId !== 0,
   );
-  const requestedSpeed = Number(params.get('speed') ?? 1);
   const speed =
     params.get('freezeTime') === '1'
       ? 0
-      : Math.min(
-          SPEED_MAX,
-          Math.max(0, Number.isFinite(requestedSpeed) ? Math.floor(requestedSpeed) : 1),
-        );
+      : Math.min(SPEED_MAX, Math.max(1, Math.floor(Number(params.get('speed') ?? 1)) || 1));
   const auto = params.get('auto');
   return {
     count: map.players,

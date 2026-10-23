@@ -104,7 +104,6 @@ export function createLocalEngine(
   ),
   fog = false,
   playerName = '',
-  fixture: 'artillery' | undefined = undefined,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
@@ -112,26 +111,6 @@ export function createLocalEngine(
     name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
   }));
   const state = createMatch(loaded.map, setup, seed, { fog });
-  if (fixture === 'artillery') {
-    const humanUnits = state.units.filter((unit) => unit.owner === HUMAN_ID);
-    const artilleryUnit = humanUnits[0];
-    if (artilleryUnit) {
-      const separateHex = state.hexes.owner.find(
-        (owner, hex) => owner === HUMAN_ID && hex !== artilleryUnit.hex,
-      );
-      for (const [unitIndex, unit] of state.units.entries()) {
-        if (unit.owner !== HUMAN_ID) continue;
-        state.units[unitIndex] = {
-          ...unit,
-          ...(unit.id === artilleryUnit.id
-            ? { type: 'artillery' as const }
-            : separateHex === undefined
-              ? {}
-              : { hex: separateHex }),
-        };
-      }
-    }
-  }
   let pending: Command[] = [];
   let selected: number | null = null;
   let observerId: number | null = null;

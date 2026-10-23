@@ -55,7 +55,6 @@ export type ToWorker =
       readonly bots: readonly number[];
       /** Тиков sim за 100 мс: 1 — реальное время, больше — ускорение (запись матча). */
       readonly speed: number;
-      readonly fixture?: 'artillery';
       readonly playerName?: string;
       readonly playerColors?: readonly string[];
     }
