@@ -249,7 +249,7 @@ describe('T17ar: процедурные паттерны рельефа', () => 
     const source = readFileSync(new URL('../src/render/terrain-layer.ts', import.meta.url), 'utf8');
 
     expect(source).not.toMatch(
-      /cacheAsTexture|new\s+Texture|document\.createElement\(['"]canvas['"]\)/u,
+      /cacheAsTexture|new\s+Texture|Texture\s*\.\s*from\s*\(|\bcreateElement\s*\(\s*['"]canvas['"]\s*\)/u,
     );
   });
 });
