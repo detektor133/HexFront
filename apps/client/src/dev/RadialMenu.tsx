@@ -4,7 +4,9 @@ import type { RadialAction, RadialMenuState } from './radial-menu.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 
 function label(action: RadialAction): string {
-  return action.label.includes('.') ? t(action.label as MessageKey) : action.label;
+  return action.label.includes('.')
+    ? (t(action.label as MessageKey) ?? action.label)
+    : action.label;
 }
 
 function icon(kind: RadialAction['kind']): React.JSX.Element {
