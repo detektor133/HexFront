@@ -520,6 +520,11 @@ export function useSandbox(
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      // Только для E2E под debug: тест читает реальную камеру вместо пересборки формулы вручную
+      // (порядок setBottomInset/setTopInset сдвигает камеру, это не одна чистая формула).
+      if (debug)
+        (window as Window & { __t17asCamera?: () => unknown }).__t17asCamera = () =>
+          v.debugCamera();
       const currentTool = toolRef.current;
       v.setStroke(currentTool && currentTool.tool !== 'erase' ? input.stroke : null);
       if (viewRef.current) applyStartCameraToView(viewRef.current);

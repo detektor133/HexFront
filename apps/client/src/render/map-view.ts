@@ -127,6 +127,13 @@ export interface MapView {
   cancel(): void;
   /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
   sceneStats(): PixiSceneStats;
+  /**
+   * Текущая камера (масштаб и смещение) без побочных эффектов — только для E2E-тестов под
+   * debug: перевод мировых координат в экранные зависит от порядка вызовов setTopInset/
+   * setBottomInset (каждый сдвигает камеру, чтобы сохранить центр при смене инсета), и ручное
+   * повторение этой последовательности в тесте разъезжается с реальной камерой.
+   */
+  debugCamera(): Camera;
   destroy(): void;
 }
 
@@ -426,6 +433,9 @@ export async function createMapView(
           ? Object.keys(renderer.canvasText._activeTextures).length
           : null,
       };
+    },
+    debugCamera() {
+      return cam;
     },
     setStroke(handler) {
       if (stroking) stroke?.({ x: 0, y: 0 }, 'cancel');

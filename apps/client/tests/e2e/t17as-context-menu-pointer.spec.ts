@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { cityChipShift } from '../../src/dev/chip-place.ts';
-import { clampCamera } from '../../src/render/camera.ts';
 import { RADIAL_MENU_LONG_PRESS_MS } from '../../src/render/gesture.ts';
-import { hexCenter, mapBounds } from '../../src/render/hex-geometry.ts';
+import { hexCenter } from '../../src/render/hex-geometry.ts';
 import { tokens } from '../../src/theme/tokens.ts';
 
 /**
@@ -86,24 +85,35 @@ async function readT17asView(page: Page): Promise<T17asView> {
   });
 }
 
+type Camera = { readonly scale: number; readonly x: number; readonly y: number };
+
+/**
+ * Реальная камера (масштаб и смещение), читается прямо из `MapView` под debug — не пересобирается
+ * формулой: порядок `setBottomInset`/`setTopInset` сдвигает камеру, чтобы сохранить центр при
+ * каждой смене инсета (HUD/док/таблица лидеров), и ручное повторение этой последовательности
+ * расходится с реальной камерой на сотни px.
+ */
+async function readCamera(page: Page): Promise<Camera> {
+  const camera = await page.evaluate(() =>
+    (window as Window & { __t17asCamera?: () => Camera }).__t17asCamera?.(),
+  );
+  if (!camera) throw new Error('Камера недоступна — debug-хук __t17asCamera не установлен');
+  return camera;
+}
+
 function playerUnitPoint(
-  canvas: { x: number; y: number; width: number; height: number },
-  hud: { y: number; height: number },
-  dock: { y: number },
-  leaderboard: { width: number },
+  canvas: { x: number; y: number },
+  camera: Camera,
   capitalHex: number,
   unit: T17asView['units'][number],
 ): { x: number; y: number } {
   const radius = tokens.map.hexRadius;
-  const scale = tokens.map.zoom.detailThresholds[1] ?? tokens.map.zoom.max;
-  const world = mapBounds(40, 30, radius);
   const hexPoint = (hex: number): { x: number; y: number } => {
     const q = hex % 40;
     const r = Math.floor(hex / 40) - Math.floor((q + (q & 1)) / 2);
     const point = hexCenter({ q, r }, radius);
     return hex === capitalHex ? { x: point.x, y: point.y + cityChipShift(1, radius) } : point;
   };
-  const city = hexPoint(capitalHex);
   const start = hexPoint(unit.hex);
   const next = unit.path[0] === undefined ? start : hexPoint(unit.path[0]);
   const progress = unit.moveTotal > 0 ? unit.moveTicks / unit.moveTotal : 0;
@@ -111,29 +121,9 @@ function playerUnitPoint(
     x: start.x + (next.x - start.x) * progress,
     y: start.y + (next.y - start.y) * progress,
   };
-  const bottomInset = canvas.y + canvas.height - dock.y;
-  const topInset = hud.y + hud.height - canvas.y;
-  const rightInset = leaderboard.width + 24;
-  let camera = clampCamera(
-    { scale, x: canvas.width / 2 - city.x * scale, y: canvas.height / 2 - city.y * scale },
-    { width: canvas.width, height: canvas.height },
-    world,
-  );
-  camera = clampCamera(camera, { width: canvas.width, height: canvas.height - bottomInset }, world);
-  camera = clampCamera(
-    {
-      ...camera,
-    },
-    {
-      width: canvas.width - rightInset,
-      height: canvas.height - topInset - bottomInset,
-      top: topInset,
-    },
-    world,
-  );
   return {
-    x: canvas.x + camera.x + unitPoint.x * scale,
-    y: canvas.y + camera.y + unitPoint.y * scale,
+    x: canvas.x + camera.x + unitPoint.x * camera.scale,
+    y: canvas.y + camera.y + unitPoint.y * camera.scale,
   };
 }
 
@@ -151,13 +141,7 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Карта не имеет границ');
 
-  const hudBounds = await page.getByRole('banner').boundingBox();
-  const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
-  const leaderboardBounds = await page
-    .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
-    .boundingBox();
-  if (!hudBounds || !dockBounds || !leaderboardBounds)
-    throw new Error('Рабочая область карты не имеет границ');
+  const camera = await readCamera(page);
   const view = await readT17asView(page);
   const first = view.units.find((unit) => unit.owner === view.playerId);
   if (!first) throw new Error('У игрока нет стартового отряда');
@@ -170,14 +154,7 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
       (unit) => unit.owner === view.playerId && unit.hex === first.hex && unit.type === first.type,
     )
     .map((unit) => unit.id);
-  const capital = playerUnitPoint(
-    bounds,
-    hudBounds,
-    dockBounds,
-    leaderboardBounds,
-    capitalHex,
-    first,
-  );
+  const capital = playerUnitPoint(bounds, camera, capitalHex, first);
   const mergeButton = page.getByRole('menuitem', { name: /Слить|Merge/i });
   let pressPoint: { x: number; y: number } | undefined;
   let opened = false;
@@ -193,8 +170,14 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     pressPoint = point;
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
-    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
-    if (await mergeButton.isVisible().catch(() => false)) {
+    // Долгое нажатие триггерит открытие на тике сразу по достижении порога — React рисует меню
+    // не мгновенно; ждём появления, а не фиксированную паузу с разовой проверкой isVisible сразу
+    // после неё (иначе после HOLD_MS-порога и до отрисовки короткое окно читается как «не открыто»).
+    const visible = await mergeButton
+      .waitFor({ state: 'visible', timeout: RADIAL_MENU_LONG_PRESS_MS + 300 })
+      .then(() => true)
+      .catch(() => false);
+    if (visible) {
       opened = true;
       break;
     }
@@ -250,10 +233,11 @@ test('@layout T17as: pointer-сценарии через canvas отправля
   const openMenu = async (x: number, y: number): Promise<boolean> => {
     await page.mouse.move(x, y);
     await page.mouse.down();
-    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
+    // См. комментарий у первого теста: ждём появления меню, а не фиксированную паузу.
     return page
       .getByRole('menu')
-      .isVisible()
+      .waitFor({ state: 'visible', timeout: RADIAL_MENU_LONG_PRESS_MS + 300 })
+      .then(() => true)
       .catch(() => false);
   };
   const releaseOn = async (name: RegExp): Promise<void> => {
@@ -267,28 +251,19 @@ test('@layout T17as: pointer-сценарии через canvas отправля
     await page.mouse.up();
   };
   const openCenterMenu = async (): Promise<void> => {
-    const hudBounds = await page.getByRole('banner').boundingBox();
-    const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
-    const leaderboardBounds = await page
-      .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
-      .boundingBox();
-    if (!hudBounds || !dockBounds || !leaderboardBounds)
-      throw new Error('Рабочая область карты не имеет границ');
+    const camera = await readCamera(page);
     const view = await readT17asView(page);
-    const first = view.units.find((unit) => unit.owner === view.playerId);
+    // assignUnits/split не нужна артиллерия — её даёт fixture=artillery только первому отряду,
+    // отдельный разбор bombard ниже сам ищет артиллерийский отряд по сетке точек.
+    const first =
+      view.units.find((unit) => unit.owner === view.playerId && unit.type !== 'artillery') ??
+      view.units.find((unit) => unit.owner === view.playerId);
     if (!first) throw new Error('У игрока нет стартового отряда');
     const capitalHex = view.cities.find(
       (city) => city.owner === view.playerId && city.isCapital,
     )?.hex;
     if (capitalHex === undefined) throw new Error('Столица игрока не найдена');
-    const capital = playerUnitPoint(
-      bounds,
-      hudBounds,
-      dockBounds,
-      leaderboardBounds,
-      capitalHex,
-      first,
-    );
+    const capital = playerUnitPoint(bounds, camera, capitalHex, first);
     for (const [offsetX, offsetY] of [
       [0, 0],
       [-8, 0],
@@ -362,13 +337,7 @@ test('@layout T17as: кнопки контекстного меню у кажд�
 
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Карта не имеет границ');
-  const hudBounds = await page.getByRole('banner').boundingBox();
-  const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
-  const leaderboardBounds = await page
-    .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
-    .boundingBox();
-  if (!hudBounds || !dockBounds || !leaderboardBounds)
-    throw new Error('Рабочая область карты не имеет границ');
+  const camera = await readCamera(page);
   const view = await readT17asView(page);
   const first = view.units.find((unit) => unit.owner === view.playerId);
   if (!first) throw new Error('У игрока нет стартового отряда');
@@ -376,14 +345,7 @@ test('@layout T17as: кнопки контекстного меню у кажд�
     (city) => city.owner === view.playerId && city.isCapital,
   )?.hex;
   if (capitalHex === undefined) throw new Error('Столица игрока не найдена');
-  const initialPoint = playerUnitPoint(
-    bounds,
-    hudBounds,
-    dockBounds,
-    leaderboardBounds,
-    capitalHex,
-    first,
-  );
+  const initialPoint = playerUnitPoint(bounds, camera, capitalHex, first);
   const viewport = page.viewportSize();
   if (!viewport) throw new Error('Viewport не имеет размера');
 
@@ -412,8 +374,7 @@ test('@layout T17as: кнопки контекстного меню у кажд�
 
     await page.mouse.move(anchor.x, anchor.y);
     await page.mouse.down();
-    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
-    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.getByRole('menu')).toBeVisible({ timeout: RADIAL_MENU_LONG_PRESS_MS + 300 });
     const buttonRects = await page.getByRole('menuitem').evaluateAll((buttons) =>
       buttons.map((button) => {
         const rect = button.getBoundingClientRect();
