@@ -212,7 +212,7 @@ afterEach(() => {
 });
 
 describe('07/T17an: радиальное меню', () => {
-  it('проводит ArmyBar через MatchSurface, useSandbox и send', async () => {
+  it('не открывает radial при удержании выбранной карточки ArmyBar', async () => {
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
@@ -222,16 +222,12 @@ describe('07/T17an: радиальное меню', () => {
       return selected;
     });
     fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
-    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
-    const menu = screen.getByRole('menu');
-    const merge = screen.getByRole('menuitem', { name: /merge/i });
-    const point = menuPoint(merge, menu);
-    fireEvent.pointerMove(card, { pointerId: 1, clientX: point.x, clientY: point.y });
-    fireEvent.pointerUp(card, { pointerId: 1, clientX: point.x, clientY: point.y });
-    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(harness.commands).toEqual([]);
   });
 
-  it('отправляет assignUnits после pointerup над дочерним сектором', async () => {
+  it('не открывает radial при удержании артиллерийской карточки ArmyBar', async () => {
     harness.artillery = true;
     await renderSurface();
     const card = armyCard();
@@ -242,22 +238,9 @@ describe('07/T17an: радиальное меню', () => {
       return selected;
     });
     fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
-    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
-    const menu = screen.getByRole('menu');
-    const assign = screen.getByRole('menuitem', { name: /to army/i });
-    const root = menuPoint(assign, menu);
-    fireEvent.pointerMove(card, { pointerId: 2, clientX: root.x, clientY: root.y });
-    const child = screen
-      .getAllByRole('menuitem')
-      .find((item) => item.getAttribute('aria-label')?.toLowerCase() !== 'reserve');
-    if (!child) throw new Error('Дочерний сектор assignUnits не отрендерен');
-    const target = menuPoint(child, menu);
-    fireEvent.pointerUp(card, { pointerId: 2, clientX: target.x, clientY: target.y });
-    expect(harness.commands).toContainEqual({
-      t: 'assignUnits',
-      unitIds: expect.any(Array),
-      armyId: expect.any(Number),
-    });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(harness.commands).toEqual([]);
   });
 
   it('отменяет radial при движении карточки до порога', async () => {
