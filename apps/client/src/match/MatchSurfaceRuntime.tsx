@@ -540,7 +540,7 @@ export function useSandbox(
             const center = layerRef.current?.chipAt(candidate.hex);
             return (
               center !== undefined &&
-              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
+              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius
             );
           });
           if (!unit) return null;
