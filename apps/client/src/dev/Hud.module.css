@@ -343,23 +343,6 @@
   .taxWrap .taxButton {
     inline-size: 100%;
   }
-
-  .slotText {
-    flex-direction: column;
-    gap: 0;
-    align-items: center;
-  }
-
-  .value,
-  .rate,
-  .rateBad {
-    flex: 0 1 auto;
-  }
-
-  .rate,
-  .rateBad {
-    font-size: 9px;
-  }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
