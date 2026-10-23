@@ -133,11 +133,34 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
   }
   const active = context.state.activeTask;
   if (active?.task === task) {
-    // Попытка без коммита и без машинного маркера — не обязательно тупик владельца: часто это
-    // одна неудачная идея на измеримый пункт (например, фикс ломает другой уже принятый тест).
-    // plan смотрит один раз, может предложить другой подход/разбиение; «не трогал» всё равно
-    // паркует — диагностика не плодит повторов вслепую.
-    const finding: ReviewFinding = active.findings[0] ?? { kind: 'КОД', text: active.workPrompt };
+    // Следующий пункт мог уже закрыться предыдущим патчем: сначала это подтверждает узкий review,
+    // чтобы не требовать фиктивный коммит и не звать plan разбирать отсутствующий дефект.
+    let finding: ReviewFinding = active.findings[0] ?? { kind: 'КОД', text: active.workPrompt };
+    if (active.findings[0] !== undefined) {
+      const verdict = await runReview(
+        context,
+        task,
+        `Узкая проверка без нового коммита: исполнитель сообщил «${message.trim()}». Проверь только ` +
+          `пункт «${finding.text}» по текущему HEAD. Если он уже закрыт предыдущим патчем — OK; ` +
+          'иначе верни тот же конкретный блокер.',
+      );
+      if (typeof verdict === 'string') return verdict;
+      if (verdict.ok) {
+        active.findings = active.findings.slice(1);
+        active.findingRetries = 0;
+        active.phase = active.findings.length === 0 ? 'review' : 'work';
+        await save(context);
+        await context.say(
+          `узкий review ${task}: пункт уже исправлен предыдущим патчем, осталось ${active.findings.length} пунктов`,
+        );
+        return 'worked';
+      }
+      active.findings = [...verdict.findings, ...active.findings.slice(1)];
+      finding = active.findings[0] ?? finding;
+      await save(context);
+    }
+    // Если review подтвердил дефект, plan один раз предлагает другой подход/разбиение; повтор
+    // той же роли без нового решения не запускается вслепую.
     return diagnoseFinding(
       context,
       task,

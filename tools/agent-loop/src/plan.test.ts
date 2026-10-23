@@ -109,6 +109,16 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
+  it('принимает итоговый маркер plan в Markdown-коде', async () => {
+    const run = await runWorld({
+      plan: true,
+      sessions: [{ answer: 'Текст достаточный.\n`PLAN: не трогал`' }, NEXT_DONE, REVIEW_OK],
+    });
+
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(run.lines).toContain(`$plan ${TASK}: не трогал`);
+  });
+
   it('технический блокер передаёт исполнителю без ожидания владельца', async () => {
     const run = await runWorld({
       plan: true,
