@@ -274,6 +274,7 @@ describe('07/T17as: контекстное меню фишки отряда', ()
       }
     }
 
+    expect(harness.commands.some((command) => command.t === 'split')).toBe(true);
     expect(menu.isConnected).toBe(false);
   });
 
