@@ -17,12 +17,7 @@ import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import {
-  buildRadialActions,
-  sectorAt,
-  type RadialAction,
-  type RadialMenuState,
-} from '../dev/radial-menu.ts';
+import { buildRadialActions, type RadialAction, type RadialMenuState } from '../dev/radial-menu.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
@@ -97,15 +92,7 @@ export function createRadialActionHandler(options: {
       options.setState({ center: screen, actions, active: actions });
       return;
     }
-    const state = options.getState();
-    if (!state) return;
-    const active = sectorAt(state, screen);
-    if (phase === 'move' && active?.children)
-      options.setState({ ...state, active: active.children });
-    if (phase === 'end') {
-      if (active?.command) options.send(active.command);
-      options.setState(null);
-    }
+    // После открытия жест передан DOM-меню: отпускание указателя не выбирает сектор.
     if (phase === 'cancel') options.setState(null);
   };
 }
@@ -304,16 +291,6 @@ export function useSandbox(
     radialRef.current = next;
     setRadial(next);
   }, []);
-  useEffect(() => {
-    if (radial === null) return;
-    const closeOutside = (event: PointerEvent): void => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('[role="menu"]') !== null) return;
-      setRadialState(null);
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    return () => document.removeEventListener('pointerdown', closeOutside);
-  }, [radial, setRadialState]);
   const radialForArmy = useCallback(
     createRadialActionHandler({
       getView: () => viewRef.current,

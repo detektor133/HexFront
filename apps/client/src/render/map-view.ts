@@ -176,6 +176,7 @@ export async function createMapView(
   let stroking = false;
   let hooks: OrderHooks | null = null;
   let radialHooks: RadialHooks | null = null;
+  let radialHandedOff = false;
   let stroke: StrokeHandler | null = null;
   let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
@@ -281,7 +282,13 @@ export async function createMapView(
         hooks?.hold(toWorld(e.at), e.phase);
       } else if (e.t === 'radial') {
         velocity = null;
-        radialHooks?.action(toWorld(e.at), e.at, e.phase);
+        if (e.phase === 'start') {
+          radialHooks?.action(toWorld(e.at), e.at, e.phase);
+          radialHandedOff = true;
+        } else if (!radialHandedOff) {
+          radialHooks?.action(toWorld(e.at), e.at, e.phase);
+        }
+        if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
       } else if (e.t === 'doubleTap') {
         const world = toWorld(e.at);
         onDoubleTap?.(pixelToHex(world, opts.radius), world);

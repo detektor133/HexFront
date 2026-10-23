@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import type { RadialAction, RadialMenuState } from './radial-menu.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 
@@ -68,10 +70,28 @@ function icon(kind: RadialAction['kind']): React.JSX.Element {
 export function RadialMenu(props: {
   state: RadialMenuState;
   onAction: (action: RadialAction) => void;
+  onClose: () => void;
 }): React.JSX.Element {
   const { state } = props;
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = (event: PointerEvent): void => {
+      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      props.onClose();
+    };
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') props.onClose();
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [props]);
   return (
     <div
+      ref={menuRef}
       role="menu"
       aria-label={t('unit.toArmy')}
       style={{
