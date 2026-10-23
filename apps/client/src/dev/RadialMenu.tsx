@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { RadialAction, RadialMenuState } from './radial-menu.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
@@ -11,9 +11,13 @@ function label(action: RadialAction): string {
 
 const MENU_BUTTON_HALF_SIZE = 48;
 
-function clampViewportCoordinate(value: number, viewportSize: number): number {
-  const min = MENU_BUTTON_HALF_SIZE;
-  const max = viewportSize - MENU_BUTTON_HALF_SIZE;
+function clampViewportCoordinate(
+  value: number,
+  viewportSize: number,
+  halfSize: number = MENU_BUTTON_HALF_SIZE,
+): number {
+  const min = halfSize;
+  const max = viewportSize - halfSize;
   if (max < min) return viewportSize / 2;
   return Math.min(Math.max(value, min), max);
 }
@@ -108,7 +112,22 @@ export function RadialMenu(props: {
     y: clampViewportCoordinate(state.center.y, viewport.height),
   };
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [buttonSizes, setButtonSizes] = useState<Record<string, { width: number; height: number }>>(
+    {},
+  );
   const lastActivationRef = useRef<{ key: string; source: 'pointer' | 'keyboard' } | null>(null);
+  useLayoutEffect(() => {
+    const sizes: Record<string, { width: number; height: number }> = {};
+    for (const action of state.active) {
+      const actionKey = `${action.kind}:${action.label}`;
+      const rect = buttonRefs.current.get(actionKey)?.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        sizes[actionKey] = { width: rect.width, height: rect.height };
+      }
+    }
+    setButtonSizes(sizes);
+  }, [state.active]);
   useEffect(() => {
     const releaseCanvasCapture = (event: PointerEvent): void => {
       const target = event.target;
@@ -157,16 +176,21 @@ export function RadialMenu(props: {
         const angle = -Math.PI / 2 + ((index + 0.5) / state.active.length) * Math.PI * 2;
         const rawX = Math.cos(angle) * 88;
         const rawY = Math.sin(angle) * 88;
+        const size = buttonSizes[actionKey];
         return (
           <button
             key={`${action.kind}-${action.label}`}
+            ref={(button) => {
+              if (button) buttonRefs.current.set(actionKey, button);
+              else buttonRefs.current.delete(actionKey);
+            }}
             type="button"
             role="menuitem"
             aria-label={label(action)}
             style={{
               position: 'absolute',
-              left: `${clampViewportCoordinate(center.x + rawX, viewport.width) - center.x}px`,
-              top: `${clampViewportCoordinate(center.y + rawY, viewport.height) - center.y}px`,
+              left: `${clampViewportCoordinate(center.x + rawX, viewport.width, (size?.width ?? MENU_BUTTON_HALF_SIZE * 2) / 2) - center.x}px`,
+              top: `${clampViewportCoordinate(center.y + rawY, viewport.height, (size?.height ?? MENU_BUTTON_HALF_SIZE * 2) / 2) - center.y}px`,
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'auto',
               minWidth: '72px',
