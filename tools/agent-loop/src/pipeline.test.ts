@@ -200,6 +200,40 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
+  it('repair-spec, оставивший правку без коммита, получает немедленный повтор, а не backoff', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        {
+          // commit не указан: правка написана на диск, но дерево остаётся грязным.
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
+        },
+        {
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
+          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
+          commit: true,
+          push: false,
+        },
+        review('OK'),
+      ],
+    });
+
+    // Содержимое уже верифицировано хуком конца хода — 30-минутный backoff бессмысленен для
+    // забытого git commit, повтор идёт сразу же со своим прежним prompt'ом.
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
+    expect(run.prompts[4]).toContain('не создала git commit');
+    expect(run.lines.join('\n')).not.toContain('следующая попытка через');
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
+  });
+
   it('repair-spec удаляет чужой приёмочный тест — паркует, а не падает с ENOENT', async () => {
     const run = await runWorld({
       spec: true,

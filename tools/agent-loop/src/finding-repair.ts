@@ -157,8 +157,29 @@ export async function runTestFix(
     return backoff(context, `$spec ${task}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
     return park(context, `push:${task}`, `${task}: $spec изменила origin до review`);
-  if ((await dirtyFiles(context.git)) !== '')
-    return backoff(context, `$spec ${task} оставил незакоммиченные файлы`, result.message);
+  if ((await dirtyFiles(context.git)) !== '') {
+    // Содержимое уже прошло verify --changed в хуке конца хода сессии (AGENTS.md §0) — не хватает
+    // только `git commit`. 30-минутный backoff для этого бессмысленен: это не сбой инфраструктуры,
+    // а забытый шаг в том же ответе, который повторная попытка сразу же может исправить.
+    if (attempt < 2) {
+      await context.say(`$spec ${task}: написал правку, но не закоммитил — даю вторую попытку`);
+      return runTestFix(
+        context,
+        task,
+        {
+          ...finding,
+          text: `${finding.text}\nПредыдущая попытка написала правку, но не создала git commit — не забудь закоммитить.`,
+        },
+        attempt + 1,
+      );
+    }
+    return park(
+      context,
+      `spec:${task}`,
+      `${task}: $spec второй раз подряд не коммитит свою правку — проверь`,
+      result.message,
+    );
+  }
   const outcome = parseTestRepair(result.message);
   if (outcome === undefined)
     return park(
