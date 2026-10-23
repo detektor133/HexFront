@@ -546,15 +546,19 @@ export function useSandbox(
       const radialHooks: RadialHooks = {
         canOpen(world) {
           const current = viewRef.current;
-          if (!current || toolRef.current || pickedRef.current.units.length === 0) return false;
-          return pickedRef.current.units.some((id) => {
-            const unit = current.units.find((candidate) => candidate.id === id);
-            const center = unit ? layerRef.current?.chipAt(unit.hex) : undefined;
+          if (!current || toolRef.current) return false;
+          const unit = current.units.find((candidate) => {
+            if (candidate.owner !== current.playerId || candidate.order === 'retreat') return false;
+            const center = layerRef.current?.chipAt(candidate.hex);
             return (
               center !== undefined &&
               Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
             );
           });
+          if (!unit) return false;
+          if (!pickedRef.current.units.includes(unit.id))
+            pick(selectUnits(current, pickedRef.current, [unit.id]));
+          return true;
         },
         action(_world, screen, phase) {
           radialForArmy(armyRef.current ?? -1, screen, phase);
