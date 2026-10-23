@@ -74,6 +74,7 @@ export function RadialMenu(props: {
 }): React.JSX.Element {
   const { state } = props;
   const menuRef = useRef<HTMLDivElement>(null);
+  const lastActivationRef = useRef<{ key: string; source: 'pointer' | 'keyboard' } | null>(null);
   useEffect(() => {
     const releaseCanvasCapture = (event: PointerEvent): void => {
       const target = event.target;
@@ -115,6 +116,7 @@ export function RadialMenu(props: {
       }}
     >
       {state.active.map((action, index) => {
+        const actionKey = `${action.kind}:${action.label}`;
         const angle = -Math.PI / 2 + ((index + 0.5) / state.active.length) * Math.PI * 2;
         return (
           <button
@@ -130,11 +132,22 @@ export function RadialMenu(props: {
               pointerEvents: 'auto',
               minWidth: '72px',
             }}
-            onPointerUp={() => props.onAction(action)}
-            onClick={(event) => event.preventDefault()}
+            onPointerUp={() => {
+              lastActivationRef.current = { key: actionKey, source: 'pointer' };
+              props.onAction(action);
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              if (lastActivationRef.current?.key === actionKey) {
+                lastActivationRef.current = null;
+                return;
+              }
+              props.onAction(action);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
+                lastActivationRef.current = { key: actionKey, source: 'keyboard' };
                 props.onAction(action);
               }
             }}
