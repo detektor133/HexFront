@@ -446,4 +446,55 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     const source = readFileSync(join(process.cwd(), 'apps/client/src/dev/UnitCard.tsx'), 'utf8');
     expect(source).not.toMatch(/Orders|ArmyPlates/);
   });
+
+  it('5: pointermove и pointerup выполняют assignUnits, split и bombard через send', async () => {
+    const activate = (item: HTMLElement, point: { x: number; y: number }): void => {
+      fireEvent.pointerMove(item, {
+        button: 0,
+        pointerId: 1,
+        clientX: point.x,
+        clientY: point.y,
+      });
+      fireEvent.pointerUp(item, {
+        button: 0,
+        pointerId: 1,
+        clientX: point.x,
+        clientY: point.y,
+      });
+    };
+
+    const assignFixture = await openMapMenu('stack');
+    activate(
+      screen.getByRole('menuitem', { name: messages.ru['unit.toArmy'] }),
+      assignFixture.point,
+    );
+    const reserve = screen.getByRole('menuitem', { name: messages.ru['army.reserve'] });
+    activate(reserve, assignFixture.point);
+    expect(harness.commands.at(-1)).toMatchObject({
+      t: 'assignUnits',
+      unitIds: harness.selectedUnitIds,
+      armyId: null,
+    });
+
+    cleanup();
+    const splitFixture = await openMapMenu('stack');
+    activate(screen.getByRole('menuitem', { name: messages.ru['unit.split'] }), splitFixture.point);
+    expect(harness.commands.at(-1)).toMatchObject({
+      t: 'split',
+      unitId: expect.any(Number),
+      soldiers: expect.any(Number),
+    });
+
+    cleanup();
+    const bombardFixture = await openMapMenu('artillery');
+    activate(
+      screen.getByRole('menuitem', { name: messages.ru['unit.autoTarget'] }),
+      bombardFixture.point,
+    );
+    expect(harness.commands.at(-1)).toEqual({
+      t: 'bombard',
+      unitId: expect.any(Number),
+      targetUnitId: null,
+    });
+  });
 });
