@@ -294,36 +294,26 @@ export async function createMapView(
         hooks?.hold(toWorld(e.at), e.phase);
       } else if (e.t === 'radial') {
         velocity = null;
+        const canvasBounds = app.canvas.getBoundingClientRect();
+        const screen = { x: e.at.x + canvasBounds.left, y: e.at.y + canvasBounds.top };
         if (e.phase === 'start') {
-          const { canvas } = app;
-          const bounds = canvas.getBoundingClientRect();
-          radialHooks?.action(
-            e.context,
-            toWorld(e.at),
-            { x: e.at.x + bounds.left, y: e.at.y + bounds.top },
-            e.phase,
-          );
+          radialHooks?.action(e.context, toWorld(e.at), screen, e.phase);
           if (
             activePointerId !== null &&
-            typeof canvas.releasePointerCapture === 'function' &&
-            (typeof canvas.hasPointerCapture !== 'function' ||
-              canvas.hasPointerCapture(activePointerId))
+            typeof app.canvas.releasePointerCapture === 'function' &&
+            (typeof app.canvas.hasPointerCapture !== 'function' ||
+              app.canvas.hasPointerCapture(activePointerId))
           ) {
-            canvas.releasePointerCapture(activePointerId);
+            app.canvas.releasePointerCapture(activePointerId);
           }
           radialHandedOff = true;
         } else if (
           !radialHandedOff ||
           (typeof globalThis.document?.elementFromPoint === 'function' &&
-            !globalThis.document
-              .elementFromPoint(
-                e.at.x + app.canvas.getBoundingClientRect().left,
-                e.at.y + app.canvas.getBoundingClientRect().top,
-              )
-              ?.closest('[role="menu"]') &&
+            !globalThis.document.elementFromPoint(screen.x, screen.y)?.closest('[role="menu"]') &&
             (e.phase === 'end' || e.phase === 'cancel'))
         ) {
-          radialHooks?.action(e.context, toWorld(e.at), e.at, e.phase);
+          radialHooks?.action(e.context, toWorld(e.at), screen, e.phase);
         }
         if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
       } else if (e.t === 'doubleTap') {
