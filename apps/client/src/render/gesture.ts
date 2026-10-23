@@ -155,7 +155,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (btn === 0 && !shift) deps.press(at);
     },
 
-    move(id, at, ms, viewportAt = radialViewportAt) {
+    move(id, at, ms, _viewportAt = radialViewportAt) {
       const prev = active.get(id);
       if (!prev) return;
       const before = pinch();
@@ -169,7 +169,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         return;
       }
       last = at;
-      radialViewportAt = viewportAt;
       if (mode === 'pressed') this.tick(ms);
       if (mode === 'holding') {
         if (!deps.inside(at)) return cancelHold();
@@ -181,7 +180,13 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       }
       if (mode === 'radial') {
         if (radialContext)
-          emit({ t: 'radial', at, viewportAt, context: radialContext, phase: 'move' });
+          emit({
+            t: 'radial',
+            at,
+            viewportAt: radialViewportAt,
+            context: radialContext,
+            phase: 'move',
+          });
         return;
       }
       if (mode === 'held') return;
@@ -206,16 +211,21 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       else if (mode === 'panning') emit({ t: 'pan', dx: at.x - prev.x, dy: at.y - prev.y });
     },
 
-    up(id, at, ms, viewportAt = radialViewportAt) {
+    up(id, at, ms, _viewportAt = radialViewportAt) {
       if (!active.has(id)) return;
       active.delete(id);
-      radialViewportAt = viewportAt;
       if (mode === 'pressed') this.tick(ms);
       if (mode === 'stroking') emit({ t: 'stroke', at, phase: 'end' });
       else if (mode === 'selecting') emit({ t: 'selection', at: start, to: at, phase: 'end' });
       else if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'end' });
       else if (mode === 'radial' && radialContext)
-        emit({ t: 'radial', at, viewportAt, context: radialContext, phase: 'end' });
+        emit({
+          t: 'radial',
+          at,
+          viewportAt: radialViewportAt,
+          context: radialContext,
+          phase: 'end',
+        });
       else if (mode === 'pressed') {
         deps.release();
         if (
