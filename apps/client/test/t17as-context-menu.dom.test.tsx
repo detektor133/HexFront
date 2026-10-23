@@ -199,6 +199,8 @@ afterEach(() => {
 describe('07/T17as: контекстное меню фишки отряда', () => {
   it('1: удержание фишки открывает одно меню в точке нажатия с доступными кнопками', async () => {
     const { menu, point } = await openMapMenu();
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(menu.isConnected).toBe(true);
     expect(Number.parseFloat(menu.style.left)).toBe(point.x);
     expect(Number.parseFloat(menu.style.top)).toBe(point.y);
     const items = screen.getAllByRole('menuitem');
