@@ -45,7 +45,7 @@ function icon(kind: RadialAction['kind']): React.JSX.Element {
       </svg>
     );
   }
-  if (kind === 'split' || kind === 'bombard') {
+  if (kind === 'split') {
     return (
       <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
         <path
@@ -58,6 +58,21 @@ function icon(kind: RadialAction['kind']): React.JSX.Element {
         />
         <path
           d="M4 4h5v5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  if (kind === 'bombard') {
+    return (
+      <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+        <circle cx="17" cy="7" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M4 20h9M7 17l5-5h5M12 12l-2-4H6"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
