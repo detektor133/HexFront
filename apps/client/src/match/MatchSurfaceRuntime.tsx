@@ -85,7 +85,7 @@ export function createRadialActionHandler(options: {
   send: (command: Command) => void;
   getState: () => RadialMenuState | null;
   setState: (state: RadialMenuState | null) => void;
-}): (armyId: number, screen: Point, phase: RadialPhase) => void {
+}): (armyId: number | null, screen: Point, phase: RadialPhase) => void {
   return (armyId, screen, phase): void => {
     const view = options.getView();
     if (!view) return;
@@ -210,7 +210,7 @@ interface Sandbox {
   setHudHeight(height: number, leaderboardWidth?: number): void;
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
-  radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
+  radialForArmy(armyId: number | null, screen: Point, phase: RadialPhase): void;
   radialAction(action: RadialAction): void;
 }
 
@@ -561,7 +561,7 @@ export function useSandbox(
           return true;
         },
         action(_world, screen, phase) {
-          radialForArmy(armyRef.current ?? -1, screen, phase);
+          radialForArmy(armyRef.current, screen, phase);
         },
       };
       v.setRadialHooks?.(radialHooks);
