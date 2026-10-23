@@ -1,5 +1,6 @@
 import {
   FRONT_SPLIT_MIN,
+  MAX_UNITS_PER_HEX,
   type Command,
   type Fp,
   type PlayerView,
@@ -57,7 +58,9 @@ export function buildRadialActions(
       unit.type !== 'artillery' &&
       unit.soldiers >= 2 * FRONT_SPLIT_MIN &&
       unit.order !== 'retreat' &&
-      unit.moveTotal === 0,
+      unit.moveTotal === 0 &&
+      view.units.filter((candidate) => candidate.owner === unit.owner && candidate.hex === unit.hex)
+        .length < MAX_UNITS_PER_HEX,
   );
   if (splitUnit) {
     actions.push({
