@@ -451,25 +451,13 @@ export async function createMapView(
       cam = zoomAt(cam, scale / cam.scale, v.width / 2, v.height / 2, v, bounds);
     },
     setBottomInset(px) {
-      const previousCenterY = (topInset + view().height - bottomInset) / 2;
       bottomInset = Math.max(0, px);
-      const nextCenterY = (topInset + view().height - bottomInset) / 2;
-      cam = { ...cam, y: cam.y + nextCenterY - previousCenterY };
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
     setTopInset(px, right = rightInset) {
-      const previousCenterX = (view().width - rightInset) / 2;
-      const previousCenterY = (topInset + view().height - bottomInset) / 2;
       topInset = Math.max(0, px);
       rightInset = Math.max(0, right);
-      const nextCenterX = (view().width - rightInset) / 2;
-      const nextCenterY = (topInset + view().height - bottomInset) / 2;
-      cam = {
-        ...cam,
-        x: cam.x + nextCenterX - previousCenterX,
-        y: cam.y + nextCenterY - previousCenterY,
-      };
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
