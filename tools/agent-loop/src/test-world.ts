@@ -421,7 +421,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       for (const path of paths) {
         if (committed.has(path)) continue;
         tracked.delete(path);
-        await rm(join(root, path), { force: true }).catch(() => {});
+        await rm(join(root, path), { force: true });
       }
       return ok();
     }
