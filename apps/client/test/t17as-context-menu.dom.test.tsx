@@ -381,6 +381,29 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     expect(harness.commands).toEqual([]);
   });
 
+  it('5: pointermove на HTML-кнопку и pointerup выполняют действие меню через send', async () => {
+    const { point } = await openMapMenu('stack');
+    const merge = screen.getByRole('menuitem', { name: /Слить|Merge/i });
+
+    fireEvent.pointerMove(merge, {
+      button: 0,
+      pointerId: 1,
+      clientX: point.x,
+      clientY: point.y,
+    });
+    fireEvent.pointerUp(merge, {
+      button: 0,
+      pointerId: 1,
+      clientX: point.x,
+      clientY: point.y,
+    });
+
+    expect(harness.commands.at(-1)).toMatchObject({
+      t: 'merge',
+      unitIds: expect.arrayContaining([expect.any(Number), expect.any(Number)]),
+    });
+  });
+
   it('4: UnitCard не возвращает плоские Orders или ArmyPlates', () => {
     const source = readFileSync(join(process.cwd(), 'apps/client/src/dev/UnitCard.tsx'), 'utf8');
     expect(source).not.toMatch(/Orders|ArmyPlates/);
