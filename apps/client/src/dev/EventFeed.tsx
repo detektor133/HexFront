@@ -50,9 +50,11 @@ export function EventFeed(props: {
   const [now, setNow] = useState<number>(props.now);
   useEffect(() => {
     setNow(props.now);
+  }, [props.now]);
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(performance.now()), 250);
     return () => window.clearInterval(timer);
-  }, [props.now]);
+  }, []);
   const items = visibleEvents(props.items, now);
   if (items.length === 0) return null;
   return (
