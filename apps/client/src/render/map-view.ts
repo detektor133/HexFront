@@ -133,7 +133,7 @@ export interface MapView {
    * setBottomInset (каждый сдвигает камеру, чтобы сохранить центр при смене инсета), и ручное
    * повторение этой последовательности в тесте разъезжается с реальной камерой.
    */
-  debugCamera(): Camera;
+  debugCamera?(): Camera;
   destroy(): void;
 }
 

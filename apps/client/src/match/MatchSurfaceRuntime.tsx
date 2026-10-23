@@ -524,7 +524,7 @@ export function useSandbox(
       // (порядок setBottomInset/setTopInset сдвигает камеру, это не одна чистая формула).
       if (debug)
         (window as Window & { __t17asCamera?: () => unknown }).__t17asCamera = () =>
-          v.debugCamera();
+          v.debugCamera?.();
       const currentTool = toolRef.current;
       v.setStroke(currentTool && currentTool.tool !== 'erase' ? input.stroke : null);
       if (viewRef.current) applyStartCameraToView(viewRef.current);
