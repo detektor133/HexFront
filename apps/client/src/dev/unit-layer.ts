@@ -412,7 +412,10 @@ export function createUnitLayer(
       for (const entry of entries) {
         if (entry.units.length === 0) continue;
         const at = drawnAt.get(entry.key) ?? entry.at(1);
-        if (Math.abs(world.x - at.x) <= radius && Math.abs(world.y - at.y) <= halfHeight) {
+        const target = entry.at(1);
+        const hit = (point: Point): boolean =>
+          Math.abs(world.x - point.x) <= radius && Math.abs(world.y - point.y) <= halfHeight;
+        if (hit(at) || hit(target)) {
           return entry.units;
         }
       }
