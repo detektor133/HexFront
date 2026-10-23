@@ -189,7 +189,6 @@ export async function createMapView(
   let hooks: OrderHooks | null = null;
   let radialHooks: RadialHooks | null = null;
   let radialHandedOff = false;
-  let radialScreen: Point | null = null;
   let stroke: StrokeHandler | null = null;
   let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
@@ -295,13 +294,8 @@ export async function createMapView(
         hooks?.hold(toWorld(e.at), e.phase);
       } else if (e.t === 'radial') {
         velocity = null;
-        const canvasBounds = app.canvas.getBoundingClientRect();
-        const screen = radialScreen ?? {
-          x: e.at.x + canvasBounds.left,
-          y: e.at.y + canvasBounds.top,
-        };
         if (e.phase === 'start') {
-          radialHooks?.action(e.context, toWorld(e.at), screen, e.phase);
+          radialHooks?.action(e.context, toWorld(e.at), e.viewportAt, e.phase);
           if (
             activePointerId !== null &&
             typeof app.canvas.releasePointerCapture === 'function' &&
@@ -314,10 +308,12 @@ export async function createMapView(
         } else if (
           !radialHandedOff ||
           (typeof globalThis.document?.elementFromPoint === 'function' &&
-            !globalThis.document.elementFromPoint(screen.x, screen.y)?.closest('[role="menu"]') &&
+            !globalThis.document
+              .elementFromPoint(e.viewportAt.x, e.viewportAt.y)
+              ?.closest('[role="menu"]') &&
             (e.phase === 'end' || e.phase === 'cancel'))
         ) {
-          radialHooks?.action(e.context, toWorld(e.at), screen, e.phase);
+          radialHooks?.action(e.context, toWorld(e.at), e.viewportAt, e.phase);
         }
         if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
       } else if (e.t === 'doubleTap') {
@@ -330,14 +326,9 @@ export async function createMapView(
   );
   const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
-    pressed: (n, pointerId, at) => {
+    pressed: (n, pointerId) => {
       pressed = n;
       activePointerId = n === 0 ? null : (pointerId ?? activePointerId);
-      if (n === 0) radialScreen = null;
-      else if (at) {
-        const bounds = app.canvas.getBoundingClientRect();
-        radialScreen = { x: at.x + bounds.left, y: at.y + bounds.top };
-      }
       if (n > 0) velocity = null;
     },
     idle: (ms) => {
@@ -482,7 +473,7 @@ export async function createMapView(
 interface InputHandlers {
   zoom(factor: number, at: Point): void;
   /** Сколько указателей нажато (инерция — только когда ни одного). */
-  pressed(n: number, pointerId?: number, at?: Point): void;
+  pressed(n: number, pointerId?: number): void;
   /** Палец отпущен после паузы дольше ms — инерции нет. */
   idle(ms: number): void;
 }
@@ -498,16 +489,19 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.setPointerCapture(e.pointerId);
     count += 1;
     const at = local(e);
-    h.pressed(count, e.pointerId, at);
-    g.down(e.pointerId, at, e.button, performance.now(), e.shiftKey);
+    h.pressed(count, e.pointerId);
+    g.down(e.pointerId, at, e.button, performance.now(), e.shiftKey, {
+      x: e.clientX,
+      y: e.clientY,
+    });
   };
   const move = (e: PointerEvent): void => {
     if (count === 0) return g.hover(local(e));
-    g.move(e.pointerId, local(e), performance.now());
+    g.move(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
   };
   const up = (e: PointerEvent): void => {
     count = Math.max(0, count - 1);
-    g.up(e.pointerId, local(e), performance.now());
+    g.up(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
     h.pressed(count, e.pointerId);
     if (count === 0) h.idle(INERTIA_MAX_PAUSE_MS);
   };
@@ -517,7 +511,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   };
   const releasedMove = (e: PointerEvent): void => {
     if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
-    g.move(e.pointerId, local(e), performance.now());
+    g.move(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
   };
   const leave = (): void => {
     if (count === 0) g.hover(null);
