@@ -350,10 +350,19 @@
     align-items: center;
   }
 
+  .slot {
+    flex-direction: column;
+    gap: 0;
+  }
+
   .value,
   .rate,
   .rateBad {
     flex: 0 1 auto;
+  }
+
+  .value {
+    font-size: var(--font-size-caption);
   }
 
   .rate,
