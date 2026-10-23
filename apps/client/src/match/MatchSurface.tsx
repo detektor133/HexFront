@@ -98,7 +98,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
     bottomPanelHeight: dockH,
-    eventRows: Math.min(3, sb.events.length),
+    eventRows: Math.min(4, sb.events.length),
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
     leaderboardRows: view?.ranking?.length ?? 0,

@@ -188,7 +188,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const eventFeedWidth = Math.min(280, Math.max(44, width - edge * 2));
   const eventFeedX = width - edge - eventFeedWidth;
   const leftWidth = Math.min(280, Math.max(44, width - leaderboardWidth - edge * 3));
-  const eventHeight = Math.min(3, Math.max(0, input.eventRows)) * 44;
+  const eventHeight = Math.min(4, Math.max(0, input.eventRows)) * 44;
   const leftColumnTop = input.hudHeight + gap;
   const leftColumnBottom = bottomY - gap;
   const eventFeedY = bottomY - gap - eventHeight;
