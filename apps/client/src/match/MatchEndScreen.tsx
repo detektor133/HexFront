@@ -38,7 +38,7 @@ function holdClock(seconds: number): string {
 export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | null {
   const [watching, setWatching] = useState(false);
   if (watching || (props.winner < 0 && !props.eliminated && !props.victoryHold)) return null;
-  const eliminated = props.winner < 0 && props.eliminated;
+  const eliminated = props.eliminated;
   const result = eliminated
     ? [
         <h2 key="title">{`${t('match.eliminated')} · ${t('match.placeLower')} ${props.place}`}</h2>,
