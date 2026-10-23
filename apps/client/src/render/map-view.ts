@@ -285,6 +285,7 @@ export async function createMapView(
         velocity = null;
         if (e.phase === 'start') {
           const { canvas } = app;
+          radialHooks?.action(toWorld(e.at), e.at, e.phase);
           if (
             activePointerId !== null &&
             typeof canvas.releasePointerCapture === 'function' &&
@@ -293,7 +294,6 @@ export async function createMapView(
           ) {
             canvas.releasePointerCapture(activePointerId);
           }
-          radialHooks?.action(toWorld(e.at), e.at, e.phase);
           radialHandedOff = true;
         } else if (!radialHandedOff) {
           radialHooks?.action(toWorld(e.at), e.at, e.phase);
