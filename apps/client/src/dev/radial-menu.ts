@@ -67,7 +67,7 @@ export function buildRadialActions(
         unitId: splitUnit.id,
         soldiers: Math.floor(splitUnit.soldiers / 2) as Fp,
       },
-      label: 'Разделить',
+      label: 'unit.split',
     });
   }
   if (units.length === 1 && first?.type === 'artillery') {
