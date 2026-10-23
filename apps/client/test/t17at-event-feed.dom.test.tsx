@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { GameEvent, PlayerView } from '@hexfront/sim';
 
 import { EventFeed } from '../src/dev/EventFeed.tsx';
-import { appendEvents, type EventFeedItem } from '../src/dev/event-feed.ts';
+import { appendEvents, EVENT_TTL_MS, type EventFeedItem } from '../src/dev/event-feed.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 afterEach(cleanup);
@@ -103,5 +103,27 @@ describe('07/T17at: DOM ленты событий', () => {
     fireEvent.click(captureButton);
     expect(onFocus).toHaveBeenCalledTimes(1);
     expect(onFocus).toHaveBeenCalledWith(expect.objectContaining({ id: 'capture', hex: 3 }));
+  });
+
+  it('Приёмка 3: удаляет событие из DOM после истечения TTL', () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+    try {
+      const items = appendEvents(
+        [],
+        [{ t: 'unitDestroyed', playerId: 0, unitId: 2, hex: 9 }],
+        viewWithoutCities,
+        0,
+        0,
+      );
+      render(<EventFeed items={items} localPlayerId={0} now={0} onFocus={vi.fn()} />);
+
+      expect(screen.getByRole('button')).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(EVENT_TTL_MS);
+      });
+      expect(screen.queryByRole('button')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
