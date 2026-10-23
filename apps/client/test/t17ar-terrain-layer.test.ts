@@ -197,52 +197,64 @@ describe('T17ar: процедурные паттерны рельефа', () => 
   });
 
   it('Приёмка: координаты конечных точек после учёта devicePixelRatio — целые физические пиксели, а ширина линии — tokens.map.patternWidth экранных px', () => {
+    const originalDevicePixelRatio = Object.getOwnPropertyDescriptor(
+      globalThis,
+      'devicePixelRatio',
+    );
     Object.defineProperty(globalThis, 'devicePixelRatio', { configurable: true, value: DPR });
-    const calls = recordPatternCalls();
-    const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
-    calls.circles.mockClear();
-    calls.curves.mockClear();
-    calls.fills.mockClear();
-    calls.lines.mockClear();
-    calls.moves.mockClear();
-    calls.strokes.mockClear();
-
-    for (const scale of SCALES) {
-      layer.update(scale, 3);
-
-      expectPhysicalCoordinates(calls, scale);
-      expect(calls.fills).toHaveBeenCalledWith(tokens.map.terrain.forestInk);
-      const patternColors = calls.strokes.mock.calls
-        .map((args: unknown[]) => args[0])
-        .filter(
-          (style: unknown): style is { color: string; width: number } =>
-            typeof style === 'object' &&
-            style !== null &&
-            'color' in style &&
-            'width' in style &&
-            (style as { width: number }).width === tokens.map.patternWidth / scale,
-        )
-        .map((style: { color: string; width: number }) => style.color);
-      expect(patternColors).toEqual([
-        tokens.map.terrain.hillInk,
-        tokens.map.terrain.mountainInk,
-        tokens.map.terrain.desertInk,
-      ]);
-      const patternStroke = calls.strokes.mock.calls.find((args: unknown[]) => {
-        const [style] = args;
-        return style && typeof style === 'object' && 'color' in style;
-      });
-      expect(patternStroke?.[0]).toMatchObject({ width: tokens.map.patternWidth / scale });
+    try {
+      const calls = recordPatternCalls();
+      const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
       calls.circles.mockClear();
       calls.curves.mockClear();
       calls.fills.mockClear();
       calls.lines.mockClear();
       calls.moves.mockClear();
       calls.strokes.mockClear();
-    }
 
-    layer.destroy();
-    vi.restoreAllMocks();
+      for (const scale of SCALES) {
+        layer.update(scale, 3);
+
+        expectPhysicalCoordinates(calls, scale);
+        expect(calls.fills).toHaveBeenCalledWith(tokens.map.terrain.forestInk);
+        const patternColors = calls.strokes.mock.calls
+          .map((args: unknown[]) => args[0])
+          .filter(
+            (style: unknown): style is { color: string; width: number } =>
+              typeof style === 'object' &&
+              style !== null &&
+              'color' in style &&
+              'width' in style &&
+              (style as { width: number }).width === tokens.map.patternWidth / scale,
+          )
+          .map((style: { color: string; width: number }) => style.color);
+        expect(patternColors).toEqual([
+          tokens.map.terrain.hillInk,
+          tokens.map.terrain.mountainInk,
+          tokens.map.terrain.desertInk,
+        ]);
+        const patternStroke = calls.strokes.mock.calls.find((args: unknown[]) => {
+          const [style] = args;
+          return style && typeof style === 'object' && 'color' in style;
+        });
+        expect(patternStroke?.[0]).toMatchObject({ width: tokens.map.patternWidth / scale });
+        calls.circles.mockClear();
+        calls.curves.mockClear();
+        calls.fills.mockClear();
+        calls.lines.mockClear();
+        calls.moves.mockClear();
+        calls.strokes.mockClear();
+      }
+
+      layer.destroy();
+      vi.restoreAllMocks();
+    } finally {
+      if (originalDevicePixelRatio) {
+        Object.defineProperty(globalThis, 'devicePixelRatio', originalDevicePixelRatio);
+      } else {
+        Reflect.deleteProperty(globalThis, 'devicePixelRatio');
+      }
+    }
   });
 
   it('Правило родителя: слой не использует Texture, canvas-растер или кэширование ранее созданного паттерна', () => {
