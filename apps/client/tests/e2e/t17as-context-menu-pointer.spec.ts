@@ -348,3 +348,95 @@ test('@layout T17as: pointer-сценарии через canvas отправля
   expect(bombardFound).toBe(true);
   await expect.poll(commandTypes).toContain('bombard');
 });
+
+test('@layout T17as: кнопки контекстного меню у каждой границы viewport остаются внутри viewport', async ({
+  page,
+}) => {
+  await page.addInitScript(installT17asTrace);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/match?debug=1&map=small&speed=0');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await selectHumanPlayer(page);
+  await page.waitForTimeout(500);
+
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error('Карта не имеет границ');
+  const hudBounds = await page.getByRole('banner').boundingBox();
+  const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
+  const leaderboardBounds = await page
+    .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
+    .boundingBox();
+  if (!hudBounds || !dockBounds || !leaderboardBounds)
+    throw new Error('Рабочая область карты не имеет границ');
+  const view = await readT17asView(page);
+  const first = view.units.find((unit) => unit.owner === view.playerId);
+  if (!first) throw new Error('У игрока нет стартового отряда');
+  const capitalHex = view.cities.find(
+    (city) => city.owner === view.playerId && city.isCapital,
+  )?.hex;
+  if (capitalHex === undefined) throw new Error('Столица игрока не найдена');
+  const initialPoint = playerUnitPoint(
+    bounds,
+    hudBounds,
+    dockBounds,
+    leaderboardBounds,
+    capitalHex,
+    first,
+  );
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('Viewport не имеет размера');
+
+  const anchors = [
+    { name: 'левой', x: 80, y: viewport.height / 2 },
+    { name: 'правой', x: viewport.width - 80, y: viewport.height / 2 },
+    { name: 'верхней', x: viewport.width / 2, y: 80 },
+    { name: 'нижней', x: viewport.width / 2, y: viewport.height - 80 },
+  ];
+  for (const anchor of anchors) {
+    await page.reload();
+    await expect(canvas).toBeVisible();
+    await selectHumanPlayer(page);
+    await page.waitForTimeout(500);
+    await page.mouse.move(initialPoint.x, initialPoint.y);
+    for (let zoom = 0; zoom < 4; zoom += 1) await page.mouse.wheel(0, -100);
+    const shift = { x: anchor.x - initialPoint.x, y: anchor.y - initialPoint.y };
+    const panStart = {
+      x: bounds.x + bounds.width / 2 + (shift.y === 0 ? 100 : 0),
+      y: bounds.y + bounds.height / 2 + (shift.x === 0 ? 100 : 0),
+    };
+    await page.mouse.move(panStart.x, panStart.y);
+    await page.mouse.down();
+    await page.mouse.move(panStart.x + shift.x, panStart.y + shift.y, { steps: 5 });
+    await page.mouse.up();
+
+    await page.mouse.move(anchor.x, anchor.y);
+    await page.mouse.down();
+    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
+    await expect(page.getByRole('menu')).toBeVisible();
+    const buttonRects = await page.getByRole('menuitem').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height,
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        };
+      }),
+    );
+    expect(buttonRects.length, `У якоря возле ${anchor.name} нет кнопок меню`).toBeGreaterThan(0);
+    for (const rect of buttonRects) {
+      expect(rect.width).toBeGreaterThan(0);
+      expect(rect.height).toBeGreaterThan(0);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+      expect(rect.top).toBeGreaterThanOrEqual(0);
+      expect(rect.right).toBeLessThanOrEqual(viewport.width);
+      expect(rect.bottom).toBeLessThanOrEqual(viewport.height);
+    }
+    await page.mouse.up();
+    await expect(page.getByRole('menu')).toBeHidden();
+  }
+});
