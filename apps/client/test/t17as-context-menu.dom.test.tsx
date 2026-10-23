@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
+import { RadialMenu } from '../src/dev/RadialMenu.tsx';
 import { cityChipShift } from '../src/dev/chip-place.ts';
 import { messages } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -235,6 +236,43 @@ afterEach(() => {
 });
 
 describe('07/T17as: контекстное меню фишки отряда', () => {
+  it('1: четыре действия меню имеют попарно различные SVG-пиктограммы', () => {
+    const actions = [
+      { kind: 'merge' as const, label: 'unit.merge' },
+      { kind: 'assignUnits' as const, label: 'unit.toArmy' },
+      { kind: 'split' as const, label: 'unit.split' },
+      { kind: 'bombard' as const, label: 'unit.autoTarget' },
+    ];
+    render(
+      createElement(RadialMenu, {
+        state: { center: { x: 0, y: 0 }, actions, active: actions },
+        onAction: vi.fn(),
+        onClose: vi.fn(),
+      }),
+    );
+
+    const items = screen.getAllByRole('menuitem');
+    const labels = [
+      messages.ru['unit.merge'],
+      messages.ru['unit.toArmy'],
+      messages.ru['unit.split'],
+      messages.ru['unit.autoTarget'],
+    ];
+    const svgs = labels.map((label) => {
+      const item = screen.getByRole('menuitem', { name: label });
+      const svg = item.querySelector('svg');
+      expect(svg).not.toBeNull();
+      return svg?.outerHTML;
+    });
+
+    expect(items).toHaveLength(4);
+    for (let first = 0; first < svgs.length; first += 1) {
+      for (let second = first + 1; second < svgs.length; second += 1) {
+        expect(svgs[first]).not.toBe(svgs[second]);
+      }
+    }
+  });
+
   it('1: удержание фишки открывает одно меню в точке нажатия с доступными кнопками', async () => {
     const { menu, point } = await openMapMenu();
     await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
