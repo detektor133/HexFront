@@ -90,6 +90,7 @@ class TestWorker {
     const ownUnits = snapshot.view.units.filter((unit) => unit.owner === snapshot.view.playerId);
     const firstUnit = ownUnits[0];
     if (!firstUnit) throw new Error('В фикстуре нет собственного отряда');
+    let view = snapshot.view;
     if (harness.fixture === 'stack') {
       const secondUnit = ownUnits.find((unit) => unit.id !== firstUnit.id);
       if (!secondUnit) throw new Error('В фикстуре нет пары собственных отрядов');
@@ -106,20 +107,19 @@ class TestWorker {
         }
         return unit;
       });
-      (snapshot.view as { units: typeof preparedUnits }).units = preparedUnits;
+      view = { ...snapshot.view, units: preparedUnits };
     } else {
       const artillery = { ...firstUnit, armyId: null, type: 'artillery' as const };
-      (snapshot.view as { units: typeof snapshot.view.units }).units = [artillery];
+      view = { ...snapshot.view, units: [artillery] };
     }
-    harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
-    harness.unitCityLevel =
-      snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
+    harness.unitHex = view.units[0]?.hex ?? 0;
+    harness.unitCityLevel = view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
     queueMicrotask(() =>
       this.onmessage?.({
         data: {
           t: 'view',
           kind: 'snapshot',
-          snapshot: { t: 'snapshot', tick: snapshot.view.tick, view: snapshot.view },
+          snapshot: { t: 'snapshot', tick: view.tick, view },
           seq: 1,
           selection: snapshot.selection,
           rejected: snapshot.rejected,
