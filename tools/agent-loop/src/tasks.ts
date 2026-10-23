@@ -131,6 +131,24 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
     const result = await runSkill(context, 'next', `$accept ${accept}`);
     return result.ok ? 'worked' : skillFailed(context, `$accept ${accept}`, result);
   }
+  const active = context.state.activeTask;
+  if (active?.task === task) {
+    // Попытка без коммита и без машинного маркера — не обязательно тупик владельца: часто это
+    // одна неудачная идея на измеримый пункт (например, фикс ломает другой уже принятый тест).
+    // plan смотрит один раз, может предложить другой подход/разбиение; «не трогал» всё равно
+    // паркует — диагностика не плодит повторов вслепую.
+    const finding: ReviewFinding = active.findings[0] ?? { kind: 'КОД', text: active.workPrompt };
+    return diagnoseFinding(
+      context,
+      task,
+      finding,
+      false,
+      `Исполнитель не создал коммит по пункту «${finding.text}» задачи ${task} и не дал ` +
+        `машинный маркер (СПЕК:/$split/$accept). Его отчёт: «${message.trim()}». Оцени: нужна ` +
+        'переделка подхода, пункт стоит разбить, это инфраструктурный блокер без участия ' +
+        'владельца, или правда нужно решение владельца.',
+    );
+  }
   return park(
     context,
     `task:${task}`,

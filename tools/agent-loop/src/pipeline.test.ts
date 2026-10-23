@@ -694,6 +694,49 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('исполнитель без коммита и без машинного маркера — зовёт plan, а не паркует сразу владельцу', async () => {
+    const finding = 'КОД: меню не открывается после удержания фишки на canvas';
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: finding }],
+        },
+      },
+      sessions: [
+        {
+          answer:
+            'Не коммитил: исправление ломает другой уже принятый тест t17an-radial-menu.test.ts.',
+          push: false,
+        },
+        {
+          answer:
+            'Другой подход: обрабатывать pointerdown раньше, не после release.\n' +
+            'PLAN: переделать — обрабатывать pointerdown раньше, не после release',
+        },
+      ],
+      maxRounds: 1,
+    });
+
+    // Без диагностики plan это сразу встало бы на «нужен ответ владельца через $decide/$done»,
+    // хотя у исполнителя уже есть внятный диагноз провала (сломанный чужой тест) и есть кому
+    // предложить другой подход.
+    expect(run.prompts.slice(0, 2).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('не дал машинный маркер');
+    expect(run.prompts[1]).toContain('ломает другой уже принятый тест');
+    expect(run.lines).toContain(
+      '06/T1j5-Б1: plan решил переделать механизм целиком — обрабатывать pointerdown раньше, не после release',
+    );
+  });
+
   it('после красного CI повторно публикует исправленный HEAD без ложного конфликта origin', async () => {
     const run = await runWorld({
       spec: true,
