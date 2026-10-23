@@ -71,7 +71,7 @@ export function EventFeed(props: {
           );
           const className = `${styles.item} ${item.important ? styles.important : ''}`;
 
-          return item.hex === null ? (
+          return item.hex === null || item.hex === undefined ? (
             <div className={className} key={item.id}>
               {content}
             </div>
