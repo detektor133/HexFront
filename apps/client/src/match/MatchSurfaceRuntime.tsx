@@ -228,6 +228,7 @@ export function useSandbox(
   const mapViewRef = useRef<MapView | null>(null);
   const toolRef = useRef<ToolState | null>(null);
   const armyRef = useRef<number | null>(null);
+  const radialArmyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
@@ -556,12 +557,13 @@ export function useSandbox(
             );
           });
           if (!unit) return false;
+          radialArmyRef.current = unit.armyId;
           if (!pickedRef.current.units.includes(unit.id))
             pick(selectUnits(current, pickedRef.current, [unit.id]));
           return true;
         },
         action(_world, screen, phase) {
-          radialForArmy(armyRef.current, screen, phase);
+          radialForArmy(radialArmyRef.current, screen, phase);
         },
       };
       v.setRadialHooks?.(radialHooks);
