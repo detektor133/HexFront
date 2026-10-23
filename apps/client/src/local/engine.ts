@@ -113,9 +113,9 @@ export function createLocalEngine(
   }));
   const state = createMatch(loaded.map, setup, seed, { fog });
   if (fixture === 'artillery') {
-    const unitIndex = state.units.findIndex((candidate) => candidate.owner === HUMAN_ID);
-    const unit = state.units[unitIndex];
-    if (unit) state.units[unitIndex] = { ...unit, type: 'artillery' };
+    for (const [unitIndex, unit] of state.units.entries()) {
+      if (unit.owner === HUMAN_ID) state.units[unitIndex] = { ...unit, type: 'artillery' };
+    }
   }
   let pending: Command[] = [];
   let selected: number | null = null;
