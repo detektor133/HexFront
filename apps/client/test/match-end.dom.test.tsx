@@ -62,8 +62,8 @@ describe('экран конца матча и выбывание', () => {
     expect(screen.getByText('Победа по очкам')).toBeTruthy();
   });
 
-  it('критерий: при eliminated и winner < 0 показывается карточка «Вы выбыли · место N»', () => {
-    render(<MatchEndScreen {...baseProps} winner={-1} eliminated place={3} />);
+  it('критерий: при eliminated и winner >= 0 показывается карточка «Вы выбыли · место N»', () => {
+    render(<MatchEndScreen {...baseProps} winner={0} eliminated place={3} />);
 
     expect(screen.getByText('Вы выбыли · место 3')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Наблюдать' })).toBeTruthy();
