@@ -200,6 +200,35 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
+  it('repair-spec удаляет чужой приёмочный тест — паркует, а не падает с ENOENT', async () => {
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        {
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/other.test.ts',
+          writes: { 'packages/sim/test/other.test.ts': "it('другое', () => {});\n" },
+          removes: ['packages/sim/test/task.test.ts'],
+          files: ['packages/sim/test/task.test.ts', 'packages/sim/test/other.test.ts'],
+          commit: true,
+          push: false,
+        },
+      ],
+    });
+
+    // Автор тестов не имеет права удалять чужую проверку (AGENTS.md §4.5): цикл паркует с
+    // понятной причиной, а не падает необработанным ENOENT при попытке прочитать удалённый файл.
+    expect(run.lines).toContain(
+      'жду: $spec 06/T1j5-Б1 удалил packages/sim/test/task.test.ts — проверь',
+    );
+  });
+
   it('передаёт красный усиленный тест кодеру без лишнего review', async () => {
     const run = await runWorld({
       spec: true,

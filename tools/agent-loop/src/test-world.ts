@@ -61,6 +61,8 @@ export interface Session {
   readonly dirty?: boolean;
   /** Файлы, которые сессия пишет на диск (путь → текст); при коммите они уходят в HEAD. */
   readonly writes?: Readonly<Record<string, string>>;
+  /** Файлы, которые сессия удаляет с диска (путь уходит из `tracked`, при коммите — из HEAD). */
+  readonly removes?: readonly string[];
   readonly status?: string;
   readonly stage?: string;
   /** Сессия переключила ветку (шаг 7 `$stage-close`). */
@@ -303,6 +305,10 @@ export async function runWorld(world: World): Promise<Outcome> {
       await writeFile(join(root, path), text);
       tracked.add(path);
     }
+    for (const path of session.removes ?? []) {
+      await rm(join(root, path), { force: true }).catch(() => {});
+      tracked.delete(path);
+    }
     const changed =
       env?.AGENT_ROLE !== 'reviewer' &&
       (session.mark !== undefined || session.stage !== undefined || session.status !== undefined);
@@ -315,6 +321,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         if (text === undefined) committed.delete(path);
         else committed.set(path, text);
       }
+      for (const path of session.removes ?? []) committed.delete(path);
     }
     if (session.push === true) origin = head;
     files = session.files ?? [
@@ -323,6 +330,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         ? ['docs/stages/stage-06-bots-balance.md']
         : []),
       ...Object.keys(session.writes ?? {}),
+      ...(session.removes ?? []),
     ];
     if (committing) commitFiles.set(head, files);
     dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';

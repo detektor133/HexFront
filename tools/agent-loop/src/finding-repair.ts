@@ -175,8 +175,19 @@ export async function runTestFix(
   if (!(await checkPermissions(context, base, context.definitions.specPaths)))
     return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`, result.message);
   const saved = { ...(context.state.spec[task] ?? {}) };
-  for (const path of await changedPathsBetween(context, base))
-    saved[path] = await readFile(join(context.config.root, path), 'utf8');
+  for (const path of await changedPathsBetween(context, base)) {
+    // Автор тестов не может удалить чужую проверку (AGENTS.md §4.5); чтение несуществующего
+    // файла раньше падало необработанным ENOENT и обрывало весь цикл.
+    const text = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
+    if (text === undefined)
+      return park(
+        context,
+        `spec:${task}`,
+        `$spec ${task} удалил ${path} — проверь`,
+        result.message,
+      );
+    saved[path] = text;
+  }
   context.state.spec[task] = saved;
   await save(context);
   if (outcome.kind === 'code') return rerouteToCode(context, outcome.detail);
