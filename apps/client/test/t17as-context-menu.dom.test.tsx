@@ -218,7 +218,10 @@ describe('07/T17as: контекстное меню фишки отряда', ()
       expect(harness.commands.length).toBeGreaterThan(before);
       const command = harness.commands.at(-1);
       expect(command).toBeDefined();
-      if (command?.t === 'merge') {
+      if (command?.t === 'split') {
+        expect(command.unitId).toBeTypeOf('number');
+        expect(command.soldiers).toBeGreaterThan(0);
+      } else if (command?.t === 'merge') {
         expect(command.unitIds.length).toBeGreaterThan(0);
       } else if (command?.t === 'assignUnits') {
         expect(command.unitIds.length).toBeGreaterThan(0);
