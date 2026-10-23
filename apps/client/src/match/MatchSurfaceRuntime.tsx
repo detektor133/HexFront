@@ -42,6 +42,7 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
+import type { RadialContext } from '../render/gesture.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type RadialHooks, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
@@ -80,13 +81,14 @@ export function createRadialActionHandler(options: {
   send: (command: Command) => void;
   getState: () => RadialMenuState | null;
   setState: (state: RadialMenuState | null) => void;
-}): (armyId: number | null, screen: Point, phase: RadialPhase) => void {
-  return (armyId, screen, phase): void => {
+}): (context: RadialContext | null, screen: Point, phase: RadialPhase) => void {
+  return (context, screen, phase): void => {
     const view = options.getView();
     if (!view) return;
     if (phase === 'start') {
+      if (!context) return;
       const actions = buildRadialActions(
-        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
+        view.units.filter((unit) => unit.owner === view.playerId && unit.hex === context.hex),
         view,
       );
       options.setState({ center: screen, actions, active: actions });
@@ -197,7 +199,7 @@ interface Sandbox {
   setHudHeight(height: number, leaderboardWidth?: number): void;
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
-  radialForArmy(armyId: number | null, screen: Point, phase: RadialPhase): void;
+  radialForUnit(context: RadialContext | null, screen: Point, phase: RadialPhase): void;
   radialAction(action: RadialAction): void;
 }
 
@@ -215,7 +217,6 @@ export function useSandbox(
   const mapViewRef = useRef<MapView | null>(null);
   const toolRef = useRef<ToolState | null>(null);
   const armyRef = useRef<number | null>(null);
-  const radialArmyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
@@ -291,7 +292,7 @@ export function useSandbox(
     radialRef.current = next;
     setRadial(next);
   }, []);
-  const radialForArmy = useCallback(
+  const radialForUnit = useCallback(
     createRadialActionHandler({
       getView: () => viewRef.current,
       send: (command) => matchRef.current?.send(command),
@@ -524,7 +525,7 @@ export function useSandbox(
       const radialHooks: RadialHooks = {
         canOpen(world) {
           const current = viewRef.current;
-          if (!current || toolRef.current) return false;
+          if (!current || toolRef.current) return null;
           const hit = layerRef.current?.unitsAt(world) ?? [];
           const unit = current.units.find((candidate) => {
             if (candidate.owner !== current.playerId || candidate.order === 'retreat') return false;
@@ -536,14 +537,13 @@ export function useSandbox(
               Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
             );
           });
-          if (!unit) return false;
-          radialArmyRef.current = unit.armyId;
+          if (!unit) return null;
           if (!pickedRef.current.units.includes(unit.id))
             pick(selectUnits(current, pickedRef.current, [unit.id]));
-          return true;
+          return { unitId: unit.id, hex: unit.hex };
         },
-        action(_world, screen, phase) {
-          radialForArmy(radialArmyRef.current, screen, phase);
+        action(context, _world, screen, phase) {
+          radialForUnit(context, screen, phase);
         },
       };
       v.setRadialHooks?.(radialHooks);
@@ -616,7 +616,7 @@ export function useSandbox(
     events,
     workerTelemetry: workerTelemetryRef.current,
     radial,
-    radialForArmy,
+    radialForUnit,
     radialAction,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },

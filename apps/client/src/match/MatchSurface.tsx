@@ -155,7 +155,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <RadialMenu
           state={sb.radial}
           onAction={sb.radialAction}
-          onClose={() => sb.radialForArmy(null, sb.radial?.center ?? { x: 0, y: 0 }, 'cancel')}
+          onClose={() => sb.radialForUnit(null, sb.radial?.center ?? { x: 0, y: 0 }, 'cancel')}
         />
       )}
       {styleFor('event-feed') && (

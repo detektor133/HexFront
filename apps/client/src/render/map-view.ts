@@ -18,7 +18,13 @@ import {
   type Velocity,
   type Viewport,
 } from './camera.ts';
-import { createGesture, type Gesture, type StrokePhase, type TapKind } from './gesture.ts';
+import {
+  createGesture,
+  type Gesture,
+  type RadialContext,
+  type StrokePhase,
+  type TapKind,
+} from './gesture.ts';
 import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
@@ -73,8 +79,13 @@ export interface OrderHooks {
 }
 
 export interface RadialHooks {
-  canOpen(world: Point): boolean;
-  action(world: Point, screen: Point, phase: 'start' | 'move' | 'end' | 'cancel'): void;
+  canOpen(world: Point): RadialContext | null;
+  action(
+    context: RadialContext,
+    world: Point,
+    screen: Point,
+    phase: 'start' | 'move' | 'end' | 'cancel',
+  ): void;
 }
 
 /** Росчерк: точка в мировых координатах карты. */
@@ -239,7 +250,7 @@ export async function createMapView(
         grabbed = null;
       },
       canHold: () => stroke === null && (hooks?.canHold() ?? false),
-      canRadial: (at) => radialHooks?.canOpen(toWorld(at)) ?? false,
+      canRadial: (at) => radialHooks?.canOpen(toWorld(at)) ?? null,
       cancelZone: (at) => hooks?.cancelZone(toWorld(at)) ?? false,
       inside: (at) => at.x >= 0 && at.y >= 0 && at.x <= view().width && at.y <= view().height,
     },
@@ -285,7 +296,7 @@ export async function createMapView(
         velocity = null;
         if (e.phase === 'start') {
           const { canvas } = app;
-          radialHooks?.action(toWorld(e.at), e.at, e.phase);
+          radialHooks?.action(e.context, toWorld(e.at), e.at, e.phase);
           if (
             activePointerId !== null &&
             typeof canvas.releasePointerCapture === 'function' &&
@@ -296,7 +307,7 @@ export async function createMapView(
           }
           radialHandedOff = true;
         } else if (!radialHandedOff) {
-          radialHooks?.action(toWorld(e.at), e.at, e.phase);
+          radialHooks?.action(e.context, toWorld(e.at), e.at, e.phase);
         }
         if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
       } else if (e.t === 'doubleTap') {
