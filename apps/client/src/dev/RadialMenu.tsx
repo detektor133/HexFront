@@ -32,7 +32,7 @@ export function RadialMenu(props: { state: RadialMenuState }): React.JSX.Element
               left: `${Math.cos(angle) * 88}px`,
               top: `${Math.sin(angle) * 88}px`,
               transform: 'translate(-50%, -50%)',
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
               minWidth: '72px',
             }}
           >

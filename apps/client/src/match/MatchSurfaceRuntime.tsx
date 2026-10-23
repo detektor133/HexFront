@@ -293,10 +293,20 @@ export function useSandbox(
     layerRef.current?.setRoadPreview(path);
   }, []);
   const setArmyRef = useRef(setArmy);
-  const setRadialState = (next: RadialMenuState | null): void => {
+  const setRadialState = useCallback((next: RadialMenuState | null): void => {
     radialRef.current = next;
     setRadial(next);
-  };
+  }, []);
+  useEffect(() => {
+    if (radial === null) return;
+    const closeOutside = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('[role="menu"]') !== null) return;
+      setRadialState(null);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [radial, setRadialState]);
   const radialForArmy = useCallback(
     createRadialActionHandler({
       getView: () => viewRef.current,
@@ -567,6 +577,7 @@ export function useSandbox(
         setTool(null);
         return;
       }
+      setRadialState(null);
       pick(NOTHING_PICKED);
     };
     window.addEventListener('keydown', onKey);
