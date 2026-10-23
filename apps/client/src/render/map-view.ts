@@ -189,6 +189,7 @@ export async function createMapView(
   let hooks: OrderHooks | null = null;
   let radialHooks: RadialHooks | null = null;
   let radialHandedOff = false;
+  let radialScreen: Point | null = null;
   let stroke: StrokeHandler | null = null;
   let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
@@ -295,7 +296,10 @@ export async function createMapView(
       } else if (e.t === 'radial') {
         velocity = null;
         const canvasBounds = app.canvas.getBoundingClientRect();
-        const screen = { x: e.at.x + canvasBounds.left, y: e.at.y + canvasBounds.top };
+        const screen = radialScreen ?? {
+          x: e.at.x + canvasBounds.left,
+          y: e.at.y + canvasBounds.top,
+        };
         if (e.phase === 'start') {
           radialHooks?.action(e.context, toWorld(e.at), screen, e.phase);
           if (
@@ -326,9 +330,14 @@ export async function createMapView(
   );
   const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
-    pressed: (n, pointerId) => {
+    pressed: (n, pointerId, at) => {
       pressed = n;
       activePointerId = n === 0 ? null : (pointerId ?? activePointerId);
+      if (n === 0) radialScreen = null;
+      else if (at) {
+        const bounds = app.canvas.getBoundingClientRect();
+        radialScreen = { x: at.x + bounds.left, y: at.y + bounds.top };
+      }
       if (n > 0) velocity = null;
     },
     idle: (ms) => {
@@ -473,7 +482,7 @@ export async function createMapView(
 interface InputHandlers {
   zoom(factor: number, at: Point): void;
   /** Сколько указателей нажато (инерция — только когда ни одного). */
-  pressed(n: number, pointerId?: number): void;
+  pressed(n: number, pointerId?: number, at?: Point): void;
   /** Палец отпущен после паузы дольше ms — инерции нет. */
   idle(ms: number): void;
 }
@@ -488,8 +497,9 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   const down = (e: PointerEvent): void => {
     canvas.setPointerCapture(e.pointerId);
     count += 1;
-    h.pressed(count, e.pointerId);
-    g.down(e.pointerId, local(e), e.button, performance.now(), e.shiftKey);
+    const at = local(e);
+    h.pressed(count, e.pointerId, at);
+    g.down(e.pointerId, at, e.button, performance.now(), e.shiftKey);
   };
   const move = (e: PointerEvent): void => {
     if (count === 0) return g.hover(local(e));
