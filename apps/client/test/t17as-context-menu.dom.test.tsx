@@ -292,7 +292,7 @@ describe('07/T17as: контекстное меню фишки отряда', ()
       expect(root).toBeDefined();
       if (!root) throw new Error(`Корневая кнопка меню не найдена: ${rootLabel}`);
       const before = harness.commands.length;
-      fireEvent.keyDown(root, { key: 'Enter' });
+      fireEvent.click(root);
 
       if (screen.queryByRole('menu')) {
         const childLabels = screen
@@ -308,14 +308,14 @@ describe('07/T17as: контекстное меню фишки отряда', ()
             .find((item) => item.getAttribute('aria-label') === rootLabel);
           expect(parent).toBeDefined();
           if (!parent) throw new Error(`Родительская кнопка меню не найдена: ${rootLabel}`);
-          fireEvent.keyDown(parent, { key: 'Enter' });
+          fireEvent.click(parent);
           const child = screen
             .getAllByRole('menuitem')
             .find((item) => item.getAttribute('aria-label') === childLabel);
           expect(child).toBeDefined();
           if (!child) throw new Error(`Дочерняя кнопка меню не найдена: ${childLabel}`);
           const childBefore = harness.commands.length;
-          fireEvent.keyDown(child, { key: 'Enter' });
+          fireEvent.click(child);
           expectCommand(childBefore);
         }
       } else {
