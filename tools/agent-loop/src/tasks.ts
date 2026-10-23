@@ -504,7 +504,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
           context,
           task,
           active.findings[0] as ReviewFinding,
-          false,
+          true,
           `Финальный review задачи ${task} ${rounds} раз(а) подряд возвращает новые пункты ` +
             `(разные файлы/формулировки) вместо схождения к нулю. Свежий пункт: «${first.text}». ` +
             'Оцени: это реальный тупик, который нужно переделать целиком, или review предъявляет ' +

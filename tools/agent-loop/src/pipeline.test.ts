@@ -556,18 +556,23 @@ describe('последовательный конвейер задачи', () =>
       sessions: [
         review(`ВОЗВРАТ\n- ${finding}`),
         { answer: 'Текст задачи ясен, review предъявляет избыточные требования.\nPLAN: не трогал' },
+        codeCommit('Исправлен дефект.'),
+        review('OK'),
       ],
-      maxRounds: 1,
+      ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+    // Это первая попытка на свежем пункте, не повторный отказ: «не трогал» от plan означает «текст
+    // в порядке, пункт реальный» — исполнитель получает обычную попытку, а не паркуется мимо неё.
+    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
       '$review 06/T1j5-Б1',
       '$plan 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
     ]);
     expect(run.prompts[1]).toContain('3 раз(а) подряд возвращает новые пункты');
     expect(run.prompts[1]).toContain('вместо схождения к нулю');
     expect(run.lines).toContain(
-      'жду: 06/T1j5-Б1: plan не изменил повторно отклонённый пункт; автоматический повтор той же роли запрещён',
+      '06/T1j5-Б1: plan не нашёл конфликт требований, даю исправляющей роли последнюю попытку',
     );
   });
 
