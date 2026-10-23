@@ -303,6 +303,13 @@ test('@layout T17as: pointer-сценарии через canvas отправля
   };
 
   await openCenterMenu();
+  const commandsBeforeCancel = await commandTypes();
+  await page.mouse.move(bounds.x + 10, bounds.y + 10);
+  await page.mouse.up();
+  await expect(page.getByRole('menu')).toBeHidden();
+  expect(await commandTypes()).toEqual(commandsBeforeCancel);
+
+  await openCenterMenu();
   await releaseOn(/В армию|To army/i);
   await releaseOn(/Резерв|Reserve/i);
   await expect.poll(commandTypes).toContain('assignUnits');
