@@ -129,6 +129,9 @@ export function RadialMenu(props: {
         position: 'fixed',
         left: state.center.x,
         top: state.center.y,
+        width: '1px',
+        height: '1px',
+        transform: 'translate(-50%, -50%)',
         pointerEvents: 'auto',
         zIndex: 20,
       }}
