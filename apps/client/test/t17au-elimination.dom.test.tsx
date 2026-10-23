@@ -121,6 +121,25 @@ describe('DOM-приёмка выбывания из матча (07/T17au)', () 
     expect(screen.queryByRole('button', { name: 'В главное меню' })).not.toBeNull();
   });
 
+  it('критерий: при выбывшем локальном игроке и winner >= 0 показывается экран выбывания, а не победы', async () => {
+    const winnerId = baseView.players.find(({ id }) => id !== baseView.playerId)?.id;
+    expect(winnerId).toBeDefined();
+    if (winnerId === undefined) return;
+
+    const view = createView({
+      winner: winnerId,
+      me: { ...baseView.me, place: 2 },
+      players: baseView.players.map((player) =>
+        player.id === baseView.playerId ? { ...player, status: 'eliminated' } : player,
+      ),
+    });
+
+    await renderSurface(view);
+
+    expect(screen.queryByRole('heading', { name: /Вы выбыли/u })).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Победа' })).toBeNull();
+  });
+
   it('критерий: «Наблюдать» отправляет { type: setFog, enabled: false }, скрывает экран и оставляет поверхность матча', async () => {
     const view = createView({
       winner: -1,
