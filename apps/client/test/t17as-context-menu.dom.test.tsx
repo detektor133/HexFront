@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
 import { cityChipShift } from '../src/dev/chip-place.ts';
+import { messages } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
@@ -242,7 +243,13 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     expect(Number.parseFloat(menu.style.top)).toBe(point.y);
     const items = screen.getAllByRole('menuitem');
     expect(items.length).toBeGreaterThan(0);
-    expect(items.every((item) => item.getAttribute('aria-label'))).toBe(true);
+    const labels = items.map((item) => item.getAttribute('aria-label'));
+    expect(labels).toEqual(
+      expect.arrayContaining([messages.ru['unit.merge'], messages.ru['unit.toArmy']]),
+    );
+    expect(labels.every((label) => label !== null && !Object.hasOwn(messages.ru, label))).toBe(
+      true,
+    );
     expect(items.every((item) => item.style.pointerEvents === 'auto')).toBe(true);
   });
 
