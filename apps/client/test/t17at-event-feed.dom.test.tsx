@@ -40,6 +40,7 @@ describe('07/T17at: DOM ленты событий', () => {
             null,
           ),
         ]}
+        localPlayerId={0}
         now={0}
         onFocus={vi.fn()}
       />,
@@ -48,6 +49,8 @@ describe('07/T17at: DOM ленты событий', () => {
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(4);
     expect(buttons.every((button) => button.textContent?.trim().length)).toBe(true);
+    expect(buttons[2]?.textContent).toBe('Город захвачен');
+    expect(buttons[3]?.textContent).toBe('Город потерян');
   });
 
   it('Приёмка 3: цветовой маркер берётся у владельца события, а клик фокусирует только событие с гексом', () => {
