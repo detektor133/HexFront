@@ -44,6 +44,7 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
   const centerX = bounds.x + (bounds.width - rightInset) / 2;
   const centerY = mapTop + (mapBottom - mapTop) / 2 + 20;
   const mergeButton = page.getByRole('menuitem', { name: /Слить|Merge/i });
+  let pressPoint: { x: number; y: number } | undefined;
   let opened = false;
   for (const [offsetX, offsetY] of [
     [0, 0],
@@ -52,7 +53,9 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     [0, -20],
     [0, 20],
   ]) {
-    await page.mouse.move(centerX + offsetX, centerY + offsetY);
+    const point = { x: centerX + offsetX, y: centerY + offsetY };
+    pressPoint = point;
+    await page.mouse.move(point.x, point.y);
     await page.mouse.down();
     await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
     if (await mergeButton.isVisible().catch(() => false)) {
@@ -62,6 +65,11 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     await page.mouse.up();
   }
   expect(opened).toBe(true);
+  if (!pressPoint) throw new Error('Точка нажатия не зафиксирована');
+  const menuBounds = await page.getByRole('menu').boundingBox();
+  if (!menuBounds) throw new Error('Контекстное меню не имеет границ');
+  expect(menuBounds.x + menuBounds.width / 2).toBeCloseTo(pressPoint.x, 0);
+  expect(menuBounds.y + menuBounds.height / 2).toBeCloseTo(pressPoint.y, 0);
   const buttonBounds = await mergeButton.boundingBox();
   if (!buttonBounds) throw new Error('Кнопка merge не имеет границ');
   await page.mouse.move(
