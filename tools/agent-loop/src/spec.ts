@@ -226,11 +226,30 @@ export async function specViolation(
   context: LoopContext,
   task: string,
 ): Promise<string | undefined> {
-  for (const [path, text] of Object.entries(context.state.spec[task] ?? {})) {
+  const spec = context.state.spec[task];
+  if (spec === undefined) return undefined;
+  const orphaned = new Set<string>();
+  for (const [path, text] of Object.entries(spec)) {
     const shown = await context.git.attempt(['show', `HEAD:${path}`]);
-    if (shown.code !== 0) return `приёмочный тест ${path} не закоммичен`;
+    if (shown.code !== 0) {
+      // Ни в HEAD, ни на диске: осиротевшая запись (путь переименован в более раннем раунде
+      // repair-$spec без удаления старого ключа — снимок `changedPathsBetween` видит только
+      // добавленный новый путь, старый никогда не был закоммичен и не попадает в диапазон).
+      // Терять нечего — убираем из учёта вместо вечного «не закоммичен» на призрак.
+      const onDisk = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
+      if (onDisk === undefined) {
+        orphaned.add(path);
+        continue;
+      }
+      return `приёмочный тест ${path} не закоммичен`;
+    }
     if (normalize(shown.stdout) !== normalize(text))
       return `исполнитель изменил приёмочный тест ${path}`;
+  }
+  if (orphaned.size > 0) {
+    const kept = Object.fromEntries(Object.entries(spec).filter(([path]) => !orphaned.has(path)));
+    context.state.spec = { ...context.state.spec, [task]: kept };
+    await save(context);
   }
   return undefined;
 }

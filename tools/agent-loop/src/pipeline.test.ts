@@ -234,6 +234,33 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
+  it('осиротевшая запись state.spec (ни в HEAD, ни на диске) не паркует вечно — тихо убирается', async () => {
+    const run = await runWorld({
+      spec: true,
+      state: {
+        spec: {
+          '06/T1j5-Б1': {
+            // Путь, который $spec в более раннем раунде переименовал без удаления старого
+            // ключа: его никогда не было в HEAD и сейчас нет на диске — терять нечего.
+            'apps/client/test/ghost.test.ts': "it('устаревший', () => {});\n",
+          },
+        },
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [codeCommit(), review('OK')],
+    });
+
+    expect(run.lines.join('\n')).not.toContain('не закоммичен');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('repair-spec удаляет чужой приёмочный тест — паркует, а не падает с ENOENT', async () => {
     const run = await runWorld({
       spec: true,
