@@ -76,4 +76,24 @@ describe('07/T17at: фильтр ленты событий', () => {
     ].join('\n');
     expect(source).not.toMatch(/war|diplomac|войн|дипломат/u);
   });
+
+  it('чужое событие среди сохраняемых записей отбрасывается', () => {
+    const events = [
+      { t: 'unitDestroyed', playerId: 0, unitId: 1, hex: 1 },
+      { t: 'unitDestroyed', playerId: 1, unitId: 2, hex: 2 },
+      { t: 'unitCapitulated', playerId: 0, unitId: 3, hex: 3 },
+      captured(0, 4, 0, 1),
+      captured(1, 5, 1, 0),
+    ] as GameEvent[];
+
+    const items = appendForPlayer(events, 0);
+
+    expect(items).toHaveLength(4);
+    expect(items.map((item) => item.event)).toEqual([
+      expect.objectContaining({ t: 'unitDestroyed', unitId: 1, playerId: 0 }),
+      expect.objectContaining({ t: 'unitCapitulated', playerId: 0 }),
+      expect.objectContaining({ t: 'cityCaptured', previousOwnerId: 0, newOwnerId: 1 }),
+      expect.objectContaining({ t: 'cityCaptured', previousOwnerId: 1, newOwnerId: 0 }),
+    ]);
+  });
 });
