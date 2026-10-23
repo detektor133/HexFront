@@ -503,6 +503,10 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
     up(e);
   };
+  const releasedMove = (e: PointerEvent): void => {
+    if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
+    g.move(e.pointerId, local(e), performance.now());
+  };
   const leave = (): void => {
     if (count === 0) g.hover(null);
   };
@@ -516,6 +520,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+  globalThis.document?.addEventListener('pointermove', releasedMove);
   globalThis.document?.addEventListener('pointerup', releasedUp);
   globalThis.document?.addEventListener('pointercancel', releasedUp);
   canvas.addEventListener('pointerleave', leave);
@@ -529,6 +534,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);
     canvas.removeEventListener('pointercancel', up);
+    globalThis.document?.removeEventListener('pointermove', releasedMove);
     globalThis.document?.removeEventListener('pointerup', releasedUp);
     globalThis.document?.removeEventListener('pointercancel', releasedUp);
     canvas.removeEventListener('pointerleave', leave);
