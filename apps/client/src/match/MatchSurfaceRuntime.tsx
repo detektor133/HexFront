@@ -97,7 +97,7 @@ export function createRadialActionHandler(options: {
       return;
     }
     // После открытия жест передан DOM-меню: отпускание указателя не выбирает сектор.
-    if (phase === 'cancel') options.setState(null);
+    if (phase === 'end' || phase === 'cancel') options.setState(null);
   };
 }
 
