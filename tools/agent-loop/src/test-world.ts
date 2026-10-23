@@ -306,7 +306,7 @@ export async function runWorld(world: World): Promise<Outcome> {
       tracked.add(path);
     }
     for (const path of session.removes ?? []) {
-      await rm(join(root, path), { force: true }).catch(() => {});
+      await rm(join(root, path), { force: true });
       tracked.delete(path);
     }
     const changed =
