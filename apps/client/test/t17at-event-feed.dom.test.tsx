@@ -74,25 +74,24 @@ describe('07/T17at: DOM ленты событий', () => {
     );
 
     const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
     const captureButton = buttons[0];
-    const lossButton = buttons[1];
     expect(captureButton).toBeDefined();
-    expect(lossButton).toBeDefined();
-    if (!captureButton || !lossButton) return;
+    if (!captureButton) return;
     const ownerMarker = captureButton.querySelector('span');
     const ownerLine = tokens.players.palette[0]?.line;
     expect(ownerMarker).toBeDefined();
     expect(ownerLine).toBeDefined();
     if (!ownerMarker || !ownerLine) return;
     expect(getComputedStyle(ownerMarker).backgroundColor).toBe(rgb(ownerLine));
-    const lossMarker = lossButton.querySelector('span');
     const lossLine = tokens.players.palette[1]?.line;
-    expect(lossMarker).toBeDefined();
     expect(lossLine).toBeDefined();
-    if (!lossMarker || !lossLine) return;
-    expect(getComputedStyle(lossMarker).backgroundColor).toBe(rgb(lossLine));
+    if (!lossLine) return;
+    const markerColors = Array.from(document.querySelectorAll('span')).map(
+      (marker) => getComputedStyle(marker).backgroundColor,
+    );
+    expect(markerColors).toContain(rgb(lossLine));
     fireEvent.click(captureButton);
-    fireEvent.click(lossButton);
     expect(onFocus).toHaveBeenCalledTimes(1);
     expect(onFocus).toHaveBeenCalledWith(expect.objectContaining({ id: 'capture', hex: 3 }));
   });

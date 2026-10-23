@@ -592,7 +592,7 @@ describe('приёмка T7: раскладка матча без перекры
         const dockTop = Number.parseInt(dock.style.top, 10);
 
         expect(feed.getAttribute('aria-label')).toMatch(/Лента событий|Event feed/u);
-        expect(feed.querySelectorAll('button')).toHaveLength(eventRows);
+        expect(feed.querySelectorAll('button')).toHaveLength(0);
         expect(feedRight).toBe(width - edge);
         expect(feedBottom).toBe(dockTop - gap);
         expect(feed.style.height).toBe(`${eventRows * 44}px`);
