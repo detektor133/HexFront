@@ -66,25 +66,25 @@ describe('экран конца матча и выбывание', () => {
     render(<MatchEndScreen {...baseProps} winner={-1} eliminated place={3} />);
 
     expect(screen.getByText('Вы выбыли · место 3')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Смотреть' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'В меню' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Наблюдать' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'В главное меню' })).toBeTruthy();
   });
 
-  it('критерий: «Смотреть» отправляет то же выключение тумана и прячет карточку', () => {
+  it('критерий: «Наблюдать» отправляет то же выключение тумана и прячет карточку', () => {
     const onWatch = vi.fn();
     render(<MatchEndScreen {...baseProps} winner={-1} eliminated onWatch={onWatch} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Смотреть' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Наблюдать' }));
 
     expect(onWatch).toHaveBeenCalledWith({ type: 'setFog', enabled: false });
     expect(screen.queryByText(/Вы выбыли/)).toBeNull();
   });
 
-  it('критерий: «В меню» ведёт на /', () => {
+  it('критерий: «В главное меню» ведёт на /', () => {
     const onMenu = vi.fn();
     render(<MatchEndScreen {...baseProps} winner={-1} eliminated onMenu={onMenu} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'В меню' }));
+    fireEvent.click(screen.getByRole('button', { name: 'В главное меню' }));
 
     expect(onMenu).toHaveBeenCalledWith('/');
   });
