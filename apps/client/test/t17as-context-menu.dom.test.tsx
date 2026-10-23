@@ -479,7 +479,7 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     cleanup();
     const splitFixture = await openMapMenu('stack');
     activate(screen.getByRole('menuitem', { name: messages.ru['unit.split'] }), splitFixture.point);
-    expect(harness.commands.at(-1)).toMatchObject({
+    expect(harness.commands.at(-1)).toEqual({
       t: 'split',
       unitId: harness.selectedUnitIds[0],
       soldiers: 50_000,
