@@ -113,8 +113,23 @@ export function createLocalEngine(
   }));
   const state = createMatch(loaded.map, setup, seed, { fog });
   if (fixture === 'artillery') {
-    for (const [unitIndex, unit] of state.units.entries()) {
-      if (unit.owner === HUMAN_ID) state.units[unitIndex] = { ...unit, type: 'artillery' };
+    const humanUnits = state.units.filter((unit) => unit.owner === HUMAN_ID);
+    const artilleryUnit = humanUnits[0];
+    if (artilleryUnit) {
+      const separateHex = state.hexes.owner.find(
+        (owner, hex) => owner === HUMAN_ID && hex !== artilleryUnit.hex,
+      );
+      for (const [unitIndex, unit] of state.units.entries()) {
+        if (unit.owner !== HUMAN_ID) continue;
+        state.units[unitIndex] = {
+          ...unit,
+          ...(unit.id === artilleryUnit.id
+            ? { type: 'artillery' as const }
+            : separateHex === undefined
+              ? {}
+              : { hex: separateHex }),
+        };
+      }
     }
   }
   let pending: Command[] = [];
