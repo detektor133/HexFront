@@ -68,6 +68,7 @@ describe('07/T17at: DOM ленты событий', () => {
             null,
           ),
         ]}
+        localPlayerId={0}
         now={0}
         onFocus={onFocus}
       />,
