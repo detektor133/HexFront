@@ -18,7 +18,7 @@ import {
   type Step,
 } from './context.ts';
 import { diagnoseFinding, findingPrompt, runTestFix } from './finding-repair.ts';
-import { changedPaths, currentBranch, dirtyFiles, head, remoteHead } from './git.ts';
+import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
@@ -320,7 +320,10 @@ async function publishReviewed(
     await rememberPublished(context, task, local);
     return undefined;
   }
-  if (remote !== expectedRemote)
+  // origin ушёл вперёд, но это коммиты, которые уже есть в нашем HEAD (например, инфра-фикс
+  // опубликовали отдельно, пока эта задача ждала review) — не чужая, расходящаяся история, с
+  // которой нужен rebase, а просто устаревшая отметка «последний известный origin» этой задачи.
+  if (remote !== expectedRemote && !(await isAncestor(context.git, remote, local)))
     return park(
       context,
       `sync:${task}`,
