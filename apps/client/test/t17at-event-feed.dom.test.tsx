@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { GameEvent } from '@hexfront/sim';
+import type { GameEvent, PlayerView } from '@hexfront/sim';
 
 import { EventFeed } from '../src/dev/EventFeed.tsx';
-import type { EventFeedItem } from '../src/dev/event-feed.ts';
+import { appendEvents, type EventFeedItem } from '../src/dev/event-feed.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 afterEach(cleanup);
@@ -16,6 +16,8 @@ const item = (id: string, event: GameEvent, hex: number | null): EventFeedItem =
   important: true,
   expiresAt: 1000,
 });
+
+const viewWithoutCities = { tick: 0, cities: [], armies: [], units: [] } as unknown as PlayerView;
 
 const rgb = (hex: string): string => {
   const value = hex.slice(1);
@@ -54,6 +56,14 @@ describe('07/T17at: DOM ленты событий', () => {
 
   it('Приёмка 3: цветовой маркер берётся у владельца события, а клик фокусирует только событие с гексом', () => {
     const onFocus = vi.fn();
+    const lostCity = {
+      t: 'cityCaptured',
+      playerId: 1,
+      previousOwnerId: 0,
+      newOwnerId: 1,
+      cityId: 4,
+    } satisfies GameEvent;
+    const itemsWithoutHex = appendEvents([], [lostCity], viewWithoutCities, 0, 0);
     render(
       <EventFeed
         items={[
@@ -62,11 +72,7 @@ describe('07/T17at: DOM ленты событий', () => {
             { t: 'cityCaptured', playerId: 0, previousOwnerId: 1, newOwnerId: 0, cityId: 3 },
             3,
           ),
-          item(
-            'loss',
-            { t: 'cityCaptured', playerId: 1, previousOwnerId: 0, newOwnerId: 1, cityId: 4 },
-            null,
-          ),
+          ...itemsWithoutHex,
         ]}
         localPlayerId={0}
         now={0}
