@@ -173,6 +173,7 @@ export async function createMapView(
   let centerAnimation: { from: Camera; to: Camera; elapsedMs: number; durationMs: number } | null =
     null;
   let pressed = 0;
+  let activePointerId: number | null = null;
   let stroking = false;
   let hooks: OrderHooks | null = null;
   let radialHooks: RadialHooks | null = null;
@@ -283,6 +284,15 @@ export async function createMapView(
       } else if (e.t === 'radial') {
         velocity = null;
         if (e.phase === 'start') {
+          const { canvas } = app;
+          if (
+            activePointerId !== null &&
+            typeof canvas.releasePointerCapture === 'function' &&
+            (typeof canvas.hasPointerCapture !== 'function' ||
+              canvas.hasPointerCapture(activePointerId))
+          ) {
+            canvas.releasePointerCapture(activePointerId);
+          }
           radialHooks?.action(toWorld(e.at), e.at, e.phase);
           radialHandedOff = true;
         } else if (!radialHandedOff) {
@@ -299,8 +309,9 @@ export async function createMapView(
   );
   const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
-    pressed: (n) => {
+    pressed: (n, pointerId) => {
       pressed = n;
+      activePointerId = n === 0 ? null : (pointerId ?? activePointerId);
       if (n > 0) velocity = null;
     },
     idle: (ms) => {
@@ -433,7 +444,7 @@ export async function createMapView(
 interface InputHandlers {
   zoom(factor: number, at: Point): void;
   /** Сколько указателей нажато (инерция — только когда ни одного). */
-  pressed(n: number): void;
+  pressed(n: number, pointerId?: number): void;
   /** Палец отпущен после паузы дольше ms — инерции нет. */
   idle(ms: number): void;
 }
@@ -448,7 +459,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   const down = (e: PointerEvent): void => {
     canvas.setPointerCapture(e.pointerId);
     count += 1;
-    h.pressed(count);
+    h.pressed(count, e.pointerId);
     g.down(e.pointerId, local(e), e.button, performance.now(), e.shiftKey);
   };
   const move = (e: PointerEvent): void => {
@@ -458,7 +469,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   const up = (e: PointerEvent): void => {
     count = Math.max(0, count - 1);
     g.up(e.pointerId, local(e), performance.now());
-    h.pressed(count);
+    h.pressed(count, e.pointerId);
     if (count === 0) h.idle(INERTIA_MAX_PAUSE_MS);
   };
   const leave = (): void => {
