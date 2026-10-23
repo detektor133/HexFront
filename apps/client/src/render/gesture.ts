@@ -211,7 +211,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       else if (mode === 'panning') emit({ t: 'pan', dx: at.x - prev.x, dy: at.y - prev.y });
     },
 
-    up(id, at, ms, _viewportAt = radialViewportAt) {
+    up(id, at, ms, viewportAt = radialViewportAt) {
       if (!active.has(id)) return;
       active.delete(id);
       if (mode === 'pressed') this.tick(ms);
@@ -222,7 +222,10 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         emit({
           t: 'radial',
           at,
-          viewportAt: radialViewportAt,
+          // Отпускание решает исход (решение владельца, 2026-10-23): реальная точка отпускания,
+          // а не замороженная на удержании — иначе отмена увести-и-отпустить в пустоту не
+          // отличима от отпускания на кнопке (map-view.ts проверяет elementFromPoint именно тут).
+          viewportAt,
           context: radialContext,
           phase: 'end',
         });

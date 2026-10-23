@@ -103,18 +103,22 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     expect(kinds(s)).not.toContain('pan');
   });
 
-  it('radial сохраняет исходную viewport-точку после move и up', () => {
+  it('radial открывается в точке удержания, но закрывается по реальной точке отпускания', () => {
+    // Решение владельца, 2026-10-23: отпускание решает исход — увести указатель в пустоту и
+    // отпустить равносильно отмене, увести на кнопку и отпустить — наведению на неё. Открытие
+    // (start) и ведение (move) остаются на точке удержания — меню не плавает за пальцем.
     const s = setup({ radial: true });
     const anchor = { x: 11, y: 22 };
+    const releasedAt = { x: 55, y: 66 };
     s.g.down(1, { x: 100, y: 100 }, 0, 0, false, anchor);
     s.g.tick(RADIAL_MENU_LONG_PRESS_MS);
     s.g.move(1, { x: 200, y: 150 }, RADIAL_MENU_LONG_PRESS_MS + 10, { x: 33, y: 44 });
-    s.g.up(1, { x: 300, y: 250 }, RADIAL_MENU_LONG_PRESS_MS + 20, { x: 55, y: 66 });
+    s.g.up(1, { x: 300, y: 250 }, RADIAL_MENU_LONG_PRESS_MS + 20, releasedAt);
 
     expect(s.events.filter((event) => event.t === 'radial')).toEqual([
       expect.objectContaining({ phase: 'start', viewportAt: anchor }),
       expect.objectContaining({ phase: 'move', viewportAt: anchor }),
-      expect.objectContaining({ phase: 'end', viewportAt: anchor }),
+      expect.objectContaining({ phase: 'end', viewportAt: releasedAt }),
     ]);
   });
 
