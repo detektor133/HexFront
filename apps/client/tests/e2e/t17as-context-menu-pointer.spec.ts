@@ -2,6 +2,36 @@ import { expect, test } from '@playwright/test';
 
 import { RADIAL_MENU_LONG_PRESS_MS } from '../../src/render/gesture.ts';
 
+function playerCapitalPoint(
+  canvas: { x: number; y: number; width: number; height: number },
+  hud: { y: number; height: number },
+  dock: { y: number },
+  leaderboard: { width: number },
+  q: number,
+  r: number,
+): { x: number; y: number } {
+  const radius = 20;
+  const worldWidth = radius * 1.5 * 39 + radius * 2;
+  const worldHeight = radius * Math.sqrt(3) * 29 + radius * Math.sqrt(3);
+  const top = Math.max(canvas.y, hud.y + hud.height);
+  const bottom = Math.min(canvas.y + canvas.height, dock.y);
+  const viewWidth = canvas.width - leaderboard.width - 24;
+  const viewHeight = bottom - top;
+  const scale = Math.min(canvas.width / worldWidth, canvas.height / worldHeight);
+  const cameraX = Math.min(
+    radius * scale,
+    Math.max(viewWidth - (worldWidth - radius * 2) * scale, 0),
+  );
+  const cameraY = Math.min(
+    top + radius * Math.sqrt(3) * scale,
+    Math.max(top + viewHeight - (worldHeight - radius * Math.sqrt(3)) * scale, 0),
+  );
+  return {
+    x: cameraX + radius * 1.5 * q * scale,
+    y: cameraY + radius * Math.sqrt(3) * (r + q / 2) * scale,
+  };
+}
+
 test('@layout T17as: pointerdown на canvas, удержание, pointermove в HTML-кнопку и pointerup отправляют merge', async ({
   page,
 }) => {
@@ -38,31 +68,37 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
     .boundingBox();
   if (!hudBounds || !dockBounds || !leaderboardBounds)
     throw new Error('Рабочая область карты не имеет границ');
-  const mapTop = Math.max(bounds.y, hudBounds.y + hudBounds.height);
-  const mapBottom = Math.min(bounds.y + bounds.height, dockBounds.y);
-  const rightInset = leaderboardBounds.width + 24;
-  const centerX = bounds.x + (bounds.width - rightInset) / 2;
-  const centerY = mapTop + (mapBottom - mapTop) / 2 + 20;
   const mergeButton = page.getByRole('menuitem', { name: /Слить|Merge/i });
   let pressPoint: { x: number; y: number } | undefined;
   let opened = false;
-  for (const [offsetX, offsetY] of [
-    [0, 0],
-    [-20, 0],
-    [20, 0],
-    [0, -20],
-    [0, 20],
+  for (const [q, r] of [
+    [5, 0],
+    [20, -5],
+    [34, -14],
+    [5, 16],
+    [22, 11],
+    [34, 2],
   ]) {
-    const point = { x: centerX + offsetX, y: centerY + offsetY };
-    pressPoint = point;
-    await page.mouse.move(point.x, point.y);
-    await page.mouse.down();
-    await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
-    if (await mergeButton.isVisible().catch(() => false)) {
-      opened = true;
-      break;
+    const capital = playerCapitalPoint(bounds, hudBounds, dockBounds, leaderboardBounds, q, r);
+    for (const [offsetX, offsetY] of [
+      [0, 0],
+      [-8, 0],
+      [8, 0],
+      [0, -8],
+      [0, 8],
+    ]) {
+      const point = { x: capital.x + offsetX, y: capital.y + offsetY };
+      pressPoint = point;
+      await page.mouse.move(point.x, point.y);
+      await page.mouse.down();
+      await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
+      if (await mergeButton.isVisible().catch(() => false)) {
+        opened = true;
+        break;
+      }
+      await page.mouse.up();
     }
-    await page.mouse.up();
+    if (opened) break;
   }
   expect(opened).toBe(true);
   if (!pressPoint) throw new Error('Точка нажатия не зафиксирована');
@@ -144,17 +180,33 @@ test('@layout T17as: pointer-сценарии через canvas отправля
     );
     await page.mouse.up();
   };
-  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
   const openCenterMenu = async (): Promise<void> => {
-    for (const [offsetX, offsetY] of [
-      [0, 0],
-      [-20, 0],
-      [20, 0],
-      [0, -20],
-      [0, 20],
+    const hudBounds = await page.getByRole('banner').boundingBox();
+    const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
+    const leaderboardBounds = await page
+      .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
+      .boundingBox();
+    if (!hudBounds || !dockBounds || !leaderboardBounds)
+      throw new Error('Рабочая область карты не имеет границ');
+    for (const [q, r] of [
+      [5, 0],
+      [20, -5],
+      [34, -14],
+      [5, 16],
+      [22, 11],
+      [34, 2],
     ]) {
-      if (await openMenu(center.x + offsetX, center.y + offsetY)) return;
-      await page.mouse.up();
+      const capital = playerCapitalPoint(bounds, hudBounds, dockBounds, leaderboardBounds, q, r);
+      for (const [offsetX, offsetY] of [
+        [0, 0],
+        [-8, 0],
+        [8, 0],
+        [0, -8],
+        [0, 8],
+      ]) {
+        if (await openMenu(capital.x + offsetX, capital.y + offsetY)) return;
+        await page.mouse.up();
+      }
     }
     throw new Error('Контекстное меню фишки не найдено в центре карты');
   };
