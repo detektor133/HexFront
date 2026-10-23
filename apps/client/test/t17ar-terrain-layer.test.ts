@@ -157,6 +157,10 @@ describe('T17ar: процедурные паттерны рельефа', () => 
       calls.lines.mockClear();
     }
 
+    expect(mountainCoordinates).toHaveLength(SCALES.length);
+    expect(mountainCoordinates[0]).not.toHaveLength(0);
+    expect(mountainCoordinates[1]).not.toHaveLength(0);
+    expect(mountainCoordinates[0]).toHaveLength(mountainCoordinates[1]?.length ?? -1);
     expect(mountainCoordinates[0]).not.toEqual(mountainCoordinates[1]);
     layer.destroy();
     vi.restoreAllMocks();
