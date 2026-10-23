@@ -337,6 +337,39 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('финальный review третий круг подряд находит новые пункты — зовёт plan, а не очередной патч', async () => {
+    const finding = 'КОД: другой дефект, не связанный с предыдущими пунктами';
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+          fullReviewRounds: 2,
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${finding}`),
+        { answer: 'Текст задачи ясен, review предъявляет избыточные требования.\nPLAN: не трогал' },
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('3 раз(а) подряд находит новые пункты');
+    expect(run.prompts[1]).toContain('вместо схождения');
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1: plan не изменил повторно отклонённый пункт; автоматический повтор той же роли запрещён',
+    );
+  });
+
   it('СПЕК без коммита откатывает чужую правку продукта — следующий тик не паркует «дерево не чистое»', async () => {
     const specPath = 'apps/client/test/t17ar-terrain-layer.test.ts';
     const strayPath = 'apps/client/src/render/terrain-layer.ts';

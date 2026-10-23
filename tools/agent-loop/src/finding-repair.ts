@@ -87,6 +87,7 @@ export async function diagnoseFinding(
       active.findings[0] = { kind: 'ПЕРЕДЕЛАТЬ', text: `ПЕРЕДЕЛАТЬ: ${planned.detail}` };
       active.findingRetries = 0;
       delete active.fixStreak;
+      delete active.fullReviewRounds;
       active.phase = 'work';
       await save(context);
     }

@@ -35,6 +35,9 @@ export interface TaskRun {
 /** Подряд точечных патчей одного продуктового файла, после которых зовётся plan (не ещё патч). */
 export const REDESIGN_STREAK = 3;
 
+/** Подряд кругов финального review с новыми пунктами (любыми, не только по одному файлу/тесту). */
+export const REVIEW_ROUND_LIMIT = 3;
+
 /** Первый продуктовый (не тестовый) файл `apps/client/src` в списке изменённых путей коммита. */
 export function dominantProductFile(paths: readonly string[]): string | undefined {
   return paths.find(
@@ -424,6 +427,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       const nextFindings = targeted
         ? [...verdict.findings, ...active.findings.slice(1)]
         : [...verdict.findings];
+      if (!targeted) active.fullReviewRounds = (active.fullReviewRounds ?? 0) + 1;
       const streak = active.fixStreak;
       const first = nextFindings[0];
       if (
@@ -448,6 +452,31 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         await save(context);
         await context.say(
           `финальный review ${task}: файл ${streak.file} патчится уже ${streak.count}-й раз подряд — зову plan оценить переделку`,
+        );
+        return { step: 'worked', done: false };
+      }
+      if (
+        !targeted &&
+        first !== undefined &&
+        (active.fullReviewRounds ?? 0) >= REVIEW_ROUND_LIMIT
+      ) {
+        active.findings = [
+          {
+            kind: 'ПЛАН',
+            text:
+              `ПЛАН: финальный review задачи ${task} ${active.fullReviewRounds} раз(а) подряд ` +
+              `находит новые пункты (разные файлы/формулировки) вместо схождения — реши, тупик ли ` +
+              `это (переделать механизм целиком) или review просто предъявляет избыточные ` +
+              `требования и текущий результат уже отвечает критериям задачи. Свежий пункт review: ${first.text}`,
+          },
+          ...nextFindings.slice(1),
+        ];
+        active.findingRetries = 0;
+        active.fullReviewRounds = 0;
+        active.phase = 'work';
+        await save(context);
+        await context.say(
+          `финальный review ${task}: review не сходится ${REVIEW_ROUND_LIMIT}-й круг подряд — зову plan`,
         );
         return { step: 'worked', done: false };
       }
@@ -481,6 +510,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       return { step: 'worked', done: false };
     }
     delete active.fixStreak;
+    delete active.fullReviewRounds;
     active.phase = 'pre-push';
     await save(context);
   }
