@@ -234,6 +234,73 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
+  it('НЕПРОВЕРЯЕМО на красный e2e не верится на слово — реальный прогон даёт вторую попытку', async () => {
+    const specPath = 'apps/client/tests/e2e/task.spec.ts';
+    const untestable = (): Session => ({
+      answer: `РЕМОНТ: НЕПРОВЕРЯЕМО — запуск Playwright запрещён правилами проекта\nСПЕК: ${specPath}`,
+      writes: { [specPath]: "test('@layout x', async () => {});\n" },
+      commit: true,
+      push: false,
+    });
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        untestable(),
+        untestable(),
+        review('OK'),
+      ],
+      layout: ['layout: FAIL', 'layout: OK'],
+    });
+
+    // 2026-10-23, 07/T17as: $spec заявил «Playwright запрещён» (неверно — п.10 его же скилла это
+    // прямо разрешает), а реальный прогон изменённого e2e был красным по существу. Цикл теперь не
+    // верит вердикту на слово, а реально его перепроверяет.
+    expect(run.layoutCalls).toBe(2);
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
+    expect(run.prompts[4]).toContain('реальный прогон изменённых тестов красный');
+    expect(run.lines).toContain(
+      'repair-$spec 06/T1j5-Б1: заявил НЕПРОВЕРЯЕМО, но изменённый тест красный — даю вторую попытку',
+    );
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
+  });
+
+  it('НЕПРОВЕРЯЕМО второй раз подряд при красном тесте — паркует с реальной ошибкой', async () => {
+    const specPath = 'apps/client/tests/e2e/task.spec.ts';
+    const untestable = (): Session => ({
+      answer: `РЕМОНТ: НЕПРОВЕРЯЕМО — запуск Playwright запрещён правилами проекта\nСПЕК: ${specPath}`,
+      writes: { [specPath]: "test('@layout x', async () => {});\n" },
+      commit: true,
+      push: false,
+    });
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
+        untestable(),
+        untestable(),
+      ],
+      layout: ['layout: FAIL', 'layout: FAIL'],
+    });
+
+    expect(run.layoutCalls).toBe(2);
+    expect(run.lines).toContain(
+      'жду: 06/T1j5-Б1: repair-$spec второй раз подряд заявил НЕПРОВЕРЯЕМО при красном изменённом тесте',
+    );
+  });
+
   it('осиротевшая запись state.spec (ни в HEAD, ни на диске) не паркует вечно — тихо убирается', async () => {
     const run = await runWorld({
       spec: true,

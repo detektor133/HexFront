@@ -78,6 +78,8 @@ export interface World {
   readonly prePush?: readonly string[];
   /** Ответы `pnpm test:e2e:visual` (визуальный гейт перед push); без значения — зелёный. */
   readonly visual?: readonly string[];
+  /** Ответы `pnpm test:e2e:layout` (перепроверка repair-$spec при НЕПРОВЕРЯЕМО); без значения — зелёный. */
+  readonly layout?: readonly string[];
   /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
   readonly verify?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
@@ -145,6 +147,7 @@ export interface Outcome {
   ciCalls: number;
   prePushCalls: number;
   visualCalls: number;
+  layoutCalls: number;
   /** Число push к моменту каждого запуска pre-push gate. */
   readonly pushesAtPrePush: number[];
   verifyCalls: number;
@@ -194,7 +197,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     join(root, 'tools/agent-loop/permissions.json'),
     JSON.stringify({
       reviewer: ['docs/stages/**', 'docs/STATUS.md', 'docs/reports/**'],
-      spec: ['**/*.test.ts', '**/test/**'],
+      spec: ['**/*.test.ts', '**/*.spec.ts', '**/test/**', '**/tests/**'],
       plan: ['docs/stages/**', 'docs/STATUS.md', 'docs/QUESTIONS.md', 'docs/DECISIONS.md'],
     }),
   );
@@ -202,6 +205,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const ci = [...(world.ci ?? [])];
   const prePush = [...(world.prePush ?? [])];
   const visual = [...(world.visual ?? [])];
+  const layout = [...(world.layout ?? [])];
   const verify = [...(world.verify ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
@@ -221,6 +225,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     ciCalls: 0,
     prePushCalls: 0,
     visualCalls: 0,
+    layoutCalls: 0,
     pushesAtPrePush: [],
     verifyCalls: 0,
     slowCalls: [],
@@ -519,6 +524,11 @@ export async function runWorld(world: World): Promise<Outcome> {
           out.visualCalls += 1;
           const line = visual.shift() ?? 'visual: OK';
           return { code: line.startsWith('visual: OK') ? 0 : 1, stdout: line, stderr: '' };
+        }
+        if (command === 'pnpm' && args[0] === 'test:e2e:layout') {
+          out.layoutCalls += 1;
+          const line = layout.shift() ?? 'layout: OK';
+          return { code: line.startsWith('layout: OK') ? 0 : 1, stdout: line, stderr: '' };
         }
         if (command === 'pnpm' && args[0] === 'verify') {
           out.verifyCalls += 1;

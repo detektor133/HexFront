@@ -143,6 +143,33 @@ const verifyFailureSummary = (stdout: string, stderr: string): string =>
     .slice(-8)
     .join('\n');
 
+const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;
+
+/**
+ * Не верит вердикту `НЕПРОВЕРЯЕМО` на слово (2026-10-23, 07/T17as: $spec заявил, что Playwright
+ * запрещён правилами проекта — неверно, п.10 его же скилла прямо разрешает `test:e2e:layout`;
+ * тест при этом был красным по существу). Реально прогоняет изменённые тесты сам.
+ * @returns хвост ошибки, если изменённые тесты красные; undefined — все зелёные.
+ */
+async function verifyTouchedTests(
+  context: LoopContext,
+  touched: readonly string[],
+): Promise<string | undefined> {
+  const specs = touched.filter((path) => E2E_SPEC_RE.test(path));
+  if (specs.length > 0) {
+    const e2e = await context.config.runCommand('pnpm', ['test:e2e:layout', ...specs], {
+      cwd: context.config.root,
+      timeoutMs: context.config.maxMinutes * 60_000,
+    });
+    if (e2e.code !== 0) return verifyFailureSummary(e2e.stdout, e2e.stderr);
+  }
+  const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
+    cwd: context.config.root,
+    timeoutMs: context.config.maxMinutes * 60_000,
+  });
+  return verified.code === 0 ? undefined : verifyFailureSummary(verified.stdout, verified.stderr);
+}
+
 export async function runTestFix(
   context: LoopContext,
   task: string,
@@ -196,7 +223,8 @@ export async function runTestFix(
   if (!(await checkPermissions(context, base, context.definitions.specPaths)))
     return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`, result.message);
   const saved = { ...(context.state.spec[task] ?? {}) };
-  for (const path of await changedPathsBetween(context, base)) {
+  const touched = await changedPathsBetween(context, base);
+  for (const path of touched) {
     // Автор тестов не может удалить чужую проверку (AGENTS.md §4.5); чтение несуществующего
     // файла раньше падало необработанным ENOENT и обрывало весь цикл.
     const text = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
@@ -212,13 +240,35 @@ export async function runTestFix(
   context.state.spec[task] = saved;
   await save(context);
   if (outcome.kind === 'code') return rerouteToCode(context, outcome.detail);
-  if (outcome.kind === 'untestable')
+  if (outcome.kind === 'untestable') {
+    // Не верим вердикту на слово: реально прогоняем изменённые тесты сами же себе (2026-10-23,
+    // 07/T17as — заявил «Playwright запрещён правилами проекта», хотя это неверно и сам тест был
+    // красным по существу).
+    const failure = await verifyTouchedTests(context, touched);
+    if (failure === undefined) return undefined;
+    if (attempt < 2) {
+      await context.say(
+        `repair-$spec ${task}: заявил НЕПРОВЕРЯЕМО, но изменённый тест красный — даю вторую попытку`,
+      );
+      return runTestFix(
+        context,
+        task,
+        {
+          ...finding,
+          text:
+            `${finding.text}\nПредыдущая попытка заявила РЕМОНТ: НЕПРОВЕРЯЕМО, но реальный ` +
+            `прогон изменённых тестов красный:\n${failure}`,
+        },
+        attempt + 1,
+      );
+    }
     return park(
       context,
       `spec:${task}`,
-      `$spec ${task} изменил тесты, хотя сообщил о непроверяемом критерии; нужен ручной разбор`,
-      result.message,
+      `${task}: repair-$spec второй раз подряд заявил НЕПРОВЕРЯЕМО при красном изменённом тесте`,
+      failure,
     );
+  }
   const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
     cwd: context.config.root,
     timeoutMs: context.config.maxMinutes * 60_000,
