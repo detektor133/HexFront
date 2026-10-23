@@ -88,7 +88,9 @@ export function createRadialActionHandler(options: {
     if (phase === 'start') {
       if (!context) return;
       const actions = buildRadialActions(
-        view.units.filter((unit) => unit.owner === view.playerId && unit.hex === context.hex),
+        view.units.filter(
+          (unit) => unit.owner === view.playerId && context.unitIds.includes(unit.id),
+        ),
         view,
       );
       options.setState({ center: screen, actions, active: actions });
@@ -540,7 +542,19 @@ export function useSandbox(
           if (!unit) return null;
           if (!pickedRef.current.units.includes(unit.id))
             pick(selectUnits(current, pickedRef.current, [unit.id]));
-          return { unitId: unit.id, hex: unit.hex };
+          const unitIds = hit.filter((id) =>
+            current.units.some(
+              (candidate) =>
+                candidate.id === id &&
+                candidate.owner === current.playerId &&
+                candidate.order !== 'retreat',
+            ),
+          );
+          return {
+            unitId: unit.id,
+            unitIds: unitIds.length > 0 ? unitIds : [unit.id],
+            hex: unit.hex,
+          };
         },
         action(context, _world, screen, phase) {
           radialForUnit(context, screen, phase);

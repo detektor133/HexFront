@@ -19,6 +19,7 @@ export type TapKind = 'select' | 'order';
 
 export interface RadialContext {
   readonly unitId: number;
+  readonly unitIds: readonly number[];
   readonly hex: number;
 }
 
