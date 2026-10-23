@@ -296,7 +296,13 @@ export async function createMapView(
         velocity = null;
         if (e.phase === 'start') {
           const { canvas } = app;
-          radialHooks?.action(e.context, toWorld(e.at), e.at, e.phase);
+          const bounds = canvas.getBoundingClientRect();
+          radialHooks?.action(
+            e.context,
+            toWorld(e.at),
+            { x: e.at.x + bounds.left, y: e.at.y + bounds.top },
+            e.phase,
+          );
           if (
             activePointerId !== null &&
             typeof canvas.releasePointerCapture === 'function' &&
