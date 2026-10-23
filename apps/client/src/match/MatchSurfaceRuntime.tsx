@@ -446,6 +446,7 @@ export function useSandbox(
           setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
         ),
         autoCommand: setup.autoCommand ?? localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
+        ...(debug ? { fixture: 'artillery' as const } : {}),
       },
     );
     setPlayerPalette(
@@ -535,7 +536,6 @@ export function useSandbox(
             const center = layerRef.current?.chipAt(candidate.hex);
             return (
               center !== undefined &&
-              candidate.moveTotal === 0 &&
               Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
             );
           });

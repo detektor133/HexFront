@@ -28,6 +28,7 @@ export function startLocalMatch(
     readonly playerName?: string;
     readonly playerColors?: readonly string[];
     readonly autoCommand?: boolean;
+    readonly fixture?: 'artillery';
   } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
@@ -45,6 +46,7 @@ export function startLocalMatch(
     ...(options.telemetry ? { telemetry: true } : {}),
     ...(options.playerName ? { playerName: options.playerName } : {}),
     ...(options.playerColors ? { playerColors: options.playerColors } : {}),
+    ...(options.fixture ? { fixture: options.fixture } : {}),
   };
   post(start);
   if (options.autoCommand) post({ t: 'command', cmd: { t: 'setAutoCommand', on: true } });
