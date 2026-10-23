@@ -481,8 +481,8 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     activate(screen.getByRole('menuitem', { name: messages.ru['unit.split'] }), splitFixture.point);
     expect(harness.commands.at(-1)).toMatchObject({
       t: 'split',
-      unitId: expect.any(Number),
-      soldiers: expect.any(Number),
+      unitId: harness.selectedUnitIds[0],
+      soldiers: 50_000,
     });
 
     cleanup();
