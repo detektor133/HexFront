@@ -75,6 +75,16 @@ export function RadialMenu(props: {
   const { state } = props;
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const releaseCanvasCapture = (event: PointerEvent): void => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        typeof target.hasPointerCapture === 'function' &&
+        target.hasPointerCapture(event.pointerId)
+      ) {
+        target.releasePointerCapture(event.pointerId);
+      }
+    };
     const close = (event: PointerEvent): void => {
       if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
       props.onClose();
@@ -83,9 +93,11 @@ export function RadialMenu(props: {
       if (event.key === 'Escape') props.onClose();
     };
     document.addEventListener('pointerdown', close);
+    document.addEventListener('pointermove', releaseCanvasCapture);
     document.addEventListener('keydown', escape);
     return () => {
       document.removeEventListener('pointerdown', close);
+      document.removeEventListener('pointermove', releaseCanvasCapture);
       document.removeEventListener('keydown', escape);
     };
   }, [props]);
