@@ -312,7 +312,17 @@ export async function createMapView(
             canvas.releasePointerCapture(activePointerId);
           }
           radialHandedOff = true;
-        } else if (!radialHandedOff) {
+        } else if (
+          !radialHandedOff ||
+          (typeof globalThis.document?.elementFromPoint === 'function' &&
+            !globalThis.document
+              .elementFromPoint(
+                e.at.x + app.canvas.getBoundingClientRect().left,
+                e.at.y + app.canvas.getBoundingClientRect().top,
+              )
+              ?.closest('[role="menu"]') &&
+            (e.phase === 'end' || e.phase === 'cancel'))
+        ) {
           radialHooks?.action(e.context, toWorld(e.at), e.at, e.phase);
         }
         if (e.phase === 'end' || e.phase === 'cancel') radialHandedOff = false;
