@@ -45,26 +45,29 @@ function icon(kind: RadialAction['kind']): React.JSX.Element {
       </svg>
     );
   }
-  return (
-    <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
-      <path
-        d="M4 20h7M7 17l7-7M10 20l7-7M14 10l3-3 3 3M17 7V4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 4h5v5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  if (kind === 'split' || kind === 'bombard') {
+    return (
+      <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+        <path
+          d="M4 20h7M7 17l7-7M10 20l7-7M14 10l3-3 3 3M17 7V4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M4 4h5v5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  throw new Error(`Неизвестная пиктограмма действия: ${kind}`);
 }
 
 export function RadialMenu(props: {
