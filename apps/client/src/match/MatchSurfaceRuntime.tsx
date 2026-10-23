@@ -396,7 +396,13 @@ export function useSandbox(
       workerTelemetryRef.current = m.telemetry ?? null;
       layerRef.current?.setView(view, pickedRef.current);
       setMsg(applied);
-      const nextEvents = appendEvents(eventsRef.current, m.events, view, performance.now());
+      const nextEvents = appendEvents(
+        eventsRef.current,
+        m.events,
+        view,
+        performance.now(),
+        view.playerId,
+      );
       eventsRef.current = nextEvents;
       setEvents(nextEvents);
       const last = m.rejected.at(-1);

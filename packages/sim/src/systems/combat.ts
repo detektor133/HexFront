@@ -182,9 +182,18 @@ function occupy(state: MatchState, hex: HexId): void {
   const power = (u: Unit): number => attackContribution(state.map, u, hex, state.units);
   for (const u of attackers) if (power(u) > power(winner)) winner = u;
   const city = state.cities.find((c) => c.hex === hex && c.owner !== winner.owner);
+  const previousOwnerId = city ? city.owner : winner.owner;
   moveUnit(state, winner, hex);
   captureHex(state, hex, winner.owner);
-  if (city) state.events.push({ t: 'cityCaptured', playerId: winner.owner, cityId: city.id });
+  if (city) {
+    state.events.push({
+      t: 'cityCaptured',
+      playerId: winner.owner,
+      cityId: city.id,
+      previousOwnerId,
+      newOwnerId: winner.owner,
+    });
+  }
   for (const u of attackersOf(state, hex).concat(winner)) {
     u.order = 'idle';
     u.target = -1;

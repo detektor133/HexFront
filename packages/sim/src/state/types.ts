@@ -230,7 +230,14 @@ export type GameEvent =
       readonly hex: HexId;
     }
   | {
-      readonly t: 'cityCaptured' | 'capitalMoved';
+      readonly t: 'cityCaptured';
+      readonly playerId: number;
+      readonly cityId: number;
+      readonly previousOwnerId: number;
+      readonly newOwnerId: number;
+    }
+  | {
+      readonly t: 'capitalMoved';
       readonly playerId: number;
       readonly cityId: number;
     }

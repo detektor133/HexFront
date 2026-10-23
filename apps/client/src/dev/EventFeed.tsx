@@ -34,6 +34,9 @@ export function eventLabel(event: GameEvent['t']): Parameters<typeof t>[0] {
 }
 
 function label(event: GameEvent): string {
+  if (event.t === 'cityCaptured') {
+    return t(event.newOwnerId === event.playerId ? 'event.cityCaptured' : 'event.cityLost');
+  }
   return t(eventLabel(event.t));
 }
 
@@ -57,7 +60,9 @@ export function EventFeed(props: {
           className={`${styles.item} ${item.important ? styles.important : ''}`}
           key={item.id}
           type="button"
-          onClick={() => props.onFocus(item)}
+          onClick={() => {
+            if (item.hex !== null) props.onFocus(item);
+          }}
         >
           <span
             className={styles.owner}

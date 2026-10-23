@@ -13,12 +13,25 @@ describe('лента событий', () => {
         ({
           t: 'cityCaptured',
           playerId: 0,
+          previousOwnerId: 1,
+          newOwnerId: 0,
           cityId,
         }) as GameEvent,
     );
-    const items = appendEvents([], events, view, 100);
-    expect(items).toHaveLength(3);
-    expect(eventHex({ t: 'cityCaptured', playerId: 0, cityId: 7 }, view)).toBe(12);
+    const items = Reflect.apply(appendEvents, null, [[], events, view, 100, 0]);
+    expect(items).toHaveLength(4);
+    expect(
+      eventHex(
+        {
+          t: 'cityCaptured',
+          playerId: 0,
+          previousOwnerId: 1,
+          newOwnerId: 0,
+          cityId: 7,
+        } as GameEvent,
+        view,
+      ),
+    ).toBe(12);
   });
 
   it('удаляет запись ровно после шести секунд', () => {
