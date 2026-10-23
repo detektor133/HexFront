@@ -619,7 +619,8 @@ export function useSandbox(
     setRoadPreview,
     setDockHeight(height, leaderboardWidth) {
       dockHeightRef.current = height;
-      if (leaderboardWidth !== undefined) rightInsetRef.current = leaderboardWidth + 24;
+      if (leaderboardWidth !== undefined)
+        rightInsetRef.current = leaderboardWidth + tokens.space.xl;
       mapViewRef.current?.setBottomInset(height);
       if (leaderboardWidth !== undefined) {
         mapViewRef.current?.setTopInset(hudHeightRef.current, rightInsetRef.current);
@@ -627,7 +628,8 @@ export function useSandbox(
     },
     setHudHeight(height, leaderboardWidth) {
       hudHeightRef.current = height;
-      if (leaderboardWidth !== undefined) rightInsetRef.current = leaderboardWidth + 24;
+      if (leaderboardWidth !== undefined)
+        rightInsetRef.current = leaderboardWidth + tokens.space.xl;
       mapViewRef.current?.setTopInset(height, rightInsetRef.current);
     },
     pixiTelemetry() {
