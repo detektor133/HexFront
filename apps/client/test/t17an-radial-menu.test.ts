@@ -412,10 +412,23 @@ describe('07/T17an: радиальное меню', () => {
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
-    const selectedCard = await waitFor(() => selectedArmyCard());
-    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 7, clientX: 100, clientY: 100 });
+    await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
+    if (!harness.mapCanvas || !harness.app) throw new Error('MapView input is not connected');
+    fireEvent.pointerDown(harness.mapCanvas, {
+      button: 0,
+      pointerId: 7,
+      clientX: harness.world.x,
+      clientY: harness.world.y,
+    });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
     await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
-    fireEvent.pointerUp(selectedCard, { pointerId: 7, clientX: 100, clientY: 100 });
+    fireEvent.pointerDown(document.body, { pointerId: 7, clientX: 0, clientY: 0 });
+    fireEvent.pointerUp(document.body, {
+      pointerId: 7,
+      clientX: 0,
+      clientY: 0,
+    });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(harness.commands).toEqual([]);
   });
