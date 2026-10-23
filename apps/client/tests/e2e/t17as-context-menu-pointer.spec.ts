@@ -148,7 +148,8 @@ test('@layout T17as: pointer-сценарии через canvas отправля
     };
   });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/match?debug=1&map=small&speed=0');
+  // bombard нужна артиллерия: отдельный явный флаг, не завязка на debug (07/T17as, docs/QUESTIONS.md).
+  await page.goto('/match?debug=1&map=small&speed=0&fixture=artillery');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   await page.waitForTimeout(500);

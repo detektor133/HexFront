@@ -446,7 +446,11 @@ export function useSandbox(
           setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
         ),
         autoCommand: setup.autoCommand ?? localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
-        ...(debug ? { fixture: 'artillery' as const } : {}),
+        // Отдельный флаг, а не завязка на debug: стартовый стек одинаковых отрядов (без фикстуры)
+        // нужен сценариям merge, артиллерия — только тем, кто её явно просит (07/T17as).
+        ...(new URLSearchParams(window.location.search).get('fixture') === 'artillery'
+          ? { fixture: 'artillery' as const }
+          : {}),
       },
     );
     setPlayerPalette(
