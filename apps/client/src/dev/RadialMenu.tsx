@@ -15,7 +15,7 @@ export function RadialMenu(props: { state: RadialMenuState }): React.JSX.Element
         position: 'fixed',
         left: state.center.x,
         top: state.center.y,
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
         zIndex: 20,
       }}
     >
