@@ -445,9 +445,9 @@ describe('07/T17as: контекстное меню фишки отряда', ()
       clientY: point.y,
     });
 
-    expect(harness.commands.at(-1)).toMatchObject({
+    expect(harness.commands.at(-1)).toEqual({
       t: 'merge',
-      unitIds: expect.arrayContaining([expect.any(Number), expect.any(Number)]),
+      unitIds: harness.selectedUnitIds,
     });
   });
 
