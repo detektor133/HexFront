@@ -460,25 +460,27 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         first !== undefined &&
         (active.fullReviewRounds ?? 0) >= REVIEW_ROUND_LIMIT
       ) {
-        active.findings = [
-          {
-            kind: 'ПЛАН',
-            text:
-              `ПЛАН: финальный review задачи ${task} ${active.fullReviewRounds} раз(а) подряд ` +
-              `находит новые пункты (разные файлы/формулировки) вместо схождения — реши, тупик ли ` +
-              `это (переделать механизм целиком) или review просто предъявляет избыточные ` +
-              `требования и текущий результат уже отвечает критериям задачи. Свежий пункт review: ${first.text}`,
-          },
-          ...nextFindings.slice(1),
-        ];
+        const rounds = active.fullReviewRounds;
+        // Диагностируется сам свежий пункт (сохраняет его kind — КОД/ТЕСТ), а не обёртка ПЛАН:
+        // «переделать» обязана уйти той же роли (кодеру или автору тестов), а не всегда кодеру.
+        active.findings = nextFindings;
         active.findingRetries = 0;
         active.fullReviewRounds = 0;
-        active.phase = 'work';
         await save(context);
         await context.say(
           `финальный review ${task}: review не сходится ${REVIEW_ROUND_LIMIT}-й круг подряд — зову plan`,
         );
-        return { step: 'worked', done: false };
+        const step = await diagnoseFinding(
+          context,
+          task,
+          active.findings[0] as ReviewFinding,
+          false,
+          `Финальный review задачи ${task} ${rounds} раз(а) подряд возвращает новые пункты ` +
+            `(разные файлы/формулировки) вместо схождения к нулю. Свежий пункт: «${first.text}». ` +
+            'Оцени: это реальный тупик, который нужно переделать целиком, или review предъявляет ' +
+            'избыточные требования к уже достаточному решению?',
+        );
+        return { step, done: false };
       }
       active.findings = nextFindings;
       active.findingRetries = 0;

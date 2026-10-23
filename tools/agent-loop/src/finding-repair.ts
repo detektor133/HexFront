@@ -18,11 +18,11 @@ import type { ReviewFinding } from './review.ts';
 export const findingPrompt = (task: string, finding: ReviewFinding): string =>
   [
     finding.kind === 'ТЕСТ' ? `$spec ${task}` : `$task ${task}`,
-    finding.kind === 'ПЕРЕДЕЛАТЬ'
-      ? 'Это не точечный патч: план решил, что механизм нужно переписать целиком одним ' +
-        'согласованным решением, потому что подряд несколько точечных патчей одного файла не ' +
-        'закрыли задачу по существу. Не добавляй ещё один частный костыль поверх старых — замени ' +
-        'сам подход (раскладку/алгоритм), сохранив приёмку задачи.'
+    finding.text.startsWith('ПЕРЕДЕЛАТЬ:')
+      ? 'Это не точечный патч: план решил, что механизм (или подход теста к нему) нужно ' +
+        'переписать целиком одним согласованным решением, потому что подряд несколько точечных ' +
+        'патчей не закрыли задачу по существу. Не добавляй ещё один частный костыль поверх ' +
+        'старых — замени сам подход, сохранив приёмку задачи.'
       : 'Исправь ровно один пункт reviewer; остальные пункты этой задачи тебе не переданы:',
     finding.text,
     ...(finding.kind === 'ТЕСТ'
@@ -55,11 +55,13 @@ export async function diagnoseFinding(
   task: string,
   finding: ReviewFinding,
   retryOnce = false,
+  question?: string,
 ): Promise<Step> {
   const planned = await runPlan(
     context,
     task,
-    `Диагностика возврата reviewer: «${finding.text}». Проверь, выполним ли критерий в разрешённой тестовой среде. Если нет — запиши вопрос; не заставляй тест имитировать результат проверяемого механизма.`,
+    question ??
+      `Диагностика возврата reviewer: «${finding.text}». Проверь, выполним ли критерий в разрешённой тестовой среде. Если нет — запиши вопрос; не заставляй тест имитировать результат проверяемого механизма.`,
   );
   if (typeof planned === 'string') return planned;
   if (planned.blocked)
@@ -84,7 +86,10 @@ export async function diagnoseFinding(
   }
   if (planned.outcome === 'переделать') {
     if (active !== undefined) {
-      active.findings[0] = { kind: 'ПЕРЕДЕЛАТЬ', text: `ПЕРЕДЕЛАТЬ: ${planned.detail}` };
+      // ТЕСТ-пункт переделывается автором тестов ($spec), а не кодером: иначе редизайн того,
+      // что сломалось в тестах, уедет роли, которая к тестам не имеет доступа по правам.
+      const kind = finding.kind === 'ТЕСТ' ? 'ТЕСТ' : 'ПЕРЕДЕЛАТЬ';
+      active.findings[0] = { kind, text: `ПЕРЕДЕЛАТЬ: ${planned.detail}` };
       active.findingRetries = 0;
       delete active.fixStreak;
       delete active.fullReviewRounds;

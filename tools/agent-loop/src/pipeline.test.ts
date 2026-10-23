@@ -363,11 +363,57 @@ describe('последовательный конвейер задачи', () =>
       '$review 06/T1j5-Б1',
       '$plan 06/T1j5-Б1',
     ]);
-    expect(run.prompts[1]).toContain('3 раз(а) подряд находит новые пункты');
-    expect(run.prompts[1]).toContain('вместо схождения');
+    expect(run.prompts[1]).toContain('3 раз(а) подряд возвращает новые пункты');
+    expect(run.prompts[1]).toContain('вместо схождения к нулю');
     expect(run.lines).toContain(
       'жду: 06/T1j5-Б1: plan не изменил повторно отклонённый пункт; автоматический повтор той же роли запрещён',
     );
+  });
+
+  it('третий круг подряд на ТЕСТ-пункте, который план решил переделать, уходит автору тестов, не кодеру', async () => {
+    const finding =
+      'ТЕСТ: apps/client/test/t17ar-terrain-layer.test.ts:120 — не проверяет равный объём вызовов';
+    const run = await runWorld({
+      spec: true,
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+          fullReviewRounds: 2,
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${finding}`),
+        {
+          answer:
+            'Подход теста пора переписать целиком.\nPLAN: переделать — сверять снимки координат, а не отдельные вызовы',
+        },
+        {
+          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: apps/client/test/t17ar-terrain-layer.test.ts',
+          writes: {
+            'apps/client/test/t17ar-terrain-layer.test.ts': "it('снимок координат', () => {});\n",
+          },
+          commit: true,
+          push: false,
+        },
+      ],
+      maxRounds: 1,
+    });
+
+    // Пункт был ТЕСТ — редизайн должен уйти $spec, а не $task, иначе роль без прав на правку
+    // тестов получит задачу переписать тестовый подход.
+    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+      '$spec 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[2]).toContain('переписать целиком');
+    expect(run.prompts[2]).toContain('РЕМОНТ: ИСПРАВЛЕНО');
   });
 
   it('СПЕК без коммита откатывает чужую правку продукта — следующий тик не паркует «дерево не чистое»', async () => {
