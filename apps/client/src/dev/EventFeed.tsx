@@ -56,24 +56,37 @@ export function EventFeed(props: {
   if (items.length === 0) return null;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
-      {items.map((item) => (
-        <button
-          className={`${styles.item} ${item.important ? styles.important : ''}`}
-          key={item.id}
-          type="button"
-          onClick={() => {
-            if (item.hex !== null) props.onFocus(item);
-          }}
-        >
-          <span
-            className={styles.owner}
-            style={{
-              background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
-            }}
-          />
-          <span>{label(item.event, props.localPlayerId ?? 0)}</span>
-        </button>
-      ))}
+      {items.map((item) =>
+        (() => {
+          const content = (
+            <>
+              <span
+                className={styles.owner}
+                style={{
+                  background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
+                }}
+              />
+              <span>{label(item.event, props.localPlayerId ?? 0)}</span>
+            </>
+          );
+          const className = `${styles.item} ${item.important ? styles.important : ''}`;
+
+          return item.hex === null ? (
+            <div className={className} key={item.id}>
+              {content}
+            </div>
+          ) : (
+            <button
+              className={className}
+              key={item.id}
+              type="button"
+              onClick={() => props.onFocus(item)}
+            >
+              {content}
+            </button>
+          );
+        })(),
+      )}
     </div>
   );
 }
