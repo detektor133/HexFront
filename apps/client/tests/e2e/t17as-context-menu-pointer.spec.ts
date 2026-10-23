@@ -31,12 +31,28 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Карта не имеет границ');
 
-  const centerX = bounds.x + bounds.width / 2;
-  const centerY = bounds.y + bounds.height / 2;
+  const hudBounds = await page.getByRole('banner').boundingBox();
+  const dockBounds = await page.locator('div[class*="dock"]').boundingBox();
+  const leaderboardBounds = await page
+    .getByRole('region', { name: /Таблица лидеров|Leaderboard/i })
+    .boundingBox();
+  if (!hudBounds || !dockBounds || !leaderboardBounds)
+    throw new Error('Рабочая область карты не имеет границ');
+  const mapTop = Math.max(bounds.y, hudBounds.y + hudBounds.height);
+  const mapBottom = Math.min(bounds.y + bounds.height, dockBounds.y);
+  const rightInset = leaderboardBounds.width + 24;
+  const centerX = bounds.x + (bounds.width - rightInset) / 2;
+  const centerY = mapTop + (mapBottom - mapTop) / 2 + 20;
   const mergeButton = page.getByRole('menuitem', { name: /Слить|Merge/i });
   let opened = false;
-  for (const offsetY of [-100, -75, -50, -25, 0, 25, 50, 75, 100]) {
-    await page.mouse.move(centerX, centerY + offsetY);
+  for (const [offsetX, offsetY] of [
+    [0, 0],
+    [-20, 0],
+    [20, 0],
+    [0, -20],
+    [0, 20],
+  ]) {
+    await page.mouse.move(centerX + offsetX, centerY + offsetY);
     await page.mouse.down();
     await page.waitForTimeout(RADIAL_MENU_LONG_PRESS_MS + 10);
     if (await mergeButton.isVisible().catch(() => false)) {
