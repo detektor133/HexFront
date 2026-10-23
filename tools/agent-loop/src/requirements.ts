@@ -49,7 +49,7 @@ function addedLines(original: string, current: string): string[] | undefined {
   const added: string[] = [];
   let expectedIndex = 0;
   for (const line of actual) {
-    if (line === expected[expectedIndex]) {
+    if (line.trim() === expected[expectedIndex]?.trim()) {
       expectedIndex += 1;
     } else {
       added.push(line);
