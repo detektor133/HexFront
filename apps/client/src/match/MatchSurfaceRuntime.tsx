@@ -525,13 +525,10 @@ export function useSandbox(
         canOpen(world) {
           const current = viewRef.current;
           if (!current || toolRef.current) return false;
+          const hit = layerRef.current?.unitsAt(world) ?? [];
           const unit = current.units.find((candidate) => {
             if (candidate.owner !== current.playerId || candidate.order === 'retreat') return false;
-            const center = layerRef.current?.chipAt(candidate.hex);
-            return (
-              center !== undefined &&
-              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
-            );
+            return hit.includes(candidate.id);
           });
           if (!unit) return false;
           radialArmyRef.current = unit.armyId;
