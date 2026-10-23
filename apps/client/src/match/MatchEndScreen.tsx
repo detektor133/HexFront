@@ -50,10 +50,10 @@ export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | 
             setWatching(true);
           }}
         >
-          {t('match.watch')}
+          {t('match.observe')}
         </button>,
         <button key="menu" type="button" onClick={() => props.onMenu('/')}>
-          {t('pause.menu')}
+          {t('match.mainMenu')}
         </button>,
       ]
     : props.winner >= 0
