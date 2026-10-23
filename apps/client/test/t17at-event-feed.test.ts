@@ -70,7 +70,10 @@ describe('07/T17at: фильтр ленты событий', () => {
   });
 
   it('Приёмка 2: не вводит новые типы войны или дипломатии', () => {
-    const source = readFileSync('apps/client/src/dev/event-feed.ts', 'utf8');
+    const source = [
+      readFileSync('apps/client/src/dev/event-feed.ts', 'utf8'),
+      readFileSync('packages/sim/src/state/types.ts', 'utf8'),
+    ].join('\n');
     expect(source).not.toMatch(/war|diplomac|войн|дипломат/u);
   });
 });
