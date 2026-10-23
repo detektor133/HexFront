@@ -496,7 +496,10 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     });
   };
   const move = (e: PointerEvent): void => {
-    if (count === 0) return g.hover(local(e));
+    if (count === 0) {
+      h.idle(0);
+      return g.hover(local(e));
+    }
     g.move(e.pointerId, local(e), performance.now(), { x: e.clientX, y: e.clientY });
   };
   const up = (e: PointerEvent): void => {
