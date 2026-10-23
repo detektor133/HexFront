@@ -86,6 +86,12 @@ describe('07/T17at: DOM ленты событий', () => {
     expect(ownerLine).toBeDefined();
     if (!ownerMarker || !ownerLine) return;
     expect(getComputedStyle(ownerMarker).backgroundColor).toBe(rgb(ownerLine));
+    const lossMarker = lossButton.querySelector('span');
+    const lossLine = tokens.players.palette[1]?.line;
+    expect(lossMarker).toBeDefined();
+    expect(lossLine).toBeDefined();
+    if (!lossMarker || !lossLine) return;
+    expect(getComputedStyle(lossMarker).backgroundColor).toBe(rgb(lossLine));
     fireEvent.click(captureButton);
     fireEvent.click(lossButton);
     expect(onFocus).toHaveBeenCalledTimes(1);
