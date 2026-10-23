@@ -71,6 +71,8 @@ const harness = vi.hoisted(() => ({
   } | null,
   world: { x: 100, y: 100 },
   artillery: false,
+  compatibleStack: false,
+  stackUnitIds: [] as number[],
   unitHex: 0,
   unitCityLevel: null as number | null,
 }));
@@ -97,6 +99,14 @@ class TestWorker {
         0,
         1,
       );
+    }
+    if (harness.compatibleStack) {
+      const firstUnit = snapshot.view.units[0];
+      if (!firstUnit) throw new Error('В снимке нет отряда для фикстуры слияния');
+      const nextId = Math.max(...snapshot.view.units.map((unit) => unit.id)) + 1;
+      const stackedUnit = { ...firstUnit, id: nextId };
+      (snapshot.view as { units: typeof snapshot.view.units }).units = [firstUnit, stackedUnit];
+      harness.stackUnitIds = [firstUnit.id, stackedUnit.id];
     }
     queueMicrotask(() =>
       this.onmessage?.({
@@ -199,6 +209,8 @@ beforeEach(() => {
   harness.mapCanvas = null;
   harness.app = null;
   harness.artillery = false;
+  harness.compatibleStack = false;
+  harness.stackUnitIds.length = 0;
   harness.world = { x: 100, y: 100 };
   harness.unitHex = 0;
   harness.unitCityLevel = null;
@@ -254,6 +266,7 @@ describe('07/T17an: радиальное меню', () => {
   });
 
   it('проводит удержание фишки MapView через runtime до send', async () => {
+    harness.compatibleStack = true;
     await renderSurface();
     fireEvent.click(armyCard());
     await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
@@ -267,19 +280,24 @@ describe('07/T17an: радиальное меню', () => {
     await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
     harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
     const menu = await screen.findByRole('menu');
-    const merge = screen.getByRole('menuitem', { name: /merge/i });
-    const point = menuPoint(merge, menu);
+    const mergeItem = screen.getByRole('menuitem', { name: /merge/i });
+    const point = menuPoint(mergeItem, menu);
     fireEvent.pointerMove(harness.mapCanvas, {
       pointerId: 1,
       clientX: point.x,
       clientY: point.y,
     });
-    fireEvent.pointerUp(harness.mapCanvas, {
+    fireEvent.pointerUp(mergeItem, {
       pointerId: 1,
       clientX: point.x,
       clientY: point.y,
     });
-    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
+    expect(harness.commands).toContainEqual({
+      t: 'merge',
+      unitIds: expect.arrayContaining(harness.stackUnitIds),
+    });
+    const mergeCommand = harness.commands.find((command) => command.t === 'merge');
+    expect(mergeCommand?.unitIds).toHaveLength(2);
   });
 
   it('проводит двойной тап MapView через runtime до выбора и centerOn', async () => {
