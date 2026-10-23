@@ -63,6 +63,7 @@ const testMap = loaded.map;
 
 const harness = vi.hoisted(() => ({
   commands: [] as Command[],
+  fixture: 'stack' as 'stack' | 'artillery',
   canvas: null as HTMLCanvasElement | null,
   app: null as {
     canvas: HTMLCanvasElement;
@@ -86,6 +87,30 @@ class TestWorker {
     const engine = createLocalEngine(message.map, message.seed ?? 42, message.players ?? 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const snapshot = engine.snapshot();
+    const ownUnits = snapshot.view.units.filter((unit) => unit.owner === snapshot.view.playerId);
+    const firstUnit = ownUnits[0];
+    if (!firstUnit) throw new Error('В фикстуре нет собственного отряда');
+    if (harness.fixture === 'stack') {
+      const secondUnit = ownUnits.find((unit) => unit.id !== firstUnit.id);
+      if (!secondUnit) throw new Error('В фикстуре нет пары собственных отрядов');
+      const preparedUnits = snapshot.view.units.map((unit) => {
+        if (unit.id === firstUnit.id || unit.id === secondUnit.id) {
+          return {
+            ...unit,
+            armyId: null,
+            hex: firstUnit.hex,
+            type: 'infantry' as const,
+            order: 'idle' as const,
+            moveTotal: 0,
+          };
+        }
+        return unit;
+      });
+      (snapshot.view as { units: typeof preparedUnits }).units = preparedUnits;
+    } else {
+      const artillery = { ...firstUnit, armyId: null, type: 'artillery' as const };
+      (snapshot.view as { units: typeof snapshot.view.units }).units = [artillery];
+    }
     harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
     harness.unitCityLevel =
       snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
@@ -113,7 +138,8 @@ function armyCard(): HTMLElement {
   return card;
 }
 
-async function renderSurface(): Promise<void> {
+async function renderSurface(fixture: 'stack' | 'artillery' = 'stack'): Promise<void> {
+  harness.fixture = fixture;
   vi.stubGlobal('Worker', TestWorker);
   vi.stubGlobal(
     'fetch',
@@ -151,8 +177,10 @@ function unitPoint(): { x: number; y: number } {
   };
 }
 
-async function openMapMenu(): Promise<{ menu: HTMLElement; point: { x: number; y: number } }> {
-  await renderSurface();
+async function openMapMenu(
+  fixture: 'stack' | 'artillery' = 'stack',
+): Promise<{ menu: HTMLElement; point: { x: number; y: number } }> {
+  await renderSurface(fixture);
   if (!harness.canvas) throw new Error('MapView input не подключён');
   const point = unitPoint();
   fireEvent.pointerDown(harness.canvas, {
@@ -184,6 +212,7 @@ beforeEach(() => {
     removeEventListener: vi.fn(),
   }));
   harness.commands.length = 0;
+  harness.fixture = 'stack';
   harness.canvas = null;
   harness.app = null;
   harness.unitCityLevel = null;
@@ -278,6 +307,38 @@ describe('07/T17as: контекстное меню фишки отряда', ()
 
     expect(harness.commands.some((command) => command.t === 'split')).toBe(true);
     expect(menu.isConnected).toBe(false);
+  });
+
+  it('1: совместимый стек показывает merge и отправляет два unitIds', async () => {
+    await openMapMenu('stack');
+    const merge = screen.getByRole('menuitem', { name: /Слить|Merge/i });
+
+    fireEvent.keyDown(merge, { key: 'Enter' });
+
+    expect(harness.commands.at(-1)).toMatchObject({
+      t: 'merge',
+      unitIds: expect.arrayContaining([expect.any(Number), expect.any(Number)]),
+    });
+    expect((harness.commands.at(-1) as Extract<Command, { t: 'merge' }>).unitIds).toHaveLength(2);
+  });
+
+  it('1: артиллерийская фикстура показывает bombard без merge и отправляет автоцель', async () => {
+    await openMapMenu('artillery');
+    const rootLabels = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.getAttribute('aria-label'));
+    const bombard = screen.getByRole('menuitem', { name: /Огонь: автоцель|Auto fire/i });
+
+    expect(rootLabels).toContain(bombard.getAttribute('aria-label'));
+    expect(screen.queryByRole('menuitem', { name: /Слить|Merge/i })).toBeNull();
+
+    fireEvent.keyDown(bombard, { key: 'Enter' });
+
+    expect(harness.commands.at(-1)).toEqual({
+      t: 'bombard',
+      unitId: expect.any(Number),
+      targetUnitId: null,
+    });
   });
 
   it('2: удержание карточки ArmyBar не открывает меню', async () => {
