@@ -1,6 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { RADIAL_MENU_LONG_PRESS_MS } from '../../src/render/gesture.ts';
+
+/**
+ * Матч (и каждый `page.reload()`) стартует в режиме наблюдателя «Whole map» (observerId=null)
+ * независимо от debug — у этого вида нет playerId, поэтому `canOpen` контекстного меню не находит
+ * ничьих юнитов. Переключение на «Player 1» (HUMAN_ID=0) даёт собственную фишку для удержания.
+ */
+async function selectHumanPlayer(page: Page): Promise<void> {
+  await page.getByRole('combobox', { name: /Observer|Наблюдатель/i }).selectOption('0');
+}
 
 function playerCapitalPoint(
   canvas: { x: number; y: number; width: number; height: number },
@@ -57,6 +66,7 @@ test('@layout T17as: pointerdown на canvas, удержание, pointermove в
   await page.goto('/match?debug=1&map=small&speed=0');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
+  await selectHumanPlayer(page);
   await page.waitForTimeout(500);
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Карта не имеет границ');
@@ -152,6 +162,7 @@ test('@layout T17as: pointer-сценарии через canvas отправля
   await page.goto('/match?debug=1&map=small&speed=0&fixture=artillery');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
+  await selectHumanPlayer(page);
   await page.waitForTimeout(500);
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Карта не имеет границ');
@@ -219,6 +230,7 @@ test('@layout T17as: pointer-сценарии через canvas отправля
 
   await page.reload();
   await expect(canvas).toBeVisible();
+  await selectHumanPlayer(page);
   await page.waitForTimeout(500);
   await openCenterMenu();
   await releaseOn(/Разделить|Split/i);
@@ -226,6 +238,7 @@ test('@layout T17as: pointer-сценарии через canvas отправля
 
   await page.reload();
   await expect(canvas).toBeVisible();
+  await selectHumanPlayer(page);
   await page.waitForTimeout(500);
   let bombardFound = false;
   for (let row = 1; row <= 4 && !bombardFound; row += 1) {
