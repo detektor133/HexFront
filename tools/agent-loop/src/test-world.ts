@@ -366,7 +366,16 @@ export async function runWorld(world: World): Promise<Outcome> {
       const text = snapshots.get(Number(snapshot[1]));
       return text === undefined ? { code: 128, stdout: '', stderr: 'нет коммита' } : ok(text);
     }
-    if (sub === 'diff' && args.includes('--name-status')) return ok(world.reviewFiles ?? '');
+    if (sub === 'diff' && args.includes('--name-status')) {
+      if (world.reviewFiles !== undefined) return ok(world.reviewFiles);
+      const [fromRef, toRef] = (args[2] ?? '').split('..');
+      if (fromRef === undefined || toRef === undefined) return ok('');
+      return ok(
+        unionFiles(resolveCommit(fromRef), resolveCommit(toRef))
+          .map((path) => `M\t${path}`)
+          .join('\n'),
+      );
+    }
     if (sub === 'diff' && first === '--name-only') {
       const [fromRef, toRef] = (args[2] ?? '').split('..');
       return ok(

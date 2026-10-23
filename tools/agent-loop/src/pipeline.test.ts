@@ -229,6 +229,50 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('узкий пункт review, назвавший файл цикла по имени, не паркуется как самовольная правка', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review(
+          'ВОЗВРАТ\n- КОД: tools/agent-loop/src/test-world.ts:309 — молчаливый catch {} запрещён',
+        ),
+        {
+          answer: 'Исправлен ровно один пункт reviewer: убран молчаливый catch.',
+          writes: { 'tools/agent-loop/src/test-world.ts': 'export const fixed = true;\n' },
+          files: ['tools/agent-loop/src/test-world.ts'],
+          commit: true,
+          push: false,
+        },
+        review('OK'),
+      ],
+    });
+
+    // 07/T22 ловил самовольную правку цикла, не исполнение дефекта, который независимый review
+    // сам нашёл и назвал по имени файла в своём пункте.
+    expect(run.lines.join('\n')).not.toContain('изменила код цикла');
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
+  });
+
+  it('правка файла цикла, которую не называл пункт review, всё равно паркуется', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review('ВОЗВРАТ\n- КОД: packages/sim/src/task.ts:1 — неверная проверка'),
+        {
+          answer: 'Заодно поправил цикл.',
+          writes: { 'tools/agent-loop/src/other.ts': 'export const x = 1;\n' },
+          files: ['packages/sim/src/task.ts', 'tools/agent-loop/src/other.ts'],
+          commit: true,
+          push: false,
+        },
+      ],
+    });
+
+    expect(run.lines.join('\n')).toContain(
+      'изменила код цикла (tools/agent-loop/src/other.ts) без поручения владельца',
+    );
+  });
+
   it('передаёт красный усиленный тест кодеру без лишнего review', async () => {
     const run = await runWorld({
       spec: true,

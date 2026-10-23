@@ -143,6 +143,7 @@ async function runProductWork(
   context: LoopContext,
   task: string,
   prompt: string,
+  finding: ReviewFinding | undefined,
 ): Promise<Step | undefined> {
   const base = await head(context.git);
   const published = await remoteHead(context.git);
@@ -176,7 +177,12 @@ async function runProductWork(
   const violation = await specViolation(context, task);
   if (violation !== undefined) return park(context, `spec:${task}`, violation, result.message);
   if (!isInfraTask(task)) {
-    const forbidden = await forbiddenPaths(context.git, base);
+    // Правка кода цикла не самовольна, если именно её назвал сам пункт review (findingPrompt
+    // передаёт исполнителю ровно этот один пункт) — 07/T22 ловил самовольную правку, а не
+    // исполнение дефекта, который независимый review уже нашёл и назвал по имени файла.
+    const forbidden = (await forbiddenPaths(context.git, base)).filter(
+      (path) => finding === undefined || !mentionsStreakFile(finding.text, path),
+    );
     if (forbidden.length > 0)
       return park(context, `scope:${task}`, scopeViolation(task, forbidden), result.message);
   }
@@ -207,7 +213,9 @@ async function recoverCommittedWork(
   const violation = await specViolation(context, task);
   if (violation !== undefined) return park(context, `spec:${task}`, violation);
   if (!isInfraTask(task)) {
-    const forbidden = await forbiddenPaths(context.git, base);
+    const forbidden = (await forbiddenPaths(context.git, base)).filter(
+      (path) => finding === undefined || !mentionsStreakFile(finding.text, path),
+    );
     if (forbidden.length > 0)
       return park(context, `scope:${task}`, scopeViolation(task, forbidden));
   }
@@ -357,6 +365,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
               context,
               task,
               finding === undefined ? active.workPrompt : findingPrompt(task, finding),
+              finding,
             );
       if (stop === 'rerouted') {
         delete active.workAttempt;
