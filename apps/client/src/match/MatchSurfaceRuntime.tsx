@@ -17,7 +17,12 @@ import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import { buildRadialActions, sectorAt, type RadialMenuState } from '../dev/radial-menu.ts';
+import {
+  buildRadialActions,
+  sectorAt,
+  type RadialAction,
+  type RadialMenuState,
+} from '../dev/radial-menu.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
@@ -206,6 +211,7 @@ interface Sandbox {
   pixiTelemetry(): PixiTelemetry;
   readonly radial: RadialMenuState | null;
   radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
+  radialAction(action: RadialAction): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -315,6 +321,19 @@ export function useSandbox(
       setState: setRadialState,
     }),
     [],
+  );
+  const radialAction = useCallback(
+    (action: RadialAction): void => {
+      const state = radialRef.current;
+      if (!state) return;
+      if (action.children) {
+        setRadialState({ ...state, active: action.children });
+        return;
+      }
+      if (action.command) matchRef.current?.send(action.command);
+      setRadialState(null);
+    },
+    [setRadialState],
   );
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
@@ -612,6 +631,7 @@ export function useSandbox(
     workerTelemetry: workerTelemetryRef.current,
     radial,
     radialForArmy,
+    radialAction,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {

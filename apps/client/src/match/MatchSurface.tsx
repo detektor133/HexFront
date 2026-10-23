@@ -151,7 +151,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      {sb.radial && <RadialMenu state={sb.radial} />}
+      {sb.radial && <RadialMenu state={sb.radial} onAction={sb.radialAction} />}
       {styleFor('event-feed') && (
         <EventFeed
           items={sb.events}

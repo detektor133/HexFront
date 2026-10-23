@@ -5,7 +5,10 @@ function label(action: RadialAction): string {
   return action.label.includes('.') ? t(action.label as MessageKey) : action.label;
 }
 
-export function RadialMenu(props: { state: RadialMenuState }): React.JSX.Element {
+export function RadialMenu(props: {
+  state: RadialMenuState;
+  onAction: (action: RadialAction) => void;
+}): React.JSX.Element {
   const { state } = props;
   return (
     <div
@@ -34,6 +37,13 @@ export function RadialMenu(props: { state: RadialMenuState }): React.JSX.Element
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'auto',
               minWidth: '72px',
+            }}
+            onClick={() => props.onAction(action)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                props.onAction(action);
+              }
             }}
           >
             {label(action)}
