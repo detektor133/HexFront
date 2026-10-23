@@ -47,12 +47,13 @@ export function EventFeed(props: {
   readonly onFocus: (item: EventFeedItem) => void;
   readonly style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
-  const [, redraw] = useState(0);
+  const [now, setNow] = useState<number>(props.now);
   useEffect(() => {
-    const timer = window.setInterval(() => redraw((value) => value + 1), 250);
+    setNow(props.now);
+    const timer = window.setInterval(() => setNow(performance.now()), 250);
     return () => window.clearInterval(timer);
-  }, []);
-  const items = visibleEvents(props.items, props.now);
+  }, [props.now]);
+  const items = visibleEvents(props.items, now);
   if (items.length === 0) return null;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
