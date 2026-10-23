@@ -207,6 +207,70 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     expect(items.every((item) => item.style.pointerEvents === 'auto')).toBe(true);
   });
 
+  it('1: каждая кнопка меню выполняет свою команду через send', async () => {
+    const { menu } = await openMapMenu();
+    const rootLabels = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.getAttribute('aria-label'))
+      .filter((label): label is string => label !== null);
+
+    const expectCommand = (before: number): void => {
+      expect(harness.commands.length).toBeGreaterThan(before);
+      const command = harness.commands.at(-1);
+      expect(command).toBeDefined();
+      if (command?.t === 'merge') {
+        expect(command.unitIds.length).toBeGreaterThan(0);
+      } else if (command?.t === 'assignUnits') {
+        expect(command.unitIds.length).toBeGreaterThan(0);
+        expect(command).toHaveProperty('armyId');
+      } else if (command?.t === 'bombard') {
+        expect(command.unitId).toBeTypeOf('number');
+        expect(command.targetUnitId).toBeNull();
+      } else {
+        throw new Error(`Неожиданный тип команды: ${command?.t ?? 'нет команды'}`);
+      }
+    };
+
+    for (const rootLabel of rootLabels) {
+      cleanup();
+      await openMapMenu();
+      const root = screen
+        .getAllByRole('menuitem')
+        .find((item) => item.getAttribute('aria-label') === rootLabel);
+      expect(root).toBeDefined();
+      const before = harness.commands.length;
+      fireEvent.click(root);
+
+      if (screen.queryByRole('menu')) {
+        const childLabels = screen
+          .getAllByRole('menuitem')
+          .map((item) => item.getAttribute('aria-label'))
+          .filter((label): label is string => label !== rootLabel && label !== null);
+        expect(childLabels.length).toBeGreaterThan(0);
+        for (const childLabel of childLabels) {
+          cleanup();
+          await openMapMenu();
+          const parent = screen
+            .getAllByRole('menuitem')
+            .find((item) => item.getAttribute('aria-label') === rootLabel);
+          expect(parent).toBeDefined();
+          fireEvent.click(parent);
+          const child = screen
+            .getAllByRole('menuitem')
+            .find((item) => item.getAttribute('aria-label') === childLabel);
+          expect(child).toBeDefined();
+          const childBefore = harness.commands.length;
+          fireEvent.click(child);
+          expectCommand(childBefore);
+        }
+      } else {
+        expectCommand(before);
+      }
+    }
+
+    expect(menu.isConnected).toBe(false);
+  });
+
   it('2: удержание карточки ArmyBar не открывает меню', async () => {
     await renderSurface();
     const card = armyCard();
