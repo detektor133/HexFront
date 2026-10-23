@@ -180,12 +180,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         return;
       }
       if (mode === 'radial') {
-        if (!deps.inside(at)) {
-          if (radialContext)
-            emit({ t: 'radial', at, viewportAt, context: radialContext, phase: 'cancel' });
-          mode = 'held';
-          return;
-        }
         if (radialContext)
           emit({ t: 'radial', at, viewportAt, context: radialContext, phase: 'move' });
         return;
