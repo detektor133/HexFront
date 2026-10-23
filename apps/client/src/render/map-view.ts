@@ -472,6 +472,10 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     h.pressed(count, e.pointerId);
     if (count === 0) h.idle(INERTIA_MAX_PAUSE_MS);
   };
+  const releasedUp = (e: PointerEvent): void => {
+    if (count === 0 || canvas.hasPointerCapture?.(e.pointerId)) return;
+    up(e);
+  };
   const leave = (): void => {
     if (count === 0) g.hover(null);
   };
@@ -485,6 +489,8 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+  globalThis.document?.addEventListener('pointerup', releasedUp);
+  globalThis.document?.addEventListener('pointercancel', releasedUp);
   canvas.addEventListener('pointerleave', leave);
   canvas.addEventListener('wheel', wheel, { passive: false });
   // Правая кнопка — приказ, контекстное меню браузера над картой не нужно.
@@ -496,6 +502,8 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);
     canvas.removeEventListener('pointercancel', up);
+    globalThis.document?.removeEventListener('pointerup', releasedUp);
+    globalThis.document?.removeEventListener('pointercancel', releasedUp);
     canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('wheel', wheel);
   };
