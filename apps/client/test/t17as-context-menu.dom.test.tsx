@@ -247,9 +247,9 @@ describe('07/T17as: контекстное меню фишки отряда', ()
     expect(labels).toEqual(
       expect.arrayContaining([messages.ru['unit.merge'], messages.ru['unit.toArmy']]),
     );
-    expect(labels.every((label) => label !== null && !Object.hasOwn(messages.ru, label))).toBe(
-      true,
-    );
+    expect(
+      labels.every((label) => label !== null && Object.values(messages.ru).includes(label)),
+    ).toBe(true);
     expect(items.every((item) => item.style.pointerEvents === 'auto')).toBe(true);
   });
 
