@@ -573,7 +573,7 @@ describe('приёмка T7: раскладка матча без перекры
     'монтирует EventFeed и выдерживает геометрию на viewport %ix%i',
     async (width, height) => {
       installLayoutMeasurements();
-      for (const eventRows of [1, 2, 3]) {
+      for (const eventRows of [1, 2, 3, 4]) {
         cleanup();
         vi.resetModules();
         prepareDomScene('', { width, height }, eventRows);
