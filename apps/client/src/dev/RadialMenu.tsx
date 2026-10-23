@@ -131,6 +131,7 @@ export function RadialMenu(props: {
               minWidth: '72px',
             }}
             onPointerUp={() => props.onAction(action)}
+            onClick={(event) => event.preventDefault()}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
