@@ -9,6 +9,15 @@ function label(action: RadialAction): string {
     : action.label;
 }
 
+const MENU_BUTTON_HALF_SIZE = 48;
+
+function clampViewportCoordinate(value: number, viewportSize: number): number {
+  const min = MENU_BUTTON_HALF_SIZE;
+  const max = viewportSize - MENU_BUTTON_HALF_SIZE;
+  if (max < min) return viewportSize / 2;
+  return Math.min(Math.max(value, min), max);
+}
+
 function icon(kind: RadialAction['kind']): React.JSX.Element {
   if (kind === 'merge') {
     return (
@@ -93,6 +102,11 @@ export function RadialMenu(props: {
   onClose: () => void;
 }): React.JSX.Element {
   const { state } = props;
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const center = {
+    x: clampViewportCoordinate(state.center.x, viewport.width),
+    y: clampViewportCoordinate(state.center.y, viewport.height),
+  };
   const menuRef = useRef<HTMLDivElement>(null);
   const lastActivationRef = useRef<{ key: string; source: 'pointer' | 'keyboard' } | null>(null);
   useEffect(() => {
@@ -129,8 +143,8 @@ export function RadialMenu(props: {
       aria-label={t('unit.toArmy')}
       style={{
         position: 'fixed',
-        left: state.center.x,
-        top: state.center.y,
+        left: center.x,
+        top: center.y,
         width: '1px',
         height: '1px',
         transform: 'translate(-50%, -50%)',
@@ -141,6 +155,8 @@ export function RadialMenu(props: {
       {state.active.map((action, index) => {
         const actionKey = `${action.kind}:${action.label}`;
         const angle = -Math.PI / 2 + ((index + 0.5) / state.active.length) * Math.PI * 2;
+        const rawX = Math.cos(angle) * 88;
+        const rawY = Math.sin(angle) * 88;
         return (
           <button
             key={`${action.kind}-${action.label}`}
@@ -149,8 +165,8 @@ export function RadialMenu(props: {
             aria-label={label(action)}
             style={{
               position: 'absolute',
-              left: `${Math.cos(angle) * 88}px`,
-              top: `${Math.sin(angle) * 88}px`,
+              left: `${clampViewportCoordinate(center.x + rawX, viewport.width) - center.x}px`,
+              top: `${clampViewportCoordinate(center.y + rawY, viewport.height) - center.y}px`,
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'auto',
               minWidth: '72px',
