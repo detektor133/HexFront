@@ -521,6 +521,7 @@ export function SandboxSurface({
       <div ref={hostRef} className={styles.map} />
       <EventFeed
         items={sb.events}
+        {...(view ? { localPlayerId: view.playerId } : {})}
         now={performance.now()}
         onFocus={sb.focusEvent}
         style={{ '--observer-h': `${observerH}px` } as React.CSSProperties}

@@ -155,6 +155,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {styleFor('event-feed') && (
         <EventFeed
           items={sb.events}
+          {...(view ? { localPlayerId: view.playerId } : {})}
           now={performance.now()}
           onFocus={sb.focusEvent}
           style={styleFor('event-feed')}

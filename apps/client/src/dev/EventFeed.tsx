@@ -33,15 +33,16 @@ export function eventLabel(event: GameEvent['t']): Parameters<typeof t>[0] {
   }
 }
 
-function label(event: GameEvent): string {
+function label(event: GameEvent, localPlayerId: number): string {
   if (event.t === 'cityCaptured') {
-    return t(event.newOwnerId === event.playerId ? 'event.cityCaptured' : 'event.cityLost');
+    return t(event.newOwnerId === localPlayerId ? 'event.cityCaptured' : 'event.cityLost');
   }
   return t(eventLabel(event.t));
 }
 
 export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
+  readonly localPlayerId?: number;
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
   readonly style?: React.CSSProperties | undefined;
@@ -70,7 +71,7 @@ export function EventFeed(props: {
               background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
             }}
           />
-          <span>{label(item.event)}</span>
+          <span>{label(item.event, props.localPlayerId ?? 0)}</span>
         </button>
       ))}
     </div>
