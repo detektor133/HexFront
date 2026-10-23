@@ -392,30 +392,20 @@ describe('07/T17an: радиальное меню', () => {
     expect(sectorAt(state, { x: 100, y: 100 })).toBeNull();
   });
 
-  it('проверяет точный корневой набор artillery и payload bombard', async () => {
+  it('не открывает radial при удержании артиллерийской карточки ArmyBar', async () => {
     harness.artillery = true;
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
-    const selectedCard = await waitFor(() => selectedArmyCard());
-    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 6, clientX: 100, clientY: 100 });
-    await waitFor(() => expect(screen.getByRole('menu')).toBeTruthy());
-    const menu = screen.getByRole('menu');
-    const items = screen.getAllByRole('menuitem');
-    expect(items).toHaveLength(2);
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(
-      expect.arrayContaining(['To army', 'Auto fire']),
-    );
-    expect(screen.queryByRole('menuitem', { name: /merge/i })).toBeNull();
-    const bombard = screen.getByRole('menuitem', { name: 'Auto fire' });
-    const point = menuPoint(bombard, menu);
-    fireEvent.pointerMove(selectedCard, { pointerId: 6, clientX: point.x, clientY: point.y });
-    fireEvent.pointerUp(selectedCard, { pointerId: 6, clientX: point.x, clientY: point.y });
-    expect(harness.commands).toContainEqual({
-      t: 'bombard',
-      unitId: expect.any(Number),
-      targetUnitId: null,
+    const selectedCard = await waitFor(() => {
+      const selected = selectedArmyCard();
+      expect(selected.getAttribute('aria-pressed')).toBe('true');
+      return selected;
     });
+    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 6, clientX: 100, clientY: 100 });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(harness.commands).toEqual([]);
   });
 
   it('отменяет radial при отпускании вне секторов без send', async () => {
