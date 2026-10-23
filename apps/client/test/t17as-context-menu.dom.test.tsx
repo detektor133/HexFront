@@ -1,0 +1,236 @@
+// @vitest-environment jsdom
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
+import { Container } from 'pixi.js';
+import { createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { hexFromId, loadMap, type Command } from '@hexfront/sim';
+
+import { cityChipShift } from '../src/dev/chip-place.ts';
+import { createLocalEngine } from '../src/local/engine.ts';
+import { MatchSurface } from '../src/match/MatchSurface.tsx';
+import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
+import { hexCenter } from '../src/render/hex-geometry.ts';
+import { tokens } from '../src/theme/tokens.ts';
+
+vi.mock('pixi.js', async (importOriginal) => {
+  const pixi = await importOriginal<Record<string, unknown>>();
+  const PixiContainer = pixi.Container as typeof Container;
+  class TestApplication {
+    readonly canvas = document.createElement('canvas');
+    readonly stage = new PixiContainer();
+    readonly ticker = {
+      callbacks: [] as Array<(ticker: { deltaMS: number; FPS: number }) => void>,
+      add: (callback: (ticker: { deltaMS: number; FPS: number }) => void): void => {
+        this.ticker.callbacks.push(callback);
+      },
+    };
+    readonly renderer = { texture: { managedTextures: [] as readonly unknown[] } };
+    screen = { width: 390, height: 844 };
+
+    constructor() {
+      (globalThis as Record<string, unknown>).__t17asApp = this;
+      Object.defineProperty(this.canvas, 'getBoundingClientRect', {
+        value: () => ({ left: 0, top: 0 }),
+      });
+      Object.defineProperty(this.canvas, 'setPointerCapture', { value: vi.fn() });
+    }
+
+    async init(options: {
+      readonly resizeTo: { clientWidth?: number; clientHeight?: number };
+    }): Promise<void> {
+      this.screen = {
+        width: options.resizeTo.clientWidth || 390,
+        height: options.resizeTo.clientHeight || 844,
+      };
+    }
+
+    destroy(): void {}
+  }
+  return { ...pixi, Application: TestApplication };
+});
+
+const mapJson: unknown = JSON.parse(
+  readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
+);
+const loaded = loadMap(mapJson);
+if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+const testMap = loaded.map;
+
+const harness = vi.hoisted(() => ({
+  commands: [] as Command[],
+  canvas: null as HTMLCanvasElement | null,
+  app: null as {
+    canvas: HTMLCanvasElement;
+    stage: Container;
+    ticker: { callbacks: Array<(ticker: { deltaMS: number; FPS: number }) => void> };
+  } | null,
+  unitHex: 0,
+  unitCityLevel: null as number | null,
+}));
+
+class TestWorker {
+  public onmessage: ((event: MessageEvent) => void) | null = null;
+  public onerror: ((event: ErrorEvent) => void) | null = null;
+
+  public postMessage(message: { t: string; map?: unknown; seed?: number; players?: number }): void {
+    if ('cmd' in message) {
+      harness.commands.push((message as { cmd: Command }).cmd);
+      return;
+    }
+    if (message.t !== 'start') return;
+    const engine = createLocalEngine(message.map, message.seed ?? 42, message.players ?? 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const snapshot = engine.snapshot();
+    harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
+    harness.unitCityLevel =
+      snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: {
+          t: 'view',
+          kind: 'snapshot',
+          snapshot: { t: 'snapshot', tick: snapshot.view.tick, view: snapshot.view },
+          seq: 1,
+          selection: snapshot.selection,
+          rejected: snapshot.rejected,
+          events: snapshot.events,
+        },
+      } as MessageEvent),
+    );
+  }
+
+  public terminate(): void {}
+}
+
+function armyCard(): HTMLElement {
+  const card = screen.getAllByRole('button').find((item) => item.className.includes('_pick_'));
+  if (!card) throw new Error('Карточка армии не отрендерена');
+  return card;
+}
+
+async function renderSurface(): Promise<void> {
+  vi.stubGlobal('Worker', TestWorker);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(mapJson), { status: 200 })),
+  );
+  render(createElement(MatchSurface, { debug: true }));
+  await waitFor(() => expect(armyCard()).toBeTruthy());
+  fireEvent.click(armyCard());
+  await waitFor(() =>
+    expect(
+      screen.getAllByRole('button').some((item) => item.getAttribute('aria-pressed') === 'true'),
+    ).toBe(true),
+  );
+  const app = (globalThis as Record<string, unknown>).__t17asApp as typeof harness.app;
+  if (!app) throw new Error('Pixi Application не создан');
+  app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+  harness.app = app;
+  harness.canvas = app.canvas;
+}
+
+function unitPoint(): { x: number; y: number } {
+  if (!harness.app) throw new Error('MapView не создан');
+  const world = harness.app.stage.children[0];
+  if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+  const point = hexCenter(hexFromId(harness.unitHex, testMap.width), tokens.map.hexRadius);
+  return {
+    x: world.position.x + point.x * world.scale.x,
+    y:
+      world.position.y +
+      (point.y +
+        (harness.unitCityLevel === null
+          ? 0
+          : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius))) *
+        world.scale.y,
+  };
+}
+
+async function openMapMenu(): Promise<{ menu: HTMLElement; point: { x: number; y: number } }> {
+  await renderSurface();
+  if (!harness.canvas) throw new Error('MapView input не подключён');
+  const point = unitPoint();
+  fireEvent.pointerDown(harness.canvas, {
+    button: 0,
+    pointerId: 1,
+    clientX: point.x,
+    clientY: point.y,
+  });
+  await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+  harness.app?.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
+  return { menu: await screen.findByRole('menu'), point };
+}
+
+beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(): void {}
+      disconnect(): void {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  harness.commands.length = 0;
+  harness.canvas = null;
+  harness.app = null;
+  harness.unitCityLevel = null;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe('07/T17as: контекстное меню фишки отряда', () => {
+  it('1: удержание фишки открывает одно меню в точке нажатия с доступными кнопками', async () => {
+    const { menu, point } = await openMapMenu();
+    expect(Number.parseFloat(menu.style.left)).toBe(point.x);
+    expect(Number.parseFloat(menu.style.top)).toBe(point.y);
+    const items = screen.getAllByRole('menuitem');
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((item) => item.getAttribute('aria-label'))).toBe(true);
+    expect(items.every((item) => item.style.pointerEvents === 'auto')).toBe(true);
+  });
+
+  it('2: удержание карточки ArmyBar не открывает меню', async () => {
+    await renderSurface();
+    const card = armyCard();
+    fireEvent.pointerDown(card, { button: 0, pointerId: 2, clientX: 40, clientY: 40 });
+    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('3: Escape и клик вне меню отменяют меню без send', async () => {
+    await openMapMenu();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(harness.commands).toEqual([]);
+
+    cleanup();
+    const { menu } = await openMapMenu();
+    fireEvent.pointerDown(document.body, { clientX: 0, clientY: 0 });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(menu.isConnected).toBe(false);
+    expect(harness.commands).toEqual([]);
+  });
+
+  it('4: UnitCard не возвращает плоские Orders или ArmyPlates', () => {
+    const source = readFileSync(join(process.cwd(), 'apps/client/src/dev/UnitCard.tsx'), 'utf8');
+    expect(source).not.toMatch(/Orders|ArmyPlates/);
+  });
+});
