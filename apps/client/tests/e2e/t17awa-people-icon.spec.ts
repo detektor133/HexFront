@@ -18,6 +18,18 @@ for (const width of WIDTHS) {
       return {
         width: rect.width,
         height: rect.height,
+        pathsStrokeClippedByViewBox: Array.from(
+          element.querySelectorAll<SVGGraphicsElement>('path'),
+        ).some((path) => {
+          const bbox = path.getBBox({ stroke: true });
+          const viewBox = (element as SVGSVGElement).viewBox.baseVal;
+          return (
+            bbox.left < viewBox.x ||
+            bbox.right > viewBox.x + viewBox.width ||
+            bbox.top < viewBox.y ||
+            bbox.bottom > viewBox.y + viewBox.height
+          );
+        }),
         clippedByParent: Boolean(
           parent &&
           (rect.left < parent.left ||
@@ -37,6 +49,7 @@ for (const width of WIDTHS) {
 
     expect(result.width).toBe(14);
     expect(result.height).toBe(14);
+    expect(result.pathsStrokeClippedByViewBox).toBe(false);
     expect(result.clippedByParent).toBe(false);
     expect(result.intersectsNext).toBe(false);
   });
