@@ -1,8 +1,15 @@
 // Снимок состояния для игрока: то, что клиент получает 10 раз в секунду.
 // Архитектура: sim-core.md — «Запросы». Туман войны — этап 04: сейчас видно всё.
+import { forecastBattle } from './forecast.ts';
 import { planViews, type PlanView } from './plan-view.ts';
 import { playerPlace, playerPlaces, playerScore, playerScores } from './score.ts';
-import { armyViews, unitViews, type ArmyView, type UnitView } from './unit-view.ts';
+import {
+  armyViews,
+  unitViews,
+  type ArmyView,
+  type AttackState,
+  type UnitView,
+} from './unit-view.ts';
 import { RECRUIT_STEP, TICKS_PER_S, type UnitType } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
@@ -11,6 +18,7 @@ import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 import {
   incomeBases,
   playerIncomePerSecond,
@@ -233,7 +241,7 @@ export function playerView(
     score,
     place: viewContext.places[id] ?? 0,
   }));
-  return {
+  const view: PlayerView = {
     me: summary(state, playerId, viewContext),
     tick: state.tick,
     winner: state.winner,
@@ -312,6 +320,60 @@ export function playerView(
         totalTicks: r.totalTicks,
       })),
   };
+  return {
+    ...view,
+    units: view.units.map((unit) => ({
+      ...unit,
+      attackState: attackState(state, view, unit),
+    })),
+  };
+}
+
+function attackState(state: MatchState, view: PlayerView, unit: UnitView): AttackState | null {
+  if (unit.order !== 'attack' || unit.target < 0) return null;
+  const localDefender =
+    view.units.some(
+      (candidate) => candidate.owner === view.playerId && candidate.hex === unit.target,
+    ) ||
+    view.cities.some(
+      (candidate) =>
+        candidate.owner === view.playerId &&
+        candidate.hex === unit.target &&
+        candidate.defenders > 0 &&
+        candidate.defenseOrg > 0,
+    );
+  if (unit.owner !== view.playerId && !localDefender) return null;
+  const perspective =
+    unit.owner === view.playerId
+      ? view
+      : { ...view, playerId: unit.owner, units: unitViews(state, unit.owner) };
+  const attackerIds = allUnits(state)
+    .filter(
+      (candidate) =>
+        candidate.owner === unit.owner &&
+        candidate.order === 'attack' &&
+        candidate.target === unit.target,
+    )
+    .map((candidate) => candidate.id);
+  const forecast = forecastBattle(state.map, perspective, attackerIds, unit.target);
+  const attackerTime = forecast.attackerTimeS ?? 0;
+  const defenderTime = forecast.defenderTimeS ?? 0;
+  const totalTime = attackerTime + defenderTime;
+  const attackerAdvantage =
+    totalTime === 0 ? 100 : intDiv(100 * attackerTime + intDiv(totalTime, 2), totalTime);
+  const advantage = localDefender ? 100 - attackerAdvantage : attackerAdvantage;
+  const status = localDefender
+    ? forecast.outcome === 'victory'
+      ? 'danger'
+      : forecast.outcome === 'defeat'
+        ? 'success'
+        : 'warning'
+    : forecast.outcome === 'victory'
+      ? 'success'
+      : forecast.outcome === 'defeat'
+        ? 'danger'
+        : 'warning';
+  return { target: unit.target, advantage, status };
 }
 
 /**

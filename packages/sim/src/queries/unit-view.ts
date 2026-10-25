@@ -34,6 +34,14 @@ export interface UnitView {
   readonly fireTarget: number;
   /** Атакующий неартиллерийский отряд получает бонус от своей артиллерии. */
   readonly artillerySupport: boolean;
+  readonly attackState?: AttackState | null;
+}
+
+/** Локальная оценка боя для отряда, участвующего в атаке. */
+export interface AttackState {
+  readonly target: HexId;
+  readonly advantage: number;
+  readonly status: 'success' | 'warning' | 'danger';
 }
 
 /** Своя армия в снимке. */
@@ -74,6 +82,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
           u.type !== 'artillery' &&
           u.order === 'attack' &&
           isSupportedByArtillery(state.map, state.units, u.owner, u.target),
+        attackState: null,
       };
     });
 }

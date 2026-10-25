@@ -8,7 +8,6 @@ import {
   type Fighter,
   type Ground,
 } from './battle-math.ts';
-import type { PlayerView } from './player-view.ts';
 import type { UnitView } from './unit-view.ts';
 import type { MapStatic } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
@@ -23,6 +22,10 @@ export interface Forecast {
   readonly outcome: ForecastOutcome;
   /** Секунды до слома первой стороны, fixed-point. */
   readonly timeS: Fp;
+  /** Время до слома атакующей стороны, fixed-point секунды. */
+  readonly attackerTimeS?: Fp;
+  /** Время до слома защищающейся стороны, fixed-point секунды. */
+  readonly defenderTimeS?: Fp;
   /** Доля солдат, которую потеряет сторона, fixed-point 0..1. */
   readonly attackerLoss: Fp;
   readonly defenderLoss: Fp;
@@ -57,6 +60,8 @@ function side(
 const INSTANT: Omit<Forecast, 'attack'> = {
   outcome: 'victory',
   timeS: 0 as Fp,
+  attackerTimeS: 0 as Fp,
+  defenderTimeS: 0 as Fp,
   attackerLoss: 0 as Fp,
   defenderLoss: 0 as Fp,
   defense: 0,
@@ -70,6 +75,18 @@ function lossShare(enemyPower: number, timeS: Fp, soldiers: number): Fp {
 }
 
 type Combatant = Fighter & { readonly org: number };
+
+interface ForecastView {
+  readonly playerId: number;
+  readonly hexes: { readonly building: Uint8Array };
+  readonly cities: readonly {
+    readonly hex: HexId;
+    readonly owner: number;
+    readonly defenders: Fp;
+    readonly defenseOrg: Fp;
+  }[];
+  readonly units: readonly UnitView[];
+}
 
 /** Входные данные прогноза: бойцы сторон, оборона города, все отряды (для поддержки артиллерии). */
 interface ForecastInput {
@@ -98,6 +115,8 @@ function forecastCore(f: ForecastInput): Forecast {
   return {
     outcome,
     timeS,
+    attackerTimeS: tAtt,
+    defenderTimeS: tDef,
     attackerLoss: lossShare(defense, timeS, att.soldiers),
     defenderLoss: lossShare(attack, timeS, def.soldiers),
     attack,
@@ -113,7 +132,7 @@ function forecastCore(f: ForecastInput): Forecast {
  */
 export function forecastBattle(
   map: MapStatic,
-  view: PlayerView,
+  view: ForecastView,
   unitIds: readonly number[],
   target: HexId,
 ): Forecast {
