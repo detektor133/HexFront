@@ -154,6 +154,32 @@ export function verifySplit(
   return errors;
 }
 
+/**
+ * Возвращает исходного родителя перед первой дочерней задачей, если plan удалил только его.
+ * Восстановление разрешено лишь когда итоговое разбиение после вставки полностью проходит verifySplit.
+ */
+export function restoreMissingSplitParent(
+  task: string,
+  before: RequirementsState,
+  after: RequirementsState,
+): string | undefined {
+  const original = taskBlock(before.stageText, task);
+  if (original === '' || taskBlock(after.stageText, task) !== '') return undefined;
+
+  const name = shortId(task);
+  const childHeading = new RegExp(
+    `^- \\[[^\\]]\\] \\*\\*${escapeRegExp(name)}[a-zа-яё](?:\\d+)?\\.`,
+    'imu',
+  );
+  const childIndex = after.stageText.search(childHeading);
+  if (childIndex < 0) return undefined;
+
+  const repaired = `${after.stageText.slice(0, childIndex)}${original.trimEnd()}\n\n${after.stageText.slice(childIndex)}`;
+  return verifySplit(task, before, { ...after, stageText: repaired }).length === 0
+    ? repaired
+    : undefined;
+}
+
 /** Сохранность исходных требований после $plan до передачи задачи исполнителю. */
 export function verifyPlanTransition(
   task: string,

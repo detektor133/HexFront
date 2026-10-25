@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { verifyPlanTransition } from './requirements.ts';
+import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
 import { taskBlock } from './stage-file.ts';
 import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
 
@@ -195,6 +195,47 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain(`$plan ${TASK}: разбито`);
     expect(run.lines).toContain('готово: 06/T1j5-Б1a');
     expect(run.lines).toContain('$plan 06/T1j5-Б1b: не трогал');
+  });
+
+  it('plan удалил родителя при корректном разбиении — цикл восстанавливает его до работы', async () => {
+    const original =
+      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.';
+    const splitWithoutParent = fixtureStage.replace(
+      original,
+      '- [ ] **T1j5-Б1a. Часть первая** (tools/evolve).\n  *Приёмка:* тесты.\n' +
+        '- [ ] **T1j5-Б1b. Часть вторая** (tools/evolve).\n  *Проверка:* интеграция.',
+    );
+    const splitStatus = fixtureStatus.replace(
+      'Очередь: 06/T1j5-Б1 → 06/T1i → 06/T1e',
+      'Очередь: 06/T1j5-Б1a → 06/T1j5-Б1b → 06/T1i → 06/T1e',
+    );
+    const repaired = restoreMissingSplitParent(
+      TASK,
+      { stageText: fixtureStage, status: fixtureStatus },
+      { stageText: splitWithoutParent, status: splitStatus },
+    );
+    expect(repaired).toContain(`${original}\n\n- [ ] **T1j5-Б1a.`);
+
+    const run = await runWorld({
+      plan: true,
+      maxRounds: 1,
+      sessions: [
+        {
+          answer: 'PLAN: разбито',
+          stage: splitWithoutParent,
+          status: splitStatus,
+          commit: true,
+          files: ['docs/stages/stage-06-bots-balance.md', 'docs/STATUS.md'],
+        },
+        { task: 'T1j5-Б1a', mark: '~', answer: 'Готово.' },
+        { task: 'T1j5-Б1a', mark: 'x', answer: 'OK' },
+        { answer: 'PLAN: не трогал' },
+        { answer: 'Готово.', commit: false },
+      ],
+    });
+    expect(run.lines).toContain(`$plan ${TASK}: восстановлен удалённый родитель разбиения`);
+    expect(run.lines).toContain(`$plan ${TASK}: разбито`);
+    expect(commands(run.prompts).slice(0, 2)).toEqual([`$plan ${TASK}`, '$task 06/T1j5-Б1a']);
   });
 
   it('plan удалил приёмку — блокирует $task, даже если ответил «уточнено»', async () => {

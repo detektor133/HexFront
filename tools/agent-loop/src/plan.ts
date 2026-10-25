@@ -5,6 +5,9 @@
 // отредактировала код самого цикла, 07/T17e неизмеримый критерий «минимальное перекрытие карты»
 // три круга подряд рождал новый обход теста. Проверка текста задачи до круга исполнителя снимает
 // часть таких случаев заранее.
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import {
   backoff,
   checkPermissions,
@@ -17,7 +20,7 @@ import {
   type Step,
 } from './context.ts';
 import { dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
-import { verifyPlanTransition } from './requirements.ts';
+import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
 import { isOwnerTask, selectTask, taskBlock, taskMark, type TaskMark } from './stage-file.ts';
 
 /** Без роли plan в roles.json цикл работает по-старому: текст задачи перед работой не проверяется. */
@@ -88,7 +91,17 @@ export async function runPlan(
       `$plan ${task} не ответил строкой «PLAN: …» — проверь`,
       result.message,
     );
-  const after = await readStage(context.config.root);
+  let after = await readStage(context.config.root);
+  if (outcome === 'разбито') {
+    const repaired = restoreMissingSplitParent(task, before, after);
+    if (repaired !== undefined) {
+      await writeFile(join(context.config.root, after.path), repaired, 'utf8');
+      await git.run(['add', '--', after.path]);
+      await git.run(['commit', '--amend', '--no-edit']);
+      after = await readStage(context.config.root);
+      await context.say(`$plan ${task}: восстановлен удалённый родитель разбиения`);
+    }
+  }
   const errors = verifyPlanTransition(task, before, after, outcome);
   if (errors.length > 0)
     return park(
