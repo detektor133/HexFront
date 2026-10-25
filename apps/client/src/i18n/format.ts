@@ -10,14 +10,47 @@ export function formatFp(fp: number, digits = 0): string {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })
-    .format(fp / FP)
-    .replace(/\u00a0/g, ' ');
+    .formatToParts(fp / FP)
+    .map((part) => (part.type === 'group' ? ' ' : part.value))
+    .join('');
+}
+
+/** Fixed-point число в компактном локализованном формате HUD. */
+export function formatCompact(fp: number): string {
+  const n = Math.floor(fp / FP);
+  const thousand = t('unit.thousandSuffix');
+  const million = t('unit.millionSuffix');
+  if (n < THOUSAND) {
+    if (Math.round(fp / FP) >= THOUSAND) return formatFp(THOUSAND * FP);
+    return formatFp(fp, fp / FP < 10 && !Number.isInteger(fp / FP) ? 1 : 0);
+  }
+  if (n < TEN_THOUSAND) {
+    const tenths = Math.floor(n / (THOUSAND / 10)) / 10;
+    return `${new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(tenths)}${thousand}`;
+  }
+  if (n < MILLION) {
+    return `${Math.floor(n / THOUSAND)}${thousand}`;
+  }
+  const tenths = Math.round((n / MILLION) * 10) / 10;
+  return `${new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(tenths)}${million}`;
 }
 
 /** Скорость со знаком: «+1,2/с», «−0,6/с». */
-export function formatRate(fpPerS: number, digits = 1): string {
+export function formatRate(fpPerS: number): string {
   const sign = fpPerS > 0 ? '+' : fpPerS < 0 ? '−' : '';
-  return `${sign}${formatFp(Math.abs(fpPerS), digits)}${t('hud.perSecond')}`;
+  return `${sign}${formatCompact(Math.abs(fpPerS))}${t('hud.perSecond')}`;
+}
+
+/** Fixed-point скорость с полным локализованным числом для подсказки HUD. */
+export function formatRateFull(fpPerS: number): string {
+  const sign = fpPerS > 0 ? '+' : fpPerS < 0 ? '−' : '';
+  return `${sign}${formatFp(Math.abs(fpPerS))}${t('hud.perSecond')}`;
 }
 
 /** Доля fixed-point (200 = 20 %) → «20 %». */
@@ -38,6 +71,7 @@ export function formatClock(tick: number, ticksPerS: number): string {
 
 const THOUSAND = 1000;
 const TEN_THOUSAND = 10_000;
+const MILLION = 1_000_000;
 
 /**
  * Солдаты на фишке (units.md, «Формат числа»): «850», «1,4к», «12к»; округление вниз —

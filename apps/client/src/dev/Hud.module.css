@@ -19,11 +19,11 @@
   flex: 1 1 0;
 }
 
-/* Пауза — прямой потомок .hud (в отличие от шестерёнки внутри .settingsWrap): без этого правила флекс мог сжать кнопку меньше 44×44. */
 .hud > .settingsButton {
   flex: 0 0 var(--touch-target-min);
 }
 
+/* Пауза — прямой потомок .hud (в отличие от шестерёнки внутри .settingsWrap): без этого правила флекс мог сжать кнопку меньше 44×44. */
 /* На 360 px узкие поля экономят место под обязательные цифры и приросты (ui.md «HUD»: без горизонтального скролла). */
 @media (max-width: 360px) {
   .hud {
@@ -96,6 +96,10 @@
   animation: hudValueChange 150ms cubic-bezier(0, 0, 0.2, 1);
 }
 
+.fullValue {
+  display: none;
+}
+
 .warning {
   color: var(--status-warning);
 }
@@ -114,7 +118,6 @@
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
@@ -134,6 +137,7 @@
   box-sizing: border-box;
   flex: 1 1 auto;
   width: auto;
+  inline-size: 100%;
   height: auto;
   min-height: var(--touch-target-min);
   min-width: var(--touch-target-min);
@@ -165,20 +169,6 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
-}
-
-@media (min-width: 601px) {
-  .hud > :is(.slot, .taxWrap) {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .slotText {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
 .slider {
@@ -292,6 +282,46 @@
   border: 1px solid var(--ui-border-strong);
 }
 
+@media (min-width: 601px) {
+  .hud {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) repeat(2, var(--touch-target-min));
+  }
+
+  .hud > :where(.slot, .taxWrap) {
+    min-width: 0;
+  }
+
+  .slotText {
+    display: grid;
+    grid-auto-flow: row;
+    justify-items: start;
+    gap: 0;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .value,
+  .rate,
+  .rateBad {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .taxWrap {
+    grid-column: 3;
+  }
+
+  .settingsWrap {
+    grid-column: 7;
+    inline-size: var(--touch-target-min);
+  }
+
+  .victoryHold {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Телефон в портрете: две строки, вторая мельче (ui.md). */
 @media (max-width: 600px) {
   .hud {
@@ -304,14 +334,17 @@
     font-size: var(--font-size-body);
   }
 
+  .compactValue {
+    display: none;
+  }
+
+  .fullValue {
+    display: inline;
+  }
+
   .hud > :where(.slot, .taxWrap) {
     flex: 1 1 0;
     min-width: 0;
-  }
-
-  .slotText {
-    flex: 1 1 auto;
-    overflow: hidden;
   }
 
   .taxButton {

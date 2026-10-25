@@ -13,7 +13,15 @@ import {
 
 import styles from './Hud.module.css';
 import { t } from '../i18n/dict.ts';
-import { formatClock, formatFp, formatMult, formatPercent, formatRate } from '../i18n/format.ts';
+import {
+  formatClock,
+  formatCompact,
+  formatFp,
+  formatMult,
+  formatPercent,
+  formatRate,
+  formatRateFull,
+} from '../i18n/format.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
@@ -62,7 +70,9 @@ function Slot(props: {
   icon: MetricIconName;
   label: string;
   value: string;
+  fullValue?: string;
   rate?: string;
+  fullRate?: string;
   negative?: boolean;
   tone?: 'success' | 'warning' | 'danger';
 }): React.JSX.Element {
@@ -70,11 +80,30 @@ function Slot(props: {
     <div className={styles.slot}>
       <MetricIcon name={props.icon} label={props.label} />
       <span className={styles.slotText}>
-        <span className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}>
-          {props.value}
+        <span
+          className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}
+          title={props.fullValue === props.value ? props.fullValue : undefined}
+          aria-label={props.fullValue}
+        >
+          {props.fullValue !== undefined && props.fullValue !== props.value ? (
+            <>
+              <span className={styles.compactValue} title={props.fullValue}>
+                {props.value}
+              </span>
+              <span className={styles.fullValue}>{props.fullValue}</span>
+            </>
+          ) : (
+            props.value
+          )}
         </span>
         {props.rate && (
-          <span className={props.negative ? styles.rateBad : styles.rate}>{props.rate}</span>
+          <span
+            className={props.negative ? styles.rateBad : styles.rate}
+            title={props.fullRate}
+            aria-label={props.fullRate}
+          >
+            {props.rate}
+          </span>
         )}
       </span>
     </div>
@@ -229,15 +258,19 @@ export function Hud(props: {
       <Slot
         icon="people"
         label={t('hud.people')}
-        value={formatFp(s.popTotal)}
+        value={formatCompact(s.popTotal)}
+        fullValue={formatFp(s.popTotal)}
         rate={formatRate(s.popGrowthPerS)}
+        fullRate={formatRateFull(s.popGrowthPerS)}
         negative={s.popGrowthPerS < 0}
       />
       <Slot
         icon="gold"
         label={t('hud.gold')}
-        value={formatFp(me.gold)}
+        value={formatCompact(me.gold)}
+        fullValue={formatFp(me.gold)}
         rate={formatRate(net)}
+        fullRate={formatRateFull(net)}
         negative={net < 0}
       />
       <div className={styles.taxWrap}>
@@ -301,7 +334,9 @@ export function Hud(props: {
         value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`}
       />
       {view.victoryHold && (
-        <span>{`${t('leaderboard.player')} ${view.victoryHold.player + 1} ${t('match.holdsCities')} · 00:${String(view.victoryHold.seconds).padStart(2, '0')}`}</span>
+        <span
+          className={styles.victoryHold}
+        >{`${t('leaderboard.player')} ${view.victoryHold.player + 1} ${t('match.holdsCities')} · 00:${String(view.victoryHold.seconds).padStart(2, '0')}`}</span>
       )}
       <Settings
         view={view}

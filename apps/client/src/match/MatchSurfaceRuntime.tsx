@@ -14,6 +14,7 @@ import {
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
+import { applyHudPreview, readHudPreview } from '../dev/hud-preview.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
@@ -363,6 +364,7 @@ export function useSandbox(
     let startCameraApplied = false;
     const deltaApplier = new ViewDeltaApplier();
     const setup = readLocalMatchSetup(window.location.search);
+    const hudPreview = import.meta.env.DEV ? readHudPreview(window.location.search) : null;
     const applyStartCameraToView = (currentView: PlayerView): void => {
       if (startCameraApplied || !mapViewRef.current) return;
       const city = currentView.cities.find((item) => item.owner === currentView.playerId);
@@ -379,10 +381,11 @@ export function useSandbox(
       });
     };
     const applyMessage = (m: WorkerViewMessage): void => {
-      const view =
+      const receivedView =
         m.kind === 'snapshot'
           ? deltaApplier.applySnapshot(m.snapshot)
           : deltaApplier.applyDelta(m.delta);
+      const view = applyHudPreview(receivedView, hudPreview);
       const applied = { ...m, view } as ViewMessage;
       if (view.tick % 10 === 0 || view.winner >= 0) {
         setReplay((current) => {

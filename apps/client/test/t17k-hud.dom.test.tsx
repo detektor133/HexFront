@@ -195,9 +195,19 @@ describe('07/T17k: компактный HUD', () => {
     expect(screen.getByRole('button', { name: 'Настройки' }).className).toContain('settingsButton');
     expect(screen.getByRole('button', { name: 'Пауза' }).className).toContain('settingsButton');
     expect(hudCss).toMatch(
-      /\.hud > \.settingsButton \{[\s\S]*?flex: 0 0 var\(--touch-target-min\);[\s\S]*?\}/,
+      /\.hud \{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(6, minmax\(0, 1fr\)\) repeat\(2, var\(--touch-target-min\)\);[\s\S]*?\}/,
     );
-    expect(hudCss).toMatch(/\.hud > \.slot,\s*\.hud > \.taxWrap \{[\s\S]*?flex: 1 1 0;/);
+    const hudRule = hudCss.match(/\.hud \{[^}]*\}/)?.[0] ?? '';
+    expect(hudRule).not.toContain('flex:');
+    const desktopHudCss = hudCss.split('@media')[0] ?? hudCss;
+    const directChildLayoutRules =
+      desktopHudCss.match(
+        /\.hud > \.(?:slot|taxWrap|settingsButton)(?:,\s*\.hud > \.(?:slot|taxWrap|settingsButton))*\s*\{[^}]*\}/g,
+      ) ?? [];
+    expect(directChildLayoutRules).toHaveLength(2);
+    expect(directChildLayoutRules.join('\n')).toContain('.hud > .slot');
+    expect(directChildLayoutRules.join('\n')).toContain('.hud > .taxWrap');
+    expect(directChildLayoutRules.join('\n')).toContain('.hud > .settingsButton');
     expect(hudCss).toMatch(
       /\.settingsButton \{[\s\S]*?width: var\(--touch-target-min\);[\s\S]*?height: 44px;[\s\S]*?\}/,
     );
