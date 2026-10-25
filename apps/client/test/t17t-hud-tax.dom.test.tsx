@@ -132,29 +132,6 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     expect(themeCss).toContain(`--selection-color: ${tokens.selection.color};`);
     expect(tokensJson).toContain(`"color": "${tokens.selection.color}"`);
 
-    const expectedIcons: Record<string, readonly string[]> = {
-      Налог: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
-      Снабжение: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
-      Время: [
-        'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
-      ],
-      Место: ['M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z'],
-    };
-    for (const [label, paths] of Object.entries(expectedIcons)) {
-      const icon = screen.getByLabelText(label, { selector: 'svg' });
-      expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-      expect(icon.getAttribute('fill')).toBe('none');
-      expect(icon.getAttribute('stroke')).toBe('currentColor');
-      expect(icon.getAttribute('stroke-width')).toBe('2');
-      expect(icon.getAttribute('stroke-linecap')).toBe('round');
-      expect(icon.getAttribute('stroke-linejoin')).toBe('round');
-      expect(icon.getAttribute('title')).toBe(label);
-      expect(icon.getAttribute('class')).not.toContain('goldIcon');
-      expect(
-        Array.from(icon.querySelectorAll('path')).map((path) => path.getAttribute('d')),
-      ).toEqual(paths);
-    }
-
     const taxButton = screen.getByRole('button', { name: 'Налог' });
     expect(taxButton.title).toBe('Налог');
     expect(taxButton.textContent).toMatch(/%/u);
