@@ -58,7 +58,7 @@ export interface Session {
   readonly push?: boolean;
   /** Файлы последнего коммита (для проверки прав ревью). */
   readonly files?: readonly string[];
-  readonly dirty?: boolean;
+  readonly dirty?: boolean | string;
   /** Файлы, которые сессия пишет на диск (путь → текст); при коммите они уходят в HEAD. */
   readonly writes?: Readonly<Record<string, string>>;
   /** Файлы, которые сессия удаляет с диска (путь уходит из `tracked`, при коммите — из HEAD). */
@@ -338,7 +338,12 @@ export async function runWorld(world: World): Promise<Outcome> {
       ...(session.removes ?? []),
     ];
     if (committing) commitFiles.set(head, files);
-    dirty = session.dirty === true ? ' M packages/sim/src/step.ts' : '';
+    dirty =
+      typeof session.dirty === 'string'
+        ? session.dirty
+        : session.dirty === true
+          ? ' M packages/sim/src/step.ts'
+          : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
   // git stash: отложенная на время Issue владельца работа (только незакоммиченные строки `dirty`).

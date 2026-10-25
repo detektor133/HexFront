@@ -11,7 +11,7 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import { dirtyFiles, head, remoteHead } from './git.ts';
+import { changedPaths, dirtyFiles, head, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import type { ReviewFinding } from './review.ts';
 
@@ -132,6 +132,27 @@ const changedPathsBetween = async (context: LoopContext, base: string): Promise<
     .map((path) => path.trim())
     .filter(Boolean);
 
+const normalize = (text: string): string => text.replace(/\r\n/gu, '\n').trimEnd();
+
+/** Незакоммиченными остались только исходные приёмочные тесты в сохранённом виде. */
+async function onlySavedSpecDirty(
+  context: LoopContext,
+  task: string,
+  checkContent = true,
+): Promise<boolean> {
+  const paths = await changedPaths(context.git);
+  const saved = context.state.spec[task];
+  if (paths.length === 0 || saved === undefined) return false;
+  for (const path of paths) {
+    const expected = saved[path];
+    if (expected === undefined) return false;
+    if (!checkContent) continue;
+    const current = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
+    if (current === undefined || normalize(current) !== normalize(expected)) return false;
+  }
+  return true;
+}
+
 /** Хвост ошибки verify для повторного промпта $spec: без шума, но с конкретной строкой TS/assert. */
 const verifyFailureSummary = (stdout: string, stderr: string): string =>
   [stdout, stderr]
@@ -163,6 +184,17 @@ async function verifyTouchedTests(
     });
     if (e2e.code !== 0) return verifyFailureSummary(e2e.stdout, e2e.stderr);
   }
+  const unit = touched.filter(
+    (path) => !E2E_SPEC_RE.test(path) && /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path),
+  );
+  if (unit.length > 0) {
+    const tested = await context.config.runCommand('pnpm', ['exec', 'vitest', 'run', ...unit], {
+      cwd: context.config.root,
+      timeoutMs: context.config.maxMinutes * 60_000,
+    });
+    if (tested.code !== 0) return verifyFailureSummary(tested.stdout, tested.stderr);
+  }
+  if (specs.length + unit.length === touched.length) return undefined;
   const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
     cwd: context.config.root,
     timeoutMs: context.config.maxMinutes * 60_000,
@@ -176,7 +208,10 @@ export async function runTestFix(
   finding: ReviewFinding,
   /** Вторая попытка после своего же красного verify --changed; третья запрещена. */
   attempt = 1,
+  /** До первой попытки в дереве уже лежали красные приёмочные тесты текущей задачи. */
+  pendingSpec = false,
 ): Promise<Step | 'rerouted' | undefined> {
+  const hadPendingSpec = pendingSpec || (await onlySavedSpecDirty(context, task, false));
   const base = await head(context.git);
   const published = await remoteHead(context.git);
   const result = await session(context, 'spec', findingPrompt(task, finding));
@@ -184,7 +219,9 @@ export async function runTestFix(
     return backoff(context, `$spec ${task}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
     return park(context, `push:${task}`, `${task}: $spec изменила origin до review`);
-  if ((await dirtyFiles(context.git)) !== '') {
+  const committed = (await head(context.git)) !== base;
+  const expectedDirty = committed && hadPendingSpec && (await onlySavedSpecDirty(context, task));
+  if ((await dirtyFiles(context.git)) !== '' && !expectedDirty) {
     // Содержимое уже прошло verify --changed в хуке конца хода сессии (AGENTS.md §0) — не хватает
     // только `git commit`. 30-минутный backoff для этого бессмысленен: это не сбой инфраструктуры,
     // а забытый шаг в том же ответе, который повторная попытка сразу же может исправить.
@@ -198,6 +235,7 @@ export async function runTestFix(
           text: `${finding.text}\nПредыдущая попытка написала правку, но не создала git commit — не забудь закоммитить.`,
         },
         attempt + 1,
+        hadPendingSpec,
       );
     }
     return park(
@@ -215,7 +253,7 @@ export async function runTestFix(
       `$spec ${task} не указал машинный исход РЕМОНТ; повтор автоматически запрещён`,
       result.message,
     );
-  if ((await head(context.git)) === base) {
+  if (!committed) {
     if (outcome.kind === 'untestable') return diagnoseFinding(context, task, finding);
     if (outcome.kind === 'code') return rerouteToCode(context, outcome.detail);
     return park(context, `spec:${task}`, `$spec ${task} сообщил об исправлении без коммита`);
@@ -269,11 +307,17 @@ export async function runTestFix(
       failure,
     );
   }
-  const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
-    cwd: context.config.root,
-    timeoutMs: context.config.maxMinutes * 60_000,
-  });
-  if (verified.code !== 0) {
+  const failure = hadPendingSpec
+    ? await verifyTouchedTests(context, touched)
+    : await context.config
+        .runCommand('pnpm', ['verify', '--changed'], {
+          cwd: context.config.root,
+          timeoutMs: context.config.maxMinutes * 60_000,
+        })
+        .then((verified) =>
+          verified.code === 0 ? undefined : verifyFailureSummary(verified.stdout, verified.stderr),
+        );
+  if (failure !== undefined) {
     if (attempt < 2) {
       await context.say(
         `repair-$spec ${task}: заявил ИСПРАВЛЕНО, но verify --changed красный — даю вторую попытку`,
@@ -285,16 +329,17 @@ export async function runTestFix(
           ...finding,
           text:
             `${finding.text}\nПредыдущая попытка заявила РЕМОНТ: ИСПРАВЛЕНО, но ` +
-            `pnpm verify --changed оказался красным:\n${verifyFailureSummary(verified.stdout, verified.stderr)}`,
+            `реальный прогон изменённых тестов оказался красным:\n${failure}`,
         },
         attempt + 1,
+        hadPendingSpec,
       );
     }
     return park(
       context,
       `test-fix:${task}`,
       `${task}: repair-$spec второй раз подряд оставил красный verify --changed; повтор и review запрещены`,
-      `${verified.stdout}\n${verified.stderr}`,
+      failure,
     );
   }
   return undefined;

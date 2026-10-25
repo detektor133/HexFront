@@ -234,6 +234,47 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
   });
 
+  it('repair-spec с коммитом не принимает исходные красные тесты за свою незакоммиченную правку', async () => {
+    const acceptance = 'packages/sim/test/acceptance.test.ts';
+    const oldTest = 'packages/sim/test/old.test.ts';
+    const run = await runWorld({
+      spec: true,
+      state: {
+        spec: { '06/T1j5-Б1': { [acceptance]: "it('приёмка', () => {});\n" } },
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'ТЕСТ', text: `ТЕСТ: ${oldTest} содержит старое требование` }],
+        },
+      },
+      dirty: acceptance,
+      sessions: [
+        {
+          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${oldTest}`,
+          writes: {
+            [oldTest]: "it('исправлено', () => {});\n",
+            [acceptance]: "it('приёмка', () => {});\n",
+          },
+          files: [oldTest],
+          commit: true,
+          dirty: `?? ${acceptance}`,
+        },
+        review('OK'),
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$spec 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.execs).toContain(`vitest run ${oldTest}`);
+    expect(run.lines.join('\n')).not.toContain('не коммитит свою правку');
+  });
+
   it('НЕПРОВЕРЯЕМО на красный e2e не верится на слово — реальный прогон даёт вторую попытку', async () => {
     const specPath = 'apps/client/tests/e2e/task.spec.ts';
     const untestable = (): Session => ({
