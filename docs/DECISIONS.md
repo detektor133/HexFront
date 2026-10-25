@@ -1,5 +1,6 @@
 # Журнал решений
 
+- 2026-10-25 · 07/infra · Диагностический prompt противоречил `docs/testing.md`: при неподходящем тестовом слое он прямо просил `plan` записать вопрос владельцу. Теперь технический конфликт маршрутизируется в `PLAN: инфраструктура`, а `$spec` переносит реальную CSS-геометрию из jsdom в Playwright · `.agents/skills/spec/SKILL.md`, `tools/agent-loop/src/{finding-repair,pipeline.test}.ts` · Этап: 07/infra
 - 2026-10-25 · 07/T17awa · По решению владельца фактический CSS-размер иконки 14×14 проверяет Playwright; DOM-тест проверяет структуру SVG, замкнутость, зеркальность и границы геометрии · `docs/stages/stage-07-playable-build.md`, `apps/client/test/t17awa-people-icon.dom.test.tsx`, `apps/client/tests/e2e/t17awa-people-icon.spec.ts` · Этап: 07/T17awa
 - 2026-10-25 · 07/infra · После успешного repair-`$spec` и узкого review T17awa переходила в следующий тик с фазой `review`; общий dirty-gate разрешал штатные незакоммиченные приёмочные тесты только в фазе `work` и ложно парковал задачу. Сохранённые тесты активной задачи теперь разрешены во всех её фазах, тогда как любой посторонний dirty-путь по-прежнему останавливает цикл · `tools/agent-loop/src/{agent-loop,pipeline.test}.ts` · Этап: 07/infra
 
