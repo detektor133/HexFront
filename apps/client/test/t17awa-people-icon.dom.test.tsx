@@ -93,9 +93,7 @@ describe('07/T17awa: иконка людей в HUD', () => {
 
     const icon = screen.getByLabelText('Люди', { selector: 'svg' });
     expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-    expect(hudCss).toMatch(
-      /\.metricIcon\s*\{[\s\S]*?inline-size:\s*14px;[\s\S]*?block-size:\s*14px;/u,
-    );
+    expect(hudCss).toMatch(/\.metricIcon\s*\{[\s\S]*?inline-size:\s*14px;[\s\S]*?height:\s*14px;/u);
 
     const silhouettes = Array.from(icon.querySelectorAll('path'))
       .flatMap((path) => path.getAttribute('d')?.split(/(?=M)/u) ?? [])
