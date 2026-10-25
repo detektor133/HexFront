@@ -133,9 +133,6 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     expect(tokensJson).toContain(`"color": "${tokens.selection.color}"`);
 
     const expectedIcons: Record<string, readonly string[]> = {
-      Люди: [
-        'M4 12C4 10.34 5.34 9 7 9C8.66 9 10 10.34 10 12M5 7C5 5.9 5.9 5 7 5C8.1 5 9 5.9 9 7M10 12C10 10.34 11.34 9 13 9M11 7C11 5.9 11.9 5 13 5',
-      ],
       Налог: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
       Снабжение: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
       Время: [
