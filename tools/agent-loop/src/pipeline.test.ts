@@ -35,6 +35,7 @@ describe('последовательный конвейер задачи', () =>
       '$review 06/T1j5-Б1',
     ]);
     expect(run.roles).toEqual(['spec', '', 'reviewer']);
+    expect(run.prompts[0]).toContain('Вычисляемые ожидания не угадывай');
     expect(run.pushes).toBe(2);
     expect(run.prePushCalls).toBe(1);
     expect(run.ciCalls).toBe(2);
@@ -130,7 +131,20 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[4]).toContain('Узкая проверка');
     expect(run.prompts[7]).toContain('Финальный полный review');
     expect(run.lines).toContain('06/T1j5-Б1: 3 локальных коммитов сведены в один перед push');
+    expect(run.commitDepthsAtPrePush).toEqual([1]);
     expect(run.verifyCalls).toBe(1);
+  });
+
+  it('перед первым review даёт исполнителю и reviewer полную матрицу критериев', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[0]).toContain('Перед первым review сверь реализацию и тесты');
+    expect(run.prompts[0]).toContain('1. *приёмка:* тесты');
+    expect(run.prompts[1]).toContain('Проверь каждый пункт матрицы до вердикта');
+    expect(run.prompts[1]).toContain('1. *приёмка:* тесты');
   });
 
   it('даёт repair-spec вторую попытку после своего красного verify, затем не повторяет и не шлёт на review', async () => {

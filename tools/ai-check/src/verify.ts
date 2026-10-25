@@ -8,24 +8,15 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { buildVerifySteps } from './verify-steps.ts';
+
 const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 const SUMMARY_MAX_LINES = 20;
 const ERRORS_PER_STEP = 4;
-const CODE_RE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
-const FORMAT_RE = /\.(ts|tsx|js|jsx|mjs|cjs|json|css|html|yml|yaml)$/;
-/** Файлы вне линтера (как .prettierignore и eslint.config.js). */
-const SKIP_RE =
-  /^(docs\/|coverage\/|\.ai-logs\/|pnpm-lock\.yaml|apps\/client\/src\/theme\/tokens\.)/;
 /** Что считать строкой ошибки в выводе шага. */
 const ERROR_RE = /error|FAIL|✗|×|AssertionError|не прошло|expected|warn/i;
 
 const changedOnly = process.argv.includes('--changed');
-
-interface Step {
-  readonly name: string;
-  readonly cmd: string;
-  readonly args: readonly string[];
-}
 
 function git(args: readonly string[]): string[] {
   return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
@@ -39,34 +30,6 @@ function changedFiles(): string[] {
   return [...new Set([...tracked, ...git(['ls-files', '--others', '--exclude-standard'])])];
 }
 
-function buildSteps(): Step[] {
-  const files = changedOnly ? changedFiles() : null;
-  const pick = (re: RegExp): string[] =>
-    files === null ? ['.'] : files.filter((f) => re.test(f) && !SKIP_RE.test(f));
-  const code = pick(CODE_RE);
-  const format = pick(FORMAT_RE);
-  const steps: Step[] = [
-    { name: 'build', cmd: 'pnpm', args: ['-r', '--if-present', 'build'] },
-    { name: 'types', cmd: 'pnpm', args: ['typecheck'] },
-  ];
-  if (code.length > 0) {
-    steps.push({
-      name: 'lint',
-      cmd: 'pnpm',
-      args: ['exec', 'eslint', '--max-warnings', '0', ...code],
-    });
-  }
-  if (format.length > 0) {
-    steps.push({ name: 'prettier', cmd: 'pnpm', args: ['exec', 'prettier', '--check', ...format] });
-  }
-  steps.push({
-    name: 'tests',
-    cmd: 'pnpm',
-    args: ['exec', 'vitest', 'run', ...(changedOnly ? ['--changed', 'HEAD'] : [])],
-  });
-  return steps;
-}
-
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 mkdirSync('.ai-logs', { recursive: true });
 const logPath = join('.ai-logs', `verify-${stamp}.log`).replaceAll('\\', '/');
@@ -75,7 +38,7 @@ writeFileSync(logPath, '');
 const started = Date.now();
 const summary: string[] = [];
 let failed = 0;
-for (const step of buildSteps()) {
+for (const step of buildVerifySteps(changedOnly ? changedFiles() : null)) {
   const t = Date.now();
   const r = spawnSync(step.cmd, step.args, {
     encoding: 'utf8',

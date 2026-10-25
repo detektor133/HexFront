@@ -150,6 +150,7 @@ export interface Outcome {
   layoutCalls: number;
   /** Число push к моменту каждого запуска pre-push gate. */
   readonly pushesAtPrePush: number[];
+  readonly commitDepthsAtPrePush: number[];
   verifyCalls: number;
   /** Вызовы `pnpm exec` (eslint, prettier) с аргументами. */
   readonly execs: string[];
@@ -227,6 +228,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     visualCalls: 0,
     layoutCalls: 0,
     pushesAtPrePush: [],
+    commitDepthsAtPrePush: [],
     verifyCalls: 0,
     slowCalls: [],
     reruns: [],
@@ -551,6 +553,9 @@ export async function runWorld(world: World): Promise<Outcome> {
         if (command === 'pnpm' && args[0] === 'verify:prepush') {
           out.prePushCalls += 1;
           out.pushesAtPrePush.push(pushes);
+          out.commitDepthsAtPrePush.push(
+            (commitDepth.get(head) ?? 0) - (commitDepth.get(origin) ?? 0),
+          );
           const line = prePush.shift() ?? 'pre-push: OK';
           return { code: line.startsWith('pre-push: OK') ? 0 : 1, stdout: line, stderr: '' };
         }

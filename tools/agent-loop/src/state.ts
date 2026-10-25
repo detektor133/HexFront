@@ -20,7 +20,15 @@ export interface ActiveTask {
   /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
   readonly workPrompt: string;
   phase:
-    'work' | 'review' | 'target-review' | 'pre-push' | 'visual' | 'ci' | 'finalize' | 'docs-ci';
+    | 'work'
+    | 'review'
+    | 'target-review'
+    | 'consolidate'
+    | 'pre-push'
+    | 'visual'
+    | 'ci'
+    | 'finalize'
+    | 'docs-ci';
   findings: PendingFinding[];
   /** Неудачные узкие review текущего пункта; первый зовёт plan, второй останавливает цикл. */
   findingRetries?: number;

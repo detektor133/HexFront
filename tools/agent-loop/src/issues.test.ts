@@ -315,9 +315,9 @@ describe('Issues в цикле', () => {
       ],
     });
     // Затем очередь идёт дальше: T1i закрыта, следующая — T1e.
-    expect(run.prompts).toEqual([
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
       '$done 06/T1i 30 поколений, веса лучшей особи',
-      DECIDE,
+      DECIDE.split('\n')[0],
       '$task 06/T1e',
     ]);
     expect(run.closed).toEqual([11, 10]);

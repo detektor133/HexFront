@@ -40,6 +40,12 @@ const requirements = (block: string): string[] => {
   return [...new Set(atoms(body.join('\n')))];
 };
 
+/** Полная нумерованная матрица требований задачи для самопроверки исполнителя и reviewer. */
+export function taskCriteriaMatrix(stageText: string, task: string): string {
+  const items = requirements(taskBlock(stageText, task));
+  return items.map((item, index) => `${index + 1}. ${item}`).join('\n');
+}
+
 /** Пути и пакеты из заголовка родителя могут распределяться между независимыми подзадачами. */
 const scopeReferences = (block: string): string[] => {
   const heading = block.split(/\r?\n/u, 1)[0] ?? '';

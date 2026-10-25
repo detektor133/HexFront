@@ -25,6 +25,7 @@ import {
 } from './finding-repair.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
+import { taskCriteriaMatrix } from './requirements.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
@@ -194,7 +195,15 @@ async function runProductWork(
   const base = await head(context.git);
   const published = await remoteHead(context.git);
   const locked = specFiles(context, task);
-  const result = await session(context, 'next', withSpec(prompt, task, locked), locked);
+  const matrix =
+    finding === undefined
+      ? taskCriteriaMatrix((await readStage(context.config.root)).stageText, task)
+      : '';
+  const checkedPrompt =
+    matrix === ''
+      ? prompt
+      : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nНе коммить частичное выполнение.`;
+  const result = await session(context, 'next', withSpec(checkedPrompt, task, locked), locked);
   if (result.failure !== undefined)
     return backoff(context, `${firstLine(prompt)}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
@@ -597,6 +606,12 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     }
     delete active.fixStreak;
     delete active.fullReviewRounds;
+    active.phase = 'consolidate';
+    await save(context);
+  }
+  if (active.phase === 'consolidate') {
+    const squashStop = await consolidateTaskHistory(context, task, active.base);
+    if (squashStop !== undefined) return { step: squashStop, done: false };
     active.phase = 'pre-push';
     await save(context);
   }
@@ -626,8 +641,6 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   if (active.phase === 'visual') {
     const stop = await runVisualGate(context, task, active.base);
     if (stop !== undefined) return { step: stop, done: false };
-    const squashStop = await consolidateTaskHistory(context, task, active.base);
-    if (squashStop !== undefined) return { step: squashStop, done: false };
     active.phase = 'ci';
     await save(context);
   }

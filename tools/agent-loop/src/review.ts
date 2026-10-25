@@ -1,6 +1,7 @@
 // Reviewer только читает локальный diff. Вердикт хранит оркестратор, stage-файл reviewer не меняет.
-import { backoff, session, type LoopContext, type Step } from './context.ts';
+import { backoff, readStage, session, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, remoteHead } from './git.ts';
+import { taskCriteriaMatrix } from './requirements.ts';
 import type { FindingKind } from './state.ts';
 
 export type { FindingKind };
@@ -40,9 +41,14 @@ export async function runReview(
   const beforeHead = await head(context.git);
   const beforeRemote = await remoteHead(context.git);
   const beforeTree = await dirtyFiles(context.git);
+  const matrix = taskCriteriaMatrix((await readStage(context.config.root)).stageText, task);
+  const fullMatrix = note.startsWith('Узкая')
+    ? ''
+    : `Проверь каждый пункт матрицы до вердикта; один проход должен вернуть все блокеры:\n${matrix}`;
   const prompt = [
     `$review ${task}`,
     note,
+    fullMatrix,
     'Reviewer работает только на чтение: ничего не изменяй, не коммить и не push.',
     'Ответ: первая строка `OK` или `ВОЗВРАТ`.',
     'При возврате перечисли все блокеры строками `- КОД: ...` или `- ТЕСТ: ...`.',
