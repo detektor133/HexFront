@@ -70,6 +70,7 @@ function mockRuntime(): void {
 
 afterEach(() => {
   cleanup();
+  document.querySelector('[data-t17awa-people-css]')?.remove();
   vi.resetModules();
 });
 
@@ -87,13 +88,21 @@ describe('07/T17awa: иконка людей в HUD', () => {
   it('критерий: иконка имеет viewBox «0 0 14 14», CSS-размер 14×14 и два завершённых силуэта', async () => {
     mockRuntime();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
-    const hudCss = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8');
-
     render(<MatchPage />);
 
     const icon = screen.getByLabelText('Люди', { selector: 'svg' });
     expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-    expect(hudCss).toMatch(/\.metricIcon\s*\{[\s\S]*?inline-size:\s*14px;[\s\S]*?height:\s*14px;/u);
+    expect(icon.className.baseVal).toMatch(/metricIcon/u);
+    const style = document.createElement('style');
+    style.dataset.t17awaPeopleCss = 'true';
+    style.textContent = readFileSync(
+      join(process.cwd(), 'apps/client/src/dev/Hud.module.css'),
+      'utf8',
+    ).replaceAll('.metricIcon', `.${icon.className.baseVal.split(/\s+/u)[0]}`);
+    document.head.append(style);
+    const computedStyle = getComputedStyle(icon);
+    expect(computedStyle.inlineSize).toBe('14px');
+    expect(computedStyle.height).toBe('14px');
 
     const silhouettes = Array.from(icon.querySelectorAll('path'))
       .flatMap((path) => path.getAttribute('d')?.split(/(?=M)/u) ?? [])
