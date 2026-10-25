@@ -15,6 +15,24 @@ import { changedPaths, dirtyFiles, head, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import type { ReviewFinding } from './review.ts';
 
+/** Объединяет все замечания одной роли в один рабочий заход, сохраняя порядок ролей review. */
+export function batchReviewFindings(findings: readonly ReviewFinding[]): ReviewFinding[] {
+  const emitted = new Set<ReviewFinding['kind']>();
+  return findings.flatMap((finding) => {
+    if (finding.kind === 'ПЛАН') return [finding];
+    if (emitted.has(finding.kind)) return [];
+    emitted.add(finding.kind);
+    const sameRole = findings.filter((candidate) => candidate.kind === finding.kind);
+    if (sameRole.length === 1) return [finding];
+    return [
+      {
+        kind: finding.kind,
+        text: sameRole.map((candidate, index) => `${index + 1}. ${candidate.text}`).join('\n'),
+      },
+    ];
+  });
+}
+
 export const findingPrompt = (task: string, finding: ReviewFinding): string =>
   [
     finding.kind === 'ТЕСТ' ? `$spec ${task}` : `$task ${task}`,
@@ -23,7 +41,7 @@ export const findingPrompt = (task: string, finding: ReviewFinding): string =>
         'переписать целиком одним согласованным решением, потому что подряд несколько точечных ' +
         'патчей не закрыли задачу по существу. Не добавляй ещё один частный костыль поверх ' +
         'старых — замени сам подход, сохранив приёмку задачи.'
-      : 'Исправь ровно один пункт reviewer; остальные пункты этой задачи тебе не переданы:',
+      : 'Исправь весь переданный пакет замечаний одной роли за один согласованный проход:',
     finding.text,
     ...(finding.kind === 'ТЕСТ'
       ? [

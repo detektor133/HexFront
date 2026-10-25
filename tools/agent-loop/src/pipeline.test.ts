@@ -77,9 +77,9 @@ describe('последовательный конвейер задачи', () =>
     expect(run.ciCalls).toBe(2);
   });
 
-  it('выдаёт дефекты по одному и после каждого запускает узкий review', async () => {
+  it('выдаёт дефекты пакетами по ролям и после каждого пакета запускает узкий review', async () => {
     const returned = review(
-      'ВОЗВРАТ\n- КОД: критерий 1 — неверный путь, packages/sim/src/task.ts:1\n- ТЕСТ: критерий 2 — нет края, packages/sim/test/task.test.ts:1',
+      'ВОЗВРАТ\n- КОД: критерий 1 — неверный путь, packages/sim/src/task.ts:1\n- ТЕСТ: критерий 2 — нет края, packages/sim/test/task.test.ts:1\n- КОД: критерий 3 — неверный результат, packages/sim/src/task.ts:2',
     );
     const codeFix: Session = {
       answer: 'Исправлен первый пункт.',
@@ -122,12 +122,14 @@ describe('последовательный конвейер задачи', () =>
       '$review 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
-    expect(run.prompts[3]).toContain('Исправь ровно один пункт reviewer');
+    expect(run.prompts[3]).toContain('Исправь весь переданный пакет замечаний');
     expect(run.prompts[3]).toContain('КОД: критерий 1');
+    expect(run.prompts[3]).toContain('КОД: критерий 3');
     expect(run.prompts[3]).not.toContain('ТЕСТ: критерий 2');
     expect(run.prompts[5]).toContain('ТЕСТ: критерий 2');
     expect(run.prompts[4]).toContain('Узкая проверка');
     expect(run.prompts[7]).toContain('Финальный полный review');
+    expect(run.lines).toContain('06/T1j5-Б1: 3 локальных коммитов сведены в один перед push');
     expect(run.verifyCalls).toBe(1);
   });
 
@@ -603,7 +605,7 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
-  it('финальный review третий круг подряд находит новые пункты — зовёт plan, а не очередной патч', async () => {
+  it('финальный review второй круг подряд находит новые пункты — зовёт plan, а не очередной патч', async () => {
     const finding = 'КОД: другой дефект, не связанный с предыдущими пунктами';
     const run = await runWorld({
       plan: true,
@@ -615,7 +617,7 @@ describe('последовательный конвейер задачи', () =>
           workPrompt: '$task 06/T1j5-Б1',
           phase: 'review',
           findings: [],
-          fullReviewRounds: 2,
+          fullReviewRounds: 1,
         },
       },
       sessions: [
@@ -634,14 +636,14 @@ describe('последовательный конвейер задачи', () =>
       '$plan 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
     ]);
-    expect(run.prompts[1]).toContain('3 раз(а) подряд возвращает новые пункты');
+    expect(run.prompts[1]).toContain('2 раз(а) подряд возвращает новые пункты');
     expect(run.prompts[1]).toContain('вместо схождения к нулю');
     expect(run.lines).toContain(
       '06/T1j5-Б1: plan не нашёл конфликт требований, даю исправляющей роли последнюю попытку',
     );
   });
 
-  it('третий круг подряд на ТЕСТ-пункте, который план решил переделать, уходит автору тестов, не кодеру', async () => {
+  it('второй круг подряд на ТЕСТ-пункте, который plan решил переделать, уходит автору тестов, не кодеру', async () => {
     const finding =
       'ТЕСТ: apps/client/test/t17ar-terrain-layer.test.ts:120 — не проверяет равный объём вызовов';
     const run = await runWorld({
@@ -655,7 +657,7 @@ describe('последовательный конвейер задачи', () =>
           workPrompt: '$task 06/T1j5-Б1',
           phase: 'review',
           findings: [],
-          fullReviewRounds: 2,
+          fullReviewRounds: 1,
         },
       },
       sessions: [

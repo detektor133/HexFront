@@ -239,7 +239,9 @@ export async function runWorld(world: World): Promise<Outcome> {
   };
   let branch = world.branch ?? 'stage-06';
   let head = 0;
+  let nextCommit = 0;
   let origin = 0;
+  const commitDepth = new Map<number, number>([[0, 0]]);
   let dirty =
     world.dirty === true
       ? ' M packages/sim/src/bots/weights.json'
@@ -248,6 +250,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         : ` M ${world.dirty}`;
   let files: readonly string[] = [];
   let pushes = 0;
+  let squashedFiles: readonly string[] = [];
   // Файлы каждого коммита codex-сессии по номеру HEAD: `git diff --name-only A..B` считает их
   // объединением по диапазону, как настоящий git, а не только файлами последней сессии.
   const commitFiles = new Map<number, readonly string[]>();
@@ -319,7 +322,9 @@ export async function runWorld(world: World): Promise<Outcome> {
       (session.mark !== undefined || session.stage !== undefined || session.status !== undefined);
     const committing = session.commit ?? changed;
     if (committing) {
-      head += 1;
+      const parent = head;
+      head = ++nextCommit;
+      commitDepth.set(head, (commitDepth.get(parent) ?? 0) + 1);
       snapshots.set(head, await readFile(stagePath, 'utf8'));
       for (const path of tracked) {
         const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
@@ -406,6 +411,17 @@ export async function runWorld(world: World): Promise<Outcome> {
     }
     if (sub === 'remote') return ok('https://github.com/detektor133/HexFront.git');
     if (sub === 'log') return ok(world.headTrailer ?? '');
+    if (sub === 'rev-list' && first === '--count') {
+      const [fromRef, toRef] = (args[2] ?? '').split('..');
+      return ok(
+        String(
+          fromRef !== undefined && toRef !== undefined
+            ? (commitDepth.get(resolveCommit(toRef)) ?? 0) -
+                (commitDepth.get(resolveCommit(fromRef)) ?? 0)
+            : 0,
+        ),
+      );
+    }
     if (sub === 'rev-parse')
       return ok(`c${first?.startsWith('origin/') ? origin : first === 'HEAD^' ? head - 1 : head}`);
     if (sub === 'diff' && first === '--quiet')
@@ -417,6 +433,12 @@ export async function runWorld(world: World): Promise<Outcome> {
       return ok();
     }
     if (sub === 'add') return ok();
+    if (sub === 'reset' && first === '--soft') {
+      const target = resolveCommit(args[2] ?? 'HEAD');
+      squashedFiles = unionFiles(target, head);
+      head = target;
+      return ok();
+    }
     if (sub === 'checkout' && args.includes('--')) {
       const paths = args.slice(args.indexOf('--') + 1);
       for (const path of paths) {
@@ -436,7 +458,9 @@ export async function runWorld(world: World): Promise<Outcome> {
       return ok();
     }
     if (sub === 'commit') {
-      head += 1;
+      const parent = head;
+      head = ++nextCommit;
+      commitDepth.set(head, (commitDepth.get(parent) ?? 0) + 1);
       snapshots.set(head, await readFile(stagePath, 'utf8'));
       for (const path of tracked) {
         const text = await readFile(join(root, path), 'utf8').catch(() => undefined);
@@ -444,6 +468,11 @@ export async function runWorld(world: World): Promise<Outcome> {
         else committed.set(path, text);
       }
       dirty = '';
+      if (squashedFiles.length > 0) {
+        commitFiles.set(head, squashedFiles);
+        files = squashedFiles;
+        squashedFiles = [];
+      }
       return ok();
     }
     if (sub === 'merge-base') {

@@ -1,4 +1,4 @@
-// Последовательный автомат задачи: spec → локальная работа → review → пункты по одному → push → CI.
+// Последовательный автомат задачи: spec → локальная работа → review → пакеты по ролям → push → CI.
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
@@ -17,7 +17,12 @@ import {
   type SkillResult,
   type Step,
 } from './context.ts';
-import { diagnoseFinding, findingPrompt, runTestFix } from './finding-repair.ts';
+import {
+  batchReviewFindings,
+  diagnoseFinding,
+  findingPrompt,
+  runTestFix,
+} from './finding-repair.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
@@ -36,7 +41,7 @@ export interface TaskRun {
 export const REDESIGN_STREAK = 3;
 
 /** Подряд кругов финального review с новыми пунктами (любыми, не только по одному файлу/тесту). */
-export const REVIEW_ROUND_LIMIT = 3;
+export const REVIEW_ROUND_LIMIT = 2;
 
 /** Первый продуктовый (не тестовый) файл `apps/client/src` в списке изменённых путей коммита. */
 export function dominantProductFile(paths: readonly string[]): string | undefined {
@@ -155,7 +160,7 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
         );
         return 'worked';
       }
-      active.findings = [...verdict.findings, ...active.findings.slice(1)];
+      active.findings = [...batchReviewFindings(verdict.findings), ...active.findings.slice(1)];
       finding = active.findings[0] ?? finding;
       await save(context);
     }
@@ -377,6 +382,34 @@ async function publishReviewed(
   return undefined;
 }
 
+async function consolidateTaskHistory(
+  context: LoopContext,
+  task: string,
+  base: string,
+): Promise<Step | undefined> {
+  const count = Number(await context.git.run(['rev-list', '--count', `${base}..HEAD`]));
+  if (!Number.isSafeInteger(count) || count <= 1) return undefined;
+  const source = await head(context.git);
+  const reset = await context.git.attempt(['reset', '--soft', base]);
+  if (reset.code !== 0)
+    return park(
+      context,
+      `squash:${task}`,
+      `${task}: не удалось подготовить сводный коммит`,
+      reset.stderr,
+    );
+  const committed = await context.git.attempt(['commit', '-C', source]);
+  if (committed.code !== 0)
+    return park(
+      context,
+      `squash:${task}`,
+      `${task}: не удалось создать сводный коммит после soft reset`,
+      committed.stderr,
+    );
+  await context.say(`${task}: ${count} локальных коммитов сведены в один перед push`);
+  return undefined;
+}
+
 async function runPhase(context: LoopContext): Promise<TaskRun> {
   const active = context.state.activeTask;
   if (active === undefined) throw new Error('нет активной задачи');
@@ -464,7 +497,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
           );
           return { step: 'worked', done: false };
         }
-        active.findings = [...verdict.findings, ...active.findings.slice(1)];
+        active.findings = [...batchReviewFindings(verdict.findings), ...active.findings.slice(1)];
         await save(context);
         await context.say(
           `узкий review ${task}: пункт не принят, запускаю диагностику plan перед повтором`,
@@ -477,9 +510,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         );
         return { step, done: false };
       }
-      const nextFindings = targeted
-        ? [...verdict.findings, ...active.findings.slice(1)]
-        : [...verdict.findings];
+      const nextFindings = batchReviewFindings(verdict.findings);
       if (!targeted) active.fullReviewRounds = (active.fullReviewRounds ?? 0) + 1;
       const streak = active.fixStreak;
       const first = nextFindings[0];
@@ -540,7 +571,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       active.phase = 'work';
       await save(context);
       await context.say(
-        `финальный review ${task}: ${active.findings.length} пунктов, исправляется первый`,
+        `финальный review ${task}: ${verdict.findings.length} пунктов собраны в ${active.findings.length} пакет(а) по ролям`,
       );
       return { step: 'worked', done: false };
     }
@@ -595,6 +626,8 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   if (active.phase === 'visual') {
     const stop = await runVisualGate(context, task, active.base);
     if (stop !== undefined) return { step: stop, done: false };
+    const squashStop = await consolidateTaskHistory(context, task, active.base);
+    if (squashStop !== undefined) return { step: squashStop, done: false };
     active.phase = 'ci';
     await save(context);
   }

@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseTestRepair } from './finding-repair.ts';
+import { batchReviewFindings, parseTestRepair } from './finding-repair.ts';
+
+describe('пакет возвратов review', () => {
+  it('передаёт все замечания кодеру одним пакетом, тестовые — отдельным', () => {
+    expect(
+      batchReviewFindings([
+        { kind: 'КОД', text: 'КОД: сломан HUD' },
+        { kind: 'ТЕСТ', text: 'ТЕСТ: нет проверки края' },
+        { kind: 'КОД', text: 'КОД: неверный формат' },
+      ]),
+    ).toEqual([
+      { kind: 'КОД', text: '1. КОД: сломан HUD\n2. КОД: неверный формат' },
+      { kind: 'ТЕСТ', text: 'ТЕСТ: нет проверки края' },
+    ]);
+  });
+});
 
 describe('машинный исход repair-spec', () => {
   it('различает зелёное исправление, дефект продукта и непроверяемый критерий', () => {

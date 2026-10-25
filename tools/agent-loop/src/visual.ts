@@ -10,6 +10,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { park, save, session, type LoopContext, type Step } from './context.ts';
+import { batchReviewFindings } from './finding-repair.ts';
 import { parseReviewVerdict } from './review.ts';
 
 const UI_GLOBS = [
@@ -88,13 +89,13 @@ export async function runVisualGate(
   if (verdict.ok) return undefined;
   const active = context.state.activeTask;
   if (active !== undefined) {
-    active.findings = [...verdict.findings];
+    active.findings = [...batchReviewFindings(verdict.findings)];
     active.findingRetries = 0;
     active.phase = 'work';
     await save(context);
   }
   await context.say(
-    `визуальный гейт ${task}: ${verdict.findings.length} пунктов, исправляется первый`,
+    `визуальный гейт ${task}: ${verdict.findings.length} пунктов собраны в ${active?.findings.length ?? 0} пакет(а) по ролям`,
   );
   return 'worked';
 }
