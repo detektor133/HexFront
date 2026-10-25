@@ -21,9 +21,7 @@ type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
 function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
   const iconRef = useRef<SVGSVGElement>(null);
   const paths: Record<MetricIconName, readonly string[]> = {
-    people: [
-      'M4 12C4 10.34 5.34 9 7 9C8.66 9 10 10.34 10 12M5 7C5 5.9 5.9 5 7 5C8.1 5 9 5.9 9 7M10 12C10 10.34 11.34 9 13 9M11 7C11 5.9 11.9 5 13 5',
-    ],
+    people: ['M2 12L2 8L3 6L5 6L6 8L6 12Z', 'M12 12L12 8L11 6L9 6L8 8L8 12Z'],
     gold: [
       'M3 4C3 2.9 4.8 2 7 2C9.2 2 11 2.9 11 4C11 5.1 9.2 6 7 6C4.8 6 3 5.1 3 4',
       'M3 4V10C3 11.1 4.8 12 7 12C9.2 12 11 11.1 11 10V4',
