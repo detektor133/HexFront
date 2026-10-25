@@ -92,13 +92,14 @@ describe('07/T17awa: иконка людей в HUD', () => {
 
     const icon = screen.getByLabelText('Люди', { selector: 'svg' });
     expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-    expect(icon.className.baseVal).toMatch(/metricIcon/u);
+    const className = icon.getAttribute('class') ?? '';
+    expect(className).toMatch(/metricIcon/u);
     const style = document.createElement('style');
     style.dataset.t17awaPeopleCss = 'true';
     style.textContent = readFileSync(
       join(process.cwd(), 'apps/client/src/dev/Hud.module.css'),
       'utf8',
-    ).replaceAll('.metricIcon', `.${icon.className.baseVal.split(/\s+/u)[0]}`);
+    ).replaceAll('.metricIcon', `.${className.split(/\s+/u)[0]}`);
     document.head.append(style);
     const computedStyle = getComputedStyle(icon);
     expect(computedStyle.inlineSize).toBe('14px');
