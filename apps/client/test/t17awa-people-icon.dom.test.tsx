@@ -127,6 +127,7 @@ describe('07/T17awa: иконка людей в HUD', () => {
     const [left, right] = bounds;
     expect(left).toBeDefined();
     expect(right).toBeDefined();
+    expect(bounds.every(({ minX, maxX, minY, maxY }) => maxX > minX && maxY > minY)).toBe(true);
     expect((left?.maxX ?? 0) + (right?.minX ?? 0)).toBe(14);
     expect((left?.minX ?? 0) + (right?.maxX ?? 0)).toBe(14);
     expect(left?.minY).toBe(right?.minY);
