@@ -27,6 +27,16 @@ for (const width of WIDTHS) {
         element.querySelectorAll<HTMLElement>('[class*="value"], [class*="rate"]'),
       ).filter((node) => getComputedStyle(node).display !== 'none');
       const errors: string[] = [];
+      const slotTexts = Array.from(element.querySelectorAll<HTMLElement>('[class*="slotText"]'));
+      for (const slotText of slotTexts) {
+        const value = slotText.querySelector<HTMLElement>(':scope > [class*="value"]');
+        const rate = slotText.querySelector<HTMLElement>(':scope > [class*="rate"]');
+        if (!value || !rate || getComputedStyle(rate).display === 'none') continue;
+        const valueRect = value.getBoundingClientRect();
+        const rateRect = rate.getBoundingClientRect();
+        if (valueRect.bottom <= rateRect.top || rateRect.bottom <= valueRect.top)
+          errors.push('значение и прирост расположены в две строки');
+      }
       for (const node of nodes) {
         const style = getComputedStyle(node);
         const rect = node.getBoundingClientRect();

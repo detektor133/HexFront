@@ -1006,6 +1006,36 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('снимает устаревшую активную задачу, уже закрытую и опубликованную ведущей сессией', async () => {
+    const run = await runWorld({
+      stage: setMark(fixtureStage, 'T1j5-Б1', 'x'),
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'старый-origin',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+        parked: {
+          key: 'push:06/T1j5-Б1',
+          head: 'c0',
+          reason: '06/T1j5-Б1: origin изменился во время оборванной сессии',
+        },
+      },
+      sessions: [],
+    });
+
+    expect(run.lines).toContain(
+      '06/T1j5-Б1: закрытая и опубликованная задача удалена из памяти цикла',
+    );
+    expect(run.lines).toContain(
+      'жду: очередь дошла до 06/T1i — это задача владельца. Когда сделаешь — Issue «$done 06/T1i» с текстом, что сделано',
+    );
+    expect(run.lines).not.toContain('жду: 06/T1j5-Б1: origin изменился во время оборванной сессии');
+  });
+
   it('после перезапуска завершает оборванную финализацию', async () => {
     const run = await runWorld({
       state: {

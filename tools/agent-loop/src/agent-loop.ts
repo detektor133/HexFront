@@ -15,13 +15,21 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import { changedPaths, currentBranch, dirtyFiles, head, makeGit, syncWithOrigin } from './git.ts';
+import {
+  changedPaths,
+  currentBranch,
+  dirtyFiles,
+  head,
+  makeGit,
+  remoteHead,
+  syncWithOrigin,
+} from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
 import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
-import { specFiles } from './spec.ts';
+import { forgetSpec, specFiles } from './spec.ts';
 import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
@@ -87,6 +95,26 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   );
 }
 
+/** Убирает память задачи, которую ведущая сессия уже закрыла и опубликовала во время остановки цикла. */
+async function reconcileExternallyCompletedTask(context: LoopContext): Promise<void> {
+  const { activeTask } = context.state;
+  if (activeTask?.remoteBase === undefined) return;
+  const stage = await readStage(context.config.root);
+  if (taskMark(stage.stageText, activeTask.task) !== 'x') return;
+  const local = await head(context.git);
+  const remote = await remoteHead(context.git);
+  if (local !== remote || activeTask.remoteBase === remote) return;
+  delete context.state.activeTask;
+  delete context.state.parked;
+  delete context.state.resume;
+  delete context.state.resumeNote;
+  delete context.state.waitingAnswer;
+  await forgetSpec(context, activeTask.task);
+  await save(context);
+  context.config.board?.end(MAIN_AGENT, `${activeTask.task}: внешнее завершение принято`);
+  await context.say(`${activeTask.task}: закрытая и опубликованная задача удалена из памяти цикла`);
+}
+
 /** Один шаг: Issue, закрытый этап или задача очереди. */
 async function tick(context: LoopContext): Promise<Step> {
   const { config, git, state } = context;
@@ -102,6 +130,7 @@ async function tick(context: LoopContext): Promise<Step> {
     return park(context, 'branch', `ожидалась ветка ${expected} из STATUS, сейчас ${branch}`);
   const files = await dirtyFiles(git);
   if (files !== '') return dirtyTree(context, files);
+  await reconcileExternallyCompletedTask(context);
   // Доделка имеет смысл только для незакоммиченной работы: в чистом дереве её не продолжать
   // позже на чужих файлах (например, весах, которые пишет evolve владельца).
   if (state.resume !== undefined || state.waitingAnswer !== undefined) {
