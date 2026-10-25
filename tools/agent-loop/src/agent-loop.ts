@@ -45,16 +45,11 @@ export {
 /** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
 async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
   const { state, config } = context;
-  if (state.activeTask?.phase === 'finalize')
-    return (
-      await processTask(context, state.activeTask.task, {
-        mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
-        workPrompt: state.activeTask.workPrompt,
-      })
-    ).step;
-  if (state.activeTask?.phase === 'work') {
+  if (state.activeTask !== undefined) {
     const paths = await changedPaths(context.git);
     const specs = new Set(specFiles(context, state.activeTask.task));
+    // Приёмочные тесты `$spec` лежат незакоммиченными до продуктового коммита. Они штатны не
+    // только в work: после repair-$spec задача отдельным тиком проходит узкий/full review.
     if (paths.length > 0 && paths.every((path) => specs.has(path)))
       return (
         await processTask(context, state.activeTask.task, {
@@ -63,6 +58,13 @@ async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
         })
       ).step;
   }
+  if (state.activeTask?.phase === 'finalize')
+    return (
+      await processTask(context, state.activeTask.task, {
+        mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
+        workPrompt: state.activeTask.workPrompt,
+      })
+    ).step;
   if (state.resume !== undefined) {
     const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
     const workPrompt = [resumePrompt(state.resume), state.resumeNote].filter(Boolean).join('\n');

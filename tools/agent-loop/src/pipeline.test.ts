@@ -275,6 +275,30 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines.join('\n')).not.toContain('не коммитит свою правку');
   });
 
+  it('после узкого review RED-тесты активной задачи не блокируют следующий тик', async () => {
+    const acceptance = 'packages/sim/test/acceptance.test.ts';
+    const run = await runWorld({
+      spec: true,
+      dirty: acceptance,
+      state: {
+        spec: { '06/T1j5-Б1': { [acceptance]: "it('приёмка', () => {});\n" } },
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+        },
+      },
+      sessions: [review('OK')],
+      maxRounds: 1,
+    });
+
+    expect(run.prompts[0]?.split('\n')[0]).toBe('$review 06/T1j5-Б1');
+    expect(run.lines.join('\n')).not.toContain('рабочее дерево не чистое');
+  });
+
   it('НЕПРОВЕРЯЕМО на красный e2e не верится на слово — реальный прогон даёт вторую попытку', async () => {
     const specPath = 'apps/client/tests/e2e/task.spec.ts';
     const untestable = (): Session => ({
