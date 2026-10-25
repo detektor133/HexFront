@@ -13,7 +13,8 @@ const normalize = (text: string): string =>
     .replace(/\*\*/gu, '')
     .replace(/\s+/gu, ' ')
     .trim()
-    .replace(/[.!?。]+$/gu, '');
+    .replace(/[.!?。]+$/gu, '')
+    .toLocaleLowerCase('ru-RU');
 
 const lines = (text: string): string[] =>
   text
@@ -30,11 +31,19 @@ const atoms = (text: string): string[] =>
     .map(normalize)
     .filter(Boolean);
 
-/** Первая строка содержит номер и название задачи; после названия могут идти требования. */
+/** Служебные зависимости проверяются порядком очереди, а не копированием в каждую подзадачу. */
 const requirements = (block: string): string[] => {
-  const [heading = '', ...body] = block.split(/\r?\n/u);
-  const afterTitle = heading.replace(/^- \[[^\]]\] \*\*T[^*]+\*\*/u, '');
-  return [...new Set(atoms([afterTitle, ...body].join('\n')))];
+  const body = block
+    .split(/\r?\n/u)
+    .slice(1)
+    .filter((line) => !/^\s*\*После:\*/iu.test(line));
+  return [...new Set(atoms(body.join('\n')))];
+};
+
+/** Пути и пакеты из заголовка родителя могут распределяться между независимыми подзадачами. */
+const scopeReferences = (block: string): string[] => {
+  const heading = block.split(/\r?\n/u, 1)[0] ?? '';
+  return [...heading.matchAll(/`([^`]+)`/gu)].map((match) => normalize(match[1] ?? ''));
 };
 
 const shortId = (task: string): string => task.split('/').at(-1) ?? task;
@@ -138,6 +147,11 @@ export function verifySplit(
   }
 
   const childTexts = children.map((child) => normalize(taskBlock(after.stageText, child)));
+  const combinedChildren = childTexts.join(' ');
+  for (const reference of scopeReferences(original)) {
+    if (!combinedChildren.includes(reference))
+      errors.push('область родителя не перенесена в подзадачи: «' + excerpt(reference) + '»');
+  }
   const body = original.split(/\r?\n/u).slice(1);
   const exactOnce = new Set(
     lines(body.filter((line) => /приёмка|^\s*\d+[.)]\s/iu.test(line)).join('\n')),
