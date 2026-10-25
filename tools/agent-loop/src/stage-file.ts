@@ -50,6 +50,10 @@ export const parseQueue = (status: string): string[] =>
     ...(status.match(/Очередь:\s*([^\r\n]+)/)?.[1] ?? '').matchAll(new RegExp(TASK_ID_SOURCE, 'g')),
   ].map((match) => match[0]);
 
+/** @returns задачи очереди STATUS, для которых в этапе нет отдельного машиночитаемого заголовка. */
+export const missingQueueTasks = (status: string, stageText: string): string[] =>
+  parseQueue(status).filter((task) => taskMark(stageText, task) === undefined);
+
 /**
  * @returns первая задача очереди STATUS, не закрытая в файле этапа (`[ ]` или `[~]`) и не в
  * `skip` (задачи, которые `plan` заблокировал вопросом в `docs/QUESTIONS.md`).

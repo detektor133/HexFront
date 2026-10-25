@@ -34,6 +34,7 @@ import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
   isOwnerTask,
+  missingQueueTasks,
   selectTask,
   statusBranch,
   taskBlock,
@@ -130,6 +131,17 @@ async function tick(context: LoopContext): Promise<Step> {
     return park(context, 'branch', `ожидалась ветка ${expected} из STATUS, сейчас ${branch}`);
   const files = await dirtyFiles(git);
   if (files !== '') return dirtyTree(context, files);
+  const currentStage = await readStage(config.root);
+  const missing =
+    closedStageBranch(status) === undefined
+      ? missingQueueTasks(status, currentStage.stageText)
+      : [];
+  if (missing.length > 0)
+    return park(
+      context,
+      `stage-queue:${currentStage.stage}`,
+      `в этапе нет отдельных заголовков задач очереди: ${missing.join(', ')}`,
+    );
   await reconcileExternallyCompletedTask(context);
   // Доделка имеет смысл только для незакоммиченной работы: в чистом дереве её не продолжать
   // позже на чужих файлах (например, весах, которые пишет evolve владельца).

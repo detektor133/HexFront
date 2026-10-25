@@ -5,6 +5,7 @@ import {
   closedStageBranch,
   commandTask,
   isOwnerTask,
+  missingQueueTasks,
   parseQueue,
   selectTask,
   taskMark,
@@ -30,6 +31,13 @@ describe('разбор файла этапа', () => {
     expect(taskMark(stage, '06/T1')).toBe(' ');
     expect(taskMark(stage, '06/T1i')).toBe('x');
     expect(taskMark(stage, '06/T9')).toBeUndefined();
+  });
+
+  it('не принимает объединённый заголовок за отдельные задачи очереди', () => {
+    const status = 'Очередь: 07/T17awa → 07/T17awb → 07/T17ax';
+    const stage = '- [x] **T17awa–T17awb. HUD**\n- [ ] **T17ax. Бой**\n';
+
+    expect(missingQueueTasks(status, stage)).toEqual(['07/T17awa', '07/T17awb']);
   });
 
   it('определяет задачу владельца только по заголовку', () => {
