@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,7 +69,6 @@ function mockRuntime(): void {
 
 afterEach(() => {
   cleanup();
-  document.querySelector('[data-t17awa-people-css]')?.remove();
   vi.resetModules();
 });
 
@@ -85,26 +83,13 @@ describe('07/T17awa: иконка людей в HUD', () => {
     expect(icons).toHaveLength(1);
   });
 
-  it('критерий: иконка имеет viewBox «0 0 14 14», CSS-размер 14×14 и два завершённых силуэта', async () => {
+  it('критерий: иконка имеет viewBox «0 0 14 14» и два завершённых силуэта', async () => {
     mockRuntime();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
     render(<MatchPage />);
 
     const icon = screen.getByLabelText('Люди', { selector: 'svg' });
     expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-    const className = icon.getAttribute('class') ?? '';
-    expect(className).toMatch(/metricIcon/u);
-    const style = document.createElement('style');
-    style.dataset.t17awaPeopleCss = 'true';
-    style.textContent = readFileSync(
-      join(process.cwd(), 'apps/client/src/dev/Hud.module.css'),
-      'utf8',
-    ).replaceAll('.metricIcon', `.${className.split(/\s+/u)[0]}`);
-    document.head.append(style);
-    const computedStyle = getComputedStyle(icon);
-    expect(computedStyle.inlineSize).toBe('14px');
-    expect(computedStyle.height).toBe('14px');
-
     const silhouettes = Array.from(icon.querySelectorAll('path'))
       .flatMap((path) => path.getAttribute('d')?.split(/(?=M)/u) ?? [])
       .filter((path) => /Z\s*$/iu.test(path));
@@ -146,5 +131,14 @@ describe('07/T17awa: иконка людей в HUD', () => {
     expect((left?.minX ?? 0) + (right?.maxX ?? 0)).toBe(14);
     expect(left?.minY).toBe(right?.minY);
     expect(left?.maxY).toBe(right?.maxY);
+
+    const [leftPath, rightPath] = silhouettes;
+    expect(rightPath?.match(/[A-Za-z]+/gu)).toEqual(leftPath?.match(/[A-Za-z]+/gu));
+    const leftNumbers = (leftPath?.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
+    const rightNumbers = (rightPath?.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
+    const mirroredLeft = leftNumbers.map((coordinate, index) =>
+      index % 2 === 0 ? Number((14 - coordinate).toFixed(3)) : coordinate,
+    );
+    expect(rightNumbers).toEqual(mirroredLeft);
   });
 });

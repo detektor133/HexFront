@@ -9,7 +9,7 @@ for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/match?map=small');
 
-    const icon = page.getByLabel('Люди', { exact: true });
+    const icon = page.getByRole('banner').getByLabel(/^(?:Люди|People)$/u);
     await expect(icon).toBeVisible();
     const result = await icon.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -35,8 +35,8 @@ for (const width of WIDTHS) {
       };
     });
 
-    expect(result.width).toBeGreaterThan(0);
-    expect(result.height).toBeGreaterThan(0);
+    expect(result.width).toBe(14);
+    expect(result.height).toBe(14);
     expect(result.clippedByParent).toBe(false);
     expect(result.intersectsNext).toBe(false);
   });
