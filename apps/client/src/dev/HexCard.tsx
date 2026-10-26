@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TERRAIN_NAMES,
@@ -14,28 +14,35 @@ import { visibleActions, type HexAction } from './hex-actions.ts';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
 import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
+import { GoldIcon } from '../ui/gold-icon.tsx';
 
 function ActionButton(props: {
   a: HexAction;
   send: (cmd: Command) => void;
   blockedText: string | null;
   onRoadPreview?: (path: readonly number[] | null) => void;
-}): React.JSX.Element {
-  const [why, setWhy] = useState(false);
+}): React.JSX.Element | null {
   const { a } = props;
+  const reasonId = useId();
   // Что даёт постройка — во всплывающей подсказке, не текстом в карточке (04/T16).
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
   const preview = a.kind === 'rebuild' ? a.previewPath : undefined;
   const clearPreview = (): void => props.onRoadPreview?.(null);
-  // Недоступное по правилам «Основать город»: приглушённая кнопка и причина строкой (ui.md).
   if (a.blocked) {
     return (
       <div className={styles.action}>
-        <button type="button" className={`${styles.button} ${styles.muted}`} disabled>
+        <button
+          type="button"
+          className={`${styles.button} ${styles.muted}`}
+          disabled
+          aria-describedby={reasonId}
+        >
           <span>{t(`action.${a.kind}` as MessageKey)}</span>
         </button>
-        <span className={styles.hint}>{props.blockedText}</span>
+        <span id={reasonId} className={styles.hint}>
+          {props.blockedText ?? reasonText(a.blocked)}
+        </span>
       </div>
     );
   }
@@ -44,31 +51,32 @@ function ActionButton(props: {
       <button
         type="button"
         className={styles.button}
+        disabled={!a.affordable}
+        {...(!a.affordable ? { 'aria-describedby': reasonId } : {})}
         title={hint ?? undefined}
         onMouseEnter={() => preview && props.onRoadPreview?.(preview)}
         onMouseLeave={clearPreview}
         onFocus={() => preview && props.onRoadPreview?.(preview)}
         onBlur={clearPreview}
         onClick={() => {
-          if (a.affordable) {
-            props.send(a.cmd);
-            clearPreview();
-          } else {
-            setWhy(true);
-          }
+          props.send(a.cmd);
+          clearPreview();
         }}
       >
         <span>{t(`action.${a.kind}` as MessageKey)}</span>
         <Price value={formatFp(a.cost)} ok={a.affordable} />
       </button>
-      {/* Причина — только по тапу (ui.md). */}
-      {why && !a.affordable && <span className={styles.reason}>{reasonText('notEnoughGold')}</span>}
+      {!a.affordable && (
+        <span id={reasonId} className={styles.reason}>
+          {reasonText('notEnoughGold')}
+        </span>
+      )}
     </div>
   );
 }
 
 // Набор в своём городе (03/T12): доступный — с ценой; не хватает только золота — с ценой и
-// причиной по тапу; недоступный по правилам — скрыт (ui.md).
+// причиной; недоступный по правилам — disabled с постоянной причиной (ui.md).
 
 // Глиф рода войск в сетке 14×14 — как на фишке (art/units.md, «Глифы»).
 function UnitGlyph(props: { type: RecruitOption['type'] }): React.JSX.Element {
@@ -90,10 +98,7 @@ function UnitGlyph(props: { type: RecruitOption['type'] }): React.JSX.Element {
 function Price(props: { value: string; ok: boolean }): React.JSX.Element {
   return (
     <span className={props.ok ? styles.price : styles.priceBad}>
-      <svg viewBox="0 0 14 14" className={styles.coin} aria-hidden="true">
-        <circle cx="7" cy="7" r="5" />
-        <line x1="7" y1="4.5" x2="7" y2="9.5" />
-      </svg>
+      <GoldIcon {...(styles.coin ? { className: styles.coin } : {})} />
       {props.value}
     </span>
   );
@@ -104,6 +109,7 @@ function RecruitButton(props: {
   send: (cmd: Command) => void;
   cityId: number;
 }): React.JSX.Element | null {
+  const reasonId = useId();
   const [soldiers, setSoldiers] = useState(
     props.o.amounts[0]?.soldiers ?? (0 as RecruitAmount['soldiers']),
   );
@@ -113,6 +119,7 @@ function RecruitButton(props: {
   const { check } = amount;
   const label = t(`unit.${o.type}` as MessageKey);
   const reason = check.ok ? null : reasonText(check.reason);
+  const blocked = !check.ok && check.reason !== 'notEnoughGold';
   return (
     <div className={styles.action}>
       <label className={styles.recruitControl}>
@@ -136,16 +143,21 @@ function RecruitButton(props: {
       </label>
       <button
         type="button"
-        className={styles.button}
+        className={`${styles.button}${blocked ? ` ${styles.muted}` : ''}`}
         disabled={!check.ok}
         aria-label={`${label} ${formatSoldiers(soldiers)}`}
+        {...(reason ? { 'aria-describedby': reasonId } : {})}
         title={label}
         onClick={() => props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers })}
       >
         <span>{t('recruit.queue')}</span>
         {check.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
       </button>
-      {reason && <span className={styles.reason}>{reason}</span>}
+      {reason && (
+        <span id={reasonId} className={styles.reason}>
+          {reason}
+        </span>
+      )}
       {check.timeS !== undefined && (
         <span className={styles.time}>
           {formatFp(check.timeS)} {t('card.seconds')}

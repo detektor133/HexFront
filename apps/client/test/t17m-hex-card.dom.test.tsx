@@ -371,7 +371,9 @@ describe('T17m: карточка клетки', () => {
     render(
       <HexCard s={connected.selection} view={connected.view} map={mapResult.map} send={send} />,
     );
-    expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
+    const connectedButton = screen.getByRole('button', { name: /Проложить дорогу/u });
+    expect((connectedButton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Город связан со столицей')).toBeTruthy();
   });
 
   it('берёт внешнюю высоту содержимого с padding и рамкой', () => {

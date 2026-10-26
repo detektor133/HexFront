@@ -38,19 +38,23 @@ describe('действия карточки гекса', () => {
     expect(visibleActions(plain(), 1, 0, false)).toEqual([]);
   });
 
-  it('недоступные по правилам скрыты, «не хватает золота» — с ценой', () => {
-    const actions = visibleActions(plain(), 0, 0, false).filter((a) => a.kind !== 'foundCity');
-    expect(actions.map((a) => [a.kind, a.cost, a.affordable])).toEqual([
-      ['improve', 20_000, true],
-      ['fort', 60_000, false],
+  it('запрещённые по правилам видимы с причиной, «не хватает золота» — видимо с ценой', () => {
+    const actions = visibleActions(plain(), 0, 0, false);
+    expect(actions.map((a) => [a.kind, a.cost, a.affordable, a.blocked])).toEqual([
+      ['foundCity', 0, false, 'cityTooClose'],
+      ['improve', 20_000, true, undefined],
+      ['fort', 60_000, false, undefined],
+      ['depot', 0, false, 'depotTooClose'],
     ]);
   });
 
-  it('«Основать город» видна всегда — недоступная с причиной (ui.md)', () => {
-    const [found] = visibleActions(plain(), 0, 0, false);
-    expect(found).toMatchObject({ kind: 'foundCity', affordable: false, blocked: 'cityTooClose' });
-    const low = visibleActions(plain({ foundCity: rule('popTooLow') }), 0, 0, false)[0];
-    expect(low).toMatchObject({ kind: 'foundCity', blocked: 'popTooLow' });
+  it('«Основать город» видна с причиной запрета и доступна при разрешении', () => {
+    expect(visibleActions(plain(), 0, 0, false)).toContainEqual(
+      expect.objectContaining({ kind: 'foundCity', affordable: false, blocked: 'cityTooClose' }),
+    );
+    expect(visibleActions(plain({ foundCity: rule('popTooLow') }), 0, 0, false)).toContainEqual(
+      expect.objectContaining({ kind: 'foundCity', affordable: false, blocked: 'popTooLow' }),
+    );
     const ready = visibleActions(plain({ foundCity: ok(120_000) }), 0, 0, false)[0];
     expect(ready).toMatchObject({ kind: 'foundCity', affordable: true });
     expect(ready?.blocked).toBeUndefined();
@@ -77,7 +81,7 @@ describe('действия карточки гекса', () => {
     expect(road).toMatchObject({ kind: 'rebuild', previewPath: [5, 6, 7] });
   });
 
-  it('показывает дорогу для изолированного склада и скрывает для подключённого', () => {
+  it('показывает дорогу для изолированного склада и причину для подключённого', () => {
     const plan = {
       ok: true,
       cityHex: 5,
@@ -96,6 +100,8 @@ describe('действия карточки гекса', () => {
     });
     expect(
       visibleActions(plain({ rebuild: { ok: false, reason: 'notIsolated' } }), 0, 0, false),
-    ).not.toContainEqual(expect.objectContaining({ kind: 'rebuild' }));
+    ).toContainEqual(
+      expect.objectContaining({ kind: 'rebuild', affordable: false, blocked: 'notIsolated' }),
+    );
   });
 });

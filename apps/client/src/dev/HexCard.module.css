@@ -101,6 +101,10 @@
   cursor: pointer;
 }
 
+.button:disabled {
+  cursor: not-allowed;
+}
+
 .price {
   display: inline-flex;
   align-items: center;
@@ -147,8 +151,9 @@
 
 /* Недоступное по правилам действие, которое всё же показывается с причиной (ui.md). */
 .muted {
+  background: var(--ui-surface2);
+  border-color: var(--ui-border);
   color: var(--ui-ink3);
-  cursor: default;
 }
 
 /* Набор: глиф рода войск + число (art/ui.md, «Одна иконка — подпись до двух слов»). */

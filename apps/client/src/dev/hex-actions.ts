@@ -15,7 +15,7 @@ export interface HexAction {
   readonly cmd: Command;
   /** Путь для предпросмотра дороги, если действие — перестройка снабжения. */
   readonly previewPath?: readonly number[];
-  /** Почему недоступно по правилам — только у «Основать город»; иначе такие действия скрыты. */
+  /** Почему действие недоступно по правилам; такое действие остаётся видимой disabled-кнопкой. */
   readonly blocked?: RejectReason;
 }
 
@@ -29,16 +29,17 @@ function foundCityAction(check: ConstructionCheck, hex: number): HexAction {
   return { kind: 'foundCity', cost: 0, affordable: false, cmd, blocked: check.reason };
 }
 
-function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): HexAction | null {
+function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): HexAction {
   if (check.ok) return { kind, cost: check.cost, affordable: true, cmd };
   if (check.reason === 'notEnoughGold' && check.cost !== undefined) {
     return { kind, cost: check.cost, affordable: false, cmd };
   }
-  return null;
+  return { kind, cost: 0, affordable: false, cmd, blocked: check.reason };
 }
 
-function rebuildAction(plan: NonNullable<Selection['rebuild']>, target: Command): HexAction | null {
-  if (!plan.ok) return null;
+function rebuildAction(plan: NonNullable<Selection['rebuild']>, target: Command): HexAction {
+  if (!plan.ok)
+    return { kind: 'rebuild', cost: 0, affordable: false, cmd: target, blocked: plan.reason };
   return {
     kind: 'rebuild',
     cost: plan.cost,
@@ -60,12 +61,12 @@ export function visibleActions(
 ): HexAction[] {
   if (owner !== humanId || busy) return [];
   const hex = s.hex;
-  const out: (HexAction | null)[] = [];
+  const out: HexAction[] = [];
   const city = s.city;
   if (city) {
     out.push(fromCheck('upgrade', city.upgrade, { t: 'upgradeCity', cityId: city.id }));
     const r = city.rebuild;
-    if (r?.ok) {
+    if (r) {
       out.push(rebuildAction(r, { t: 'rebuildSupply', cityId: city.id }));
     }
   } else {
@@ -75,5 +76,5 @@ export function visibleActions(
     if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));
   }
   out.push(fromCheck('depot', s.depot, { t: 'build', hex, kind: 'depot' }));
-  return out.filter((a): a is HexAction => a !== null);
+  return out;
 }
