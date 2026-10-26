@@ -1,24 +1,12 @@
-import { Container, Graphics } from 'pixi.js';
+import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { tokens } from '../theme/tokens.ts';
 
-const MARKER_RADIUS_PX = 8;
-const MARKER_BORDER_PX = 2;
-const SECTOR_BORDER_PX = 1.5;
-const SECTOR_COUNT = 8;
-const BLADE_LENGTH_PX = MARKER_RADIUS_PX * 1.4;
-const BLADE_HALF_WIDTH_PX = (MARKER_RADIUS_PX * 0.22) / 2;
-
-/** Переводит организованность стороны в дискретное состояние сектора 0…7. */
-export function battleOrgState(
-  ownOrganization: number | null,
-  enemyOrganization: number | null,
-): number | null {
-  if (ownOrganization === null || enemyOrganization === null) return null;
-  const total = ownOrganization + enemyOrganization;
-  if (total <= 0) return null;
-  return Math.min(SECTOR_COUNT - 1, Math.floor((ownOrganization / total) * SECTOR_COUNT));
-}
+const BODY_RADIUS_PX = 12;
+const PROTRUSION_LENGTH_PX = 7;
+const PROTRUSION_BASE_HALF_PX = 5;
+const BORDER_PX = 2;
+const TEXT_PX = 12;
 
 /** Состояние видимости иконки исхода и карточки прогноза. */
 export interface BattleForecastPresentation {
@@ -31,10 +19,7 @@ export function getBattleForecastPresentation(input: {
   readonly hovered: boolean;
   readonly outcome: 'success' | 'warning' | 'danger';
 }): BattleForecastPresentation {
-  return {
-    showOutcomeIcon: true,
-    showForecastCard: input.hovered,
-  };
+  return { showOutcomeIcon: true, showForecastCard: input.hovered };
 }
 
 export interface BattleMarkerObject {
@@ -43,8 +28,8 @@ export interface BattleMarkerObject {
 }
 
 export interface BattleMarkerOptions {
-  readonly ownColor?: string;
-  readonly enemyColor?: string;
+  readonly direction?: readonly [number, number];
+  readonly color?: string;
 }
 
 export interface BattleMarker<T extends BattleMarkerObject> {
@@ -53,86 +38,68 @@ export interface BattleMarker<T extends BattleMarkerObject> {
   destroy(): void;
 }
 
-function bladePolygon(angle: number): number[] {
-  const axisX = Math.sin(angle);
-  const axisY = -Math.cos(angle);
-  const normalX = Math.cos(angle);
-  const normalY = Math.sin(angle);
+function protrusion(direction: readonly [number, number]): number[] {
+  const [x, y] = direction;
+  const normalX = -y;
+  const normalY = x;
+  const baseX = x * BODY_RADIUS_PX;
+  const baseY = y * BODY_RADIUS_PX;
+  const tipX = baseX + x * PROTRUSION_LENGTH_PX;
+  const tipY = baseY + y * PROTRUSION_LENGTH_PX;
   return [
-    axisX * BLADE_LENGTH_PX,
-    axisY * BLADE_LENGTH_PX,
-    normalX * BLADE_HALF_WIDTH_PX,
-    normalY * BLADE_HALF_WIDTH_PX,
-    -axisX * BLADE_LENGTH_PX,
-    -axisY * BLADE_LENGTH_PX,
-    -normalX * BLADE_HALF_WIDTH_PX,
-    -normalY * BLADE_HALF_WIDTH_PX,
+    baseX + normalX * PROTRUSION_BASE_HALF_PX,
+    baseY + normalY * PROTRUSION_BASE_HALF_PX,
+    baseX - normalX * PROTRUSION_BASE_HALF_PX,
+    baseY - normalY * PROTRUSION_BASE_HALF_PX,
+    tipX,
+    tipY,
   ];
 }
 
-function drawState(state: number | null, ownColor: string, enemyColor: string): BattleMarkerObject {
+function normalizeDirection(direction: readonly [number, number]): [number, number] {
+  const length = Math.hypot(direction[0], direction[1]);
+  if (length === 0) return [0, -1];
+  return [direction[0] / length, direction[1] / length];
+}
+
+function drawMarker(
+  advantage: number | null,
+  direction: readonly [number, number],
+  color: string,
+): BattleMarkerObject {
   const container = new Container();
   const graphics = new Graphics();
   graphics.context.batchMode = 'batch';
-  graphics.circle(0, 0, MARKER_RADIUS_PX).fill(tokens.ui.surface);
-
-  if (state === null) {
-    graphics.circle(0, 0, MARKER_RADIUS_PX).fill(tokens.ui.border);
-  } else {
-    const ownShare = state / SECTOR_COUNT;
-    const start = -Math.PI / 2;
-    const split = start + Math.PI * 2 * ownShare;
-    graphics
-      .moveTo(0, 0)
-      .arc(0, 0, MARKER_RADIUS_PX, start, split)
-      .lineTo(0, 0)
-      .fill(ownColor)
-      .stroke({ color: tokens.ui.surface, width: SECTOR_BORDER_PX });
-    graphics
-      .moveTo(0, 0)
-      .arc(0, 0, MARKER_RADIUS_PX, split, start + Math.PI * 2)
-      .lineTo(0, 0)
-      .fill(enemyColor)
-      .stroke({ color: tokens.ui.surface, width: SECTOR_BORDER_PX });
-  }
-
-  graphics.poly(bladePolygon(Math.PI / 4)).fill(tokens.ui.ink);
-  graphics.poly(bladePolygon(-Math.PI / 4)).fill(tokens.ui.ink);
-
-  graphics.circle(0, 0, MARKER_RADIUS_PX).stroke({
+  graphics.circle(0, 0, BODY_RADIUS_PX).fill(tokens.ui.surface);
+  graphics.poly(protrusion(direction)).fill(tokens.ui.surface).stroke({
     color: tokens.ui.ink,
-    width: MARKER_BORDER_PX,
+    width: BORDER_PX,
   });
+  graphics.circle(0, 0, BODY_RADIUS_PX).stroke({ color: tokens.ui.ink, width: BORDER_PX });
   container.addChild(graphics);
-  return { state, container };
+  if (advantage !== null) {
+    const text = new BitmapText({
+      text: String(advantage),
+      style: {
+        fontFamily: tokens.font.ui.family,
+        fontWeight: '500',
+        fontSize: TEXT_PX,
+        fill: color,
+      },
+    });
+    text.anchor.set(0.5, 0.5);
+    container.addChild(text);
+  }
+  return { state: advantage, container };
 }
 
-/** Создаёт маркер с кэшем: Pixi-объект меняется только при смене состояния. */
+/** Создаёт направленный маркер боя и обновляет его только при изменении числа. */
 export function createBattleMarker(
   options: BattleMarkerOptions = {},
 ): BattleMarker<BattleMarkerObject> {
-  const states = new Map<number | null, BattleMarkerObject>(
-    Array.from(
-      { length: SECTOR_COUNT },
-      (_, index) =>
-        [
-          index,
-          drawState(
-            index,
-            options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
-            options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
-          ),
-        ] as const,
-    ),
-  );
-  states.set(
-    null,
-    drawState(
-      null,
-      options.ownColor ?? tokens.players.palette[0]?.line ?? tokens.ui.ink,
-      options.enemyColor ?? tokens.players.palette[1]?.line ?? tokens.ui.ink,
-    ),
-  );
+  const direction = normalizeDirection(options.direction ?? [0, -1]);
+  const color = options.color ?? tokens.ui.ink;
+  const objects = new Map<number | null, BattleMarkerObject>();
   let object: BattleMarkerObject | null = null;
   let state: number | null | undefined;
 
@@ -142,11 +109,15 @@ export function createBattleMarker(
     },
     update(nextState: number | null): void {
       if (object !== null && state === nextState) return;
-      object = states.get(nextState) ?? null;
+      object = objects.get(nextState) ?? null;
+      if (object === null) {
+        object = drawMarker(nextState, direction, color);
+        objects.set(nextState, object);
+      }
       state = nextState;
     },
     destroy(): void {
-      for (const cached of states.values())
+      for (const cached of objects.values())
         cached.container?.destroy({ children: true, context: true });
     },
   };

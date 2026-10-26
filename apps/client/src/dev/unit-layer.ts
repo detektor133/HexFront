@@ -21,7 +21,6 @@ import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
 import {
-  battleOrgState,
   createBattleMarker,
   type BattleMarker,
   type BattleMarkerObject,
@@ -54,8 +53,8 @@ export interface UnitLayer {
   setView(view: PlayerView, picked: Picked, nowMs: number): void;
   setScale(scale: number): void;
   cacheTelemetry(): UnitLayerCacheTelemetry;
-  /** Возвращает состояние маркера боя для целевого гекса или null, если маркера нет. */
-  battleMarkerState(targetHex: number): number | null;
+  /** Возвращает состояние маркера боя для пары исходного и целевого гексов или null, если маркера нет. */
+  battleMarkerState(sourceHex: number, targetHex: number): number | null;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
   /** Возвращает отряды фишки под мировой точкой, включая её текущую позицию. */
@@ -159,36 +158,59 @@ export function createUnitLayer(
   /** Гексы с городами и их уровень — фишка стоит ниже знака города. */
   const cities = new Map<number, number>();
   const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
+  const battleMarkerColors = new Map<string, string>();
 
-  function drawBattleMarker(u: UnitView, v: PlayerView, pulse: number): void {
-    const key = `${u.target}`;
+  function battleAdvantage(u: UnitView, v: PlayerView): number | null {
+    if (u.attackState !== null && u.attackState !== undefined) return u.attackState.advantage;
+    if (u.owner !== v.playerId) return null;
     const attackers = v.units.filter(
-      (candidate) => candidate.target === u.target && candidate.order === 'attack',
+      (candidate) => candidate.order === 'attack' && candidate.target === u.target,
     );
     const defenders = v.units.filter(
       (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
     );
-    let attackerOrg = 0;
-    for (const candidate of attackers) attackerOrg += candidate.org;
-    let defenderOrg = 0;
-    for (const candidate of defenders) defenderOrg += candidate.org;
+    const attackerOrg = attackers.reduce((sum, candidate) => sum + candidate.org, 0);
+    const defenderOrg = defenders.reduce((sum, candidate) => sum + candidate.org, 0);
+    const total = attackerOrg + defenderOrg;
+    return total === 0 ? 0 : Math.round((100 * attackerOrg) / total);
+  }
+
+  function drawBattleMarker(u: UnitView, v: PlayerView, pulse: number): void {
+    const key = `${u.hex}->${u.target}`;
+    const sourceCenter = center(u.hex);
+    const targetCenter = center(u.target);
+    const length = Math.hypot(targetCenter.x - sourceCenter.x, targetCenter.y - sourceCenter.y);
+    const direction: [number, number] = [
+      (targetCenter.x - sourceCenter.x) / length,
+      (targetCenter.y - sourceCenter.y) / length,
+    ];
+    const edgeCenter = {
+      x: (sourceCenter.x + targetCenter.x) / 2 - direction[0] * 4,
+      y: (sourceCenter.y + targetCenter.y) / 2 - direction[1] * 4,
+    };
+    const color =
+      u.attackState === null || u.attackState === undefined
+        ? tokens.ui.ink
+        : tokens.status[u.attackState.status];
     let marker = battleMarkers.get(key);
-    if (!marker) {
+    if (!marker || battleMarkerColors.get(key) !== color) {
+      if (marker?.object?.container) battles.removeChild(marker.object.container);
+      marker?.destroy();
       marker = createBattleMarker({
-        ownColor: playerLine(u.owner),
-        enemyColor: playerLine(defenders[0]?.owner ?? -1),
+        direction,
+        color,
       });
       battleMarkers.set(key, marker);
+      battleMarkerColors.set(key, color);
     }
     const previous = marker.object;
-    marker.update(battleOrgState(attackerOrg, defenderOrg));
+    marker.update(battleAdvantage(u, v));
     const current = marker.object;
     if (current && current !== previous) {
       if (previous?.container) battles.removeChild(previous.container);
       if (current.container) battles.addChild(current.container);
     }
-    const targetCenter = center(u.target);
-    current?.container?.position.set(targetCenter.x, targetCenter.y);
+    current?.container?.position.set(edgeCenter.x, edgeCenter.y);
     current?.container?.scale.set(CHIP_WORLD * pulse);
   }
 
@@ -353,8 +375,8 @@ export function createUnitLayer(
     const pulse = battlePulseScale(nowMs, reducedMotion);
     const drawn = new Set<string>();
     for (const u of v.units) {
-      if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.target}`)) continue;
-      const key = `${u.target}`;
+      if (u.order !== 'attack' || u.target < 0 || drawn.has(`${u.hex}->${u.target}`)) continue;
+      const key = `${u.hex}->${u.target}`;
       drawn.add(key);
       drawBattleMarker(u, v, pulse);
     }
@@ -363,6 +385,7 @@ export function createUnitLayer(
       if (marker.object?.container) battles.removeChild(marker.object.container);
       marker.destroy();
       battleMarkers.delete(key);
+      battleMarkerColors.delete(key);
     }
   }
 
@@ -391,8 +414,8 @@ export function createUnitLayer(
 
   const layer: UnitLayer = {
     container,
-    battleMarkerState(targetHex) {
-      return battleMarkers.get(`${targetHex}`)?.object?.state ?? null;
+    battleMarkerState(sourceHex, targetHex) {
+      return battleMarkers.get(`${sourceHex}->${targetHex}`)?.object?.state ?? null;
     },
     setView(v, p, nowMs) {
       view = v;
@@ -451,6 +474,7 @@ export function createUnitLayer(
     destroy() {
       for (const chip of chips.values()) chip.destroy();
       for (const marker of battleMarkers.values()) marker.destroy();
+      battleMarkerColors.clear();
       container.destroy({ children: true, context: true });
     },
   };

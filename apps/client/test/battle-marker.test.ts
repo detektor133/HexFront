@@ -8,7 +8,7 @@ import { hexFromId, loadMap } from '@hexfront/sim';
 import { drawForecastPresentation } from '../src/dev/forecast-plate.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
-import { battleOrgState, createBattleMarker } from '../src/match/battle-marker.ts';
+import { createBattleMarker } from '../src/match/battle-marker.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
@@ -17,15 +17,6 @@ const small = JSON.parse(
 ) as unknown;
 
 describe('маркер боя и плашка прогноза (07/T12a)', () => {
-  it('4: переводит долю организованности в одно из 8 состояний на границах 0, 12,5, 50 и 100 % и для равных сторон', () => {
-    expect(battleOrgState(0, 100)).toBe(0);
-    expect(battleOrgState(1000, 7000)).toBe(1);
-    expect(battleOrgState(50, 50)).toBe(4);
-    expect(battleOrgState(100, 0)).toBe(7);
-    expect(battleOrgState(40, 40)).toBe(4);
-    expect(battleOrgState(null, null)).toBeNull();
-  });
-
   it('4: при неизменном состоянии маркер не создаёт новых объектов Pixi', () => {
     const marker = createBattleMarker();
 
