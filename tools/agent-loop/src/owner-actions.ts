@@ -97,7 +97,8 @@ export function waitActions(
   if (url !== undefined) actions.push({ kind: 'open', key: 'О', label: 'ссылка', target: url });
   // Две команды в причине — два ответа: вопрос («$decide») и своя работа («$done NN/Tn»).
   const commands = [...reason.matchAll(ISSUE_RE)].flatMap((match) => match.slice(1, 2));
-  if (repo !== undefined)
+  // plan-blocked отвечает внутри консоли; внешняя Issue здесь только создаёт конфликт B/В.
+  if (repo !== undefined && key !== 'plan-blocked')
     commands.slice(0, 2).forEach((command, index) =>
       actions.push({
         kind: 'open',

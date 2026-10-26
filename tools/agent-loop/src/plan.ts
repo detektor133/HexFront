@@ -174,8 +174,7 @@ export async function selectPlannedTask(
           context,
           'plan-blocked',
           `до ${task} очередь не дошла: ${blockers.join(', ')} ждут решений владельца в ` +
-            'docs/QUESTIONS.md. Нажми [В] «ответить здесь»: варианты и свободный ввод; ' +
-            'либо Issue «$decide»',
+            'docs/QUESTIONS.md. Нажми Enter или B: варианты и свободный ввод',
         );
     }
     // Задача владельца не уходит исполнителю: plan её не проверяет, tick() сам ждёт владельца.

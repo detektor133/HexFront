@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
-import { parseKey, performAction, type ActionDeps } from './console-ui.ts';
+import {
+  isAnswerShortcut,
+  parseKey,
+  performAction,
+  resolveKey,
+  type ActionDeps,
+} from './console-ui.ts';
 import type { GithubClient } from './github.ts';
 import { actionKey, issueUrl, waitActions } from './owner-actions.ts';
 
@@ -66,14 +72,13 @@ describe('действия ожидания', () => {
     const reason =
       'до 07/T17 очередь не дошла: 07/T17axb, 07/T17axc ждут решений владельца в docs/QUESTIONS.md. Ответ — Issue «$decide»';
     const actions = waitActions('plan-blocked', reason, false, REPO);
-    expect(actions.map((action) => `${action.key} ${action.label}`)).toEqual([
-      'В ответить здесь',
-      'И Issue «$decide»',
-    ]);
+    expect(actions.map((action) => `${action.key} ${action.label}`)).toEqual(['В ответить здесь']);
     expect(actions[0]).toMatchObject({
       kind: 'answer',
       tasks: ['07/T17axb', '07/T17axc'],
     });
+    expect(resolveKey('B', 1, actions)).toEqual({ kind: 'action', key: 'В' });
+    expect(resolveKey('\r', 1, actions)).toEqual({ kind: 'action', key: 'В' });
   });
 
   it('заготовка «$done NN/Tn», ожидание без GitHub и PR этапа не дают ни Issue, ни повтора', () => {
@@ -119,6 +124,7 @@ describe('действия ожидания', () => {
     expect(parseKey('q', 1)).toEqual({ kind: 'quit', force: false });
     expect(parseKey('gp', 1)).toBeUndefined();
     expect(parseKey('x', 1)).toBeUndefined();
+    expect(['\r', '\n', '\r\n', 'B', 'b', 'В', 'в', 'D', 'd'].every(isAnswerShortcut)).toBe(true);
   });
 });
 

@@ -304,7 +304,7 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.prompts).toEqual([`$plan ${TASK}`]);
     expect(run.lines).toContain(`$plan ${TASK}: вопрос`);
     expect(run.lines).toContain(
-      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Нажми [В] «ответить здесь»: варианты и свободный ввод; либо Issue «$decide»',
+      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Нажми Enter или B: варианты и свободный ввод',
     );
     expect(run.lines.some((line) => line.includes('очередь дошла до 06/T1i'))).toBe(false);
   });
@@ -335,7 +335,7 @@ describe('роль plan перед исполнением задачи', () => {
     });
     expect(run.prompts).toEqual([]);
     expect(run.lines).toContain(
-      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Нажми [В] «ответить здесь»: варианты и свободный ввод; либо Issue «$decide»',
+      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Нажми Enter или B: варианты и свободный ввод',
     );
   });
 

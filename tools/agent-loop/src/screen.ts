@@ -133,7 +133,7 @@ function banner(
       reasonLines,
     );
     const actions = board.focusActions.flatMap((action): Span[] => [
-      [`${indent.slice(1)}[${action.key}]`, 'bold'],
+      [`${indent.slice(1)}[${action.kind === 'answer' ? 'Enter/B' : action.key}]`, 'bold'],
       [` ${action.label} `],
     ]);
     return [

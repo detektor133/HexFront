@@ -8,7 +8,7 @@ import { createInterface } from 'node:readline/promises';
 import { stageSummary, type Board } from './board.ts';
 import { readStage } from './context.ts';
 import type { GithubClient } from './github.ts';
-import { actionKey, openExternal, type ActionKey } from './owner-actions.ts';
+import { actionKey, openExternal, type ActionKey, type WaitAction } from './owner-actions.ts';
 import { customDecision, optionDecision, parsePlanQuestions } from './owner-questions.ts';
 import { stopAllCommands } from './process.ts';
 import { renderFrame } from './screen.ts';
@@ -54,6 +54,22 @@ export function parseKey(chunk: string, _limit: number): KeyAction | undefined {
   if (/^[\r\nrRкК]$/u.test(key)) return { kind: 'wake' };
   const action = actionKey(key);
   return action === undefined ? undefined : { kind: 'action', key: action };
+}
+
+/** Enter и визуально ожидаемые варианты B/В открывают ответы plan независимо от раскладки. */
+export const isAnswerShortcut = (chunk: string): boolean =>
+  /^(?:\r|\n|\r\n|[bBdDвВ])$/u.test(chunk);
+
+/** Контекст ожидания имеет приоритет над глобальной раскладкой: B не должна открыть `[И]`. */
+export function resolveKey(
+  chunk: string,
+  limit: number,
+  actions: readonly WaitAction[],
+): KeyAction | undefined {
+  const answer = actions.find((action) => action.kind === 'answer');
+  return answer !== undefined && isAnswerShortcut(chunk)
+    ? { kind: 'action', key: answer.key }
+    : parseKey(chunk, limit);
 }
 
 export interface ActionDeps {
@@ -355,7 +371,7 @@ export function createConsoleUi(
     wakeAll();
   };
   const onKey = (chunk: string): void => {
-    const action = parseKey(chunk, board.shownLimit);
+    const action = resolveKey(chunk, board.shownLimit, board.focusActions);
     if (action !== undefined) act(action);
   };
   process.on('SIGINT', quit);
