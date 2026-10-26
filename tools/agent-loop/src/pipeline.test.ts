@@ -149,10 +149,11 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[1]).toContain('1. *приёмка:* тесты');
   });
 
-  it('полный локальный контур чинится до первого review одним пакетом', async () => {
+  it('красный полный контур сначала разделяет дефекты кода и тестов через review', async () => {
     const run = await runWorld({
       sessions: [
         codeCommit(),
+        review('ВОЗВРАТ\n- КОД: удалённый экспорт всё ещё используется продуктом — src/task.ts:1'),
         codeCommit('Исправлен весь пакет ошибок полного контура.'),
         review('OK'),
         review('OK'),
@@ -167,12 +168,15 @@ describe('последовательный конвейер задачи', () =>
     expect(run.preReviewCalls).toBe(2);
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
       '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
-    expect(run.prompts[1]).toContain('исправь весь пакет ошибок за один проход');
+    expect(run.prompts[1]).toContain('Классифицируй все ошибки по матрице задачи');
+    expect(run.prompts[1]).toContain('устаревшее или противоречащее задаче ожидание — ТЕСТ');
     expect(run.prompts[1]).toContain('удалённый экспорт всё ещё импортируется');
+    expect(run.prompts[2]).toContain('удалённый экспорт всё ещё используется продуктом');
     expect(run.lines).toContain('полный локальный контур перед review 06/T1j5-Б1: FAIL');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });

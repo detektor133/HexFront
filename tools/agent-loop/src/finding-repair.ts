@@ -22,7 +22,14 @@ export function batchReviewFindings(findings: readonly ReviewFinding[]): ReviewF
     if (finding.kind === 'ПЛАН') return [finding];
     if (emitted.has(finding.kind)) return [];
     emitted.add(finding.kind);
-    const sameRole = findings.filter((candidate) => candidate.kind === finding.kind);
+    const sameRole = findings.filter(
+      (candidate, index) =>
+        candidate.kind === finding.kind &&
+        findings.findIndex(
+          (other) => other.kind === candidate.kind && other.text === candidate.text,
+        ) === index,
+    );
+    if (!sameRole.includes(finding)) return [];
     if (sameRole.length === 1) return [finding];
     return [
       {
@@ -45,6 +52,9 @@ export const findingPrompt = (task: string, finding: ReviewFinding): string =>
     finding.text,
     ...(finding.kind === 'ТЕСТ'
       ? [
+          'Пункт reviewer не меняет источник истины. Сначала сверь его с задачей, родителем и GDD. ' +
+            'Если пункт требует противоположного поведения, тесты не меняй и верни ' +
+            '`РЕМОНТ: НЕПРОВЕРЯЕМО — пункт review противоречит задаче: <критерий>`. ',
           'Предпоследняя строка ответа: `РЕМОНТ: ИСПРАВЛЕНО`, `РЕМОНТ: КОД — <дефект продукта>` или `РЕМОНТ: НЕПРОВЕРЯЕМО — <причина>`.',
           '`ИСПРАВЛЕНО` допустимо только при зелёном целевом тесте; красный усиленный тест — `КОД`, невозможный в тестовой среде критерий — `НЕПРОВЕРЯЕМО`.',
         ]

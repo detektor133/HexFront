@@ -117,13 +117,13 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
     await discardStraySpecAttempt(context, task);
     if (context.state.activeTask.findings.length === 0)
       context.state.activeTask.resumeWorkAfterFindings = true;
-    context.state.activeTask.findings = [
+    context.state.activeTask.findings = batchReviewFindings([
       {
         kind: 'ТЕСТ',
         text: `ТЕСТ: неверный приёмочный тест — ${specRemark.slice('СПЕК:'.length).trim()}`,
       },
       ...context.state.activeTask.findings,
-    ];
+    ]);
     await save(context);
     return 'worked';
   }
@@ -152,7 +152,7 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
       );
       if (typeof verdict === 'string') return verdict;
       if (verdict.ok) {
-        active.findings = active.findings.slice(1);
+        active.findings = batchReviewFindings(active.findings.slice(1));
         active.findingRetries = 0;
         active.phase = active.findings.length === 0 ? 'review' : 'work';
         await save(context);
@@ -161,7 +161,7 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
         );
         return 'worked';
       }
-      active.findings = [...batchReviewFindings(verdict.findings), ...active.findings.slice(1)];
+      active.findings = batchReviewFindings([...verdict.findings, ...active.findings.slice(1)]);
       finding = active.findings[0] ?? finding;
       await save(context);
     }
@@ -481,14 +481,26 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         timeoutMs: 20 * 60_000,
       });
       if (checked.code !== 0) {
-        active.findings = [
-          {
-            kind: 'КОД',
-            text:
-              'КОД: полный локальный контур перед review красный; исправь весь пакет ошибок ' +
-              `за один проход — ${prePushFailure(checked.stdout, checked.stderr)}`,
-          },
-        ];
+        const failure = prePushFailure(checked.stdout, checked.stderr);
+        const diagnosis = await runReview(
+          context,
+          task,
+          'Полный локальный контур перед review красный. Классифицируй все ошибки по матрице ' +
+            'задачи: устаревшее или противоречащее задаче ожидание — ТЕСТ, расхождение продукта ' +
+            `с задачей — КОД. Не требуй от продукта удовлетворять неверному тесту.\n${failure}`,
+        );
+        if (typeof diagnosis === 'string') return { step: diagnosis, done: false };
+        if (diagnosis.ok)
+          return {
+            step: await park(
+              context,
+              `check-review:${task}`,
+              `${task}: reviewer не классифицировал красный полный локальный контур`,
+              failure,
+            ),
+            done: false,
+          };
+        active.findings = batchReviewFindings(diagnosis.findings);
         active.findingRetries = 0;
         active.phase = 'work';
         await save(context);
@@ -529,7 +541,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
           );
           return { step: 'worked', done: false };
         }
-        active.findings = [...batchReviewFindings(verdict.findings), ...active.findings.slice(1)];
+        active.findings = batchReviewFindings([...verdict.findings, ...active.findings.slice(1)]);
         await save(context);
         await context.say(
           `узкий review ${task}: пункт не принят, запускаю диагностику plan перед повтором`,
