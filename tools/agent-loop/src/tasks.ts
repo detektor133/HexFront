@@ -202,7 +202,7 @@ async function runProductWork(
   const checkedPrompt =
     matrix === ''
       ? prompt
-      : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nНе коммить частичное выполнение.`;
+      : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nДля каждого пункта найди продуктовый путь и проверку. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.`;
   const result = await session(context, 'next', withSpec(checkedPrompt, task, locked), locked);
   if (result.failure !== undefined)
     return backoff(context, `${firstLine(prompt)}: ${result.failure}`, result.message);
@@ -474,6 +474,29 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   }
   if (active.phase === 'review' || active.phase === 'target-review') {
     const targeted = active.phase === 'target-review';
+    if (!targeted) {
+      await context.say(`… полный локальный контур перед review ${task}`);
+      const checked = await context.config.runCommand('pnpm', ['check'], {
+        cwd: context.config.root,
+        timeoutMs: 20 * 60_000,
+      });
+      if (checked.code !== 0) {
+        active.findings = [
+          {
+            kind: 'КОД',
+            text:
+              'КОД: полный локальный контур перед review красный; исправь весь пакет ошибок ' +
+              `за один проход — ${prePushFailure(checked.stdout, checked.stderr)}`,
+          },
+        ];
+        active.findingRetries = 0;
+        active.phase = 'work';
+        await save(context);
+        await context.say(`полный локальный контур перед review ${task}: FAIL`);
+        return { step: 'worked', done: false };
+      }
+      await context.say(`полный локальный контур перед review ${task}: OK`);
+    }
     const finding = active.findings[0];
     const note = targeted
       ? `Узкая проверка: проверь только исправление пункта «${finding?.text ?? ''}». Новые замечания не добавляй; они проверятся финальным review.`

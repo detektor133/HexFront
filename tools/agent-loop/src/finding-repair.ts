@@ -58,6 +58,8 @@ type TestRepairOutcome =
   | { readonly kind: 'untestable'; readonly detail: string };
 
 const TEST_REPAIR_RE = /^РЕМОНТ:\s*(ИСПРАВЛЕНО|КОД|НЕПРОВЕРЯЕМО)(?:\s*[—-]\s*(.+))?\s*$/imu;
+const SPEC_PATHS_RE = /^СПЕК:\s*(.+)\s*$/imu;
+const TEST_CASE_RE = /\b(?:it|test)(?:\.(?:each|only|skip|todo))?\s*\(/gu;
 
 export function parseTestRepair(message: string): TestRepairOutcome | undefined {
   const match = TEST_REPAIR_RE.exec(message);
@@ -66,6 +68,32 @@ export function parseTestRepair(message: string): TestRepairOutcome | undefined 
   const detail = match[2]?.trim();
   if (!detail) return undefined;
   return match[1] === 'КОД' ? { kind: 'code', detail } : { kind: 'untestable', detail };
+}
+
+/**
+ * Разрешает заменить целиком только один явно отклонённый сценарий. Иначе удаление файла может
+ * незаметно унести независимую регрессию, которую новый тест не обязан повторять.
+ */
+async function isSafeSingleTestReplacement(
+  context: LoopContext,
+  finding: ReviewFinding,
+  message: string,
+  saved: Readonly<Record<string, string>>,
+  deletedPath: string,
+): Promise<boolean> {
+  if (!finding.text.includes(deletedPath)) return false;
+  const previous = saved[deletedPath];
+  if (previous === undefined || (previous.match(TEST_CASE_RE) ?? []).length !== 1) return false;
+  const replacements = SPEC_PATHS_RE.exec(message)?.[1]
+    ?.split(',')
+    .map((path) => path.trim())
+    .filter((path) => path !== deletedPath && /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path));
+  if (replacements === undefined || replacements.length === 0) return false;
+  for (const path of replacements) {
+    const text = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
+    if (text !== undefined) return true;
+  }
+  return false;
 }
 
 export async function diagnoseFinding(
@@ -278,12 +306,23 @@ export async function runTestFix(
   }
   if (!(await checkPermissions(context, base, context.definitions.specPaths)))
     return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`, result.message);
-  const saved = { ...(context.state.spec[task] ?? {}) };
+  let saved = { ...(context.state.spec[task] ?? {}) };
   const touched = await changedPathsBetween(context, base);
+  let replacedDeletedTest = false;
   for (const path of touched) {
     // Автор тестов не может удалить чужую проверку (AGENTS.md §4.5); чтение несуществующего
     // файла раньше падало необработанным ENOENT и обрывало весь цикл.
     const text = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
+    if (
+      text === undefined &&
+      outcome.kind === 'fixed' &&
+      (await isSafeSingleTestReplacement(context, finding, result.message, saved, path))
+    ) {
+      saved = Object.fromEntries(Object.entries(saved).filter(([savedPath]) => savedPath !== path));
+      replacedDeletedTest = true;
+      await context.say(`repair-$spec ${task}: заменил единственный отклонённый тест ${path}`);
+      continue;
+    }
     if (text === undefined)
       return park(
         context,
@@ -325,16 +364,19 @@ export async function runTestFix(
       failure,
     );
   }
-  const failure = hadPendingSpec
-    ? await verifyTouchedTests(context, touched)
-    : await context.config
-        .runCommand('pnpm', ['verify', '--changed'], {
-          cwd: context.config.root,
-          timeoutMs: context.config.maxMinutes * 60_000,
-        })
-        .then((verified) =>
-          verified.code === 0 ? undefined : verifyFailureSummary(verified.stdout, verified.stderr),
-        );
+  const failure =
+    hadPendingSpec && !replacedDeletedTest
+      ? await verifyTouchedTests(context, touched)
+      : await context.config
+          .runCommand('pnpm', ['verify', '--changed'], {
+            cwd: context.config.root,
+            timeoutMs: context.config.maxMinutes * 60_000,
+          })
+          .then((verified) =>
+            verified.code === 0
+              ? undefined
+              : verifyFailureSummary(verified.stdout, verified.stderr),
+          );
   if (failure !== undefined) {
     if (attempt < 2) {
       await context.say(

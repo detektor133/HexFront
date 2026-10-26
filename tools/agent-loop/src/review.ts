@@ -44,7 +44,7 @@ export async function runReview(
   const matrix = taskCriteriaMatrix((await readStage(context.config.root)).stageText, task);
   const fullMatrix = note.startsWith('Узкая')
     ? ''
-    : `Проверь каждый пункт матрицы до вердикта; один проход должен вернуть все блокеры:\n${matrix}`;
+    : `Проверь каждый пункт матрицы до вердикта; один проход должен вернуть все блокеры. Для изменённых или удалённых публичных имён проверь через rg все импорты, вызовы и старые тесты; не ограничивайся новым приёмочным файлом:\n${matrix}`;
   const prompt = [
     `$review ${task}`,
     note,

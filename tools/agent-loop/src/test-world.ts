@@ -76,6 +76,8 @@ export interface World {
   readonly ci?: readonly string[];
   /** Ответы обязательного локального gate перед push; без значения — зелёный. */
   readonly prePush?: readonly string[];
+  /** Ответы полного `pnpm check` перед каждым полным review; без значения — зелёный. */
+  readonly preReview?: readonly string[];
   /** Ответы `pnpm test:e2e:visual` (визуальный гейт перед push); без значения — зелёный. */
   readonly visual?: readonly string[];
   /** Ответы `pnpm test:e2e:layout` (перепроверка repair-$spec при НЕПРОВЕРЯЕМО); без значения — зелёный. */
@@ -146,6 +148,7 @@ export interface Outcome {
   pushes: number;
   ciCalls: number;
   prePushCalls: number;
+  preReviewCalls: number;
   visualCalls: number;
   layoutCalls: number;
   /** Число push к моменту каждого запуска pre-push gate. */
@@ -205,6 +208,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const sessions = [...world.sessions];
   const ci = [...(world.ci ?? [])];
   const prePush = [...(world.prePush ?? [])];
+  const preReview = [...(world.preReview ?? [])];
   const visual = [...(world.visual ?? [])];
   const layout = [...(world.layout ?? [])];
   const verify = [...(world.verify ?? [])];
@@ -225,6 +229,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     pushes: 0,
     ciCalls: 0,
     prePushCalls: 0,
+    preReviewCalls: 0,
     visualCalls: 0,
     layoutCalls: 0,
     pushesAtPrePush: [],
@@ -552,6 +557,11 @@ export async function runWorld(world: World): Promise<Outcome> {
       ...(world.resume === undefined ? {} : { resume: world.resume }),
       github,
       runCommand: async (command, args, options) => {
+        if (command === 'pnpm' && args[0] === 'check') {
+          out.preReviewCalls += 1;
+          const line = preReview.shift() ?? 'check: OK';
+          return { code: line.startsWith('check: OK') ? 0 : 1, stdout: line, stderr: '' };
+        }
         if (command === 'pnpm' && args[0] === 'verify:prepush') {
           out.prePushCalls += 1;
           out.pushesAtPrePush.push(pushes);

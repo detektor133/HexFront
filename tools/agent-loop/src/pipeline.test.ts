@@ -142,9 +142,39 @@ describe('последовательный конвейер задачи', () =>
     });
 
     expect(run.prompts[0]).toContain('Перед первым review сверь реализацию и тесты');
+    expect(run.prompts[0]).toContain('найди все импорты, вызовы и старые тесты');
     expect(run.prompts[0]).toContain('1. *приёмка:* тесты');
     expect(run.prompts[1]).toContain('Проверь каждый пункт матрицы до вердикта');
+    expect(run.prompts[1]).toContain('проверь через rg все импорты, вызовы и старые тесты');
     expect(run.prompts[1]).toContain('1. *приёмка:* тесты');
+  });
+
+  it('полный локальный контур чинится до первого review одним пакетом', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        codeCommit('Исправлен весь пакет ошибок полного контура.'),
+        review('OK'),
+        review('OK'),
+      ],
+      preReview: [
+        'check: FAIL\nFAIL old.test.ts\nerror удалённый экспорт всё ещё импортируется',
+        'check: OK',
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.preReviewCalls).toBe(2);
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('исправь весь пакет ошибок за один проход');
+    expect(run.prompts[1]).toContain('удалённый экспорт всё ещё импортируется');
+    expect(run.lines).toContain('полный локальный контур перед review 06/T1j5-Б1: FAIL');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('даёт repair-spec вторую попытку после своего красного verify, затем не повторяет и не шлёт на review', async () => {
@@ -436,6 +466,41 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain(
       'жду: $spec 06/T1j5-Б1 удалил packages/sim/test/task.test.ts — проверь',
     );
+  });
+
+  it('repair-spec заменяет явно отклонённый одиночный тест и проверяет полный diff', async () => {
+    const oldTest = 'packages/sim/test/task.test.ts';
+    const replacement = 'packages/sim/test/replacement.test.ts';
+    const run = await runWorld({
+      spec: true,
+      sessions: [
+        {
+          answer: 'Приёмочный тест записан.',
+          writes: { [oldTest]: "it('отменённое поведение', () => {});\n" },
+          push: false,
+        },
+        codeCommit(),
+        review(`ВОЗВРАТ\n- ТЕСТ: ${oldTest}:1 — сценарий проверяет отменённое поведение`),
+        {
+          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${replacement}`,
+          writes: { [replacement]: "it('новое поведение', () => {});\n" },
+          removes: [oldTest],
+          files: [oldTest, replacement],
+          commit: true,
+          push: false,
+        },
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.lines).toContain(
+      `repair-$spec 06/T1j5-Б1: заменил единственный отклонённый тест ${oldTest}`,
+    );
+    expect(run.lines.join('\n')).not.toContain(`удалил ${oldTest} — проверь`);
+    expect(run.verifyCalls).toBe(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('узкий пункт review, назвавший файл цикла по имени, не паркуется как самовольная правка', async () => {
