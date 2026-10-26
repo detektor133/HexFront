@@ -9,7 +9,7 @@ import { stageSummary, type Board } from './board.ts';
 import { readStage } from './context.ts';
 import type { GithubClient } from './github.ts';
 import { actionKey, openExternal, type ActionKey } from './owner-actions.ts';
-import { acceptProposal, customDecision, parsePlanQuestions } from './owner-questions.ts';
+import { customDecision, optionDecision, parsePlanQuestions } from './owner-questions.ts';
 import { stopAllCommands } from './process.ts';
 import { renderFrame } from './screen.ts';
 
@@ -287,12 +287,21 @@ export function createConsoleUi(
       process.stdout.write('\nОтветы на вопросы plan\n');
       for (const question of questions) {
         process.stdout.write(`\n${question.task}: ${question.question}\n`);
-        process.stdout.write(`  [1] Принять рекомендацию: ${question.proposal}\n`);
-        process.stdout.write('  [2] Ввести свой ответ\n  [3] Пропустить этот вопрос\n');
+        question.options.forEach((option, index) =>
+          process.stdout.write(
+            `  [${index + 1}] ${option}${index === question.recommended ? ' ← рекомендуется' : ''}\n`,
+          ),
+        );
+        process.stdout.write('  [С] Ввести свой ответ\n  [П] Пропустить этот вопрос\n');
         let choice = '';
-        while (!/^[123]$/u.test(choice)) choice = (await lines.question('Выбор [1/2/3]: ')).trim();
-        if (choice === '1') decisions.push(acceptProposal(question));
-        if (choice === '2') {
+        const maximum = question.options.length;
+        while (
+          !/^[сп]$/iu.test(choice) &&
+          (!/^\d+$/u.test(choice) || Number(choice) < 1 || Number(choice) > maximum)
+        )
+          choice = (await lines.question(`Выбор [1–${maximum}/С/П]: `)).trim();
+        if (/^\d+$/u.test(choice)) decisions.push(optionDecision(question, Number(choice) - 1));
+        if (/^с$/iu.test(choice)) {
           let custom = '';
           while (custom.trim() === '') custom = await lines.question('Твой ответ: ');
           decisions.push(customDecision(question, custom));

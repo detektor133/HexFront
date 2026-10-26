@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { acceptProposal, customDecision, parsePlanQuestions } from './owner-questions.ts';
+import { customDecision, optionDecision, parsePlanQuestions } from './owner-questions.ts';
 
 const QUESTIONS = `# Вопросы
 
@@ -15,7 +15,8 @@ describe('вопросы plan в консоли', () => {
       {
         task: '07/T17axb',
         question: 'Какая форма маркера',
-        proposal: 'описать шесть направлений',
+        options: ['описать шесть направлений'],
+        recommended: 0,
       },
     ]);
   });
@@ -26,13 +27,28 @@ describe('вопросы plan в консоли', () => {
     ).toEqual(['07/T17axb', '07/T17ay']);
   });
 
-  it('рекомендация разрешает агенту определить недостающие UI-параметры без нового вопроса', () => {
+  it('формирует решение из конкретного варианта и принимает свободный ответ', () => {
     const [question] = parsePlanQuestions(QUESTIONS, ['07/T17ay']);
     expect(question).toBeDefined();
     if (question === undefined) throw new Error('вопрос T17ay не найден');
-    expect(acceptProposal(question)).toContain('не возвращай владельцу новым вопросом');
+    expect(optionDecision(question, question.recommended)).toBe(
+      '### 07/T17ay\n\nиспользовать токены UI',
+    );
     expect(customDecision(question, '  две монеты 14×14  ')).toBe(
       '### 07/T17ay\n\nдве монеты 14×14',
     );
+  });
+
+  it('читает 2–3 варианта и номер рекомендации нового формата', () => {
+    const text =
+      '2026-10-26 · 07/T2 · Размер · блокирует · варианты: [1] 14 px | [2] 16 px | [3] 22 px · рекомендовано: 2 — соответствует сетке';
+    expect(parsePlanQuestions(text, ['07/T2'])).toEqual([
+      {
+        task: '07/T2',
+        question: 'Размер',
+        options: ['14 px', '16 px', '22 px'],
+        recommended: 1,
+      },
+    ]);
   });
 });
