@@ -63,8 +63,8 @@ describe('updateFixStreak', () => {
     expect(active.fixStreak).toEqual({ file: 'apps/client/src/dev/Hud.module.css', count: 2 });
   });
 
-  it('порог эскалации — три подряд патча одного файла', () => {
-    expect(REDESIGN_STREAK).toBe(3);
+  it('порог эскалации — два подряд патча одного файла (бюджет под слабую модель)', () => {
+    expect(REDESIGN_STREAK).toBe(2);
   });
 });
 

@@ -39,7 +39,9 @@ export interface TaskRun {
 }
 
 /** Подряд точечных патчей одного продуктового файла, после которых зовётся plan (не ещё патч). */
-export const REDESIGN_STREAK = 3;
+export const REDESIGN_STREAK = 2;
+/** Второй подряд отказ от теста через `СПЕК:` без решения `plan` между ними зовёт `plan`. */
+export const SPEC_BOUNCE_LIMIT = 2;
 
 /** Подряд кругов финального review с новыми пунктами (любыми, не только по одному файлу/тесту). */
 export const REVIEW_ROUND_LIMIT = 2;
@@ -114,16 +116,31 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
     .map((line) => line.trim())
     .find((line) => line.startsWith('СПЕК:'));
   if (specRemark !== undefined && context.state.activeTask?.task === task) {
+    const active = context.state.activeTask;
     await discardStraySpecAttempt(context, task);
-    if (context.state.activeTask.findings.length === 0)
-      context.state.activeTask.resumeWorkAfterFindings = true;
-    context.state.activeTask.findings = batchReviewFindings([
-      {
-        kind: 'ТЕСТ',
-        text: `ТЕСТ: неверный приёмочный тест — ${specRemark.slice('СПЕК:'.length).trim()}`,
-      },
-      ...context.state.activeTask.findings,
-    ]);
+    const finding: ReviewFinding = {
+      kind: 'ТЕСТ',
+      text: `ТЕСТ: неверный приёмочный тест — ${specRemark.slice('СПЕК:'.length).trim()}`,
+    };
+    active.specBounceStreak = (active.specBounceStreak ?? 0) + 1;
+    if (active.specBounceStreak >= SPEC_BOUNCE_LIMIT) {
+      await save(context);
+      return diagnoseFinding(
+        context,
+        task,
+        finding,
+        false,
+        `Исполнитель задачи ${task} уже ${active.specBounceStreak} раз(а) подряд отбрасывает ` +
+          `приёмочный тест маркером «СПЕК:» вместо кода, и каждый раз называет противоречие ` +
+          `по-другому (например «тест требует показать» и следом «тест требует скрыть» — критерию ` +
+          `удовлетворить не удаётся ни одной стороной). Свежая претензия: «${finding.text}». ` +
+          'Реши сам, чего на самом деле требует критерий приёмки, и либо уточни тест/задачу этим ' +
+          'решением, либо разбей задачу, либо запиши вопрос в docs/QUESTIONS.md — дальше не бросай ' +
+          'противоречие обратно исполнителю без этого решения.',
+      );
+    }
+    if (active.findings.length === 0) active.resumeWorkAfterFindings = true;
+    active.findings = batchReviewFindings([finding, ...active.findings]);
     await save(context);
     return 'worked';
   }
@@ -228,6 +245,7 @@ async function runProductWork(
   delete context.state.resume;
   delete context.state.resumeNote;
   delete context.state.waitingAnswer;
+  if (context.state.activeTask?.task === task) delete context.state.activeTask.specBounceStreak;
   await save(context);
   const violation = await specViolation(context, task);
   if (violation !== undefined) return park(context, `spec:${task}`, violation, result.message);
@@ -641,6 +659,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     }
     delete active.fixStreak;
     delete active.fullReviewRounds;
+    delete active.specBounceStreak;
     active.phase = 'consolidate';
     await save(context);
   }
