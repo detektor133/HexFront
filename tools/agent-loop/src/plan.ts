@@ -21,7 +21,14 @@ import {
 } from './context.ts';
 import { dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
 import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
-import { isOwnerTask, selectTask, taskBlock, taskMark, type TaskMark } from './stage-file.ts';
+import {
+  isOwnerTask,
+  parseQueue,
+  selectTask,
+  taskBlock,
+  taskMark,
+  type TaskMark,
+} from './stage-file.ts';
 
 /** Без роли plan в roles.json цикл работает по-старому: текст задачи перед работой не проверяется. */
 export const planEnabled = (context: LoopContext): boolean =>
@@ -134,8 +141,8 @@ const blockedTasks = (stage: StageState, planBlocked: Readonly<Record<string, st
 /**
  * Задача очереди перед работой: `plan` проверяет её текст один раз для каждой свежей задачи
  * (отметка ` `), прежде чем она уйдёт исполнителю. Разбирается в `tick()` между выбором `$next`
- * и запуском `$task`. Задача, которую `plan` заблокировал вопросом, пропускается — цикл берёт
- * следующую незаблокированную задачу очереди, а не ждёт владельца на месте.
+ * и запуском `$task`. Задача, которую `plan` заблокировал вопросом, пропускается только ради
+ * следующей автоматической задачи; задача владельца не выдаётся, пока перед ней есть блокеры.
  * @returns выбранную задачу и промпт работы, шаг цикла при остановке, или undefined — очередь пуста.
  */
 export async function selectPlannedTask(
@@ -145,7 +152,8 @@ export async function selectPlannedTask(
   const { state, config } = context;
   let stage = initialStage;
   for (;;) {
-    const task = selectTask(stage.status, stage.stageText, blockedTasks(stage, state.planBlocked));
+    const blocked = blockedTasks(stage, state.planBlocked);
+    const task = selectTask(stage.status, stage.stageText, blocked);
     if (task === undefined) {
       if (selectTask(stage.status, stage.stageText) === undefined) return undefined;
       return park(
@@ -155,6 +163,20 @@ export async function selectPlannedTask(
       );
     }
     const mark = taskMark(stage.stageText, task) ?? ' ';
+    if (isOwnerTask(taskBlock(stage.stageText, task))) {
+      const queue = parseQueue(stage.status);
+      const ownerIndex = queue.indexOf(task);
+      const blockers = queue
+        .slice(0, ownerIndex)
+        .filter((candidate) => blocked.includes(candidate));
+      if (blockers.length > 0)
+        return park(
+          context,
+          'plan-blocked',
+          `до ${task} очередь не дошла: ${blockers.join(', ')} ждут решений владельца в ` +
+            'docs/QUESTIONS.md. Ответ — Issue «$decide»',
+        );
+    }
     // Задача владельца не уходит исполнителю: plan её не проверяет, tick() сам ждёт владельца.
     if (mark !== ' ' || !planEnabled(context) || isOwnerTask(taskBlock(stage.stageText, task)))
       return { task, mark, workPrompt: `$task ${task}` };

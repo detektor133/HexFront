@@ -303,8 +303,10 @@ describe('роль plan перед исполнением задачи', () => {
     const run = await runWorld({ plan: true, sessions: [planQuestion] });
     expect(run.prompts).toEqual([`$plan ${TASK}`]);
     expect(run.lines).toContain(`$plan ${TASK}: вопрос`);
-    // Следующая задача очереди — 06/T1i, она задача владельца: цикл до неё дошёл сам.
-    expect(run.lines.some((line) => line.includes('очередь дошла до 06/T1i'))).toBe(true);
+    expect(run.lines).toContain(
+      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Ответ — Issue «$decide»',
+    );
+    expect(run.lines.some((line) => line.includes('очередь дошла до 06/T1i'))).toBe(false);
   });
 
   it('все задачи очереди заблокированы вопросом plan — ожидание владельца', async () => {
@@ -332,7 +334,9 @@ describe('роль plan перед исполнением задачи', () => {
       sessions: [],
     });
     expect(run.prompts).toEqual([]);
-    expect(run.lines.some((line) => line.includes('очередь дошла до 06/T1i'))).toBe(true);
+    expect(run.lines).toContain(
+      'жду: до 06/T1i очередь не дошла: 06/T1j5-Б1 ждут решений владельца в docs/QUESTIONS.md. Ответ — Issue «$decide»',
+    );
   });
 
   it('владелец изменил блок задачи — блок снимается, plan проверяет заново', async () => {
