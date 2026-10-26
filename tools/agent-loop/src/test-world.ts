@@ -520,6 +520,8 @@ export async function runWorld(world: World): Promise<Outcome> {
       if (item) issues[found] = { ...item, labels: [...item.labels, label] };
       return Promise.resolve();
     },
+    createIssue: (_title, _body) =>
+      Promise.resolve('https://github.com/detektor133/HexFront/issues/100'),
     changed: () => {
       out.checks += 1;
       // Первый вызов в ожидании только запоминает состояние; Issue приходит ко второй проверке.

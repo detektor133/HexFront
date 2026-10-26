@@ -8,12 +8,19 @@ import { TASK_ID_SOURCE } from './stage-file.ts';
  * Клавиша действия — русская буква; латиница той же физической клавиши тоже работает, чтобы
  * владельцу не переключать раскладку. Цифры, плюс и минус заняты числом агентов.
  */
-export const ACTION_KEYS = { П: 'g', О: 'j', И: 'b', Д: 'l', З: 'p', Л: 'k' } as const;
+export const ACTION_KEYS = { П: 'g', В: 'd', О: 'j', И: 'b', Д: 'l', З: 'p', Л: 'k' } as const;
 export type ActionKey = keyof typeof ACTION_KEYS;
 
 export type WaitAction =
   /** Повторить шаг, на котором цикл ждёт: то же, что перезапуск цикла, но без выхода. */
   | { readonly kind: 'retry'; readonly key: 'П'; readonly label: string }
+  /** Ответить на вопросы plan прямо в консоли и создать одну Issue `$decide`. */
+  | {
+      readonly kind: 'answer';
+      readonly key: 'В';
+      readonly label: string;
+      readonly tasks: readonly string[];
+    }
   /** Открыть ссылку или файл в программе по умолчанию. */
   | {
       readonly kind: 'open';
@@ -41,7 +48,7 @@ export function actionKey(key: string): ActionKey | undefined {
  * Ожидания, которые повтор шага не снимет: нужна Issue владельца (задача владельца, очередь,
  * разбиение) или мерж PR этапа — его цикл и так проверяет на каждом шаге.
  */
-const NO_RETRY = /^((owner|queue|split):|merge:stage-)/u;
+const NO_RETRY = /^((owner|queue|split):|merge:stage-|plan-blocked$)/u;
 /** Ссылка в тексте причины; знаки препинания за ней — не часть адреса. */
 const URL_RE = /https:\/\/[^\s«»"')]+[^\s«»"').,;:]/u;
 /** Команда Issue в причине: «$done 07/T5», «$decide». Заготовки вроде «$done NN/Tn» — не команда. */
@@ -70,6 +77,14 @@ export function waitActions(
       key: 'П',
       label: key.startsWith('rounds:') ? 'дать ещё круги' : 'повторить',
     });
+  if (key === 'plan-blocked') {
+    const tasks = /^до \S+ очередь не дошла: (.+?) ждут решений владельца/u
+      .exec(reason)?.[1]
+      ?.split(', ')
+      .filter((task) => new RegExp(`^${TASK_ID_SOURCE}$`).test(task));
+    if (tasks !== undefined && tasks.length > 0)
+      actions.push({ kind: 'answer', key: 'В', label: 'ответить здесь', tasks });
+  }
   const url = URL_RE.exec(reason)?.[0];
   const run = url === undefined ? undefined : RUN_RE.exec(url)?.[1];
   if (key.startsWith('slow:') && run !== undefined)

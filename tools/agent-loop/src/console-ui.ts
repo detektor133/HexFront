@@ -1,10 +1,15 @@
 // Полноэкранная консоль цикла: отдельный экран терминала, кадр перерисовывается целиком
 // (screen.ts), клавиши — по одной без Enter. Терминал в raw-режиме, поэтому Ctrl+C не доходит до
 // сессий codex сигналом: выход останавливает их сам (stopAllCommands).
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+
 import { stageSummary, type Board } from './board.ts';
 import { readStage } from './context.ts';
 import type { GithubClient } from './github.ts';
 import { actionKey, openExternal, type ActionKey } from './owner-actions.ts';
+import { acceptProposal, customDecision, parsePlanQuestions } from './owner-questions.ts';
 import { stopAllCommands } from './process.ts';
 import { renderFrame } from './screen.ts';
 
@@ -56,6 +61,8 @@ export interface ActionDeps {
   readonly github: GithubClient | undefined;
   readonly open: (target: string, onError: (message: string) => void) => void;
   readonly say: (notice: string) => void;
+  /** Показать вопросы plan построчно и создать `$decide` из ответов. */
+  readonly answer: (tasks: readonly string[]) => Promise<boolean>;
   /** Разбудить цикл: сейчас или через delayMs. */
   readonly wake: (delayMs?: number) => void;
 }
@@ -83,6 +90,18 @@ export async function performAction(key: ActionKey, deps: ActionDeps): Promise<v
   if (action.kind === 'open') {
     deps.open(action.target, say);
     say(`Открываю: ${action.label}`);
+    return;
+  }
+  if (action.kind === 'answer') {
+    if (deps.github === undefined) {
+      say('Без GITHUB_TOKEN консоль не сможет создать Issue с ответами');
+      return;
+    }
+    if (await deps.answer(action.tasks)) {
+      board.requestRetry(agent);
+      say('Ответы отправлены — цикл применит `$decide`');
+      deps.wake();
+    }
     return;
   }
   if (deps.github === undefined) {
@@ -130,6 +149,8 @@ interface Screen {
   /** Сообщение владельцу в нижней строке; само гаснет через NOTICE_MS. */
   readonly say: (notice: string) => void;
   readonly closed: () => boolean;
+  readonly suspend: () => void;
+  readonly resume: () => void;
   readonly close: () => void;
 }
 
@@ -138,18 +159,19 @@ function openScreen(board: Board, root: string): Screen {
   const out = process.stdout;
   const colors = process.env.NO_COLOR === undefined;
   let closed = false;
+  let suspended = false;
   let pending: NodeJS.Timeout | undefined;
   let noticeTimer: NodeJS.Timeout | undefined;
   const draw = (): void => {
     pending = undefined;
-    if (closed) return;
+    if (closed || suspended) return;
     // Последний столбец не занимается: часть терминалов Windows переносит строку на нём.
     const width = Math.max(1, (out.columns || 100) - 1);
     const lines = renderFrame(board, width, out.rows || 30, colors);
     out.write(lines.map((text, index) => `${ESC}${index + 1};1H${text}${ESC}K`).join(''));
   };
   const redraw = (): void => {
-    if (!closed && pending === undefined) pending = setTimeout(draw, DRAW_DELAY_MS);
+    if (!closed && !suspended && pending === undefined) pending = setTimeout(draw, DRAW_DELAY_MS);
   };
   const say = (notice: string): void => {
     if (closed) return;
@@ -190,6 +212,19 @@ function openScreen(board: Board, root: string): Screen {
     redraw,
     say,
     closed: () => closed,
+    suspend: () => {
+      if (closed || suspended) return;
+      suspended = true;
+      clearTimeout(pending);
+      pending = undefined;
+      out.write(SCREEN_OFF);
+    },
+    resume: () => {
+      if (closed || !suspended) return;
+      suspended = false;
+      out.write(SCREEN_ON);
+      draw();
+    },
     close: () => {
       if (closed) return;
       closed = true;
@@ -215,6 +250,7 @@ export function createConsoleUi(
   const screen = openScreen(board, root);
   const sleepers = new Set<() => void>();
   let quitArmed = Number.NEGATIVE_INFINITY;
+  let answering = false;
   const wakeAll = (): void => {
     for (const wake of sleepers) wake();
     sleepers.clear();
@@ -233,6 +269,54 @@ export function createConsoleUi(
     );
     process.exit(130);
   };
+  const answer = async (tasks: readonly string[]): Promise<boolean> => {
+    if (answering || github === undefined) return false;
+    answering = true;
+    input.off('data', onKey);
+    if (input.isTTY) input.setRawMode(false);
+    screen.suspend();
+    const lines = createInterface({ input, output: process.stdout });
+    try {
+      const questions = parsePlanQuestions(
+        await readFile(join(root, 'docs', 'QUESTIONS.md'), 'utf8'),
+        tasks,
+      );
+      const decisions: string[] = [];
+      if (questions.length === 0)
+        throw new Error(`В QUESTIONS.md нет вопросов для ${tasks.join(', ')}`);
+      process.stdout.write('\nОтветы на вопросы plan\n');
+      for (const question of questions) {
+        process.stdout.write(`\n${question.task}: ${question.question}\n`);
+        process.stdout.write(`  [1] Принять рекомендацию: ${question.proposal}\n`);
+        process.stdout.write('  [2] Ввести свой ответ\n  [3] Пропустить этот вопрос\n');
+        let choice = '';
+        while (!/^[123]$/u.test(choice)) choice = (await lines.question('Выбор [1/2/3]: ')).trim();
+        if (choice === '1') decisions.push(acceptProposal(question));
+        if (choice === '2') {
+          let custom = '';
+          while (custom.trim() === '') custom = await lines.question('Твой ответ: ');
+          decisions.push(customDecision(question, custom));
+        }
+      }
+      if (decisions.length === 0) return false;
+      const confirmed = (await lines.question('\nEnter — отправить `$decide`, N — отменить: '))
+        .trim()
+        .toLowerCase();
+      if (confirmed === 'n' || confirmed === 'н') return false;
+      const url = await github.createIssue(
+        `$decide: ответы plan ${questions.map((question) => question.task).join(', ')}`,
+        `$decide\n\n${decisions.join('\n\n')}`,
+      );
+      process.stdout.write(`Создана Issue: ${url}\n`);
+      return true;
+    } finally {
+      lines.close();
+      answering = false;
+      if (input.isTTY) input.setRawMode(true);
+      input.on('data', onKey);
+      screen.resume();
+    }
+  };
   const act = (action: KeyAction): void => {
     if (action.kind === 'quit') {
       if (action.force || board.time - quitArmed < QUIT_CONFIRM_MS) quit();
@@ -246,6 +330,7 @@ export function createConsoleUi(
         github,
         open: openExternal,
         say: screen.say,
+        answer,
         wake: (delayMs = 0) => {
           if (delayMs === 0) wakeAll();
           else setTimeout(wakeAll, delayMs).unref();

@@ -26,6 +26,8 @@ export interface GithubClient {
   readonly comment: (issue: number, body: string) => Promise<void>;
   readonly close: (issue: number) => Promise<void>;
   readonly addLabel: (issue: number, label: string) => Promise<void>;
+  /** Создать Issue владельца из интерактивного ответа в консоли. */
+  readonly createIssue: (title: string, body: string) => Promise<string>;
   /** @returns адрес открытого PR head → base, нового или уже существующего. */
   readonly openPullRequest: (head: string, base: string, title: string) => Promise<string>;
   /** Перезапуск упавших jobs прогона Actions; нужно право GITHUB_TOKEN «Actions: read and write». */
@@ -210,6 +212,13 @@ export function httpGithubClient(repo: string, token: string): GithubClient {
         await request(`/issues/${issue}/labels`, 'POST', { labels: [label] }),
         'метка Issue',
       );
+    },
+    async createIssue(title, body) {
+      const response = await expectOk(
+        await request('/issues', 'POST', { title, body, labels: [AGENT_LABEL] }),
+        'создание Issue',
+      );
+      return ((await response.json()) as { html_url: string }).html_url;
     },
     async openPullRequest(head, baseBranch, title) {
       const created = await request('/pulls', 'POST', { head, base: baseBranch, title });

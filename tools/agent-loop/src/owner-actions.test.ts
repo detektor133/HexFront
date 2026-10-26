@@ -62,6 +62,20 @@ describe('действия ожидания', () => {
     expect(actionKey('l')).toBe('Д');
   });
 
+  it('блокеры plan предлагают ответить в консоли и не предлагают бесполезный повтор', () => {
+    const reason =
+      'до 07/T17 очередь не дошла: 07/T17axb, 07/T17axc ждут решений владельца в docs/QUESTIONS.md. Ответ — Issue «$decide»';
+    const actions = waitActions('plan-blocked', reason, false, REPO);
+    expect(actions.map((action) => `${action.key} ${action.label}`)).toEqual([
+      'В ответить здесь',
+      'И Issue «$decide»',
+    ]);
+    expect(actions[0]).toMatchObject({
+      kind: 'answer',
+      tasks: ['07/T17axb', '07/T17axc'],
+    });
+  });
+
   it('заготовка «$done NN/Tn», ожидание без GitHub и PR этапа не дают ни Issue, ни повтора', () => {
     const dirty = waitActions(
       'dirty',
@@ -108,7 +122,11 @@ describe('действия ожидания', () => {
   });
 });
 
-const deps = (board: Board, github?: Partial<GithubClient>) => {
+const deps = (
+  board: Board,
+  github?: Partial<GithubClient>,
+  answer: ActionDeps['answer'] = () => Promise.resolve(false),
+) => {
   const notices: string[] = [];
   const result = {
     notices,
@@ -120,12 +138,30 @@ const deps = (board: Board, github?: Partial<GithubClient>) => {
     github: github as GithubClient | undefined,
     open: (target) => result.opened.push(target),
     say: (notice) => notices.push(notice),
+    answer,
     wake: (delayMs = 0) => result.wakes.push(delayMs),
   };
   return { ...result, value };
 };
 
 describe('ответ владельца клавишей', () => {
+  it('ответ plan создаётся интерактивом, ожидание повторяется сразу после отправки', async () => {
+    const board = new Board(() => 0);
+    const actions = waitActions(
+      'plan-blocked',
+      'до 07/T17 очередь не дошла: 07/T17axb ждут решений владельца в docs/QUESTIONS.md. Ответ — Issue «$decide»',
+      false,
+      REPO,
+    );
+    board.wait(MAIN_AGENT, 'вопросы plan', actions);
+    const answer = vi.fn(() => Promise.resolve(true));
+    const run = deps(board, {}, answer);
+    await performAction('В', run.value);
+    expect(answer).toHaveBeenCalledWith(['07/T17axb']);
+    expect(board.takeRetries()).toEqual([MAIN_AGENT]);
+    expect(run.wakes).toEqual([0]);
+  });
+
   it('повтор: просьба циклу, цикл будится сразу; ожидание снимает цикл, когда применит повтор', async () => {
     const board = new Board(() => 0);
     board.wait(MAIN_AGENT, '3 ВОЗВРАТ подряд по 07/T2', [
