@@ -244,6 +244,14 @@ export function createUnitLayer(
     const army = v.armies.find((a) => a.id === first.armyId);
     const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
     const mine = first.owner === v.playerId;
+    const attack = mine ? units.find((u) => u.order === 'attack' && u.target >= 0) : undefined;
+    const attackDirection =
+      attack !== undefined
+        ? neighbors(hexFromId(attack.hex, width)).findIndex((hex) => {
+            const target = hexFromId(attack.target, width);
+            return hex.q === target.q && hex.r === target.r;
+          })
+        : -1;
     return {
       color: relationColor(first.owner, v.playerId),
       army: oneArmy ? armyColor(army.number) : null,
@@ -257,6 +265,7 @@ export function createUnitLayer(
       retreating: units.some((u) => u.order === 'retreat'),
       encircled: mine && units.some((u) => u.encircled === true),
       ghost: false,
+      attackDirection: attackDirection >= 0 ? attackDirection : null,
     };
   }
 

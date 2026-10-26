@@ -5,9 +5,10 @@
 // нехватке). Выбранная фишка — золотая рамка `selection` по краю. Размеры — px при масштабе 1.
 import { BitmapText, Container, Graphics } from 'pixi.js';
 
-import type { UnitType } from '@hexfront/sim';
+import { DIRECTIONS, type UnitType } from '@hexfront/sim';
 
 import { formatSoldiers } from '../i18n/format.ts';
+import { hexCenter } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const H = 26;
@@ -26,6 +27,8 @@ const BAR_INSET = 4;
 /** Цифра стопки: кружок в правом нижнем углу квадрата. */
 const COUNT_R = 5;
 const COUNT_PX = 8;
+const ATTACK_SLOT = 12;
+const ATTACK_ARROW = 10;
 /** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
 const WARN = 8;
 const LABEL_PX = 12;
@@ -55,6 +58,8 @@ export interface ChipState {
   readonly retreating: boolean;
   readonly encircled: boolean;
   readonly ghost: boolean;
+  /** Направление к целевому соседнему гексу; null — приказа атаки нет. */
+  readonly attackDirection?: number | null;
 }
 
 export interface Chip {
@@ -106,6 +111,33 @@ interface Parts {
 
 function barsWidth(s: ChipState): number {
   return (s.supply === null ? 1 : 2) * (BAR_W + BAR_GAP) - BAR_GAP + BAR_INSET;
+}
+
+function drawAttackArrow(g: Graphics, s: ChipState, sq: number): void {
+  if (s.attackDirection === null || s.attackDirection === undefined) return;
+  const direction = DIRECTIONS[s.attackDirection];
+  if (direction === undefined) return;
+  const vector = hexCenter(direction, 1);
+  const length = Math.hypot(vector.x, vector.y);
+  const dx = vector.x / length;
+  const dy = vector.y / length;
+  const px = -dy;
+  const py = dx;
+  const x = sq + SQUARE + PAD + ATTACK_SLOT / 2;
+  const y = 0;
+  const tipX = x + dx * (ATTACK_ARROW / 2);
+  const tipY = y + dy * (ATTACK_ARROW / 2);
+  const tailX = x - dx * (ATTACK_ARROW / 2);
+  const tailY = y - dy * (ATTACK_ARROW / 2);
+  const wingX = tipX - dx * 3;
+  const wingY = tipY - dy * 3;
+  g.moveTo(tailX, tailY)
+    .lineTo(tipX, tipY)
+    .moveTo(tipX, tipY)
+    .lineTo(wingX + px * 3, wingY + py * 3)
+    .moveTo(tipX, tipY)
+    .lineTo(wingX - px * 3, wingY - py * 3)
+    .stroke({ color: tokens.ui.ink2, width: 2, cap: 'round', join: 'round' });
 }
 
 // Корпус: белая плашка с обводкой (золото — выбрано, красная — котёл), закладка армии, квадрат.
@@ -165,11 +197,13 @@ function marks(p: Parts, s: ChipState, sq: number): void {
 function drawChip(p: Parts, s: ChipState): void {
   const top = -H / 2;
   const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX + TEXT_SLACK);
-  const w = (s.army ? TAB : 0) + SQUARE + PAD + text + PAD + barsWidth(s);
+  const attackSlot =
+    s.attackDirection === null || s.attackDirection === undefined ? 0 : ATTACK_SLOT;
+  const w = (s.army ? TAB : 0) + SQUARE + PAD + attackSlot + text + PAD + barsWidth(s);
   const left = -w / 2;
   const { g } = p;
   const sq = body(g, s, left, w);
-  p.label.position.set(sq + SQUARE + PAD + text / 2, 0);
+  p.label.position.set(sq + SQUARE + PAD + attackSlot + text / 2, 0);
   const barTop = -H / 2 + 4;
   const barH = H - 8;
   let x = left + w - BAR_INSET - BAR_W;
@@ -178,6 +212,7 @@ function drawChip(p: Parts, s: ChipState): void {
     x -= BAR_W + BAR_GAP;
   }
   vbar(g, x, barTop, barH, s.org, tokens.chip.org);
+  drawAttackArrow(g, s, sq);
   marks(p, s, sq);
   if (s.retreating) drawRetreatHatch(g, left, top, w);
 }
