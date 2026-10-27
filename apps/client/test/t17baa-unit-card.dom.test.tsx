@@ -9,6 +9,7 @@ import { hexFromId, loadMap } from '@hexfront/sim';
 
 import { installMatchMocks } from './t17q-match.ts';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
+import { selectUnitsInRect } from '../src/dev/sandbox-selection.ts';
 import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
@@ -70,22 +71,27 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
     if (onboardingButton) fireEvent.click(onboardingButton);
     await waitFor(() => expect(getSelection()).toBeDefined());
-    const unitsAtHex = view.units.filter(
-      (item) => item.hex === unit.hex && item.owner === view.playerId && item.order !== 'retreat',
+    const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
+    const from = { x: center.x - 1, y: center.y - 1 };
+    const to = { x: center.x + 1, y: center.y + 1 };
+    const selectedIds = selectUnitsInRect(view, from, to, (hex) =>
+      hexCenter(hexFromId(hex, map.width), tokens.map.hexRadius),
     );
+    const selectedUnits = view.units.filter((item) => selectedIds.includes(item.id));
+    expect(selectedIds).toContain(unit.id);
+    expect(selectedUnits).toHaveLength(selectedIds.length);
+    const singleUnit = selectedUnits[0];
     const cardName =
-      unitsAtHex.length === 1
-        ? `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`
-        : `${t('unit.selected' as MessageKey)}: ${unitsAtHex.length} · ${formatSoldiers(
-            unitsAtHex.reduce((total, item) => total + item.soldiers, 0),
+      singleUnit && selectedUnits.length === 1
+        ? `${t(`unit.${singleUnit.type}` as MessageKey)} · ${formatSoldiers(singleUnit.soldiers)}`
+        : `${t('unit.selected' as MessageKey)}: ${selectedUnits.length} · ${formatSoldiers(
+            selectedUnits.reduce((total, item) => total + item.soldiers, 0),
           )}`;
     expect(screen.queryByRole('region', { name: cardName })).toBeNull();
-    const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
-    getSelection()?.(
-      { x: center.x - 1, y: center.y - 1 },
-      { x: center.x + 1, y: center.y + 1 },
-      'end',
-    );
+    const selection = getSelection();
+    selection?.(from, from, 'start');
+    selection?.(from, to, 'move');
+    selection?.(from, to, 'end');
     const selectedCard = await screen.findByRole('region', { name: cardName });
     expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
 
