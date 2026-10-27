@@ -58,6 +58,14 @@ describe('машинный исход repair-spec', () => {
       kind: 'untestable',
       detail: 'jsdom не считает CSS',
     });
+    expect(
+      parseTestRepair(
+        '`РЕМОНТ: НЕПРОВЕРЯЕМО — typecheck упал в `tools/agent-loop/src/finding-repair.ts`',
+      ),
+    ).toEqual({
+      kind: 'untestable',
+      detail: 'typecheck упал в `tools/agent-loop/src/finding-repair.ts`',
+    });
   });
 
   it('отклоняет свободный текст и исход без причины', () => {

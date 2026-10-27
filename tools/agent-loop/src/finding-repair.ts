@@ -67,7 +67,7 @@ type TestRepairOutcome =
   | { readonly kind: 'code'; readonly detail: string }
   | { readonly kind: 'untestable'; readonly detail: string };
 
-const TEST_REPAIR_RE = /^РЕМОНТ:\s*(ИСПРАВЛЕНО|КОД|НЕПРОВЕРЯЕМО)(?:\s*[—-]\s*(.+))?\s*$/imu;
+const TEST_REPAIR_RE = /^`?РЕМОНТ:\s*(ИСПРАВЛЕНО|КОД|НЕПРОВЕРЯЕМО)(?:\s*[—-]\s*(.+))?\s*$/imu;
 const SPEC_PATHS_RE = /^СПЕК:\s*(.+)\s*$/imu;
 const TEST_CASE_RE = /\b(?:it|test)(?:\.(?:each|only|skip|todo))?\s*\(/gu;
 
@@ -176,7 +176,7 @@ export async function diagnoseFinding(
     );
     return 'worked';
   }
-  if (finding.kind === 'ТЕСТ' && active?.planTestRetryUsed !== true) {
+  if (finding.kind === 'ТЕСТ' && active !== undefined && active.planTestRetryUsed !== true) {
     active.findings[0] = finding;
     active.planTestRetryUsed = true;
     active.specBounceStreak = 0;
