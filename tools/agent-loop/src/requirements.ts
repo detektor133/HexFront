@@ -49,13 +49,39 @@ export function taskCriteriaMatrix(stageText: string, task: string): string {
 /** Пути и пакеты из заголовка родителя могут распределяться между независимыми подзадачами. */
 const scopeReferences = (block: string): string[] => {
   const heading = block.split(/\r?\n/u, 1)[0] ?? '';
-  return [...heading.matchAll(/`([^`]+)`/gu)].map((match) => normalize(match[1] ?? ''));
+  return [...heading.matchAll(/`([^`]+)`/gu)].flatMap((match) => {
+    const reference = normalize(match[1] ?? '');
+    const group = reference.match(/^(.*)\{([^{}]+)\}(.*)$/u);
+    if (group === null) return [reference];
+    const [, prefix, names, suffix] = group;
+    return (names ?? '').split(',').map((name) => `${prefix ?? ''}${name}${suffix ?? ''}`);
+  });
 };
 
 const shortId = (task: string): string => task.split('/').at(-1) ?? task;
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const excerpt = (value: string): string => value.slice(0, 140);
 const exactBlock = (text: string): string => text.replace(/\r\n/gu, '\n').trimEnd();
+
+/** Таблица трассировки разрешает разложить формулировку родителя на независимые подзадачи. */
+function hasCompleteSplitTrace(
+  task: string,
+  stageText: string,
+  children: readonly string[],
+  requirementCount: number,
+): boolean {
+  const heading = `| Исходная строка ${shortId(task)} | Подзадача |`;
+  const start = stageText.indexOf(heading);
+  if (start < 0) return false;
+  const table = stageText.slice(start).split(/\r?\n\r?\n/u, 1)[0] ?? '';
+  const rows = table
+    .split(/\r?\n/u)
+    .filter((line) => /^\|/u.test(line) && !/^\|\s*(?:Исходная|---)/iu.test(line));
+  return (
+    rows.length >= requirementCount &&
+    children.every((child) => rows.some((row) => row.includes(child)))
+  );
+}
 
 /** @returns строки, добавленные в current, либо undefined при удалении/изменении исходной строки. */
 function addedLines(original: string, current: string): string[] | undefined {
@@ -154,17 +180,22 @@ export function verifySplit(
 
   const childTexts = children.map((child) => normalize(taskBlock(after.stageText, child)));
   const combinedChildren = childTexts.join(' ');
+  const childScopes = children.flatMap((child) =>
+    scopeReferences(taskBlock(after.stageText, child)),
+  );
   for (const reference of scopeReferences(original)) {
-    if (!combinedChildren.includes(reference))
+    if (!combinedChildren.includes(reference) && !childScopes.includes(reference))
       errors.push('область родителя не перенесена в подзадачи: «' + excerpt(reference) + '»');
   }
+  const parentRequirements = requirements(original);
   const body = original.split(/\r?\n/u).slice(1);
   const exactOnce = new Set(
     lines(body.filter((line) => /приёмка|^\s*\d+[.)]\s/iu.test(line)).join('\n')),
   );
-  for (const item of requirements(original)) {
+  const traced = hasCompleteSplitTrace(task, after.stageText, children, parentRequirements.length);
+  for (const item of parentRequirements) {
     const found = childTexts.filter((text) => text.includes(item)).length;
-    if (found === 0) {
+    if (found === 0 && !traced) {
       errors.push('требование не перенесено в подзадачи: «' + excerpt(item) + '»');
     }
     if (found > 1 && exactOnce.has(item)) {
