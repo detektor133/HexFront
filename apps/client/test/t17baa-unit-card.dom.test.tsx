@@ -11,6 +11,7 @@ import { installMatchMocks } from './t17q-match.ts';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
 import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
+import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 
 const mapJson: unknown = JSON.parse(
@@ -65,10 +66,11 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     await waitFor(() => expect(getTap()).toBeDefined());
     const hex = hexFromId(unit.hex, map.width);
     getTap()?.(hex, 'select', { x: 0, y: 0 });
-    await waitFor(() => expect(document.querySelector('section[class*="card"]')).not.toBeNull());
+    const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+    await waitFor(() => expect(screen.getByRole('region', { name: cardName })).toBeTruthy());
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
-    await waitFor(() => expect(document.querySelector('section[class*="card"]')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('region', { name: cardName })).toBeNull());
   });
 });
