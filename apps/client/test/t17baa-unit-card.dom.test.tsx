@@ -69,7 +69,7 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
     getSelection()?.(center, center, 'end');
     const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
-    const selectedCard = await screen.findByRole('region');
+    const selectedCard = await screen.findByRole('region', { name: cardName });
     expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
 
     fireEvent.keyDown(window, { key: 'Escape' });
