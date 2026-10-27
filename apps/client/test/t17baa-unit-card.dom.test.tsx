@@ -13,6 +13,8 @@ import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
+import { hexCenter } from '../src/render/hex-geometry.ts';
+import { tokens } from '../src/theme/tokens.ts';
 
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
@@ -57,15 +59,15 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const view = engine.snapshot().view;
     const unit = view.units.find((item) => item.owner === view.playerId);
     if (!unit) throw new Error('свой отряд не найден');
-    const { getTap } = installMatchMocks(engine, mapJson);
+    const { getSelection } = installMatchMocks(engine, mapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     render(<MatchPage />);
     const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
     if (onboardingButton) fireEvent.click(onboardingButton);
-    await waitFor(() => expect(getTap()).toBeDefined());
-    const hex = hexFromId(unit.hex, map.width);
-    getTap()?.(hex, 'select', { x: 0, y: 0 });
+    await waitFor(() => expect(getSelection()).toBeDefined());
+    const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
+    getSelection()?.(center, center, 'end');
     const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
     await waitFor(() => expect(screen.getByRole('region', { name: cardName })).toBeTruthy());
 

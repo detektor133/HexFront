@@ -13,6 +13,8 @@ export function installMatchMocks(
   matchMap: unknown,
 ): {
   getTap: () => ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
+  getSelection: () =>
+    ((from: Point, to: Point, phase: 'start' | 'move' | 'end') => void) | undefined;
   emit: () => void;
 } {
   vi.stubGlobal(
@@ -23,6 +25,7 @@ export function installMatchMocks(
     })),
   );
   let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
+  let selection: ((from: Point, to: Point, phase: 'start' | 'move' | 'end') => void) | undefined;
   let onMessage: ((message: FromWorker) => void) | undefined;
   const emit = (): void => onMessage?.(engine.snapshot());
 
@@ -68,7 +71,9 @@ export function installMatchMocks(
         setTopInset: vi.fn(),
         centerOn: vi.fn(),
         setStroke: vi.fn(),
-        setSelection: vi.fn(),
+        setSelection: (onSelection) => {
+          selection = onSelection ?? undefined;
+        },
         setGrab: vi.fn(),
         setOrderHooks: vi.fn(),
         cancel: vi.fn(),
@@ -85,5 +90,5 @@ export function installMatchMocks(
       };
     },
   }));
-  return { getTap: () => tap, emit };
+  return { getTap: () => tap, getSelection: () => selection, emit };
 }
