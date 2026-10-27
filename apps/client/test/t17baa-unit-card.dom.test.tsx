@@ -59,11 +59,13 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const view = engine.snapshot().view;
-    const firstOwnUnit = view.units.find((item) => item.owner === view.playerId);
-    const unit = view.units.find(
-      (item) => item.owner === view.playerId && item.id !== firstOwnUnit?.id,
+    const eligibleOwnUnits = view.units.filter(
+      (item) => item.owner === view.playerId && item.order !== 'retreat',
     );
-    if (!unit) throw new Error('свой отряд, не скрываемый полной выборкой армии, не найден');
+    const unit = eligibleOwnUnits.find(
+      (item) => eligibleOwnUnits.filter((candidate) => candidate.hex === item.hex).length === 1,
+    );
+    if (!unit) throw new Error('свой отряд на отдельном гексе не найден');
     const { getSelection } = installMatchMocks(engine, mapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 

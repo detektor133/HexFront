@@ -9,9 +9,11 @@ test('@layout 07/T17baa: кнопка закрытия карточки отря
   await expect(canvas).toBeVisible();
   const mapBox = await canvas.boundingBox();
   if (!mapBox) throw new Error('карта не имеет границ');
-  await page.mouse.move(mapBox.x + 1, mapBox.y + 1);
+  const start = { x: mapBox.x + mapBox.width * 0.35, y: mapBox.y + mapBox.height * 0.35 };
+  const end = { x: mapBox.x + mapBox.width * 0.65, y: mapBox.y + mapBox.height * 0.65 };
+  await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move(mapBox.x + mapBox.width - 1, mapBox.y + mapBox.height - 1);
+  await page.mouse.move(end.x, end.y);
   await page.mouse.up();
 
   const card = page
