@@ -5,12 +5,15 @@ test('@layout 07/T17baa: кнопка закрытия карточки отря
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/dev/sandbox?map=small&seed=42');
+  const onboardingButton = page.getByRole('button', { name: 'Понятно' });
+  if (await onboardingButton.isVisible()) await onboardingButton.click();
+  await page.getByRole('combobox', { name: 'Observer' }).selectOption('1');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   const mapBox = await canvas.boundingBox();
   if (!mapBox) throw new Error('карта не имеет границ');
-  const start = { x: mapBox.x + mapBox.width * 0.35, y: mapBox.y + mapBox.height * 0.35 };
-  const end = { x: mapBox.x + mapBox.width * 0.65, y: mapBox.y + mapBox.height * 0.65 };
+  const start = { x: mapBox.x + 1, y: mapBox.y + 1 };
+  const end = { x: mapBox.x + mapBox.width - 1, y: mapBox.y + mapBox.height - 1 };
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y);

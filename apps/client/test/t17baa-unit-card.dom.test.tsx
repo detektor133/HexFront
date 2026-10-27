@@ -59,13 +59,10 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const view = engine.snapshot().view;
-    const eligibleOwnUnits = view.units.filter(
+    const unit = view.units.find(
       (item) => item.owner === view.playerId && item.order !== 'retreat',
     );
-    const unit = eligibleOwnUnits.find(
-      (item) => eligibleOwnUnits.filter((candidate) => candidate.hex === item.hex).length === 1,
-    );
-    if (!unit) throw new Error('свой отряд на отдельном гексе не найден');
+    if (!unit) throw new Error('свой отряд не найден');
     const { getSelection } = installMatchMocks(engine, mapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
@@ -73,7 +70,15 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
     if (onboardingButton) fireEvent.click(onboardingButton);
     await waitFor(() => expect(getSelection()).toBeDefined());
-    const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+    const unitsAtHex = view.units.filter(
+      (item) => item.hex === unit.hex && item.owner === view.playerId && item.order !== 'retreat',
+    );
+    const cardName =
+      unitsAtHex.length === 1
+        ? `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`
+        : `${t('unit.selected' as MessageKey)}: ${unitsAtHex.length} · ${formatSoldiers(
+            unitsAtHex.reduce((total, item) => total + item.soldiers, 0),
+          )}`;
     expect(screen.queryByRole('region', { name: cardName })).toBeNull();
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
     getSelection()?.(
