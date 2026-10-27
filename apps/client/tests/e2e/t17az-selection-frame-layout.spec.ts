@@ -15,6 +15,7 @@ test('@layout T17az: рамка выбора появляется при пер�
   const end = { x: bounds.x + bounds.width * 0.65, y: bounds.y + bounds.height * 0.65 };
   const frame = page.getByTestId('selection-frame');
 
+  await expect(frame).toBeHidden();
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y);
