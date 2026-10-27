@@ -129,9 +129,10 @@ export async function diagnoseFinding(
   const active = context.state.activeTask;
   if (planned.outcome === 'инфраструктура') {
     if (active !== undefined) {
+      const kind = finding.kind === 'ТЕСТ' ? 'ТЕСТ' : 'КОД';
       active.findings[0] = {
-        kind: 'КОД',
-        text: `КОД: устранить технический блокер без участия владельца — ${planned.detail}`,
+        kind,
+        text: `${kind}: устранить технический блокер без участия владельца — ${planned.detail}`,
       };
       active.findingRetries = 0;
       active.phase = 'work';
@@ -173,6 +174,15 @@ export async function diagnoseFinding(
     await context.say(
       `${task}: plan не нашёл конфликт требований, даю исправляющей роли последнюю попытку`,
     );
+    return 'worked';
+  }
+  if (finding.kind === 'ТЕСТ' && active?.planTestRetryUsed !== true) {
+    active.findings[0] = finding;
+    active.planTestRetryUsed = true;
+    active.specBounceStreak = 0;
+    active.phase = 'work';
+    await save(context);
+    await context.say(`${task}: plan подтвердил тестовый путь — даю $spec последнюю попытку`);
     return 'worked';
   }
   return park(

@@ -32,6 +32,8 @@ export interface ActiveTask {
   findings: PendingFinding[];
   /** Неудачные узкие review текущего пункта; первый зовёт plan, второй останавливает цикл. */
   findingRetries?: number;
+  /** Одна дополнительная попытка $spec после плана, подтвердившего тестовый путь. */
+  planTestRetryUsed?: boolean;
   /** HEAD и origin до рабочей сессии: по ним восстанавливается коммит после обрыва процесса. */
   workAttempt?: { readonly head: string; readonly remote: string };
   /** После исправления теста продолжить исходную работу, которая ещё не создала коммит. */
