@@ -59,6 +59,11 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const view = engine.snapshot().view;
+    const firstOwnUnit = view.units.find((item) => item.owner === view.playerId);
+    const unit = view.units.find(
+      (item) => item.owner === view.playerId && item.id !== firstOwnUnit?.id,
+    );
+    if (!unit) throw new Error('свой отряд, не скрываемый полной выборкой армии, не найден');
     const { getSelection } = installMatchMocks(engine, mapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
@@ -66,8 +71,6 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
     if (onboardingButton) fireEvent.click(onboardingButton);
     await waitFor(() => expect(getSelection()).toBeDefined());
-    const unit = view.units.find((item) => item.owner === view.playerId);
-    if (!unit) throw new Error('свой отряд не найден');
     const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
     expect(screen.queryByRole('region', { name: cardName })).toBeNull();
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
