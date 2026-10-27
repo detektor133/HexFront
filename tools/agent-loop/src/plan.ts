@@ -86,8 +86,16 @@ export async function runPlan(
   const unsynced = await syncWithOrigin(git, false);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   const match = OUTCOME_RE.exec(result.message);
-  const outcome = match?.[1] as PlanOutcome['outcome'] | undefined;
+  let outcome = match?.[1] as PlanOutcome['outcome'] | undefined;
   const detail = match?.[2]?.trim();
+  // После возврата review plan лишь выбирает дальнейшую роль. Чистый ответ без изменения документов
+  // не должен останавливать уже собранный пакет замечаний из-за пропущенного служебного хвоста.
+  if (outcome === undefined && context.state.activeTask?.task === task) {
+    outcome = 'не трогал';
+    await context.say(
+      `$plan ${task}: нет PLAN-маркера, документы не менялись — продолжаю пакет замечаний`,
+    );
+  }
   if (
     outcome === undefined ||
     ((outcome === 'инфраструктура' || outcome === 'переделать') && !detail)

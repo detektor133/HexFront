@@ -726,6 +726,40 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('не паркует пакет замечаний, если plan не дописал служебный PLAN-маркер', async () => {
+    const finding = 'КОД: дефект требует обычного исправления';
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+          fullReviewRounds: 1,
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${finding}`),
+        { answer: 'Текст задачи ясен, замечание относится к реализации.' },
+        codeCommit('Исправлен дефект.'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain(
+      '$plan 06/T1j5-Б1: нет PLAN-маркера, документы не менялись — продолжаю пакет замечаний',
+    );
+  });
+
   it('второй круг подряд на ТЕСТ-пункте, который plan решил переделать, уходит автору тестов, не кодеру', async () => {
     const finding =
       'ТЕСТ: apps/client/test/t17ar-terrain-layer.test.ts:120 — не проверяет равный объём вызовов';
