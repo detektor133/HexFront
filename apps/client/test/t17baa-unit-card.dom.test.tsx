@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, loadMap } from '@hexfront/sim';
 
@@ -23,6 +23,8 @@ const mapJson: unknown = JSON.parse(
 const loadedMap = loadMap(mapJson);
 if (!loadedMap.ok) throw new Error(loadedMap.errors.join('; '));
 const map = loadedMap.map;
+
+afterEach(cleanup);
 
 describe('07/T17baa: закрытие карточки отряда', () => {
   it('закрывает выбранный отряд локализованной кнопкой без игровой команды', () => {
@@ -57,8 +59,6 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const view = engine.snapshot().view;
-    const unit = view.units.find((item) => item.owner === view.playerId);
-    if (!unit) throw new Error('свой отряд не найден');
     const { getSelection } = installMatchMocks(engine, mapJson);
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
@@ -66,9 +66,12 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
     if (onboardingButton) fireEvent.click(onboardingButton);
     await waitFor(() => expect(getSelection()).toBeDefined());
+    const unit = view.units.find((item) => item.owner === view.playerId);
+    if (!unit) throw new Error('свой отряд не найден');
+    const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+    expect(screen.queryByRole('region', { name: cardName })).toBeNull();
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
     getSelection()?.(center, center, 'end');
-    const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
     const selectedCard = await screen.findByRole('region', { name: cardName });
     expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
 
