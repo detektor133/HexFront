@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { batchReviewFindings, parseTestRepair } from './finding-repair.ts';
+import { batchReviewFindings } from './finding-repair.ts';
 
 describe('пакет возвратов review', () => {
   it('передаёт все замечания кодеру одним пакетом, тестовые — отдельным', () => {
@@ -44,33 +44,5 @@ describe('пакет возвратов review', () => {
       },
       { kind: 'ТЕСТ', text: 'ТЕСТ: старое ожидание' },
     ]);
-  });
-});
-
-describe('машинный исход repair-spec', () => {
-  it('различает зелёное исправление, дефект продукта и непроверяемый критерий', () => {
-    expect(parseTestRepair('РЕМОНТ: ИСПРАВЛЕНО')).toEqual({ kind: 'fixed' });
-    expect(parseTestRepair('РЕМОНТ: КОД — HUD переполняется')).toEqual({
-      kind: 'code',
-      detail: 'HUD переполняется',
-    });
-    expect(parseTestRepair('РЕМОНТ: НЕПРОВЕРЯЕМО — jsdom не считает CSS')).toEqual({
-      kind: 'untestable',
-      detail: 'jsdom не считает CSS',
-    });
-    expect(
-      parseTestRepair(
-        '`РЕМОНТ: НЕПРОВЕРЯЕМО — typecheck упал в `tools/agent-loop/src/finding-repair.ts`',
-      ),
-    ).toEqual({
-      kind: 'untestable',
-      detail: 'typecheck упал в `tools/agent-loop/src/finding-repair.ts`',
-    });
-  });
-
-  it('отклоняет свободный текст и исход без причины', () => {
-    expect(parseTestRepair('Тест исправлен')).toBeUndefined();
-    expect(parseTestRepair('РЕМОНТ: КОД')).toBeUndefined();
-    expect(parseTestRepair('РЕМОНТ: НЕПРОВЕРЯЕМО')).toBeUndefined();
   });
 });

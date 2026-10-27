@@ -13,7 +13,7 @@ import {
 } from './context.ts';
 import { changedPaths, dirtyFiles, head, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
-import type { ReviewFinding } from './review.ts';
+import { runReview, type ReviewFinding } from './review.ts';
 
 /** Объединяет все замечания одной роли в один рабочий заход, сохраняя порядок ролей review. */
 export function batchReviewFindings(findings: readonly ReviewFinding[]): ReviewFinding[] {
@@ -53,32 +53,15 @@ export const findingPrompt = (task: string, finding: ReviewFinding): string =>
     ...(finding.kind === 'ТЕСТ'
       ? [
           'Пункт reviewer не меняет источник истины. Сначала сверь его с задачей, родителем и GDD. ' +
-            'Если пункт требует противоположного поведения, тесты не меняй и верни ' +
-            '`РЕМОНТ: НЕПРОВЕРЯЕМО — пункт review противоречит задаче: <критерий>`. ',
-          'Предпоследняя строка ответа: `РЕМОНТ: ИСПРАВЛЕНО`, `РЕМОНТ: КОД — <дефект продукта>` или `РЕМОНТ: НЕПРОВЕРЯЕМО — <причина>`.',
-          '`ИСПРАВЛЕНО` допустимо только при зелёном целевом тесте; красный усиленный тест — `КОД`, невозможный в тестовой среде критерий — `НЕПРОВЕРЯЕМО`.',
+            'Если пункт требует противоположного поведения, тесты не меняй и назови критерий в ответе.',
+          'Сообщи, какие тесты изменены и как они проходят. Исход определит оркестратор по реальному прогону тестов и независимому review.',
         ]
       : []),
     'Создай локальный атомарный коммит. Не меняй отметку задачи, STATUS и не push.',
   ].join('\n');
 
-type TestRepairOutcome =
-  | { readonly kind: 'fixed' }
-  | { readonly kind: 'code'; readonly detail: string }
-  | { readonly kind: 'untestable'; readonly detail: string };
-
-const TEST_REPAIR_RE = /^`?РЕМОНТ:\s*(ИСПРАВЛЕНО|КОД|НЕПРОВЕРЯЕМО)(?:\s*[—-]\s*(.+))?\s*$/imu;
 const SPEC_PATHS_RE = /^СПЕК:\s*(.+)\s*$/imu;
 const TEST_CASE_RE = /\b(?:it|test)(?:\.(?:each|only|skip|todo))?\s*\(/gu;
-
-export function parseTestRepair(message: string): TestRepairOutcome | undefined {
-  const match = TEST_REPAIR_RE.exec(message);
-  if (!match) return undefined;
-  if (match[1] === 'ИСПРАВЛЕНО') return { kind: 'fixed' };
-  const detail = match[2]?.trim();
-  if (!detail) return undefined;
-  return match[1] === 'КОД' ? { kind: 'code', detail } : { kind: 'untestable', detail };
-}
 
 /**
  * Разрешает заменить целиком только один явно отклонённый сценарий. Иначе удаление файла может
@@ -232,23 +215,20 @@ const verifyFailureSummary = (stdout: string, stderr: string): string =>
 
 const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;
 
-/**
- * Не верит вердикту `НЕПРОВЕРЯЕМО` на слово (2026-10-23, 07/T17as: $spec заявил, что Playwright
- * запрещён правилами проекта — неверно, п.10 его же скилла прямо разрешает `test:e2e:layout`;
- * тест при этом был красным по существу). Реально прогоняет изменённые тесты сам.
- * @returns хвост ошибки, если изменённые тесты красные; undefined — все зелёные.
- */
+/** @returns ошибки всех изменённых тестов; undefined — все зелёные. */
 async function verifyTouchedTests(
   context: LoopContext,
   touched: readonly string[],
 ): Promise<string | undefined> {
   const specs = touched.filter((path) => E2E_SPEC_RE.test(path));
+  const failures: string[] = [];
   if (specs.length > 0) {
     const e2e = await context.config.runCommand('pnpm', ['test:e2e:layout', ...specs], {
       cwd: context.config.root,
       timeoutMs: context.config.maxMinutes * 60_000,
     });
-    if (e2e.code !== 0) return verifyFailureSummary(e2e.stdout, e2e.stderr);
+    if (e2e.code !== 0)
+      failures.push(`Playwright: ${verifyFailureSummary(e2e.stdout, e2e.stderr)}`);
   }
   const unit = touched.filter(
     (path) => !E2E_SPEC_RE.test(path) && /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path),
@@ -258,14 +238,60 @@ async function verifyTouchedTests(
       cwd: context.config.root,
       timeoutMs: context.config.maxMinutes * 60_000,
     });
-    if (tested.code !== 0) return verifyFailureSummary(tested.stdout, tested.stderr);
+    if (tested.code !== 0)
+      failures.push(`Vitest: ${verifyFailureSummary(tested.stdout, tested.stderr)}`);
   }
-  if (specs.length + unit.length === touched.length) return undefined;
-  const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
-    cwd: context.config.root,
-    timeoutMs: context.config.maxMinutes * 60_000,
-  });
-  return verified.code === 0 ? undefined : verifyFailureSummary(verified.stdout, verified.stderr);
+  if (specs.length + unit.length !== touched.length) {
+    const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
+      cwd: context.config.root,
+      timeoutMs: context.config.maxMinutes * 60_000,
+    });
+    if (verified.code !== 0)
+      failures.push(`verify: ${verifyFailureSummary(verified.stdout, verified.stderr)}`);
+  }
+  return failures.length === 0 ? undefined : failures.join('\n');
+}
+
+/** Красный тест классифицирует независимый reviewer; ответ автора теста не управляет переходом. */
+async function classifyRedTests(
+  context: LoopContext,
+  task: string,
+  finding: ReviewFinding,
+  failure: string,
+): Promise<Step> {
+  const verdict = await runReview(
+    context,
+    task,
+    `Узкая классификация: целевые тесты после ремонта красные:\n${failure}\n` +
+      `Классифицируй каждую причину: ошибка локатора/фикстуры/ожидания — ТЕСТ, ` +
+      `отсутствующий продуктовый механизм — КОД, непроверяемый критерий — ПЛАН. ` +
+      `Верни конкретные пункты, не отвечай OK при красном тесте. Исходный пункт: ${finding.text}`,
+  );
+  if (typeof verdict === 'string') return verdict;
+  if (verdict.ok)
+    return park(
+      context,
+      `test-classification:${task}`,
+      `${task}: красный тест reviewer не классифицировал`,
+      failure,
+    );
+  const active = context.state.activeTask;
+  if (active !== undefined) {
+    const testFindings = verdict.findings.filter((item) => item.kind === 'ТЕСТ');
+    const otherFindings = verdict.findings.filter((item) => item.kind !== 'ТЕСТ');
+    active.findings = batchReviewFindings([
+      ...testFindings,
+      ...otherFindings,
+      ...active.findings.slice(1),
+    ]);
+    active.findingRetries = 0;
+    active.phase = 'work';
+    await save(context);
+  }
+  await context.say(
+    `${task}: красные тесты распределены по ролям: ${active?.findings.map((item) => item.kind).join(', ') ?? ''}`,
+  );
+  return 'worked';
 }
 
 export async function runTestFix(
@@ -276,7 +302,7 @@ export async function runTestFix(
   attempt = 1,
   /** До первой попытки в дереве уже лежали красные приёмочные тесты текущей задачи. */
   pendingSpec = false,
-): Promise<Step | 'rerouted' | undefined> {
+): Promise<Step | undefined> {
   const hadPendingSpec = pendingSpec || (await onlySavedSpecDirty(context, task, false));
   const base = await head(context.git);
   const published = await remoteHead(context.git);
@@ -311,35 +337,25 @@ export async function runTestFix(
       result.message,
     );
   }
-  const outcome = parseTestRepair(result.message);
-  if (outcome === undefined)
-    return park(
-      context,
-      `spec-protocol:${task}`,
-      `$spec ${task} не указал машинный исход РЕМОНТ; повтор автоматически запрещён`,
-      result.message,
-    );
   if (!committed) {
-    if (outcome.kind === 'untestable') return diagnoseFinding(context, task, finding);
-    if (outcome.kind === 'code') return rerouteToCode(context, outcome.detail);
-    return park(context, `spec:${task}`, `$spec ${task} сообщил об исправлении без коммита`);
+    const failure = await verifyTouchedTests(context, Object.keys(context.state.spec[task] ?? {}));
+    if (failure !== undefined) return classifyRedTests(context, task, finding, failure);
+    return undefined;
   }
   if (!(await checkPermissions(context, base, context.definitions.specPaths)))
     return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`, result.message);
   let saved = { ...(context.state.spec[task] ?? {}) };
   const touched = await changedPathsBetween(context, base);
-  let replacedDeletedTest = false;
+  const verifiedPaths: string[] = [];
   for (const path of touched) {
     // Автор тестов не может удалить чужую проверку (AGENTS.md §4.5); чтение несуществующего
     // файла раньше падало необработанным ENOENT и обрывало весь цикл.
     const text = await readFile(join(context.config.root, path), 'utf8').catch(() => undefined);
     if (
       text === undefined &&
-      outcome.kind === 'fixed' &&
       (await isSafeSingleTestReplacement(context, finding, result.message, saved, path))
     ) {
       saved = Object.fromEntries(Object.entries(saved).filter(([savedPath]) => savedPath !== path));
-      replacedDeletedTest = true;
       await context.say(`repair-$spec ${task}: заменил единственный отклонённый тест ${path}`);
       continue;
     }
@@ -351,83 +367,11 @@ export async function runTestFix(
         result.message,
       );
     saved[path] = text;
+    verifiedPaths.push(path);
   }
   context.state.spec[task] = saved;
   await save(context);
-  if (outcome.kind === 'code') return rerouteToCode(context, outcome.detail);
-  if (outcome.kind === 'untestable') {
-    // Не верим вердикту на слово: реально прогоняем изменённые тесты сами же себе (2026-10-23,
-    // 07/T17as — заявил «Playwright запрещён правилами проекта», хотя это неверно и сам тест был
-    // красным по существу).
-    const failure = await verifyTouchedTests(context, touched);
-    if (failure === undefined) return undefined;
-    if (attempt < 2) {
-      await context.say(
-        `repair-$spec ${task}: заявил НЕПРОВЕРЯЕМО, но изменённый тест красный — даю вторую попытку`,
-      );
-      return runTestFix(
-        context,
-        task,
-        {
-          ...finding,
-          text:
-            `${finding.text}\nПредыдущая попытка заявила РЕМОНТ: НЕПРОВЕРЯЕМО, но реальный ` +
-            `прогон изменённых тестов красный:\n${failure}`,
-        },
-        attempt + 1,
-      );
-    }
-    return park(
-      context,
-      `spec:${task}`,
-      `${task}: repair-$spec второй раз подряд заявил НЕПРОВЕРЯЕМО при красном изменённом тесте`,
-      failure,
-    );
-  }
-  const failure =
-    hadPendingSpec && !replacedDeletedTest
-      ? await verifyTouchedTests(context, touched)
-      : await context.config
-          .runCommand('pnpm', ['verify', '--changed'], {
-            cwd: context.config.root,
-            timeoutMs: context.config.maxMinutes * 60_000,
-          })
-          .then((verified) =>
-            verified.code === 0
-              ? undefined
-              : verifyFailureSummary(verified.stdout, verified.stderr),
-          );
-  if (failure !== undefined) {
-    if (attempt < 2) {
-      await context.say(
-        `repair-$spec ${task}: заявил ИСПРАВЛЕНО, но verify --changed красный — даю вторую попытку`,
-      );
-      return runTestFix(
-        context,
-        task,
-        {
-          ...finding,
-          text:
-            `${finding.text}\nПредыдущая попытка заявила РЕМОНТ: ИСПРАВЛЕНО, но ` +
-            `реальный прогон изменённых тестов оказался красным:\n${failure}`,
-        },
-        attempt + 1,
-        hadPendingSpec,
-      );
-    }
-    return park(
-      context,
-      `test-fix:${task}`,
-      `${task}: repair-$spec второй раз подряд оставил красный verify --changed; повтор и review запрещены`,
-      failure,
-    );
-  }
+  const failure = await verifyTouchedTests(context, verifiedPaths);
+  if (failure !== undefined) return classifyRedTests(context, task, finding, failure);
   return undefined;
-}
-
-async function rerouteToCode(context: LoopContext, detail: string): Promise<'rerouted'> {
-  const active = context.state.activeTask;
-  if (active !== undefined) active.findings[0] = { kind: 'КОД', text: `КОД: ${detail}` };
-  await save(context);
-  return 'rerouted';
 }

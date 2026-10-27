@@ -471,12 +471,6 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
               finding === undefined ? active.workPrompt : findingPrompt(task, finding),
               finding,
             );
-      if (stop === 'rerouted') {
-        delete active.workAttempt;
-        active.findingRetries = 0;
-        await save(context);
-        return { step: 'worked', done: false };
-      }
       if (stop !== undefined) {
         delete active.workAttempt;
         await save(context);

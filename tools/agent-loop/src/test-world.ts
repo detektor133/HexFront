@@ -80,8 +80,10 @@ export interface World {
   readonly preReview?: readonly string[];
   /** Ответы `pnpm test:e2e:visual` (визуальный гейт перед push); без значения — зелёный. */
   readonly visual?: readonly string[];
-  /** Ответы `pnpm test:e2e:layout` (перепроверка repair-$spec при НЕПРОВЕРЯЕМО); без значения — зелёный. */
+  /** Ответы `pnpm test:e2e:layout` после ремонта тестов; без значения — зелёный. */
   readonly layout?: readonly string[];
+  /** Ответы целевого Vitest после ремонта тестов; без значения — зелёный. */
+  readonly unit?: readonly string[];
   /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
   readonly verify?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
@@ -211,6 +213,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const preReview = [...(world.preReview ?? [])];
   const visual = [...(world.visual ?? [])];
   const layout = [...(world.layout ?? [])];
+  const unit = [...(world.unit ?? [])];
   const verify = [...(world.verify ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
@@ -594,6 +597,10 @@ export async function runWorld(world: World): Promise<Outcome> {
         }
         if (command === 'pnpm' && args[0] === 'exec') {
           out.execs.push(args.slice(1).join(' '));
+          if (args[1] === 'vitest') {
+            const line = unit.shift() ?? 'unit: OK';
+            return { code: line.startsWith('unit: OK') ? 0 : 1, stdout: line, stderr: '' };
+          }
           const line = args[1] === 'eslint' ? (lint.shift() ?? 'ok') : 'ok';
           return { code: line === 'ok' ? 0 : 1, stdout: line, stderr: '' };
         }

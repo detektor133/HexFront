@@ -205,6 +205,7 @@ async function waitForWork(context: LoopContext): Promise<void> {
   // Сбой сети или токена повторяется каждые pollSeconds: в протокол — только новый текст ошибки.
   let lastError = '';
   const check = async (): Promise<boolean> => {
+    if (state.parked && state.parked.head !== (await head(context.git))) return true;
     try {
       const changed = github !== undefined && (await github.changed());
       lastError = '';
