@@ -22,7 +22,7 @@ import {
   findingPrompt,
   verifyTouchedTests,
 } from './finding-repair.ts';
-import { currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
+import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { taskCriteriaMatrix } from './requirements.ts';
 import { runReview, type ReviewFinding } from './review.ts';
@@ -168,30 +168,49 @@ async function runProductWork(
     matrix === ''
       ? prompt
       : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nДля каждого пункта найди продуктовый путь и проверку. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.`;
-  const result = await session(context, 'next', checkedPrompt);
+  const continuation =
+    context.state.resume === task
+      ? `\nПродолжи незакоммиченную работу этой задачи. Предыдущая проверка: ${context.state.resumeNote ?? 'результат не записан'}. Исправь причину красного теста в продукте или фикстуре, проверь и создай коммит.`
+      : '';
+  const result = await session(context, 'next', checkedPrompt + continuation);
   if (result.failure !== undefined)
     return backoff(context, `${firstLine(prompt)}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
     return park(context, `push:${task}`, `${task}: рабочая сессия изменила origin до review`);
   if ((await dirtyFiles(context.git)) !== '') {
-    if (context.state.resume !== task) {
-      context.state.resume = task;
-      await save(context);
-      return 'worked';
+    const active = context.state.activeTask;
+    const paths = await changedPaths(context.git);
+    if (active !== undefined) {
+      active.workDirtyPaths = paths;
+      active.workDirtyAttempts = (active.workDirtyAttempts ?? 0) + 1;
     }
     context.state.resume = task;
-    context.state.waitingAnswer = {
-      task,
-      reason: `${task} ждёт твоего ответа: «${firstLine(result.message)}». Ответ — Issue «$decide» с решением; работа задачи останется и продолжится сама`,
-    };
+    context.state.resumeNote = firstLine(result.message);
+    delete context.state.waitingAnswer;
+    delete context.state.parked;
     await save(context);
-    return park(context, `resume:${task}`, context.state.waitingAnswer.reason, result.message);
+    if ((active?.workDirtyAttempts ?? 0) < 2) return 'worked';
+    const verdict = await runReview(
+      context,
+      task,
+      `Узкая диагностика незакоммиченной работы после двух попыток. Тест остаётся красным: ${result.message}. Проверь только текущие файлы ${paths.join(', ')}. Верни конкретную причину в продукте или фикстуре как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
+    );
+    if (typeof verdict === 'string') return verdict;
+    if (!verdict.ok && active !== undefined)
+      active.findings = batchReviewFindings(verdict.findings);
+    if (active !== undefined) active.workDirtyAttempts = 0;
+    await save(context);
+    return 'worked';
   }
   if ((await head(context.git)) === base) return followUp(context, task, result.message);
   delete context.state.resume;
   delete context.state.resumeNote;
   delete context.state.waitingAnswer;
-  if (context.state.activeTask?.task === task) delete context.state.activeTask.specBounceStreak;
+  if (context.state.activeTask?.task === task) {
+    delete context.state.activeTask.specBounceStreak;
+    delete context.state.activeTask.workDirtyPaths;
+    delete context.state.activeTask.workDirtyAttempts;
+  }
   await save(context);
   if (!isInfraTask(task)) {
     // Правка кода цикла не самовольна, если именно её назвал сам пункт review (findingPrompt

@@ -38,6 +38,10 @@ export interface ActiveTask {
   workAttempt?: { readonly head: string; readonly remote: string };
   /** После исправления теста продолжить исходную работу, которая ещё не создала коммит. */
   resumeWorkAfterFindings?: boolean;
+  /** Пути незакоммиченной работы этой задачи; чужие файлы в продолжение не втягиваются. */
+  workDirtyPaths?: string[];
+  /** Подряд незакоммиченных попыток; вторая вызывает диагностику, а не владельца. */
+  workDirtyAttempts?: number;
   /** Повтор того же падения после нового коммита означает отсутствие продвижения к приёмке. */
   lastTestFailure?: { readonly signature: string; readonly head: string };
   /** Проверенный кодовый HEAD, который должен быть родителем служебного docs-коммита. */

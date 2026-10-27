@@ -353,12 +353,13 @@ export async function runWorld(world: World): Promise<Outcome> {
       ...(session.removes ?? []),
     ];
     if (committing) commitFiles.set(head, files);
-    dirty =
-      typeof session.dirty === 'string'
-        ? session.dirty
-        : session.dirty === true
-          ? ' M packages/sim/src/step.ts'
-          : '';
+    if (env?.AGENT_ROLE !== 'reviewer' || session.dirty !== undefined)
+      dirty =
+        typeof session.dirty === 'string'
+          ? session.dirty
+          : session.dirty === true
+            ? ' M packages/sim/src/step.ts'
+            : '';
     return { code: session.code ?? 0, stdout: session.answer, stderr: '' };
   };
   // git stash: отложенная на время Issue владельца работа (только незакоммиченные строки `dirty`).

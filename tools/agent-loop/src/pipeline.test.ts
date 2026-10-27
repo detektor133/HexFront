@@ -219,6 +219,104 @@ describe('последовательный конвейер задачи', () =>
     expect(run.locked.every((locked) => locked === '')).toBe(true);
   });
 
+  it('продолжает свою незакоммиченную работу и диагностирует повторный красный тест без Issue владельца', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: добавить кнопку' }],
+        },
+      },
+      sessions: [
+        {
+          answer: 'Тест Esc красный.',
+          writes: { 'packages/sim/src/task.ts': 'draft 1' },
+          dirty: true,
+        },
+        {
+          answer: 'Тест Esc всё ещё красный.',
+          writes: { 'packages/sim/src/task.ts': 'draft 2' },
+          dirty: true,
+        },
+        review('ВОЗВРАТ\n- ТЕСТ: фикстура не открывает карточку'),
+        {
+          answer: 'Исправлены фикстура и продукт.',
+          writes: {
+            'packages/sim/src/task.ts': 'export const task = true;\n',
+            'packages/sim/test/task.test.ts': "it('критерий', () => {});\n",
+          },
+          commit: true,
+        },
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.lines.join('\n')).toContain('готово: 06/T1j5-Б1');
+    expect(run.prompts.slice(0, 4).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('Предыдущая проверка: Тест Esc красный.');
+    expect(run.prompts[3]).toContain('ТЕСТ: фикстура не открывает карточку');
+    expect(run.lines.join('\n')).not.toContain('Ответ — Issue «$decide»');
+  });
+
+  it('после перезапуска снимает устаревший запрос владельцу для своей незакоммиченной работы', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/src/task.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: красный тест Esc' }],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+        },
+        resume: '06/T1j5-Б1',
+        waitingAnswer: { task: '06/T1j5-Б1', reason: 'старый запрос владельцу' },
+        parked: { key: 'resume:06/T1j5-Б1', head: 'c0', reason: 'старый запрос владельцу' },
+      },
+      sessions: [codeCommit(), review('OK'), review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[0]).toContain('Продолжи незакоммиченную работу этой задачи');
+    expect(run.lines.join('\n')).not.toContain('старый запрос владельцу');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('не продолжает задачу, если к её грязному дереву добавлен чужой файл', async () => {
+    const run = await runWorld({
+      dirty: 'docs/STATUS.md',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+        },
+        resume: '06/T1j5-Б1',
+      },
+      sessions: [],
+    });
+
+    expect(run.lines.join('\n')).toContain('рабочее дерево не чистое');
+    expect(run.prompts).toEqual([]);
+  });
+
   it('перед первым review даёт исполнителю и reviewer полную матрицу критериев', async () => {
     const run = await runWorld({
       sessions: [codeCommit(), review('OK')],

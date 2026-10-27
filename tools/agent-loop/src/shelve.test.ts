@@ -6,33 +6,41 @@ const QUESTION: Session[] = [
   { answer: 'verify красный', dirty: true },
   { answer: 'Блокер: старый тест требует сид 42, задача — случайный сид', dirty: true },
 ];
-const DONE: Session = { task: 'T1j5-Б1', mark: '~', answer: 'Готово' };
-const REVIEW_OK: Session = { task: 'T1j5-Б1', mark: 'x', answer: 'OK' };
+const REVIEW_OK: Session = { answer: 'OK' };
 
-describe('вопрос исполнителя при недоделанной работе', () => {
-  it('ожидание называет вопрос и ответ — Issue «$decide»', async () => {
-    const run = await runWorld({ sessions: QUESTION });
-    expect(run.lines).toContain(
-      'жду: 06/T1j5-Б1 ждёт твоего ответа: «Блокер: старый тест требует сид 42, задача — случайный сид». Ответ — Issue «$decide» с решением; работа задачи останется и продолжится сама',
-    );
+describe('незакоммиченная работа и ответы владельца', () => {
+  it('красный тест продолжает исполнитель, а не Issue владельца', async () => {
+    const run = await runWorld({
+      sessions: [
+        ...QUESTION,
+        { answer: 'ВОЗВРАТ\n- ТЕСТ: неверная фикстура' },
+        { answer: 'Исправлено.', commit: true },
+        REVIEW_OK,
+        REVIEW_OK,
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+    expect(run.prompts.slice(0, 4).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+    ]);
+    expect(run.lines.join('\n')).not.toContain('Ответ — Issue «$decide»');
   });
 
-  it('ответ $decide исполняется, работа откладывается и возвращается, задача продолжается с ответом', async () => {
-    // 2026-10-14, 07/T3: при грязном дереве цикл исполнял только $done, и ответ владельца на
-    // вопрос исполнителя не мог исполниться никогда.
+  it('явный ответ владельца на старый вопрос по-прежнему исполняется с сохранением дерева', async () => {
+    const reason = '06/T1j5-Б1 ждёт твоего ответа: «вопрос». Ответ — Issue «$decide»';
     const run = await runWorld({
-      sessions: [...QUESTION, { answer: 'записано решение', commit: true }, DONE, REVIEW_OK],
+      dirty: true,
+      state: { waitingAnswer: { task: '06/T1j5-Б1', reason } },
+      sessions: [{ answer: 'записано решение', commit: true }],
       polls: 2,
       arrival: issue(12, '$decide 06/T1j5-Б1: старый тест заменить'),
     });
-    expect(run.prompts[2]).toBe('$decide 06/T1j5-Б1: старый тест заменить');
+    expect(run.prompts[0]).toBe('$decide 06/T1j5-Б1: старый тест заменить');
     expect(run.stashes).toEqual(['push', 'pop']);
-    expect(run.prompts[3]).toMatch(
-      /^\$task 06\/T1j5-Б1 продолжить\nПока работа ждала, владелец ответил Issue #12 \(\$decide 06\/T1j5-Б1: старый тест заменить\)/u,
-    );
-    expect(run.prompts[4]?.split('\n')[0]).toBe('$review 06/T1j5-Б1');
     expect(run.closed).toContain(12);
-    // Коммит ответа ждёт только `ci.yml`: workflow, сломанный задачей, не держит запись решения.
     expect(run.ciArgs[0]).toBe('');
   });
 

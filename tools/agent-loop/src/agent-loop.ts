@@ -130,7 +130,28 @@ async function tick(context: LoopContext): Promise<Step> {
   if (expected !== undefined && branch !== expected)
     return park(context, 'branch', `ожидалась ветка ${expected} из STATUS, сейчас ${branch}`);
   const files = await dirtyFiles(git);
-  if (files !== '') return dirtyTree(context, files);
+  if (files !== '') {
+    const active = state.activeTask;
+    const owned = active?.workDirtyPaths;
+    const paths = await changedPaths(git);
+    if (active === undefined || state.resume !== active.task || owned === undefined)
+      return dirtyTree(context, files);
+    if (paths.some((path) => !owned.includes(path)))
+      return park(
+        context,
+        'dirty',
+        `рабочее дерево не чистое: к ${active.task} добавлены чужие файлы`,
+      );
+    delete state.waitingAnswer;
+    delete state.parked;
+    await save(context);
+    return (
+      await processTask(context, active.task, {
+        mark: taskMark((await readStage(config.root)).stageText, active.task) ?? ' ',
+        workPrompt: `$task ${active.task}`,
+      })
+    ).step;
+  }
   const currentStage = await readStage(config.root);
   const missing =
     closedStageBranch(status) === undefined
