@@ -58,7 +58,7 @@ export interface GestureDeps {
 }
 
 export interface Gesture {
-  down(id: number, at: Point, button: number, ms: number, shift?: boolean): void;
+  down(id: number, at: Point, button: number, ms: number, shift?: boolean, mouse?: boolean): void;
   move(id: number, at: Point, ms: number): void;
   up(id: number, at: Point, ms: number): void;
   /** Отменяет активный жест без выполнения действия. */
@@ -88,7 +88,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   let last: Point = { x: 0, y: 0 };
   let downMs = 0;
   let button = 0;
-  let shift = false;
+  let mouse = true;
   // Приказ удержанием: палец уходил с фишки выбранных отрядов (возврат на неё — отмена).
   let leftZone = false;
   let lastTap: { readonly at: Point; readonly ms: number } | null = null;
@@ -108,7 +108,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   };
 
   return {
-    down(id, at, btn, ms, withShift = false) {
+    down(id, at, btn, ms, _withShift = false, isMouse = true) {
       active.set(id, at);
       if (active.size > 1) {
         // Второй палец — всегда карта: росчерк, деление и приказ удержанием отменяются.
@@ -125,9 +125,9 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       last = at;
       downMs = ms;
       button = btn;
-      shift = withShift && btn === 0;
+      mouse = isMouse;
       leftZone = false;
-      if (btn === 0 && !shift) deps.press(at);
+      if (btn === 0) deps.press(at);
     },
 
     move(id, at, ms) {
@@ -165,13 +165,13 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (mode === 'held') return;
       if (mode === 'pressed') {
         if (Math.hypot(at.x - start.x, at.y - start.y) <= DRAG_SLOP_PX) return;
-        if (shift) {
+        if (button === 0 && deps.drawing()) {
+          mode = 'stroking';
+          emit({ t: 'stroke', at: start, phase: 'start' });
+        } else if (button === 0 && mouse) {
           mode = 'selecting';
           deps.release();
           emit({ t: 'selection', at: start, to: at, phase: 'start' });
-        } else if (button === 0 && deps.drawing()) {
-          mode = 'stroking';
-          emit({ t: 'stroke', at: start, phase: 'start' });
         } else {
           mode = 'panning';
           deps.release();

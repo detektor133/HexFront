@@ -103,7 +103,7 @@ export interface MapView {
    * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
    */
   setStroke(handler: StrokeHandler | null): void;
-  /** Рамка выбора отрядов мышью; вызывается только для Shift + ЛКМ. */
+  /** Рамка выбора отрядов мышью после сдвига ЛКМ за порог жеста. */
   setSelection(handler: SelectionHandler | null): void;
   /**
    * Захват: при нажатии grab(world) может вернуть обработчик росчерка — тогда этот жест тянет
@@ -144,11 +144,25 @@ export async function createMapView(
     resolution: window.devicePixelRatio,
   });
   host.appendChild(app.canvas);
+  const selectionFrame = host.ownerDocument?.createElement('div');
+  if (selectionFrame) {
+    selectionFrame.dataset.testid = 'selection-frame';
+    selectionFrame.setAttribute('aria-hidden', 'true');
+    Object.assign(selectionFrame.style, {
+      position: 'absolute',
+      display: 'none',
+      pointerEvents: 'none',
+      boxSizing: 'border-box',
+      border: `${tokens.selection.width}px solid ${tokens.selection.color}`,
+      backgroundColor: `color-mix(in srgb, ${tokens.selection.color} 8%, transparent)`,
+    });
+    host.appendChild(selectionFrame);
+  }
+  const clearSelectionFrame = (): void => {
+    if (selectionFrame) selectionFrame.style.display = 'none';
+  };
   const world = new Container();
   app.stage.addChild(world);
-  const selection = new Graphics();
-  selection.context.batchMode = 'batch';
-  world.addChild(selection);
 
   let layer: TerrainLayer = createTerrainLayer(map, opts.radius, tokens.map.waterEdge);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
@@ -263,17 +277,14 @@ export async function createMapView(
       } else if (e.t === 'selection') {
         const from = toWorld(e.at);
         const to = toWorld(e.to);
-        selection.clear();
-        if (e.phase !== 'end' && e.phase !== 'cancel') {
-          selection
-            .rect(
-              Math.min(from.x, to.x),
-              Math.min(from.y, to.y),
-              Math.abs(to.x - from.x),
-              Math.abs(to.y - from.y),
-            )
-            .fill({ color: tokens.selection.color, alpha: 0.08 })
-            .stroke({ color: tokens.selection.color, width: tokens.selection.width / cam.scale });
+        if (selectionFrame && e.phase !== 'end' && e.phase !== 'cancel') {
+          selectionFrame.style.display = 'block';
+          selectionFrame.style.left = `${Math.min(e.at.x, e.to.x)}px`;
+          selectionFrame.style.top = `${Math.min(e.at.y, e.to.y)}px`;
+          selectionFrame.style.width = `${Math.abs(e.to.x - e.at.x)}px`;
+          selectionFrame.style.height = `${Math.abs(e.to.y - e.at.y)}px`;
+        } else if (selectionFrame) {
+          clearSelectionFrame();
         }
         selectionHandler?.(from, to, e.phase);
       } else if (e.t === 'stroke') {
@@ -365,7 +376,7 @@ export async function createMapView(
       grabbed = null;
       stroking = false;
       hooks?.cancel();
-      selection.clear();
+      clearSelectionFrame();
     },
     sceneStats() {
       const graphicsInstructions: number[] = [];
@@ -404,7 +415,7 @@ export async function createMapView(
     },
     setSelection(handler) {
       selectionHandler = handler;
-      selection.clear();
+      clearSelectionFrame();
     },
     setScale(scale) {
       const v = cameraView();
@@ -423,6 +434,7 @@ export async function createMapView(
     },
     destroy() {
       detach();
+      selectionFrame?.remove();
       app.destroy({ removeView: true }, { children: true, context: true });
     },
   };
@@ -447,7 +459,14 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.setPointerCapture(e.pointerId);
     count += 1;
     h.pressed(count);
-    g.down(e.pointerId, local(e), e.button, performance.now(), e.shiftKey);
+    g.down(
+      e.pointerId,
+      local(e),
+      e.button,
+      performance.now(),
+      e.shiftKey,
+      e.pointerType === 'mouse',
+    );
   };
   const move = (e: PointerEvent): void => {
     if (count === 0) return g.hover(local(e));

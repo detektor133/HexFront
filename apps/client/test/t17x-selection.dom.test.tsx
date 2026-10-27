@@ -40,10 +40,17 @@ function installDomGlobals(): void {
 function mapViewStub(
   map: MapStatic,
   onTap: (hex: { q: number; r: number }, kind: TapKind, world: Point) => void,
-): { view: MapView; gesture: Gesture; panCount: () => number; selectionPhases: () => string[] } {
+): {
+  view: MapView;
+  gesture: Gesture;
+  panCount: () => number;
+  zoomCount: () => number;
+  selectionPhases: () => string[];
+} {
   let selection:
     ((from: Point, to: Point, phase: 'start' | 'move' | 'end' | 'cancel') => void) | null = null;
   let pans = 0;
+  let zooms = 0;
   const selectionPhases: string[] = [];
   const view = {
     configure: () => undefined,
@@ -89,6 +96,7 @@ function mapViewStub(
         }
       }
       if (event.t === 'pan') pans += 1;
+      if (event.t === 'zoom') zooms += 1;
     },
   );
   void map;
@@ -96,6 +104,7 @@ function mapViewStub(
     view,
     gesture,
     panCount: () => pans,
+    zoomCount: () => zooms,
     selectionPhases: () => selectionPhases,
   };
 }
@@ -195,7 +204,7 @@ describe('07/T17x: выбор через реальный путь /match', () =
     expect(selectUnitsSpy.mock.calls.at(-1)?.[2]).toEqual([moving.id]);
   });
 
-  it('Shift-протяжка проходит через setSelection, а протяжка без Shift только панорамирует', async () => {
+  it('ЛКМ-протяжка без Shift выбирает отряды, двухпальцевый жест панорамирует', async () => {
     installDomGlobals();
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
@@ -207,6 +216,14 @@ describe('07/T17x: выбор через реальный путь /match', () =
       armyId: null,
       soldiers: (index === 0 ? 111_000 : 222_000) as typeof unit.soldiers,
     }));
+    const enemy = source.view.units.find((unit) => unit.owner !== source.view.playerId);
+    if (!enemy) throw new Error('нужен чужой отряд');
+    const template = selectedUnits[0];
+    if (!template) throw new Error('нужен отряд для проверки исключений');
+    selectedUnits.push(
+      { ...template, id: template.id + 100_000, owner: enemy.owner },
+      { ...template, id: template.id + 200_000, order: 'retreat' },
+    );
     const message: FromWorker = {
       ...source,
       view: { ...source.view, units: selectedUnits },
@@ -266,12 +283,16 @@ describe('07/T17x: выбор через реальный путь /match', () =
       x: Math.max(...points.map((point) => point.x)) + 4,
       y: Math.max(...points.map((point) => point.y)) + 4,
     };
-    act(() => mapStub?.gesture.down(1, first, 0, 0, true));
+    act(() => mapStub?.gesture.down(1, first, 0, 0));
     act(() => mapStub?.gesture.move(1, second, 20));
     act(() => mapStub?.gesture.up(1, second, 40));
-    act(() => mapStub?.gesture.down(2, first, 0, 0));
-    act(() => mapStub?.gesture.move(2, second, 20));
-    act(() => mapStub?.gesture.up(2, second, 40));
+    expect(mapStub?.panCount()).toBe(0);
+    const secondFinger = { x: first.x + 30, y: first.y };
+    act(() => mapStub?.gesture.down(1, first, 0, 50, false, false));
+    act(() => mapStub?.gesture.down(2, secondFinger, 0, 50, false, false));
+    act(() => mapStub?.gesture.move(2, { x: secondFinger.x + 10, y: secondFinger.y }, 70));
+    act(() => mapStub?.gesture.up(1, first, 80));
+    act(() => mapStub?.gesture.up(2, { x: secondFinger.x + 10, y: secondFinger.y }, 80));
     expect(mapStub?.selectionPhases()).toEqual(['start', 'move', 'end']);
     const selectedCard = (): Element | null =>
       document.querySelector('section[aria-label^="Выбрано"]');
@@ -281,5 +302,6 @@ describe('07/T17x: выбор через реальный путь /match', () =
     expect(selectedLabel).toContain('Выбрано отрядов: 2');
     expect(selectedLabel).toContain(formatSoldiers(333_000));
     expect(mapStub?.panCount()).toBe(1);
+    expect(mapStub?.zoomCount()).toBe(1);
   });
 });

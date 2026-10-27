@@ -14,7 +14,7 @@ export interface Picked {
 
 export const NOTHING_PICKED: Picked = { hex: null, units: [], target: null };
 
-/** Выбирает свои фишки, центры которых попали в прямоугольник Shift-рамки. */
+/** Выбирает свои фишки, центры которых попали в прямоугольник рамки. */
 export function selectUnitsInRect(
   view: PlayerView,
   from: Point,

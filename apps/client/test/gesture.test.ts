@@ -34,9 +34,9 @@ const kinds = (s: Setup): string[] =>
   s.events.map((e) => (e.t === 'tap' ? `tap:${e.kind}` : 'phase' in e ? `${e.t}:${e.phase}` : e.t));
 
 describe('жесты карты (04/T16, 07-controls.md)', () => {
-  it('выдаёт рамку выбора только для Shift + ЛКМ', () => {
+  it('выдаёт рамку выбора при ЛКМ без Shift', () => {
     const s = setup();
-    s.g.down(1, { x: 10, y: 20 }, 0, 0, true);
+    s.g.down(1, { x: 10, y: 20 }, 0, 0);
     s.g.move(1, { x: 30, y: 50 }, 20);
     s.g.up(1, { x: 40, y: 60 }, 40);
     expect(s.events).toEqual([
@@ -48,12 +48,12 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     expect(end).toMatchObject({ t: 'selection', phase: 'end', to: { x: 40, y: 60 } });
   });
 
-  it('не превращает обычное перетаскивание в рамку выбора', () => {
+  it('не создаёт рамку до преодоления порога перетаскивания', () => {
     const s = setup();
     s.g.down(1, { x: 10, y: 20 }, 0, 0);
-    s.g.move(1, { x: 30, y: 50 }, 20);
+    s.g.move(1, { x: 17, y: 20 }, 20);
     expect(s.events.some((event) => event.t === 'selection')).toBe(false);
-    expect(s.events[0]?.t).toBe('pan');
+    expect(s.events.some((event) => event.t === 'pan')).toBe(false);
   });
 
   it('Esc отменяет активное удержание без события завершения', () => {
@@ -78,7 +78,7 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     b.g.down(1, { x: 100, y: 100 }, 0, 0);
     b.g.move(1, { x: 109, y: 100 }, 50);
     b.g.up(1, { x: 109, y: 100 }, 100);
-    expect(kinds(b)).toContain('pan');
+    expect(kinds(b)).toContain('selection:start');
     expect(kinds(b)).not.toContain('tap:select');
   });
 
