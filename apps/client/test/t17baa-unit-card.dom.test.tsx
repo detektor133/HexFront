@@ -71,7 +71,11 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
     expect(screen.queryByRole('region', { name: cardName })).toBeNull();
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
-    getSelection()?.(center, center, 'end');
+    getSelection()?.(
+      { x: center.x - 1, y: center.y - 1 },
+      { x: center.x + 1, y: center.y + 1 },
+      'end',
+    );
     const selectedCard = await screen.findByRole('region', { name: cardName });
     expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
 
