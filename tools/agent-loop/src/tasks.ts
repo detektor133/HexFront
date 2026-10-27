@@ -26,7 +26,12 @@ import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead }
 import { runPlan } from './plan.ts';
 import { taskCriteriaMatrix } from './requirements.ts';
 import { runReview, type ReviewFinding } from './review.ts';
-import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
+import {
+  forbiddenPaths,
+  forbiddenWorkingPaths,
+  isInfraTask,
+  scopeViolation,
+} from './scope-guard.ts';
 import { forgetSpec } from './spec.ts';
 import { commandTask, parseQueue, setTaskMark, taskMark } from './stage-file.ts';
 import type { ActiveTask } from './state.ts';
@@ -172,7 +177,21 @@ async function runProductWork(
     context.state.resume === task
       ? `\nПродолжи незакоммиченную работу этой задачи. Предыдущая проверка: ${context.state.resumeNote ?? 'результат не записан'}. Исправь причину красного теста в продукте или фикстуре, проверь и создай коммит.`
       : '';
-  const result = await session(context, 'next', checkedPrompt + continuation);
+  const beforePaths = await changedPaths(context.git);
+  let newForbidden: string[] = [];
+  const result = await session(context, 'next', checkedPrompt + continuation).finally(async () => {
+    const afterPaths = await changedPaths(context.git);
+    const added = afterPaths.filter((path) => !beforePaths.includes(path));
+    newForbidden = isInfraTask(task) ? [] : forbiddenWorkingPaths(added);
+    if (newForbidden.length > 0 || afterPaths.length === 0) return;
+    const active = context.state.activeTask;
+    if (active?.task !== task) return;
+    active.workDirtyPaths = [...new Set([...(active.workDirtyPaths ?? []), ...afterPaths])];
+    context.state.resume = task;
+    await save(context);
+  });
+  if (newForbidden.length > 0)
+    return park(context, `scope:${task}`, scopeViolation(task, newForbidden), result.message);
   if (result.failure !== undefined)
     return backoff(context, `${firstLine(prompt)}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
@@ -411,6 +430,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       active.workAttempt = {
         head: await head(context.git),
         remote: await remoteHead(context.git),
+        dirtyPaths: await changedPaths(context.git),
       };
       await save(context);
       const stop = await runProductWork(

@@ -137,6 +137,7 @@ export interface World {
 
 export interface Outcome {
   code: number;
+  state?: LoopState;
   readonly prompts: string[];
   readonly roles: (string | undefined)[];
   /** `AGENT_LOCKED` каждой сессии codex. */
@@ -631,6 +632,7 @@ export async function runWorld(world: World): Promise<Outcome> {
     if (!(error instanceof Error && error.message === 'конец теста')) throw error;
   } finally {
     out.pushes = pushes;
+    out.state = await loadState(root);
     await rm(root, { recursive: true, force: true });
   }
   return out;

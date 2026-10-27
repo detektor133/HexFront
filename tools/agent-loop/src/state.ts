@@ -35,7 +35,7 @@ export interface ActiveTask {
   /** Одна дополнительная попытка $spec после плана, подтвердившего тестовый путь. */
   planTestRetryUsed?: boolean;
   /** HEAD и origin до рабочей сессии: по ним восстанавливается коммит после обрыва процесса. */
-  workAttempt?: { readonly head: string; readonly remote: string };
+  workAttempt?: { readonly head: string; readonly remote: string; readonly dirtyPaths?: string[] };
   /** После исправления теста продолжить исходную работу, которая ещё не создала коммит. */
   resumeWorkAfterFindings?: boolean;
   /** Пути незакоммиченной работы этой задачи; чужие файлы в продолжение не втягиваются. */

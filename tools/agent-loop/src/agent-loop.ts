@@ -27,6 +27,7 @@ import {
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
+import { forbiddenWorkingPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
 import { forgetSpec, specFiles } from './spec.ts';
@@ -134,9 +135,26 @@ async function tick(context: LoopContext): Promise<Step> {
     const active = state.activeTask;
     const owned = active?.workDirtyPaths;
     const paths = await changedPaths(git);
-    if (active === undefined || state.resume !== active.task || owned === undefined)
+    if (active?.phase === 'work' && active.workAttempt?.dirtyPaths !== undefined) {
+      const attempt = active.workAttempt;
+      const initialPaths = active.workAttempt.dirtyPaths;
+      if (
+        (await head(git)) === attempt.head &&
+        initialPaths.every((path) => paths.includes(path))
+      ) {
+        const added = paths.filter((path) => !initialPaths.includes(path));
+        const forbidden = isInfraTask(active.task) ? [] : forbiddenWorkingPaths(added);
+        if (forbidden.length > 0)
+          return park(context, `scope:${active.task}`, scopeViolation(active.task, forbidden));
+        active.workDirtyPaths = [...new Set([...(owned ?? []), ...paths])];
+        state.resume = active.task;
+        delete active.workAttempt;
+        await save(context);
+      }
+    }
+    if (active === undefined || state.resume !== active.task || active.workDirtyPaths === undefined)
       return dirtyTree(context, files);
-    if (paths.some((path) => !owned.includes(path)))
+    if (paths.some((path) => !active.workDirtyPaths?.includes(path)))
       return park(
         context,
         'dirty',

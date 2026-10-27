@@ -317,6 +317,81 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts).toEqual([]);
   });
 
+  it('запоминает новый файл задачи даже при обрыве сессии по лимиту', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/src/task.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: завершить задачу' }],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+        },
+        resume: '06/T1j5-Б1',
+      },
+      sessions: [
+        {
+          answer: 'hit your usage limit',
+          code: 1,
+          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
+          dirty: ' M packages/sim/src/task.ts',
+        },
+      ],
+    });
+
+    expect(run.state?.activeTask?.workDirtyPaths).toContain('packages/sim/test/task.test.ts');
+    expect(run.state?.resume).toBe('06/T1j5-Б1');
+    expect(run.lines.join('\n')).not.toContain('добавлены чужие файлы');
+  });
+
+  it('после обрыва процесса восстанавливает файлы начатой рабочей сессии', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/src/task.ts\n?? packages/sim/test/task.test.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: завершить задачу' }],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+          workAttempt: { head: 'c0', remote: 'c0', dirtyPaths: ['packages/sim/src/task.ts'] },
+        },
+      },
+      sessions: [{ answer: 'hit your usage limit', code: 1 }],
+    });
+
+    expect(run.prompts[0]).toContain('Продолжи незакоммиченную работу этой задачи');
+    expect(run.state?.activeTask?.workDirtyPaths).toContain('packages/sim/test/task.test.ts');
+    expect(run.lines.join('\n')).not.toContain('добавлены чужие файлы');
+  });
+
+  it('не приписывает задаче код цикла при восстановлении оборванной сессии', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/src/task.ts\n?? tools/agent-loop/src/foreign.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+          workAttempt: { head: 'c0', remote: 'c0', dirtyPaths: ['packages/sim/src/task.ts'] },
+        },
+      },
+      sessions: [],
+    });
+
+    expect(run.prompts).toEqual([]);
+    expect(run.lines.join('\n')).toContain('изменила код цикла');
+  });
+
   it('перед первым review даёт исполнителю и reviewer полную матрицу критериев', async () => {
     const run = await runWorld({
       sessions: [codeCommit(), review('OK')],

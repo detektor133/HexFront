@@ -14,6 +14,11 @@ const touchedPaths = (nameStatus: string): string[] =>
 
 /** Пути, которые обычная задача трогать не должна: это код и настройка самого цикла. */
 const FORBIDDEN_GLOBS = ['tools/agent-loop/**', '.codex/**', 'tools/agent-loop/permissions.json'];
+const forbiddenMatchers = FORBIDDEN_GLOBS.map((glob) => globToRegExp(glob));
+
+/** Запретные незакоммиченные пути, появившиеся в рабочей сессии обычной задачи. */
+export const forbiddenWorkingPaths = (paths: readonly string[]): string[] =>
+  paths.filter((path) => forbiddenMatchers.some((re) => re.test(path)));
 
 /** Задача из файла этапа (`NN/Tn`) против служебной (`NN/infra`), которой это разрешено. */
 export const isInfraTask = (task: string): boolean => task.endsWith('/infra');
@@ -22,8 +27,7 @@ export const isInfraTask = (task: string): boolean => task.endsWith('/infra');
 export async function forbiddenPaths(git: Git, base: string): Promise<string[]> {
   const nameStatus = await git.run(['diff', '--name-status', `${base}..HEAD`]);
   const touched = touchedPaths(nameStatus);
-  const globs = FORBIDDEN_GLOBS.map((glob) => globToRegExp(glob));
-  return touched.filter((path) => globs.some((re) => re.test(path)));
+  return forbiddenWorkingPaths(touched);
 }
 
 /** Запрос ожидания владельца: задача изменила код цикла без поручения. */
