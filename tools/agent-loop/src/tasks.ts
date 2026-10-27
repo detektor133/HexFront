@@ -1,10 +1,9 @@
-// Последовательный автомат задачи: spec → локальная работа → review → пакеты по ролям → push → CI.
-import { readFile, writeFile } from 'node:fs/promises';
+// Последовательный автомат задачи: код и тесты одним исполнителем → review → push → CI.
+import { writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import {
   backoff,
-  checkPermissions,
   firstLine,
   lastLines,
   park,
@@ -21,14 +20,14 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
-  runTestFix,
+  verifyTouchedTests,
 } from './finding-repair.ts';
-import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
+import { currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { taskCriteriaMatrix } from './requirements.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
-import { forgetSpec, prepareSpec, specFiles, specViolation, withSpec } from './spec.ts';
+import { forgetSpec } from './spec.ts';
 import { commandTask, parseQueue, setTaskMark, taskMark } from './stage-file.ts';
 import type { ActiveTask } from './state.ts';
 import { runVisualGate } from './visual.ts';
@@ -40,9 +39,6 @@ export interface TaskRun {
 
 /** Подряд точечных патчей одного продуктового файла, после которых зовётся plan (не ещё патч). */
 export const REDESIGN_STREAK = 2;
-/** Второй подряд отказ от теста через `СПЕК:` без решения `plan` между ними зовёт `plan`. */
-export const SPEC_BOUNCE_LIMIT = 2;
-
 /** Подряд кругов финального review с новыми пунктами (любыми, не только по одному файлу/тесту). */
 export const REVIEW_ROUND_LIMIT = 2;
 
@@ -96,54 +92,7 @@ export const skillFailed = (
   result: SkillResult & { ok: false },
 ): Promise<Step> => backoff(context, `${prompt}: ${result.reason}`, result.message);
 
-/**
- * Сессия сообщила `СПЕК:` без коммита — её попытка кода брошена по её же словам. Черновые правки
- * продуктовых файлов (не залоченные тесты задачи), если остались на диске, отбрасываются: иначе
- * следующий тик цикла увидит грязное дерево вне залоченных файлов и запаркуется «дерево не
- * чистое» мимо уже обработанного `СПЕК:` — цикл выглядит зависшим сразу после старта.
- */
-async function discardStraySpecAttempt(context: LoopContext, task: string): Promise<void> {
-  const locked = new Set(specFiles(context, task));
-  const stray = (await changedPaths(context.git)).filter((path) => !locked.has(path));
-  if (stray.length === 0) return;
-  await context.git.attempt(['checkout', '--', ...stray]);
-  await context.git.attempt(['clean', '-f', '--', ...stray]);
-}
-
 async function followUp(context: LoopContext, task: string, message: string): Promise<Step> {
-  const specRemark = message
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .find((line) => line.startsWith('СПЕК:'));
-  if (specRemark !== undefined && context.state.activeTask?.task === task) {
-    const active = context.state.activeTask;
-    await discardStraySpecAttempt(context, task);
-    const finding: ReviewFinding = {
-      kind: 'ТЕСТ',
-      text: `ТЕСТ: неверный приёмочный тест — ${specRemark.slice('СПЕК:'.length).trim()}`,
-    };
-    active.specBounceStreak = (active.specBounceStreak ?? 0) + 1;
-    if (active.specBounceStreak >= SPEC_BOUNCE_LIMIT) {
-      await save(context);
-      return diagnoseFinding(
-        context,
-        task,
-        finding,
-        false,
-        `Исполнитель задачи ${task} уже ${active.specBounceStreak} раз(а) подряд отбрасывает ` +
-          `приёмочный тест маркером «СПЕК:» вместо кода, и каждый раз называет противоречие ` +
-          `по-другому (например «тест требует показать» и следом «тест требует скрыть» — критерию ` +
-          `удовлетворить не удаётся ни одной стороной). Свежая претензия: «${finding.text}». ` +
-          'Реши сам, чего на самом деле требует критерий приёмки, и либо уточни тест/задачу этим ' +
-          'решением, либо разбей задачу, либо запиши вопрос в docs/QUESTIONS.md — дальше не бросай ' +
-          'противоречие обратно исполнителю без этого решения.',
-      );
-    }
-    if (active.findings.length === 0) active.resumeWorkAfterFindings = true;
-    active.findings = batchReviewFindings([finding, ...active.findings]);
-    await save(context);
-    return 'worked';
-  }
   const split = commandTask(message, '$split');
   if (split !== undefined) {
     const result = await runSkill(context, 'next', `$split ${split}`);
@@ -211,7 +160,6 @@ async function runProductWork(
 ): Promise<Step | undefined> {
   const base = await head(context.git);
   const published = await remoteHead(context.git);
-  const locked = specFiles(context, task);
   const matrix =
     finding === undefined
       ? taskCriteriaMatrix((await readStage(context.config.root)).stageText, task)
@@ -220,13 +168,11 @@ async function runProductWork(
     matrix === ''
       ? prompt
       : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nДля каждого пункта найди продуктовый путь и проверку. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.`;
-  const result = await session(context, 'next', withSpec(checkedPrompt, task, locked), locked);
+  const result = await session(context, 'next', checkedPrompt);
   if (result.failure !== undefined)
     return backoff(context, `${firstLine(prompt)}: ${result.failure}`, result.message);
   if ((await remoteHead(context.git)) !== published)
     return park(context, `push:${task}`, `${task}: рабочая сессия изменила origin до review`);
-  if ((await head(context.git)) === base && /^СПЕК:/mu.test(result.message))
-    return followUp(context, task, result.message);
   if ((await dirtyFiles(context.git)) !== '') {
     if (context.state.resume !== task) {
       context.state.resume = task;
@@ -247,8 +193,6 @@ async function runProductWork(
   delete context.state.waitingAnswer;
   if (context.state.activeTask?.task === task) delete context.state.activeTask.specBounceStreak;
   await save(context);
-  const violation = await specViolation(context, task);
-  if (violation !== undefined) return park(context, `spec:${task}`, violation, result.message);
   if (!isInfraTask(task)) {
     // Правка кода цикла не самовольна, если именно её назвал сам пункт review (findingPrompt
     // передаёт исполнителю ровно этот один пункт) — 07/T22 ловил самовольную правку, а не
@@ -273,18 +217,6 @@ async function recoverCommittedWork(
     return park(context, `push:${task}`, `${task}: origin изменился во время оборванной сессии`);
   if ((await dirtyFiles(context.git)) !== '')
     return park(context, `resume:${task}`, `${task}: оборванная сессия оставила грязное дерево`);
-  if (finding?.kind === 'ТЕСТ') {
-    if (!(await checkPermissions(context, base, context.definitions.specPaths)))
-      return park(context, `spec:${task}`, `$spec ${task} изменил файлы вне тестов`);
-    const saved = { ...(context.state.spec[task] ?? {}) };
-    for (const path of await changedPathsBetween(context, base))
-      saved[path] = await readFile(join(context.config.root, path), 'utf8');
-    context.state.spec[task] = saved;
-    await save(context);
-    return undefined;
-  }
-  const violation = await specViolation(context, task);
-  if (violation !== undefined) return park(context, `spec:${task}`, violation);
   if (!isInfraTask(task)) {
     const forbidden = (await forbiddenPaths(context.git, base)).filter(
       (path) => finding === undefined || !mentionsStreakFile(finding.text, path),
@@ -462,15 +394,12 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         remote: await remoteHead(context.git),
       };
       await save(context);
-      const stop =
-        finding?.kind === 'ТЕСТ'
-          ? await runTestFix(context, task, finding)
-          : await runProductWork(
-              context,
-              task,
-              finding === undefined ? active.workPrompt : findingPrompt(task, finding),
-              finding,
-            );
+      const stop = await runProductWork(
+        context,
+        task,
+        finding === undefined ? active.workPrompt : findingPrompt(task, finding),
+        finding,
+      );
       if (stop !== undefined) {
         delete active.workAttempt;
         await save(context);
@@ -481,6 +410,32 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     delete active.workAttempt;
     if (roundBase !== undefined)
       updateFixStreak(active, await changedPathsBetween(context, roundBase));
+    const failure = await verifyTouchedTests(
+      context,
+      await changedPathsBetween(context, active.base),
+    );
+    if (failure !== undefined) {
+      const currentHead = await head(context.git);
+      const repeated =
+        active.lastTestFailure?.signature === failure &&
+        active.lastTestFailure.head !== currentHead;
+      active.lastTestFailure = { signature: failure, head: currentHead };
+      active.findings = [
+        repeated
+          ? {
+              kind: 'ПЛАН',
+              text:
+                `ПЛАН: после нового коммита повторилось то же падение проверки. ` +
+                `Определи конкретную неверную предпосылку теста или продукта и другой способ ` +
+                `её исправить; очередной такой же патч не продвинул задачу. ${failure}`,
+            }
+          : { kind: 'КОД', text: `КОД: проверки задачи красные — ${failure}` },
+      ];
+      active.phase = 'work';
+      await save(context);
+      return { step: 'worked', done: false };
+    }
+    delete active.lastTestFailure;
     active.phase = finding === undefined ? 'review' : 'target-review';
     await save(context);
   }
@@ -634,19 +589,8 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     if (targeted) {
       active.findings = active.findings.slice(1);
       active.findingRetries = 0;
-      if (active.findings.length === 0 && active.resumeWorkAfterFindings === true) {
-        delete active.resumeWorkAfterFindings;
-        // Если за время починки точек уже появился продуктовый коммит (не только тест), бросовый
-        // повторный вызов голого workPrompt почти наверняка получит «уже реализована» без
-        // изменений: реальная работа прошла через цепочку КОД/ТЕСТ-пунктов, а не через исходный
-        // промпт. Финальный review проверит всё сразу вместо повторного обращения с тем же текстом.
-        const locked = new Set(specFiles(context, task));
-        const touched = await changedPathsBetween(context, active.base);
-        const hasProductCommit = touched.some((path) => !locked.has(path));
-        active.phase = hasProductCommit ? 'review' : 'work';
-      } else {
-        active.phase = active.findings.length === 0 ? 'review' : 'work';
-      }
+      delete active.resumeWorkAfterFindings;
+      active.phase = active.findings.length === 0 ? 'review' : 'work';
       await save(context);
       await context.say(`узкий review ${task}: OK, осталось ${active.findings.length} пунктов`);
       return { step: 'worked', done: false };
@@ -756,8 +700,6 @@ export async function processTask(
       phase: 'work',
       findings: [],
     };
-    const specStop = await prepareSpec(context, task, true);
-    if (specStop !== undefined) return { step: specStop, done: false };
     await save(context);
   }
   if (context.state.activeTask.task !== task)
@@ -769,6 +711,12 @@ export async function processTask(
       ),
       done: false,
     };
+  const active = context.state.activeTask;
+  if (active.findings.some((finding) => finding.kind === 'ТЕСТ')) {
+    active.findings = batchReviewFindings(active.findings);
+    await forgetSpec(context, task);
+    await save(context);
+  }
   if (options.resume === true && options.workPrompt !== '') {
     context.state.activeTask = { ...context.state.activeTask, workPrompt: options.workPrompt };
   }

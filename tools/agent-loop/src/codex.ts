@@ -11,7 +11,7 @@ interface RoleConfig {
 }
 /**
  * `next` — сессии, которые пишут код и docs; `review` — только `$review`, с правами reviewer;
- * `spec` — `$spec`, только приёмочные тесты до кода; `plan` — `$plan`, только проверка текста
+ * `spec` — ручной `$spec`, отдельная подготовка тестов; `plan` — `$plan`, проверка текста
  * задачи перед исполнителем (файл этапа, STATUS, QUESTIONS, DECISIONS).
  */
 export type Role = 'next' | 'review' | 'spec' | 'plan';

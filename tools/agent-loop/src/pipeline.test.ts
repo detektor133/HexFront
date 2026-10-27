@@ -17,28 +17,31 @@ const codeCommit = (answer = 'Код готов.'): Session => ({
 const review = (answer: string): Session => ({ answer, push: false });
 
 describe('последовательный конвейер задачи', () => {
-  it('пишет тест до кода, push делает после review и отдельно фиксирует статус', async () => {
-    const spec: Session = {
-      answer: 'Приёмочный тест записан.',
-      writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-      push: false,
-    };
+  it('исполнитель пишет код и тесты одним проходом, push идёт после review', async () => {
     const run = await runWorld({
       spec: true,
-      sessions: [spec, codeCommit(), review('OK')],
+      sessions: [
+        {
+          answer: 'Код и тест готовы.',
+          writes: {
+            'packages/sim/src/task.ts': 'export const task = true;\n',
+            'packages/sim/test/task.test.ts': "it('критерий', () => {});\n",
+          },
+          commit: true,
+        },
+        review('OK'),
+      ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$spec 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
-    expect(run.roles).toEqual(['spec', '', 'reviewer']);
-    expect(run.prompts[0]).toContain('Вычисляемые ожидания не угадывай');
+    expect(run.roles).toEqual(['', 'reviewer']);
+    expect(run.execs).toContain('vitest run packages/sim/test/task.test.ts');
+    expect(run.verifyCalls).toBe(1);
     expect(run.pushes).toBe(2);
-    expect(run.prePushCalls).toBe(1);
-    expect(run.ciCalls).toBe(2);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -78,35 +81,96 @@ describe('последовательный конвейер задачи', () =>
     expect(run.ciCalls).toBe(2);
   });
 
-  it('выдаёт дефекты пакетами по ролям и после каждого пакета запускает узкий review', async () => {
-    const returned = review(
-      'ВОЗВРАТ\n- КОД: критерий 1 — неверный путь, packages/sim/src/task.ts:1\n- ТЕСТ: критерий 2 — нет края, packages/sim/test/task.test.ts:1\n- КОД: критерий 3 — неверный результат, packages/sim/src/task.ts:2',
-    );
-    const codeFix: Session = {
-      answer: 'Исправлен первый пункт.',
-      writes: { 'packages/sim/src/task.ts': 'export const task = false;\n' },
-      commit: true,
-      push: false,
-    };
-    const testFix: Session = {
-      answer: 'Исправлен второй пункт.\nРЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-      writes: { 'packages/sim/test/task.test.ts': "it('край', () => {});\n" },
-      commit: true,
-      push: false,
-    };
+  it('после правки продукта повторяет все тесты задачи и возвращает красный результат тому же исполнителю', async () => {
     const run = await runWorld({
-      spec: true,
       sessions: [
         {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
+          answer: 'Первый срез.',
+          writes: {
+            'packages/sim/src/task.ts': 'export const task = true;\n',
+            'packages/sim/test/first.test.ts': "it('первый', () => {});\n",
+            'packages/sim/test/second.test.ts': "it('второй', () => {});\n",
+          },
+          commit: true,
         },
-        codeCommit(),
-        returned,
-        codeFix,
+        {
+          answer: 'Исправлена подготовка состояния.',
+          writes: { 'packages/sim/src/task.ts': 'export const task = false;\n' },
+          commit: true,
+        },
         review('OK'),
-        testFix,
+        review('OK'),
+      ],
+      unit: ['FAIL подготовка состояния', 'unit: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[1]).toContain('Vitest: FAIL подготовка состояния');
+    expect(run.prompts[1]).toContain('$task 06/T1j5-Б1');
+    expect(run.execs.filter((line) => line.includes('vitest run'))).toEqual([
+      'vitest run packages/sim/test/first.test.ts packages/sim/test/second.test.ts',
+      'vitest run packages/sim/test/first.test.ts packages/sim/test/second.test.ts',
+    ]);
+    expect(run.lines.join('\n')).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('повтор той же ошибки после нового коммита требует сменить подход через plan', async () => {
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [
+        {
+          answer: 'Первый срез.',
+          writes: {
+            'packages/sim/src/task.ts': 'export const task = true;\n',
+            'packages/sim/test/task.test.ts': "it('критерий', () => {});\n",
+          },
+          commit: true,
+        },
+        {
+          answer: 'Вторая попытка.',
+          writes: { 'packages/sim/src/task.ts': 'export const task = false;\n' },
+          commit: true,
+        },
+        { answer: 'PLAN: переделать — заменить неверную фикстуру', push: false },
+      ],
+      unit: ['unit: FAIL фикстура не открывает экран', 'unit: FAIL фикстура не открывает экран'],
+      maxRounds: 2,
+    });
+
+    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$plan 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[2]).toContain('повторилось то же падение проверки');
+    expect(run.lines).toContain(
+      '06/T1j5-Б1: plan решил переделать механизм целиком — заменить неверную фикстуру',
+    );
+  });
+
+  it('замечания к продукту и тесту исправляет один исполнитель одним пакетом', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review('ВОЗВРАТ\n- КОД: нет кнопки\n- ТЕСТ: неверная фикстура'),
+        {
+          answer: 'Исправлены кнопка и фикстура.',
+          writes: {
+            'packages/sim/src/task.ts': 'export const task = false;\n',
+            'packages/sim/test/task.test.ts': "it('фикстура', () => {});\n",
+          },
+          commit: true,
+        },
         review('OK'),
         review('OK'),
       ],
@@ -114,25 +178,45 @@ describe('последовательный конвейер задачи', () =>
     });
 
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$spec 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-      '$spec 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
-    expect(run.prompts[3]).toContain('Исправь весь переданный пакет замечаний');
-    expect(run.prompts[3]).toContain('КОД: критерий 1');
-    expect(run.prompts[3]).toContain('КОД: критерий 3');
-    expect(run.prompts[3]).not.toContain('ТЕСТ: критерий 2');
-    expect(run.prompts[5]).toContain('ТЕСТ: критерий 2');
-    expect(run.prompts[4]).toContain('Узкая проверка');
-    expect(run.prompts[7]).toContain('Финальный полный review');
-    expect(run.lines).toContain('06/T1j5-Б1: 3 локальных коммитов сведены в один перед push');
-    expect(run.commitDepthsAtPrePush).toEqual([1]);
+    expect(run.prompts[2]).toContain('КОД: нет кнопки');
+    expect(run.prompts[2]).toContain('ТЕСТ: неверная фикстура');
+    expect(run.prompts[3]).toContain('Узкая проверка');
     expect(run.execs).toContain('vitest run packages/sim/test/task.test.ts');
+    expect(run.commitDepthsAtPrePush).toEqual([1]);
+  });
+
+  it('после перезапуска переводит старую очередь ТЕСТ и КОД на одного исполнителя', async () => {
+    const run = await runWorld({
+      spec: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [
+            { kind: 'ТЕСТ', text: 'ТЕСТ: неверная фикстура' },
+            { kind: 'КОД', text: 'КОД: отсутствует кнопка' },
+          ],
+        },
+        spec: { '06/T1j5-Б1': { 'packages/sim/test/task.test.ts': 'старый тест' } },
+      },
+      sessions: [codeCommit(), review('OK'), review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[0]).toContain('$task 06/T1j5-Б1');
+    expect(run.prompts[0]).toContain('ТЕСТ: неверная фикстура');
+    expect(run.prompts[0]).toContain('КОД: отсутствует кнопка');
+    expect(run.prompts.some((prompt) => prompt.startsWith('$spec'))).toBe(false);
+    expect(run.locked.every((locked) => locked === '')).toBe(true);
   });
 
   it('перед первым review даёт исполнителю и reviewer полную матрицу критериев', async () => {
@@ -181,173 +265,6 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('красный тест без машинного маркера классифицирует reviewer и возвращает автору тестов', async () => {
-    const specFix: Session = {
-      answer: 'Тест изменён, результат целевого прогона в логе.',
-      writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
-      commit: true,
-      push: false,
-    };
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        specFix,
-        review('ВОЗВРАТ\n- ТЕСТ: локатор выбирает несколько карточек'),
-        specFix,
-        review('OK'),
-        review('OK'),
-      ],
-      unit: ['unit: FAIL локатор выбирает несколько карточек', 'unit: OK'],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.prompts.filter((prompt) => prompt.startsWith('$review'))).toHaveLength(4);
-    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
-    expect(run.prompts[4]).toContain('локатор выбирает несколько карточек');
-    expect(run.lines.join('\n')).not.toContain('spec-protocol');
-    expect(run.lines).toContain('готово: 06/T1j5-Б1');
-  });
-
-  it('зелёный целевой тест идёт на узкий review независимо от текста ответа spec', async () => {
-    const specFix: Session = {
-      answer: 'Проверка завершена.',
-      writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
-      commit: true,
-      push: false,
-    };
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        specFix,
-        review('OK'),
-        review('OK'),
-      ],
-      unit: ['unit: OK'],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(2);
-    expect(run.verifyCalls).toBe(0);
-    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
-  });
-
-  it('без коммита и с испорченным маркером проверяет сохранённый тест вместо остановки протокола', async () => {
-    const path = 'packages/sim/test/task.test.ts';
-    const run = await runWorld({
-      spec: true,
-      state: {
-        spec: { '06/T1j5-Б1': { [path]: "it('критерий', () => {});\n" } },
-        activeTask: {
-          task: '06/T1j5-Б1',
-          base: 'c0',
-          remoteBase: 'c0',
-          workPrompt: '$task 06/T1j5-Б1',
-          phase: 'work',
-          findings: [{ kind: 'ТЕСТ', text: `ТЕСТ: ${path}:1 — неверный локатор` }],
-        },
-      },
-      sessions: [
-        { answer: '`РЕМОНТ: НЕПРОВЕРЯЕМО — общий typecheck красный\nСПЕК: нет' },
-        review('ВОЗВРАТ\n- ТЕСТ: неверный локатор'),
-      ],
-      unit: ['unit: FAIL неверный локатор'],
-      maxRounds: 1,
-    });
-
-    expect(run.prompts[0]).toContain('$spec 06/T1j5-Б1');
-    expect(run.prompts[1]).toContain('Vitest: unit: FAIL неверный локатор');
-    expect(run.lines.join('\n')).not.toContain('spec-protocol');
-  });
-
-  it('repair-spec, оставивший правку без коммита, получает немедленный повтор, а не backoff', async () => {
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        {
-          // commit не указан: правка написана на диск, но дерево остаётся грязным.
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
-        },
-        {
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n" },
-          commit: true,
-          push: false,
-        },
-        review('OK'),
-      ],
-    });
-
-    // Содержимое уже верифицировано хуком конца хода — 30-минутный backoff бессмысленен для
-    // забытого git commit, повтор идёт сразу же со своим прежним prompt'ом.
-    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
-    expect(run.prompts[4]).toContain('не создала git commit');
-    expect(run.lines.join('\n')).not.toContain('следующая попытка через');
-    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
-  });
-
-  it('repair-spec с коммитом не принимает исходные красные тесты за свою незакоммиченную правку', async () => {
-    const acceptance = 'packages/sim/test/acceptance.test.ts';
-    const oldTest = 'packages/sim/test/old.test.ts';
-    const run = await runWorld({
-      spec: true,
-      state: {
-        spec: { '06/T1j5-Б1': { [acceptance]: "it('приёмка', () => {});\n" } },
-        activeTask: {
-          task: '06/T1j5-Б1',
-          base: 'c0',
-          remoteBase: 'c0',
-          workPrompt: '$task 06/T1j5-Б1',
-          phase: 'work',
-          findings: [{ kind: 'ТЕСТ', text: `ТЕСТ: ${oldTest} содержит старое требование` }],
-        },
-      },
-      dirty: acceptance,
-      sessions: [
-        {
-          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${oldTest}`,
-          writes: {
-            [oldTest]: "it('исправлено', () => {});\n",
-            [acceptance]: "it('приёмка', () => {});\n",
-          },
-          files: [oldTest],
-          commit: true,
-          dirty: `?? ${acceptance}`,
-        },
-        review('OK'),
-      ],
-      maxRounds: 1,
-    });
-
-    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$spec 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-    ]);
-    expect(run.execs).toContain(`vitest run ${oldTest}`);
-    expect(run.lines.join('\n')).not.toContain('не коммитит свою правку');
-  });
-
   it('после узкого review RED-тесты активной задачи не блокируют следующий тик', async () => {
     const acceptance = 'packages/sim/test/acceptance.test.ts';
     const run = await runWorld({
@@ -370,76 +287,6 @@ describe('последовательный конвейер задачи', () =>
 
     expect(run.prompts[0]?.split('\n')[0]).toBe('$review 06/T1j5-Б1');
     expect(run.lines.join('\n')).not.toContain('рабочее дерево не чистое');
-  });
-
-  it('красный e2e после ремонта попадает reviewer, даже если spec пишет НЕПРОВЕРЯЕМО', async () => {
-    const specPath = 'apps/client/tests/e2e/task.spec.ts';
-    const untestable = (): Session => ({
-      answer: `РЕМОНТ: НЕПРОВЕРЯЕМО — запуск Playwright запрещён правилами проекта\nСПЕК: ${specPath}`,
-      writes: { [specPath]: "test('@layout x', async () => {});\n" },
-      commit: true,
-      push: false,
-    });
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        untestable(),
-        review('ВОЗВРАТ\n- ТЕСТ: неверная фикстура e2e'),
-        untestable(),
-        review('OK'),
-        review('OK'),
-      ],
-      layout: ['layout: FAIL', 'layout: OK'],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.layoutCalls).toBe(2);
-    expect(run.prompts.filter((prompt) => prompt.startsWith('$spec'))).toHaveLength(3);
-    expect(run.prompts[4]).toContain('Playwright: layout: FAIL');
-    expect(run.lines).toContain('узкий review 06/T1j5-Б1: OK, осталось 0 пунктов');
-  });
-
-  it('при красных e2e и Vitest показывает reviewer обе ошибки', async () => {
-    const specPath = 'apps/client/tests/e2e/task.spec.ts';
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        {
-          answer: 'Тесты изменены.',
-          writes: {
-            [specPath]: "test('@layout x', async () => {});\n",
-            'packages/sim/test/task.test.ts': "it('ноль запрещён', () => {});\n",
-          },
-          commit: true,
-        },
-        review('ВОЗВРАТ\n- КОД: нет кнопки\n- ТЕСТ: неверная фикстура'),
-      ],
-      layout: ['layout: FAIL'],
-      unit: ['unit: FAIL'],
-      maxRounds: 1,
-    });
-
-    expect(run.layoutCalls).toBe(1);
-    const classification = run.prompts.find((prompt) =>
-      prompt.includes('классификация: целевые тесты'),
-    );
-    expect(classification).toContain('Playwright: layout: FAIL');
-    expect(classification).toContain('Vitest: unit: FAIL');
-    expect(run.prompts.at(-1)).toContain('ТЕСТ: неверная фикстура');
   });
 
   it('осиротевшая запись state.spec (ни в HEAD, ни на диске) не паркует вечно — тихо убирается', async () => {
@@ -466,70 +313,6 @@ describe('последовательный конвейер задачи', () =>
     });
 
     expect(run.lines.join('\n')).not.toContain('не закоммичен');
-    expect(run.lines).toContain('готово: 06/T1j5-Б1');
-  });
-
-  it('repair-spec удаляет чужой приёмочный тест — паркует, а не падает с ENOENT', async () => {
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест пропускает нулевой размер'),
-        {
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/other.test.ts',
-          writes: { 'packages/sim/test/other.test.ts': "it('другое', () => {});\n" },
-          removes: ['packages/sim/test/task.test.ts'],
-          files: ['packages/sim/test/task.test.ts', 'packages/sim/test/other.test.ts'],
-          commit: true,
-          push: false,
-        },
-      ],
-    });
-
-    // Автор тестов не имеет права удалять чужую проверку (AGENTS.md §4.5): цикл паркует с
-    // понятной причиной, а не падает необработанным ENOENT при попытке прочитать удалённый файл.
-    expect(run.lines).toContain(
-      'жду: $spec 06/T1j5-Б1 удалил packages/sim/test/task.test.ts — проверь',
-    );
-  });
-
-  it('repair-spec заменяет явно отклонённый одиночный тест и проверяет полный diff', async () => {
-    const oldTest = 'packages/sim/test/task.test.ts';
-    const replacement = 'packages/sim/test/replacement.test.ts';
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { [oldTest]: "it('отменённое поведение', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review(`ВОЗВРАТ\n- ТЕСТ: ${oldTest}:1 — сценарий проверяет отменённое поведение`),
-        {
-          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${replacement}`,
-          writes: { [replacement]: "it('новое поведение', () => {});\n" },
-          removes: [oldTest],
-          files: [oldTest, replacement],
-          commit: true,
-          push: false,
-        },
-        review('OK'),
-        review('OK'),
-      ],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.lines).toContain(
-      `repair-$spec 06/T1j5-Б1: заменил единственный отклонённый тест ${oldTest}`,
-    );
-    expect(run.lines.join('\n')).not.toContain(`удалил ${oldTest} — проверь`);
-    expect(run.execs).toContain(`vitest run ${replacement}`);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -577,47 +360,6 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
-  it('передаёт красный усиленный тест кодеру после независимой классификации', async () => {
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        codeCommit(),
-        review('ВОЗВРАТ\n- ТЕСТ: тест не ловит переполнение'),
-        {
-          answer:
-            'РЕМОНТ: КОД — усиленный тест выявил переполнение\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('переполнение', () => {});\n" },
-          commit: true,
-          push: false,
-        },
-        review('ВОЗВРАТ\n- КОД: усиленный тест выявил переполнение'),
-        codeCommit('Исправлено переполнение.'),
-        review('OK'),
-        review('OK'),
-      ],
-      unit: ['unit: FAIL переполнение'],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$spec 06/T1j5-Б1',
-      '$task 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-      '$spec 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-      '$task 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-    ]);
-    expect(run.prompts[5]).toContain('КОД: усиленный тест выявил переполнение');
-    expect(run.execs).toContain('vitest run packages/sim/test/task.test.ts');
-  });
-
   it('после первого повторного возврата зовёт plan, после второго — тоже plan, и только затем останавливается', async () => {
     const finding = 'ТЕСТ: тест не проверяет границы';
     const run = await runWorld({
@@ -650,7 +392,7 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
       '$review 06/T1j5-Б1',
       '$plan 06/T1j5-Б1',
-      '$spec 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$plan 06/T1j5-Б1',
     ]);
@@ -787,98 +529,6 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain(
       '$plan 06/T1j5-Б1: нет PLAN-маркера, документы не менялись — продолжаю пакет замечаний',
     );
-  });
-
-  it('второй круг подряд на ТЕСТ-пункте, который plan решил переделать, уходит автору тестов, не кодеру', async () => {
-    const finding =
-      'ТЕСТ: apps/client/test/t17ar-terrain-layer.test.ts:120 — не проверяет равный объём вызовов';
-    const run = await runWorld({
-      spec: true,
-      plan: true,
-      state: {
-        activeTask: {
-          task: '06/T1j5-Б1',
-          base: 'c0',
-          remoteBase: 'c0',
-          workPrompt: '$task 06/T1j5-Б1',
-          phase: 'review',
-          findings: [],
-          fullReviewRounds: 1,
-        },
-      },
-      sessions: [
-        review(`ВОЗВРАТ\n- ${finding}`),
-        {
-          answer:
-            'Подход теста пора переписать целиком.\nPLAN: переделать — сверять снимки координат, а не отдельные вызовы',
-        },
-        {
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: apps/client/test/t17ar-terrain-layer.test.ts',
-          writes: {
-            'apps/client/test/t17ar-terrain-layer.test.ts': "it('снимок координат', () => {});\n",
-          },
-          commit: true,
-          push: false,
-        },
-      ],
-      maxRounds: 1,
-    });
-
-    // Пункт был ТЕСТ — редизайн должен уйти $spec, а не $task, иначе роль без прав на правку
-    // тестов получит задачу переписать тестовый подход.
-    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$review 06/T1j5-Б1',
-      '$plan 06/T1j5-Б1',
-      '$spec 06/T1j5-Б1',
-    ]);
-    expect(run.prompts[2]).toContain('переписать целиком');
-    expect(run.prompts[2]).toContain('Исход определит оркестратор');
-  });
-
-  it('СПЕК без коммита откатывает чужую правку продукта — следующий тик не паркует «дерево не чистое»', async () => {
-    const specPath = 'apps/client/test/t17ar-terrain-layer.test.ts';
-    const strayPath = 'apps/client/src/render/terrain-layer.ts';
-    const run = await runWorld({
-      spec: true,
-      state: {
-        spec: { '06/T1j5-Б1': { [specPath]: "it('критерий', () => {});\n" } },
-        activeTask: {
-          task: '06/T1j5-Б1',
-          base: 'c0',
-          remoteBase: 'c0',
-          workPrompt: '$task 06/T1j5-Б1',
-          phase: 'work',
-          findings: [],
-        },
-      },
-      sessions: [
-        {
-          answer: `СПЕК: ${specPath}:10 — строгая типизация падает на неявных \`any\` в callback-параметрах.`,
-          writes: { [strayPath]: 'export const broken = true;\n' },
-          push: false,
-        },
-        {
-          answer: `РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: ${specPath}`,
-          writes: { [specPath]: "it('критерий', (value: number) => {});\n" },
-          commit: true,
-          push: false,
-        },
-        review('OK'),
-        codeCommit('Код готов после фикса теста.'),
-        review('OK'),
-      ],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$task 06/T1j5-Б1',
-      '$spec 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-      '$task 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-    ]);
-    expect(run.lines).not.toContain(expect.stringContaining('дерево не чистое'));
-    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('после продуктового коммита через цепочку точек идёт на финальный review, не на голый workPrompt', async () => {
@@ -1043,16 +693,21 @@ describe('последовательный конвейер задачи', () =>
           ],
         },
       },
-      sessions: [{ answer: 'Пункт уже исправлен предыдущим коммитом.', push: false }, review('OK')],
+      sessions: [
+        { answer: 'Пункт уже исправлен предыдущим коммитом.', push: false },
+        review('OK'),
+        review('OK'),
+      ],
       maxRounds: 1,
     });
 
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
     ]);
     expect(run.lines).toContain(
-      'узкий review 06/T1j5-Б1: пункт уже исправлен предыдущим патчем, осталось 1 пунктов',
+      'узкий review 06/T1j5-Б1: пункт уже исправлен предыдущим патчем, осталось 0 пунктов',
     );
     expect(run.lines).not.toContain(expect.stringContaining('жду:'));
   });
@@ -1061,11 +716,6 @@ describe('последовательный конвейер задачи', () =>
     const run = await runWorld({
       spec: true,
       sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
         codeCommit(),
         review('OK'),
         codeCommit('Исправлен красный CI.'),
@@ -1080,14 +730,13 @@ describe('последовательный конвейер задачи', () =>
     });
 
     expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$spec 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
     ]);
-    expect(run.prompts[3]).toContain('КОД: CI точного SHA красный');
+    expect(run.prompts[2]).toContain('КОД: CI точного SHA красный');
     expect(run.pushes).toBe(3);
     expect(run.ciCalls).toBe(3);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
@@ -1100,34 +749,6 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts).toHaveLength(1);
     expect(run.lines).toContain('жду: 06/T1j5-Б1: рабочая сессия изменила origin до review');
     expect(run.ciCalls).toBe(0);
-  });
-
-  it('передаёт замечание кодера СПЕК отдельному автору тестов', async () => {
-    const run = await runWorld({
-      spec: true,
-      sessions: [
-        {
-          answer: 'Приёмочный тест записан.',
-          writes: { 'packages/sim/test/task.test.ts': "it('критерий', () => {});\n" },
-          push: false,
-        },
-        { answer: 'СПЕК: packages/sim/test/task.test.ts:1 — проверяется неверное значение' },
-        {
-          answer: 'Тест исправлен.\nРЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('верный критерий', () => {});\n" },
-          commit: true,
-          push: false,
-        },
-        review('OK'),
-        codeCommit(),
-        review('OK'),
-      ],
-      ci: ['success https://ci/task', 'success https://ci/docs'],
-    });
-
-    expect(run.prompts[2]).toContain('$spec 06/T1j5-Б1');
-    expect(run.prompts[2]).toContain('ТЕСТ: неверный приёмочный тест');
-    expect(run.lines).not.toContain('нужен ответ владельца');
   });
 
   it('после перезапуска на docs-ci не создаёт служебный коммит повторно', async () => {

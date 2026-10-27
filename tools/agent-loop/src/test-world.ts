@@ -90,9 +90,9 @@ export interface World {
   readonly slow?: readonly string[];
   /** Ответы eslint по приёмочным тестам по порядку; без значения или `ok` — чисто. */
   readonly lint?: readonly string[];
-  /** В roles.json есть роль spec: цикл пишет приёмочные тесты до кода. */
+  /** В roles.json есть роль spec: автоматическая очередь всё равно начинает с task. */
   readonly spec?: boolean;
-  /** В roles.json есть отдельный автор тестов после ревью кода. */
+  /** Устаревшая тестовая роль для проверки совместимости конфигурации. */
   readonly test?: boolean;
   /** В roles.json есть роль plan: цикл проверяет текст задачи перед работой над ней. */
   readonly plan?: boolean;
