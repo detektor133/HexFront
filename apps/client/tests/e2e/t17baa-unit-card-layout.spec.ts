@@ -1,0 +1,42 @@
+import { expect, test } from '@playwright/test';
+
+test('@layout 07/T17baa: кнопка закрытия карточки отряда имеет область 44×44 px и не перекрывает заголовок', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/dev/sandbox?map=small&seed=42');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const mapBox = await canvas.boundingBox();
+  if (!mapBox) throw new Error('карта не имеет границ');
+  await page.mouse.move(mapBox.x + 1, mapBox.y + 1);
+  await page.mouse.down();
+  await page.mouse.move(mapBox.x + mapBox.width - 1, mapBox.y + mapBox.height - 1);
+  await page.mouse.up();
+
+  const card = page
+    .locator('section[aria-label]')
+    .filter({ has: page.locator('h2') })
+    .last();
+  await expect(card).toBeVisible();
+  const button = card.getByRole('button').first();
+  await expect(button).toBeVisible();
+  const heading = card.locator('h2');
+  const [cardBox, buttonBox, headingBox] = await Promise.all([
+    card.boundingBox(),
+    button.boundingBox(),
+    heading.boundingBox(),
+  ]);
+
+  expect(cardBox).not.toBeNull();
+  expect(buttonBox).not.toBeNull();
+  expect(headingBox).not.toBeNull();
+  if (!cardBox || !buttonBox || !headingBox) throw new Error('элемент карточки не имеет границ');
+  expect(buttonBox.width).toBeGreaterThanOrEqual(44);
+  expect(buttonBox.height).toBeGreaterThanOrEqual(44);
+  expect(buttonBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(buttonBox.y).toBeGreaterThanOrEqual(cardBox.y);
+  expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+  expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(headingBox.x);
+});

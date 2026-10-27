@@ -69,10 +69,16 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
     getSelection()?.(center, center, 'end');
     const cardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
-    await waitFor(() => expect(screen.getByRole('region', { name: cardName })).toBeTruthy());
+    const selectedCard = await screen.findByRole('region');
+    expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
-    await waitFor(() => expect(screen.queryByRole('region', { name: cardName })).toBeNull());
+    await waitFor(() => {
+      const cardWithPreviousLabel = screen
+        .queryAllByRole('region')
+        .find((card) => card.getAttribute('aria-label') === cardName);
+      expect(cardWithPreviousLabel).toBeUndefined();
+    });
   });
 });
