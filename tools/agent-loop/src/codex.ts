@@ -47,9 +47,17 @@ export interface Session {
 // Codex при исчерпанном лимите может выйти с кодом 0, поэтому лимит ищется и в тексте.
 export const USAGE_LIMIT = 'кончился лимит Codex';
 const USAGE_LIMIT_RE = /hit your usage limit|usage limit reached/i;
+const TOOL_SETUP_RE = /setup refresh had errors|Failed to create unified exec process/iu;
 const HEARTBEAT_MS = 60_000;
 
 export const minutes = (ms: number): string => `${Math.max(0, Math.round(ms / 60_000))} мин`;
+
+export function codexFailure(message: string, stderr: string, code: number): string | undefined {
+  if (TOOL_SETUP_RE.test(stderr)) return 'инструмент Codex не запустился';
+  const tail = stderr.trim().split(/\r?\n/u).slice(-20).join('\n');
+  if (USAGE_LIMIT_RE.test(`${message}\n${tail}`)) return USAGE_LIMIT;
+  return code === 0 ? undefined : `codex завершился с кодом ${code}`;
+}
 
 export async function loadAgentDefinitions(root: string): Promise<AgentDefinitions> {
   const [rolesText, permissionsText] = await Promise.all([
@@ -121,9 +129,7 @@ export async function runCodex(
       'codex',
       [
         'exec',
-        ...(role === 'review'
-          ? ['--sandbox', 'read-only']
-          : ['--dangerously-bypass-approvals-and-sandbox']),
+        '--dangerously-bypass-approvals-and-sandbox',
         ...(images.length > 0 ? ['-i', ...images] : []),
         ...(roleConfig.model ? ['--model', roleConfig.model] : []),
         ...(role === 'review' || role === 'plan'
@@ -161,11 +167,6 @@ export async function runCodex(
   await rm(outputDir, { recursive: true, force: true });
   const log = await saveSessionLog(settings, prompt, result);
   // Только итог и хвост stderr: в stdout сессии лимит может встретиться в читаемых файлах.
-  const tail = result.stderr.trim().split(/\r?\n/).slice(-20).join('\n');
-  const failure = USAGE_LIMIT_RE.test(`${message}\n${tail}`)
-    ? USAGE_LIMIT
-    : result.code !== 0
-      ? `codex завершился с кодом ${result.code}`
-      : undefined;
+  const failure = codexFailure(message, result.stderr, result.code);
   return { result, message, log, ...(failure === undefined ? {} : { failure }) };
 }

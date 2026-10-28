@@ -540,6 +540,11 @@ async function consolidateTaskHistory(
 ): Promise<Step | undefined> {
   const count = Number(await context.git.run(['rev-list', '--count', `${base}..HEAD`]));
   if (!Number.isSafeInteger(count) || count <= 1) return undefined;
+  const messages = await context.git.run(['log', '--format=%B%x00', `${base}..HEAD`]);
+  if (/^Этап:\s*\d{2}\/infra\s*$/mu.test(messages)) {
+    await context.say(`${task}: служебные коммиты сохранены отдельно; историю задачи не свожу`);
+    return undefined;
+  }
   const source = await head(context.git);
   const reset = await context.git.attempt(['reset', '--soft', base]);
   if (reset.code !== 0)

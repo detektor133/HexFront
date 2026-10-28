@@ -4,9 +4,9 @@ import type { Git } from './git.ts';
 import { forbiddenPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { runWorld, type Session } from './test-world.ts';
 
-const fakeGit = (stdout: string): Git => {
+const fakeGit = (stdout: string, log = ''): Git => {
   const attempt = (args: readonly string[]) =>
-    Promise.resolve({ code: 0, stdout: args[0] === 'diff' ? stdout : '', stderr: '' });
+    Promise.resolve({ code: 0, stdout: args[0] === 'diff' ? stdout : log, stderr: '' });
   return { attempt, run: async (args) => (await attempt(args)).stdout };
 };
 
@@ -37,6 +37,18 @@ describe('forbiddenPaths', () => {
 
   it('без правок запрещённых путей — пусто', async () => {
     expect(await forbiddenPaths(fakeGit('M\tapps/client/src/Hud.tsx\n'), 'c1')).toEqual([]);
+  });
+
+  it('не относит к продуктовой задаче отдельный служебный коммит', async () => {
+    expect(
+      await forbiddenPaths(
+        fakeGit(
+          'M\ttools/agent-loop/src/tasks.ts\n',
+          'fix(infra): исправлен цикл\n\nЭтап: 07/infra\n\0',
+        ),
+        'c1',
+      ),
+    ).toEqual([]);
   });
 });
 

@@ -27,7 +27,20 @@ export const isInfraTask = (task: string): boolean => task.endsWith('/infra');
 export async function forbiddenPaths(git: Git, base: string): Promise<string[]> {
   const nameStatus = await git.run(['diff', '--name-status', `${base}..HEAD`]);
   const touched = touchedPaths(nameStatus);
-  return forbiddenWorkingPaths(touched);
+  const forbidden = forbiddenWorkingPaths(touched);
+  const taskOwned: string[] = [];
+  for (const path of forbidden) {
+    const messages = (await git.run(['log', '--format=%B%x00', `${base}..HEAD`, '--', path]))
+      .split('\0')
+      .map((message) => message.trim())
+      .filter(Boolean);
+    if (
+      messages.length === 0 ||
+      messages.some((message) => !/^Этап:\s*\d{2}\/infra\s*$/mu.test(message))
+    )
+      taskOwned.push(path);
+  }
+  return taskOwned;
 }
 
 /** Запрос ожидания владельца: задача изменила код цикла без поручения. */

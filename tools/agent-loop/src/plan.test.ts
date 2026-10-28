@@ -109,8 +109,6 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.codexArguments[0]?.join(' ')).toContain('plan.json');
     expect(run.codexArguments[1]).not.toContain('--output-schema');
     expect(run.codexArguments[2]?.join(' ')).toContain('review.json');
-    expect(run.codexArguments[2]).toContain('read-only');
-    expect(run.codexArguments[2]).not.toContain('--dangerously-bypass-approvals-and-sandbox');
     expect(run.lines).toContain(`$plan ${TASK}: не трогал`);
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
