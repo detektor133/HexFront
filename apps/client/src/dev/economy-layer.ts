@@ -460,8 +460,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
 
   function drawBorders(v: PlayerView, changed: readonly string[]): void {
     for (const key of changed) chunkGraphics(borderChunks, key, borders).clear();
-    const width =
-      (tokens.territory.borderWidth[level - 1] ?? tokens.territory.borderWidth[1]) / scale;
+    const width = tokens.territory.borderWidth[0] / scale;
     for (const edge of territoryBorders(map, v)) {
       const key = mapChunkKey(edge.hex, map.width);
       if (!changed.includes(key)) continue;

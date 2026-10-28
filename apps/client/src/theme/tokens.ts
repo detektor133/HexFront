@@ -41,8 +41,8 @@ export const tokens = {
     "alphaOther": 0.85,
     "borderWidth": [
       1.5,
-      2.5,
-      3.5
+      1.5,
+      1.5
     ]
   },
   "players": {

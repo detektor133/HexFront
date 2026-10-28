@@ -78,7 +78,7 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
 
   return {
     container,
-    update(scale, level) {
+    update(scale, _level) {
       fill.clear();
       for (const c of cells) {
         const center = hexCenter(c.h, radius);
@@ -88,8 +88,7 @@ export function createFakeTerritories(map: MapStatic, radius: number): FakeTerri
         });
       }
       // Граница — внутренняя кромка цвета владельца (style-guide, слой 5).
-      const bw =
-        (tokens.territory.borderWidth[level - 1] ?? tokens.territory.borderWidth[1]) / scale;
+      const bw = tokens.territory.borderWidth[0] / scale;
       borders.clear();
       for (const p of [0, 1, 2]) {
         for (const c of cells.filter((x) => x.p === p)) {

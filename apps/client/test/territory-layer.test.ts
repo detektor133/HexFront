@@ -1,4 +1,4 @@
-import { Text } from 'pixi.js';
+import { Graphics, Text } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
@@ -11,6 +11,8 @@ import {
   mapChunkKey,
   territoryBorders,
 } from '../src/dev/economy-layer.ts';
+import { playerLine } from '../src/theme/colors.ts';
+import { tokens } from '../src/theme/tokens.ts';
 
 const loaded = loadMap({
   version: 1,
@@ -32,7 +34,17 @@ const view = (visible: number[]): PlayerView =>
     hexes: {
       owner: Int16Array.from([0, 1]),
       visible: Uint8Array.from(visible),
+      pop: new Int32Array(2),
+      improvement: new Uint8Array(2),
+      building: new Uint8Array(2),
+      road: new Uint8Array(2),
+      link: new Uint8Array(2),
+      growth: new Int32Array(2),
     },
+    cities: [],
+    constructions: [],
+    plans: [],
+    players: [],
   }) as unknown as PlayerView;
 
 const labelMapResult = loadMap({
@@ -86,6 +98,41 @@ describe('слои границ и тумана', () => {
 
     expect(borders.filter((edge) => edge.neighborOwner >= 0)).toHaveLength(2);
     expect(new Set(borders.map((edge) => edge.owner))).toEqual(new Set([0, 1]));
+  });
+
+  it('рисует границу толщиной 1,5 экранных px на каждом detail и сохраняет оба цвета соседей', () => {
+    vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
+    const layer = createEconomyLayer(loaded.map, 10);
+    const strokes = vi.spyOn(Graphics.prototype, 'stroke');
+    const selection = { hex: null, units: [], target: null };
+    try {
+      for (const detail of [1, 2, 3] as const) {
+        strokes.mockClear();
+        layer.update(detail, detail);
+        layer.setView(view([1, 1]), selection);
+
+        const borderStrokes = strokes.mock.calls
+          .map(([style]) => style)
+          .filter(
+            (style): style is { width: number; color: string } =>
+              typeof style === 'object' &&
+              style !== null &&
+              'width' in style &&
+              typeof style.width === 'number' &&
+              'color' in style &&
+              typeof style.color === 'string' &&
+              style.width * detail === tokens.territory.borderWidth[0] &&
+              [playerLine(0), playerLine(1)].includes(style.color),
+          );
+        expect(borderStrokes.length).toBeGreaterThanOrEqual(2);
+        expect(new Set(borderStrokes.map((style) => style.color))).toEqual(
+          new Set([playerLine(0), playerLine(1)]),
+        );
+      }
+    } finally {
+      strokes.mockRestore();
+      layer.destroy();
+    }
   });
 
   it('штрихует только гексы вне зоны обзора', () => {
