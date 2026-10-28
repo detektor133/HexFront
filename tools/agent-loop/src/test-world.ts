@@ -597,6 +597,11 @@ export async function runWorld(world: World): Promise<Outcome> {
         if (command === 'pnpm' && args[0] === 'test:e2e:layout') {
           out.layoutCalls += 1;
           const line = layout.shift() ?? 'layout: OK';
+          const visualDir = options?.env?.VISUAL_OUT_DIR;
+          if (line.startsWith('layout: OK') && visualDir) {
+            await mkdir(join(visualDir, 'target'), { recursive: true });
+            await writeFile(join(visualDir, 'target', 'test-finished-1.png'), 'screenshot');
+          }
           return { code: line.startsWith('layout: OK') ? 0 : 1, stdout: line, stderr: '' };
         }
         if (command === 'pnpm' && args[0] === 'verify') {

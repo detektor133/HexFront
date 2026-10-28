@@ -162,7 +162,7 @@ export async function runCodex(
     clearInterval(heartbeat);
   }
   const message = await readFile(outputFile, 'utf8').catch(
-    (error: unknown) => `${result.stdout}\n(последний ответ не записан: ${String(error)})`,
+    () => result.stdout.trim() || 'Последний ответ Codex не записан',
   );
   await rm(outputDir, { recursive: true, force: true });
   const log = await saveSessionLog(settings, prompt, result);

@@ -2,7 +2,7 @@
 // (`codex exec -i`), а не путём в тексте — иначе review честно не может его посмотреть.
 import { describe, expect, it } from 'vitest';
 
-import { runWorld, type Session } from './test-world.ts';
+import { fixtureStage, runWorld, type Session } from './test-world.ts';
 
 const codeCommit = (path: string, answer = 'Код готов.'): Session => ({
   answer,
@@ -50,6 +50,59 @@ describe('визуальный гейт перед push', () => {
       expect.stringContaining('hud-1024.png'),
       expect.stringContaining('hud-1920.png'),
     ]);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('передаёт reviewer снимок из состояния @layout-сценария перед общим HUD', async () => {
+    const run = await runWorld({
+      sessions: [
+        {
+          answer: 'Код и сценарий готовы.',
+          writes: {
+            'apps/client/src/dev/Hud.module.css': '.hud { display: block; }',
+            'apps/client/tests/e2e/task-layout.spec.ts': "test('@layout состояние HUD', () => {});",
+          },
+          commit: true,
+        },
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.visualCalls).toBe(1);
+    expect(run.layoutCalls).toBeGreaterThan(0);
+    const prompt = run.prompts[2] ?? '';
+    expect(prompt).toContain('task-layout.spec.ts');
+    expect(prompt).toContain('сначала 1 из @layout-сценария');
+    const visualArgs = run.codexArguments[2] ?? [];
+    const imageIndex = visualArgs.indexOf('-i');
+    expect(visualArgs[imageIndex + 1]).toContain('test-finished-1.png');
+    expect(visualArgs[imageIndex + 2]).toContain('hud-360.png');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('при обязательном @layout без сценария возвращает TEST исполнителю', async () => {
+    const run = await runWorld({
+      stage: fixtureStage.replace('*Приёмка:* тесты.', '*Приёмка:* Playwright @layout.'),
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        {
+          answer: 'Добавлен сценарий состояния.',
+          writes: {
+            'apps/client/tests/e2e/task-layout.spec.ts': "test('@layout состояние HUD', () => {});",
+          },
+          commit: true,
+        },
+        review('OK'),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[2]).toContain('в задаче требуется @layout, но её сценарий не добавлен');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 

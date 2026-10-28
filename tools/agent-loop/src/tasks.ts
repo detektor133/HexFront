@@ -641,12 +641,22 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   }
   if (active.phase === 'review' || active.phase === 'target-review') {
     const targeted = active.phase === 'target-review';
+    const checkedHead = await head(context.git);
     if (!targeted) {
       await context.say(`… полный локальный контур перед review ${task}`);
       const checked = await context.config.runCommand('pnpm', ['check'], {
         cwd: context.config.root,
         timeoutMs: 20 * 60_000,
       });
+      if ((await head(context.git)) !== checkedHead)
+        return {
+          step: await park(
+            context,
+            `check-head:${task}`,
+            `${task}: HEAD изменился во время полного check`,
+          ),
+          done: false,
+        };
       if (checked.code !== 0) {
         const failure = prePushFailure(checked.stdout, checked.stderr);
         const diagnosis = await runReview(
@@ -680,7 +690,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     const note = targeted
       ? `Узкая проверка: проверь только исправление пункта «${finding?.text ?? ''}». Новые замечания не добавляй; они проверятся финальным review.`
       : 'Финальный полный review локального diff задачи. Верни все найденные блокеры одним списком.';
-    const verdict = await runReview(context, task, note);
+    const verdict = await runReview(context, task, note, checkedHead);
     if (typeof verdict === 'string') return { step: verdict, done: false };
     if (!verdict.ok) {
       context.config.board?.count('returns');

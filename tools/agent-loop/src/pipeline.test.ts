@@ -45,6 +45,23 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('зелёный gate текущего HEAD исключает старое замечание о красной проверке', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review(
+          '{"outcome":"ВОЗВРАТ","findings":[{"kind":"ТЕСТ","basis":"gate","text":"старый verify красный: Test timed out in 5000ms"}]}',
+        ),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts).toHaveLength(2);
+    expect(run.prompts[1]).toContain('Проверка текущего HEAD');
+    expect(run.lines.join('\n')).toContain('устаревших пункт(ов) gate пропущено');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('разовый таймаут рабочего verify проверяет повторно без сессии исполнителя', async () => {
     const run = await runWorld({
       sessions: [codeCommit(), review('OK')],

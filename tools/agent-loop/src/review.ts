@@ -8,6 +8,8 @@ export type { FindingKind };
 
 export interface ReviewFinding {
   readonly kind: FindingKind;
+  /** `gate` — только фактический вывод проверки; `diff` — дефект кода или теста. */
+  readonly basis?: 'diff' | 'gate';
   /** Полный атомарный пункт, который получит ровно одна исправляющая сессия. */
   readonly text: string;
 }
@@ -34,14 +36,25 @@ export function parseReviewVerdict(message: string): Verdict | undefined {
     if (result.outcome !== 'ВОЗВРАТ' || result.findings.length === 0) return undefined;
     const findings = result.findings.flatMap((item: unknown) => {
       if (typeof item !== 'object' || item === null) return [];
-      const entry = item as { readonly kind?: unknown; readonly text?: unknown };
+      const entry = item as {
+        readonly kind?: unknown;
+        readonly basis?: unknown;
+        readonly text?: unknown;
+      };
       if (
         !['КОД', 'ТЕСТ', 'ПЛАН'].includes(String(entry.kind)) ||
         typeof entry.text !== 'string' ||
         entry.text.trim() === ''
       )
         return [];
-      return [{ kind: entry.kind as FindingKind, text: `${entry.kind}: ${entry.text.trim()}` }];
+      if (entry.basis !== undefined && !['diff', 'gate'].includes(String(entry.basis))) return [];
+      return [
+        {
+          kind: entry.kind as FindingKind,
+          ...(entry.basis === undefined ? {} : { basis: entry.basis as 'diff' | 'gate' }),
+          text: `${entry.kind}: ${entry.text.trim()}`,
+        },
+      ];
     });
     return findings.length === result.findings.length ? { ok: false, findings } : undefined;
   }
@@ -62,8 +75,11 @@ export async function runReview(
   context: LoopContext,
   task: string,
   note = '',
+  greenGateHead?: string,
 ): Promise<Verdict | Step> {
   const beforeHead = await head(context.git);
+  if (greenGateHead !== undefined && beforeHead !== greenGateHead)
+    return backoff(context, `$review ${task}: HEAD изменился после зелёной проверки`, '');
   const beforeRemote = await remoteHead(context.git);
   const beforeTree = await dirtyFiles(context.git);
   const stage = await readStage(context.config.root);
@@ -77,11 +93,15 @@ export async function runReview(
     note,
     ownerPrompt?.includes('\n') ? `Исходное поручение владельца:\n${ownerPrompt}` : '',
     `Действующий текст задачи — источник ожидаемого поведения:\n${source}`,
+    greenGateHead !== undefined
+      ? `Проверка текущего HEAD ${beforeHead} зелёная. Старые логи и прежние красные прогоны не являются доказательством дефекта.`
+      : '',
     fullInstructions,
     'Reviewer работает только на чтение: ничего не изменяй, не коммить и не push.',
     'Ответ заполни по JSON Schema: outcome `OK` или `ВОЗВРАТ`; при OK findings пуст.',
     'При возврате перечисли все блокеры в findings с kind `КОД`, `ТЕСТ` или `ПЛАН`.',
     'Каждый пункт атомарен: один дефект, критерий, наблюдение и файл:строка.',
+    'Укажи basis `diff` для доказанного дефекта кода или теста, `gate` — только для фактической ошибки приложенной текущей проверки.',
     'Текст задачи и её родителя выше старых тестов: если старый тест требует противоположного ' +
       'поведения, верни ТЕСТ, а не КОД. Перед ответом удали дубли и взаимоисключающие пункты.',
   ]
@@ -107,5 +127,13 @@ export async function runReview(
       `$review ${task} нарушил протокол ответа — повторю автоматически`,
       review.message,
     );
+  if (greenGateHead !== undefined && !verdict.ok) {
+    const current = verdict.findings.filter((finding) => finding.basis !== 'gate');
+    if (current.length !== verdict.findings.length)
+      await context.say(
+        `review ${task}: ${verdict.findings.length - current.length} устаревших пункт(ов) gate пропущено`,
+      );
+    return current.length === 0 ? { ok: true, findings: [] } : { ok: false, findings: current };
+  }
   return verdict;
 }

@@ -17,6 +17,14 @@ describe('протокол reviewer', () => {
       findings: [{ kind: 'ТЕСТ', text: 'ТЕСТ: нет проверки Esc' }],
     });
     expect(
+      parseReviewVerdict(
+        '{"outcome":"ВОЗВРАТ","findings":[{"kind":"ТЕСТ","basis":"gate","text":"старый таймаут"}]}',
+      ),
+    ).toEqual({
+      ok: false,
+      findings: [{ kind: 'ТЕСТ', basis: 'gate', text: 'ТЕСТ: старый таймаут' }],
+    });
+    expect(
       parseReviewVerdict('{"outcome":"OK","findings":[{"kind":"КОД","text":"баг"}]}'),
     ).toBeUndefined();
   });
