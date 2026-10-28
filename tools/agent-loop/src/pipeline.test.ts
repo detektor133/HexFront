@@ -640,6 +640,30 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines.join('\n')).not.toContain('добавлены чужие файлы');
   });
 
+  it('после перезапуска сохраняет паузу активной задачи по лимиту Codex', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/src/task.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+          workDirtyPaths: ['packages/sim/src/task.ts'],
+        },
+        resume: '06/T1j5-Б1',
+        retryAfter: 100_000,
+      },
+      sessions: [codeCommit()],
+    });
+
+    expect(run.prompts).toEqual([]);
+    expect(run.state?.retryAfter).toBe(100_000);
+    expect(run.state?.activeTask?.workDirtyPaths).toEqual(['packages/sim/src/task.ts']);
+  });
+
   it('после обрыва процесса восстанавливает файлы начатой рабочей сессии', async () => {
     const run = await runWorld({
       dirty: 'packages/sim/src/task.ts\n?? packages/sim/test/task.test.ts',

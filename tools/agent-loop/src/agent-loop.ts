@@ -322,8 +322,10 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   }
   // Ожидание активной задачи переживает перезапуск: повтор роли разрешает только новый коммит.
   // Ожидания вне задачи владелец по-прежнему может повторить простым перезапуском цикла.
-  if (context.state.activeTask === undefined) delete context.state.parked;
-  delete context.state.retryAfter;
+  if (context.state.activeTask === undefined) {
+    delete context.state.parked;
+    delete context.state.retryAfter;
+  }
   if (config.resume !== undefined) context.state.resume = config.resume;
   await save(context);
   await recoverShelved(context);
