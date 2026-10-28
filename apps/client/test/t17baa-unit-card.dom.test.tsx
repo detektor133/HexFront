@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+﻿import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -9,7 +9,6 @@ import { hexFromId, loadMap } from '@hexfront/sim';
 
 import { installMatchMocks } from './t17q-match.ts';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
-import { selectUnitsInRect } from '../src/dev/sandbox-selection.ts';
 import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
@@ -47,7 +46,7 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     }
 
     render(<SelectedUnit />);
-    const closeLabel = t('unit.close' as MessageKey);
+    const closeLabel = t('unit.close');
     expect(closeLabel).toBeTruthy();
     const closeButton = screen.getByRole('button', { name: closeLabel });
     expect(closeButton).toBeTruthy();
@@ -57,51 +56,58 @@ describe('07/T17baa: закрытие карточки отряда', () => {
   });
 
   it('критерий 2 и 4: Esc снимает выбор отряда и закрывает карточку', async () => {
-    const engine = createLocalEngine(mapJson, 42, 2);
-    if ('errors' in engine) throw new Error(engine.errors.join('; '));
-    const view = engine.snapshot().view;
-    const unit = view.units.find(
-      (item) => item.owner === view.playerId && item.order !== 'retreat',
+    const sourceEngine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in sourceEngine) throw new Error(sourceEngine.errors.join('; '));
+    const source = sourceEngine.snapshot();
+    const unit = source.view.units.find(
+      (item) =>
+        item.owner === source.view.playerId && item.order !== 'retreat' && item.armyId !== null,
     );
-    if (!unit) throw new Error('свой отряд не найден');
+    if (!unit || unit.armyId === null) throw new Error('собственный отряд армии не найден');
+    const peerHex =
+      (unit.hex + Math.floor((map.width * map.height) / 2)) % (map.width * map.height);
+    const selectedView = {
+      ...source.view,
+      units: source.view.units.map((item) =>
+        item.id !== unit.id && item.hex === unit.hex ? { ...item, hex: peerHex } : item,
+      ),
+    };
+    const engine = {
+      ...sourceEngine,
+      snapshot: () => ({
+        ...source,
+        view: selectedView,
+        snapshot: { ...source.snapshot, view: selectedView },
+      }),
+    };
     const { getSelection } = installMatchMocks(engine, mapJson);
+    window.history.replaceState({}, '', '/?debug=1');
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     render(<MatchPage />);
-    const onboardingButton = screen.queryByRole('button', { name: 'Понятно' });
-    if (onboardingButton) fireEvent.click(onboardingButton);
+    const onboardingButton = await screen.findByRole('button', { name: t('onboarding.disable') });
+    fireEvent.click(onboardingButton);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: t('onboarding.disable') })).toBeNull(),
+    );
     await waitFor(() => expect(getSelection()).toBeDefined());
     const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
-    const from = { x: center.x - 1, y: center.y - 1 };
-    const to = { x: center.x + 1, y: center.y + 1 };
-    const selectedIds = selectUnitsInRect(view, from, to, (hex) =>
-      hexCenter(hexFromId(hex, map.width), tokens.map.hexRadius),
+    getSelection()?.(
+      { x: center.x - 1, y: center.y - 1 },
+      { x: center.x + 1, y: center.y + 1 },
+      'end',
     );
-    const selectedUnits = view.units.filter((item) => selectedIds.includes(item.id));
-    expect(selectedIds).toContain(unit.id);
-    expect(selectedUnits).toHaveLength(selectedIds.length);
-    const singleUnit = selectedUnits[0];
-    const cardName =
-      singleUnit && selectedUnits.length === 1
-        ? `${t(`unit.${singleUnit.type}` as MessageKey)} · ${formatSoldiers(singleUnit.soldiers)}`
-        : `${t('unit.selected' as MessageKey)}: ${selectedUnits.length} · ${formatSoldiers(
-            selectedUnits.reduce((total, item) => total + item.soldiers, 0),
-          )}`;
-    expect(screen.queryByRole('region', { name: cardName })).toBeNull();
-    const selection = getSelection();
-    selection?.(from, from, 'start');
-    selection?.(from, to, 'move');
-    selection?.(from, to, 'end');
-    const selectedCard = await screen.findByRole('region', { name: cardName });
-    expect(selectedCard.getAttribute('aria-label')).toBe(cardName);
+    const closeButton = await screen.findByRole('button', { name: t('unit.close') });
+    const selectedCard = closeButton.closest('section[aria-label]');
+    expect(selectedCard).not.toBeNull();
+    if (!selectedCard) throw new Error('карточка выбранного отряда не найдена');
+    const expectedCardName = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+    expect(selectedCard.getAttribute('aria-label')).toBe(expectedCardName);
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
     await waitFor(() => {
-      const cardWithPreviousLabel = screen
-        .queryAllByRole('region')
-        .find((card) => card.getAttribute('aria-label') === cardName);
-      expect(cardWithPreviousLabel).toBeUndefined();
+      expect(screen.queryByRole('region', { name: expectedCardName })).toBeNull();
     });
   });
 });

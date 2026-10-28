@@ -15,6 +15,7 @@ import { measureCardHeight } from './card-measurement.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
+import { IconButton } from '../ui/icon-button.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -98,7 +99,18 @@ export function UnitCard(props: {
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
-        <h2 className={styles.title}>{title}</h2>
+        <div className={styles.header}>
+          <h2 className={styles.title}>{title}</h2>
+          <IconButton
+            className={styles.iconButton}
+            label={t('unit.close')}
+            onClick={() => props.onPick({ hex: null, units: [], target: null })}
+          >
+            <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </IconButton>
+        </div>
         {units.length === 1 && <UnitRows u={first} view={view} />}
         {units.length === 1 && <ArtilleryStatus unit={first} />}
       </div>

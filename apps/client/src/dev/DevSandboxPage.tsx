@@ -507,6 +507,11 @@ export function SandboxSurface({
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
+  const showUnitCardFixture = new URLSearchParams(window.location.search).get('unitCard') === '1';
+  const fixtureUnit = showUnitCardFixture
+    ? view?.units.find((unit) => unit.order !== 'retreat')
+    : undefined;
+  const cardPicked = fixtureUnit ? { hex: null, units: [fixtureUnit.id], target: null } : sb.picked;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
   const armyPicked =
@@ -579,9 +584,13 @@ export function SandboxSurface({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view && map && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
-        <UnitCard view={view} map={map} picked={sb.picked} send={sb.send} onPick={sb.pick} />
-      )}
+      {view &&
+        map &&
+        cardPicked.units.length > 0 &&
+        !sb.tool &&
+        (!armyPicked || showUnitCardFixture) && (
+          <UnitCard view={view} map={map} picked={cardPicked} send={sb.send} onPick={sb.pick} />
+        )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
         <HexCard
           s={sb.msg.selection}

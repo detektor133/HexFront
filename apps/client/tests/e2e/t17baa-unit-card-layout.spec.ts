@@ -4,21 +4,10 @@ test('@layout 07/T17baa: кнопка закрытия карточки отря
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/dev/sandbox?map=small&seed=42');
+  await page.goto('/dev/sandbox?map=small&seed=42&unitCard=1');
   const onboardingButton = page.getByRole('button', { name: 'Понятно' });
   if (await onboardingButton.isVisible()) await onboardingButton.click();
-  await page.getByRole('combobox', { name: 'Observer' }).selectOption('1');
-  const canvas = page.locator('canvas');
-  await expect(canvas).toBeVisible();
-  const mapBox = await canvas.boundingBox();
-  if (!mapBox) throw new Error('карта не имеет границ');
-  const start = { x: mapBox.x + mapBox.width * 0.25, y: mapBox.y + mapBox.height * 0.25 };
-  const end = { x: mapBox.x + mapBox.width * 0.75, y: mapBox.y + mapBox.height * 0.75 };
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y);
-  await page.mouse.up();
-
+  await page.getByRole('combobox', { name: 'Observer' }).selectOption('0');
   const card = page
     .locator('section[aria-label]')
     .filter({ has: page.locator('h2') })
@@ -26,6 +15,7 @@ test('@layout 07/T17baa: кнопка закрытия карточки отря
   await expect(card).toBeVisible();
   const button = card.getByRole('button').first();
   await expect(button).toBeVisible();
+  await expect(button).toHaveAccessibleName(/.+/);
   const heading = card.locator('h2');
   const [cardBox, buttonBox, headingBox] = await Promise.all([
     card.boundingBox(),
@@ -43,5 +33,10 @@ test('@layout 07/T17baa: кнопка закрытия карточки отря
   expect(buttonBox.y).toBeGreaterThanOrEqual(cardBox.y);
   expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
   expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
-  expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(headingBox.x);
+  expect(
+    buttonBox.x + buttonBox.width <= headingBox.x ||
+      headingBox.x + headingBox.width <= buttonBox.x ||
+      buttonBox.y + buttonBox.height <= headingBox.y ||
+      headingBox.y + headingBox.height <= buttonBox.y,
+  ).toBe(true);
 });

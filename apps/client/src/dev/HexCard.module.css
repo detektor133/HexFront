@@ -31,6 +31,13 @@
   font-weight: 500;
 }
 
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
 .stats {
   display: grid;
   grid-template-columns: 1fr auto;
