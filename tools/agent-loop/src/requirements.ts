@@ -31,9 +31,13 @@ const atoms = (text: string): string[] =>
     .map(normalize)
     .filter(Boolean);
 
+/** Таблицы трассировки этапа стоят после задачи, но не являются её критериями. */
+const withoutTrace = (block: string): string =>
+  block.split(/^\| Исходная строка /mu, 1)[0] ?? block;
+
 /** Служебные зависимости проверяются порядком очереди, а не копированием в каждую подзадачу. */
 const requirements = (block: string): string[] => {
-  const body = block
+  const body = withoutTrace(block)
     .split(/\r?\n/u)
     .slice(1)
     .filter((line) => !/^\s*\*После:\*/iu.test(line));
@@ -144,7 +148,7 @@ export function verifySplit(
   const original = taskBlock(before.stageText, task);
   const parent = taskBlock(after.stageText, task);
   if (original === '' || parent === '') return ['исходная задача удалена или отсутствует'];
-  if (original.trim() !== parent.trim()) {
+  if (withoutTrace(original).trim() !== withoutTrace(parent).trim()) {
     errors.push('исходная задача изменена или сокращена при разбиении');
   }
 

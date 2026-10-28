@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
+import { restoreMissingSplitParent, verifyPlanTransition, verifySplit } from './requirements.ts';
 import { taskBlock } from './stage-file.ts';
 import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
 
@@ -14,6 +14,46 @@ const commands = (prompts: readonly string[]): string[] =>
   prompts.map((prompt) => prompt.split('\n')[0] ?? '');
 
 describe('роль plan перед исполнением задачи', () => {
+  it('не принимает прежнюю таблицу трассировки за требование родителя при разбиении', () => {
+    const parent = [
+      '- [ ] **T17bab. Закрытие карточки клетки**.',
+      '  Кнопка закрывает карточку.',
+      '  *Приёмка:* DOM-тест и геометрия.',
+      '',
+    ].join('\n');
+    const oldTrace = [
+      '| Исходная строка T17ba | Подзадача |',
+      '| --- | --- |',
+      '| старая строка | T17bab |',
+      '',
+    ].join('\n');
+    const children = [
+      '- [ ] **T17baba. Кнопка закрытия**.',
+      '  Кнопка закрывает карточку.',
+      '  *Приёмка:* DOM-тест.',
+      '',
+      '- [ ] **T17babb. Геометрия**.',
+      '  *Приёмка:* геометрия.',
+      '',
+      '| Исходная строка T17bab | Подзадача |',
+      '| --- | --- |',
+      '| Кнопка закрывает карточку | T17baba |',
+      '| Приёмка DOM | T17baba |',
+      '| Приёмка геометрия | T17babb |',
+      '',
+    ].join('\n');
+    const next = '- [ ] **T17bb. Следующая задача**.\n';
+    expect(
+      verifySplit(
+        '07/T17bab',
+        { stageText: parent + oldTrace + next, status: 'Очередь: 07/T17bab → 07/T17bb' },
+        {
+          stageText: parent + children + oldTrace + next,
+          status: 'Очередь: 07/T17baba → 07/T17babb → 07/T17bb',
+        },
+      ),
+    ).toEqual([]);
+  });
   it('принимает уточнение отдельным блоком без изменения исходного текста', () => {
     const before = [
       '# Этап 07',
