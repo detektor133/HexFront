@@ -260,6 +260,7 @@ export async function runWorld(world: World): Promise<Outcome> {
         ? ''
         : ` M ${world.dirty}`;
   let files: readonly string[] = [];
+  let stagedFiles: readonly string[] = [];
   let pushes = 0;
   let squashedFiles: readonly string[] = [];
   // Файлы каждого коммита codex-сессии по номеру HEAD: `git diff --name-only A..B` считает их
@@ -444,7 +445,10 @@ export async function runWorld(world: World): Promise<Outcome> {
       origin = head;
       return ok();
     }
-    if (sub === 'add') return ok();
+    if (sub === 'add') {
+      stagedFiles = args.slice(args.indexOf('--') + 1);
+      return ok();
+    }
     if (sub === 'reset' && first === '--soft') {
       const target = resolveCommit(args[2] ?? 'HEAD');
       squashedFiles = unionFiles(target, head);
@@ -484,7 +488,11 @@ export async function runWorld(world: World): Promise<Outcome> {
         commitFiles.set(head, squashedFiles);
         files = squashedFiles;
         squashedFiles = [];
+      } else if (stagedFiles.length > 0) {
+        commitFiles.set(head, stagedFiles);
+        files = stagedFiles;
       }
+      stagedFiles = [];
       return ok();
     }
     if (sub === 'merge-base') {

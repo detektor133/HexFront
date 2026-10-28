@@ -88,6 +88,76 @@ const checkFailureSignature = (evidence: string): string => {
   return (lines.length > 0 ? lines.join('\n') : evidence).slice(0, 1_000);
 };
 
+/** Форматирование — механическая правка, но только внутри уже принадлежащих задаче путей. */
+async function formatOwnedWork(
+  context: LoopContext,
+  paths: readonly string[],
+  evidence: string,
+): Promise<boolean> {
+  if (!/FAIL prettier/iu.test(evidence)) return false;
+  const owned = new Set(context.state.activeTask?.workDirtyPaths ?? []);
+  const eligible = [
+    ...new Set(
+      paths.filter(
+        (path) =>
+          owned.has(path) &&
+          /\.(?:[cm]?[jt]sx?|json|css|md|html|ya?ml)$/iu.test(path) &&
+          !/^apps\/client\/src\/theme\/tokens\./u.test(path),
+      ),
+    ),
+  ];
+  if (eligible.length === 0) return false;
+  const formatted = await context.config.runCommand(
+    'pnpm',
+    ['exec', 'prettier', '--write', ...eligible],
+    {
+      cwd: context.config.root,
+      timeoutMs: context.config.maxMinutes * 60_000,
+    },
+  );
+  return formatted.code === 0;
+}
+
+/** После повторного зелёного прогона оркестратор сохраняет проверенную работу исполнителя. */
+async function commitVerifiedWork(
+  context: LoopContext,
+  task: string,
+  paths: readonly string[],
+): Promise<boolean> {
+  const active = context.state.activeTask;
+  if (active?.task !== task || (active.workDirtyAttempts ?? 0) < 3) return false;
+  const owned = new Set(active.workDirtyPaths ?? []);
+  if (paths.length === 0 || paths.some((path) => !owned.has(path))) return false;
+  if (!isInfraTask(task) && forbiddenWorkingPaths(paths).length > 0) return false;
+  const staged = (await context.git.run(['diff', '--cached', '--name-only']))
+    .split(/\r?\n/u)
+    .filter(Boolean);
+  if (staged.some((path) => !owned.has(path))) return false;
+  const scope = paths.some((path) => path.startsWith('apps/client/'))
+    ? 'client'
+    : paths.some((path) => path.startsWith('apps/server/'))
+      ? 'server'
+      : paths.some((path) => path.startsWith('packages/sim/'))
+        ? 'sim'
+        : paths.some((path) => path.startsWith('packages/protocol/'))
+          ? 'protocol'
+          : paths.some((path) => path.startsWith('packages/mapgen/'))
+            ? 'mapgen'
+            : 'infra';
+  const added = await context.git.attempt(['add', '--', ...paths]);
+  if (added.code !== 0) return false;
+  const committed = await context.git.attempt([
+    'commit',
+    '-m',
+    `feat(${scope}): выполнена задача ${task}`,
+    '-m',
+    `Этап: ${task}`,
+  ]);
+  if (committed.code !== 0) return false;
+  await context.say(`${task}: проверенная незакоммиченная работа сохранена оркестратором`);
+  return true;
+}
+
 const prePushFailure = (stdout: string, stderr: string): string => {
   const output = [stdout, stderr].filter(Boolean).join('\n');
   const lines = output
@@ -191,7 +261,7 @@ async function runProductWork(
       : '\nСверь замечания с этим текстом и текущим diff: не исправляй уже закрытый пункт повторно.');
   const continuation =
     context.state.resume === task
-      ? `\nПродолжи незакоммиченную работу этой задачи. Предыдущая проверка: ${context.state.resumeNote ?? 'результат не записан'}. Исправь причину красного теста в продукте или фикстуре, проверь и создай коммит.`
+      ? `\nПродолжи незакоммиченную работу этой задачи. Предыдущая проверка: ${context.state.resumeNote ?? 'результат не записан'}. ${context.state.resumeNote?.includes('зелёные; создай коммит') ? 'Проверки уже зелёные: создай локальный коммит без дополнительных правок.' : 'Исправь причину красной проверки в продукте или фикстуре, проверь и создай коммит.'}`
       : '';
   const beforePaths = await changedPaths(context.git);
   let newForbidden: string[] = [];
@@ -224,24 +294,44 @@ async function runProductWork(
     delete context.state.waitingAnswer;
     delete context.state.parked;
     await save(context);
-    if ((active?.workDirtyAttempts ?? 0) < 2) return 'worked';
     const touched = [
       ...new Set([...paths, ...(await changedPathsBetween(context, active?.base ?? base))]),
     ];
-    const evidence = await verifyTouchedTests(context, touched);
-    const signature = evidence === undefined ? undefined : checkFailureSignature(evidence);
-    const repeated = signature !== undefined && active?.lastDirtyFailure === signature;
-    if (active !== undefined) {
-      if (signature === undefined) delete active.lastDirtyFailure;
-      else active.lastDirtyFailure = signature;
+    let evidence = await verifyTouchedTests(context, touched);
+    if (evidence !== undefined && (await formatOwnedWork(context, paths, evidence))) {
+      evidence = await verifyTouchedTests(context, touched);
+    }
+    if (evidence === undefined) {
+      if (active !== undefined) delete active.lastDirtyFailure;
+      if (await commitVerifiedWork(context, task, paths)) {
+        delete context.state.resume;
+        delete context.state.resumeNote;
+        if (active !== undefined) {
+          delete active.workDirtyPaths;
+          delete active.workDirtyAttempts;
+        }
+        await save(context);
+        return undefined;
+      }
+      context.state.resumeNote = 'Целевые тесты и verify зелёные; создай коммит';
+      await save(context);
+      return 'worked';
+    }
+    const signature = checkFailureSignature(evidence);
+    const repeated = active?.lastDirtyFailure === signature;
+    if (active !== undefined) active.lastDirtyFailure = signature;
+    if ((active?.workDirtyAttempts ?? 0) < 2) {
+      context.state.resumeNote = evidence.slice(-2_000);
+      await save(context);
+      return 'worked';
     }
     const verdict = await runReview(
       context,
       task,
-      `Узкая диагностика незакоммиченной работы после ${active?.workDirtyAttempts ?? 2} попыток. Предыдущий диагноз: ${active?.findings[0]?.text ?? 'нет'}. Отчёт исполнителя: ${result.message}. Фактическая проверка:\n${evidence ?? 'Целевые тесты и verify зелёные.'}\nПроверь только текущие файлы ${paths.join(', ')}. Если ошибка повторилась после прежнего диагноза, объясни, почему он не помог, и назови другой проверяемый путь. Если тест не дошёл до проверяемого поведения, назови нарушенную предпосылку. Верни одну причину как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
+      `Узкая диагностика незакоммиченной работы после ${active?.workDirtyAttempts ?? 2} попыток. Предыдущий диагноз: ${active?.findings[0]?.text ?? 'нет'}. Отчёт исполнителя: ${result.message}. Фактическая проверка:\n${evidence}\nПроверь только текущие файлы ${paths.join(', ')}. Если ошибка повторилась после прежнего диагноза, объясни, почему он не помог, и назови другой проверяемый путь. Если тест не дошёл до проверяемого поведения, назови нарушенную предпосылку. Верни одну причину как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
     );
     if (typeof verdict === 'string') return verdict;
-    if (active !== undefined && (!verdict.ok || evidence !== undefined)) {
+    if (active !== undefined) {
       const findings = verdict.ok
         ? [{ kind: 'КОД' as const, text: `КОД: проверка красная — ${evidence}` }]
         : batchReviewFindings(verdict.findings);

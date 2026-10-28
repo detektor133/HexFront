@@ -270,6 +270,7 @@ describe('последовательный конвейер задачи', () =>
       unit: [
         'FAIL подготовка состояния: карточка не открыта',
         'FAIL подготовка состояния: карточка не открыта',
+        'FAIL подготовка состояния: карточка не открыта',
         'unit: OK',
       ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
@@ -282,7 +283,7 @@ describe('последовательный конвейер задачи', () =>
       '$review 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
     ]);
-    expect(run.prompts[1]).toContain('Предыдущая проверка: Тест Esc красный.');
+    expect(run.prompts[1]).toContain('Предыдущая проверка: pnpm exec vitest run');
     expect(run.prompts[2]).toContain('pnpm exec vitest run packages/sim/test/task.test.ts');
     expect(run.prompts[2]).toContain('FAIL подготовка состояния: карточка не открыта');
     expect(run.prompts[2]).toContain('нарушенную предпосылку');
@@ -346,7 +347,12 @@ describe('последовательный конвейер задачи', () =>
         review('OK'),
         review('OK'),
       ],
-      unit: ['FAIL карточка не открыта', 'FAIL кнопка не нажимается', 'unit: OK'],
+      unit: [
+        'FAIL карточка не открыта',
+        'FAIL карточка не открыта',
+        'FAIL кнопка не нажимается',
+        'unit: OK',
+      ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
@@ -355,7 +361,7 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('передаёт красный verify даже при зелёном целевом тесте и OK reviewer', async () => {
+  it('передаёт красный verify без механического ремонта и при OK reviewer', async () => {
     const run = await runWorld({
       dirty: 'packages/sim/test/task.test.ts',
       state: {
@@ -379,14 +385,85 @@ describe('последовательный конвейер задачи', () =>
         review('OK'),
       ],
       unit: ['unit: OK', 'unit: OK'],
-      verify: ['verify: FAIL prettier\n[warn] apps/client/test/task.test.ts', 'verify: OK'],
+      verify: ['verify: FAIL lint\nerror apps/client/test/task.test.ts', 'verify: OK'],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts[1]).toContain('pnpm verify --changed:\nverify: FAIL prettier');
-    expect(run.prompts[1]).toContain('[warn] apps/client/test/task.test.ts');
+    expect(run.prompts[1]).toContain('pnpm verify --changed:\nverify: FAIL lint');
+    expect(run.prompts[1]).toContain('error apps/client/test/task.test.ts');
     expect(run.prompts[2]).toContain('КОД: проверка красная');
-    expect(run.prompts[2]).toContain('[warn] apps/client/test/task.test.ts');
+    expect(run.prompts[2]).toContain('error apps/client/test/task.test.ts');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('сам исправляет форматирование только файлов активной задачи и повторяет verify', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: завершить задачу' }],
+          workDirtyAttempts: 1,
+        },
+      },
+      sessions: [
+        {
+          answer: 'Проверка форматирования красная.',
+          writes: {
+            'packages/sim/test/task.test.ts': 'draft',
+            'apps/client/src/theme/tokens.ts': 'generated',
+          },
+          dirty: ' M packages/sim/test/task.test.ts\n M apps/client/src/theme/tokens.ts',
+        },
+        codeCommit(),
+        review('OK'),
+        review('OK'),
+      ],
+      verify: ['verify: FAIL prettier\n[warn] packages/sim/test/task.test.ts', 'verify: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.execs).toContain('prettier --write packages/sim/test/task.test.ts');
+    expect(run.execs.join('\n')).not.toContain('prettier --write apps/client/src/theme/tokens.ts');
+    expect(run.prompts[1]).toContain('Целевые тесты и verify зелёные; создай коммит');
+    expect(run.prompts[1]).toContain('создай локальный коммит без дополнительных правок');
+    expect(run.prompts.some((prompt) => prompt.startsWith('$review'))).toBe(true);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('после повторных зелёных проверок сам коммитит принадлежащую задаче работу', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [
+        {
+          answer: 'Исправлен продукт, коммит не создан.',
+          writes: { 'packages/sim/src/task.ts': 'draft' },
+          dirty: true,
+        },
+        { answer: 'Коммит всё ещё не создан.', dirty: true },
+        { answer: 'Работа готова, коммит не создан.', dirty: true },
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(3);
+    expect(run.lines.join('\n')).toContain(
+      'проверенная незакоммиченная работа сохранена оркестратором',
+    );
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 

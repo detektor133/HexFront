@@ -18,6 +18,7 @@ describe('незакоммиченная работа и ответы владе
         REVIEW_OK,
         REVIEW_OK,
       ],
+      verify: ['verify: FAIL tests', 'verify: FAIL tests'],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
     expect(run.prompts.slice(0, 4).map((prompt) => prompt.split('\n')[0])).toEqual([
