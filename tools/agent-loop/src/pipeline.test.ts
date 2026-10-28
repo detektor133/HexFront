@@ -733,6 +733,7 @@ describe('последовательный конвейер задачи', () =>
     });
 
     expect(run.prompts[0]).toContain('Перед первым review сверь каждый критерий');
+    expect(run.prompts[0]).toContain('координаты бери из данных объекта и преобразования карты');
     expect(run.prompts[0]).toContain('найди все импорты, вызовы и старые тесты');
     expect(run.prompts[0]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
     expect(run.prompts[0]).toContain('*Приёмка:* тесты.');
@@ -772,6 +773,44 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[1]).toContain('удалённый экспорт всё ещё импортируется');
     expect(run.prompts[2]).toContain('удалённый экспорт всё ещё используется продуктом');
     expect(run.lines).toContain('полный локальный контур перед review 06/T1j5-Б1: FAIL');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('таймаут полного check повторяется на том же HEAD без возврата исполнителю', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK'), review('OK')],
+      preReview: ['check: FAIL\nTest timed out in 5000ms', 'check: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.preReviewCalls).toBe(2);
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.lines).toContain('полный check 06/T1j5-Б1: таймаут теста, повторяю на том же HEAD');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('красный полный check не ждёт владельца, когда reviewer вернул OK', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review('OK'),
+        codeCommit('Исправил ошибку полного check.'),
+        review('OK'),
+        review('OK'),
+      ],
+      preReview: ['check: FAIL\nFAIL fixture.test.ts\nError: wrong setup', 'check: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[2]).toContain('полный check красный. Воспроизведи упавший тест');
+    expect(run.prompts[2]).toContain('проверь его предпосылки');
+    expect(run.prompts[2]).toContain('wrong setup');
+    expect(run.lines).not.toContain(
+      'жду: 06/T1j5-Б1: reviewer не классифицировал красный полный локальный контур',
+    );
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 

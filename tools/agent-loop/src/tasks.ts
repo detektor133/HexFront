@@ -271,7 +271,7 @@ async function runProductWork(
       : '') +
     `\nДействующий текст задачи — источник ожидаемого поведения:\n${source}` +
     (finding === undefined
-      ? '\nПеред первым review сверь каждый критерий с продуктовым путём и проверкой. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.'
+      ? '\nПеред первым review сверь каждый критерий с продуктовым путём и проверкой. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. В UI-тесте сначала докажи существование и выбор целевого объекта и открытие нужного экрана; координаты бери из данных объекта и преобразования карты, не угадывай пиксели. CSS проверяй на управляемом экране, реальный ввод — отдельно. Не коммить частичное выполнение.'
       : '\nСверь замечания с этим текстом и текущим diff: не исправляй уже закрытый пункт повторно.');
   const continuation =
     context.state.resume === task
@@ -644,10 +644,20 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     const checkedHead = await head(context.git);
     if (!targeted) {
       await context.say(`… полный локальный контур перед review ${task}`);
-      const checked = await context.config.runCommand('pnpm', ['check'], {
-        cwd: context.config.root,
-        timeoutMs: 20 * 60_000,
-      });
+      const runCheck = (): ReturnType<typeof context.config.runCommand> =>
+        context.config.runCommand('pnpm', ['check'], {
+          cwd: context.config.root,
+          timeoutMs: 20 * 60_000,
+        });
+      let checked = await runCheck();
+      if (
+        checked.code !== 0 &&
+        (await testTimedOut(context.config.root, checked.stdout, checked.stderr)) &&
+        (await head(context.git)) === checkedHead
+      ) {
+        await context.say(`полный check ${task}: таймаут теста, повторяю на том же HEAD`);
+        checked = await runCheck();
+      }
       if ((await head(context.git)) !== checkedHead)
         return {
           step: await park(
@@ -667,17 +677,17 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
             `с задачей — КОД. Не требуй от продукта удовлетворять неверному тесту.\n${failure}`,
         );
         if (typeof diagnosis === 'string') return { step: diagnosis, done: false };
-        if (diagnosis.ok)
-          return {
-            step: await park(
-              context,
-              `check-review:${task}`,
-              `${task}: reviewer не классифицировал красный полный локальный контур`,
-              failure,
-            ),
-            done: false,
-          };
-        active.findings = batchReviewFindings(diagnosis.findings);
+        active.findings = diagnosis.ok
+          ? [
+              {
+                kind: 'КОД',
+                text:
+                  'КОД: полный check красный. Воспроизведи упавший тест и проверь его ' +
+                  'предпосылки до изменения продукта: если нужный объект или экран не подготовлен, ' +
+                  `исправь фикстуру; если проверка дошла до действия — исправь продукт. ${failure}`,
+              },
+            ]
+          : batchReviewFindings(diagnosis.findings);
         active.findingRetries = 0;
         active.phase = 'work';
         await save(context);
