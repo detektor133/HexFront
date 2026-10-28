@@ -1,4 +1,7 @@
 // Возврат reviewer: единый пакет исполнителю, диагностика plan и проверки задачи.
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { park, save, type LoopContext, type Step } from './context.ts';
 import { runPlan } from './plan.ts';
 import type { ReviewFinding } from './review.ts';
@@ -120,6 +123,18 @@ export async function diagnoseFinding(
 const failureOutput = (stdout: string, stderr: string): string =>
   [stdout, stderr].filter(Boolean).join('\n').trim().slice(-4_000);
 
+/** Лог verify хранит точную причину, которую краткая консольная сводка обрезает. */
+export async function testTimedOut(root: string, stdout: string, stderr: string): Promise<boolean> {
+  const output = `${stdout}\n${stderr}`;
+  if (/\bTest timed out in \d+ms\b/iu.test(output)) return true;
+  const match = /^лог:\s+\.ai-logs[\\/]verify-([\dTZ-]+)\.log/mu.exec(output);
+  if (match?.[1] === undefined) return false;
+  const log = await readFile(join(root, '.ai-logs', `verify-${match[1]}.log`), 'utf8').catch(
+    () => '',
+  );
+  return /\bTest timed out in \d+ms\b/iu.test(log);
+}
+
 const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;
 
 /** @returns фактический вывод красных целевых тестов; undefined — все зелёные. */
@@ -163,10 +178,19 @@ export async function verifyTouchedTests(
   const failures: string[] = [];
   const targeted = await verifyTargetedTests(context, touched);
   if (targeted !== undefined) failures.push(targeted);
-  const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
-    cwd: context.config.root,
-    timeoutMs: context.config.maxMinutes * 60_000,
-  });
+  const runVerify = (): ReturnType<typeof context.config.runCommand> =>
+    context.config.runCommand('pnpm', ['verify', '--changed'], {
+      cwd: context.config.root,
+      timeoutMs: context.config.maxMinutes * 60_000,
+    });
+  let verified = await runVerify();
+  if (
+    verified.code !== 0 &&
+    (await testTimedOut(context.config.root, verified.stdout, verified.stderr))
+  ) {
+    await context.say('рабочий verify: таймаут теста, повторяю тот же gate на том же HEAD');
+    verified = await runVerify();
+  }
   if (verified.code !== 0)
     failures.push(`pnpm verify --changed:\n${failureOutput(verified.stdout, verified.stderr)}`);
   return failures.length === 0 ? undefined : failures.join('\n');

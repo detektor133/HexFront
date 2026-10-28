@@ -20,6 +20,7 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
+  testTimedOut,
   verifyTouchedTests,
 } from './finding-repair.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
@@ -816,7 +817,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     let result = await runPrePush();
     if (
       result.code !== 0 &&
-      /\bTest timed out in \d+ms\b/iu.test(`${result.stdout}\n${result.stderr}`)
+      (await testTimedOut(context.config.root, result.stdout, result.stderr))
     ) {
       await context.say(
         `локальная приёмка ${task}: таймаут теста, повторяю тот же gate на том же HEAD`,

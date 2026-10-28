@@ -1,6 +1,33 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { batchReviewFindings } from './finding-repair.ts';
+import { batchReviewFindings, testTimedOut } from './finding-repair.ts';
+
+describe('диагностика таймаута verify', () => {
+  it('читает причину из лога, когда краткая сводка её скрывает', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hexfront-timeout-test-'));
+    try {
+      await mkdir(join(root, '.ai-logs'));
+      await writeFile(
+        join(root, '.ai-logs', 'verify-2026-10-28T09-53-15.log'),
+        'FAIL test/t17q.test.ts\nError: Test timed out in 5000ms.\n',
+      );
+      expect(
+        await testTimedOut(
+          root,
+          'verify: FAIL tests\nлог: .ai-logs/verify-2026-10-28T09-53-15.log',
+          '',
+        ),
+      ).toBe(true);
+      expect(await testTimedOut(root, 'verify: FAIL lint', '')).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('пакет возвратов review', () => {
   it('передаёт замечания к коду и тестам одному исполнителю в исходном порядке', () => {

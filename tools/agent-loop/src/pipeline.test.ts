@@ -45,6 +45,33 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('разовый таймаут рабочего verify проверяет повторно без сессии исполнителя', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      verify: ['verify: FAIL tests\nTest timed out in 5000ms', 'verify: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.verifyCalls).toBe(2);
+    expect(run.prompts).toHaveLength(2);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('повторный таймаут рабочего verify остаётся красным', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit()],
+      verify: [
+        'verify: FAIL tests\nTest timed out in 5000ms',
+        'verify: FAIL tests\nTest timed out in 5000ms',
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.verifyCalls).toBe(2);
+    expect(run.pushes).toBe(0);
+    expect(run.state?.activeTask?.findings[0]?.text).toContain('проверки задачи красные');
+  });
+
   it('красный локальный gate возвращает дефект без push и повторяет gate после исправления', async () => {
     const run = await runWorld({
       sessions: [
