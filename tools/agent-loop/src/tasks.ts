@@ -808,10 +808,21 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   }
   if (active.phase === 'pre-push') {
     await context.say(`… локальная приёмка ${task}`);
-    const result = await context.config.runCommand('pnpm', ['verify:prepush'], {
-      cwd: context.config.root,
-      timeoutMs: 20 * 60_000,
-    });
+    const runPrePush = (): ReturnType<typeof context.config.runCommand> =>
+      context.config.runCommand('pnpm', ['verify:prepush'], {
+        cwd: context.config.root,
+        timeoutMs: 20 * 60_000,
+      });
+    let result = await runPrePush();
+    if (
+      result.code !== 0 &&
+      /\bTest timed out in \d+ms\b/iu.test(`${result.stdout}\n${result.stderr}`)
+    ) {
+      await context.say(
+        `локальная приёмка ${task}: таймаут теста, повторяю тот же gate на том же HEAD`,
+      );
+      result = await runPrePush();
+    }
     if (result.code !== 0) {
       active.findings = [
         {

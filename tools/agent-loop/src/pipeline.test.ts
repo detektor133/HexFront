@@ -81,6 +81,34 @@ describe('последовательный конвейер задачи', () =>
     expect(run.ciCalls).toBe(2);
   });
 
+  it('разовый таймаут полного gate перепроверяет на том же HEAD без возврата исполнителю', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      prePush: ['pre-push: FAIL\nTest timed out in 5000ms', 'pre-push: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prePushCalls).toBe(2);
+    expect(run.commitDepthsAtPrePush).toEqual([1, 1]);
+    expect(run.prompts).toHaveLength(2);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('повторный таймаут полного gate остаётся красным и запрещает push', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      prePush: [
+        'pre-push: FAIL\nTest timed out in 5000ms',
+        'pre-push: FAIL\nTest timed out in 5000ms',
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.prePushCalls).toBe(2);
+    expect(run.pushes).toBe(0);
+    expect(run.lines).toContain('локальная приёмка 06/T1j5-Б1: FAIL, push запрещён');
+  });
+
   it('после правки продукта повторяет все тесты задачи и возвращает красный результат тому же исполнителю', async () => {
     const run = await runWorld({
       sessions: [
