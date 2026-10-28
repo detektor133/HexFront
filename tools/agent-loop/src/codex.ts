@@ -121,9 +121,14 @@ export async function runCodex(
       'codex',
       [
         'exec',
-        '--dangerously-bypass-approvals-and-sandbox',
+        ...(role === 'review'
+          ? ['--sandbox', 'read-only']
+          : ['--dangerously-bypass-approvals-and-sandbox']),
         ...(images.length > 0 ? ['-i', ...images] : []),
         ...(roleConfig.model ? ['--model', roleConfig.model] : []),
+        ...(role === 'review' || role === 'plan'
+          ? ['--output-schema', join(settings.root, 'tools/agent-loop/schemas', `${role}.json`)]
+          : []),
         '-c',
         `model_reasoning_effort=${roleConfig.reasoningEffort}`,
         '--output-last-message',

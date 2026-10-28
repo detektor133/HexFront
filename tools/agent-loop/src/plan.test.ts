@@ -105,6 +105,12 @@ describe('роль plan перед исполнением задачи', () => {
     const run = await runWorld({ plan: true, sessions: [PLAN_UNTOUCHED, NEXT_DONE, REVIEW_OK] });
     expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
     expect(run.roles).toEqual(['plan', '', 'reviewer']);
+    expect(run.codexArguments[0]).toContain('--output-schema');
+    expect(run.codexArguments[0]?.join(' ')).toContain('plan.json');
+    expect(run.codexArguments[1]).not.toContain('--output-schema');
+    expect(run.codexArguments[2]?.join(' ')).toContain('review.json');
+    expect(run.codexArguments[2]).toContain('read-only');
+    expect(run.codexArguments[2]).not.toContain('--dangerously-bypass-approvals-and-sandbox');
     expect(run.lines).toContain(`$plan ${TASK}: не трогал`);
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
@@ -388,7 +394,7 @@ describe('роль plan перед исполнением задачи', () => {
 
   it('plan не ответил строкой «PLAN: …» — ожидание владельца', async () => {
     const run = await runWorld({ plan: true, sessions: [{ answer: 'Всё хорошо.' }] });
-    expect(run.lines).toContain(`жду: $plan ${TASK} не ответил строкой «PLAN: …» — проверь`);
+    expect(run.lines).toContain(`жду: $plan ${TASK} не дал проверяемый исход — проверь`);
   });
 
   it('plan оставил незакоммиченные файлы — ожидание владельца', async () => {

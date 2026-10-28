@@ -20,6 +20,31 @@ const FINDING_RE = /^\s*[-*]\s*(КОД|ТЕСТ|ПЛАН):\s*(.+)$/u;
 
 /** @returns структурированный ответ reviewer или undefined при нарушении протокола. */
 export function parseReviewVerdict(message: string): Verdict | undefined {
+  if (message.trimStart().startsWith('{')) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      return undefined;
+    }
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const result = parsed as { readonly outcome?: unknown; readonly findings?: unknown };
+    if (!Array.isArray(result.findings)) return undefined;
+    if (result.outcome === 'OK' && result.findings.length === 0) return { ok: true, findings: [] };
+    if (result.outcome !== 'ВОЗВРАТ' || result.findings.length === 0) return undefined;
+    const findings = result.findings.flatMap((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return [];
+      const entry = item as { readonly kind?: unknown; readonly text?: unknown };
+      if (
+        !['КОД', 'ТЕСТ', 'ПЛАН'].includes(String(entry.kind)) ||
+        typeof entry.text !== 'string' ||
+        entry.text.trim() === ''
+      )
+        return [];
+      return [{ kind: entry.kind as FindingKind, text: `${entry.kind}: ${entry.text.trim()}` }];
+    });
+    return findings.length === result.findings.length ? { ok: false, findings } : undefined;
+  }
   const lines = message.trim().split(/\r?\n/u);
   const first = lines[0]?.trim();
   if (first === 'OK') return { ok: true, findings: [] };
@@ -54,8 +79,8 @@ export async function runReview(
     `Действующий текст задачи — источник ожидаемого поведения:\n${source}`,
     fullInstructions,
     'Reviewer работает только на чтение: ничего не изменяй, не коммить и не push.',
-    'Ответ: первая строка `OK` или `ВОЗВРАТ`.',
-    'При возврате перечисли все блокеры строками `- КОД: ...` или `- ТЕСТ: ...`.',
+    'Ответ заполни по JSON Schema: outcome `OK` или `ВОЗВРАТ`; при OK findings пуст.',
+    'При возврате перечисли все блокеры в findings с kind `КОД`, `ТЕСТ` или `ПЛАН`.',
     'Каждый пункт атомарен: один дефект, критерий, наблюдение и файл:строка.',
     'Текст задачи и её родителя выше старых тестов: если старый тест требует противоположного ' +
       'поведения, верни ТЕСТ, а не КОД. Перед ответом удали дубли и взаимоисключающие пункты.',

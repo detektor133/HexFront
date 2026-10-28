@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["не трогал", "уточнено", "разбито", "вопрос", "инфраструктура", "переделать"]
+    },
+    "detail": { "type": "string" }
+  },
+  "required": ["outcome", "detail"],
+  "additionalProperties": false
+}

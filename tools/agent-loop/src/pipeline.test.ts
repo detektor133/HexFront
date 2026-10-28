@@ -467,6 +467,72 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('передаёт исполнителю и reviewer причину отказа git commit', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [
+        {
+          answer: 'Код готов без коммита.',
+          writes: { 'packages/sim/src/task.ts': 'draft' },
+          dirty: true,
+        },
+        { answer: 'Код готов без коммита.', dirty: true },
+        { answer: 'Код готов без коммита.', dirty: true },
+        review('ВОЗВРАТ\n- КОД: исправить ошибку хука коммита'),
+        codeCommit(),
+        review('OK'),
+        review('OK'),
+      ],
+      gitCommitFailures: ['pre-commit: проверка не прошла'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[3]).toContain('git commit: pre-commit: проверка не прошла');
+    expect(run.prompts[4]).toContain('исправить ошибку хука коммита');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('не коммитит автоматически новый путь, появившийся после зелёного прогона', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [],
+        },
+      },
+      sessions: [
+        { answer: 'Черновик.', writes: { 'packages/sim/src/task.ts': 'draft' }, dirty: true },
+        { answer: 'Готово.', dirty: true },
+        {
+          answer: 'Добавлен ещё один файл.',
+          writes: { 'packages/sim/src/other.ts': 'new' },
+          dirty: true,
+        },
+        codeCommit(),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.lines.join('\n')).not.toContain('работа сохранена оркестратором');
+    expect(run.prompts[3]).toContain('создай локальный коммит');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('не продолжает задачу, если к её грязному дереву добавлен чужой файл', async () => {
     const run = await runWorld({
       dirty: 'docs/STATUS.md',

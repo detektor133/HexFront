@@ -21,6 +21,7 @@ import {
 } from './context.ts';
 import { dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
 import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
+import { parsePlanMessage } from './role-output.ts';
 import {
   isOwnerTask,
   parseQueue,
@@ -37,11 +38,7 @@ export const planEnabled = (context: LoopContext): boolean =>
 export const planPrompt = (task: string, note = ''): string =>
   [`$plan ${task}`, note].filter(Boolean).join('\n');
 
-/** Первая строка ответа `plan`: что сделано с текстом задачи (см. `.agents/skills/plan/SKILL.md`). */
-// Без \b: в JS \b считает границу по [A-Za-z0-9_], кириллица — не «словесный» символ, и граница
-// после последней кириллической буквы (конец слова → конец строки, оба «несловесные») не находится.
-const OUTCOME_RE =
-  /^`?PLAN:\s*(не трогал|уточнено|разбито|вопрос|инфраструктура|переделать)(?:\s*[—-]\s*(.+?))?`?\s*$/imu;
+/** Исход роли передаётся JSON-объектом, старый текстовый формат читается при миграции. */
 
 /** `blocked` — вопрос записан в `docs/QUESTIONS.md`, задачу исполнителю передавать нельзя. */
 export interface PlanOutcome {
@@ -85,9 +82,9 @@ export async function runPlan(
     );
   const unsynced = await syncWithOrigin(git, false);
   if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
-  const match = OUTCOME_RE.exec(result.message);
-  let outcome = match?.[1] as PlanOutcome['outcome'] | undefined;
-  const detail = match?.[2]?.trim();
+  const parsed = parsePlanMessage(result.message);
+  let outcome = parsed?.outcome;
+  const detail = parsed?.detail;
   // После возврата review plan лишь выбирает дальнейшую роль. Чистый ответ без изменения документов
   // не должен останавливать уже собранный пакет замечаний из-за пропущенного служебного хвоста.
   if (outcome === undefined && context.state.activeTask?.task === task) {
@@ -103,7 +100,7 @@ export async function runPlan(
     return park(
       context,
       `plan:${task}`,
-      `$plan ${task} не ответил строкой «PLAN: …» — проверь`,
+      `$plan ${task} не дал проверяемый исход — проверь`,
       result.message,
     );
   let after = await readStage(context.config.root);

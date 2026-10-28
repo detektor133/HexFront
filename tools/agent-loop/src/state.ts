@@ -40,6 +40,8 @@ export interface ActiveTask {
   resumeWorkAfterFindings?: boolean;
   /** Пути незакоммиченной работы этой задачи; чужие файлы в продолжение не втягиваются. */
   workDirtyPaths?: string[];
+  /** Пути последнего зелёного прогона: автоматический коммит допускает только стабильный набор. */
+  verifiedDirtyPaths?: string[];
   /** Подряд незакоммиченных попыток; вторая диагностируется, третья меняет подход. */
   workDirtyAttempts?: number;
   /** Последняя фактическая ошибка целевого теста до рабочего коммита. */
@@ -147,12 +149,22 @@ export async function loadState(root: string): Promise<LoopState> {
     pullRequests: {},
     planBlocked: {},
   };
-  const text = await readFile(statePath(root), 'utf8').catch((error: unknown) => {
+  const path = statePath(root);
+  const text = await readFile(path, 'utf8').catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
     throw error;
   });
   if (text === '') return empty;
-  const saved = JSON.parse(text) as Partial<LoopState>;
+  let saved: Partial<LoopState>;
+  try {
+    saved = JSON.parse(text) as Partial<LoopState>;
+  } catch {
+    const backup = await readFile(`${path}.bak`, 'utf8');
+    saved = JSON.parse(backup) as Partial<LoopState>;
+    await writeFile(`${path}.corrupt-${Date.now()}`, text, 'utf8');
+    await writeFile(`${path}.tmp`, backup, 'utf8');
+    await rename(`${path}.tmp`, path);
+  }
   // Старый `specRewrite` больше не даёт исполнителю править тесты: его не мигрируем.
   const {
     specRewrite,
@@ -190,6 +202,9 @@ export async function saveState(root: string, state: LoopState): Promise<void> {
   const path = statePath(root);
   await mkdir(dirname(path), { recursive: true });
   // Через временный файл: оборванная запись не должна ломать каждый следующий запуск.
-  await writeFile(`${path}.tmp`, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  const serialized = `${JSON.stringify(state, null, 2)}\n`;
+  await writeFile(`${path}.tmp`, serialized, 'utf8');
   await rename(`${path}.tmp`, path);
+  await writeFile(`${path}.bak.tmp`, serialized, 'utf8');
+  await rename(`${path}.bak.tmp`, `${path}.bak`);
 }

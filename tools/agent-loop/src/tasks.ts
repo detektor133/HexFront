@@ -119,20 +119,26 @@ async function formatOwnedWork(
 }
 
 /** После повторного зелёного прогона оркестратор сохраняет проверенную работу исполнителя. */
-async function commitVerifiedWork(
-  context: LoopContext,
+export async function commitVerifiedWork(
+  context: Pick<LoopContext, 'git' | 'state' | 'say'>,
   task: string,
   paths: readonly string[],
-): Promise<boolean> {
+): Promise<{ readonly kind: 'skipped' | 'committed' | 'failed'; readonly reason?: string }> {
   const active = context.state.activeTask;
-  if (active?.task !== task || (active.workDirtyAttempts ?? 0) < 3) return false;
+  if (active?.task !== task || (active.workDirtyAttempts ?? 0) < 3) return { kind: 'skipped' };
   const owned = new Set(active.workDirtyPaths ?? []);
-  if (paths.length === 0 || paths.some((path) => !owned.has(path))) return false;
-  if (!isInfraTask(task) && forbiddenWorkingPaths(paths).length > 0) return false;
+  const verified = new Set(active.verifiedDirtyPaths ?? []);
+  if (paths.length === 0 || paths.some((path) => !owned.has(path)))
+    return { kind: 'failed', reason: 'git commit: рабочие пути не совпали с путями задачи' };
+  if (verified.size !== paths.length || paths.some((path) => !verified.has(path)))
+    return { kind: 'skipped' };
+  if (!isInfraTask(task) && forbiddenWorkingPaths(paths).length > 0)
+    return { kind: 'failed', reason: 'git commit: работа затронула код агентного цикла' };
   const staged = (await context.git.run(['diff', '--cached', '--name-only']))
     .split(/\r?\n/u)
     .filter(Boolean);
-  if (staged.some((path) => !owned.has(path))) return false;
+  if (staged.some((path) => !owned.has(path)))
+    return { kind: 'failed', reason: 'git commit: в индексе есть чужие файлы' };
   const scope = paths.some((path) => path.startsWith('apps/client/'))
     ? 'client'
     : paths.some((path) => path.startsWith('apps/server/'))
@@ -145,7 +151,8 @@ async function commitVerifiedWork(
             ? 'mapgen'
             : 'infra';
   const added = await context.git.attempt(['add', '--', ...paths]);
-  if (added.code !== 0) return false;
+  if (added.code !== 0)
+    return { kind: 'failed', reason: `git add: ${added.stderr.trim() || 'неизвестная ошибка'}` };
   const committed = await context.git.attempt([
     'commit',
     '-m',
@@ -153,9 +160,15 @@ async function commitVerifiedWork(
     '-m',
     `Этап: ${task}`,
   ]);
-  if (committed.code !== 0) return false;
+  if (committed.code !== 0)
+    return {
+      kind: 'failed',
+      reason: `git commit: ${committed.stderr.trim() || committed.stdout.trim() || 'неизвестная ошибка'}`,
+    };
+  if ((await dirtyFiles(context.git)) !== '')
+    return { kind: 'failed', reason: 'git commit: после коммита остались изменённые файлы' };
   await context.say(`${task}: проверенная незакоммиченная работа сохранена оркестратором`);
-  return true;
+  return { kind: 'committed' };
 }
 
 const prePushFailure = (stdout: string, stderr: string): string => {
@@ -303,20 +316,27 @@ async function runProductWork(
     }
     if (evidence === undefined) {
       if (active !== undefined) delete active.lastDirtyFailure;
-      if (await commitVerifiedWork(context, task, paths)) {
+      const committed = await commitVerifiedWork(context, task, paths);
+      if (committed.kind === 'committed') {
         delete context.state.resume;
         delete context.state.resumeNote;
         if (active !== undefined) {
           delete active.workDirtyPaths;
           delete active.workDirtyAttempts;
+          delete active.verifiedDirtyPaths;
         }
         await save(context);
         return undefined;
       }
-      context.state.resumeNote = 'Целевые тесты и verify зелёные; создай коммит';
-      await save(context);
-      return 'worked';
+      if (committed.kind === 'skipped') {
+        if (active !== undefined) active.verifiedDirtyPaths = [...paths].sort();
+        context.state.resumeNote = 'Целевые тесты и verify зелёные; создай коммит';
+        await save(context);
+        return 'worked';
+      }
+      evidence = committed.reason ?? 'git commit: неизвестная ошибка';
     }
+    if (active !== undefined) delete active.verifiedDirtyPaths;
     const signature = checkFailureSignature(evidence);
     const repeated = active?.lastDirtyFailure === signature;
     if (active !== undefined) active.lastDirtyFailure = signature;
@@ -361,6 +381,7 @@ async function runProductWork(
     delete context.state.activeTask.specBounceStreak;
     delete context.state.activeTask.workDirtyPaths;
     delete context.state.activeTask.workDirtyAttempts;
+    delete context.state.activeTask.verifiedDirtyPaths;
     delete context.state.activeTask.lastDirtyFailure;
   }
   await save(context);

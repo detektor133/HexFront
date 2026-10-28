@@ -86,6 +86,8 @@ export interface World {
   readonly unit?: readonly string[];
   /** Ответы локального `pnpm verify --changed` после repair-spec; без значения — зелёный. */
   readonly verify?: readonly string[];
+  /** Ошибки локального git commit оркестратора по порядку. */
+  readonly gitCommitFailures?: readonly string[];
   /** Ответы `ci:wait --workflow=slow.yml`; без значения — зелёный. Код 3 — строка `pending`. */
   readonly slow?: readonly string[];
   /** Ответы eslint по приёмочным тестам по порядку; без значения или `ok` — чисто. */
@@ -216,6 +218,7 @@ export async function runWorld(world: World): Promise<Outcome> {
   const layout = [...(world.layout ?? [])];
   const unit = [...(world.unit ?? [])];
   const verify = [...(world.verify ?? [])];
+  const gitCommitFailures = [...(world.gitCommitFailures ?? [])];
   const slow = [...(world.slow ?? [])];
   const lint = [...(world.lint ?? [])];
   const issues = [...(world.issues ?? [])];
@@ -474,6 +477,8 @@ export async function runWorld(world: World): Promise<Outcome> {
       return ok();
     }
     if (sub === 'commit') {
+      const commitFailure = gitCommitFailures.shift();
+      if (commitFailure !== undefined) return { code: 1, stdout: '', stderr: commitFailure };
       const parent = head;
       head = ++nextCommit;
       commitDepth.set(head, (commitDepth.get(parent) ?? 0) + 1);

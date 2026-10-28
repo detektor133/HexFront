@@ -3,6 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { parseReviewVerdict } from './review.ts';
 
 describe('протокол reviewer', () => {
+  it('принимает структурированный ответ и отвергает противоречивый', () => {
+    expect(parseReviewVerdict('{"outcome":"OK","findings":[]}')).toEqual({
+      ok: true,
+      findings: [],
+    });
+    expect(
+      parseReviewVerdict(
+        '{"outcome":"ВОЗВРАТ","findings":[{"kind":"ТЕСТ","text":"нет проверки Esc"}]}',
+      ),
+    ).toEqual({
+      ok: false,
+      findings: [{ kind: 'ТЕСТ', text: 'ТЕСТ: нет проверки Esc' }],
+    });
+    expect(
+      parseReviewVerdict('{"outcome":"OK","findings":[{"kind":"КОД","text":"баг"}]}'),
+    ).toBeUndefined();
+  });
   it('принимает строгий OK без замечаний', () => {
     expect(parseReviewVerdict('OK\nКритерии подтверждены.')).toEqual({ ok: true, findings: [] });
   });

@@ -9,6 +9,7 @@ import type { GithubClient } from './github.ts';
 import { waitActions } from './owner-actions.ts';
 import type { RunCommand } from './process.ts';
 import { verifyPlanTransition, verifySplit } from './requirements.ts';
+import { parsePlanMessage } from './role-output.ts';
 import { saveState, type LoopState } from './state.ts';
 
 export interface AgentConfig {
@@ -376,9 +377,7 @@ export async function runSkill(
     return fail('$plan изменил файлы вне permissions.json');
   if (before !== undefined) {
     const after = await readStage(context.config.root);
-    const outcome = done.message.match(
-      /^PLAN:\s*(не трогал|уточнено|разбито|вопрос)(?![а-яё])/imu,
-    )?.[1];
+    const outcome = parsePlanMessage(done.message)?.outcome;
     const errors =
       splitTask !== undefined
         ? verifySplit(splitTask, before, after)
