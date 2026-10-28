@@ -113,7 +113,7 @@
 | Критерий приёмки: DOM-тесты отдельно проверяют `UnitCard` и `HexCard`; Playwright проверяет область 44×44 px, пересечение с заголовком и размещение внутри карточки | T17bab (зависит от T17baa) |
 | Критерий приёмки: `pnpm verify --changed` проходит | T17bab (зависит от T17baa) |
 
-- [ ] **T17bb. Акцент доступных действий города** (`apps/client/src/dev/{HexCard.tsx,HexCard.module.css}`, `apps/client/test`, `apps/client/tests/e2e`, `docs/art/ui.md`).
+- [x] **T17bb. Акцент доступных действий города** (`apps/client/src/dev/{HexCard.tsx,HexCard.module.css}`, `apps/client/test`, `apps/client/tests/e2e`, `docs/art/ui.md`).
   Доступные действия `upgrade`, `improve`, `foundCity`, `fort`, `depot`, `rebuild` и набор `infantry`, `armor`, `artillery` получают контрастную тёмную заливку `ui.ink` и текст `ui.surface`; недоступные из-за нехватки золота или правил сохраняют утверждённые T17ay состояния и не получают этот акцент. Hover и `focus-visible` доступны только для действий, которые можно выполнить.
   *Приёмка:* DOM-тест поимённо проверяет классы и отправку команды только у доступных действий; Playwright `@layout` проверяет вычисленные цвета, отсутствие акцента и hover у обоих disabled-состояний. `pnpm verify --changed` проходит.
 
