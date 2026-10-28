@@ -112,6 +112,24 @@
   cursor: not-allowed;
 }
 
+.accent {
+  background: var(--ui-ink);
+  color: var(--ui-surface);
+}
+
+.accent .price {
+  color: var(--ui-surface);
+}
+
+.button:not(:disabled):hover {
+  border-color: var(--selection-color);
+}
+
+.button:not(:disabled):focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
 .price {
   display: inline-flex;
   align-items: center;

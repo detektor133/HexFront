@@ -93,6 +93,7 @@ function expectThreeStates(
     if (state === 'available') {
       const button = screen.getByRole('button', { name: label });
       expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(button.className).toMatch(/\b\S*accent\S*\b/u);
       fireEvent.click(button);
       expect(send).toHaveBeenCalledTimes(1);
     } else if (state === 'forbidden') {
@@ -100,6 +101,7 @@ function expectThreeStates(
       expect(button).not.toBeNull();
       if (!button) return;
       expect((button as HTMLButtonElement).disabled).toBe(true);
+      expect(button.className).not.toMatch(/\b\S*accent\S*\b/u);
       expect(
         screen.queryByText(
           /Не хватает золота|Не хватает людей|Нет пути по своей земле|На гексе уже есть постройка|Максимальный уровень/u,
@@ -110,6 +112,7 @@ function expectThreeStates(
     } else {
       const button = screen.getByRole('button', { name: label });
       expect((button as HTMLButtonElement).disabled).toBe(true);
+      expect(button.className).not.toMatch(/\b\S*accent\S*\b/u);
       expect(
         screen.getByText(
           /Не хватает золота|Не хватает людей|Нет пути по своей земле|На гексе уже есть постройка|Максимальный уровень/u,
@@ -212,12 +215,18 @@ describe('07/T17ay: состояния строительства и найма'
         expect(button).not.toBeNull();
         if (!button) continue;
         expect((button as HTMLButtonElement).disabled).toBe(true);
+        expect(button.className).not.toMatch(/\b\S*accent\S*\b/u);
         expect(screen.queryByText(/Не хватает людей/iu)).not.toBeNull();
         fireEvent.click(button);
         expect(send).not.toHaveBeenCalled();
       } else {
         const button = screen.getByRole('button', { name: new RegExp(_title, 'iu') });
         expect((button as HTMLButtonElement).disabled).toBe(check !== availableRecruit);
+        if (check === availableRecruit) {
+          expect(button.className).toMatch(/accent/u);
+        } else {
+          expect(button.className).not.toMatch(/accent/u);
+        }
         fireEvent.click(button);
         expect(send).toHaveBeenCalledTimes(check === availableRecruit ? 1 : 0);
       }

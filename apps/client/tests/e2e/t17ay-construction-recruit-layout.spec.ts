@@ -14,6 +14,7 @@ test('@layout T17ay: отключённые действия показываю�
   await expect(blockedReason).toBeVisible();
   await expect(blockedReason).not.toHaveText('');
   await expect(blocked).toHaveCSS('cursor', 'not-allowed');
+  await expect(blocked).not.toHaveClass(/accent/u);
   const blockedBefore = await blocked.evaluate((element) => {
     const style = getComputedStyle(element);
     return { color: style.color, background: style.backgroundColor, border: style.borderColor };
@@ -36,11 +37,17 @@ test('@layout T17ay: отключённые действия показываю�
   await armorSlider.fill(maximum ?? '');
   const recruit = armorSlider.locator('xpath=following::button[1]');
   await expect(recruit).toBeEnabled();
+  await expect(recruit).toHaveClass(/accent/u);
+  await expect(recruit).toHaveCSS('background-color', 'rgb(34, 33, 30)');
+  await expect(recruit).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await recruit.focus();
+  await expect(recruit).toHaveCSS('outline-style', 'solid');
   await recruit.click();
   const unaffordable = page
     .locator('section[aria-label] button:disabled[aria-describedby]:not([class*="muted"])')
     .first();
   await expect(unaffordable).toBeDisabled();
+  await expect(unaffordable).not.toHaveClass(/accent/u);
   await expect(unaffordable).toHaveCSS('cursor', 'not-allowed');
   const unaffordableReasonId = await unaffordable.getAttribute('aria-describedby');
   expect(unaffordableReasonId).not.toBeNull();
@@ -51,6 +58,16 @@ test('@layout T17ay: отключённые действия показываю�
     const style = getComputedStyle(element);
     return { color: style.color, background: style.backgroundColor, border: style.borderColor };
   });
+
+  await unaffordable.hover();
+  await expect
+    .poll(() =>
+      unaffordable.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.color, background: style.backgroundColor, border: style.borderColor };
+      }),
+    )
+    .toEqual(unaffordableAppearance);
 
   expect(unaffordableAppearance).not.toEqual(blockedBefore);
 });

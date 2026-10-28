@@ -51,7 +51,7 @@ function ActionButton(props: {
     <div className={styles.action}>
       <button
         type="button"
-        className={styles.button}
+        className={`${styles.button}${a.affordable ? ` ${styles.accent}` : ''}`}
         disabled={!a.affordable}
         {...(!a.affordable ? { 'aria-describedby': reasonId } : {})}
         title={hint ?? undefined}
@@ -144,7 +144,7 @@ function RecruitButton(props: {
       </label>
       <button
         type="button"
-        className={`${styles.button}${blocked ? ` ${styles.muted}` : ''}`}
+        className={`${styles.button}${check.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
         disabled={!check.ok}
         aria-label={`${label} ${formatSoldiers(soldiers)}`}
         {...(reason ? { 'aria-describedby': reasonId } : {})}
