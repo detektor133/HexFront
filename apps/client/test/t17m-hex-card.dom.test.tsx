@@ -445,7 +445,9 @@ describe('T17m: карточка клетки', () => {
     expect(screen.queryByText('Золото')).toBeNull();
     expect(screen.queryByText(/Строительство/u)).toBeNull();
     expect(screen.queryByText(/Набор/u)).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getAllByRole('button')).toEqual([
+      screen.getByRole('button', { name: t('card.close') }),
+    ]);
   });
 
   it('не раскрывает fogged-нейтральную клетку и не ломает UnitCard', () => {
@@ -476,7 +478,9 @@ describe('T17m: карточка клетки', () => {
       />,
     );
     expect(screen.getByText('нейтральный')).toBeTruthy();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getAllByRole('button')).toEqual([
+      screen.getByRole('button', { name: t('card.close') }),
+    ]);
     cleanup();
 
     render(

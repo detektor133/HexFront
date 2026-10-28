@@ -15,6 +15,7 @@ import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
 import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
+import { IconButton } from '../ui/icon-button.tsx';
 
 function ActionButton(props: {
   a: HexAction;
@@ -235,7 +236,14 @@ export function HexCard(props: {
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
-        <h2 className={styles.title}>{title}</h2>
+        <div className={styles.header}>
+          <h2 className={styles.title}>{title}</h2>
+          <IconButton className={styles.iconButton} label={t('card.close')}>
+            <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </IconButton>
+        </div>
         <dl className={styles.stats}>
           <Row label={t('card.owner')} value={ownerText} />
           <Row

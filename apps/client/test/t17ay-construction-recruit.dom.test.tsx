@@ -13,6 +13,7 @@ import {
 } from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
+import { t } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { Selection, ViewPayload } from '../src/local/messages.ts';
 
@@ -23,6 +24,17 @@ const mapResult = loadMap(mapJson);
 if (!mapResult.ok) throw new Error(mapResult.errors.join('; '));
 const map = mapResult.map;
 const FIXED_ONE = 1000 as Fp;
+
+describe('кнопка закрытия карточки клетки', () => {
+  it('показывает локализованное доступное имя для выбранной клетки', () => {
+    const { nonCity, view } = getFixtures();
+    expect(nonCity.hex).toBeGreaterThanOrEqual(0);
+
+    render(<HexCard s={nonCity} view={view} map={map} send={() => undefined} />);
+
+    expect(screen.queryByRole('button', { name: t('card.close') })).not.toBeNull();
+  });
+});
 
 const available: ConstructionCheck = { ok: true, cost: FIXED_ONE, timeS: FIXED_ONE };
 const unaffordable: ConstructionCheck = {
@@ -215,7 +227,9 @@ describe('07/T17ay: состояния строительства и найма'
   it('критерий 07/T17ay: одна общая иконка монет содержит два контура и используется в HUD и карточке', () => {
     const { city, view } = getFixtures();
     renderCard(city, view);
-    const prices = Array.from(document.querySelectorAll('button svg'));
+    const prices = Array.from(document.querySelectorAll('button svg')).filter(
+      (icon) => icon.querySelectorAll('circle').length > 0,
+    );
     expect(prices.length).toBeGreaterThan(0);
     expect(prices.every((icon) => icon.querySelectorAll('circle').length === 2)).toBe(true);
 
