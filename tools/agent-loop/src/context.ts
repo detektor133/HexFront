@@ -61,7 +61,8 @@ const RETRY_MS = 30 * 60_000;
  * Ожидания, которые снимаются сами, без нового коммита: их проверка повторяется каждый шаг.
  * Красный `slow` — тоже: прогон, перезапущенный на GitHub, зеленеет на том же HEAD.
  */
-export const selfClearing = (key: string): boolean => /^(dirty|branch|sync|slow:.+)$/u.test(key);
+export const selfClearing = (key: string): boolean =>
+  /^(dirty|branch|sync|slow:.+|check-review:.+)$/u.test(key);
 
 /** Имя агента на панели: поток `wN` или главный каталог. */
 export const agentName = (_context: LoopContext): string => MAIN_AGENT;

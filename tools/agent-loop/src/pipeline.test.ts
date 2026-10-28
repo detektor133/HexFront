@@ -814,6 +814,32 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('после обновления цикла продолжает задачу из старого ожидания check-review', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+        },
+        parked: {
+          key: 'check-review:06/T1j5-Б1',
+          head: 'c0',
+          reason: 'reviewer не классифицировал красный полный локальный контур',
+        },
+      },
+      sessions: [review('OK')],
+      preReview: ['check: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[0]).toContain('$review 06/T1j5-Б1');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('после узкого review RED-тесты активной задачи не блокируют следующий тик', async () => {
     const acceptance = 'packages/sim/test/acceptance.test.ts';
     const run = await runWorld({
