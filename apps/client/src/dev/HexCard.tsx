@@ -191,6 +191,7 @@ export function HexCard(props: {
   view: PlayerView;
   map: MapStatic;
   send: (cmd: Command) => void;
+  onClose?: () => void;
   onRoadPreview?: (path: readonly number[] | null) => void;
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
@@ -238,7 +239,7 @@ export function HexCard(props: {
       <div ref={contentRef} className={styles.cardBody}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
-          <IconButton className={styles.iconButton} label={t('card.close')}>
+          <IconButton className={styles.iconButton} label={t('card.close')} onClick={props.onClose}>
             <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
               <path d="m6 6 12 12M18 6 6 18" />
             </svg>

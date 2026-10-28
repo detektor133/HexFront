@@ -39,143 +39,155 @@ afterEach(() => {
 });
 
 describe('T17m: карточка клетки', () => {
-  it('проходит путь тапа по карте через selection, обновляет и закрывает карточку', async () => {
-    let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
-    const engine = createLocalEngine(mapJson, 42, 2);
-    if ('errors' in engine) throw new Error(engine.errors.join('; '));
-    const initial = engine.snapshot();
-    const neutralHexes = initial.view.hexes.owner
-      .map((owner, hex) => (owner === -1 ? hex : -1))
-      .filter((hex) => hex >= 0);
-    const firstHex = neutralHexes[0];
-    const secondHex = engine.state.cities.find((city) => city.hex !== firstHex)?.hex;
-    if (firstHex === undefined || secondHex === undefined) {
-      throw new Error('нейтральные клетки для выбора не найдены');
-    }
-    const emit = (onMessage: (message: FromWorker) => void): void => onMessage(engine.snapshot());
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: true, json: async () => mapJson }) as Response),
-    );
-    vi.doMock('../src/local/local-match.ts', () => ({
-      startLocalMatch: (
-        _map: unknown,
-        _seed: number,
-        _players: unknown,
-        onMessage: (message: FromWorker) => void,
-      ): LocalMatch => {
-        emit(onMessage);
-        return {
-          send: () => undefined,
-          setFog: (fog) => {
-            engine.setFog(fog);
-            emit(onMessage);
-          },
-          setPaused: () => undefined,
-          step: () => undefined,
-          setSpeed: () => undefined,
-          setObserver: (playerId) => {
-            engine.setObserver(playerId);
-            emit(onMessage);
-          },
-          setView: (playerId, fog) => {
-            engine.setView(playerId, fog);
-            emit(onMessage);
-          },
-          select: (hex) => {
-            engine.select(hex);
-            emit(onMessage);
-          },
-          ack: () => undefined,
-          dispose: () => undefined,
-        };
-      },
-    }));
-    vi.doMock('../src/render/map-view.ts', () => ({
-      createMapView: async (
-        _host: HTMLElement,
-        _map: MapStatic,
-        _initial: MapViewOptions,
-        _onState: (state: MapViewState) => void,
-        onTap?: (hex: { q: number; r: number }, kind: TapKind, world: Point) => void,
-      ): Promise<MapView> => {
-        tap = onTap;
-        return {
-          configure: () => undefined,
-          setScale: () => undefined,
-          setBottomInset: () => undefined,
-          setTopInset: () => undefined,
-          centerOn: () => undefined,
-          setStroke: () => undefined,
-          setSelection: () => undefined,
-          setGrab: () => undefined,
-          setOrderHooks: () => undefined,
-          cancel: () => undefined,
-          sceneStats: () => ({
-            objects: 0,
-            text: 0,
-            graphics: 0,
-            graphicsInstructions: [],
-            graphicsDetails: [],
-            textures: 0,
-            canvasTextTextures: null,
-          }),
-          destroy: () => undefined,
-        };
-      },
-    }));
-    const measuredHeights: number[] = [];
-    class MatchResizeObserver {
-      public constructor(private readonly callback: ResizeObserverCallback) {}
-
-      public observe(target: Element): void {
-        const height = target.className.toString().includes('card') ? 248 : 0;
-        Object.defineProperty(target, 'scrollHeight', { configurable: true, value: height });
-        this.callback(
-          [{ target, contentRect: { height: 0 } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-        if (height > 0) measuredHeights.push(height);
+  it.each(['кнопкой закрытия', 'клавишей Esc'] as const)(
+    'проходит путь выбора клетки и снимает её выбор через %s',
+    async (dismissal) => {
+      let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
+      const engine = createLocalEngine(mapJson, 42, 2);
+      if ('errors' in engine) throw new Error(engine.errors.join('; '));
+      const initial = engine.snapshot();
+      const neutralHexes = initial.view.hexes.owner
+        .map((owner, hex) => (owner === -1 ? hex : -1))
+        .filter((hex) => hex >= 0);
+      const firstHex = neutralHexes[0];
+      const secondHex = engine.state.cities.find((city) => city.hex !== firstHex)?.hex;
+      if (firstHex === undefined || secondHex === undefined) {
+        throw new Error('нейтральные клетки для выбора не найдены');
       }
+      const send = vi.fn();
+      const emit = (onMessage: (message: FromWorker) => void): void => onMessage(engine.snapshot());
 
-      public disconnect(): void {}
-    }
-    vi.stubGlobal('ResizeObserver', MatchResizeObserver);
-    const { MatchPage } = await import('../src/match/MatchPage.tsx');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: true, json: async () => mapJson }) as Response),
+      );
+      vi.doMock('../src/local/local-match.ts', () => ({
+        startLocalMatch: (
+          _map: unknown,
+          _seed: number,
+          _players: unknown,
+          onMessage: (message: FromWorker) => void,
+        ): LocalMatch => {
+          emit(onMessage);
+          return {
+            send,
+            setFog: (fog) => {
+              engine.setFog(fog);
+              emit(onMessage);
+            },
+            setPaused: () => undefined,
+            step: () => undefined,
+            setSpeed: () => undefined,
+            setObserver: (playerId) => {
+              engine.setObserver(playerId);
+              emit(onMessage);
+            },
+            setView: (playerId, fog) => {
+              engine.setView(playerId, fog);
+              emit(onMessage);
+            },
+            select: (hex) => {
+              engine.select(hex);
+              emit(onMessage);
+            },
+            ack: () => undefined,
+            dispose: () => undefined,
+          };
+        },
+      }));
+      vi.doMock('../src/render/map-view.ts', () => ({
+        createMapView: async (
+          _host: HTMLElement,
+          _map: MapStatic,
+          _initial: MapViewOptions,
+          _onState: (state: MapViewState) => void,
+          onTap?: (hex: { q: number; r: number }, kind: TapKind, world: Point) => void,
+        ): Promise<MapView> => {
+          tap = onTap;
+          return {
+            configure: () => undefined,
+            setScale: () => undefined,
+            setBottomInset: () => undefined,
+            setTopInset: () => undefined,
+            centerOn: () => undefined,
+            setStroke: () => undefined,
+            setSelection: () => undefined,
+            setGrab: () => undefined,
+            setOrderHooks: () => undefined,
+            cancel: () => undefined,
+            sceneStats: () => ({
+              objects: 0,
+              text: 0,
+              graphics: 0,
+              graphicsInstructions: [],
+              graphicsDetails: [],
+              textures: 0,
+              canvasTextTextures: null,
+            }),
+            destroy: () => undefined,
+          };
+        },
+      }));
+      const measuredHeights: number[] = [];
+      class MatchResizeObserver {
+        public constructor(private readonly callback: ResizeObserverCallback) {}
 
-    window.history.replaceState({}, '', '/match');
-    render(<MatchPage />);
-    await waitFor(() => expect(tap).toBeDefined());
-    const select = async (hex: number): Promise<void> => {
-      const point = hexFromId(hex, mapResult.map.width);
-      act(() => tap?.(point, 'select', { x: 0, y: 0 }));
-      act(() => tap?.(point, 'select', { x: 0, y: 0 }));
-      await waitFor(() => expect(document.querySelector('section[class*="card"]')).not.toBeNull());
-    };
-    const clearSelection = (): void => {
-      act(() => tap?.({ q: -100, r: -100 }, 'select', { x: 0, y: 0 }));
-    };
-    const getCard = (): HTMLElement => {
-      const card = document.querySelector<HTMLElement>('section[class*="card"]');
-      if (!card) throw new Error('карточка клетки не найдена');
-      return card;
-    };
+        public observe(target: Element): void {
+          const height = target.className.toString().includes('card') ? 248 : 0;
+          Object.defineProperty(target, 'scrollHeight', { configurable: true, value: height });
+          this.callback(
+            [{ target, contentRect: { height: 0 } } as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          );
+          if (height > 0) measuredHeights.push(height);
+        }
 
-    await select(firstHex);
-    expect(measuredHeights).toContain(248);
-    expect(getCard().textContent).toMatch(/Население/u);
-    expect(getCard().textContent).toContain('нейтральный');
-    const firstTitle = getCard().getAttribute('aria-label');
-    const firstContent = getCard().textContent;
-    await select(secondHex);
-    await waitFor(() => expect(getCard().textContent).not.toBe(firstContent));
-    expect(
-      getCard().getAttribute('aria-label') !== firstTitle || getCard().textContent !== firstContent,
-    ).toBe(true);
-    clearSelection();
-    expect(document.querySelector('section[class*="card"]')).toBeNull();
-  });
+        public disconnect(): void {}
+      }
+      vi.stubGlobal('ResizeObserver', MatchResizeObserver);
+      vi.resetModules();
+      const { MatchPage } = await import('../src/match/MatchPage.tsx');
+
+      window.history.replaceState({}, '', '/match');
+      render(<MatchPage />);
+      await waitFor(() => expect(tap).toBeDefined());
+      const select = async (hex: number): Promise<void> => {
+        const point = hexFromId(hex, mapResult.map.width);
+        act(() => tap?.(point, 'select', { x: 0, y: 0 }));
+        act(() => tap?.(point, 'select', { x: 0, y: 0 }));
+        await waitFor(() =>
+          expect(document.querySelector('section[class*="card"]')).not.toBeNull(),
+        );
+      };
+      const getCard = (): HTMLElement => {
+        const card = document.querySelector<HTMLElement>('section[class*="card"]');
+        if (!card) throw new Error('карточка клетки не найдена');
+        return card;
+      };
+
+      await select(firstHex);
+      expect(measuredHeights).toContain(248);
+      expect(getCard().textContent).toMatch(/Население/u);
+      expect(getCard().textContent).toContain('нейтральный');
+      const firstTitle = getCard().getAttribute('aria-label');
+      const firstContent = getCard().textContent;
+      await select(secondHex);
+      await waitFor(() => expect(getCard().textContent).not.toBe(firstContent));
+      expect(
+        getCard().getAttribute('aria-label') !== firstTitle ||
+          getCard().textContent !== firstContent,
+      ).toBe(true);
+      expect(engine.snapshot().selection?.hex).toBe(secondHex);
+      if (dismissal === 'кнопкой закрытия') {
+        fireEvent.click(screen.getByRole('button', { name: t('card.close') }));
+      } else {
+        fireEvent.keyDown(window, { key: 'Escape' });
+      }
+      await waitFor(() => expect(document.querySelector('section[class*="card"]')).toBeNull());
+      expect(engine.snapshot().selection).toBeNull();
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
 
   it('показывает данные своей клетки и города', () => {
     const engine = createLocalEngine(mapJson, 42, 2);

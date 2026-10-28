@@ -16,7 +16,7 @@ import { ObserverPanel } from '../dev/ObserverPanel.tsx';
 import { RadialMenu } from '../dev/RadialMenu.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
-import { armySelection } from '../dev/sandbox-selection.ts';
+import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
 import { t } from '../i18n/dict.ts';
 
@@ -267,6 +267,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             view={view}
             map={map}
             send={sb.send}
+            onClose={() => sb.pick(NOTHING_PICKED)}
             onRoadPreview={sb.setRoadPreview}
             onHeight={setCardH}
             style={styleFor('card')}

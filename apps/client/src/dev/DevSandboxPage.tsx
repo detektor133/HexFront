@@ -597,6 +597,7 @@ export function SandboxSurface({
           view={view}
           map={map}
           send={sb.send}
+          onClose={() => sb.pick(NOTHING_PICKED)}
           onRoadPreview={sb.setRoadPreview}
         />
       )}
