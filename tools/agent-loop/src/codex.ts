@@ -47,7 +47,7 @@ export interface Session {
 // Codex при исчерпанном лимите может выйти с кодом 0, поэтому лимит ищется и в тексте.
 export const USAGE_LIMIT = 'кончился лимит Codex';
 const USAGE_LIMIT_RE = /hit your usage limit|usage limit reached/i;
-const TOOL_SETUP_RE = /setup refresh had errors|Failed to create unified exec process/iu;
+const TOOL_SETUP_RE = /^Failed to create unified exec process:/mu;
 const HEARTBEAT_MS = 60_000;
 
 export const minutes = (ms: number): string => `${Math.max(0, Math.round(ms / 60_000))} мин`;
