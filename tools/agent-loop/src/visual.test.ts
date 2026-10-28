@@ -37,6 +37,10 @@ describe('визуальный гейт перед push', () => {
       '$review 06/T1j5-Б1',
     ]);
     expect(run.prompts[2]).toContain('Приложены');
+    expect(run.prompts[2]).toContain('Критерий этой задачи:');
+    expect(run.prompts[2]).toContain('Изменённые файлы UI этой задачи:');
+    expect(run.prompts[2]).toContain('apps/client/src/dev/Hud.module.css');
+    expect(run.prompts[2]).toContain('Замечания к другим элементам карты не возвращай');
     expect(run.prompts[2]).not.toMatch(/hud-360\.png/u);
     const visualArgs = run.codexArguments[2] ?? [];
     expect(visualArgs).toContain('-i');
@@ -54,7 +58,9 @@ describe('визуальный гейт перед push', () => {
       sessions: [
         codeCommit('apps/client/src/dev/Hud.module.css'),
         review('OK'),
-        review('ВОЗВРАТ\n- КОД: иконка людей сжата transform: scaleX(0.6), 360 px'),
+        review(
+          'ВОЗВРАТ\n- КОД: apps/client/src/dev/Hud.module.css: иконка людей сжата transform: scaleX(0.6), 360 px',
+        ),
         codeCommit('apps/client/src/dev/Hud.module.css', 'Исправлено искажение.'),
         review('OK'),
         review('OK'),
@@ -77,5 +83,21 @@ describe('визуальный гейт перед push', () => {
     expect(run.prompts[2]).toContain('Приложены');
     expect(run.prompts[3]).toContain('иконка людей сжата');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('пропускает замечание к чужому элементу карты и завершает задачу', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        review('ВОЗВРАТ\n- КОД: apps/client/src/render/unit-chips.ts: метки налезают, 360 px'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.visualCalls).toBe(1);
+    expect(run.prompts).toHaveLength(3);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+    expect(run.lines.some((line) => line.includes('вне изменённого UI пропущено'))).toBe(true);
   });
 });

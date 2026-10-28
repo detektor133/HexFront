@@ -9,9 +9,11 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { park, save, session, type LoopContext, type Step } from './context.ts';
+import { park, readStage, save, session, type LoopContext, type Step } from './context.ts';
 import { batchReviewFindings } from './finding-repair.ts';
+import { dirtyFiles, head, remoteHead } from './git.ts';
 import { parseReviewVerdict } from './review.ts';
+import { taskBlock } from './stage-file.ts';
 
 const UI_GLOBS = [
   /^apps\/client\/src\/dev\//u,
@@ -62,13 +64,26 @@ export async function runVisualGate(
       `${task}: не удалось снять визуальные снимки HUD — проверь вручную`,
       `${shots.stdout}\n${shots.stderr}`.slice(-2_000),
     );
+  const [stage, changed] = await Promise.all([
+    readStage(context.config.root),
+    context.git.run(['diff', '--name-only', `${base}..HEAD`]),
+  ]);
+  const changedUi = changed
+    .split(/\r?\n/u)
+    .map((path) => path.trim())
+    .filter((path) => UI_GLOBS.some((glob) => glob.test(path)));
+  const beforeHead = await head(context.git);
+  const beforeRemote = await remoteHead(context.git);
+  const beforeTree = await dirtyFiles(context.git);
   const paths = WIDTHS.map((width) => join(outDir, `hud-${width}.png`));
   const prompt = [
     `$review ${task}`,
     `Визуальная проверка (не повтор геометрических тестов — они уже зелёные). Приложены ${paths.length} снимка HUD по порядку: ${WIDTHS.join(', ')} px.`,
-    'Ищи то, что рект-проверки не видят: искажённые или сжатые трансформацией иконки и текст,',
-    'нахлёст элементов на глаз, нечитаемые подписи, обрезанные буквы. Код не читай, ничего не меняй и не коммить.',
-    'Ответ: первая строка `OK` или `ВОЗВРАТ`. При возврате — пункты `- КОД: ...` с описанием искажения и шириной, на которой оно видно.',
+    `Критерий этой задачи:\n${taskBlock(stage.stageText, task)}`,
+    `Изменённые файлы UI этой задачи:\n${changedUi.join('\n')}`,
+    'Проверяй только изменённый UI-элемент из критерия задачи, видимый на снимках: искажение, нахлёст, обрезку.',
+    'В каждом замечании укажи точный путь изменённого UI-файла из списка выше и ширину снимка. Замечания к другим элементам карты не возвращай в эту задачу. Если нужный элемент отсутствует на снимках, верни OK: его DOM и @layout проверки уже прошли.',
+    'Код не читай, ничего не меняй и не коммить. Ответ — JSON по схеме review.',
   ].join('\n');
   const result = await session(context, 'review', prompt, [], paths);
   if (result.failure !== undefined)
@@ -78,6 +93,12 @@ export async function runVisualGate(
       `${task}: визуальный review не выполнен — ${result.failure}`,
       result.message,
     );
+  if (
+    (await head(context.git)) !== beforeHead ||
+    (await remoteHead(context.git)) !== beforeRemote ||
+    (await dirtyFiles(context.git)) !== beforeTree
+  )
+    return park(context, `visual:${task}`, `${task}: визуальный reviewer изменил Git или файлы`);
   const verdict = parseReviewVerdict(result.message);
   if (verdict === undefined)
     return park(
@@ -87,15 +108,23 @@ export async function runVisualGate(
       result.message,
     );
   if (verdict.ok) return undefined;
+  const relevant = verdict.findings.filter((finding) =>
+    changedUi.some((path) => finding.text.includes(path)),
+  );
+  if (relevant.length !== verdict.findings.length)
+    await context.say(
+      `визуальный гейт ${task}: ${verdict.findings.length - relevant.length} пункт(ов) вне изменённого UI пропущено`,
+    );
+  if (relevant.length === 0) return undefined;
   const active = context.state.activeTask;
   if (active !== undefined) {
-    active.findings = [...batchReviewFindings(verdict.findings)];
+    active.findings = [...batchReviewFindings(relevant)];
     active.findingRetries = 0;
     active.phase = 'work';
     await save(context);
   }
   await context.say(
-    `визуальный гейт ${task}: ${verdict.findings.length} пунктов собраны в ${active?.findings.length ?? 0} пакет(а) по ролям`,
+    `визуальный гейт ${task}: ${relevant.length} пунктов собраны в ${active?.findings.length ?? 0} пакет(а) по ролям`,
   );
   return 'worked';
 }
