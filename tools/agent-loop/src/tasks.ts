@@ -20,11 +20,11 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
+  verifyTargetedTests,
   verifyTouchedTests,
 } from './finding-repair.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
-import { taskCriteriaMatrix } from './requirements.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import {
   forbiddenPaths,
@@ -33,7 +33,7 @@ import {
   scopeViolation,
 } from './scope-guard.ts';
 import { forgetSpec } from './spec.ts';
-import { commandTask, parseQueue, setTaskMark, taskMark } from './stage-file.ts';
+import { commandTask, parseQueue, setTaskMark, taskBlock, taskMark } from './stage-file.ts';
 import type { ActiveTask } from './state.ts';
 import { runVisualGate } from './visual.ts';
 
@@ -75,6 +75,14 @@ export function mentionsStreakFile(text: string, file: string): boolean {
 export const resumePrompt = (task: string): string => `$task ${task} продолжить`;
 export const ciFixPrompt = (task: string, line: string): string =>
   `$task ${task} CI красный: ${line}`;
+
+const dirtyFailureSignature = (evidence: string): string => {
+  const lines = evidence
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => /FAIL|AssertionError|Error:|Expected|Received/iu.test(line));
+  return (lines.length > 0 ? lines.join('\n') : evidence).slice(0, 1_000);
+};
 
 const prePushFailure = (stdout: string, stderr: string): string => {
   const output = [stdout, stderr].filter(Boolean).join('\n');
@@ -165,14 +173,18 @@ async function runProductWork(
 ): Promise<Step | undefined> {
   const base = await head(context.git);
   const published = await remoteHead(context.git);
-  const matrix =
-    finding === undefined
-      ? taskCriteriaMatrix((await readStage(context.config.root)).stageText, task)
-      : '';
+  const stage = await readStage(context.config.root);
+  const source = taskBlock(stage.stageText, task);
+  const ownerPrompt = context.state.activeTask?.workPrompt;
   const checkedPrompt =
-    matrix === ''
-      ? prompt
-      : `${prompt}\nПеред первым review сверь реализацию и тесты со всей матрицей требований:\n${matrix}\nДля каждого пункта найди продуктовый путь и проверку. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.`;
+    `${prompt}` +
+    (finding !== undefined && ownerPrompt?.includes('\n')
+      ? `\nИсходное поручение владельца:\n${ownerPrompt}`
+      : '') +
+    `\nДействующий текст задачи — источник ожидаемого поведения:\n${source}` +
+    (finding === undefined
+      ? '\nПеред первым review сверь каждый критерий с продуктовым путём и проверкой. Через rg найди все импорты, вызовы и старые тесты каждого удалённого или изменённого публичного имени. Не коммить частичное выполнение.'
+      : '\nСверь замечания с этим текстом и текущим diff: не исправляй уже закрытый пункт повторно.');
   const continuation =
     context.state.resume === task
       ? `\nПродолжи незакоммиченную работу этой задачи. Предыдущая проверка: ${context.state.resumeNote ?? 'результат не записан'}. Исправь причину красного теста в продукте или фикстуре, проверь и создай коммит.`
@@ -209,15 +221,41 @@ async function runProductWork(
     delete context.state.parked;
     await save(context);
     if ((active?.workDirtyAttempts ?? 0) < 2) return 'worked';
+    const touched = [
+      ...new Set([...paths, ...(await changedPathsBetween(context, active?.base ?? base))]),
+    ];
+    const evidence = await verifyTargetedTests(context, touched);
+    const signature = evidence === undefined ? undefined : dirtyFailureSignature(evidence);
+    const repeated = signature !== undefined && active?.lastDirtyFailure === signature;
+    if (active !== undefined) {
+      if (signature === undefined) delete active.lastDirtyFailure;
+      else active.lastDirtyFailure = signature;
+    }
     const verdict = await runReview(
       context,
       task,
-      `Узкая диагностика незакоммиченной работы после двух попыток. Тест остаётся красным: ${result.message}. Проверь только текущие файлы ${paths.join(', ')}. Верни конкретную причину в продукте или фикстуре как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
+      `Узкая диагностика незакоммиченной работы после ${active?.workDirtyAttempts ?? 2} попыток. Предыдущий диагноз: ${active?.findings[0]?.text ?? 'нет'}. Отчёт исполнителя: ${result.message}. Фактическая целевая проверка:\n${evidence ?? 'Целевые тесты зелёные или не найдены.'}\nПроверь только текущие файлы ${paths.join(', ')}. Если ошибка повторилась после прежнего диагноза, объясни, почему он не помог, и назови другой проверяемый путь. Если тест не дошёл до проверяемого поведения, назови нарушенную предпосылку. Верни одну причину как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
     );
     if (typeof verdict === 'string') return verdict;
-    if (!verdict.ok && active !== undefined)
-      active.findings = batchReviewFindings(verdict.findings);
-    if (active !== undefined) active.workDirtyAttempts = 0;
+    if (active !== undefined && (!verdict.ok || evidence !== undefined)) {
+      const findings = verdict.ok
+        ? [{ kind: 'КОД' as const, text: `КОД: целевой тест красный — ${evidence}` }]
+        : batchReviewFindings(verdict.findings);
+      active.findings =
+        (active.workDirtyAttempts ?? 0) >= 3 && repeated
+          ? [
+              {
+                kind: 'ПЕРЕДЕЛАТЬ',
+                text:
+                  'ПЕРЕДЕЛАТЬ: повторная незакоммиченная попытка не устранила красную ' +
+                  'предпосылку. Сначала установи, почему тест не достигает нужного состояния; ' +
+                  'замени способ подготовки состояния или механизм по диагнозу reviewer, ' +
+                  'не меняя посторонний код. Диагноз: ' +
+                  findings.map((item) => item.text).join(' | '),
+              },
+            ]
+          : findings;
+    }
     await save(context);
     return 'worked';
   }
@@ -229,6 +267,7 @@ async function runProductWork(
     delete context.state.activeTask.specBounceStreak;
     delete context.state.activeTask.workDirtyPaths;
     delete context.state.activeTask.workDirtyAttempts;
+    delete context.state.activeTask.lastDirtyFailure;
   }
   await save(context);
   if (!isInfraTask(task)) {

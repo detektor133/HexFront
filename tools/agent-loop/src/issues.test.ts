@@ -284,9 +284,11 @@ describe('Issues в цикле', () => {
         { task: 'T2', mark: 'x', answer: 'OK' },
       ],
     });
-    expect(run.prompts[0]).toBe(body);
+    expect(run.prompts[0]).toContain(body);
+    expect(run.prompts[0]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
     expect(run.prompts[2]).toContain('КОД: фон не рисуется');
-    expect(run.prompts[2]).not.toContain('Первым — живой фон меню');
+    expect(run.prompts[2]).toContain('Исходное поручение владельца:');
+    expect(run.prompts[2]).toContain('Первым — живой фон меню');
     expect(run.closed).toEqual([12]);
   });
 
@@ -367,7 +369,9 @@ describe('закрытие этапа', () => {
         { answer: 'дошла до 07/T1', commit: false },
       ],
     });
-    expect(run.prompts).toEqual(['$stage-close', '$task 07/T1']);
+    expect(run.prompts[0]).toBe('$stage-close');
+    expect(run.prompts[1]).toContain('$task 07/T1');
+    expect(run.prompts[1]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
     expect(run.lines).toContain('новый этап: ветка stage-07');
   });
 

@@ -32,11 +32,11 @@ export const findingPrompt = (task: string, finding: ReviewFinding): string =>
   [
     `$task ${task}`,
     finding.text.startsWith('ПЕРЕДЕЛАТЬ:')
-      ? 'Это не точечный патч: план решил, что механизм (или подход теста к нему) нужно ' +
-        'переписать целиком одним согласованным решением, потому что подряд несколько точечных ' +
-        'патчей не закрыли задачу по существу. Не добавляй ещё один частный костыль поверх ' +
-        'старых — замени сам подход, сохранив приёмку задачи.'
-      : 'Исправь весь пакет замечаний к продукту и тестам одним согласованным проходом:',
+      ? 'Повторные патчи не закрыли конкретную причину. Замени проблемный подход в границах ' +
+        'этого критерия: если неверна предпосылка теста, меняй фикстуру; если отсутствует ' +
+        'поведение, меняй продукт. Не переписывай посторонний код и сохрани всю приёмку задачи.'
+      : 'Замечания reviewer — гипотезы о текущих дефектах. Сначала воспроизведи их; ' +
+        'повторы одной причины объедини, уже исправленное не переделывай:',
     finding.text,
     'Сверь ожидания тестов с задачей и реальным состоянием приложения. Ошибку подготовки теста ' +
       'исправь в тесте; отсутствие механизма — в продукте. Не удаляй чужие регрессии.',
@@ -129,8 +129,8 @@ const verifyFailureSummary = (stdout: string, stderr: string): string =>
 
 const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;
 
-/** @returns ошибки всех тестов задачи и рабочего verify; undefined — все зелёные. */
-export async function verifyTouchedTests(
+/** @returns фактический вывод красных целевых тестов; undefined — все зелёные. */
+export async function verifyTargetedTests(
   context: LoopContext,
   touched: readonly string[],
 ): Promise<string | undefined> {
@@ -142,7 +142,12 @@ export async function verifyTouchedTests(
       timeoutMs: context.config.maxMinutes * 60_000,
     });
     if (e2e.code !== 0)
-      failures.push(`Playwright: ${verifyFailureSummary(e2e.stdout, e2e.stderr)}`);
+      failures.push(
+        `pnpm test:e2e:layout ${specs.join(' ')}:\n${[e2e.stdout, e2e.stderr]
+          .filter(Boolean)
+          .join('\n')
+          .slice(-4_000)}`,
+      );
   }
   const unit = touched.filter(
     (path) => !E2E_SPEC_RE.test(path) && /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path),
@@ -153,8 +158,24 @@ export async function verifyTouchedTests(
       timeoutMs: context.config.maxMinutes * 60_000,
     });
     if (tested.code !== 0)
-      failures.push(`Vitest: ${verifyFailureSummary(tested.stdout, tested.stderr)}`);
+      failures.push(
+        `pnpm exec vitest run ${unit.join(' ')}:\n${[tested.stdout, tested.stderr]
+          .filter(Boolean)
+          .join('\n')
+          .slice(-4_000)}`,
+      );
   }
+  return failures.length === 0 ? undefined : failures.join('\n');
+}
+
+/** @returns ошибки всех тестов задачи и рабочего verify; undefined — все зелёные. */
+export async function verifyTouchedTests(
+  context: LoopContext,
+  touched: readonly string[],
+): Promise<string | undefined> {
+  const failures: string[] = [];
+  const targeted = await verifyTargetedTests(context, touched);
+  if (targeted !== undefined) failures.push(targeted);
   const verified = await context.config.runCommand('pnpm', ['verify', '--changed'], {
     cwd: context.config.root,
     timeoutMs: context.config.maxMinutes * 60_000,

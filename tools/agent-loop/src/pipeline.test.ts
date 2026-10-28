@@ -105,7 +105,8 @@ describe('последовательный конвейер задачи', () =>
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts[1]).toContain('Vitest: FAIL подготовка состояния');
+    expect(run.prompts[1]).toContain('pnpm exec vitest run packages/sim/test/first.test.ts');
+    expect(run.prompts[1]).toContain('FAIL подготовка состояния');
     expect(run.prompts[1]).toContain('$task 06/T1j5-Б1');
     expect(run.execs.filter((line) => line.includes('vitest run'))).toEqual([
       'vitest run packages/sim/test/first.test.ts packages/sim/test/second.test.ts',
@@ -234,7 +235,10 @@ describe('последовательный конвейер задачи', () =>
       sessions: [
         {
           answer: 'Тест Esc красный.',
-          writes: { 'packages/sim/src/task.ts': 'draft 1' },
+          writes: {
+            'packages/sim/src/task.ts': 'draft 1',
+            'packages/sim/test/task.test.ts': 'draft test',
+          },
           dirty: true,
         },
         {
@@ -243,6 +247,12 @@ describe('последовательный конвейер задачи', () =>
           dirty: true,
         },
         review('ВОЗВРАТ\n- ТЕСТ: фикстура не открывает карточку'),
+        {
+          answer: 'Та же предпосылка осталась красной.',
+          writes: { 'packages/sim/test/task.test.ts': 'draft test 2' },
+          dirty: true,
+        },
+        review('ВОЗВРАТ\n- ТЕСТ: фикстура по-прежнему выбирает армию вместо отряда'),
         {
           answer: 'Исправлены фикстура и продукт.',
           writes: {
@@ -253,6 +263,11 @@ describe('последовательный конвейер задачи', () =>
         },
         review('OK'),
         review('OK'),
+      ],
+      unit: [
+        'FAIL подготовка состояния: карточка не открыта',
+        'FAIL подготовка состояния: карточка не открыта',
+        'unit: OK',
       ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
@@ -265,7 +280,14 @@ describe('последовательный конвейер задачи', () =>
       '$task 06/T1j5-Б1',
     ]);
     expect(run.prompts[1]).toContain('Предыдущая проверка: Тест Esc красный.');
+    expect(run.prompts[2]).toContain('pnpm exec vitest run packages/sim/test/task.test.ts');
+    expect(run.prompts[2]).toContain('FAIL подготовка состояния: карточка не открыта');
+    expect(run.prompts[2]).toContain('нарушенную предпосылку');
     expect(run.prompts[3]).toContain('ТЕСТ: фикстура не открывает карточку');
+    expect(run.prompts[3]).toContain('Замечания reviewer — гипотезы');
+    expect(run.prompts[3]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
+    expect(run.prompts[5]).toContain('ПЕРЕДЕЛАТЬ: повторная незакоммиченная попытка');
+    expect(run.prompts[5]).toContain('выбирает армию вместо отряда');
     expect(run.lines.join('\n')).not.toContain('Ответ — Issue «$decide»');
   });
 
@@ -292,6 +314,73 @@ describe('последовательный конвейер задачи', () =>
 
     expect(run.prompts[0]).toContain('Продолжи незакоммиченную работу этой задачи');
     expect(run.lines.join('\n')).not.toContain('старый запрос владельцу');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('при новой ошибке теста не требует переделывать уже изменённый подход', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: завершить задачу' }],
+        },
+      },
+      sessions: [
+        {
+          answer: 'Карточка не открылась.',
+          writes: { 'packages/sim/test/task.test.ts': 'draft 1' },
+          dirty: true,
+        },
+        { answer: 'Фикстура изменена.', dirty: true },
+        review('ВОЗВРАТ\n- ТЕСТ: не достигнуто состояние карточки'),
+        { answer: 'Карточка открылась, но кнопка не нажимается.', dirty: true },
+        review('ВОЗВРАТ\n- КОД: кнопка не отвечает на клик'),
+        codeCommit(),
+        review('OK'),
+        review('OK'),
+      ],
+      unit: ['FAIL карточка не открыта', 'FAIL кнопка не нажимается', 'unit: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[5]).not.toContain('ПЕРЕДЕЛАТЬ:');
+    expect(run.prompts[5]).toContain('КОД: кнопка не отвечает на клик');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('не принимает OK reviewer вместо красного целевого теста', async () => {
+    const run = await runWorld({
+      dirty: 'packages/sim/test/task.test.ts',
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'ТЕСТ', text: 'ТЕСТ: не открыта карточка' }],
+          workDirtyPaths: ['packages/sim/test/task.test.ts'],
+          workDirtyAttempts: 1,
+        },
+        resume: '06/T1j5-Б1',
+      },
+      sessions: [
+        { answer: 'Тест красный.', dirty: ' M packages/sim/test/task.test.ts' },
+        review('OK'),
+        codeCommit(),
+        review('OK'),
+        review('OK'),
+      ],
+      unit: ['FAIL карточка не открыта', 'unit: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[2]).toContain('КОД: целевой тест красный');
+    expect(run.prompts[2]).toContain('FAIL карточка не открыта');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -392,17 +481,20 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines.join('\n')).toContain('изменила код цикла');
   });
 
-  it('перед первым review даёт исполнителю и reviewer полную матрицу критериев', async () => {
+  it('каждой роли даёт действующий текст задачи, а reviewer также матрицу', async () => {
     const run = await runWorld({
       sessions: [codeCommit(), review('OK')],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts[0]).toContain('Перед первым review сверь реализацию и тесты');
+    expect(run.prompts[0]).toContain('Перед первым review сверь каждый критерий');
     expect(run.prompts[0]).toContain('найди все импорты, вызовы и старые тесты');
-    expect(run.prompts[0]).toContain('1. *приёмка:* тесты');
+    expect(run.prompts[0]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
+    expect(run.prompts[0]).toContain('*Приёмка:* тесты.');
+    expect(run.prompts[0]).not.toContain('1. *приёмка:* тесты');
     expect(run.prompts[1]).toContain('Проверь каждый пункт матрицы до вердикта');
     expect(run.prompts[1]).toContain('проверь через rg все импорты, вызовы и старые тесты');
+    expect(run.prompts[1]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
     expect(run.prompts[1]).toContain('1. *приёмка:* тесты');
   });
 

@@ -2,6 +2,7 @@
 import { backoff, readStage, session, type LoopContext, type Step } from './context.ts';
 import { dirtyFiles, head, remoteHead } from './git.ts';
 import { taskCriteriaMatrix } from './requirements.ts';
+import { taskBlock } from './stage-file.ts';
 import type { FindingKind } from './state.ts';
 
 export type { FindingKind };
@@ -41,13 +42,16 @@ export async function runReview(
   const beforeHead = await head(context.git);
   const beforeRemote = await remoteHead(context.git);
   const beforeTree = await dirtyFiles(context.git);
-  const matrix = taskCriteriaMatrix((await readStage(context.config.root)).stageText, task);
+  const stage = await readStage(context.config.root);
+  const matrix = taskCriteriaMatrix(stage.stageText, task);
+  const source = taskBlock(stage.stageText, task);
   const fullMatrix = note.startsWith('Узкая')
     ? ''
     : `Проверь каждый пункт матрицы до вердикта; один проход должен вернуть все блокеры. Для изменённых или удалённых публичных имён проверь через rg все импорты, вызовы и старые тесты; не ограничивайся новым приёмочным файлом:\n${matrix}`;
   const prompt = [
     `$review ${task}`,
     note,
+    `Действующий текст задачи — источник ожидаемого поведения:\n${source}`,
     fullMatrix,
     'Reviewer работает только на чтение: ничего не изменяй, не коммить и не push.',
     'Ответ: первая строка `OK` или `ВОЗВРАТ`.',
