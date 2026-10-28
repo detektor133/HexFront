@@ -286,6 +286,8 @@ describe('Issues в цикле', () => {
     });
     expect(run.prompts[0]).toContain(body);
     expect(run.prompts[0]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
+    expect(run.prompts[1]).toContain('Исходное поручение владельца:');
+    expect(run.prompts[1]).toContain('Первым — живой фон меню');
     expect(run.prompts[2]).toContain('КОД: фон не рисуется');
     expect(run.prompts[2]).toContain('Исходное поручение владельца:');
     expect(run.prompts[2]).toContain('Первым — живой фон меню');

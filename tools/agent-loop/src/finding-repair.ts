@@ -116,16 +116,9 @@ export async function diagnoseFinding(
   );
 }
 
-/** Хвост ошибки проверки: без шума, но с конкретной строкой TS/assert. */
-const verifyFailureSummary = (stdout: string, stderr: string): string =>
-  [stdout, stderr]
-    .filter(Boolean)
-    .join('\n')
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => /error|FAIL|AssertionError|Expected|Received/iu.test(line))
-    .slice(-8)
-    .join('\n');
+/** Ограничивает объём лога, сохраняя соседние строки с путями и причиной ошибки. */
+const failureOutput = (stdout: string, stderr: string): string =>
+  [stdout, stderr].filter(Boolean).join('\n').trim().slice(-4_000);
 
 const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;
 
@@ -143,10 +136,7 @@ export async function verifyTargetedTests(
     });
     if (e2e.code !== 0)
       failures.push(
-        `pnpm test:e2e:layout ${specs.join(' ')}:\n${[e2e.stdout, e2e.stderr]
-          .filter(Boolean)
-          .join('\n')
-          .slice(-4_000)}`,
+        `pnpm test:e2e:layout ${specs.join(' ')}:\n${failureOutput(e2e.stdout, e2e.stderr)}`,
       );
   }
   const unit = touched.filter(
@@ -159,10 +149,7 @@ export async function verifyTargetedTests(
     });
     if (tested.code !== 0)
       failures.push(
-        `pnpm exec vitest run ${unit.join(' ')}:\n${[tested.stdout, tested.stderr]
-          .filter(Boolean)
-          .join('\n')
-          .slice(-4_000)}`,
+        `pnpm exec vitest run ${unit.join(' ')}:\n${failureOutput(tested.stdout, tested.stderr)}`,
       );
   }
   return failures.length === 0 ? undefined : failures.join('\n');
@@ -181,6 +168,6 @@ export async function verifyTouchedTests(
     timeoutMs: context.config.maxMinutes * 60_000,
   });
   if (verified.code !== 0)
-    failures.push(`verify: ${verifyFailureSummary(verified.stdout, verified.stderr)}`);
+    failures.push(`pnpm verify --changed:\n${failureOutput(verified.stdout, verified.stderr)}`);
   return failures.length === 0 ? undefined : failures.join('\n');
 }

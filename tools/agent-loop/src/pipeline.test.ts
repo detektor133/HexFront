@@ -144,7 +144,10 @@ describe('последовательный конвейер задачи', () =>
         },
         { answer: 'PLAN: переделать — заменить неверную фикстуру', push: false },
       ],
-      unit: ['unit: FAIL фикстура не открывает экран', 'unit: FAIL фикстура не открывает экран'],
+      unit: [
+        'unit: FAIL фикстура не открывает экран 100ms',
+        'unit: FAIL фикстура не открывает экран 200ms',
+      ],
       maxRounds: 2,
     });
 
@@ -352,7 +355,7 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('не принимает OK reviewer вместо красного целевого теста', async () => {
+  it('передаёт красный verify даже при зелёном целевом тесте и OK reviewer', async () => {
     const run = await runWorld({
       dirty: 'packages/sim/test/task.test.ts',
       state: {
@@ -375,12 +378,15 @@ describe('последовательный конвейер задачи', () =>
         review('OK'),
         review('OK'),
       ],
-      unit: ['FAIL карточка не открыта', 'unit: OK'],
+      unit: ['unit: OK', 'unit: OK'],
+      verify: ['verify: FAIL prettier\n[warn] apps/client/test/task.test.ts', 'verify: OK'],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts[2]).toContain('КОД: целевой тест красный');
-    expect(run.prompts[2]).toContain('FAIL карточка не открыта');
+    expect(run.prompts[1]).toContain('pnpm verify --changed:\nverify: FAIL prettier');
+    expect(run.prompts[1]).toContain('[warn] apps/client/test/task.test.ts');
+    expect(run.prompts[2]).toContain('КОД: проверка красная');
+    expect(run.prompts[2]).toContain('[warn] apps/client/test/task.test.ts');
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
@@ -481,7 +487,7 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines.join('\n')).toContain('изменила код цикла');
   });
 
-  it('каждой роли даёт действующий текст задачи, а reviewer также матрицу', async () => {
+  it('каждой роли даёт действующий текст задачи без второй копии критериев', async () => {
     const run = await runWorld({
       sessions: [codeCommit(), review('OK')],
       ci: ['success https://ci/task', 'success https://ci/docs'],
@@ -492,10 +498,10 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prompts[0]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
     expect(run.prompts[0]).toContain('*Приёмка:* тесты.');
     expect(run.prompts[0]).not.toContain('1. *приёмка:* тесты');
-    expect(run.prompts[1]).toContain('Проверь каждый пункт матрицы до вердикта');
+    expect(run.prompts[1]).toContain('Проверь каждый пункт действующего блока задачи');
     expect(run.prompts[1]).toContain('проверь через rg все импорты, вызовы и старые тесты');
     expect(run.prompts[1]).toContain('Действующий текст задачи — источник ожидаемого поведения:');
-    expect(run.prompts[1]).toContain('1. *приёмка:* тесты');
+    expect(run.prompts[1]).not.toContain('1. *приёмка:* тесты');
   });
 
   it('красный полный контур сначала разделяет дефекты кода и тестов через review', async () => {

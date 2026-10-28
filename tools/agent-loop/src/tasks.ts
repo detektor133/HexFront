@@ -20,7 +20,6 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
-  verifyTargetedTests,
   verifyTouchedTests,
 } from './finding-repair.ts';
 import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
@@ -76,11 +75,16 @@ export const resumePrompt = (task: string): string => `$task ${task} продо�
 export const ciFixPrompt = (task: string, line: string): string =>
   `$task ${task} CI красный: ${line}`;
 
-const dirtyFailureSignature = (evidence: string): string => {
+const checkFailureSignature = (evidence: string): string => {
   const lines = evidence
     .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => /FAIL|AssertionError|Error:|Expected|Received/iu.test(line));
+    .map((line) =>
+      line
+        .replaceAll('\u001b', '')
+        .replace(/\b\d+(?:\.\d+)?\s*(?:ms|s)\b/giu, '<время>')
+        .trim(),
+    )
+    .filter((line) => /FAIL|\[warn\]|AssertionError|Error:|Expected|Received/iu.test(line));
   return (lines.length > 0 ? lines.join('\n') : evidence).slice(0, 1_000);
 };
 
@@ -224,8 +228,8 @@ async function runProductWork(
     const touched = [
       ...new Set([...paths, ...(await changedPathsBetween(context, active?.base ?? base))]),
     ];
-    const evidence = await verifyTargetedTests(context, touched);
-    const signature = evidence === undefined ? undefined : dirtyFailureSignature(evidence);
+    const evidence = await verifyTouchedTests(context, touched);
+    const signature = evidence === undefined ? undefined : checkFailureSignature(evidence);
     const repeated = signature !== undefined && active?.lastDirtyFailure === signature;
     if (active !== undefined) {
       if (signature === undefined) delete active.lastDirtyFailure;
@@ -234,12 +238,12 @@ async function runProductWork(
     const verdict = await runReview(
       context,
       task,
-      `Узкая диагностика незакоммиченной работы после ${active?.workDirtyAttempts ?? 2} попыток. Предыдущий диагноз: ${active?.findings[0]?.text ?? 'нет'}. Отчёт исполнителя: ${result.message}. Фактическая целевая проверка:\n${evidence ?? 'Целевые тесты зелёные или не найдены.'}\nПроверь только текущие файлы ${paths.join(', ')}. Если ошибка повторилась после прежнего диагноза, объясни, почему он не помог, и назови другой проверяемый путь. Если тест не дошёл до проверяемого поведения, назови нарушенную предпосылку. Верни одну причину как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
+      `Узкая диагностика незакоммиченной работы после ${active?.workDirtyAttempts ?? 2} попыток. Предыдущий диагноз: ${active?.findings[0]?.text ?? 'нет'}. Отчёт исполнителя: ${result.message}. Фактическая проверка:\n${evidence ?? 'Целевые тесты и verify зелёные.'}\nПроверь только текущие файлы ${paths.join(', ')}. Если ошибка повторилась после прежнего диагноза, объясни, почему он не помог, и назови другой проверяемый путь. Если тест не дошёл до проверяемого поведения, назови нарушенную предпосылку. Верни одну причину как КОД:/ТЕСТ:, не запрашивай решение владельца для ошибки теста.`,
     );
     if (typeof verdict === 'string') return verdict;
     if (active !== undefined && (!verdict.ok || evidence !== undefined)) {
       const findings = verdict.ok
-        ? [{ kind: 'КОД' as const, text: `КОД: целевой тест красный — ${evidence}` }]
+        ? [{ kind: 'КОД' as const, text: `КОД: проверка красная — ${evidence}` }]
         : batchReviewFindings(verdict.findings);
       active.findings =
         (active.workDirtyAttempts ?? 0) >= 3 && repeated
@@ -494,10 +498,11 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     );
     if (failure !== undefined) {
       const currentHead = await head(context.git);
+      const signature = checkFailureSignature(failure);
       const repeated =
-        active.lastTestFailure?.signature === failure &&
+        active.lastTestFailure?.signature === signature &&
         active.lastTestFailure.head !== currentHead;
-      active.lastTestFailure = { signature: failure, head: currentHead };
+      active.lastTestFailure = { signature, head: currentHead };
       active.findings = [
         repeated
           ? {
