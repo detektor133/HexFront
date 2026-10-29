@@ -3,7 +3,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 
 import { backoff, readStatus, type LoopContext, type Step } from './context.ts';
-import { head, isAncestor, makeGit } from './git.ts';
+import { dirtyFiles, head, isAncestor, makeGit } from './git.ts';
 import { statusBranch } from './stage-file.ts';
 
 export interface TaskWorkspace {
@@ -96,6 +96,16 @@ export async function promoteWorkspace(
   const published = await context.git.run(['rev-parse', `origin/${branch}`]);
   if (published !== expected && !(await isAncestor(workspace.context.git, expected, published)))
     return backoff(context, `${task}: origin/${branch} разошёлся с проверенным HEAD`, '');
+  if ((await dirtyFiles(context.git)) !== '')
+    return backoff(context, `${task}: каталог этапа содержит незакоммиченные файлы`, '');
+  const local = await head(context.git);
+  if (
+    local === published &&
+    (local === expected || (await isAncestor(context.git, expected, local)))
+  ) {
+    await context.say(`${task}: проверенный HEAD уже содержится в опубликованной ветке этапа`);
+    return undefined;
+  }
   const merged = await context.git.attempt(['merge', '--ff-only', expected]);
   if (merged.code !== 0)
     return backoff(context, `${task}: каталог этапа разошёлся с ${branch}`, merged.stderr);

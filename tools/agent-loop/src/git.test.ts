@@ -190,6 +190,31 @@ describe('сведение ветки с origin на настоящем git', { 
     expect(await head(mine)).toBe(await head(result.context.git));
   });
 
+  it('снимает ожидающий перенос, если опубликованный каталог уже содержит проверенную задачу', async () => {
+    const { mine, root, context } = await workspaceRepo();
+    const workspace = await taskWorkspace(context, '06/T1j5');
+    if (typeof workspace === 'string') throw new Error('checkout не создан');
+    await commitFile(workspace.context.git, workspace.root, 'task.txt', 'готово');
+    const expected = await head(workspace.context.git);
+    expect(await syncWithOrigin(workspace.context.git, true)).toBeUndefined();
+    await mine.run(['fetch', 'origin', 'stage-06']);
+    await mine.run(['merge', '--ff-only', expected]);
+    await commitFile(mine, root, 'infra.txt', 'служебная правка');
+    expect(await syncWithOrigin(mine, true)).toBeUndefined();
+    const published = await head(mine);
+    context.state.pendingPromotion = {
+      task: '06/T1j5',
+      workspaceRoot: workspace.root,
+      branch: 'stage-06',
+      head: expected,
+    };
+    await save(context);
+
+    expect(await promotePending(context)).toBeUndefined();
+    expect((await loadState(root)).pendingPromotion).toBeUndefined();
+    expect(await head(mine)).toBe(published);
+  });
+
   it('первую рабочую сессию запускает в checkout задачи и не загрязняет каталог этапа', async () => {
     const { mine, context } = await workspaceRepo(async (cwd, role) => {
       if (role === 'reviewer')
