@@ -652,8 +652,16 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     const finding = active.findings[0];
     const currentHead = await head(context.git);
     if (
-      finding?.kind === 'КОД' &&
-      finding.text.startsWith('КОД: CI точного SHA красный') &&
+      active.workAttempt !== undefined &&
+      active.ciRetries !== undefined &&
+      (await ciRecheckSafe(context, active.workAttempt.head))
+    ) {
+      delete active.workAttempt;
+      await save(context);
+    }
+    if (
+      finding !== undefined &&
+      active.ciRetries !== undefined &&
       (await ciRecheckSafe(context, active.remoteBase)) &&
       active.ciDiagnosticRecheck !== currentHead &&
       active.workAttempt === undefined

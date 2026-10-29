@@ -850,8 +850,9 @@ describe('последовательный конвейер задачи', () =>
           remoteBase: 'c0',
           workPrompt: '$task 06/T1j5-Б1',
           phase: 'work',
-          findings: [{ kind: 'КОД', text: 'КОД: CI точного SHA красный — failure job=check' }],
-          ciRetries: 1,
+          findings: [{ kind: 'КОД', text: 'КОД: технический блокер после красного CI' }],
+          ciRetries: 2,
+          workAttempt: { head: 'c0', remote: 'c0', dirtyPaths: [] },
         },
       },
       ci: [
