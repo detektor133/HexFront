@@ -56,11 +56,12 @@ export async function runPlan(
   context: LoopContext,
   task: string,
   note = '',
+  originalBefore?: StageState,
 ): Promise<PlanOutcome | Step> {
   const { git, definitions } = context;
   const base = await head(git);
   const published = await remoteHead(git);
-  const before = await readStage(context.config.root);
+  const before = originalBefore ?? (await readStage(context.config.root));
   const result = await session(context, 'plan', planPrompt(task, note));
   if (result.failure !== undefined)
     return backoff(context, `$plan ${task}: ${result.failure}`, result.message);
@@ -115,6 +116,20 @@ export async function runPlan(
     }
   }
   const errors = verifyPlanTransition(task, before, after, outcome);
+  if (
+    errors.length > 0 &&
+    outcome === 'разбито' &&
+    originalBefore === undefined &&
+    taskBlock(after.stageText, task) !== ''
+  ) {
+    await context.say(`$plan ${task}: разбиение не прошло сверку — возвращаю точные ошибки plan`);
+    return runPlan(
+      context,
+      task,
+      `Исправь уже записанное разбиение и верни outcome «разбито». Исходный блок родителя не меняй. Ошибки сверки:\n${errors.map((error) => `- ${error}`).join('\n')}`,
+      before,
+    );
+  }
   if (errors.length > 0)
     return park(
       context,

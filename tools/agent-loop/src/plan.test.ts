@@ -279,6 +279,47 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain('$plan 06/T1j5-Б1b: не трогал');
   });
 
+  it('возвращает неполное разбиение plan с точными ошибками и затем продолжает очередь', async () => {
+    const parent = fixtureStage.replace(
+      '  *Приёмка:* тесты.',
+      '  *Приёмка:* тесты. Проверка геометрии.',
+    );
+    const first = parent.replace(
+      '  *Приёмка:* тесты. Проверка геометрии.',
+      '  *Приёмка:* тесты. Проверка геометрии.\n' +
+        '- [ ] **T1j5-Б1a. Код** (tools/evolve).\n  *Приёмка:* проверка кода.\n' +
+        '- [ ] **T1j5-Б1b. Геометрия** (tools/evolve).\n  *Приёмка:* проверка CSS.',
+    );
+    const repaired = first.replace(
+      '- [ ] **T2. Итерации баланса**.',
+      'Трассировка разбиения T1j5-Б1:\n\n' +
+        '| Исходный текст | Подзадача |\n| --- | --- |\n' +
+        '| Тесты | 06/T1j5-Б1a |\n| Геометрия | 06/T1j5-Б1b |\n\n' +
+        '- [ ] **T2. Итерации баланса**.',
+    );
+    const status = fixtureStatus.replace('06/T1j5-Б1 →', '06/T1j5-Б1a → 06/T1j5-Б1b →');
+    const run = await runWorld({
+      stage: parent,
+      plan: true,
+      maxRounds: 1,
+      sessions: [
+        { answer: 'PLAN: разбито', stage: first, status, commit: true },
+        { answer: 'PLAN: разбито', stage: repaired, commit: true },
+        { task: 'T1j5-Б1a', mark: '~', answer: 'Готово.' },
+        { task: 'T1j5-Б1a', mark: 'x', answer: 'OK' },
+        { answer: 'PLAN: не трогал' },
+        { answer: 'Готово.', commit: false },
+      ],
+    });
+    expect(commands(run.prompts).slice(0, 3)).toEqual([
+      `$plan ${TASK}`,
+      `$plan ${TASK}`,
+      '$task 06/T1j5-Б1a',
+    ]);
+    expect(run.prompts[1]).toContain('требование не перенесено в подзадачи');
+    expect(run.lines).toContain(`$plan ${TASK}: разбито`);
+  });
+
   it('принимает распределение путей и критериев родителя между подзадачами', () => {
     const parent = [
       '- [ ] **T9. Бой** (`sim/a.ts`, `client/b.ts`).',
