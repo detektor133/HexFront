@@ -71,6 +71,24 @@
   font-weight: 600;
 }
 
+.groupTitle button,
+.unitList button {
+  min-height: var(--touch-target-min);
+  width: 100%;
+  padding: 0 var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupTitle button[aria-pressed='true'],
+.unitList button[aria-pressed='true'] {
+  background: var(--ui-surface2);
+}
+
 .unitList {
   margin: var(--space-xs) 0 0;
   padding: 0;

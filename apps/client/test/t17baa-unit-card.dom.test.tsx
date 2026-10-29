@@ -166,3 +166,112 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     });
   });
 });
+
+describe('07/T17bdb: выбор из сгруппированной карточки', () => {
+  it('переключает строку и всю группу, а одиночный выбор показывает подробности', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const source = engine.snapshot().view;
+    const army = source.armies[0];
+    const template = source.units.find((unit) => unit.owner === source.playerId);
+    if (!army || !template) throw new Error('фикстуре нужны армия и свой отряд');
+    const first = {
+      ...template,
+      id: 9201,
+      armyId: army.id,
+      soldiers: 101_000 as typeof template.soldiers,
+    };
+    const second = {
+      ...template,
+      id: 9202,
+      armyId: army.id,
+      soldiers: 102_000 as typeof template.soldiers,
+    };
+    const reserve = {
+      ...template,
+      id: 9203,
+      armyId: null,
+      soldiers: 103_000 as typeof template.soldiers,
+    };
+    const view = { ...source, units: [...source.units, first, second, reserve] };
+
+    function InteractiveCard(): React.JSX.Element | null {
+      const [picked, setPicked] = useState<Picked>({
+        hex: null,
+        units: [first.id, reserve.id],
+        target: null,
+      });
+      return (
+        <UnitCard view={view} map={map} picked={picked} send={() => undefined} onPick={setPicked} />
+      );
+    }
+
+    render(<InteractiveCard />);
+    const secondRow = `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`;
+    const secondButton = screen.getByRole('button', { name: secondRow });
+    expect(secondButton.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(secondButton);
+    expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: secondRow }));
+    expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    const groupButton = screen.getByRole('button', {
+      name: t('army.numbered').replace('{n}', String(army.number)),
+    });
+    fireEvent.click(groupButton);
+    expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: t('army.numbered').replace('{n}', String(army.number)) }),
+    );
+    expect(screen.queryByRole('region', { name: t('unit.groups') })).toBeNull();
+    const detailed = `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`;
+    expect(screen.getByRole('region', { name: detailed })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: t('unit.close') }));
+    expect(screen.queryByRole('region', { name: detailed })).toBeNull();
+  });
+
+  it('после снятия строки оставляет подробную карточку оставшегося отряда', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const source = engine.snapshot().view;
+    const army = source.armies[0];
+    const template = source.units.find((unit) => unit.owner === source.playerId);
+    if (!army || !template) throw new Error('фикстуре нужны армия и свой отряд');
+    const first = {
+      ...template,
+      id: 9301,
+      armyId: army.id,
+      soldiers: 111_000 as typeof template.soldiers,
+    };
+    const second = {
+      ...template,
+      id: 9302,
+      armyId: army.id,
+      soldiers: 112_000 as typeof template.soldiers,
+    };
+    const view = { ...source, units: [...source.units, first, second] };
+    function InteractiveCard(): React.JSX.Element | null {
+      const [picked, setPicked] = useState<Picked>({
+        hex: null,
+        units: [first.id, second.id],
+        target: null,
+      });
+      return (
+        <UnitCard view={view} map={map} picked={picked} send={() => undefined} onPick={setPicked} />
+      );
+    }
+    render(<InteractiveCard />);
+    const firstRow = `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`;
+    fireEvent.click(screen.getByRole('button', { name: firstRow }));
+    const remaining = `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`;
+    expect(screen.getByRole('region', { name: remaining })).toBeTruthy();
+    expect(screen.getByText(t('unit.org'))).toBeTruthy();
+  });
+});

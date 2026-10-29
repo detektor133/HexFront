@@ -78,6 +78,25 @@ export function selectUnits(view: PlayerView, picked: Picked, ids: readonly numb
   return { hex: first?.hex ?? null, units: [], target: null };
 }
 
+/** Переключает выбранные отряды, сохраняя остальные выбранные отряды. */
+export function toggleUnitSelection(
+  view: PlayerView,
+  picked: Picked,
+  ids: readonly number[],
+): Picked {
+  const eligible = view.units.filter(
+    (unit) => ids.includes(unit.id) && unit.owner === view.playerId && unit.order !== 'retreat',
+  );
+  if (eligible.length === 0) return picked;
+  const allSelected = eligible.every((unit) => picked.units.includes(unit.id));
+  const toggled = new Set(eligible.map((unit) => unit.id));
+  const units = picked.units.filter((id) => !allSelected || !toggled.has(id));
+  if (!allSelected) {
+    for (const unit of eligible) if (!units.includes(unit.id)) units.push(unit.id);
+  }
+  return { hex: null, units, target: null };
+}
+
 /** Армии выбранных отрядов: выбранная целиком и затронутые частично. */
 export interface ArmySelection {
   readonly whole: number | null;

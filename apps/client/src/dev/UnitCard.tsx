@@ -12,7 +12,7 @@ import {
 import styles from './HexCard.module.css';
 import { armyName } from './army-name.ts';
 import { measureCardHeight } from './card-measurement.ts';
-import type { Picked } from './sandbox-selection.ts';
+import { toggleUnitSelection, type Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -95,13 +95,23 @@ export function UnitCard(props: {
     units.length === 1
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
       : t('unit.groups');
-  const groups = units.reduce<Map<number | null, UnitView[]>>((result, unit) => {
+  const selectedGroups = units.reduce<Map<number | null, UnitView[]>>((result, unit) => {
     const group = result.get(unit.armyId) ?? [];
     group.push(unit);
     result.set(unit.armyId, group);
     return result;
   }, new Map());
-  const orderedGroups = [...groups.entries()].sort(([left], [right]) => {
+  const groups = [...selectedGroups.keys()].map(
+    (armyId) =>
+      [
+        armyId,
+        view.units.filter(
+          (unit) =>
+            unit.owner === view.playerId && unit.order !== 'retreat' && unit.armyId === armyId,
+        ),
+      ] as const,
+  );
+  const orderedGroups = groups.sort(([left], [right]) => {
     if (left === null) return right === null ? 0 : 1;
     if (right === null) return -1;
     const leftNumber = view.armies.find((army) => army.id === left)?.number ?? left;
@@ -133,11 +143,33 @@ export function UnitCard(props: {
                 armyId === null ? undefined : view.armies.find((item) => item.id === armyId);
               return (
                 <section className={styles.unitGroup} key={armyId ?? 'reserve'}>
-                  <h3 className={styles.groupTitle}>{army ? armyName(army) : t('army.reserve')}</h3>
+                  <h3 className={styles.groupTitle}>
+                    <button
+                      type="button"
+                      aria-pressed={group.every((unit) => picked.units.includes(unit.id))}
+                      onClick={() =>
+                        props.onPick(
+                          toggleUnitSelection(
+                            view,
+                            picked,
+                            group.map((unit) => unit.id),
+                          ),
+                        )
+                      }
+                    >
+                      {army ? armyName(army) : t('army.reserve')}
+                    </button>
+                  </h3>
                   <ul className={styles.unitList}>
                     {group.map((unit) => (
                       <li key={unit.id}>
-                        {t(`unit.${unit.type}` as MessageKey)} · {formatSoldiers(unit.soldiers)}
+                        <button
+                          type="button"
+                          aria-pressed={picked.units.includes(unit.id)}
+                          onClick={() => props.onPick(toggleUnitSelection(view, picked, [unit.id]))}
+                        >
+                          {t(`unit.${unit.type}` as MessageKey)} · {formatSoldiers(unit.soldiers)}
+                        </button>
                       </li>
                     ))}
                   </ul>
