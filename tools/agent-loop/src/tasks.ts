@@ -473,9 +473,21 @@ async function finishTask(context: LoopContext, task: string): Promise<Step | un
   const expected = active.codeHead ?? (await context.git.run(['rev-parse', 'HEAD^']));
   const publishStop = await publishReviewed(context, task, expected);
   if (publishStop !== undefined) return publishStop;
+  const publishedHead = await head(context.git);
   const docsCi = await waitCi(context, `фиксации ${task}`, true);
   if (docsCi.verdict !== 'green')
     return backoff(context, `CI docs-коммита ${task} не зелёный: ${docsCi.line}`, '');
+  if ((await head(context.git)) !== publishedHead)
+    return backoff(context, `${task}: HEAD изменился во время проверки CI`, '');
+  if (active.workspaceRoot !== undefined) {
+    const branch = await publishBranch(context.git);
+    context.state.pendingPromotion = {
+      task,
+      workspaceRoot: active.workspaceRoot,
+      branch,
+      head: publishedHead,
+    };
+  }
   delete context.state.activeTask;
   delete context.state.resume;
   await forgetSpec(context, task);

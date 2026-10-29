@@ -86,6 +86,7 @@ export interface LoopState {
     readonly task: string;
     readonly workspaceRoot: string;
     readonly branch: string;
+    readonly head: string;
   };
   /** Сколько задач может идти одновременно (Issue `$streams N` или `--streams N`); нет — 1. */
   streams?: number;

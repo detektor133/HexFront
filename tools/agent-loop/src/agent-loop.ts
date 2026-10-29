@@ -87,10 +87,8 @@ export async function runWorkspaceTask(
     step = (await processTask(taskContext, task, { mark, workPrompt })).step;
   }
   if (context.state.activeTask !== undefined) return step;
-  const branch = workspace.context.git.targetBranch;
-  if (branch === undefined) throw new Error('У checkout задачи нет ветки публикации');
-  context.state.pendingPromotion = { task, workspaceRoot: workspace.root, branch };
-  await save(context);
+  if (context.state.pendingPromotion === undefined)
+    throw new Error(`${task}: после CI не сохранён проверенный HEAD задачи`);
   return (await finishPromotion(context, workspace)) ?? step;
 }
 
@@ -98,9 +96,9 @@ async function finishPromotion(
   context: LoopContext,
   workspace: TaskWorkspace,
 ): Promise<Step | undefined> {
-  const task = context.state.pendingPromotion?.task;
-  if (task === undefined) return undefined;
-  const result = await promoteWorkspace(context, task, workspace);
+  const pending = context.state.pendingPromotion;
+  if (pending === undefined) return undefined;
+  const result = await promoteWorkspace(context, pending.task, workspace, pending.head);
   if (result !== undefined) return result;
   delete context.state.pendingPromotion;
   await save(context);

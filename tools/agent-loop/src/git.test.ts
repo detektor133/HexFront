@@ -184,7 +184,9 @@ describe('сведение ветки с origin на настоящем git', { 
     expect((await loadState(root)).activeTask?.workspaceRoot).toBe(result.root);
     expect(await head(mine)).toBe(base);
     expect(await syncWithOrigin(result.context.git, true)).toBeUndefined();
-    expect(await promoteWorkspace(context, '06/T1j5', result)).toBeUndefined();
+    expect(
+      await promoteWorkspace(context, '06/T1j5', result, await head(result.context.git)),
+    ).toBeUndefined();
     expect(await head(mine)).toBe(await head(result.context.git));
   });
 
@@ -289,12 +291,35 @@ describe('сведение ветки с origin на настоящем git', { 
       task: '06/T1j5',
       workspaceRoot: workspace.root,
       branch: 'stage-06',
+      head: await head(workspace.context.git),
     };
     await save(context);
 
     expect(await promotePending(context)).toBeUndefined();
     expect((await loadState(root)).pendingPromotion).toBeUndefined();
     expect(await head(mine)).toBe(await head(workspace.context.git));
+  });
+
+  it('после CI переносит сохранённый SHA, даже если checkout задачи получил новый коммит', async () => {
+    const { mine, root, context } = await workspaceRepo();
+    const workspace = await taskWorkspace(context, '06/T1j5');
+    if (typeof workspace === 'string') throw new Error('checkout не создан');
+    await commitFile(workspace.context.git, workspace.root, 'task.txt', 'проверено');
+    await syncWithOrigin(workspace.context.git, true);
+    const verifiedHead = await head(workspace.context.git);
+    context.state.pendingPromotion = {
+      task: '06/T1j5',
+      workspaceRoot: workspace.root,
+      branch: 'stage-06',
+      head: verifiedHead,
+    };
+    await save(context);
+    await commitFile(workspace.context.git, workspace.root, 'later.txt', 'не проверено');
+    await syncWithOrigin(workspace.context.git, true);
+
+    expect(await promotePending({ ...context, state: await loadState(root) })).toBeUndefined();
+    expect(await head(mine)).toBe(verifiedHead);
+    expect(await head(mine)).not.toBe(await head(workspace.context.git));
   });
 
   it('переносит проверенный HEAD без следующего чужого коммита origin', async () => {
@@ -308,7 +333,9 @@ describe('сведение ветки с origin на настоящем git', { 
     await other.run(['push', 'origin', 'stage-06']);
     const mainHead = await head(mine);
 
-    expect(await promoteWorkspace(context, '06/T1j5', workspace)).toBeUndefined();
+    expect(
+      await promoteWorkspace(context, '06/T1j5', workspace, await head(workspace.context.git)),
+    ).toBeUndefined();
     expect(await head(mine)).toBe(await head(workspace.context.git));
     expect(await head(mine)).not.toBe(mainHead);
     expect(await head(mine)).not.toBe(await head(other));
@@ -324,7 +351,9 @@ describe('сведение ветки с origin на настоящем git', { 
     await other.run(['push', '--force', 'origin', 'stage-06']);
     const mainHead = await head(mine);
 
-    expect(await promoteWorkspace(context, '06/T1j5', workspace)).toBe('idle');
+    expect(
+      await promoteWorkspace(context, '06/T1j5', workspace, await head(workspace.context.git)),
+    ).toBe('idle');
     expect(await head(mine)).toBe(mainHead);
   });
 

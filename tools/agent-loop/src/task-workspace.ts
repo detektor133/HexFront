@@ -86,13 +86,13 @@ export async function promoteWorkspace(
   context: LoopContext,
   task: string,
   workspace: TaskWorkspace,
+  expected: string,
 ): Promise<Step | undefined> {
   const branch = workspace.context.git.targetBranch;
   if (branch === undefined) throw new Error('У checkout задачи нет ветки публикации');
   const fetched = await context.git.attempt(['fetch', 'origin', branch]);
   if (fetched.code !== 0)
     return backoff(context, `${task}: не удалось обновить ${branch} после CI`, fetched.stderr);
-  const expected = await head(workspace.context.git);
   const published = await context.git.run(['rev-parse', `origin/${branch}`]);
   if (published !== expected && !(await isAncestor(workspace.context.git, expected, published)))
     return backoff(context, `${task}: origin/${branch} разошёлся с проверенным HEAD`, '');
