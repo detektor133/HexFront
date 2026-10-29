@@ -10,6 +10,7 @@ export interface TerritoryLabel {
   readonly playerId: number;
   readonly name: string;
   readonly at: { readonly x: number; readonly y: number };
+  readonly fontSize: number;
 }
 
 /** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
@@ -34,7 +35,13 @@ export function buildTerritoryLabels(
     const sum = sums.get(player.id);
     const name = player.name ?? '';
     if (!sum || name.trim() === '') return [];
-    return [{ playerId: player.id, name, at: { x: sum.x / sum.count, y: sum.y / sum.count } }];
+    const fontSize = Math.min(
+      tokens.font.size.display,
+      Math.max(tokens.font.size.caption, tokens.font.size.caption * Math.sqrt(sum.count)),
+    );
+    return [
+      { playerId: player.id, name, fontSize, at: { x: sum.x / sum.count, y: sum.y / sum.count } },
+    ];
   });
 }
 
@@ -44,7 +51,7 @@ export function territoryLabelsKey(
   scale: number,
   detail: 1 | 2 | 3,
 ): string {
-  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.at.x}:${label.at.y}`).join(',')}`;
+  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.fontSize}:${label.at.x}:${label.at.y}`).join(',')}`;
 }
 
 /** Рисует подписи государств на первых двух уровнях детализации. */
@@ -55,14 +62,13 @@ export function drawTerritoryLabels(
   detail: 1 | 2 | 3,
 ): void {
   if (detail === 3) return;
-  const fontSize = tokens.city.labelSize[0] ?? 0;
   for (const label of labels) {
     const text = new Text({
       text: label.name,
       style: {
         fontFamily: tokens.font.ui.family,
         fontWeight: '400',
-        fontSize,
+        fontSize: label.fontSize,
         fill: playerLine(label.playerId),
         stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
       },
