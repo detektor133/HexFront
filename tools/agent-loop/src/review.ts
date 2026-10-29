@@ -8,8 +8,8 @@ export type { FindingKind };
 
 export interface ReviewFinding {
   readonly kind: FindingKind;
-  /** `gate` — только фактический вывод проверки; `diff` — дефект кода или теста. */
-  readonly basis?: 'diff' | 'gate';
+  /** `gate` — вывод проверки, `diff` — код или тест, `visual` — снимок без числовых измерений. */
+  readonly basis?: 'diff' | 'gate' | 'visual';
   /** Полный атомарный пункт, который получит ровно одна исправляющая сессия. */
   readonly text: string;
 }
@@ -47,11 +47,14 @@ export function parseReviewVerdict(message: string): Verdict | undefined {
         entry.text.trim() === ''
       )
         return [];
-      if (entry.basis !== undefined && !['diff', 'gate'].includes(String(entry.basis))) return [];
+      if (entry.basis !== undefined && !['diff', 'gate', 'visual'].includes(String(entry.basis)))
+        return [];
       return [
         {
           kind: entry.kind as FindingKind,
-          ...(entry.basis === undefined ? {} : { basis: entry.basis as 'diff' | 'gate' }),
+          ...(entry.basis === undefined
+            ? {}
+            : { basis: entry.basis as 'diff' | 'gate' | 'visual' }),
           text: `${entry.kind}: ${entry.text.trim()}`,
         },
       ];

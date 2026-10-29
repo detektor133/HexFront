@@ -151,12 +151,26 @@ function visualPrompt(task: string, scope: VisualScope, shots: VisualShots): str
     `Изменённые файлы UI этой задачи:\n${scope.changedUi.join('\n')}`,
     `Сценарии состояния изменённого элемента:\n${scope.layoutSpecs.join('\n')}`,
     'Проверяй только изменённый UI-элемент из критерия задачи, видимый на снимках: искажение, нахлёст, обрезку.',
+    'Все числовые проверки геометрии уже прошли в @layout. Не оценивай по снимку пиксели, размеры области клика, толщину, отступы или проценты и не возвращай числовые замечания. Если нужного состояния нет на снимке, укажи дефект сценария без оценки размеров.',
     hasTaskShots
       ? 'Если изменённый элемент отсутствует и на снимках сценария, верни ТЕСТ с путём сценария.'
       : 'Снимков состояния изменённого элемента нет: видны только общие кадры HUD. Не требуй отсутствующий @layout-сценарий, если его нет в критерии задачи; не делай выводов о невидимом элементе.',
     'В каждом замечании укажи точный путь изменённого UI-файла или @layout-сценария из списка выше и ширину снимка. Замечания к другим элементам карты не возвращай.',
-    'Код не читай, ничего не меняй и не коммить. Ответ — JSON по схеме review.',
+    'Для замечаний используй basis `visual`: снимок доказывает только видимый дефект. Код не читай, ничего не меняй и не коммить. Ответ — JSON по схеме visual.',
   ].join('\n');
+}
+
+/** Скриншот не доказывает численную геометрию; ширина самого кадра не является размером элемента. */
+function claimsMeasuredGeometry(text: string): boolean {
+  const withoutViewport = text.replace(/\b(?:360|1024|1920)\s*px\b/giu, '');
+  return (
+    /\b\d+(?:[.,]\d+)?\s*(?:px|пиксел(?:ь|я|ей)?|rem|em|vh|vw)\b/iu.test(withoutViewport) ||
+    /\b\d+(?:[.,]\d+)?\s*%/u.test(withoutViewport) ||
+    /\b\d+\s*[×x]\s*\d+\b/iu.test(withoutViewport) ||
+    /(?:област[ьи] клика|размер|ширин|высот|отступ|радиус).{0,50}(?:меньше|больше|ниже|выше|недостаточн|не достигает|не менее|не больше)/iu.test(
+      withoutViewport,
+    )
+  );
 }
 
 async function applyVisualFindings(
@@ -165,16 +179,26 @@ async function applyVisualFindings(
   scope: VisualScope,
   verdict: Extract<Verdict, { readonly ok: false }>,
 ): Promise<Step | undefined> {
-  const relevant = verdict.findings.filter(
+  const grounded = verdict.findings.filter(
+    (finding) =>
+      finding.basis === 'visual' &&
+      finding.kind !== 'ПЛАН' &&
+      !claimsMeasuredGeometry(finding.text),
+  );
+  if (grounded.length !== verdict.findings.length)
+    await context.say(
+      `визуальный гейт ${task}: ${verdict.findings.length - grounded.length} числовых или неподтверждённых пункт(ов) пропущено`,
+    );
+  const relevant = grounded.filter(
     (finding) =>
       (scope.layoutSpecs.length > 0 ||
         scope.criterion.includes('@layout') ||
         finding.kind !== 'ТЕСТ') &&
       [...scope.changedUi, ...scope.layoutSpecs].some((path) => finding.text.includes(path)),
   );
-  if (relevant.length !== verdict.findings.length)
+  if (relevant.length !== grounded.length)
     await context.say(
-      `визуальный гейт ${task}: ${verdict.findings.length - relevant.length} пункт(ов) вне изменённого UI пропущено`,
+      `визуальный гейт ${task}: ${grounded.length - relevant.length} пункт(ов) вне изменённого UI пропущено`,
     );
   if (relevant.length === 0) return undefined;
   const active = context.state.activeTask;

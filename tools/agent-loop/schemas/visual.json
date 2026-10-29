@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": { "type": "string", "enum": ["OK", "ВОЗВРАТ"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["КОД", "ТЕСТ"] },
+          "basis": { "type": "string", "enum": ["visual"] },
+          "text": { "type": "string" }
+        },
+        "required": ["kind", "basis", "text"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["outcome", "findings"],
+  "additionalProperties": false
+}

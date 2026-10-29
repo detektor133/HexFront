@@ -11,6 +11,8 @@ const codeCommit = (path: string, answer = 'Код готов.'): Session => ({
   push: false,
 });
 const review = (answer: string): Session => ({ answer, push: false });
+const visualFinding = (kind: 'КОД' | 'ТЕСТ', text: string): Session =>
+  review(JSON.stringify({ outcome: 'ВОЗВРАТ', findings: [{ kind, basis: 'visual', text }] }));
 
 describe('визуальный гейт перед push', () => {
   it('не запускается для задачи, не тронувшей клиентский UI', async () => {
@@ -40,6 +42,8 @@ describe('визуальный гейт перед push', () => {
     expect(run.prompts[2]).toContain('Критерий этой задачи:');
     expect(run.prompts[2]).toContain('Изменённые файлы UI этой задачи:');
     expect(run.prompts[2]).toContain('apps/client/src/dev/Hud.module.css');
+    expect(run.prompts[2]).toContain('Не оценивай по снимку пиксели');
+    expect(run.codexArguments[2]?.some((argument) => argument.endsWith('visual.json'))).toBe(true);
     expect(run.prompts[2]).toContain('Замечания к другим элементам карты не возвращай');
     expect(run.prompts[2]).not.toMatch(/hud-360\.png/u);
     const visualArgs = run.codexArguments[2] ?? [];
@@ -111,8 +115,9 @@ describe('визуальный гейт перед push', () => {
       sessions: [
         codeCommit('apps/client/src/dev/Hud.module.css'),
         review('OK'),
-        review(
-          'ВОЗВРАТ\n- КОД: apps/client/src/dev/Hud.module.css: иконка людей сжата transform: scaleX(0.6), 360 px',
+        visualFinding(
+          'КОД',
+          'apps/client/src/dev/Hud.module.css: иконка людей сжата transform: scaleX(0.6), 360 px',
         ),
         codeCommit('apps/client/src/dev/Hud.module.css', 'Исправлено искажение.'),
         review('OK'),
@@ -143,7 +148,7 @@ describe('визуальный гейт перед push', () => {
       sessions: [
         codeCommit('apps/client/src/dev/Hud.module.css'),
         review('OK'),
-        review('ВОЗВРАТ\n- КОД: apps/client/src/render/unit-chips.ts: метки налезают, 360 px'),
+        visualFinding('КОД', 'apps/client/src/render/unit-chips.ts: метки налезают, 360 px'),
       ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
@@ -159,7 +164,7 @@ describe('визуальный гейт перед push', () => {
       sessions: [
         codeCommit('apps/client/src/dev/Hud.module.css'),
         review('OK'),
-        review('ВОЗВРАТ\n- ТЕСТ: apps/client/src/dev/Hud.module.css: нет кадра элемента, 360 px'),
+        visualFinding('ТЕСТ', 'apps/client/src/dev/Hud.module.css: нет кадра элемента, 360 px'),
       ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
     });
@@ -167,5 +172,46 @@ describe('визуальный гейт перед push', () => {
     expect(run.prompts[2]).toContain('видны только общие кадры HUD');
     expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('не отправляет исполнителю выдуманный размер после зелёной геометрической проверки', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        visualFinding(
+          'КОД',
+          'Область клика строки ниже 44 px по высоте на снимке 360 px — apps/client/src/dev/Hud.module.css',
+        ),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines.some((line) => line.includes('числовых или неподтверждённых'))).toBe(true);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('не принимает вывод снимка за ошибку прошедшего gate', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        review(
+          JSON.stringify({
+            outcome: 'ВОЗВРАТ',
+            findings: [
+              {
+                kind: 'КОД',
+                basis: 'gate',
+                text: 'apps/client/src/dev/Hud.module.css: текст обрезан на снимке 360 px',
+              },
+            ],
+          }),
+        ),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines.some((line) => line.includes('неподтверждённых'))).toBe(true);
   });
 });

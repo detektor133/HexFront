@@ -133,7 +133,14 @@ export async function runCodex(
         ...(images.length > 0 ? ['-i', ...images] : []),
         ...(roleConfig.model ? ['--model', roleConfig.model] : []),
         ...(role === 'review' || role === 'plan'
-          ? ['--output-schema', join(settings.root, 'tools/agent-loop/schemas', `${role}.json`)]
+          ? [
+              '--output-schema',
+              join(
+                settings.root,
+                'tools/agent-loop/schemas',
+                `${role === 'review' && images.length > 0 ? 'visual' : role}.json`,
+              ),
+            ]
           : []),
         '-c',
         `model_reasoning_effort=${roleConfig.reasoningEffort}`,
