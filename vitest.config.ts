@@ -6,9 +6,9 @@ import { testProjects } from './vitest.projects.ts';
 export default defineConfig({
   test: {
     passWithNoTests: true,
-    // При полной матрице десятки jsdom/fork workers конкурируют за CPU и отдельные DOM-тесты
-    // превышают 5 с только в общем прогоне. Восемь workers сохраняют сами проверки и их таймаут.
-    maxWorkers: 8,
+    // На CI восемь одновременных jsdom/fork workers дважды превысили 5 с в независимых DOM-тестах.
+    // Четыре workers уменьшают конкуренцию за CPU без изменения утверждений тестов.
+    maxWorkers: 4,
     projects: testProjects(false),
   },
 });
