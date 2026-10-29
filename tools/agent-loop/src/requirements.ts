@@ -33,7 +33,8 @@ const atoms = (text: string): string[] =>
 
 /** Таблицы трассировки этапа стоят после задачи, но не являются её критериями. */
 const withoutTrace = (block: string): string =>
-  block.split(/^\| Исходная строка /mu, 1)[0] ?? block;
+  block.split(/^(?:Трассировка разбиения [^\r\n]+:|\| Исходн(?:ая строка|ый текст) )/mu, 1)[0] ??
+  block;
 
 /** Служебные зависимости проверяются порядком очереди, а не копированием в каждую подзадачу. */
 const requirements = (block: string): string[] => {
