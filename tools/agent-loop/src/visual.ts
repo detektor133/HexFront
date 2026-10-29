@@ -143,14 +143,18 @@ async function captureVisualShots(
 }
 
 function visualPrompt(task: string, scope: VisualScope, shots: VisualShots): string {
+  const hasTaskShots = shots.layoutCount > 0;
   return [
     `$review ${task}`,
-    `Приложены ${shots.paths.length} снимков: сначала ${shots.layoutCount} из @layout-сценария задачи, затем HUD на ${WIDTHS.join(', ')} px. Первые снимки показывают состояние изменённого элемента.`,
+    `Приложены ${shots.paths.length} снимков: сначала ${shots.layoutCount} из @layout-сценария задачи, затем HUD на ${WIDTHS.join(', ')} px.`,
     `Критерий этой задачи:\n${scope.criterion}`,
     `Изменённые файлы UI этой задачи:\n${scope.changedUi.join('\n')}`,
     `Сценарии состояния изменённого элемента:\n${scope.layoutSpecs.join('\n')}`,
     'Проверяй только изменённый UI-элемент из критерия задачи, видимый на снимках: искажение, нахлёст, обрезку.',
-    'В каждом замечании укажи точный путь изменённого UI-файла или @layout-сценария из списка выше и ширину снимка. Замечания к другим элементам карты не возвращай. Если изменённый элемент отсутствует и на снимках сценария, верни ТЕСТ с путём сценария, а не OK.',
+    hasTaskShots
+      ? 'Если изменённый элемент отсутствует и на снимках сценария, верни ТЕСТ с путём сценария.'
+      : 'Снимков состояния изменённого элемента нет: видны только общие кадры HUD. Не требуй отсутствующий @layout-сценарий, если его нет в критерии задачи; не делай выводов о невидимом элементе.',
+    'В каждом замечании укажи точный путь изменённого UI-файла или @layout-сценария из списка выше и ширину снимка. Замечания к другим элементам карты не возвращай.',
     'Код не читай, ничего не меняй и не коммить. Ответ — JSON по схеме review.',
   ].join('\n');
 }
@@ -161,8 +165,12 @@ async function applyVisualFindings(
   scope: VisualScope,
   verdict: Extract<Verdict, { readonly ok: false }>,
 ): Promise<Step | undefined> {
-  const relevant = verdict.findings.filter((finding) =>
-    [...scope.changedUi, ...scope.layoutSpecs].some((path) => finding.text.includes(path)),
+  const relevant = verdict.findings.filter(
+    (finding) =>
+      (scope.layoutSpecs.length > 0 ||
+        scope.criterion.includes('@layout') ||
+        finding.kind !== 'ТЕСТ') &&
+      [...scope.changedUi, ...scope.layoutSpecs].some((path) => finding.text.includes(path)),
   );
   if (relevant.length !== verdict.findings.length)
     await context.say(

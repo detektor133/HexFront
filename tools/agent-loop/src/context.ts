@@ -256,10 +256,14 @@ async function ciWait(
   if (ci.code === 3) return { verdict: 'unknown', line, pending: true };
   const details = ci.stdout
     .split(/\r?\n/u)
-    .filter((entry) => /(?:\bFAIL\b|Test timed out|\bError:|##\[error\])/iu.test(entry))
-    .slice(-12)
+    .filter((entry) =>
+      /(?:\bFAIL\b|Test timed out|\bError:|AssertionError|TestingLibraryElementError|##\[error\])/iu.test(
+        entry,
+      ),
+    )
+    .slice(0, 20)
     .join('\n')
-    .slice(-2_000);
+    .slice(0, 3_000);
   const attempt = /(?:^|\n)run_attempt=(\d+)/u.exec(ci.stdout)?.[1];
   return {
     verdict: line.startsWith('failure job=') ? 'red' : 'unknown',

@@ -159,6 +159,33 @@ describe('ожидание GitHub Actions', () => {
     expect(output.at(-1)).toBe('failure job=tests https://github.com/acme/game/actions/runs/42');
   });
 
+  it('передаёт имена упавших тестов из всего job, даже если хвост занят DOM-дампом', async () => {
+    const log = [
+      'FAIL client test/first.test.ts > сценарий',
+      'Error: Test timed out in 5000ms.',
+      ...Array.from({ length: 60 }, (_, index) => `<div>${index}</div>`),
+      '##[error]Process completed with exit code 1.',
+    ].join('\n');
+    const responses = [
+      jsonResponse({ workflow_runs: [run('completed', 'failure')] }),
+      jsonResponse({ jobs: [{ id: 7, name: 'check', conclusion: 'failure' }] }),
+      textResponse(log),
+    ];
+    const output: string[] = [];
+    await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      fetchFn: async (): Promise<HttpResponse> => responses.shift() ?? jsonResponse({}),
+      writeLine: (line): void => {
+        output.push(line);
+      },
+    });
+
+    expect(output).toContain('FAIL client test/first.test.ts > сценарий');
+    expect(output).toContain('Error: Test timed out in 5000ms.');
+    expect(output.some((line) => line.startsWith('<div>'))).toBe(false);
+  });
+
   it('после перезапуска игнорирует старую красную попытку того же SHA', async () => {
     const old = run('completed', 'failure');
     const next = { ...old, run_attempt: 2, status: 'completed', conclusion: 'success' };

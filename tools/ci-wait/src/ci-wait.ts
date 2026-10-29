@@ -167,7 +167,13 @@ const printFailedRun = async (
     if (job) {
       const logResponse = await request(fetchFn, `${apiBase}/actions/jobs/${job.id}/logs`, headers);
       const text = await logResponse.text();
-      for (const line of text.replace(/\r\n/g, '\n').trimEnd().split('\n').slice(-30))
+      const lines = text.replace(/\r\n/g, '\n').trimEnd().split('\n');
+      const diagnostic = lines.filter((line) =>
+        /\bFAIL\b|Test timed out|AssertionError|TestingLibraryElementError|##\[error\]/iu.test(
+          line,
+        ),
+      );
+      for (const line of diagnostic.length > 0 ? diagnostic.slice(0, 24) : lines.slice(-30))
         writeLine(line);
     }
   } catch (error) {

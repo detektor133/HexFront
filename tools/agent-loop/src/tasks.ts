@@ -544,7 +544,7 @@ async function retryTimedOutCi(
 }
 
 /** После старого красного CI допускается перепроверка HEAD с одними служебными коммитами. */
-async function ciRecheckSafe(
+export async function ciRecheckSafe(
   context: LoopContext,
   remoteBase: string | undefined,
 ): Promise<boolean> {
@@ -552,16 +552,14 @@ async function ciRecheckSafe(
   const current = await head(context.git);
   if (current === remoteBase) return true;
   if (!(await isAncestor(context.git, remoteBase, current))) return false;
-  const trailers = await context.git.run([
-    'log',
-    '--format=%(trailers:key=Этап,valueonly)',
-    `${remoteBase}..HEAD`,
-  ]);
-  const commits = trailers
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
+  const messages = await context.git.run(['log', '--format=%B%x00', `${remoteBase}..HEAD`]);
+  const commits = messages
+    .split('\0')
+    .map((message) => message.trim())
     .filter(Boolean);
-  return commits.length > 0 && commits.every((line) => /^\d{2}\/infra$/u.test(line));
+  return (
+    commits.length > 0 && commits.every((message) => /^Этап:\s*\d{2}\/infra\s*$/mu.test(message))
+  );
 }
 
 async function rememberPublished(

@@ -153,4 +153,19 @@ describe('визуальный гейт перед push', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
     expect(run.lines.some((line) => line.includes('вне изменённого UI пропущено'))).toBe(true);
   });
+
+  it('без @layout не превращает невидимый на общем HUD элемент в дефект теста', async () => {
+    const run = await runWorld({
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        review('ВОЗВРАТ\n- ТЕСТ: apps/client/src/dev/Hud.module.css: нет кадра элемента, 360 px'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[2]).toContain('видны только общие кадры HUD');
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
 });
