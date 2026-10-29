@@ -47,14 +47,14 @@ export function territoryLabelsKey(
   return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.at.x}:${label.at.y}`).join(',')}`;
 }
 
-/** Рисует подписи государств только на максимальном отдалении карты. */
+/** Рисует подписи государств на первых двух уровнях детализации. */
 export function drawTerritoryLabels(
   container: Container,
   labels: readonly TerritoryLabel[],
   scale: number,
   detail: 1 | 2 | 3,
 ): void {
-  if (detail !== 1) return;
+  if (detail === 3) return;
   const fontSize = tokens.city.labelSize[0] ?? 0;
   for (const label of labels) {
     const text = new Text({

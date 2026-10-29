@@ -140,7 +140,7 @@ describe('слои границ и тумана', () => {
     expect(fogHexes(view([1, 1]))).toEqual([]);
   });
 
-  it('показывает подписи на detail 1 и скрывает их на detail 2 и 3 через setView', () => {
+  it('показывает подписи на detail 1 и 2 и скрывает на detail 3 через setView', () => {
     vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
     const layer = createEconomyLayer(labelMapResult.map, 10);
     try {
@@ -151,7 +151,9 @@ describe('слои границ и тумана', () => {
       ).toEqual(['Север', 'Юг']);
 
       layer.update(1, 2);
-      expect(layer.territoryLabels.children).toHaveLength(0);
+      expect(
+        layer.territoryLabels.children.map((child) => (child instanceof Text ? child.text : null)),
+      ).toEqual(['Север', 'Юг']);
       layer.update(1, 3);
       expect(layer.territoryLabels.children).toHaveLength(0);
     } finally {
