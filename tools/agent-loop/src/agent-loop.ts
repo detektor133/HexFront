@@ -15,22 +15,14 @@ import {
   type LoopContext,
   type Step,
 } from './context.ts';
-import {
-  changedPaths,
-  currentBranch,
-  dirtyFiles,
-  head,
-  makeGit,
-  remoteHead,
-  syncWithOrigin,
-} from './git.ts';
+import { taskDirtyTree } from './dirty-work.ts';
+import { currentBranch, dirtyFiles, head, makeGit, remoteHead, syncWithOrigin } from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
-import { forbiddenWorkingPaths, isInfraTask, scopeViolation } from './scope-guard.ts';
 import { unshelveWork } from './shelve.ts';
 import { slowGate } from './slow.ts';
-import { forgetSpec, specFiles } from './spec.ts';
+import { forgetSpec } from './spec.ts';
 import { brokenStatus, closedStage, closeStage } from './stage-close.ts';
 import {
   closedStageBranch,
@@ -42,7 +34,8 @@ import {
   taskMark,
 } from './stage-file.ts';
 import { loadState } from './state.ts';
-import { processTask, resumePrompt } from './tasks.ts';
+import { promoteWorkspace, taskWorkspace, type TaskWorkspace } from './task-workspace.ts';
+import { processTask } from './tasks.ts';
 
 export { type AgentConfig } from './context.ts';
 export {
@@ -51,51 +44,6 @@ export {
   type CommandResult,
   type RunCommand,
 } from './process.ts';
-
-/** Грязное дерево: доделка своей задачи, `$done` владельца или ожидание. */
-async function dirtyTree(context: LoopContext, files: string): Promise<Step> {
-  const { state, config } = context;
-  if (state.activeTask !== undefined) {
-    const paths = await changedPaths(context.git);
-    const specs = new Set(specFiles(context, state.activeTask.task));
-    // Приёмочные тесты `$spec` лежат незакоммиченными до продуктового коммита. Они штатны не
-    // только в work: после repair-$spec задача отдельным тиком проходит узкий/full review.
-    if (paths.length > 0 && paths.every((path) => specs.has(path)))
-      return (
-        await processTask(context, state.activeTask.task, {
-          mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
-          workPrompt: state.activeTask.workPrompt,
-        })
-      ).step;
-  }
-  if (state.activeTask?.phase === 'finalize')
-    return (
-      await processTask(context, state.activeTask.task, {
-        mark: taskMark((await readStage(config.root)).stageText, state.activeTask.task) ?? ' ',
-        workPrompt: state.activeTask.workPrompt,
-      })
-    ).step;
-  if (state.resume !== undefined) {
-    const mark = taskMark((await readStage(config.root)).stageText, state.resume) ?? ' ';
-    const workPrompt = [resumePrompt(state.resume), state.resumeNote].filter(Boolean).join('\n');
-    return (await processTask(context, state.resume, { mark, workPrompt, resume: true })).step;
-  }
-  const issue = await processIssues(context, true);
-  if (issue !== undefined) return issue;
-  // Вопрос исполнителя переживает перезапуск цикла: ждём ответа, а не доделки по кругу.
-  const waiting = state.waitingAnswer;
-  if (waiting !== undefined) return park(context, `resume:${waiting.task}`, waiting.reason);
-  const list = files
-    .split(/\r?\n/)
-    .slice(0, 5)
-    .map((line) => line.trim())
-    .join(', ');
-  return park(
-    context,
-    'dirty',
-    `рабочее дерево не чистое (${list}). Работа владельца — Issue «$done NN/Tn»; недоделка задачи — pnpm agent:run --resume NN/Tn. Остальные Issues ждут чистого дерева`,
-  );
-}
 
 /** Убирает память задачи, которую ведущая сессия уже закрыла и опубликовала во время остановки цикла. */
 async function reconcileExternallyCompletedTask(context: LoopContext): Promise<void> {
@@ -117,6 +65,62 @@ async function reconcileExternallyCompletedTask(context: LoopContext): Promise<v
   await context.say(`${activeTask.task}: закрытая и опубликованная задача удалена из памяти цикла`);
 }
 
+export async function runWorkspaceTask(
+  context: LoopContext,
+  task: string,
+  mark: string,
+  workPrompt: string,
+): Promise<Step> {
+  const workspace = await taskWorkspace(context, task);
+  if (typeof workspace === 'string') return workspace;
+  const taskContext = workspace.context;
+  const files = await dirtyFiles(taskContext.git);
+  let step: Step;
+  if (files !== '') {
+    step = await taskDirtyTree(taskContext, files);
+  } else {
+    const parked = context.state.parked;
+    if (parked && !selfClearing(parked.key) && parked.head === (await head(taskContext.git))) {
+      const issue = await processIssues(taskContext, false);
+      return issue ?? park(taskContext, parked.key, parked.reason);
+    }
+    step = (await processTask(taskContext, task, { mark, workPrompt })).step;
+  }
+  if (context.state.activeTask !== undefined) return step;
+  const branch = workspace.context.git.targetBranch;
+  if (branch === undefined) throw new Error('У checkout задачи нет ветки публикации');
+  context.state.pendingPromotion = { task, workspaceRoot: workspace.root, branch };
+  await save(context);
+  return (await finishPromotion(context, workspace)) ?? step;
+}
+
+async function finishPromotion(
+  context: LoopContext,
+  workspace: TaskWorkspace,
+): Promise<Step | undefined> {
+  const task = context.state.pendingPromotion?.task;
+  if (task === undefined) return undefined;
+  const result = await promoteWorkspace(context, task, workspace);
+  if (result !== undefined) return result;
+  delete context.state.pendingPromotion;
+  await save(context);
+  return undefined;
+}
+
+export async function promotePending(context: LoopContext): Promise<Step | undefined> {
+  const pending = context.state.pendingPromotion;
+  if (pending === undefined) return undefined;
+  const workspace: TaskWorkspace = {
+    root: pending.workspaceRoot,
+    context: {
+      ...context,
+      config: { ...context.config, root: pending.workspaceRoot, stateRoot: context.config.root },
+      git: makeGit(context.config.runCommand, pending.workspaceRoot, pending.branch),
+    },
+  };
+  return finishPromotion(context, workspace);
+}
+
 /** Один шаг: Issue, закрытый этап или задача очереди. */
 async function tick(context: LoopContext): Promise<Step> {
   const { config, git, state } = context;
@@ -130,46 +134,19 @@ async function tick(context: LoopContext): Promise<Step> {
   const expected = statusBranch(status);
   if (expected !== undefined && branch !== expected)
     return park(context, 'branch', `ожидалась ветка ${expected} из STATUS, сейчас ${branch}`);
+  if (state.pendingPromotion !== undefined) return (await promotePending(context)) ?? 'worked';
+  if (state.activeTask?.workspaceRoot !== undefined)
+    return runWorkspaceTask(
+      context,
+      state.activeTask.task,
+      taskMark(
+        (await readStage(state.activeTask.workspaceRoot)).stageText,
+        state.activeTask.task,
+      ) ?? ' ',
+      state.activeTask.workPrompt,
+    );
   const files = await dirtyFiles(git);
-  if (files !== '') {
-    const active = state.activeTask;
-    const owned = active?.workDirtyPaths;
-    const paths = await changedPaths(git);
-    if (active?.phase === 'work' && active.workAttempt?.dirtyPaths !== undefined) {
-      const attempt = active.workAttempt;
-      const initialPaths = active.workAttempt.dirtyPaths;
-      if (
-        (await head(git)) === attempt.head &&
-        initialPaths.every((path) => paths.includes(path))
-      ) {
-        const added = paths.filter((path) => !initialPaths.includes(path));
-        const forbidden = isInfraTask(active.task) ? [] : forbiddenWorkingPaths(added);
-        if (forbidden.length > 0)
-          return park(context, `scope:${active.task}`, scopeViolation(active.task, forbidden));
-        active.workDirtyPaths = [...new Set([...(owned ?? []), ...paths])];
-        state.resume = active.task;
-        delete active.workAttempt;
-        await save(context);
-      }
-    }
-    if (active === undefined || state.resume !== active.task || active.workDirtyPaths === undefined)
-      return dirtyTree(context, files);
-    if (paths.some((path) => !active.workDirtyPaths?.includes(path)))
-      return park(
-        context,
-        'dirty',
-        `рабочее дерево не чистое: к ${active.task} добавлены чужие файлы`,
-      );
-    delete state.waitingAnswer;
-    delete state.parked;
-    await save(context);
-    return (
-      await processTask(context, active.task, {
-        mark: taskMark((await readStage(config.root)).stageText, active.task) ?? ' ',
-        workPrompt: `$task ${active.task}`,
-      })
-    ).step;
-  }
+  if (files !== '') return taskDirtyTree(context, files);
   const currentStage = await readStage(config.root);
   const missing =
     closedStageBranch(status) === undefined
@@ -229,6 +206,7 @@ async function tick(context: LoopContext): Promise<Step> {
       firstLine(block),
     );
   await context.say(`задача ${task} [${mark}]`);
+  if (config.taskIsolation === true) return runWorkspaceTask(context, task, mark, workPrompt);
   return (await processTask(context, task, { mark, workPrompt })).step;
 }
 
@@ -312,7 +290,7 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
     config,
     definitions: await loadAgentDefinitions(config.root),
     git: makeGit(config.runCommand, config.root),
-    state: await loadState(config.root),
+    state: await loadState(config.stateRoot ?? config.root),
     say: await openLog(config),
   };
   if (config.board !== undefined) config.board.limit = () => 1;
@@ -343,7 +321,11 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
 
 /** Цикл оборвался, пока работа задачи была отложена на время Issue: она возвращается в дерево. */
 async function recoverShelved(context: LoopContext): Promise<void> {
-  const back = await unshelveWork(context);
+  const active = context.state.activeTask;
+  const workspace =
+    active?.workspaceRoot === undefined ? undefined : await taskWorkspace(context, active.task);
+  if (typeof workspace === 'string') return;
+  const back = await unshelveWork(workspace?.context ?? context);
   if (back.kind === 'none') return;
   if (back.kind === 'refused') {
     await context.say(`работа ${back.task} не вернулась из git stash: ${back.reason}`);

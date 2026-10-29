@@ -14,6 +14,10 @@ import { saveState, type LoopState } from './state.ts';
 
 export interface AgentConfig {
   readonly root: string;
+  /** Центральное состояние и журнал остаются у оркестратора при работе в checkout задачи. */
+  readonly stateRoot?: string;
+  /** Новые задачи выполняются в отдельном checkout; старые активные задачи сохраняют прежний путь. */
+  readonly taskIsolation?: boolean;
   readonly maxRounds: number;
   /**
    * `--streams N`: предел параллельных задач, запоминается в памяти цикла. Не задан — прежний
@@ -72,7 +76,7 @@ export const lastLines = (text: string, count = 15): string =>
   text.trim().split(/\r?\n/).slice(-count).join('\n');
 
 export const save = (context: LoopContext): Promise<void> =>
-  saveState(context.config.root, context.state);
+  saveState(context.config.stateRoot ?? context.config.root, context.state);
 
 function showParked(context: LoopContext, key: string, reason: string): void {
   const board = context.config.board;
@@ -401,13 +405,14 @@ export async function runSkill(
 }
 
 export async function openLog(config: AgentConfig): Promise<(line: string) => Promise<void>> {
-  await mkdir(join(config.root, '.ai-logs'), { recursive: true });
+  const root = config.stateRoot ?? config.root;
+  await mkdir(join(root, '.ai-logs'), { recursive: true });
   const logPath = join(
-    config.root,
+    root,
     '.ai-logs',
     `agent-loop-${new Date(config.now()).toISOString().slice(0, 10)}.md`,
   );
-  if (config.board !== undefined) config.board.loopLog = relative(config.root, logPath);
+  if (config.board !== undefined) config.board.loopLog = relative(root, logPath);
   return async (line) => {
     config.writeLine(line);
     await appendFile(logPath, `- ${new Date(config.now()).toISOString()} ${line}\n`, 'utf8');

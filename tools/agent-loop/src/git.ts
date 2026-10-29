@@ -6,12 +6,15 @@ export interface Git {
   readonly run: (args: readonly string[]) => Promise<string>;
   /** Команда, у которой ненулевой код — ответ, а не сбой (`merge-base --is-ancestor`). */
   readonly attempt: (args: readonly string[]) => Promise<CommandResult>;
+  /** Ветка этапа для отдельного checkout задачи; по умолчанию текущая ветка. */
+  readonly targetBranch?: string;
 }
 
-export function makeGit(runCommand: RunCommand, root: string): Git {
+export function makeGit(runCommand: RunCommand, root: string, targetBranch?: string): Git {
   const attempt = (args: readonly string[]) => runCommand('git', args, { cwd: root });
   return {
     attempt,
+    ...(targetBranch === undefined ? {} : { targetBranch }),
     async run(args) {
       const result = await attempt(args);
       if (result.code !== 0)
@@ -22,10 +25,12 @@ export function makeGit(runCommand: RunCommand, root: string): Git {
 }
 
 export const currentBranch = (git: Git): Promise<string> => git.run(['branch', '--show-current']);
+export const publishBranch = async (git: Git): Promise<string> =>
+  git.targetBranch ?? currentBranch(git);
 export const head = (git: Git): Promise<string> => git.run(['rev-parse', 'HEAD']);
 /** SHA опубликованной ветки без сетевого запроса; fetch до начала задачи обновляет этот ref. */
 export async function remoteHead(git: Git): Promise<string> {
-  const branch = await currentBranch(git);
+  const branch = await publishBranch(git);
   const result = await git.attempt(['rev-parse', `origin/${branch}`]);
   return result.code === 0 ? result.stdout.trim() : '';
 }
@@ -55,12 +60,12 @@ export const isAncestor = async (
  * @returns undefined при успехе или причина остановки.
  */
 export async function syncWithOrigin(git: Git, push: boolean): Promise<string | undefined> {
-  const branch = await currentBranch(git);
+  const branch = await publishBranch(git);
   const fetched = await git.attempt(['fetch', 'origin', branch]);
   // Ветки ещё нет в origin (новая ветка потока или этапа): сводить не с чем — опубликовать.
   if (fetched.code !== 0 && /couldn't find remote ref/i.test(fetched.stderr)) {
     if (!push) return undefined;
-    const published = await git.attempt(['push', '-u', 'origin', branch]);
+    const published = await git.attempt(['push', '-u', 'origin', `HEAD:${branch}`]);
     return published.code === 0
       ? undefined
       : `push новой ветки ${branch} не прошёл: ${published.stderr}`;
@@ -81,7 +86,7 @@ export async function syncWithOrigin(git: Git, push: boolean): Promise<string | 
     }
   }
   if (!push) return undefined;
-  const pushed = await git.attempt(['push', 'origin', branch]);
+  const pushed = await git.attempt(['push', 'origin', `HEAD:${branch}`]);
   return pushed.code === 0 ? undefined : `push в origin/${branch} не прошёл: ${pushed.stderr}`;
 }
 

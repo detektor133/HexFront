@@ -23,7 +23,7 @@ import {
   testTimedOut,
   verifyTouchedTests,
 } from './finding-repair.ts';
-import { changedPaths, currentBranch, dirtyFiles, head, isAncestor, remoteHead } from './git.ts';
+import { changedPaths, dirtyFiles, head, isAncestor, publishBranch, remoteHead } from './git.ts';
 import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import {
@@ -508,7 +508,7 @@ async function publishReviewed(
   task: string,
   expectedRemote: string,
 ): Promise<Step | undefined> {
-  const branch = await currentBranch(context.git);
+  const branch = await publishBranch(context.git);
   const fetched = await context.git.attempt(['fetch', 'origin', branch]);
   if (fetched.code !== 0)
     return backoff(context, `${task}: не удалось обновить origin/${branch}`, fetched.stderr.trim());
@@ -527,7 +527,7 @@ async function publishReviewed(
       `sync:${task}`,
       `${task}: origin/${branch} изменился после review (${remote || 'нет ref'} вместо ${expectedRemote}); автоматический rebase запрещён`,
     );
-  const pushed = await context.git.attempt(['push', 'origin', branch]);
+  const pushed = await context.git.attempt(['push', 'origin', `HEAD:${branch}`]);
   if (pushed.code !== 0)
     return backoff(context, `${task}: push проверенного HEAD не прошёл`, pushed.stderr.trim());
   await rememberPublished(context, task, local);
@@ -926,6 +926,7 @@ export async function processTask(
     context.state.activeTask = {
       task,
       base: await head(context.git),
+      ...(context.config.stateRoot === undefined ? {} : { workspaceRoot: context.config.root }),
       remoteBase: await remoteHead(context.git),
       workPrompt: options.workPrompt,
       phase: 'work',

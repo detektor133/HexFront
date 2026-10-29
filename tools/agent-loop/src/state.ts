@@ -15,6 +15,8 @@ export interface PendingFinding {
 export interface ActiveTask {
   readonly task: string;
   readonly base: string;
+  /** Отдельный checkout задачи; старые задачи без поля продолжаются в каталоге этапа. */
+  readonly workspaceRoot?: string;
   /** Последний SHA этой задачи, успешно опубликованный в origin. */
   remoteBase?: string;
   /** Исходное поручение, включая текст Issue; переживает перезапуск процесса. */
@@ -79,6 +81,12 @@ export interface ActiveTask {
 export interface LoopState {
   /** Единственная активная задача: её локальные коммиты не push-ятся до финального review. */
   activeTask?: ActiveTask;
+  /** Задача уже опубликована и принята CI, но каталог этапа ещё не подтянут. */
+  pendingPromotion?: {
+    readonly task: string;
+    readonly workspaceRoot: string;
+    readonly branch: string;
+  };
   /** Сколько задач может идти одновременно (Issue `$streams N` или `--streams N`); нет — 1. */
   streams?: number;
   /** Недоделка: сессия этой задачи оборвалась с незакоммиченной работой. */

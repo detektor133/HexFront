@@ -61,6 +61,7 @@ const ui = board === undefined ? undefined : createConsoleUi(board, process.cwd(
 try {
   process.exitCode = await runAgentLoop({
     root: process.cwd(),
+    taskIsolation: true,
     maxRounds: positive('--max-rounds', 3),
     maxMinutes: positive('--max-minutes', 120),
     pollSeconds: positive('--poll-seconds', 30),
