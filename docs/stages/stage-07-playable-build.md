@@ -117,7 +117,7 @@
   Доступные действия `upgrade`, `improve`, `foundCity`, `fort`, `depot`, `rebuild` и набор `infantry`, `armor`, `artillery` получают контрастную тёмную заливку `ui.ink` и текст `ui.surface`; недоступные из-за нехватки золота или правил сохраняют утверждённые T17ay состояния и не получают этот акцент. Hover и `focus-visible` доступны только для действий, которые можно выполнить.
   *Приёмка:* DOM-тест поимённо проверяет классы и отправку команды только у доступных действий; Playwright `@layout` проверяет вычисленные цвета, отсутствие акцента и hover у обоих disabled-состояний. `pnpm verify --changed` проходит.
 
-- [ ] **T17bc. Тонкая граница территории** (`docs/art/tokens.json`, сгенерированные `apps/client/src/theme/tokens.*`, `apps/client/src/dev/{economy-layer.ts,fake-territories.ts}`, `apps/client/test`, `docs/art/style-guide.md`).
+- [x] **T17bc. Тонкая граница территории** (`docs/art/tokens.json`, сгенерированные `apps/client/src/theme/tokens.*`, `apps/client/src/dev/{economy-layer.ts,fake-territories.ts}`, `apps/client/test`, `docs/art/style-guide.md`).
   Обычная граница территории остаётся отдельной от линии фронта и рисуется сплошной внутренней кромкой цвета владельца толщиной `territory.borderWidth[0]` на всех уровнях детализации; двойные кромки соседей сохраняются. `front.width` и белая подложка фронта не меняются.
   *Приёмка:* тест слоя проверяет ширину обычной границы 1,5 экранных px при каждом detail-уровне и двухцветную границу соседних владельцев; отдельная проверка подтверждает, что фронт продолжает использовать `front.width` и `front.casing`. Сгенерированные токены обновляются через `pnpm tokens`; `pnpm verify --changed` проходит.
 
