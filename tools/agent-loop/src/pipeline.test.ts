@@ -840,6 +840,32 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('старый красный CI без лога перечитывает один раз и перезапускает таймаут без кодера', async () => {
+    const run = await runWorld({
+      sessions: [],
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'work',
+          findings: [{ kind: 'КОД', text: 'КОД: CI точного SHA красный — failure job=check' }],
+          ciRetries: 1,
+        },
+      },
+      ci: [
+        'Test timed out in 5000ms.\nrun_attempt=1\nfailure job=check https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/124',
+      ],
+    });
+
+    expect(run.reruns).toEqual([123]);
+    expect(run.prompts).toEqual([]);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('после узкого review RED-тесты активной задачи не блокируют следующий тик', async () => {
     const acceptance = 'packages/sim/test/acceptance.test.ts';
     const run = await runWorld({
@@ -1316,6 +1342,22 @@ describe('последовательный конвейер задачи', () =>
     expect(run.ciCalls).toBe(3);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
     expect(run.lines).not.toContain(expect.stringContaining('автоматический rebase запрещён'));
+  });
+
+  it('после таймаута теста в CI один раз перезапускает job того же SHA без патча продукта', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK'), review('OK')],
+      ci: [
+        'Test timed out in 5000ms.\nrun_attempt=1\nfailure job=check https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/124',
+      ],
+    });
+
+    expect(run.reruns).toEqual([123]);
+    expect(run.ciArgs[1]).toContain('--after-attempt=1');
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
   it('останавливает задачу, если исполнитель push-нул до review', async () => {

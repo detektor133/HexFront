@@ -152,10 +152,39 @@ describe('ожидание GitHub Actions', () => {
     });
 
     expect(code).toBe(1);
-    expect(output.slice(0, -1)).toEqual(
+    expect(output.slice(0, -2)).toEqual(
       Array.from({ length: 30 }, (_, index) => `строка ${index + 6}`),
     );
+    expect(output.at(-2)).toBe('run_attempt=1');
     expect(output.at(-1)).toBe('failure job=tests https://github.com/acme/game/actions/runs/42');
+  });
+
+  it('после перезапуска игнорирует старую красную попытку того же SHA', async () => {
+    const old = run('completed', 'failure');
+    const next = { ...old, run_attempt: 2, status: 'completed', conclusion: 'success' };
+    const responses = [
+      jsonResponse({ workflow_runs: [old] }),
+      jsonResponse({ workflow_runs: [old, next] }),
+    ];
+    const output: string[] = [];
+    let now = 0;
+    const code = await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      afterAttempt: 1,
+      fetchFn: async (): Promise<HttpResponse> => responses.shift() ?? jsonResponse({}),
+      sleep: async (ms): Promise<void> => {
+        now += ms;
+      },
+      now: () => now,
+      writeLine: (line): void => {
+        output.push(line);
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(output[0]).toMatch(/^pending /u);
+    expect(output.at(-1)).toMatch(/^success /u);
   });
 
   it('передаёт Bearer-токен во все запросы', async () => {
@@ -295,6 +324,7 @@ describe('ожидание GitHub Actions', () => {
     expect(code).toBe(1);
     expect(output).toEqual([
       'лог упавшего job не получен: сеть: TypeError: fetch failed',
+      'run_attempt=1',
       'failure job=tests https://github.com/acme/game/actions/runs/42',
     ]);
   });

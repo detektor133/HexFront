@@ -51,6 +51,8 @@ export interface WaitForCiOptions {
   readonly timeoutMs?: number;
   /** Один опрос без ожидания: незавершённый прогон — строка `pending` и код 3. */
   readonly once?: boolean;
+  /** После перезапуска job игнорировать старую попытку того же workflow. */
+  readonly afterAttempt?: number;
   /**
    * Зелёный CI требует и остальные workflow этого SHA, кроме `slow.yml` (флаг `--all-workflows`;
    * цикл — перед ревью и слиянием задачи). 2026-10-14: `pages.yml` 07/T4 падал на каждом push,
@@ -174,6 +176,7 @@ const printFailedRun = async (
     );
   }
   // Прогон без job — сам файл workflow не принят GitHub: называем файл, а не «unknown».
+  writeLine(`run_attempt=${run.run_attempt ?? 1}`);
   writeLine(`failure job=${job?.name ?? run.path?.split('/').pop() ?? 'unknown'} ${run.html_url}`);
   return 1;
 };
@@ -210,7 +213,13 @@ export async function waitForCi(options: WaitForCiOptions): Promise<number> {
     try {
       const response = await request(fetchFn, `${runsUrl}&per_page=10`, headers);
       const payload = (await response.json()) as WorkflowRunsPayload;
-      lastRun = findRun(payload.workflow_runs ?? [], options.sha) ?? lastRun;
+      lastRun =
+        findRun(
+          (payload.workflow_runs ?? []).filter(
+            (run) => (run.run_attempt ?? 1) > (options.afterAttempt ?? 0),
+          ),
+          options.sha,
+        ) ?? lastRun;
     } catch (error) {
       lastError = transientMessage(error);
     }

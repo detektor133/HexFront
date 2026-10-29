@@ -12,6 +12,7 @@ import {
   save,
   session,
   waitCi,
+  type CiResult,
   type LoopContext,
   type SkillResult,
   type Step,
@@ -474,9 +475,21 @@ async function finishTask(context: LoopContext, task: string): Promise<Step | un
   const publishStop = await publishReviewed(context, task, expected);
   if (publishStop !== undefined) return publishStop;
   const publishedHead = await head(context.git);
-  const docsCi = await waitCi(context, `фиксации ${task}`, true);
+  const docsCi = await waitCi(
+    context,
+    `фиксации ${task}`,
+    true,
+    active.ciTimeoutRerun?.head === publishedHead ? active.ciTimeoutRerun.afterAttempt : undefined,
+  );
+  if (docsCi.verdict === 'red' && (await retryTimedOutCi(context, task, docsCi, publishedHead)))
+    return 'worked';
   if (docsCi.verdict !== 'green')
-    return backoff(context, `CI docs-коммита ${task} не зелёный: ${docsCi.line}`, '');
+    return backoff(
+      context,
+      `CI docs-коммита ${task} не зелёный: ${docsCi.line}`,
+      docsCi.details ?? '',
+    );
+  delete active.ciTimeoutRerun;
   if ((await head(context.git)) !== publishedHead)
     return backoff(context, `${task}: HEAD изменился во время проверки CI`, '');
   if (active.workspaceRoot !== undefined) {
@@ -495,6 +508,60 @@ async function finishTask(context: LoopContext, task: string): Promise<Step | un
   context.config.board?.count('done');
   await context.say(`готово: ${task}`);
   return undefined;
+}
+
+/** Таймаут в CI проверяем повтором того же SHA; код задачи не меняется из-за сбоя раннера. */
+async function retryTimedOutCi(
+  context: LoopContext,
+  task: string,
+  ci: CiResult,
+  currentHead: string,
+): Promise<boolean> {
+  const active = context.state.activeTask;
+  const runId = /\/actions\/runs\/(\d+)/u.exec(ci.line)?.[1];
+  if (
+    active === undefined ||
+    !/Test timed out in \d+ms/iu.test(ci.details ?? '') ||
+    ci.attempt === undefined ||
+    runId === undefined ||
+    context.config.github === undefined ||
+    active.ciTimeoutRerun?.head === currentHead
+  )
+    return false;
+  try {
+    await context.config.github.rerunFailedJobs(Number(runId));
+  } catch (error) {
+    await context.say(
+      `${task}: не удалось перезапустить упавший job: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  }
+  active.ciTimeoutRerun = { head: currentHead, afterAttempt: ci.attempt };
+  active.ciRetries = 0;
+  await save(context);
+  await context.say(`${task}: таймаут теста в CI, перезапущен упавший job того же SHA`);
+  return true;
+}
+
+/** После старого красного CI допускается перепроверка HEAD с одними служебными коммитами. */
+async function ciRecheckSafe(
+  context: LoopContext,
+  remoteBase: string | undefined,
+): Promise<boolean> {
+  if (remoteBase === undefined) return false;
+  const current = await head(context.git);
+  if (current === remoteBase) return true;
+  if (!(await isAncestor(context.git, remoteBase, current))) return false;
+  const trailers = await context.git.run([
+    'log',
+    '--format=%(trailers:key=Этап,valueonly)',
+    `${remoteBase}..HEAD`,
+  ]);
+  const commits = trailers
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return commits.length > 0 && commits.every((line) => /^\d{2}\/infra$/u.test(line));
 }
 
 async function rememberPublished(
@@ -585,6 +652,20 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   const { task } = active;
   if (active.phase === 'work') {
     const finding = active.findings[0];
+    const currentHead = await head(context.git);
+    if (
+      finding?.kind === 'КОД' &&
+      finding.text.startsWith('КОД: CI точного SHA красный') &&
+      (await ciRecheckSafe(context, active.remoteBase)) &&
+      active.ciDiagnosticRecheck !== currentHead &&
+      active.workAttempt === undefined
+    ) {
+      active.ciDiagnosticRecheck = currentHead;
+      active.findings = [];
+      active.phase = 'ci';
+      await save(context);
+      return { step: 'worked', done: false };
+    }
     if (finding?.kind === 'ПЛАН') {
       const step = await diagnoseFinding(context, task, finding);
       return { step, done: false };
@@ -888,29 +969,41 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     }
     const publishStop = await publishReviewed(context, task, active.remoteBase ?? active.base);
     if (publishStop !== undefined) return { step: publishStop, done: false };
-    const ci = await waitCi(context, task, true);
+    const currentHead = await head(context.git);
+    const ci = await waitCi(
+      context,
+      task,
+      true,
+      active.ciTimeoutRerun?.head === currentHead ? active.ciTimeoutRerun.afterAttempt : undefined,
+    );
     if (ci.verdict === 'unknown')
       return {
         step: await backoff(context, `CI ${task} не проверен: ${ci.line}`, ''),
         done: false,
       };
     if (ci.verdict === 'red') {
+      active.ciDiagnosticRecheck = currentHead;
+      if (await retryTimedOutCi(context, task, ci, currentHead))
+        return { step: 'worked', done: false };
       active.ciRetries = (active.ciRetries ?? 0) + 1;
+      const failure = `${ci.line}${ci.details === undefined ? '' : `\n${ci.details}`}`;
       active.findings = [
         active.ciRetries >= 2
           ? {
               kind: 'ПЛАН',
               text:
                 `ПЛАН: CI красный второй раз подряд по задаче ${task} — очередной точечный патч ` +
-                `уже не помог один раз; реши, нужен ли цельный пересмотр решения. Последний провал: ${ci.line}`,
+                `уже не помог один раз; реши, нужен ли цельный пересмотр решения. Последний провал: ${failure}`,
             }
-          : { kind: 'КОД', text: `КОД: CI точного SHA красный — ${ci.line}` },
+          : { kind: 'КОД', text: `КОД: CI точного SHA красный — ${failure}` },
       ];
       active.phase = 'work';
       await save(context);
       return { step: 'worked', done: false };
     }
     delete active.ciRetries;
+    delete active.ciTimeoutRerun;
+    delete active.ciDiagnosticRecheck;
     active.codeHead = await head(context.git);
     active.phase = 'finalize';
     await save(context);

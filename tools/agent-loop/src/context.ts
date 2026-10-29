@@ -188,6 +188,9 @@ export interface CiResult {
   readonly verdict: 'green' | 'red' | 'unknown';
   /** Итоговая строка `ci:wait`: ссылка на прогон или причина. */
   readonly line: string;
+  /** Причина падения из лога job, передаётся исполнителю без повторного поиска. */
+  readonly details?: string;
+  readonly attempt?: number;
 }
 
 /** Последняя строка итога `ci:wait`; строки pnpm вроде ELIFECYCLE её не заслоняют. */
@@ -209,12 +212,14 @@ export async function waitCi(
   context: LoopContext,
   label: string,
   allWorkflows = false,
+  afterAttempt?: number,
 ): Promise<CiResult> {
   const { config, say, state } = context;
   const started = config.now();
   config.board?.begin(agentName(context), `CI ${label}`);
   await say(`… жду CI ${label}`);
   const args = allWorkflows ? ['--all-workflows'] : [];
+  if (afterAttempt !== undefined) args.push(`--after-attempt=${afterAttempt}`);
   let ci = await ciWait(context, args, CI_TIMEOUT_MS);
   if (ci.verdict === 'unknown') ci = await ciWait(context, args, CI_TIMEOUT_MS);
   countCi(context, `CI ${label}`, ci);
@@ -249,7 +254,20 @@ async function ciWait(
   if (ci.code === 0) return { verdict: 'green', line, pending: false };
   // Код 3 — `--once`: прогон ещё идёт. Это не красный CI и не сбой.
   if (ci.code === 3) return { verdict: 'unknown', line, pending: true };
-  return { verdict: line.startsWith('failure job=') ? 'red' : 'unknown', line, pending: false };
+  const details = ci.stdout
+    .split(/\r?\n/u)
+    .filter((entry) => /(?:\bFAIL\b|Test timed out|\bError:|##\[error\])/iu.test(entry))
+    .slice(-12)
+    .join('\n')
+    .slice(-2_000);
+  const attempt = /(?:^|\n)run_attempt=(\d+)/u.exec(ci.stdout)?.[1];
+  return {
+    verdict: line.startsWith('failure job=') ? 'red' : 'unknown',
+    line,
+    ...(details === '' ? {} : { details }),
+    ...(attempt === undefined ? {} : { attempt: Number(attempt) }),
+    pending: false,
+  };
 }
 
 /**

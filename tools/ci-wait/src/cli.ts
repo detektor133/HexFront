@@ -24,6 +24,9 @@ async function main(): Promise<number> {
     ...(workflow === undefined ? {} : { workflow }),
     ...(timeout > 0 ? { timeoutMs: timeout * 60_000 } : {}),
     ...(process.argv.includes('--once') ? { once: true } : {}),
+    ...(option('after-attempt') === undefined
+      ? {}
+      : { afterAttempt: Number(option('after-attempt')) }),
     ...(process.argv.includes('--all-workflows') ? { otherWorkflows: true } : {}),
     ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}),
   });

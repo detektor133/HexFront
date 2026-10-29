@@ -61,6 +61,10 @@ export interface ActiveTask {
   fixStreak?: { readonly file: string; readonly count: number };
   /** Подряд красных CI точного SHA этой задачи: второй подряд зовёт `plan`, а не новый патч вслепую. */
   ciRetries?: number;
+  /** Один диагностический повтор старого красного CI без лога перед вызовом исполнителя. */
+  ciDiagnosticRecheck?: string;
+  /** После таймаута CI ждём новую попытку того же SHA, не повторяя сломанный run. */
+  ciTimeoutRerun?: { readonly head: string; readonly afterAttempt: number };
   /**
    * Подряд кругов финального (не узкого) review этой задачи, каждый раз вернувших новые пункты —
    * даже если это разные файлы или разные формулировки. Без этого счётчика review может находить
