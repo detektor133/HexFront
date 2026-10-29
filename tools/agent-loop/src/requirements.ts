@@ -75,7 +75,19 @@ function hasCompleteSplitTrace(
   requirementCount: number,
 ): boolean {
   const heading = `| Исходная строка ${shortId(task)} | Подзадача |`;
-  const start = stageText.indexOf(heading);
+  let start = stageText.indexOf(heading);
+  if (start < 0) {
+    const marker = `Трассировка разбиения ${shortId(task)}:`;
+    const markerStart = stageText.indexOf(marker);
+    if (markerStart >= 0) {
+      const tableStart = stageText.indexOf('| Исходный текст | Подзадача |', markerStart);
+      if (
+        tableStart >= 0 &&
+        /^\s*$/u.test(stageText.slice(markerStart + marker.length, tableStart))
+      )
+        start = tableStart;
+    }
+  }
   if (start < 0) return false;
   const table = stageText.slice(start).split(/\r?\n\r?\n/u, 1)[0] ?? '';
   const rows = table
