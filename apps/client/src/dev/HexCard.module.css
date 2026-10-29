@@ -56,6 +56,28 @@
   text-align: right;
 }
 
+.unitGroups {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.unitGroup {
+  min-width: 0;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+
+.unitList {
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-caption);
+}
+
 .good,
 .bad {
   margin: var(--space-sm) 0 0;

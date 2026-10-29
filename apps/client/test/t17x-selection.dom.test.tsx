@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs';
 
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, hexId, loadMap, neighbors, type MapStatic } from '@hexfront/sim';
 
 import type * as SandboxSelection from '../src/dev/sandbox-selection.ts';
-import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
 import type { FromWorker } from '../src/local/messages.ts';
@@ -294,13 +293,9 @@ describe('07/T17x: выбор через реальный путь /match', () =
     act(() => mapStub?.gesture.up(1, first, 80));
     act(() => mapStub?.gesture.up(2, { x: secondFinger.x + 10, y: secondFinger.y }, 80));
     expect(mapStub?.selectionPhases()).toEqual(['start', 'move', 'end']);
-    const selectedCard = (): Element | null =>
-      document.querySelector('section[aria-label^="Выбрано"]');
-    await waitFor(() => expect(selectedCard()).toBeDefined());
-    const selectedLabel = selectedCard()?.getAttribute('aria-label');
-    expect(selectedLabel).toBeTruthy();
-    expect(selectedLabel).toContain('Выбрано отрядов: 2');
-    expect(selectedLabel).toContain(formatSoldiers(333_000));
+    const selectedCard = await screen.findByRole('region', { name: 'Выбранные отряды' });
+    expect(selectedCard.textContent).not.toContain('Выбрано отрядов');
+    expect(selectedCard.querySelectorAll('li')).toHaveLength(2);
     expect(mapStub?.panCount()).toBe(1);
     expect(mapStub?.zoomCount()).toBe(1);
   });

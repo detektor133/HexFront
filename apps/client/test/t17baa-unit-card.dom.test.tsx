@@ -27,6 +27,61 @@ const map = loadedMap.map;
 afterEach(cleanup);
 
 describe('07/T17baa: закрытие карточки отряда', () => {
+  it('показывает выбранные отряды группами по номеру армии и отдельно резерв', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const source = engine.snapshot().view;
+    const templateArmy = source.armies[0];
+    if (!templateArmy) throw new Error('для фикстуры нужна армия');
+    const armies = [
+      { ...templateArmy, id: 9001, number: 2, name: '' },
+      { ...templateArmy, id: 9002, number: 1, name: '' },
+    ];
+    const [laterArmy, earlierArmy] = armies;
+    if (!laterArmy || !earlierArmy) throw new Error('неполная фикстура армий');
+    const templateUnit = source.units.find((unit) => unit.owner === source.playerId);
+    if (!templateUnit) throw new Error('для фикстуры нужен свой отряд');
+    const first = { ...templateUnit, id: 9101, soldiers: 110_000 as typeof templateUnit.soldiers };
+    const second = { ...templateUnit, id: 9102, soldiers: 120_000 as typeof templateUnit.soldiers };
+    const third = { ...templateUnit, id: 9103, soldiers: 130_000 as typeof templateUnit.soldiers };
+    const fourth = { ...templateUnit, id: 9100, soldiers: 140_000 as typeof templateUnit.soldiers };
+    const view = {
+      ...source,
+      armies: armies.map((army, index) => ({ ...army, number: index === 0 ? 2 : 1 })),
+      units: [
+        ...source.units,
+        { ...first, armyId: laterArmy.id },
+        { ...second, armyId: null },
+        { ...third, armyId: earlierArmy.id },
+        { ...fourth, armyId: earlierArmy.id },
+      ],
+    };
+    const selected = [first.id, second.id, third.id, fourth.id];
+    const { container } = render(
+      <UnitCard
+        view={view}
+        map={map}
+        picked={{ hex: null, units: selected, target: null }}
+        send={() => undefined}
+        onPick={() => undefined}
+      />,
+    );
+    const card = screen.getByRole('region', { name: t('unit.groups') });
+    const headings = Array.from(card.querySelectorAll('h3'), (heading) => heading.textContent);
+    expect(headings).toEqual([
+      t('army.numbered').replace('{n}', '1'),
+      t('army.numbered').replace('{n}', '2'),
+      t('army.reserve'),
+    ]);
+    expect(Array.from(card.querySelectorAll('li'), (row) => row.textContent)).toEqual([
+      `${t(`unit.${fourth.type}` as MessageKey)} · ${formatSoldiers(fourth.soldiers)}`,
+      `${t(`unit.${third.type}` as MessageKey)} · ${formatSoldiers(third.soldiers)}`,
+      `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`,
+      `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`,
+    ]);
+    expect(container.textContent).not.toContain('Выбрано отрядов');
+  });
+
   it('закрывает выбранный отряд локализованной кнопкой без игровой команды', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));

@@ -91,11 +91,24 @@ export function UnitCard(props: {
     .filter((u): u is UnitView => u !== undefined);
   const [first] = units;
   if (!first) return null;
-  const total = units.reduce((s, u) => s + u.soldiers, 0);
   const title =
     units.length === 1
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
-      : `${t('unit.selected')}: ${units.length} · ${formatSoldiers(total)}`;
+      : t('unit.groups');
+  const groups = units.reduce<Map<number | null, UnitView[]>>((result, unit) => {
+    const group = result.get(unit.armyId) ?? [];
+    group.push(unit);
+    result.set(unit.armyId, group);
+    return result;
+  }, new Map());
+  const orderedGroups = [...groups.entries()].sort(([left], [right]) => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    const leftNumber = view.armies.find((army) => army.id === left)?.number ?? left;
+    const rightNumber = view.armies.find((army) => army.id === right)?.number ?? right;
+    return leftNumber - rightNumber;
+  });
+  for (const [, group] of orderedGroups) group.sort((left, right) => left.id - right.id);
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
@@ -113,6 +126,26 @@ export function UnitCard(props: {
         </div>
         {units.length === 1 && <UnitRows u={first} view={view} />}
         {units.length === 1 && <ArtilleryStatus unit={first} />}
+        {units.length > 1 && (
+          <div className={styles.unitGroups}>
+            {orderedGroups.map(([armyId, group]) => {
+              const army =
+                armyId === null ? undefined : view.armies.find((item) => item.id === armyId);
+              return (
+                <section className={styles.unitGroup} key={armyId ?? 'reserve'}>
+                  <h3 className={styles.groupTitle}>{army ? armyName(army) : t('army.reserve')}</h3>
+                  <ul className={styles.unitList}>
+                    {group.map((unit) => (
+                      <li key={unit.id}>
+                        {t(`unit.${unit.type}` as MessageKey)} · {formatSoldiers(unit.soldiers)}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
