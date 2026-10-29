@@ -47,13 +47,13 @@ export interface Session {
 // Codex при исчерпанном лимите может выйти с кодом 0, поэтому лимит ищется и в тексте.
 export const USAGE_LIMIT = 'кончился лимит Codex';
 const USAGE_LIMIT_RE = /hit your usage limit|usage limit reached/i;
-const TOOL_SETUP_RE = /^Failed to create unified exec process:/mu;
+const TOOL_SETUP_RE = /^Failed to create unified exec process:/u;
 const HEARTBEAT_MS = 60_000;
 
 export const minutes = (ms: number): string => `${Math.max(0, Math.round(ms / 60_000))} мин`;
 
 export function codexFailure(message: string, stderr: string, code: number): string | undefined {
-  if (TOOL_SETUP_RE.test(stderr)) return 'инструмент Codex не запустился';
+  if (code !== 0 && TOOL_SETUP_RE.test(stderr.trimStart())) return 'инструмент Codex не запустился';
   const tail = stderr.trim().split(/\r?\n/u).slice(-20).join('\n');
   if (USAGE_LIMIT_RE.test(`${message}\n${tail}`)) return USAGE_LIMIT;
   return code === 0 ? undefined : `codex завершился с кодом ${code}`;

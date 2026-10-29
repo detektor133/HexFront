@@ -8,7 +8,7 @@ describe('сбой сессии codex', () => {
       codexFailure(
         '{"outcome":"ВОЗВРАТ","findings":[{"kind":"ПЛАН","text":"не удалось прочитать diff"}]}',
         'Failed to create unified exec process: helper_unknown_error: setup refresh had errors',
-        0,
+        1,
       ),
     ).toBe('инструмент Codex не запустился');
   });
@@ -23,5 +23,17 @@ describe('сбой сессии codex', () => {
         0,
       ),
     ).toBeUndefined();
+  });
+
+  it('не принимает ошибку внутренней команды за сбой успешно завершённой сессии', () => {
+    const stderr = [
+      'OpenAI Codex v0.161.0',
+      'exec_command failed:',
+      'Failed to create unified exec process: Неверно задано имя папки. (os error 267)',
+      'codex',
+      'Исправил путь, проверки прошли, коммит создан.',
+    ].join('\n');
+    expect(codexFailure('Коммит создан; verify прошёл.', stderr, 0)).toBeUndefined();
+    expect(codexFailure('Работа прервана.', stderr, 1)).toBe('codex завершился с кодом 1');
   });
 });
