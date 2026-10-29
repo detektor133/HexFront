@@ -681,6 +681,15 @@ describe('последовательный конвейер задачи', () =>
     expect(run.state?.activeTask?.workDirtyPaths).toEqual(['packages/sim/src/task.ts']);
   });
 
+  it('сохраняет исходный HEAD, если Codex создал коммит и затем сообщил сбой', async () => {
+    const run = await runWorld({
+      sessions: [{ answer: 'Ошибка после коммита.', code: 1, commit: true }],
+    });
+    expect(run.state?.activeTask?.workAttempt?.head).toBe('c0');
+    expect(run.state?.activeTask?.phase).toBe('work');
+    expect(run.state?.retryAfter).toBeDefined();
+  });
+
   it('после обрыва процесса восстанавливает файлы начатой рабочей сессии', async () => {
     const run = await runWorld({
       dirty: 'packages/sim/src/task.ts\n?? packages/sim/test/task.test.ts',

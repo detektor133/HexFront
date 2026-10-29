@@ -699,7 +699,11 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         finding,
       );
       if (stop !== undefined) {
-        delete active.workAttempt;
+        if (
+          (await head(context.git)) === active.workAttempt.head ||
+          (await dirtyFiles(context.git)) !== ''
+        )
+          delete active.workAttempt;
         await save(context);
         return { step: stop, done: false };
       }
