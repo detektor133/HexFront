@@ -507,11 +507,27 @@ export function SandboxSurface({
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
-  const showUnitCardFixture = new URLSearchParams(window.location.search).get('unitCard') === '1';
-  const fixtureUnit = showUnitCardFixture
-    ? view?.units.find((unit) => unit.order !== 'retreat')
-    : undefined;
-  const cardPicked = fixtureUnit ? { hex: null, units: [fixtureUnit.id], target: null } : sb.picked;
+  const unitCardFixture = new URLSearchParams(window.location.search).get('unitCard');
+  const showUnitCardFixture = unitCardFixture === '1' || unitCardFixture === 'groups';
+  const fixtureSourceUnit = view?.units.find(
+    (unit) => unit.order !== 'retreat' && unit.armyId !== null,
+  );
+  const fixtureUnits =
+    unitCardFixture === 'groups'
+      ? fixtureSourceUnit
+        ? [
+            { ...fixtureSourceUnit, id: 2_147_483_646 },
+            { ...fixtureSourceUnit, id: 2_147_483_647, armyId: null },
+          ]
+        : undefined
+      : unitCardFixture === '1'
+        ? view?.units.filter((unit) => unit.order !== 'retreat').slice(0, 1)
+        : undefined;
+  const cardView =
+    view && fixtureUnits && unitCardFixture === 'groups' ? { ...view, units: fixtureUnits } : view;
+  const cardPicked = fixtureUnits
+    ? { hex: null, units: fixtureUnits.map((unit) => unit.id), target: null }
+    : sb.picked;
   // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
   const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
   const armyPicked =
@@ -584,12 +600,21 @@ export function SandboxSurface({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view &&
+      {cardView &&
         map &&
         cardPicked.units.length > 0 &&
         !sb.tool &&
         (!armyPicked || showUnitCardFixture) && (
-          <UnitCard view={view} map={map} picked={cardPicked} send={sb.send} onPick={sb.pick} />
+          <UnitCard
+            view={cardView}
+            map={map}
+            picked={cardPicked}
+            send={sb.send}
+            onPick={sb.pick}
+            {...(unitCardFixture === 'groups'
+              ? { style: { left: '8px', bottom: 'calc(var(--dock-h, 0px) + 8px)' } }
+              : {})}
+          />
         )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
         <HexCard
