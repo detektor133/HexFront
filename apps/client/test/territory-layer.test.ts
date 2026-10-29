@@ -1,8 +1,9 @@
 import { Graphics, Text } from 'pixi.js';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
 
+import { installTextCanvasStub } from './text-canvas.ts';
 import {
   borderMapChunks,
   changedMapChunks,
@@ -11,6 +12,7 @@ import {
   mapChunkKey,
   territoryBorders,
 } from '../src/dev/economy-layer.ts';
+import { buildTerritoryLabels } from '../src/dev/territory-labels.ts';
 import { playerLine } from '../src/theme/colors.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
@@ -61,6 +63,20 @@ const labelMapResult = loadMap({
 });
 if (!labelMapResult.ok) throw new Error(labelMapResult.errors.join('; '));
 
+const cacheLabelMapResult = loadMap({
+  version: 1,
+  id: 'territory-label-cache-test',
+  width: 3,
+  height: 3,
+  terrain: 'AQEBAQEBAQEB',
+  features: [],
+  riverEdges: [],
+  roads: 'AAA=',
+  cities: [],
+  spawns: [{ q: 0, r: 0 }],
+});
+if (!cacheLabelMapResult.ok) throw new Error(cacheLabelMapResult.errors.join('; '));
+
 const labelView = (owner: number[]): PlayerView =>
   ({
     playerId: 0,
@@ -77,6 +93,8 @@ const labelView = (owner: number[]): PlayerView =>
     cities: [],
     constructions: [],
     plans: [],
+    units: [],
+    recruits: [],
     players: [
       { id: 0, name: 'Север' },
       { id: 1, name: 'Юг' },
@@ -84,6 +102,8 @@ const labelView = (owner: number[]): PlayerView =>
   }) as unknown as PlayerView;
 
 describe('слои границ и тумана', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('инвалидирует только чанк изменившегося гекса', () => {
     expect(mapChunkKey(17, 32)).toBe('1:0');
     expect(changedMapChunks([0, 17, 17], 32)).toEqual(['0:0', '1:0']);
@@ -141,6 +161,7 @@ describe('слои границ и тумана', () => {
   });
 
   it('показывает подписи на detail 1 и 2 и скрывает на detail 3 через setView', () => {
+    installTextCanvasStub();
     vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
     const layer = createEconomyLayer(labelMapResult.map, 10);
     try {
@@ -156,6 +177,71 @@ describe('слои границ и тумана', () => {
       ).toEqual(['Север', 'Юг']);
       layer.update(1, 3);
       expect(layer.territoryLabels.children).toHaveLength(0);
+    } finally {
+      layer.destroy();
+    }
+  });
+
+  it('пересоздаёт подпись при расширении территории через setView', () => {
+    installTextCanvasStub();
+    vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
+    const layer = createEconomyLayer(labelMapResult.map, 10);
+    const selection = { hex: null, units: [], target: null };
+    try {
+      layer.update(1, 1);
+      layer.setView(labelView([0, -1, -1, 0]), selection);
+      const previous = layer.territoryLabels.children[0];
+      expect(previous).toBeInstanceOf(Text);
+      const previousPosition = previous instanceof Text ? { x: previous.x, y: previous.y } : null;
+
+      layer.setView(labelView([0, 0, 0, 0]), selection);
+      const updated = layer.territoryLabels.children[0];
+      expect(updated).toBeInstanceOf(Text);
+      expect(updated).not.toBe(previous);
+      expect(updated instanceof Text ? updated.text : '').toBe('Север');
+      expect(updated instanceof Text ? { x: updated.x, y: updated.y } : null).toEqual(
+        previousPosition,
+      );
+    } finally {
+      layer.destroy();
+    }
+  });
+
+  it('пересоздаёт подпись через setView при изменении ширины с прежними центром и кеглем', () => {
+    installTextCanvasStub();
+    vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
+    const selection = { hex: null, units: [], target: null };
+    const narrowLabels = buildTerritoryLabels(
+      labelView([-1, 0, -1, -1, 0, -1, -1, 0, -1]),
+      cacheLabelMapResult.map.width,
+      10,
+    );
+    const wideLabels = buildTerritoryLabels(
+      labelView([0, 0, -1, -1, -1, -1, -1, -1, 0]),
+      cacheLabelMapResult.map.width,
+      10,
+    );
+    expect(narrowLabels[0]?.fontSize).toBe(wideLabels[0]?.fontSize);
+    expect(narrowLabels[0]?.at).toEqual(wideLabels[0]?.at);
+    expect(narrowLabels[0]?.maxWidth).toBeLessThan(wideLabels[0]?.maxWidth ?? 0);
+    const layer = createEconomyLayer(cacheLabelMapResult.map, 10);
+    try {
+      layer.update(1, 1);
+      layer.setView(labelView([-1, 0, -1, -1, 0, -1, -1, 0, -1]), selection);
+      const previous = layer.territoryLabels.children[0];
+      expect(previous).toBeInstanceOf(Text);
+      if (!(previous instanceof Text)) throw new Error('Подпись первой территории не создана');
+      const previousPosition = { x: previous.x, y: previous.y };
+      const previousWidth = previous.width;
+
+      layer.setView(labelView([0, 0, -1, -1, -1, -1, -1, -1, 0]), selection);
+      const updated = layer.territoryLabels.children[0];
+      expect(updated).toBeInstanceOf(Text);
+      if (!(updated instanceof Text)) throw new Error('Подпись второй территории не создана');
+
+      expect(updated).not.toBe(previous);
+      expect({ x: updated.x, y: updated.y }).toEqual(previousPosition);
+      expect(updated.width).toBeGreaterThan(previousWidth);
     } finally {
       layer.destroy();
     }

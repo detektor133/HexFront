@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { Container, Text } from 'pixi.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildTerritoryLabels, territoryLabelsKey } from '../src/dev/territory-labels.ts';
+import { installTextCanvasStub } from './text-canvas.ts';
+import {
+  buildTerritoryLabels,
+  territoryLabelsKey,
+  drawTerritoryLabels,
+} from '../src/dev/territory-labels.ts';
 
 describe('подписи территорий', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('строит один центроид на владельца и пропускает нейтральные гексы и игроков без территории', () => {
     const labels = buildTerritoryLabels(
       {
@@ -50,5 +58,34 @@ describe('подписи территорий', () => {
 
     expect(larger[0]?.at).toEqual(smaller[0]?.at);
     expect(territoryLabelsKey(larger, 1, 1)).not.toBe(territoryLabelsKey(smaller, 1, 1));
+  });
+
+  it('сохраняет короткую подпись и уменьшает длинную до ширины территории', () => {
+    installTextCanvasStub();
+    const labels = buildTerritoryLabels(
+      {
+        hexes: { owner: Int16Array.from([0, -1, 1, -1]) },
+        players: [
+          { id: 0, name: 'ЮЮ' },
+          { id: 1, name: 'Очень длинное название государства' },
+        ],
+      } as never,
+      2,
+      10,
+    );
+    const short = labels[0];
+    const long = labels[1];
+
+    expect(short).toBeDefined();
+    expect(long).toBeDefined();
+    const container = new Container();
+    drawTerritoryLabels(container, labels, 1, 1);
+    const drawn = container.children.filter((child): child is Text => child instanceof Text);
+    expect(drawn).toHaveLength(2);
+    expect(drawn[0]?.width).toBeLessThanOrEqual(short?.maxWidth ?? 0);
+    expect(drawn[1]?.width).toBeLessThanOrEqual(long?.maxWidth ?? 0);
+    expect(drawn[0]?.scale.x).toBeLessThan(1);
+    expect(drawn[1]?.scale.x).toBeLessThan(1);
+    container.destroy({ children: true });
   });
 });

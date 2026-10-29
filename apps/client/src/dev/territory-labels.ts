@@ -11,6 +11,7 @@ export interface TerritoryLabel {
   readonly name: string;
   readonly at: { readonly x: number; readonly y: number };
   readonly fontSize: number;
+  readonly maxWidth: number;
 }
 
 /** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
@@ -19,15 +20,26 @@ export function buildTerritoryLabels(
   mapWidth: number,
   hexRadius: number,
 ): readonly TerritoryLabel[] {
-  const sums = new Map<number, { x: number; y: number; count: number }>();
+  const sums = new Map<
+    number,
+    { x: number; y: number; count: number; minX: number; maxX: number }
+  >();
   for (let id = 0; id < view.hexes.owner.length; id += 1) {
     const owner = view.hexes.owner[id] ?? -1;
     if (owner < 0) continue;
     const at = hexCenter(hexFromId(id, mapWidth), hexRadius);
-    const sum = sums.get(owner) ?? { x: 0, y: 0, count: 0 };
+    const sum = sums.get(owner) ?? {
+      x: 0,
+      y: 0,
+      count: 0,
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+    };
     sum.x += at.x;
     sum.y += at.y;
     sum.count += 1;
+    sum.minX = Math.min(sum.minX, at.x - hexRadius);
+    sum.maxX = Math.max(sum.maxX, at.x + hexRadius);
     sums.set(owner, sum);
   }
 
@@ -40,7 +52,13 @@ export function buildTerritoryLabels(
       Math.max(tokens.font.size.caption, tokens.font.size.caption * Math.sqrt(sum.count)),
     );
     return [
-      { playerId: player.id, name, fontSize, at: { x: sum.x / sum.count, y: sum.y / sum.count } },
+      {
+        playerId: player.id,
+        name,
+        fontSize,
+        maxWidth: sum.maxX - sum.minX,
+        at: { x: (sum.minX + sum.maxX) / 2, y: sum.y / sum.count },
+      },
     ];
   });
 }
@@ -51,7 +69,22 @@ export function territoryLabelsKey(
   scale: number,
   detail: 1 | 2 | 3,
 ): string {
-  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.fontSize}:${label.at.x}:${label.at.y}`).join(',')}`;
+  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.fontSize}:${label.maxWidth}:${label.at.x}:${label.at.y}`).join(',')}`;
+}
+
+/** Возвращает горизонтальный коэффициент подписи, чтобы её ширина не превышала территорию. */
+export function territoryLabelWidthScale(textWidth: number, maxWidth: number): number {
+  return Math.min(1, maxWidth / textWidth);
+}
+
+function measuredTextWidth(text: Text): number {
+  if (
+    typeof document === 'undefined' ||
+    document.createElement('canvas').getContext('2d') === null
+  ) {
+    return text.text.length * text.style.fontSize;
+  }
+  return text.width;
 }
 
 /** Рисует подписи государств на первых двух уровнях детализации. */
@@ -75,7 +108,10 @@ export function drawTerritoryLabels(
     });
     text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
     text.anchor.set(0.5);
-    text.scale.set(1 / scale);
+    text.scale.set(
+      territoryLabelWidthScale(measuredTextWidth(text), label.maxWidth) / scale,
+      1 / scale,
+    );
     text.position.set(label.at.x, label.at.y);
     container.addChild(text);
   }
