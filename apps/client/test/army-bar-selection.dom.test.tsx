@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,6 +47,40 @@ function viewWithTwoArmiesOnOneHex() {
 }
 
 describe('07/T17aj: выбор армии через панель', () => {
+  it('обычный клик по каждой карточке выбирает её armyId', () => {
+    const { view, armies } = viewWithTwoArmiesOnOneHex();
+    const onSelect = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+      },
+    );
+
+    render(
+      createElement(ArmyBar, {
+        view,
+        selected: null,
+        partial: [],
+        onSelect,
+        send: vi.fn(),
+        onPick: vi.fn(),
+        tool: null,
+        onTool: vi.fn(),
+      }),
+    );
+
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('[class*="pick"]'));
+    expect(cards).toHaveLength(2);
+    for (const [index, army] of armies.entries()) {
+      const card = cards[index];
+      if (!card) throw new Error(`Карточка армии ${army.id} не найдена`);
+      fireEvent.click(card);
+      expect(onSelect).toHaveBeenLastCalledWith(army.id);
+    }
+  });
+
   it('ПКМ по каждой карточке выбирает её armyId и отменяет браузерное меню', () => {
     const { view, armies } = viewWithTwoArmiesOnOneHex();
     const onSelect = vi.fn();
