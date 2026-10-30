@@ -93,20 +93,25 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(neutral && isHostile(view, neutral.hex)).toBe(true);
   });
 
-  it('рамка выбирает только свои неотступающие отряды и допускает обратное направление', () => {
-    const selected = selectUnitsInRect(
-      view,
-      { x: 1_000_000, y: 1_000_000 },
-      { x: -1_000_000, y: -1_000_000 },
-      (hex) => ({ x: hex, y: hex }),
-    );
-    expect(selected).toEqual(
-      view.units.filter((u) => u.owner === view.playerId && u.order !== 'retreat').map((u) => u.id),
-    );
-    expect(
-      selected.some((id) => view.units.find((u) => u.id === id)?.owner !== view.playerId),
-    ).toBe(false);
-    expect(selected).toHaveLength(2);
+  it('рамка включает только свой неотступающий отряд с центром внутри', () => {
+    const own = view.units.find((unit) => unit.owner === view.playerId);
+    const enemy = view.units.find((unit) => unit.owner !== view.playerId);
+    if (!own || !enemy) throw new Error('нужны собственный и чужой отряды');
+    const fixture: PlayerView = {
+      ...view,
+      units: [
+        { ...own, id: 10_001, hex: 5, order: 'idle' },
+        { ...enemy, id: 10_002, hex: 5 },
+        { ...own, id: 10_003, hex: 5, order: 'retreat' },
+        { ...own, id: 10_004, hex: 6, order: 'idle' },
+      ],
+    };
+    const selected = selectUnitsInRect(fixture, { x: 4.5, y: 4.5 }, { x: 5.5, y: 5.5 }, (hex) => ({
+      x: hex,
+      y: hex,
+    }));
+
+    expect(selected).toEqual([10_001]);
   });
 });
 
