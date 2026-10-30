@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, loadMap, type MapStatic } from '@hexfront/sim';
 
 import { ArmyBar } from '../src/dev/ArmyBar.tsx';
+import { armyName } from '../src/dev/army-name.ts';
 import type * as SandboxSelection from '../src/dev/sandbox-selection.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -241,5 +242,95 @@ describe('07/T17aj: выбор фишки на карте', () => {
     act(() => onTap?.(hex, 'select', { x: point.x + 1, y: point.y }));
     expect(selectUnitsSpy.mock.calls.at(-1)?.[2]).toEqual(selectedCalls);
     expect(selectUnitsSpy.mock.results.at(-1)?.value.units).toEqual([]);
+  });
+});
+
+describe('07/T17bkc: переименование карточки армии', () => {
+  it('сохраняет переименование по Enter и blur, отменяет Escape и соблюдает правила имени', () => {
+    const { view, armies } = viewWithTwoArmiesOnOneHex();
+    const send = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+      },
+    );
+    const props = {
+      view,
+      selected: null,
+      partial: [],
+      onSelect: vi.fn(),
+      send,
+      onPick: vi.fn(),
+      tool: null,
+      onTool: vi.fn(),
+    };
+    const { rerender } = render(createElement(ArmyBar, props));
+    const first = armies[0];
+    const second = armies[1];
+    if (!first || !second) throw new Error('Фикстура должна содержать две армии');
+    const firstName = armyName(first);
+    const secondName = armyName(second);
+    const clickName = (name: string): void => {
+      const button = screen
+        .getAllByRole('button', { name })
+        .find((element) => element.tagName === 'BUTTON');
+      if (!button) throw new Error(`Кнопка названия армии «${name}» не найдена`);
+      fireEvent.click(button);
+    };
+
+    clickName(firstName);
+    const enterInput = screen.getByRole('textbox', { name: 'Название армии' });
+    expect((enterInput as HTMLInputElement).maxLength).toBe(20);
+    fireEvent.change(enterInput, { target: { value: 'Новый флот' } });
+    fireEvent.keyDown(enterInput, { key: 'Enter' });
+    expect(send).toHaveBeenLastCalledWith({
+      t: 'renameArmy',
+      armyId: first.id,
+      name: 'Новый флот',
+    });
+
+    clickName(secondName);
+    const blurInput = screen.getByRole('textbox', { name: 'Название армии' });
+    fireEvent.change(blurInput, { target: { value: 'Флот резерва' } });
+    fireEvent.blur(blurInput);
+    expect(send).toHaveBeenLastCalledWith({
+      t: 'renameArmy',
+      armyId: second.id,
+      name: 'Флот резерва',
+    });
+
+    clickName(firstName);
+    const escapeInput = screen.getByRole('textbox', { name: 'Название армии' });
+    fireEvent.change(escapeInput, { target: { value: 'Отменить' } });
+    const callsBeforeEscape = send.mock.calls.length;
+    fireEvent.keyDown(escapeInput, { key: 'Escape' });
+    expect(send).toHaveBeenCalledTimes(callsBeforeEscape);
+    expect(screen.queryByRole('textbox', { name: 'Название армии' })).toBeNull();
+
+    rerender(
+      createElement(ArmyBar, {
+        ...props,
+        view: { ...view, armies: [{ ...first, name: '' }, second] },
+      }),
+    );
+    const numberedName = armyName({ ...first, name: '' });
+    clickName(numberedName);
+    const emptyInput = screen.getByRole('textbox', { name: 'Название армии' });
+    fireEvent.change(emptyInput, { target: { value: '   ' } });
+    fireEvent.keyDown(emptyInput, { key: 'Enter' });
+    expect(send).toHaveBeenLastCalledWith({ t: 'renameArmy', armyId: first.id, name: '' });
+    expect(screen.getByText(numberedName).textContent).toBe(numberedName);
+
+    clickName(numberedName);
+    const limitedInput = screen.getByRole('textbox', { name: 'Название армии' });
+    fireEvent.change(limitedInput, { target: { value: '123456789012345678901' } });
+    fireEvent.keyDown(limitedInput, { key: 'Enter' });
+    expect(send).toHaveBeenLastCalledWith({
+      t: 'renameArmy',
+      armyId: first.id,
+      name: '12345678901234567890',
+    });
   });
 });
