@@ -27,9 +27,10 @@ import {
 import { armyName } from '../src/dev/army-name.ts';
 import { cityChipShift } from '../src/dev/chip-place.ts';
 import { edgeMid } from '../src/dev/plan-edges.ts';
+import type * as SplitDragModule from '../src/dev/split-drag.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
-import { hexCenter } from '../src/render/hex-geometry.ts';
+import { hexCenter, type Point } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
 vi.mock('pixi.js', async (importOriginal) => {
@@ -76,6 +77,7 @@ const radius = tokens.map.hexRadius;
 
 const harness = vi.hoisted(() => ({
   commands: [] as Command[],
+  splitGrabCaptured: false,
   view: null as PlayerView | null,
   canvas: null as HTMLCanvasElement | null,
   app: null as {
@@ -83,6 +85,21 @@ const harness = vi.hoisted(() => ({
     ticker: { callbacks: Array<(value: { deltaMS: number; FPS: number }) => void> };
   } | null,
 }));
+
+vi.mock('../src/dev/split-drag.ts', async (importOriginal) => {
+  const splitDrag = await importOriginal<typeof SplitDragModule>();
+  return {
+    ...splitDrag,
+    createSplitGrab: (deps: SplitDragModule.SplitDeps) => {
+      const grab = splitDrag.createSplitGrab(deps);
+      return (world: Point) => {
+        const handler = grab(world);
+        if (handler) harness.splitGrabCaptured = true;
+        return handler;
+      };
+    },
+  };
+});
 
 class TestWorker {
   public onmessage: ((event: MessageEvent) => void) | null = null;
@@ -310,6 +327,7 @@ beforeEach(() => {
     removeEventListener: vi.fn(),
   }));
   harness.commands = [];
+  harness.splitGrabCaptured = false;
   harness.view = null;
   harness.canvas = null;
   harness.app = null;
@@ -542,6 +560,8 @@ describe('07/T17ap: непрерывный росчерк планов чере�
       clientX: point.x + 12,
       clientY: point.y,
     });
+    expect(harness.splitGrabCaptured).toBe(true);
+    expect(harness.commands).toEqual([]);
     fireEvent.pointerUp(harness.canvas, {
       pointerId: 41,
       clientX: point.x + 12,
