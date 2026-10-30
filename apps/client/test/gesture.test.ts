@@ -100,6 +100,7 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     split.g.move(1, { x: 120, y: 100 }, 100);
     split.g.up(1, { x: 120, y: 100 }, 200);
     expect(kinds(split)).toEqual(['stroke:start', 'stroke:move', 'stroke:end']);
+    expect(kinds(split)).not.toContain('selection:start');
   });
 
   it('каждая из трёх отмен не отдаёт приказа', () => {
