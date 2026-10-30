@@ -46,6 +46,11 @@ function mapViewStub(
   zoomCount: () => number;
   selectionPhases: () => string[];
 } {
+  const camera = { x: 170, y: 90, scale: 1.5 };
+  const toWorld = (point: Point): Point => ({
+    x: (point.x - camera.x) / camera.scale,
+    y: (point.y - camera.y) / camera.scale,
+  });
   let selection:
     ((from: Point, to: Point, phase: 'start' | 'move' | 'end' | 'cancel') => void) | null = null;
   let pans = 0;
@@ -91,7 +96,7 @@ function mapViewStub(
       if (event.t === 'selection') {
         if (selection) {
           selectionPhases.push(event.phase);
-          selection(event.at, event.to, event.phase);
+          selection(toWorld(event.at), toWorld(event.to), event.phase);
         }
       }
       if (event.t === 'pan') pans += 1;
@@ -220,8 +225,18 @@ describe('07/T17x: выбор через реальный путь /match', () =
     const template = selectedUnits[0];
     if (!template) throw new Error('нужен отряд для проверки исключений');
     selectedUnits.push(
-      { ...template, id: template.id + 100_000, owner: enemy.owner },
-      { ...template, id: template.id + 200_000, order: 'retreat' },
+      {
+        ...template,
+        id: template.id + 100_000,
+        owner: enemy.owner,
+        soldiers: 333_000 as typeof template.soldiers,
+      },
+      {
+        ...template,
+        id: template.id + 200_000,
+        order: 'retreat',
+        soldiers: 444_000 as typeof template.soldiers,
+      },
     );
     const message: FromWorker = {
       ...source,
@@ -271,8 +286,13 @@ describe('07/T17x: выбор через реальный путь /match', () =
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
     render(<MatchPage />);
     await waitFor(() => expect(mapStub).toBeDefined());
+    const camera = { x: 170, y: 90, scale: 1.5 };
+    const toScreen = (point: Point): Point => ({
+      x: camera.x + point.x * camera.scale,
+      y: camera.y + point.y * camera.scale,
+    });
     const points = own.map((unit) =>
-      hexCenter(hexFromId(unit.hex, loaded.map.width), tokens.map.hexRadius),
+      toScreen(hexCenter(hexFromId(unit.hex, loaded.map.width), tokens.map.hexRadius)),
     );
     const first = {
       x: Math.min(...points.map((point) => point.x)) - 4,
@@ -296,6 +316,15 @@ describe('07/T17x: выбор через реальный путь /match', () =
     const selectedCard = await screen.findByRole('region', { name: 'Выбранные отряды' });
     expect(selectedCard.textContent).not.toContain('Выбрано отрядов');
     expect(selectedCard.querySelectorAll('li')).toHaveLength(2);
+    const selectedRows = Array.from(
+      selectedCard.querySelectorAll('li button[aria-pressed="true"]'),
+    );
+    expect(selectedRows).toHaveLength(2);
+    expect(selectedRows.map((row) => row.textContent)).toEqual(
+      expect.arrayContaining(['Пехота · 111', 'Пехота · 222']),
+    );
+    expect(selectedCard.textContent).not.toContain('333');
+    expect(selectedCard.textContent).not.toContain('444');
     expect(mapStub?.panCount()).toBe(1);
     expect(mapStub?.zoomCount()).toBe(1);
   });
