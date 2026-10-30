@@ -7,9 +7,14 @@ import {
   territoryLabelsKey,
   drawTerritoryLabels,
 } from '../src/dev/territory-labels.ts';
+import { setPlayerPalette } from '../src/theme/colors.ts';
+import { tokens } from '../src/theme/tokens.ts';
 
 describe('подписи территорий', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setPlayerPalette(null);
+  });
 
   it('строит один центроид на владельца и пропускает нейтральные гексы и игроков без территории', () => {
     const labels = buildTerritoryLabels(
@@ -58,6 +63,25 @@ describe('подписи территорий', () => {
 
     expect(larger[0]?.at).toEqual(smaller[0]?.at);
     expect(territoryLabelsKey(larger, 1, 1)).not.toBe(territoryLabelsKey(smaller, 1, 1));
+  });
+
+  it('окрашивает подпись цветом линии из палитры игрока', () => {
+    installTextCanvasStub();
+    const player = tokens.players.palette[1];
+    expect(player).toBeDefined();
+    if (!player) return;
+    const container = new Container();
+    drawTerritoryLabels(
+      container,
+      [{ playerId: 1, name: 'Юг', at: { x: 0, y: 0 }, fontSize: 12, maxWidth: 100 }],
+      1,
+      1,
+    );
+
+    const label = container.children[0];
+    expect(label).toBeInstanceOf(Text);
+    expect((label as Text).style.fill).toBe(player.line);
+    container.destroy({ children: true });
   });
 
   it('сохраняет короткую подпись и уменьшает длинную до ширины территории', () => {
