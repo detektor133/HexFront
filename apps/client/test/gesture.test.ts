@@ -18,22 +18,25 @@ interface Setup {
     canHold: boolean;
     zone: (p: Pt) => boolean;
     ownChipCaptured: boolean;
+    frontHandleCaptured: boolean;
   };
 }
 
-function setup(over: Partial<Setup['state']> = {}, ownChipAt?: Pt): Setup {
+function setup(over: Partial<Setup['state']> = {}, ownChipAt?: Pt, frontHandleAt?: Pt): Setup {
   const events: GestureEvent[] = [];
   const state = {
     drawing: false,
     canHold: true,
     zone: (_: Pt) => false,
     ownChipCaptured: false,
+    frontHandleCaptured: false,
     ...over,
   };
   const deps: GestureDeps = {
-    drawing: () => state.drawing || state.ownChipCaptured,
+    drawing: () => state.drawing || state.ownChipCaptured || state.frontHandleCaptured,
     press: (at) => {
-      state.ownChipCaptured = ownChipAt?.x === at.x && ownChipAt.y === at.y;
+      state.ownChipCaptured = ownChipAt?.x === at.x && ownChipAt?.y === at.y;
+      state.frontHandleCaptured = frontHandleAt?.x === at.x && frontHandleAt?.y === at.y;
     },
     release: () => undefined,
     canHold: () => state.canHold,
@@ -122,6 +125,17 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     s.g.down(1, ownChipAt, 0, 0);
     expect(s.state.ownChipCaptured).toBe(true);
     s.g.move(1, { x: ownChipAt.x + DRAG_SLOP_PX + 1, y: ownChipAt.y }, 100);
+    s.g.up(1, { x: 140, y: 100 }, 200);
+    expect(kinds(s)).toEqual(['stroke:start', 'stroke:move', 'stroke:end']);
+    expect(s.events.some((event) => event.t === 'selection')).toBe(false);
+  });
+
+  it('захват ручки фронта создаёт её росчерк вместо рамки', () => {
+    const handleAt = { x: 100, y: 100 };
+    const s = setup({}, undefined, handleAt);
+    s.g.down(1, handleAt, 0, 0);
+    expect(s.state.frontHandleCaptured).toBe(true);
+    s.g.move(1, { x: handleAt.x + DRAG_SLOP_PX + 1, y: handleAt.y }, 100);
     s.g.up(1, { x: 140, y: 100 }, 200);
     expect(kinds(s)).toEqual(['stroke:start', 'stroke:move', 'stroke:end']);
     expect(s.events.some((event) => event.t === 'selection')).toBe(false);
