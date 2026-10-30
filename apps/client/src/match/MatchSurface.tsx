@@ -88,12 +88,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   const { army } = sb;
   const view = sb.msg?.view;
-  // При выборе всей армии UnitCard не рендерится, поэтому она не должна занимать место в раскладке.
-  const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
-  const armyPicked =
-    armyUnits.length > 0 &&
-    armyUnits.length === sb.picked.units.length &&
-    armyUnits.every((u) => sb.picked.units.includes(u.id));
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
@@ -104,7 +98,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     leaderboardRows: view?.ranking?.length ?? 0,
     ...(leaderboardSize === undefined ? {} : { leaderboardSize }),
     cardHeight: cardH,
-    cardOpen: !armyPicked && (sb.picked.units.length > 0 || sb.picked.hex !== null),
+    cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
     popupOpen,
     ...(taxAnchor === undefined ? {} : { popupAnchorX: taxAnchor.x, popupAnchorY: taxAnchor.y }),
     ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
@@ -245,7 +239,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view && map && styleFor('card') && sb.picked.units.length > 0 && !sb.tool && !armyPicked && (
+      {view && map && styleFor('card') && sb.picked.units.length > 0 && !sb.tool && (
         <UnitCard
           view={view}
           map={map}

@@ -508,7 +508,6 @@ export function SandboxSurface({
   const { army } = sb;
   const view = sb.msg?.view;
   const unitCardFixture = new URLSearchParams(window.location.search).get('unitCard');
-  const showUnitCardFixture = unitCardFixture === '1' || unitCardFixture === 'groups';
   const fixtureSourceUnit = view?.units.find(
     (unit) => unit.order !== 'retreat' && unit.armyId !== null,
   );
@@ -528,12 +527,6 @@ export function SandboxSurface({
   const cardPicked = fixtureUnits
     ? { hex: null, units: fixtureUnits.map((unit) => unit.id), target: null }
     : sb.picked;
-  // Выбрана армия целиком — её сводка в нижней панели, карточка отряда не нужна (как в HoI4).
-  const armyUnits = view?.units.filter((u) => u.armyId !== null && u.armyId === army) ?? [];
-  const armyPicked =
-    armyUnits.length > 0 &&
-    armyUnits.length === sb.picked.units.length &&
-    armyUnits.every((u) => sb.picked.units.includes(u.id));
   const map = typeof loaded === 'string' ? null : loaded.map;
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
@@ -600,22 +593,18 @@ export function SandboxSurface({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {cardView &&
-        map &&
-        cardPicked.units.length > 0 &&
-        !sb.tool &&
-        (!armyPicked || showUnitCardFixture) && (
-          <UnitCard
-            view={cardView}
-            map={map}
-            picked={cardPicked}
-            send={sb.send}
-            onPick={sb.pick}
-            {...(unitCardFixture === 'groups'
-              ? { style: { left: '8px', bottom: 'calc(var(--dock-h, 0px) + 8px)' } }
-              : {})}
-          />
-        )}
+      {cardView && map && cardPicked.units.length > 0 && !sb.tool && (
+        <UnitCard
+          view={cardView}
+          map={map}
+          picked={cardPicked}
+          send={sb.send}
+          onPick={sb.pick}
+          {...(unitCardFixture === 'groups'
+            ? { style: { left: '8px', bottom: 'calc(var(--dock-h, 0px) + 8px)' } }
+            : {})}
+        />
+      )}
       {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
         <HexCard
           s={sb.msg.selection}

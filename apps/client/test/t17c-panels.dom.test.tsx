@@ -124,7 +124,7 @@ describe('приёмка 07/T17c: панели матча в левом нижн
     await renderMatch('?army=1');
     const armyCards = screen
       .getAllByRole('button', { name: /армия/iu })
-      .filter((card) => card.hasAttribute('aria-pressed'));
+      .filter((card) => card.hasAttribute('aria-pressed') && card.className.includes('_pick_'));
     expect(armyCards.length).toBeGreaterThan(0);
     expect(armyCards.filter((card) => card.getAttribute('aria-pressed') === 'true')).toHaveLength(
       1,

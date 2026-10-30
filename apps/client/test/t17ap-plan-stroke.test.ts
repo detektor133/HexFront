@@ -23,6 +23,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { armyName } from '../src/dev/army-name.ts';
 import { edgeMid } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
@@ -315,6 +316,106 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('07/T17ap: непрерывный росчерк планов через runtime', () => {
+  it('показывает группы при выборе армии и переключает строку на подробную карточку', async () => {
+    const { view } = await renderSurface();
+    const army = view.armies.find(
+      (item) =>
+        view.units.filter(
+          (unit) =>
+            unit.armyId === item.id && unit.owner === view.playerId && unit.order !== 'retreat',
+        ).length >= 2,
+    );
+    if (!army) throw new Error('В фикстуре нет своей армии с двумя отрядами');
+    const armyIndex = view.armies.findIndex((item) => item.id === army.id);
+    const cards = screen.getAllByRole('button').filter((item) => item.className.includes('_pick_'));
+    const armyCard = cards[armyIndex];
+    if (!armyCard) throw new Error('Карточка целевой армии отсутствует');
+    expect(armyCard.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(armyCard);
+
+    const card = await waitFor(() => {
+      const selectedCard = Array.from(
+        document.querySelectorAll<HTMLElement>('section[aria-label]'),
+      ).find((element) => element.querySelector('ul button'));
+      expect(selectedCard).not.toBeNull();
+      return selectedCard as HTMLElement;
+    });
+    expect(card.textContent).toContain(armyName(army));
+    expect(card.querySelectorAll('ul button')).toHaveLength(2);
+    expect(armyCard.getAttribute('aria-pressed')).toBe('true');
+
+    const row = card.querySelector<HTMLButtonElement>('ul button');
+    if (!row) throw new Error('Строка отряда отсутствует');
+    fireEvent.click(row);
+
+    await waitFor(() => expect(card.querySelector('ul')).toBeNull());
+    expect(card.querySelector('dl')).not.toBeNull();
+  });
+
+  it('показывает группы после рамки, охватившей отряды двух армий', async () => {
+    const { map, view, world } = await renderSurface();
+    const firstArmy = view.armies[0];
+    if (!firstArmy) throw new Error('В фикстуре нет первой армии');
+    const secondArmy = {
+      ...firstArmy,
+      id: Math.max(...view.armies.map((army) => army.id)) + 1,
+      number: Math.max(...view.armies.map((army) => army.number)) + 1,
+      name: 'Тестовая армия',
+    };
+    (view as { armies: typeof view.armies }).armies = [...view.armies, secondArmy];
+    const units = view.units.filter(
+      (unit) => unit.owner === view.playerId && unit.order !== 'retreat',
+    );
+    const centers = units.map((unit) => ({
+      unit,
+      point: world.toGlobal(hexCenter(hexFromId(unit.hex, map.width), radius)),
+    }));
+    let pair: (typeof centers)[number][] | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const first of centers) {
+      for (const second of centers) {
+        if (first.unit.id === second.unit.id) continue;
+        const distance = Math.hypot(first.point.x - second.point.x, first.point.y - second.point.y);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          pair = [first, second];
+        }
+      }
+    }
+    if (!pair) throw new Error('Не найдена пара своих отрядов для рамки');
+    const [first, second] = pair;
+    if (!first || !second || !harness.canvas) throw new Error('Не подготовлена рамка выбора');
+    (first.unit as { armyId: number | null }).armyId = firstArmy.id;
+    (second.unit as { armyId: number | null }).armyId = secondArmy.id;
+    const margin = 12;
+    const from = {
+      clientX: Math.min(first.point.x, second.point.x) - margin,
+      clientY: Math.min(first.point.y, second.point.y) - margin,
+    };
+    const to = {
+      clientX: Math.max(first.point.x, second.point.x) + margin,
+      clientY: Math.max(first.point.y, second.point.y) + margin,
+    };
+    fireEvent.pointerDown(harness.canvas, {
+      button: 0,
+      pointerId: 31,
+      pointerType: 'mouse',
+      ...from,
+    });
+    fireEvent.pointerMove(harness.canvas, { pointerId: 31, ...to });
+    fireEvent.pointerUp(harness.canvas, { pointerId: 31, ...to });
+
+    const card = await waitFor(() => {
+      const selectedCard = Array.from(
+        document.querySelectorAll<HTMLElement>('section[aria-label]'),
+      ).find((element) => element.querySelector('ul button'));
+      expect(selectedCard).toBeTruthy();
+      return selectedCard as HTMLElement;
+    });
+    expect(card.querySelectorAll('ul button').length).toBeGreaterThanOrEqual(2);
+    expect(card.querySelectorAll('h3')).toHaveLength(2);
+  });
   it('передаёт через canvas полный непрерывный фронт и точный assignFront', async () => {
     const { map, view, world } = await renderSurface();
     await selectArmy();
