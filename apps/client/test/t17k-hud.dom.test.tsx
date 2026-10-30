@@ -12,6 +12,7 @@ import { createLocalEngine } from '../src/local/engine.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
 const hudCss = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8');
+const hudSource = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.tsx'), 'utf8');
 const tokensJson = readFileSync(join(process.cwd(), 'docs/art/tokens.json'), 'utf8');
 
 const mapJson: unknown = JSON.parse(
@@ -59,7 +60,7 @@ function layoutInput(viewport: { readonly width: number; readonly height: number
 }
 
 describe('07/T17k: компактный HUD', () => {
-  it('сохраняет шесть метрик, доступные кнопки и правильные SVG', () => {
+  it('сохраняет шесть метрик и использует готовые иконки Tabler', () => {
     renderHud();
     for (const label of ['Люди', 'Золото', 'Налог', 'Снабжение', 'Время', 'Место']) {
       expect(document.querySelector(`svg[aria-label="${label}"]`)).toBeTruthy();
@@ -76,28 +77,25 @@ describe('07/T17k: компактный HUD', () => {
         ?.getAttribute('aria-hidden'),
     ).toBe('true');
     for (const icon of Array.from(document.querySelectorAll('header svg[aria-label]'))) {
-      expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
+      expect(icon.getAttribute('width')).toBe('14');
+      expect(icon.getAttribute('height')).toBe('14');
     }
     const gold = document.querySelector('svg[aria-label="Золото"]');
     expect(gold?.getAttribute('class')).toContain('goldIcon');
-    expect(gold?.querySelectorAll('path').length).toBeGreaterThan(1);
     expect(screen.getByRole('button', { name: 'Пауза' }).querySelectorAll('path')).toHaveLength(2);
-
-    for (const icon of Array.from(document.querySelectorAll('header svg[aria-label]'))) {
-      for (const path of Array.from(icon.querySelectorAll('path'))) {
-        const coordinates =
-          path
-            .getAttribute('d')
-            ?.match(/-?\d+(?:\.\d+)?/g)
-            ?.map(Number) ?? [];
-        expect(coordinates.every((coordinate) => coordinate >= 0 && coordinate <= 14)).toBe(true);
-      }
+    for (const iconName of [
+      'IconUsers',
+      'IconCoin',
+      'IconPercentage',
+      'IconPackage',
+      'IconClock',
+      'IconTrophy',
+    ]) {
+      expect(hudSource).toContain(iconName);
     }
-    expect(document.querySelector('svg[aria-label="Налог"] path')?.getAttribute('d')).toBe(
-      'M4 10L10 4',
-    );
     expect(tokensJson).toContain('"color": "#C99A2E"');
     expect(hudCss).toContain('.goldIcon {\n  color: var(--selection-color);\n}');
+    expect(hudCss).toContain('color: var(--ui-ink2);');
     expect(hudCss).toContain('height: 44px;');
     expect(hudCss).toContain('min-height: var(--touch-target-min);');
     expect(hudCss).toContain('min-width: var(--touch-target-min);');

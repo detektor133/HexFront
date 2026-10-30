@@ -15,6 +15,7 @@ const MAP_JSON: unknown = JSON.parse(
 const LOADED_MAP = loadMap(MAP_JSON);
 if (!LOADED_MAP.ok) throw new Error(LOADED_MAP.errors.join('; '));
 const LOADED_MAP_VALUE = LOADED_MAP.map;
+const HUD_SOURCE = readFileSync('apps/client/src/dev/Hud.tsx', 'utf8');
 
 const VIEWPORTS = [360, 768, 1440] as const;
 const LABELS = ['Люди', 'Золото', 'Налог', 'Снабжение', 'Время', 'Место'] as const;
@@ -105,7 +106,7 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
     const header = document.querySelector('header');
     if (!header) throw new Error('Верхняя панель не найдена');
     for (const label of LABELS)
-      expect(within(header).queryByText(label, { exact: true })).toBeNull();
+      expect(within(header).queryByText(label, { exact: true, selector: 'span' })).toBeNull();
     for (const value of ['280', '+2,8/с', '200', '+0,4/с', '20 %', '100 %', '00:00', '#1/2']) {
       expect(screen.getByText(value, { exact: true })).toBeTruthy();
     }
@@ -118,15 +119,16 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
       { label: 'Время', value: '00:00' },
       { label: 'Место', value: '#1/2' },
     ] as const;
-    const icons = Array.from(document.querySelectorAll<SVGElement>('svg[aria-label][title]'));
+    const icons = Array.from(document.querySelectorAll<SVGElement>('svg[aria-label]'));
     expect(icons).toHaveLength(metrics.length);
     for (const metric of metrics) {
       const icon = within(header).getByLabelText(metric.label, { selector: 'svg' });
-      expect(icon.getAttribute('title')).toBe(metric.label);
+      expect(icon.querySelector('title')?.textContent).toBe(metric.label);
       const metricElement = icon.parentElement;
       if (!metricElement) throw new Error(`Иконка «${metric.label}» не связана со значением`);
       expect(metricElement).not.toBe(header);
-      const metricText = metricElement.textContent?.replace(/\s+/g, '') ?? '';
+      const metricText =
+        metricElement.textContent?.replace(metric.label, '').replace(/\s+/g, '') ?? '';
       const expectedText = `${metric.value}${'rate' in metric ? metric.rate : ''}`.replace(
         /\s+/g,
         '',
@@ -156,26 +158,25 @@ describe('Приёмка 07/T17h: верхняя панель матча', () =>
     }
   });
 
-  it('правило панели: «иконки — свои, по сетке 14×14, линия 2, round cap/join»', async () => {
+  it('правило панели: шесть показателей используют Tabler иконки размером 14×14', async () => {
     await renderMatch(1440);
 
-    const icons = Array.from(document.querySelectorAll<SVGElement>('svg[aria-label][title]'));
+    const icons = Array.from(document.querySelectorAll<SVGElement>('svg[aria-label]'));
     expect(icons).toHaveLength(6);
     for (const icon of icons) {
-      expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-      expect(icon.getAttribute('stroke-width')).toBe('2');
-      expect(icon.getAttribute('stroke-linecap')).toBe('round');
-      expect(icon.getAttribute('stroke-linejoin')).toBe('round');
-      const path = icon.querySelector('path');
-      if (!path) throw new Error('У иконки нет пути');
-      const coordinates = path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [];
-      expect(
-        coordinates.every((coordinate) => {
-          const value = Number(coordinate);
-          return value >= 0 && value <= 14;
-        }),
-      ).toBe(true);
+      expect(icon.getAttribute('width')).toBe('14');
+      expect(icon.getAttribute('height')).toBe('14');
+      expect(icon.querySelector('title')?.textContent).toBe(icon.getAttribute('aria-label'));
     }
+    for (const name of [
+      'IconUsers',
+      'IconCoin',
+      'IconPercentage',
+      'IconPackage',
+      'IconClock',
+      'IconTrophy',
+    ])
+      expect(HUD_SOURCE).toContain(name);
   });
 
   it('критерий цвета прироста: отрицательный прирост людей получает status.danger', async () => {

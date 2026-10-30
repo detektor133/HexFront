@@ -15,6 +15,7 @@
   "dependencies": {
     "@hexfront/protocol": "workspace:*",
     "@hexfront/sim": "workspace:*",
+    "@tabler/icons-react": "^3.50.0",
     "pixi.js": "^8.21.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

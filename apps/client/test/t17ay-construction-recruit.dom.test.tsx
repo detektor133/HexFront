@@ -248,6 +248,6 @@ describe('07/T17ay: состояния строительства и найма'
     );
     const hudSource = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.tsx'), 'utf8');
     expect(hexCardSource).toMatch(/GoldIcon/u);
-    expect(hudSource).toMatch(/GoldIcon/u);
+    expect(hudSource).toMatch(/gold:\s*IconCoin/u);
   });
 });

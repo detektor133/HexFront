@@ -71,6 +71,7 @@
   flex: 0 0 14px;
   inline-size: 14px;
   height: 14px;
+  color: var(--ui-ink2);
 }
 
 .goldIcon {

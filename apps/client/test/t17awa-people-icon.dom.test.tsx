@@ -13,6 +13,7 @@ const mapJson: unknown = JSON.parse(
 const loaded = loadMap(mapJson);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 const loadedMap = loaded.map;
+const hudSource = readFileSync('apps/client/src/dev/Hud.tsx', 'utf8');
 
 function mockRuntime(): void {
   const engine = createLocalEngine(mapJson, 42, 2);
@@ -83,63 +84,28 @@ describe('07/T17awa: иконка людей в HUD', () => {
     expect(icons).toHaveLength(1);
   });
 
-  it('критерий: иконка имеет viewBox «0 0 14 14» и два завершённых силуэта', async () => {
+  it('Заменён тест: готовая Tabler иконка людей имеет размер 14×14 px', async () => {
     mockRuntime();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
     render(<MatchPage />);
 
     const icon = screen.getByLabelText('Люди', { selector: 'svg' });
-    expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-    const silhouettes = Array.from(icon.querySelectorAll('path'))
-      .flatMap((path) => path.getAttribute('d')?.split(/(?=M)/u) ?? [])
-      .filter((path) => /Z\s*$/iu.test(path));
-    expect(silhouettes).toHaveLength(2);
+    expect(icon.getAttribute('width')).toBe('14');
+    expect(icon.getAttribute('height')).toBe('14');
+    expect(hudSource).toContain('people: IconUsers');
   });
 
-  it('критерий: геометрия двух силуэтов симметрична и все координаты находятся внутри viewBox', async () => {
+  it('сохраняет доступное имя и привязку к числу населения', async () => {
     mockRuntime();
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
     render(<MatchPage />);
 
-    const silhouettes = Array.from(
-      screen.getByLabelText('Люди', { selector: 'svg' }).querySelectorAll('path'),
-    )
-      .flatMap((path) => path.getAttribute('d')?.split(/(?=M)/u) ?? [])
-      .filter((path) => /Z\s*$/iu.test(path));
-    const coordinates = silhouettes.flatMap((path) =>
-      (path.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number),
-    );
-    expect(coordinates.length).toBeGreaterThan(0);
-    expect(coordinates.every((coordinate) => coordinate >= 0 && coordinate <= 14)).toBe(true);
-
-    const bounds = silhouettes.map((path) => {
-      const numbers = (path.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
-      const xCoordinates = numbers.filter((_, index) => index % 2 === 0);
-      const yCoordinates = numbers.filter((_, index) => index % 2 === 1);
-      return {
-        minX: Math.min(...xCoordinates),
-        maxX: Math.max(...xCoordinates),
-        minY: Math.min(...yCoordinates),
-        maxY: Math.max(...yCoordinates),
-      };
-    });
-    const [left, right] = bounds;
-    expect(left).toBeDefined();
-    expect(right).toBeDefined();
-    expect(bounds.every(({ minX, maxX, minY, maxY }) => maxX > minX && maxY > minY)).toBe(true);
-    expect((left?.maxX ?? 0) + (right?.minX ?? 0)).toBe(14);
-    expect((left?.minX ?? 0) + (right?.maxX ?? 0)).toBe(14);
-    expect(left?.minY).toBe(right?.minY);
-    expect(left?.maxY).toBe(right?.maxY);
-
-    const [leftPath, rightPath] = silhouettes;
-    expect(rightPath?.match(/[A-Za-z]+/gu)).toEqual(leftPath?.match(/[A-Za-z]+/gu));
-    const leftNumbers = (leftPath?.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
-    const rightNumbers = (rightPath?.match(/-?\d+(?:\.\d+)?/gu) ?? []).map(Number);
-    const mirroredLeft = leftNumbers.map((coordinate, index) =>
-      index % 2 === 0 ? Number((14 - coordinate).toFixed(3)) : coordinate,
-    );
-    expect(rightNumbers).toEqual(mirroredLeft);
+    const icon = screen.getByLabelText('Люди', { selector: 'svg' });
+    expect(icon.querySelector('title')?.textContent).toBe('Люди');
+    const slot = icon.parentElement;
+    if (!slot) throw new Error('Иконка людей не связана со значением');
+    expect(slot.textContent).toContain('280');
+    expect(slot.textContent).toContain('+2,8/с');
   });
 });

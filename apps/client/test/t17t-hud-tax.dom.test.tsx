@@ -19,6 +19,7 @@ const loadedMap = loaded.map;
 const hudCss = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8');
 const themeCss = readFileSync(join(process.cwd(), 'apps/client/src/theme/tokens.css'), 'utf8');
 const tokensJson = readFileSync(join(process.cwd(), 'docs/art/tokens.json'), 'utf8');
+const hudSource = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.tsx'), 'utf8');
 
 let lastSend: ReturnType<typeof vi.fn> | undefined;
 
@@ -122,37 +123,39 @@ describe('07/T17t: золото и налог в HUD ПК', () => {
     render(<MatchPage />);
 
     const gold = screen.getByLabelText('Золото', { selector: 'svg' });
-    expect(gold.getAttribute('viewBox')).toBe('0 0 14 14');
+    expect(gold.getAttribute('width')).toBe('14');
+    expect(gold.getAttribute('height')).toBe('14');
     expect(gold.getAttribute('stroke-width')).toBe('2');
     expect(gold.getAttribute('stroke-linecap')).toBe('round');
     expect(gold.getAttribute('stroke-linejoin')).toBe('round');
-    expect(gold.querySelectorAll('path')).toHaveLength(2);
     expect(gold.getAttribute('class')).toContain('goldIcon');
     expect(hudCss).toContain('.goldIcon {\n  color: var(--selection-color);\n}');
     expect(themeCss).toContain(`--selection-color: ${tokens.selection.color};`);
     expect(tokensJson).toContain(`"color": "${tokens.selection.color}"`);
 
-    const expectedIcons: Record<string, readonly string[]> = {
-      Налог: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
-      Снабжение: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
-      Время: [
-        'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
-      ],
-      Место: ['M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z'],
-    };
-    for (const [label, paths] of Object.entries(expectedIcons)) {
+    const expectedIcons = {
+      Люди: 'IconUsers',
+      Золото: 'IconCoin',
+      Налог: 'IconPercentage',
+      Снабжение: 'IconPackage',
+      Время: 'IconClock',
+      Место: 'IconTrophy',
+    } as const;
+    for (const [label, iconName] of Object.entries(expectedIcons)) {
       const icon = screen.getByLabelText(label, { selector: 'svg' });
-      expect(icon.getAttribute('viewBox')).toBe('0 0 14 14');
-      expect(icon.getAttribute('fill')).toBe('none');
-      expect(icon.getAttribute('stroke')).toBe('currentColor');
-      expect(icon.getAttribute('stroke-width')).toBe('2');
-      expect(icon.getAttribute('stroke-linecap')).toBe('round');
-      expect(icon.getAttribute('stroke-linejoin')).toBe('round');
-      expect(icon.getAttribute('title')).toBe(label);
-      expect(icon.getAttribute('class')).not.toContain('goldIcon');
-      expect(
-        Array.from(icon.querySelectorAll('path')).map((path) => path.getAttribute('d')),
-      ).toEqual(paths);
+      expect(icon.getAttribute('width')).toBe('14');
+      expect(icon.getAttribute('height')).toBe('14');
+      expect(icon.querySelector('title')?.textContent).toBe(label);
+      const iconKeys = {
+        Люди: 'people',
+        Золото: 'gold',
+        Налог: 'tax',
+        Снабжение: 'supply',
+        Время: 'time',
+        Место: 'place',
+      } as const;
+      expect(hudSource).toContain(`${iconKeys[label as keyof typeof iconKeys]}: ${iconName}`);
+      expect(icon.getAttribute('class')).toContain(label === 'Золото' ? 'goldIcon' : 'metricIcon');
     }
 
     const taxButton = screen.getByRole('button', { name: 'Налог' });

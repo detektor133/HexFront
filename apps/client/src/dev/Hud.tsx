@@ -1,3 +1,11 @@
+import {
+  IconClock,
+  IconCoin,
+  IconPackage,
+  IconPercentage,
+  IconTrophy,
+  IconUsers,
+} from '@tabler/icons-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -22,55 +30,29 @@ import {
   formatRate,
   formatRateFull,
 } from '../i18n/format.ts';
-import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 
 type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
 
+const METRIC_ICONS = {
+  people: IconUsers,
+  gold: IconCoin,
+  tax: IconPercentage,
+  supply: IconPackage,
+  time: IconClock,
+  place: IconTrophy,
+} as const;
+
 function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
-  const iconRef = useRef<SVGSVGElement>(null);
-  const paths: Record<Exclude<MetricIconName, 'gold'>, readonly string[]> = {
-    people: [
-      'M1 12L1 9C1 7.9 1.8 7.2 2.6 6.9C2.2 6.5 2 6 2 5.4C2 4.3 2.7 3.5 3.5 3.5C4.3 3.5 5 4.3 5 5.4C5 6 4.8 6.5 4.4 6.9C5.2 7.2 6 7.9 6 9L6 12Z',
-      'M13 12L13 9C13 7.9 12.2 7.2 11.4 6.9C11.8 6.5 12 6 12 5.4C12 4.3 11.3 3.5 10.5 3.5C9.7 3.5 9 4.3 9 5.4C9 6 9.2 6.5 9.6 6.9C8.8 7.2 8 7.9 8 9L8 12Z',
-    ],
-    tax: ['M4 10L10 4', 'M4 4h.01', 'M10 10h.01'],
-    supply: ['M2 5H10L12 7V13H2ZM12 8H14V13H12M5 10H8'],
-    time: [
-      'M7 2C4.24 2 2 4.24 2 7C2 9.76 4.24 12 7 12C9.76 12 12 9.76 12 7C12 4.24 9.76 2 7 2M7 4V7L9 9',
-    ],
-    place: ['M7 2L9 5H12L9.5 7L10.5 11L7 9.5L3.5 11L4.5 7L2 5H5Z'],
-  };
-  useLayoutEffect(() => {
-    iconRef.current?.setAttribute('title', props.label);
-  }, [props.label]);
-  if (props.name === 'gold') {
-    return (
-      <GoldIcon
-        className={`${styles.metricIcon} ${styles.goldIcon}`}
-        label={props.label}
-        strokeWidth={2}
-        strokeLinejoin="round"
-        includePathContours
-      />
-    );
-  }
+  const Icon = METRIC_ICONS[props.name];
   return (
-    <svg
-      ref={iconRef}
-      viewBox="0 0 14 14"
+    <Icon
+      size={14}
+      stroke={2}
+      title={props.label}
       aria-label={props.label}
-      className={styles.metricIcon}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {paths[props.name].map((path) => (
-        <path key={path} d={path} />
-      ))}
-    </svg>
+      className={`${styles.metricIcon} ${props.name === 'gold' ? styles.goldIcon : ''}`}
+    />
   );
 }
 
