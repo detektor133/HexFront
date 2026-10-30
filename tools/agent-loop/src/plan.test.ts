@@ -283,6 +283,49 @@ describe('роль plan перед исполнением задачи', () => {
     expect(run.lines).toContain(`готово: ${TASK}`);
   });
 
+  it('сохраняет проверенное уточнение plan, если роль оставила только изменённый документ', async () => {
+    const clarified = fixtureStage.replace(
+      '  *Приёмка:* тесты.',
+      '  *Приёмка:* тесты.\n  *Уточнение plan:* проверить детерминированную фикстуру.',
+    );
+    const run = await runWorld({
+      plan: true,
+      sessions: [
+        {
+          answer: 'PLAN: уточнено',
+          stage: clarified,
+          commit: false,
+          dirty: ' M docs/stages/stage-06-bots-balance.md',
+        },
+        NEXT_DONE,
+        REVIEW_OK,
+      ],
+    });
+    expect(commands(run.prompts)).toEqual([`$plan ${TASK}`, `$task ${TASK}`, `$review ${TASK}`]);
+    expect(run.lines).toContain(
+      `$plan ${TASK}: проверенные документы сохранены коммитом оркестратора`,
+    );
+    expect(run.lines).toContain(`готово: ${TASK}`);
+  });
+
+  it('не сохраняет незакоммиченное уточнение, которое удалило исходную приёмку', async () => {
+    const broken = fixtureStage.replace('  *Приёмка:* тесты.', '  *Приёмка:* другая проверка.');
+    const run = await runWorld({
+      plan: true,
+      sessions: [
+        {
+          answer: 'PLAN: уточнено',
+          stage: broken,
+          commit: false,
+          dirty: ' M docs/stages/stage-06-bots-balance.md',
+        },
+      ],
+    });
+    expect(run.prompts).toEqual([`$plan ${TASK}`]);
+    expect(run.lines.some((line) => line.includes('сверка требований не пройдена'))).toBe(true);
+    expect(run.lines.some((line) => line.includes('сохранены коммитом'))).toBe(false);
+  });
+
   it('plan разбивает задачу — исполнитель получает первую подзадачу', async () => {
     const split = fixtureStage.replace(
       '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',

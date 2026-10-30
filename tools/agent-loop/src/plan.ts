@@ -19,7 +19,7 @@ import {
   type StageState,
   type Step,
 } from './context.ts';
-import { dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
+import { changedPaths, dirtyFiles, head, remoteHead, syncWithOrigin } from './git.ts';
 import { restoreMissingSplitParent, verifyPlanTransition } from './requirements.ts';
 import { parsePlanMessage } from './role-output.ts';
 import {
@@ -65,7 +65,20 @@ export async function runPlan(
   const result = await session(context, 'plan', planPrompt(task, note));
   if (result.failure !== undefined)
     return backoff(context, `$plan ${task}: ${result.failure}`, result.message);
-  if ((await dirtyFiles(git)) !== '')
+  const dirty = (await dirtyFiles(git)) !== '';
+  const paths = dirty ? await changedPaths(git) : [];
+  if (
+    dirty &&
+    ((await head(git)) !== base ||
+      paths.length === 0 ||
+      paths.some(
+        (path) =>
+          !(
+            path === before.path ||
+            ['docs/STATUS.md', 'docs/QUESTIONS.md', 'docs/DECISIONS.md'].includes(path)
+          ),
+      ))
+  )
     return park(
       context,
       `plan:${task}`,
@@ -81,8 +94,6 @@ export async function runPlan(
       `$plan ${task} вышел за свои права (изменил файлы вне permissions.json) — проверь коммит`,
       result.message,
     );
-  const unsynced = await syncWithOrigin(git, false);
-  if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   const parsed = parsePlanMessage(result.message);
   let outcome = parsed?.outcome;
   const detail = parsed?.detail;
@@ -104,13 +115,15 @@ export async function runPlan(
       `$plan ${task} не дал проверяемый исход — проверь`,
       result.message,
     );
+  if (dirty && !['уточнено', 'разбито', 'вопрос'].includes(outcome))
+    return park(context, `plan:${task}`, `$plan ${task} оставил незакоммиченные файлы — проверь`);
   let after = await readStage(context.config.root);
   if (outcome === 'разбито') {
     const repaired = restoreMissingSplitParent(task, before, after);
     if (repaired !== undefined) {
       await writeFile(join(context.config.root, after.path), repaired, 'utf8');
       await git.run(['add', '--', after.path]);
-      await git.run(['commit', '--amend', '--no-edit']);
+      if (!dirty) await git.run(['commit', '--amend', '--no-edit']);
       after = await readStage(context.config.root);
       await context.say(`$plan ${task}: восстановлен удалённый родитель разбиения`);
     }
@@ -137,6 +150,41 @@ export async function runPlan(
       `$plan ${task}: сверка требований не пройдена (${errors.length}): ${errors.slice(0, 3).join(' | ')}`,
       result.message,
     );
+  if (dirty) {
+    const changed = await changedPaths(git);
+    const added = await git.attempt(['add', '--', ...changed]);
+    if (added.code !== 0)
+      return park(
+        context,
+        `plan:${task}`,
+        `$plan ${task}: не удалось подготовить коммит`,
+        added.stderr,
+      );
+    const name = task.split('/').at(-1) ?? task;
+    const title =
+      outcome === 'разбито'
+        ? `docs(docs): разделена задача ${name}`
+        : outcome === 'вопрос'
+          ? `docs(docs): записан вопрос по задаче ${name}`
+          : `docs(docs): уточнена задача ${name}`;
+    const committed = await git.attempt([
+      'commit',
+      '-m',
+      title,
+      '-m',
+      `Этап: ${task.split('/')[0]}/infra`,
+    ]);
+    if (committed.code !== 0 || (await dirtyFiles(git)) !== '')
+      return park(
+        context,
+        `plan:${task}`,
+        `$plan ${task}: не удалось сохранить проверенные документы коммитом`,
+        committed.stderr,
+      );
+    await context.say(`$plan ${task}: проверенные документы сохранены коммитом оркестратора`);
+  }
+  const unsynced = await syncWithOrigin(git, false);
+  if (unsynced !== undefined) return park(context, `sync:${task}`, unsynced);
   await context.say(`$plan ${task}: ${outcome}`);
   return {
     blocked: outcome === 'вопрос',
