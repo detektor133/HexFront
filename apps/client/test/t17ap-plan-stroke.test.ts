@@ -12,6 +12,7 @@ import {
   borderEdges,
   defenseLinePath,
   edgeCorners,
+  FP,
   hexFromId,
   hexId,
   loadMap,
@@ -24,6 +25,7 @@ import {
 } from '@hexfront/sim';
 
 import { armyName } from '../src/dev/army-name.ts';
+import { cityChipShift } from '../src/dev/chip-place.ts';
 import { edgeMid } from '../src/dev/plan-edges.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
@@ -502,5 +504,50 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     await chooseTool(/Фронт|Front/);
     stroke([scenario.points[0], scenario.points[1]], world, true);
     expect(harness.commands).toEqual([]);
+  });
+
+  it('захватывает свою фишку и отправляет split после вытягивания через MatchSurfaceRuntime', async () => {
+    const { map, view, world } = await renderSurface();
+    const unit = view.units.find(
+      (item) =>
+        item.owner === view.playerId &&
+        item.order !== 'retreat' &&
+        item.moveTotal === 0 &&
+        map.terrain[item.hex] !== TERRAIN.water,
+    );
+    if (!unit || !harness.canvas) throw new Error('Не найден подходящий собственный отряд');
+    (unit as { soldiers: number }).soldiers = 200 * FP;
+    const center = hexCenter(hexFromId(unit.hex, map.width), radius);
+    const city = view.cities.find((item) => item.hex === unit.hex);
+    const point = world.toGlobal({
+      x: center.x,
+      y: center.y + (city ? cityChipShift(city.level, radius) : 0),
+    });
+    const total = Math.floor(unit.soldiers / FP);
+    const amount = Math.max(50, Math.min(total - 50, Math.round((total * 0.5) / 50) * 50));
+    expect(view.units.some((item) => item.id === unit.id && item.owner === view.playerId)).toBe(
+      true,
+    );
+    expect(harness.commands).toEqual([]);
+
+    fireEvent.pointerDown(harness.canvas, {
+      button: 0,
+      pointerId: 41,
+      pointerType: 'mouse',
+      clientX: point.x,
+      clientY: point.y,
+    });
+    fireEvent.pointerMove(harness.canvas, {
+      pointerId: 41,
+      clientX: point.x + 12,
+      clientY: point.y,
+    });
+    fireEvent.pointerUp(harness.canvas, {
+      pointerId: 41,
+      clientX: point.x + 12,
+      clientY: point.y,
+    });
+
+    expect(harness.commands).toEqual([{ t: 'split', unitId: unit.id, soldiers: amount * FP }]);
   });
 });
