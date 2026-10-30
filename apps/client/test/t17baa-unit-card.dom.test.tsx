@@ -194,6 +194,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
       soldiers: 103_000 as typeof template.soldiers,
     };
     const view = { ...source, units: [...source.units, first, second, reserve] };
+    const send = vi.fn();
 
     function InteractiveCard(): React.JSX.Element | null {
       const [picked, setPicked] = useState<Picked>({
@@ -201,9 +202,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
         units: [first.id, reserve.id],
         target: null,
       });
-      return (
-        <UnitCard view={view} map={map} picked={picked} send={() => undefined} onPick={setPicked} />
-      );
+      return <UnitCard view={view} map={map} picked={picked} send={send} onPick={setPicked} />;
     }
 
     render(<InteractiveCard />);
@@ -235,6 +234,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
 
     fireEvent.click(screen.getByRole('button', { name: t('unit.close') }));
     expect(screen.queryByRole('region', { name: detailed })).toBeNull();
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('после снятия строки оставляет подробную карточку оставшегося отряда', () => {

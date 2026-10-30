@@ -263,7 +263,7 @@
   stroke: none;
 }
 
-/* Действие одной иконкой: 44×44, иконка 22×22, линия 2, round. */
+/* Кнопка закрытия сохраняет сенсорную область, не добавляя отдельную плитку. */
 .iconButton {
   display: flex;
   align-items: center;
@@ -272,16 +272,16 @@
   height: var(--touch-target-min);
   flex: 0 0 var(--touch-target-min);
   padding: 0;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--ui-ink);
   cursor: pointer;
 }
 
 .icon {
-  width: calc(var(--touch-target-min) / 2);
-  height: 22px;
+  width: var(--space-lg);
+  height: var(--space-lg);
   fill: none;
   stroke: currentColor;
   stroke-width: 2;

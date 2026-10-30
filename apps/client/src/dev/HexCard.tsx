@@ -1,3 +1,4 @@
+import { IconX } from '@tabler/icons-react';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -240,9 +241,7 @@ export function HexCard(props: {
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
           <IconButton className={styles.iconButton} label={t('card.close')} onClick={props.onClose}>
-            <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            <IconX className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         </div>
         <dl className={styles.stats}>

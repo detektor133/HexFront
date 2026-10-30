@@ -1,3 +1,4 @@
+import { IconX } from '@tabler/icons-react';
 import { useLayoutEffect, useRef } from 'react';
 
 import {
@@ -152,9 +153,7 @@ export function UnitCard(props: {
             label={t('unit.close')}
             onClick={() => props.onPick({ hex: null, units: [], target: null })}
           >
-            <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            <IconX className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         </div>
         {units.length === 1 && <UnitRows u={first} view={view} />}
