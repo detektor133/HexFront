@@ -69,7 +69,7 @@ export function selectHex(view: PlayerView, picked: Picked, hex: number): Picked
 /** Выбирает отряды, найденные hit-test фишки, сохраняя семантику повторного тапа. */
 export function selectUnits(view: PlayerView, picked: Picked, ids: readonly number[]): Picked {
   const units = view.units
-    .filter((u) => ids.includes(u.id) && u.owner === view.playerId && u.order !== 'retreat')
+    .filter((u) => ids.includes(u.id) && u.owner === view.playerId)
     .map((u) => u.id);
   if (units.length === 0) return selectHex(view, picked, picked.hex ?? -1);
   const same = units.every((id) => picked.units.includes(id));
@@ -85,7 +85,7 @@ export function toggleUnitSelection(
   ids: readonly number[],
 ): Picked {
   const eligible = view.units.filter(
-    (unit) => ids.includes(unit.id) && unit.owner === view.playerId && unit.order !== 'retreat',
+    (unit) => ids.includes(unit.id) && unit.owner === view.playerId,
   );
   if (eligible.length === 0) return picked;
   const allSelected = eligible.every((unit) => picked.units.includes(unit.id));

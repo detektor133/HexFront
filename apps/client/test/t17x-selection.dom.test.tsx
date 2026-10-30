@@ -315,7 +315,7 @@ describe('07/T17x: выбор через реальный путь /match', () =
     expect(mapStub?.selectionPhases()).toEqual(['start', 'move', 'end']);
     const selectedCard = await screen.findByRole('region', { name: 'Выбранные отряды' });
     expect(selectedCard.textContent).not.toContain('Выбрано отрядов');
-    expect(selectedCard.querySelectorAll('li')).toHaveLength(2);
+    expect(selectedCard.querySelectorAll('li')).toHaveLength(3);
     const selectedRows = Array.from(
       selectedCard.querySelectorAll('li button[aria-pressed="true"]'),
     );
@@ -324,7 +324,7 @@ describe('07/T17x: выбор через реальный путь /match', () =
       expect.arrayContaining(['Пехота · 111', 'Пехота · 222']),
     );
     expect(selectedCard.textContent).not.toContain('333');
-    expect(selectedCard.textContent).not.toContain('444');
+    expect(selectedCard.textContent).toContain('444');
     expect(mapStub?.panCount()).toBe(1);
     expect(mapStub?.zoomCount()).toBe(1);
   });

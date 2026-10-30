@@ -91,6 +91,18 @@ export function UnitCard(props: {
     .filter((u): u is UnitView => u !== undefined);
   const [first] = units;
   if (!first) return null;
+  const mergeReason: MessageKey | null =
+    units.length < 2
+      ? 'unit.mergeNeedMore'
+      : units.some((unit) => unit.owner !== view.playerId)
+        ? 'unit.mergeNotOwn'
+        : units.some((unit) => unit.order === 'retreat')
+          ? 'reason.retreating'
+          : units.some((unit) => unit.type !== first.type)
+            ? 'unit.mergeDifferentTypes'
+            : units.some((unit) => unit.hex !== first.hex)
+              ? 'unit.mergeDifferentHexes'
+              : null;
   const title =
     units.length === 1
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
@@ -105,10 +117,7 @@ export function UnitCard(props: {
     (armyId) =>
       [
         armyId,
-        view.units.filter(
-          (unit) =>
-            unit.owner === view.playerId && unit.order !== 'retreat' && unit.armyId === armyId,
-        ),
+        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
       ] as const,
   );
   const orderedGroups = groups.sort(([left], [right]) => {
@@ -141,18 +150,23 @@ export function UnitCard(props: {
             {orderedGroups.map(([armyId, group]) => {
               const army =
                 armyId === null ? undefined : view.armies.find((item) => item.id === armyId);
+              const selectableGroup = group;
               return (
                 <section className={styles.unitGroup} key={armyId ?? 'reserve'}>
                   <h3 className={styles.groupTitle}>
                     <button
                       type="button"
-                      aria-pressed={group.every((unit) => picked.units.includes(unit.id))}
+                      aria-pressed={
+                        selectableGroup.length > 0 &&
+                        selectableGroup.every((unit) => picked.units.includes(unit.id))
+                      }
+                      disabled={selectableGroup.length === 0}
                       onClick={() =>
                         props.onPick(
                           toggleUnitSelection(
                             view,
                             picked,
-                            group.map((unit) => unit.id),
+                            selectableGroup.map((unit) => unit.id),
                           ),
                         )
                       }
@@ -178,6 +192,17 @@ export function UnitCard(props: {
             })}
           </div>
         )}
+        {mergeReason ? (
+          <p role="status">{t(mergeReason)}</p>
+        ) : units.length > 1 ? (
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => props.send({ t: 'merge', unitIds: units.map((unit) => unit.id) })}
+          >
+            {t('unit.merge')}
+          </button>
+        ) : null}
       </div>
     </section>
   );

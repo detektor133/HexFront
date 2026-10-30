@@ -507,7 +507,7 @@ describe('T17m: карточка клетки', () => {
     expect(screen.queryByRole('group', { name: 'В армию' })).toBeNull();
     expect(screen.getByText('Организованность')).toBeTruthy();
     expect(document.querySelector('dl')).not.toBeNull();
-    expect(screen.queryByRole('status')).not.toBeNull();
+    expect(screen.getByRole('status', { name: t('unit.artilleryNoTarget') })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Слить' })).toBeNull();
     expect(screen.queryByTestId('merge-icon')).toBeNull();
     expect(screen.queryByText(/Резерв/)).toBeNull();
