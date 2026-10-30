@@ -174,7 +174,7 @@
   Цвет остаётся `players.palette[].line`, контур — `ui.surface`.
   *Приёмка:* модульные тесты проверяют цвет подписи по `players.palette[].line` и контур по `ui.surface`; `pnpm verify --changed` проходит.
 
-- [ ] **T17beca. Цвет подписей государств** (`apps/client/src/dev/territory-labels.ts`, `apps/client/test`).
+- [x] **T17beca. Цвет подписей государств** (`apps/client/src/dev/territory-labels.ts`, `apps/client/test`).
   Цвет подписи остаётся `players.palette[].line`.
   *Приёмка:* модульные тесты проверяют цвет подписи по `players.palette[].line`; `pnpm verify --changed` проходит.
 
