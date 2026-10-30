@@ -14,6 +14,28 @@ const commands = (prompts: readonly string[]): string[] =>
   prompts.map((prompt) => prompt.split('\n')[0] ?? '');
 
 describe('роль plan перед исполнением задачи', () => {
+  it('не включает следующий раздел в исходную задачу при разбиении последней задачи', () => {
+    const parent =
+      '- [ ] **T17bs. Деление**.\n  Кнопка делит отряд.\n  *Приёмка:* тест кнопки и жеста.\n\n';
+    const section = '## Завершённые задачи\n\n- [x] **T1. Основа**.\n';
+    const children = [
+      '- [ ] **T17bsa. Кнопка**.\n  Кнопка делит отряд.\n  *Приёмка:* тест кнопки.\n',
+      '- [ ] **T17bsb. Жест**.\n  *Приёмка:* тест жеста.\n',
+      '| Исходная строка T17bs | Подзадача |\n| --- | --- |\n',
+      '| Кнопка делит отряд | T17bsa |\n| *Приёмка:* тест кнопки и жеста. | T17bsa; T17bsb |\n\n',
+    ].join('\n');
+    expect(taskBlock(parent + section, '07/T17bs')).toBe(parent);
+    expect(
+      verifySplit(
+        '07/T17bs',
+        { stageText: parent + section, status: 'Очередь: 07/T17bs' },
+        {
+          stageText: parent + children + section,
+          status: 'Очередь: 07/T17bsa → 07/T17bsb',
+        },
+      ),
+    ).toEqual([]);
+  });
   it('принимает трассировку разбиения с заголовком «Исходный текст»', () => {
     const parent = [
       '- [ ] **T17bd. Список отрядов**.',

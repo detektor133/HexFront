@@ -23,7 +23,7 @@ export function taskBlock(stageText: string, task: string): string {
     new RegExp(`^- \\[[^\\]]\\] \\*\\*${escapeRegExp(shortId(task))}\\.`, 'm'),
   );
   if (start < 0) return '';
-  const next = stageText.slice(start + 1).search(/^- \[[^\]]\] \*\*T/m);
+  const next = stageText.slice(start + 1).search(/^(?:- \[[^\]]\] \*\*T|#{1,6}\s)/m);
   return stageText.slice(start, next < 0 ? undefined : start + 1 + next);
 }
 
