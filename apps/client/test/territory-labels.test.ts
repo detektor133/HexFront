@@ -84,6 +84,22 @@ describe('подписи территорий', () => {
     container.destroy({ children: true });
   });
 
+  it('обводит подпись цветом поверхности интерфейса', () => {
+    installTextCanvasStub();
+    const container = new Container();
+    drawTerritoryLabels(
+      container,
+      [{ playerId: 1, name: 'Юг', at: { x: 0, y: 0 }, fontSize: 12, maxWidth: 100 }],
+      1,
+      1,
+    );
+
+    const label = container.children[0];
+    expect(label).toBeInstanceOf(Text);
+    expect((label as Text).style.stroke).toMatchObject({ color: tokens.ui.surface });
+    container.destroy({ children: true });
+  });
+
   it('сохраняет короткую подпись и уменьшает длинную до ширины территории', () => {
     installTextCanvasStub();
     const labels = buildTerritoryLabels(
