@@ -88,6 +88,25 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   const { army } = sb;
   const view = sb.msg?.view;
+  const groupedCardFixture =
+    new URLSearchParams(window.location.search).get('unitCard') === 'groups';
+  const fixtureSourceUnit = view?.units.find(
+    (unit) => unit.owner === view.playerId && unit.order !== 'retreat' && unit.armyId !== null,
+  );
+  const cardView =
+    view && groupedCardFixture && fixtureSourceUnit
+      ? {
+          ...view,
+          units: [
+            { ...fixtureSourceUnit, id: 2_147_483_646 },
+            { ...fixtureSourceUnit, id: 2_147_483_647 },
+          ],
+        }
+      : view;
+  const cardPicked =
+    groupedCardFixture && fixtureSourceUnit
+      ? { hex: null, units: [2_147_483_646, 2_147_483_647], target: null }
+      : sb.picked;
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
@@ -98,7 +117,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     leaderboardRows: view?.ranking?.length ?? 0,
     ...(leaderboardSize === undefined ? {} : { leaderboardSize }),
     cardHeight: cardH,
-    cardOpen: sb.picked.units.length > 0 || sb.picked.hex !== null,
+    cardOpen: cardPicked.units.length > 0 || sb.picked.hex !== null,
     popupOpen,
     ...(taxAnchor === undefined ? {} : { popupAnchorX: taxAnchor.x, popupAnchorY: taxAnchor.y }),
     ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
@@ -239,11 +258,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {view && map && styleFor('card') && sb.picked.units.length > 0 && !sb.tool && (
+      {cardView && map && styleFor('card') && cardPicked.units.length > 0 && !sb.tool && (
         <UnitCard
-          view={view}
+          view={cardView}
           map={map}
-          picked={sb.picked}
+          picked={cardPicked}
           send={sb.send}
           onPick={sb.pick}
           onHeight={setCardH}
