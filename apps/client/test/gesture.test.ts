@@ -13,15 +13,28 @@ type Pt = { x: number; y: number };
 interface Setup {
   readonly events: GestureEvent[];
   readonly g: ReturnType<typeof createGesture>;
-  readonly state: { drawing: boolean; canHold: boolean; zone: (p: Pt) => boolean };
+  readonly state: {
+    drawing: boolean;
+    canHold: boolean;
+    zone: (p: Pt) => boolean;
+    ownChipCaptured: boolean;
+  };
 }
 
-function setup(over: Partial<Setup['state']> = {}): Setup {
+function setup(over: Partial<Setup['state']> = {}, ownChipAt?: Pt): Setup {
   const events: GestureEvent[] = [];
-  const state = { drawing: false, canHold: true, zone: (_: Pt) => false, ...over };
+  const state = {
+    drawing: false,
+    canHold: true,
+    zone: (_: Pt) => false,
+    ownChipCaptured: false,
+    ...over,
+  };
   const deps: GestureDeps = {
-    drawing: () => state.drawing,
-    press: () => undefined,
+    drawing: () => state.drawing || state.ownChipCaptured,
+    press: (at) => {
+      state.ownChipCaptured = ownChipAt?.x === at.x && ownChipAt.y === at.y;
+    },
     release: () => undefined,
     canHold: () => state.canHold,
     cancelZone: (p) => state.zone(p),
@@ -101,6 +114,17 @@ describe('жесты карты (04/T16, 07-controls.md)', () => {
     split.g.up(1, { x: 120, y: 100 }, 200);
     expect(kinds(split)).toEqual(['stroke:start', 'stroke:move', 'stroke:end']);
     expect(kinds(split)).not.toContain('selection:start');
+  });
+
+  it('захват своей фишки вытягивает её вместо рамки', () => {
+    const ownChipAt = { x: 100, y: 100 };
+    const s = setup({}, ownChipAt);
+    s.g.down(1, ownChipAt, 0, 0);
+    expect(s.state.ownChipCaptured).toBe(true);
+    s.g.move(1, { x: ownChipAt.x + DRAG_SLOP_PX + 1, y: ownChipAt.y }, 100);
+    s.g.up(1, { x: 140, y: 100 }, 200);
+    expect(kinds(s)).toEqual(['stroke:start', 'stroke:move', 'stroke:end']);
+    expect(s.events.some((event) => event.t === 'selection')).toBe(false);
   });
 
   it('каждая из трёх отмен не отдаёт приказа', () => {
