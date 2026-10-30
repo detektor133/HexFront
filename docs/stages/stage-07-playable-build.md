@@ -324,6 +324,7 @@
 - [ ] **T17bkd. Сохранить выбор армии правой кнопкой мыши** (`apps/client/src/dev/ArmyBar.tsx`, `apps/client/test`).
   ПКМ по карточке работает по прежним правилам.
   *Приёмка:* DOM-тест карточки армии проверяет действие ПКМ. `pnpm verify --changed` проходит.
+  *Уточнение plan:* DOM-тест рендерит две карточки и для каждой проверяет, что событие `contextmenu` вызывает выбор её `armyId` и устанавливает `defaultPrevented`; это соответствует `docs/art/ui.md` §«Карточки армий» и `docs/gdd/07-controls.md` §«Мышь и касания».
 
 - [ ] **T17bke. Сохранить двойной клик по карточке армии с фокусом камеры** (`apps/client/src/dev/ArmyBar.tsx`, `apps/client/src/match/MatchSurface.tsx`, `apps/client/test`).
   Двойной клик с фокусом камеры работает по прежним правилам.
