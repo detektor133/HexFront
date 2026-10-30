@@ -347,6 +347,7 @@
 - [ ] **T17bsb. Сохранение деления вытягиванием из фишки** (`apps/client/src/dev/UnitCard.tsx`, `apps/client/test/gesture.test.ts`).
   Вытягивание из фишки не меняется.
   *Приёмка:* тест жеста подтверждает сохранность деления вытягиванием; `pnpm verify --changed` проходит.
+  *Уточнение plan:* тест `захват своей фишки вытягивает её вместо рамки` в `apps/client/test/gesture.test.ts` подтверждает события `stroke:start`, `stroke:move`, `stroke:end` и отсутствие `selection`; `pnpm verify --changed` остаётся обязательной проверкой.
   *Трассировка T17bs:*
 
   | Исходная строка T17bs | Подзадача |
