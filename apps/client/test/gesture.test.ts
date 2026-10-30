@@ -34,26 +34,18 @@ const kinds = (s: Setup): string[] =>
   s.events.map((e) => (e.t === 'tap' ? `tap:${e.kind}` : 'phase' in e ? `${e.t}:${e.phase}` : e.t));
 
 describe('жесты карты (04/T16, 07-controls.md)', () => {
-  it('выдаёт рамку выбора при ЛКМ без Shift', () => {
+  it.each([false, true])('рамка начинается после порога при Shift=%s', (shift) => {
     const s = setup();
-    s.g.down(1, { x: 10, y: 20 }, 0, 0);
-    s.g.move(1, { x: 30, y: 50 }, 20);
+    s.g.down(1, { x: 10, y: 20 }, 0, 0, shift);
+    s.g.move(1, { x: 18, y: 20 }, 20);
+    expect(s.events).toEqual([]);
+    s.g.move(1, { x: 19, y: 20 }, 30);
     s.g.up(1, { x: 40, y: 60 }, 40);
     expect(s.events).toEqual([
-      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 30, y: 50 }, phase: 'start' },
-      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 30, y: 50 }, phase: 'move' },
+      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 19, y: 20 }, phase: 'start' },
+      { t: 'selection', at: { x: 10, y: 20 }, to: { x: 19, y: 20 }, phase: 'move' },
       { t: 'selection', at: { x: 10, y: 20 }, to: { x: 40, y: 60 }, phase: 'end' },
     ]);
-    const end = s.events.at(-1);
-    expect(end).toMatchObject({ t: 'selection', phase: 'end', to: { x: 40, y: 60 } });
-  });
-
-  it('не создаёт рамку до преодоления порога перетаскивания', () => {
-    const s = setup();
-    s.g.down(1, { x: 10, y: 20 }, 0, 0);
-    s.g.move(1, { x: 17, y: 20 }, 20);
-    expect(s.events.some((event) => event.t === 'selection')).toBe(false);
-    expect(s.events.some((event) => event.t === 'pan')).toBe(false);
   });
 
   it('Esc отменяет активное удержание без события завершения', () => {
