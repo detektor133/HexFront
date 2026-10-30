@@ -82,7 +82,7 @@ describe('07/T17aj: выбор армии через панель', () => {
     }
   });
 
-  it('ПКМ по каждой карточке выбирает её armyId и отменяет браузерное меню', () => {
+  it('07/T17bkd: ПКМ по каждой карточке выбирает её armyId и отменяет браузерное меню', () => {
     const { view, armies } = viewWithTwoArmiesOnOneHex();
     const onSelect = vi.fn();
     vi.stubGlobal(
