@@ -62,7 +62,6 @@ describe('подписи и причины отказа (04/T16, art/ui.md)', ()
   it('подсказок-инструкций и кнопок подтверждения атаки в словаре нет', () => {
     for (const k of [
       'unit.hintOrder',
-      'unit.split',
       'unit.clear',
       'forecast.attack',
       'forecast.cancel',

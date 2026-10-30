@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 
 import {
   FP,
+  MAX_UNITS_PER_HEX,
   type Command,
   type Fp,
   type MapStatic,
@@ -103,6 +104,19 @@ export function UnitCard(props: {
             : units.some((unit) => unit.hex !== first.hex)
               ? 'unit.mergeDifferentHexes'
               : null;
+  const splitReason: MessageKey | null =
+    units.length !== 1
+      ? null
+      : first.owner !== view.playerId
+        ? 'reason.notOwnUnit'
+        : first.soldiers < 2 * FP
+          ? 'unit.splitNeedMore'
+          : first.order === 'retreat'
+            ? 'reason.retreating'
+            : view.units.filter((unit) => unit.owner === view.playerId && unit.hex === first.hex)
+                  .length >= MAX_UNITS_PER_HEX
+              ? 'reason.hexFull'
+              : null;
   const title =
     units.length === 1
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
@@ -191,6 +205,25 @@ export function UnitCard(props: {
               );
             })}
           </div>
+        )}
+        {units.length === 1 && (
+          <>
+            <button
+              type="button"
+              className={styles.button}
+              disabled={splitReason !== null}
+              onClick={() =>
+                props.send({
+                  t: 'split',
+                  unitId: first.id,
+                  soldiers: (Math.floor(first.soldiers / (2 * FP)) * FP) as Fp,
+                })
+              }
+            >
+              {t('unit.split')}
+            </button>
+            {splitReason && <p role="status">{t(splitReason)}</p>}
+          </>
         )}
         {mergeReason ? (
           <p role="status">{t(mergeReason)}</p>
