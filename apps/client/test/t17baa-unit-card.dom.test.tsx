@@ -67,17 +67,30 @@ describe('07/T17baa: закрытие карточки отряда', () => {
       />,
     );
     const card = screen.getByRole('region', { name: t('unit.groups') });
-    const headings = Array.from(card.querySelectorAll('h3'), (heading) => heading.textContent);
-    expect(headings).toEqual([
-      t('army.numbered').replace('{n}', '1'),
-      t('army.numbered').replace('{n}', '2'),
-      t('army.reserve'),
-    ]);
-    expect(Array.from(card.querySelectorAll('li'), (row) => row.textContent)).toEqual([
-      `${t(`unit.${fourth.type}` as MessageKey)} · ${formatSoldiers(fourth.soldiers)}`,
-      `${t(`unit.${third.type}` as MessageKey)} · ${formatSoldiers(third.soldiers)}`,
-      `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`,
-      `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`,
+    const groups = Array.from(card.querySelectorAll('h3'), (heading) => {
+      const group = heading.closest('section');
+      if (!group) throw new Error('заголовок группы должен находиться внутри группы');
+      return {
+        heading: heading.textContent,
+        rows: Array.from(group.querySelectorAll('li'), (row) => row.textContent),
+      };
+    });
+    expect(groups).toEqual([
+      {
+        heading: t('army.numbered').replace('{n}', '1'),
+        rows: [
+          `${t(`unit.${fourth.type}` as MessageKey)} · ${formatSoldiers(fourth.soldiers)}`,
+          `${t(`unit.${third.type}` as MessageKey)} · ${formatSoldiers(third.soldiers)}`,
+        ],
+      },
+      {
+        heading: t('army.numbered').replace('{n}', '2'),
+        rows: [`${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`],
+      },
+      {
+        heading: t('army.reserve'),
+        rows: [`${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`],
+      },
     ]);
     expect(container.textContent).not.toContain('Выбрано отрядов');
   });
@@ -175,6 +188,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     const army = source.armies[0];
     const template = source.units.find((unit) => unit.owner === source.playerId);
     if (!army || !template) throw new Error('фикстуре нужны армия и свой отряд');
+    const otherArmy = { ...army, id: 9902, number: army.number + 1 };
     const first = {
       ...template,
       id: 9201,
@@ -193,13 +207,23 @@ describe('07/T17bdb: выбор из сгруппированной карточ
       armyId: null,
       soldiers: 103_000 as typeof template.soldiers,
     };
-    const view = { ...source, units: [...source.units, first, second, reserve] };
+    const otherArmyUnit = {
+      ...template,
+      id: 9204,
+      armyId: otherArmy.id,
+      soldiers: 104_000 as typeof template.soldiers,
+    };
+    const view = {
+      ...source,
+      armies: [...source.armies, otherArmy],
+      units: [...source.units, first, second, reserve, otherArmyUnit],
+    };
     const send = vi.fn();
 
     function InteractiveCard(): React.JSX.Element | null {
       const [picked, setPicked] = useState<Picked>({
         hex: null,
-        units: [first.id, reserve.id],
+        units: [first.id, reserve.id, otherArmyUnit.id],
         target: null,
       });
       return <UnitCard view={view} map={map} picked={picked} send={send} onPick={setPicked} />;
@@ -217,6 +241,18 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'false',
     );
+    fireEvent.click(screen.getByRole('button', { name: secondRow }));
+    expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    const otherGroupLabel = t('army.numbered').replace('{n}', String(otherArmy.number));
+    expect(screen.getByRole('button', { name: otherGroupLabel })).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: `${t(`unit.${otherArmyUnit.type}` as MessageKey)} · ${formatSoldiers(otherArmyUnit.soldiers)}`,
+      }),
+    ).toBeTruthy();
 
     const groupButton = screen.getByRole('button', {
       name: t('army.numbered').replace('{n}', String(army.number)),
@@ -228,6 +264,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     fireEvent.click(
       screen.getByRole('button', { name: t('army.numbered').replace('{n}', String(army.number)) }),
     );
+    fireEvent.click(screen.getByRole('button', { name: otherGroupLabel }));
     expect(screen.queryByRole('region', { name: t('unit.groups') })).toBeNull();
     const detailed = `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`;
     expect(screen.getByRole('region', { name: detailed })).toBeTruthy();

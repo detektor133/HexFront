@@ -69,25 +69,36 @@
 
 .unitGroup {
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface2);
 }
 
 .groupTitle {
   margin: 0;
   font-size: var(--font-size-caption);
   font-weight: 600;
+  color: var(--ui-ink2);
 }
 
 .groupTitle button,
 .unitList button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   min-height: var(--touch-target-min);
   width: 100%;
   padding: 0 var(--space-sm);
   border: 0;
-  background: transparent;
-  color: inherit;
+  background: var(--ui-surface);
+  color: var(--ui-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.groupTitle button {
+  background: var(--ui-surface2);
 }
 
 .groupTitle button[aria-pressed='true'],
@@ -95,11 +106,37 @@
   background: var(--ui-surface2);
 }
 
+.groupTitle button:hover,
+.unitList button:hover {
+  background: var(--ui-surface2);
+}
+
+.groupTitle button:focus-visible,
+.unitList button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--selection-color);
+  outline-offset: -2px;
+}
+
+.armyMarker {
+  width: var(--space-sm);
+  height: var(--space-sm);
+  flex: 0 0 var(--space-sm);
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+}
+
 .unitList {
   margin: var(--space-xs) 0 0;
   padding: 0;
   list-style: none;
   font-size: var(--font-size-caption);
+  color: var(--ui-ink);
+}
+
+.unitList button {
+  border-top: 1px solid var(--ui-border);
 }
 
 .good,

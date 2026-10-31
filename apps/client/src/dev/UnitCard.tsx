@@ -17,6 +17,7 @@ import { measureCardHeight } from './card-measurement.ts';
 import { toggleUnitSelection, type Picked } from './sandbox-selection.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
+import { armyColor } from '../theme/colors.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
@@ -184,6 +185,12 @@ export function UnitCard(props: {
                         )
                       }
                     >
+                      <span
+                        aria-hidden="true"
+                        className={styles.armyMarker}
+                        data-army-number={army?.number}
+                        style={{ backgroundColor: army ? armyColor(army.number) : undefined }}
+                      />
                       {army ? armyName(army) : t('army.reserve')}
                     </button>
                   </h3>

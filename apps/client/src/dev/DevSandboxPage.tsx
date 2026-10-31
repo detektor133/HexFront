@@ -512,20 +512,35 @@ export function SandboxSurface({
     (unit) => unit.order !== 'retreat' && unit.armyId !== null,
   );
   const fixtureUnits =
-    unitCardFixture === 'groups'
+    unitCardFixture === 'groups' || unitCardFixture === 'groups-style'
       ? fixtureSourceUnit
-        ? [
-            { ...fixtureSourceUnit, id: 2_147_483_646 },
-            { ...fixtureSourceUnit, id: 2_147_483_647, armyId: null },
-          ]
+        ? unitCardFixture === 'groups-style'
+          ? [
+              { ...fixtureSourceUnit, id: 2_147_483_645 },
+              { ...fixtureSourceUnit, id: 2_147_483_646 },
+              { ...fixtureSourceUnit, id: 2_147_483_647, armyId: null },
+            ]
+          : [
+              { ...fixtureSourceUnit, id: 2_147_483_646 },
+              { ...fixtureSourceUnit, id: 2_147_483_647, armyId: null },
+            ]
         : undefined
       : unitCardFixture === '1'
         ? view?.units.filter((unit) => unit.order !== 'retreat').slice(0, 1)
         : undefined;
   const cardView =
-    view && fixtureUnits && unitCardFixture === 'groups' ? { ...view, units: fixtureUnits } : view;
+    view && fixtureUnits && (unitCardFixture === 'groups' || unitCardFixture === 'groups-style')
+      ? { ...view, units: fixtureUnits }
+      : view;
   const cardPicked = fixtureUnits
-    ? { hex: null, units: fixtureUnits.map((unit) => unit.id), target: null }
+    ? {
+        hex: null,
+        units:
+          unitCardFixture === 'groups-style'
+            ? fixtureUnits.filter((_, index) => index !== 1).map((unit) => unit.id)
+            : fixtureUnits.map((unit) => unit.id),
+        target: null,
+      }
     : sb.picked;
   const map = typeof loaded === 'string' ? null : loaded.map;
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
@@ -600,7 +615,7 @@ export function SandboxSurface({
           picked={cardPicked}
           send={sb.send}
           onPick={sb.pick}
-          {...(unitCardFixture === 'groups'
+          {...(unitCardFixture === 'groups' || unitCardFixture === 'groups-style'
             ? { style: { left: '8px', bottom: 'calc(var(--dock-h, 0px) + 8px)' } }
             : {})}
         />
