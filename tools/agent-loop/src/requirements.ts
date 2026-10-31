@@ -210,6 +210,16 @@ export function verifySplit(
     lines(body.filter((line) => /приёмка|^\s*\d+[.)]\s/iu.test(line)).join('\n')),
   );
   const traced = hasCompleteSplitTrace(task, after.stageText, children, parentRequirements.length);
+  const missing = parentRequirements.filter((item) =>
+    childTexts.every((text) => !text.includes(item)),
+  );
+  if (
+    missing.length > 0 &&
+    !traced &&
+    !after.stageText.includes(`| Исходная строка ${name} | Подзадача |`) &&
+    !after.stageText.includes(`Трассировка разбиения ${name}:`)
+  )
+    errors.push(`нет отдельной таблицы трассировки ${name}; таблица предка не учитывается`);
   for (const item of parentRequirements) {
     const found = childTexts.filter((text) => text.includes(item)).length;
     if (found === 0 && !traced) {

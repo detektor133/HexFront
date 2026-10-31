@@ -103,6 +103,17 @@ describe('роль plan перед исполнением задачи', () => {
       '',
     ].join('\n');
     const next = '- [ ] **T17bb. Следующая задача**.\n';
+    const withoutOwnTrace = children.split('| Исходная строка T17bab | Подзадача |')[0] ?? '';
+    expect(
+      verifySplit(
+        '07/T17bab',
+        { stageText: parent + oldTrace + next, status: 'Очередь: 07/T17bab → 07/T17bb' },
+        {
+          stageText: parent + withoutOwnTrace + oldTrace + next,
+          status: 'Очередь: 07/T17baba → 07/T17babb → 07/T17bb',
+        },
+      ),
+    ).toContain('нет отдельной таблицы трассировки T17bab; таблица предка не учитывается');
     expect(
       verifySplit(
         '07/T17bab',
