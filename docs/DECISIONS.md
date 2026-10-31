@@ -436,3 +436,4 @@
 2026-10-31 · 07/T17bmc · Разделена DOM-приёмка шести действий HexCard по командам и состояниям недоступности: upgrade, rebuild, foundCity, improve, fort и depot имеют отдельные условия и проверяемые команды · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md` · Этап: 07/infra
 
 2026-10-31 · 07/T17bn · Из-за запрета открывать изображения критерий снимков открытой карточки заменён проверкой DOM-геометрии и вычисленных CSS-стилей в Playwright `@layout` на 360/1024/1920 px · `docs/stages/stage-07-playable-build.md` · Этап: 07/infra
+2026-10-31 · 07/T17bp · Уточнён список платных действий и типов найма, которые должны проверять общий компонент и видимую цену: `upgrade`, `rebuild`, `foundCity`, `improve`, `fort`, `depot`, `infantry`, `armor`, `artillery` · `docs/stages/stage-07-playable-build.md` · Этап: 07/infra
