@@ -169,7 +169,7 @@ const printFailedRun = async (
       const text = await logResponse.text();
       const lines = text.replace(/\r\n/g, '\n').trimEnd().split('\n');
       const diagnostic = lines.filter((line) =>
-        /\bFAIL\b|Test timed out|AssertionError|TestingLibraryElementError|##\[error\]/iu.test(
+        /\bFAIL\s|Test timed out|Test timeout of|\) \[desktop\] ›|locator\.\w+:|AssertionError|TestingLibraryElementError|##\[error\]/iu.test(
           line,
         ),
       );

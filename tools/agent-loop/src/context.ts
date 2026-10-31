@@ -257,7 +257,7 @@ async function ciWait(
   const details = ci.stdout
     .split(/\r?\n/u)
     .filter((entry) =>
-      /(?:\bFAIL\b|Test timed out|\bError:|AssertionError|TestingLibraryElementError|##\[error\])/iu.test(
+      /(?:\bFAIL\s|Test timed out|Test timeout of|\) \[desktop\] ›|locator\.\w+:|\bError:|AssertionError|TestingLibraryElementError|##\[error\])/iu.test(
         entry,
       ),
     )

@@ -23,6 +23,7 @@ describe('диагностика таймаута verify', () => {
         ),
       ).toBe(true);
       expect(await testTimedOut(root, 'verify: FAIL lint', '')).toBe(false);
+      expect(await testTimedOut(root, 'Test timeout of 30000ms exceeded.', '')).toBe(true);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

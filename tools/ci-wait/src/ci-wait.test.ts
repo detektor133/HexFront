@@ -186,6 +186,27 @@ describe('ожидание GitHub Actions', () => {
     expect(output.some((line) => line.startsWith('<div>'))).toBe(false);
   });
 
+  it('передаёт путь и таймаут Playwright из лога job', async () => {
+    const failure = '  1) [desktop] › tests/e2e/t17bmb-hex-card-layout.spec.ts:6:3 › карточка';
+    const responses = [
+      jsonResponse({ workflow_runs: [run('completed', 'failure')] }),
+      jsonResponse({ jobs: [{ id: 7, name: 'check', conclusion: 'failure' }] }),
+      textResponse(
+        `${failure}\nTest timeout of 30000ms exceeded.\nError: locator.boundingBox: Test timeout of 30000ms exceeded.`,
+      ),
+    ];
+    const output: string[] = [];
+    await waitForCi({
+      repo: 'acme/game',
+      sha: 'abc123',
+      once: true,
+      fetchFn: async () => responses.shift() ?? jsonResponse({}),
+      writeLine: (line) => output.push(line),
+    });
+    expect(output).toContain(failure);
+    expect(output).toContain('Test timeout of 30000ms exceeded.');
+  });
+
   it('после перезапуска игнорирует старую красную попытку того же SHA', async () => {
     const old = run('completed', 'failure');
     const next = { ...old, run_attempt: 2, status: 'completed', conclusion: 'success' };

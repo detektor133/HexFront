@@ -58,20 +58,27 @@ for (const width of WIDTHS) {
     const statCells = stats.locator('dt, dd');
     expectNoOverlap(await boxes(statCells));
 
-    for (const button of await pricedActions.all()) {
-      const buttonBox = await button.boundingBox();
-      const price = button.locator('span:has(svg)');
-      const label = button.locator(':scope > span:not(:has(svg))');
-      const priceBox = await price.boundingBox();
-      const labelBox = await label.boundingBox();
-      expect(buttonBox).not.toBeNull();
-      expect(priceBox).not.toBeNull();
-      expect(labelBox).not.toBeNull();
-      if (!buttonBox || !priceBox || !labelBox) {
+    const pricedRows = await pricedActions.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const price = button.querySelector('span:has(svg)');
+        const label = button.querySelector(':scope > span:not(:has(svg))');
+        if (!price || !label) return null;
+        const box = (element: Element) => {
+          const rect = element.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        };
+        return { button: box(button), price: box(price), label: box(label) };
+      }),
+    );
+    expect(pricedRows.length).toBeGreaterThan(0);
+    for (const row of pricedRows) {
+      if (!row) {
         throw new Error('Цена, подпись или кнопка не имеет границ');
       }
-      expect(isInside(priceBox, buttonBox)).toBe(true);
-      expect(intersects(priceBox, labelBox)).toBe(false);
+      expect(row.price.width).toBeGreaterThan(0);
+      expect(row.label.width).toBeGreaterThan(0);
+      expect(isInside(row.price, row.button)).toBe(true);
+      expect(intersects(row.price, row.label)).toBe(false);
     }
 
     const recruitRows = await sliders.evaluateAll((inputs) =>

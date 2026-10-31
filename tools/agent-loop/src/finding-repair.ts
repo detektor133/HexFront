@@ -123,16 +123,19 @@ export async function diagnoseFinding(
 const failureOutput = (stdout: string, stderr: string): string =>
   [stdout, stderr].filter(Boolean).join('\n').trim().slice(-4_000);
 
+export const isTestTimeout = (output: string): boolean =>
+  /\b(?:Test timed out in \d+ms|Test timeout of \d+ms exceeded)\b/iu.test(output);
+
 /** Лог verify хранит точную причину, которую краткая консольная сводка обрезает. */
 export async function testTimedOut(root: string, stdout: string, stderr: string): Promise<boolean> {
   const output = `${stdout}\n${stderr}`;
-  if (/\bTest timed out in \d+ms\b/iu.test(output)) return true;
+  if (isTestTimeout(output)) return true;
   const match = /^лог:\s+\.ai-logs[\\/]verify-([\dTZ-]+)\.log/mu.exec(output);
   if (match?.[1] === undefined) return false;
   const log = await readFile(join(root, '.ai-logs', `verify-${match[1]}.log`), 'utf8').catch(
     () => '',
   );
-  return /\bTest timed out in \d+ms\b/iu.test(log);
+  return isTestTimeout(log);
 }
 
 const E2E_SPEC_RE = /^apps\/client\/tests\/e2e\/.*\.spec\.ts$/u;

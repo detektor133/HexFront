@@ -21,6 +21,7 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
+  isTestTimeout,
   testTimedOut,
   verifyTouchedTests,
 } from './finding-repair.ts';
@@ -529,7 +530,7 @@ async function retryTimedOutCi(
   const runId = /\/actions\/runs\/(\d+)/u.exec(ci.line)?.[1];
   if (
     active === undefined ||
-    !/Test timed out in \d+ms/iu.test(ci.details ?? '') ||
+    !isTestTimeout(ci.details ?? '') ||
     ci.attempt === undefined ||
     runId === undefined ||
     context.config.github === undefined ||

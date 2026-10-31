@@ -1370,6 +1370,20 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('таймаут Playwright в CI повторяет тот же SHA без возврата текущей задачи', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK'), review('OK')],
+      ci: [
+        '1) [desktop] › tests/e2e/t17bmb-hex-card-layout.spec.ts:6:3\nTest timeout of 30000ms exceeded.\nrun_attempt=1\nfailure job=check https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/123',
+        'success https://github.com/acme/game/actions/runs/124',
+      ],
+    });
+    expect(run.reruns).toEqual([123]);
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
     const run = await runWorld({ sessions: [{ ...codeCommit(), push: true }] });
 
