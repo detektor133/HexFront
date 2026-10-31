@@ -54,6 +54,35 @@ export const isAncestor = async (
 ): Promise<boolean> =>
   (await git.attempt(['merge-base', '--is-ancestor', ancestor, descendant])).code === 0;
 
+/** Пересоздаёт проверенное дерево поверх собственного опубликованного коммита после красного CI. */
+export async function reparentReviewedCommit(
+  git: Git,
+  published: string,
+  source: string,
+): Promise<string | undefined> {
+  if ((await dirtyFiles(git)) !== '') return 'рабочее дерево не чистое';
+  const sourceTree = await git.run(['rev-parse', `${source}^{tree}`]);
+  if (sourceTree === (await git.run(['rev-parse', `${published}^{tree}`])))
+    return 'исправленный коммит не меняет содержимое опубликованного HEAD';
+  const reset = await git.attempt(['reset', '--soft', published]);
+  if (reset.code !== 0) return reset.stderr.trim() || 'git reset --soft не прошёл';
+  const committed = await git.attempt(['commit', '-C', source]);
+  if (committed.code !== 0) {
+    await git.attempt(['reset', '--soft', source]);
+    return committed.stderr.trim() || 'git commit не прошёл';
+  }
+  const current = await head(git);
+  if (
+    (await git.run(['rev-parse', `${current}^{tree}`])) !== sourceTree ||
+    (await git.run(['rev-parse', `${current}^`])) !== published ||
+    (await dirtyFiles(git)) !== ''
+  ) {
+    await git.attempt(['reset', '--soft', source]);
+    return 'пересобранный коммит отличается от проверенного дерева';
+  }
+  return undefined;
+}
+
 /**
  * Сводит локальную ветку с origin: отстала — fast-forward, ушла вперёд — push,
  * разошлась — rebase поверх origin и push. Конфликт rebase откатывается.

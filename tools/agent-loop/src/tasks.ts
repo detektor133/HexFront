@@ -24,7 +24,15 @@ import {
   testTimedOut,
   verifyTouchedTests,
 } from './finding-repair.ts';
-import { changedPaths, dirtyFiles, head, isAncestor, publishBranch, remoteHead } from './git.ts';
+import {
+  changedPaths,
+  dirtyFiles,
+  head,
+  isAncestor,
+  publishBranch,
+  remoteHead,
+  reparentReviewedCommit,
+} from './git.ts';
 import { runPlan } from './plan.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import {
@@ -580,7 +588,7 @@ async function rememberPublished(
   if (changed) await save(context);
 }
 
-async function publishReviewed(
+export async function publishReviewed(
   context: LoopContext,
   task: string,
   expectedRemote: string,
@@ -595,15 +603,37 @@ async function publishReviewed(
     await rememberPublished(context, task, local);
     return undefined;
   }
-  // origin ушёл вперёд, но это коммиты, которые уже есть в нашем HEAD (например, инфра-фикс
-  // опубликовали отдельно, пока эта задача ждала review) — не чужая, расходящаяся история, с
-  // которой нужен rebase, а просто устаревшая отметка «последний известный origin» этой задачи.
-  if (remote !== expectedRemote && !(await isAncestor(context.git, remote, local)))
-    return park(
-      context,
-      `sync:${task}`,
-      `${task}: origin/${branch} изменился после review (${remote || 'нет ref'} вместо ${expectedRemote}); автоматический rebase запрещён`,
+  if (!(await isAncestor(context.git, remote, local))) {
+    const active = context.state.activeTask;
+    const taskTrailer = async (sha: string): Promise<boolean> =>
+      (await context.git.run(['log', '-1', '--format=%B', sha]))
+        .split(/\r?\n/u)
+        .some((line) => line.trim() === `Этап: ${task}`);
+    const ownFailedCi =
+      remote === expectedRemote &&
+      active?.task === task &&
+      active.workspaceRoot !== undefined &&
+      (active.ciRetries ?? 0) > 0 &&
+      (await isAncestor(context.git, active.base, remote)) &&
+      (await isAncestor(context.git, active.base, local)) &&
+      (await taskTrailer(remote)) &&
+      (await taskTrailer(local));
+    if (!ownFailedCi)
+      return park(
+        context,
+        `sync:${task}`,
+        `${task}: origin/${branch} и проверенный HEAD разошлись (${remote} и ${local}); push не будет fast-forward`,
+      );
+    const failure = await reparentReviewedCommit(context.git, remote, local);
+    if (failure !== undefined)
+      return park(context, `sync:${task}`, `${task}: не удалось пересобрать исправление`, failure);
+    active.phase = 'pre-push';
+    await save(context);
+    await context.say(
+      `${task}: исправление после красного CI перенесено на опубликованный HEAD; повторяю pre-push gate`,
     );
+    return 'worked';
+  }
   const pushed = await context.git.attempt(['push', 'origin', `HEAD:${branch}`]);
   if (pushed.code !== 0)
     return backoff(context, `${task}: push проверенного HEAD не прошёл`, pushed.stderr.trim());

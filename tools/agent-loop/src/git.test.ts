@@ -10,6 +10,7 @@ import { head, makeGit, mergedIntoMain, remoteHead, syncWithOrigin, type Git } f
 import { defaultRunCommand } from './process.ts';
 import { loadState } from './state.ts';
 import { promoteWorkspace, taskWorkspace } from './task-workspace.ts';
+import { publishReviewed } from './tasks.ts';
 
 const roots: string[] = [];
 
@@ -123,6 +124,75 @@ afterEach(async () => {
 // сотни миллисекунд, поэтому 5 с по умолчанию проверяли бы скорость ПК, а не код
 // (2026-10-14: $stage-close 06 остановился на таймауте). Предел — защита от зависания.
 describe('сведение ветки с origin на настоящем git', { timeout: 60_000 }, () => {
+  it('после красного CI переносит проверенное дерево на собственный опубликованный коммит до push', async () => {
+    const { mine, root, context } = await workspaceRepo();
+    await mine.run(['push', 'origin', 'stage-06']);
+    const base = await head(mine);
+    const commitTask = async (text: string): Promise<void> => {
+      await writeFile(join(root, 'task.txt'), text);
+      await mine.run(['add', 'task.txt']);
+      await mine.run(['commit', '-m', 'test(client): проверена задача', '-m', 'Этап: 06/T1j5']);
+    };
+    await commitTask('первая версия');
+    const published = await head(mine);
+    await mine.run(['push', 'origin', 'stage-06']);
+    await mine.run(['reset', '--hard', base]);
+    await commitTask('исправленная версия');
+    const source = await head(mine);
+    const sourceTree = await mine.run(['rev-parse', `${source}^{tree}`]);
+    context.state.activeTask = {
+      task: '06/T1j5',
+      base,
+      workspaceRoot: root,
+      remoteBase: published,
+      workPrompt: '$task 06/T1j5',
+      phase: 'ci',
+      findings: [],
+      ciRetries: 1,
+    };
+
+    expect(await publishReviewed(context, '06/T1j5', published)).toBe('worked');
+    const repaired = await head(mine);
+    expect(await mine.run(['rev-parse', 'HEAD^'])).toBe(published);
+    expect(await mine.run(['rev-parse', 'HEAD^{tree}'])).toBe(sourceTree);
+    expect(context.state.activeTask.phase).toBe('pre-push');
+    expect(await remoteHead(mine)).toBe(published);
+    expect(await publishReviewed(context, '06/T1j5', published)).toBeUndefined();
+    expect(await remoteHead(mine)).toBe(repaired);
+  });
+
+  it('не пересобирает задачу поверх чужого коммита', async () => {
+    const { mine, other, root, otherRoot, context } = await workspaceRepo();
+    await mine.run(['push', 'origin', 'stage-06']);
+    const base = await head(mine);
+    await writeFile(join(root, 'task.txt'), 'первая версия');
+    await mine.run(['add', 'task.txt']);
+    await mine.run(['commit', '-m', 'test(client): проверена задача', '-m', 'Этап: 06/T1j5']);
+    const published = await head(mine);
+    await mine.run(['push', 'origin', 'stage-06']);
+    await other.run(['pull', '--ff-only', 'origin', 'stage-06']);
+    await commitFile(other, otherRoot, 'foreign.txt', 'чужая правка');
+    await other.run(['push', 'origin', 'stage-06']);
+    await mine.run(['reset', '--hard', base]);
+    await writeFile(join(root, 'task.txt'), 'исправленная версия');
+    await mine.run(['add', 'task.txt']);
+    await mine.run(['commit', '-m', 'test(client): исправлена задача', '-m', 'Этап: 06/T1j5']);
+    const local = await head(mine);
+    context.state.activeTask = {
+      task: '06/T1j5',
+      base,
+      workspaceRoot: root,
+      remoteBase: published,
+      workPrompt: '$task 06/T1j5',
+      phase: 'ci',
+      findings: [],
+      ciRetries: 1,
+    };
+
+    expect(await publishReviewed(context, '06/T1j5', published)).toBe('idle');
+    expect(context.state.parked?.key).toBe('sync:06/T1j5');
+    expect(await head(mine)).toBe(local);
+  });
   it('передаёт сообщение коммита с пробелами одним аргументом', async () => {
     const { mine } = await repos();
     await mine.run([
