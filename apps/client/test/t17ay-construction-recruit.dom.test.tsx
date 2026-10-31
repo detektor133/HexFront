@@ -141,6 +141,40 @@ function expectThreeStates(
 describe('07/T17ay: состояния строительства и найма', () => {
   afterEach(cleanup);
 
+  it('07/T17bmcc: отправляет foundCity только для доступного основания города', () => {
+    cleanup();
+    const { nonCity, view } = getFixtures();
+    expect(nonCity.city).toBeNull();
+    expect(nonCity.hex).toBeGreaterThanOrEqual(0);
+
+    const send = renderCard({ ...nonCity, foundCity: available }, view);
+    expect(screen.getByRole('region')).toBeTruthy();
+    const button = screen.getByRole('button', { name: /Основать город/u });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    expect(send).toHaveBeenCalledExactlyOnceWith({ t: 'foundCity', hex: nonCity.hex });
+
+    for (const [check, expectedReason, otherReason] of [
+      [unaffordable, 'Не хватает золота', 'Ближе 4 гексов к другому городу'],
+      [
+        { ok: false, reason: 'cityTooClose' } as ConstructionCheck,
+        'Ближе 4 гексов к другому городу',
+        'Не хватает золота',
+      ],
+    ] as const) {
+      cleanup();
+      const blockedSend = renderCard({ ...nonCity, foundCity: check }, view);
+      const blockedButton = screen.getByRole('button', { name: /Основать город/u });
+      expect((blockedButton as HTMLButtonElement).disabled).toBe(true);
+      const reasonId = blockedButton.getAttribute('aria-describedby');
+      expect(reasonId).toBeTruthy();
+      expect(document.getElementById(reasonId ?? '')?.textContent).toBe(expectedReason);
+      expect(screen.queryByText(otherReason)).toBeNull();
+      fireEvent.click(blockedButton);
+      expect(blockedSend).not.toHaveBeenCalled();
+    }
+  });
+
   it('07/T17bmca: отправляет upgradeCity только для доступного улучшения', () => {
     const fixtures = getFixtures();
     const city = fixtures.city.city;
