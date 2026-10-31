@@ -247,6 +247,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           partial={partial.filter((a) => a !== army)}
           onHeight={handleArmyBarHeight}
           onSelect={sb.setArmy}
+          onFocusArmy={sb.focusArmy}
           send={sb.send}
           onPick={sb.pick}
           tool={sb.tool}

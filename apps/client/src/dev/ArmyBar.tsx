@@ -229,6 +229,7 @@ function ArmyCard(props: {
   onAuto: () => void;
   onRename: (name: string) => void;
   onClick: () => void;
+  onDoubleClick?: () => void;
 }): React.JSX.Element {
   const { stats, run } = props;
   const [editing, setEditing] = useState(false);
@@ -257,6 +258,7 @@ function ArmyCard(props: {
         className={styles.pick}
         aria-pressed={props.selected}
         onClick={select}
+        onDoubleClick={props.onDoubleClick}
         onContextMenu={selectFromContextMenu}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') select();
@@ -361,6 +363,7 @@ export function ArmyBar(props: {
   /** Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке. */
   partial: readonly number[];
   onSelect: (armyId: number | null) => void;
+  onFocusArmy?: (armyId: number) => void;
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
   tool: ToolState | null;
@@ -476,6 +479,7 @@ export function ArmyBar(props: {
                   onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
+                  onDoubleClick={() => props.onFocusArmy?.(a.id)}
                 />
               );
             })}

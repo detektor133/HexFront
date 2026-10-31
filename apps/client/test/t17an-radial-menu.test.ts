@@ -71,6 +71,7 @@ const harness = vi.hoisted(() => ({
   } | null,
   world: { x: 100, y: 100 },
   artillery: false,
+  focusHex: 0,
   unitHex: 0,
   unitCityLevel: null as number | null,
 }));
@@ -87,6 +88,11 @@ class TestWorker {
     const engine = createLocalEngine(message.map, message.seed ?? 42, message.players ?? 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
     const snapshot = engine.snapshot();
+    const focusArmy = snapshot.view.armies[0];
+    if (!focusArmy) throw new Error('Тестовая армия не создана');
+    const focusUnit = snapshot.view.units.find((unit) => unit.armyId === focusArmy.id);
+    if (!focusUnit) throw new Error('У тестовой армии нет отрядов');
+    harness.focusHex = focusUnit.hex;
     harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
     harness.unitCityLevel =
       snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
@@ -199,6 +205,7 @@ beforeEach(() => {
   harness.mapCanvas = null;
   harness.app = null;
   harness.artillery = false;
+  harness.focusHex = 0;
   harness.world = { x: 100, y: 100 };
   harness.unitHex = 0;
   harness.unitCityLevel = null;
@@ -212,6 +219,38 @@ afterEach(() => {
 });
 
 describe('07/T17an: радиальное меню', () => {
+  it('07/T17bke: двойной клик по карточке выбирает армию и центрирует на ней камеру', async () => {
+    await renderSurface();
+    const card = armyCard();
+    expect(card).toBeTruthy();
+    expect(card.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.doubleClick(card);
+    expect(await waitFor(() => selectedArmyCard().getAttribute('aria-pressed'))).toBe('true');
+
+    const app = harness.app;
+    if (!app) throw new Error('Pixi Application не создан');
+    const world = app.stage.children[0];
+    if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+    app.ticker.callbacks.forEach((callback) => callback({ deltaMS: tokens.motion.map, FPS: 60 }));
+    const target = hexCenter(hexFromId(harness.focusHex, testMap.width), tokens.map.hexRadius);
+    const camera = clampCamera(
+      {
+        scale: world.scale.x,
+        x: app.screen.width / 2 - target.x * world.scale.x,
+        y: app.screen.height / 2 - target.y * world.scale.y,
+      },
+      app.screen,
+      mapBounds(testMap.width, testMap.height, tokens.map.hexRadius),
+    );
+    expect({
+      x: world.position.x + target.x * world.scale.x,
+      y: world.position.y + target.y * world.scale.y,
+    }).toEqual({
+      x: Math.round(camera.x) + target.x * camera.scale,
+      y: Math.round(camera.y) + target.y * camera.scale,
+    });
+  });
+
   it('не открывает меню и не отправляет команду при удержании выбранной карточки армии', async () => {
     await renderSurface();
     const card = armyCard();

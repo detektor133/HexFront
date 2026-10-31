@@ -201,6 +201,7 @@ interface Sandbox {
   pick(p: Picked): void;
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
+  focusArmy(id: number): void;
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number, leaderboardWidth?: number): void;
   setHudHeight(height: number, leaderboardWidth?: number): void;
@@ -290,6 +291,20 @@ export function useSandbox(
     setArmyState(id);
     layerRef.current?.setSelectedArmy(id);
   }, []);
+  const focusArmy = useCallback(
+    (id: number) => {
+      const view = viewRef.current;
+      if (!view || typeof loaded === 'string') return;
+      const units = view.units.filter((unit) => unit.armyId === id);
+      const firstUnit = units[0];
+      setArmy(id);
+      pick({ hex: null, units: units.map((unit) => unit.id), target: null });
+      if (firstUnit) {
+        mapViewRef.current?.centerOn(hexFromId(firstUnit.hex, loaded.map.width), tokens.motion.map);
+      }
+    },
+    [loaded, pick, setArmy],
+  );
   const setRoadPreview = useCallback((path: readonly number[] | null) => {
     layerRef.current?.setRoadPreview(path);
   }, []);
@@ -625,6 +640,7 @@ export function useSandbox(
     pick,
     setTool,
     setArmy,
+    focusArmy,
     setRoadPreview,
     setDockHeight(height, leaderboardWidth) {
       dockHeightRef.current = height;
