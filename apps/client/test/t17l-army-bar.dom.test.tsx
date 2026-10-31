@@ -233,8 +233,41 @@ describe('DOM-приёмка панели армий (07/T17l)', () => {
         scrollLeft = Math.max(0, Math.min(value, strip.scrollWidth - strip.clientWidth));
       },
     });
-    fireEvent.wheel(strip, { cancelable: true, deltaX: 238, deltaY: 0 });
+    expect(content.querySelectorAll('[class*="card"]')).toHaveLength(10);
+    expect(screen.getAllByRole('button', { name: '1-я армия' }).length).toBeGreaterThan(0);
+
+    const horizontalWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaX: 238,
+      deltaY: 42,
+    });
+    const preventHorizontalDefault = vi.spyOn(horizontalWheel, 'preventDefault');
+    strip.dispatchEvent(horizontalWheel);
     expect(strip.scrollLeft).toBe(238);
+    expect(preventHorizontalDefault).toHaveBeenCalledOnce();
+
+    const verticalWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaX: 0,
+      deltaY: 42,
+    });
+    const preventVerticalDefault = vi.spyOn(verticalWheel, 'preventDefault');
+    strip.dispatchEvent(verticalWheel);
+    expect(strip.scrollLeft).toBe(280);
+    expect(preventVerticalDefault).toHaveBeenCalledOnce();
+
+    const zeroWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaX: 0,
+      deltaY: 0,
+    });
+    const preventZeroDefault = vi.spyOn(zeroWheel, 'preventDefault');
+    strip.dispatchEvent(zeroWheel);
+    expect(preventZeroDefault).not.toHaveBeenCalled();
+    expect(strip.scrollLeft).toBe(280);
     for (let index = 0; index < 20; index += 1) {
       fireEvent.wheel(strip, { cancelable: true, deltaX: 238, deltaY: 0 });
     }
