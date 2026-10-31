@@ -128,6 +128,42 @@ function expectThreeStates(
 describe('07/T17ay: состояния строительства и найма', () => {
   afterEach(cleanup);
 
+  it('07/T17bmca: отправляет upgradeCity только для доступного улучшения', () => {
+    const fixtures = getFixtures();
+    const city = fixtures.city.city;
+    if (!city) throw new Error('выбранная карточка не содержит город');
+
+    const prepared = {
+      ...fixtures.city,
+      city: { ...city, upgrade: available },
+    };
+    expect(prepared.city?.id).toBe(city.id);
+    expect(prepared.hex).toBe(city.hex);
+    const send = renderCard(prepared, fixtures.view);
+    const button = screen.getByRole('button', { name: /Улучшить город/u });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    expect(send).toHaveBeenCalledExactlyOnceWith({ t: 'upgradeCity', cityId: city.id });
+
+    for (const [upgrade, reason] of [
+      [unaffordable, 'Не хватает золота'],
+      [{ ok: false, reason: 'maxLevel' } as ConstructionCheck, 'Максимальный уровень'],
+    ] as const) {
+      cleanup();
+      const blockedSend = renderCard(
+        { ...fixtures.city, city: { ...city, upgrade } },
+        fixtures.view,
+      );
+      const blockedButton = screen.getByRole('button', { name: /Улучшить город/u });
+      expect((blockedButton as HTMLButtonElement).disabled).toBe(true);
+      const reasonId = blockedButton.getAttribute('aria-describedby');
+      expect(reasonId).toBeTruthy();
+      expect(document.getElementById(reasonId ?? '')?.textContent).toBe(reason);
+      fireEvent.click(blockedButton);
+      expect(blockedSend).not.toHaveBeenCalled();
+    }
+  });
+
   it('критерий 07/T17ay: улучшение города имеет три постоянных состояния', () => {
     const fixtures = getFixtures();
     const city = fixtures.city.city;
