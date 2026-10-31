@@ -11,11 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
 import { cityChipShift } from '../src/dev/chip-place.ts';
-import { sectorAt, type RadialMenuState } from '../src/dev/radial-menu.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { clampCamera } from '../src/render/camera.ts';
-import { RADIAL_MENU_LONG_PRESS_MS } from '../src/render/gesture.ts';
+import { HOLD_MS } from '../src/render/gesture.ts';
 import { hexCenter, mapBounds } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
 
@@ -169,13 +168,6 @@ async function renderSurface(): Promise<void> {
   };
 }
 
-function menuPoint(item: HTMLElement, menu: HTMLElement): { x: number; y: number } {
-  return {
-    x: Number.parseFloat(menu.style.left) + Number.parseFloat(item.style.left),
-    y: Number.parseFloat(menu.style.top) + Number.parseFloat(item.style.top),
-  };
-}
-
 function screenPointForHex(hexId: number, world: Container): { x: number; y: number } {
   const point = hexCenter(hexFromId(hexId, testMap.width), tokens.map.hexRadius);
   return {
@@ -218,7 +210,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('07/T17an: радиальное меню', () => {
+describe('07/T17bl: удержание и команды матча', () => {
   it('07/T17bke: двойной клик по карточке выбирает армию и центрирует на ней камеру', async () => {
     await renderSurface();
     const card = armyCard();
@@ -251,50 +243,37 @@ describe('07/T17an: радиальное меню', () => {
     });
   });
 
-  it('не открывает меню и не отправляет команду при удержании выбранной карточки армии', async () => {
-    await renderSurface();
-    const card = armyCard();
-    fireEvent.click(card);
-    const selectedCard = await waitFor(() => {
-      const selected = selectedArmyCard();
-      expect(selected.getAttribute('aria-pressed')).toBe('true');
-      return selected;
-    });
-    harness.commands.length = 0;
-    fireEvent.pointerDown(selectedCard, { button: 0, pointerId: 1 });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
-    expect(screen.queryByRole('menu')).toBeNull();
-    fireEvent.pointerUp(selectedCard, { pointerId: 1 });
-    expect(harness.commands).toEqual([]);
-  });
-
-  it('проводит удержание фишки MapView через runtime до send', async () => {
+  it('проводит удержание через MatchSurfaceRuntime → map-view и отправляет приказ без секторов', async () => {
     await renderSurface();
     fireEvent.click(armyCard());
-    await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
+    expect(await waitFor(() => selectedArmyCard().getAttribute('aria-pressed'))).toBe('true');
     if (!harness.mapCanvas || !harness.app) throw new Error('MapView input is not connected');
+    const world = harness.app.stage.children[0];
+    if (!(world instanceof Container)) throw new Error('Слой мира MapView не создан');
+    const destination = screenPointForHex(33, world);
+    harness.commands.length = 0;
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 0,
       pointerId: 1,
       clientX: harness.world.x,
       clientY: harness.world.y,
     });
-    await new Promise((resolve) => setTimeout(resolve, RADIAL_MENU_LONG_PRESS_MS + 10));
+    await new Promise((resolve) => setTimeout(resolve, HOLD_MS + 10));
     harness.app.ticker.callbacks.forEach((callback) => callback({ deltaMS: 0, FPS: 60 }));
-    const menu = await screen.findByRole('menu');
-    const merge = screen.getByRole('menuitem', { name: /merge/i });
-    const point = menuPoint(merge, menu);
+    expect(screen.queryByRole('menu')).toBeNull();
     fireEvent.pointerMove(harness.mapCanvas, {
       pointerId: 1,
-      clientX: point.x,
-      clientY: point.y,
+      clientX: destination.x,
+      clientY: destination.y,
     });
     fireEvent.pointerUp(harness.mapCanvas, {
       pointerId: 1,
-      clientX: point.x,
-      clientY: point.y,
+      clientX: destination.x,
+      clientY: destination.y,
     });
-    expect(harness.commands).toContainEqual({ t: 'merge', unitIds: expect.any(Array) });
+    await waitFor(() => expect(harness.commands).toHaveLength(1));
+    expect(harness.commands[0]).toEqual({ t: 'move', unitIds: [6, 7], to: 33 });
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('проводит двойной тап MapView через runtime до выбора и centerOn', async () => {
@@ -376,7 +355,7 @@ describe('07/T17an: радиальное меню', () => {
     }).toEqual(expectedFinal);
   });
 
-  it('отправляет ПКМ через MapView без открытия radial', async () => {
+  it('отправляет ПКМ через MapView без радиальных секторов', async () => {
     await renderSurface();
     const card = armyCard();
     fireEvent.click(card);
@@ -396,14 +375,5 @@ describe('07/T17an: радиальное меню', () => {
     await waitFor(() => expect(harness.commands).toHaveLength(1));
     expect(harness.commands[0]).toEqual({ t: 'move', unitIds: [6, 7], to: destinationHex });
     expect(screen.queryByRole('menu')).toBeNull();
-  });
-
-  it('не выбирает центр radial', () => {
-    const state: RadialMenuState = {
-      center: { x: 100, y: 100 },
-      actions: [{ kind: 'merge', label: 'merge' }],
-      active: [{ kind: 'merge', label: 'merge' }],
-    };
-    expect(sectorAt(state, { x: 100, y: 100 })).toBeNull();
   });
 });

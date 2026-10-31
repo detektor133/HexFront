@@ -18,7 +18,6 @@ import { applyHudPreview, readHudPreview } from '../dev/hud-preview.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import { buildRadialActions, sectorAt, type RadialMenuState } from '../dev/radial-menu.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
@@ -44,7 +43,7 @@ import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { hexCenter, type Point } from '../render/hex-geometry.ts';
-import { createMapView, type MapView, type RadialHooks, type TapKind } from '../render/map-view.ts';
+import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -74,38 +73,6 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
 
 type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
 type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
-export type RadialPhase = 'start' | 'move' | 'end' | 'cancel';
-
-export function createRadialActionHandler(options: {
-  getView: () => PlayerView | null;
-  send: (command: Command) => void;
-  getState: () => RadialMenuState | null;
-  setState: (state: RadialMenuState | null) => void;
-}): (armyId: number, screen: Point, phase: RadialPhase) => void {
-  return (armyId, screen, phase): void => {
-    const view = options.getView();
-    if (!view) return;
-    if (phase === 'start') {
-      const actions = buildRadialActions(
-        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
-        view,
-      );
-      options.setState({ center: screen, actions, active: actions });
-      return;
-    }
-    const state = options.getState();
-    if (!state) return;
-    const active = sectorAt(state, screen);
-    if (phase === 'move' && active?.children)
-      options.setState({ ...state, active: active.children });
-    if (phase === 'end') {
-      if (active?.command) options.send(active.command);
-      options.setState(null);
-    }
-    if (phase === 'cancel') options.setState(null);
-  };
-}
-
 export function focusUnitOnDoubleTap(options: {
   view: PlayerView;
   map: MapStatic;
@@ -206,8 +173,6 @@ interface Sandbox {
   setDockHeight(height: number, leaderboardWidth?: number): void;
   setHudHeight(height: number, leaderboardWidth?: number): void;
   pixiTelemetry(): PixiTelemetry;
-  readonly radial: RadialMenuState | null;
-  radialForArmy(armyId: number, screen: Point, phase: RadialPhase): void;
 }
 
 /** Локальный матч + карта: Web Worker, сцена Pixi, выбор и приказы кликом. */
@@ -240,8 +205,6 @@ export function useSandbox(
   );
   const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
-  const [radial, setRadial] = useState<RadialMenuState | null>(null);
-  const radialRef = useRef<RadialMenuState | null>(null);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
   const dockHeightRef = useRef(0);
   const hudHeightRef = useRef(0);
@@ -309,19 +272,6 @@ export function useSandbox(
     layerRef.current?.setRoadPreview(path);
   }, []);
   const setArmyRef = useRef(setArmy);
-  const setRadialState = (next: RadialMenuState | null): void => {
-    radialRef.current = next;
-    setRadial(next);
-  };
-  const radialForArmy = useCallback(
-    createRadialActionHandler({
-      getView: () => viewRef.current,
-      send: (command) => matchRef.current?.send(command),
-      getState: () => radialRef.current,
-      setState: setRadialState,
-    }),
-    [],
-  );
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
   const splitGrab = useMemo(
     () =>
@@ -538,24 +488,6 @@ export function useSandbox(
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
       v.setGrab((world) => (toolRef.current ? null : (input.grab(world) ?? splitGrab(world))));
       v.setOrderHooks(hooks);
-      const radialHooks: RadialHooks = {
-        canOpen(world) {
-          const current = viewRef.current;
-          if (!current || toolRef.current || pickedRef.current.units.length === 0) return false;
-          return pickedRef.current.units.some((id) => {
-            const unit = current.units.find((candidate) => candidate.id === id);
-            const center = unit ? layerRef.current?.chipAt(unit.hex) : undefined;
-            return (
-              center !== undefined &&
-              Math.hypot(world.x - center.x, world.y - center.y) <= tokens.map.hexRadius * 0.5
-            );
-          });
-        },
-        action(_world, screen, phase) {
-          radialForArmy(armyRef.current ?? -1, screen, phase);
-        },
-      };
-      v.setRadialHooks?.(radialHooks);
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
         const units = viewRef.current
@@ -604,7 +536,6 @@ export function useSandbox(
       layerRef.current = null;
       mapViewRef.current = null;
       eventsRef.current = [];
-      setRadialState(null);
     };
   }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
 
@@ -623,8 +554,6 @@ export function useSandbox(
     observerId,
     events,
     workerTelemetry: workerTelemetryRef.current,
-    radial,
-    radialForArmy,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },
     focusEvent(item) {

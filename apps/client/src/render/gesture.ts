@@ -7,7 +7,6 @@ import type { Point } from './hex-geometry.ts';
 export const DRAG_SLOP_PX = 8;
 /** Удержание без сдвига дольше этого — цель приказа и прогноз, мс. */
 export const HOLD_MS = 350;
-export const RADIAL_MENU_LONG_PRESS_MS = 400;
 export const DOUBLE_TAP_MS = 350;
 const RIGHT_BUTTON = 2;
 
@@ -33,11 +32,6 @@ export type GestureEvent =
       readonly at: Point;
       readonly phase: 'start' | 'move' | 'end' | 'cancel';
     }
-  | {
-      readonly t: 'radial';
-      readonly at: Point;
-      readonly phase: 'start' | 'move' | 'end' | 'cancel';
-    }
   | { readonly t: 'doubleTap'; readonly at: Point }
   | { readonly t: 'hover'; readonly at: Point | null };
 
@@ -50,7 +44,6 @@ export interface GestureDeps {
   release(): void;
   /** Удержание — приказ: выбраны отряды и инструмент не включён. */
   canHold(): boolean;
-  canRadial?(at: Point): boolean;
   /** Точка на фишке выбранных отрядов — палец, вернувшийся туда, отменяет приказ. */
   cancelZone(at: Point): boolean;
   /** Точка на экране (за краем — отмена приказа). */
@@ -70,15 +63,7 @@ export interface Gesture {
 }
 
 type Mode =
-  | 'idle'
-  | 'pressed'
-  | 'panning'
-  | 'stroking'
-  | 'selecting'
-  | 'holding'
-  | 'radial'
-  | 'held'
-  | 'multi';
+  'idle' | 'pressed' | 'panning' | 'stroking' | 'selecting' | 'holding' | 'held' | 'multi';
 
 /** Создаёт машину жестов; события уходят в emit в порядке возникновения. */
 export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void): Gesture {
@@ -115,7 +100,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
         if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
         if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
-        if (mode === 'radial') emit({ t: 'radial', at: last, phase: 'cancel' });
         if (mode === 'pressed') deps.release();
         mode = 'multi';
         return;
@@ -153,15 +137,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
         emit({ t: 'hold', at, phase: 'move' });
         return;
       }
-      if (mode === 'radial') {
-        if (!deps.inside(at)) {
-          emit({ t: 'radial', at, phase: 'cancel' });
-          mode = 'held';
-          return;
-        }
-        emit({ t: 'radial', at, phase: 'move' });
-        return;
-      }
       if (mode === 'held') return;
       if (mode === 'pressed') {
         if (Math.hypot(at.x - start.x, at.y - start.y) <= DRAG_SLOP_PX) return;
@@ -191,7 +166,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (mode === 'stroking') emit({ t: 'stroke', at, phase: 'end' });
       else if (mode === 'selecting') emit({ t: 'selection', at: start, to: at, phase: 'end' });
       else if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'end' });
-      else if (mode === 'radial') emit({ t: 'radial', at, phase: 'end' });
       else if (mode === 'pressed') {
         deps.release();
         if (
@@ -214,7 +188,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       if (mode === 'stroking') emit({ t: 'stroke', at: last, phase: 'cancel' });
       if (mode === 'selecting') emit({ t: 'selection', at: start, to: last, phase: 'cancel' });
       if (mode === 'holding') emit({ t: 'hold', at: last, phase: 'cancel' });
-      if (mode === 'radial') emit({ t: 'radial', at: last, phase: 'cancel' });
       if (mode === 'pressed') deps.release();
       active.clear();
       mode = 'idle';
@@ -222,14 +195,6 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
 
     tick(ms) {
       if (mode !== 'pressed' || button !== 0 || ms - downMs < HOLD_MS) return;
-      const radialAvailable = deps.canRadial?.(start) ?? false;
-      if (radialAvailable && ms - downMs < RADIAL_MENU_LONG_PRESS_MS) return;
-      if (radialAvailable) {
-        deps.release();
-        mode = 'radial';
-        emit({ t: 'radial', at: start, phase: 'start' });
-        return;
-      }
       if (!deps.canHold()) return;
       // Удержание побеждает захват: приказ, а не деление.
       deps.release();

@@ -73,11 +73,6 @@ export interface OrderHooks {
   hover(world: Point | null): void;
 }
 
-export interface RadialHooks {
-  canOpen(world: Point): boolean;
-  action(world: Point, screen: Point, phase: 'start' | 'move' | 'end' | 'cancel'): void;
-}
-
 /** Росчерк: точка в мировых координатах карты. */
 export type StrokeHandler = (world: Point, phase: StrokePhase) => void;
 export type SelectionHandler = (from: Point, to: Point, phase: StrokePhase) => void;
@@ -112,7 +107,6 @@ export interface MapView {
   setGrab(grab: ((world: Point) => StrokeHandler | null) | null): void;
   /** Приказ удержанием и наведение мыши. */
   setOrderHooks(hooks: OrderHooks | null): void;
-  setRadialHooks?(hooks: RadialHooks | null): void;
   /** Отменяет текущий жест и его прогноз. */
   cancel(): void;
   /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
@@ -191,7 +185,6 @@ export async function createMapView(
   let pressed = 0;
   let stroking = false;
   let hooks: OrderHooks | null = null;
-  let radialHooks: RadialHooks | null = null;
   let stroke: StrokeHandler | null = null;
   let selectionHandler: SelectionHandler | null = null;
   let grab: ((world: Point) => StrokeHandler | null) | null = null;
@@ -255,7 +248,6 @@ export async function createMapView(
         grabbed = null;
       },
       canHold: () => stroke === null && (hooks?.canHold() ?? false),
-      canRadial: (at) => radialHooks?.canOpen(toWorld(at)) ?? false,
       cancelZone: (at) => hooks?.cancelZone(toWorld(at)) ?? false,
       inside: (at) => at.x >= 0 && at.y >= 0 && at.x <= view().width && at.y <= view().height,
     },
@@ -294,9 +286,6 @@ export async function createMapView(
       } else if (e.t === 'hold') {
         velocity = null;
         hooks?.hold(toWorld(e.at), e.phase);
-      } else if (e.t === 'radial') {
-        velocity = null;
-        radialHooks?.action(toWorld(e.at), e.at, e.phase);
       } else if (e.t === 'doubleTap') {
         const world = toWorld(e.at);
         onDoubleTap?.(pixelToHex(world, opts.radius), world);
@@ -366,9 +355,6 @@ export async function createMapView(
     },
     setOrderHooks(h) {
       hooks = h;
-    },
-    setRadialHooks(h) {
-      radialHooks = h;
     },
     cancel() {
       gesture.cancel();

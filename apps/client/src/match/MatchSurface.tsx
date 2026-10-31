@@ -13,7 +13,6 @@ import { Hud } from '../dev/Hud.tsx';
 import { Leaderboard } from '../dev/Leaderboard.tsx';
 import { MatchEnd } from '../dev/MatchEnd.tsx';
 import { ObserverPanel } from '../dev/ObserverPanel.tsx';
-import { RadialMenu } from '../dev/RadialMenu.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
@@ -164,7 +163,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      {sb.radial && <RadialMenu state={sb.radial} />}
       {styleFor('event-feed') && (
         <EventFeed
           items={sb.events}
