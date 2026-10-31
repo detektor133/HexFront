@@ -429,6 +429,59 @@ describe('T17m: карточка клетки', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('отправляет improve для доступного гекса и блокирует его только при нехватке золота', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const cityHexes = new Set(engine.state.cities.map((city) => city.hex));
+    const hex = engine.state.hexes.owner.findIndex(
+      (owner, id) => owner === 0 && !cityHexes.has(id) && engine.state.hexes.improvement[id] === 0,
+    );
+    if (hex < 0) throw new Error('свой свободный гекс для благоустройства не найден');
+
+    engine.select(hex);
+    const available = engine.snapshot();
+    if (!available.selection || !available.selection.improve.ok) {
+      throw new Error('выбранный гекс не допускает благоустройство');
+    }
+    const send = vi.fn();
+    const buttonName = t('action.improve' as MessageKey);
+    render(
+      <HexCard s={available.selection} view={available.view} map={mapResult.map} send={send} />,
+    );
+    const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    expect(send).toHaveBeenCalledWith({ t: 'improve', hex });
+
+    cleanup();
+    const player = engine.state.players[0];
+    if (!player) throw new Error('игрок не найден');
+    player.gold = 0 as Fp;
+    engine.select(hex);
+    const unaffordable = engine.snapshot();
+    if (!unaffordable.selection?.improve || unaffordable.selection.improve.ok) {
+      throw new Error('ожидалось благоустройство, доступное по правилам, но не по золоту');
+    }
+    expect(unaffordable.selection.improve.reason).toBe('notEnoughGold');
+    send.mockClear();
+    render(
+      <HexCard
+        s={unaffordable.selection}
+        view={unaffordable.view}
+        map={mapResult.map}
+        send={send}
+      />,
+    );
+    const disabledButton = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
+    expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
+    const reasonId = disabledButton.getAttribute('aria-describedby');
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId ?? '')?.textContent).toBe('Не хватает золота');
+    expect(screen.queryByText(/максимальный уровень/u)).toBeNull();
+    fireEvent.click(disabledButton);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('берёт внешнюю высоту содержимого с padding и рамкой', () => {
     const engine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in engine) throw new Error(engine.errors.join('; '));
