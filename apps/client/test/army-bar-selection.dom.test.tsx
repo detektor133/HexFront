@@ -48,6 +48,61 @@ function viewWithTwoArmiesOnOneHex() {
 }
 
 describe('07/T17aj: выбор армии через панель', () => {
+  it('07/T17bkfa: кнопка ▶ отправляет startOffensive для своей армии', () => {
+    const { view, armies } = viewWithTwoArmiesOnOneHex();
+    const target = armies[0];
+    if (!target) throw new Error('Целевая армия не найдена');
+    const send = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+      },
+    );
+
+    render(
+      createElement(ArmyBar, {
+        view: {
+          ...view,
+          plans: [
+            ...view.plans,
+            {
+              armyId: target.id,
+              kind: 'front',
+              edges: [],
+              hexes: [],
+              offensive: { edges: [], hexes: [], active: false, progressTick: 0, taken: [] },
+              zone: [],
+              stuck: false,
+              facing: [],
+              lost: [],
+              startWanted: false,
+            },
+          ],
+        },
+        selected: null,
+        partial: [],
+        onSelect: vi.fn(),
+        send,
+        onPick: vi.fn(),
+        tool: null,
+        onTool: vi.fn(),
+      }),
+    );
+
+    const targetName = armyName(target);
+    const armyCard = screen.getByText(targetName, { exact: true }).closest('[class*="card"]');
+    expect(armyCard).toBeTruthy();
+    const startButton = armyCard?.querySelector<HTMLButtonElement>('button[aria-label="Начать"]');
+    expect(startButton).toBeTruthy();
+    if (!startButton) throw new Error('Кнопка «Начать» целевой армии не найдена');
+
+    fireEvent.click(startButton);
+
+    expect(send).toHaveBeenCalledWith({ t: 'startOffensive', armyId: target.id });
+  });
+
   it('обычный клик по каждой карточке выбирает её armyId', () => {
     const { view, armies } = viewWithTwoArmiesOnOneHex();
     const onSelect = vi.fn();
