@@ -170,6 +170,16 @@ describe('07/T17ay: состояния строительства и найма'
       expect(reasonId).toBeTruthy();
       expect(document.getElementById(reasonId ?? '')?.textContent).toBe(expectedReason);
       expect(screen.queryByText(otherReason)).toBeNull();
+      const reasonElement = document.getElementById(reasonId ?? '');
+      expect(reasonElement?.parentElement).toBe(blockedButton.parentElement);
+      expect(blockedButton.compareDocumentPosition(reasonElement as Node)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(cssRule('action')).toMatch(/display:\s*flex\s*;/u);
+      expect(cssRule('action')).toMatch(/flex-direction:\s*column\s*;/u);
+      expect(cssRule(expectedReason.startsWith('Ближе') ? 'hint' : 'reason')).not.toMatch(
+        /(?:position:\s*(?:absolute|fixed)|transform:)/u,
+      );
       fireEvent.click(blockedButton);
       expect(blockedSend).not.toHaveBeenCalled();
     }
