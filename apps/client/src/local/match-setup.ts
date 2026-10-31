@@ -10,6 +10,7 @@ export interface LocalMatchSetup {
   readonly playerName: string | null;
   readonly playerColor: string | null;
   readonly autoCommand: boolean | null;
+  readonly initialGold: number | null;
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
@@ -33,5 +34,6 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     playerName: params.get('name'),
     playerColor: params.get('color'),
     autoCommand: auto === null ? null : auto === '1',
+    initialGold: params.get('initialGold') === '0' ? 0 : null,
   };
 }

@@ -57,6 +57,7 @@ export type ToWorker =
       readonly speed: number;
       readonly playerName?: string;
       readonly playerColors?: readonly string[];
+      readonly initialGold?: number;
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }

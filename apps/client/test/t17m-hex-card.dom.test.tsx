@@ -476,8 +476,70 @@ describe('T17m: карточка клетки', () => {
     expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
     const reasonId = disabledButton.getAttribute('aria-describedby');
     expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId ?? '')?.textContent).toBe('Не хватает золота');
+    const reason = document.getElementById(reasonId ?? '');
+    expect(reason?.textContent).toBe('Не хватает золота');
+    expect(reason?.parentElement).toBe(disabledButton.parentElement);
+    expect(disabledButton.compareDocumentPosition(reason as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.queryByText(/максимальный уровень/u)).toBeNull();
+    fireEvent.click(disabledButton);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('отправляет build fort для доступного гекса и блокирует его при нехватке золота', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const cityHexes = new Set(engine.state.cities.map((city) => city.hex));
+    const hex = engine.state.hexes.owner.findIndex(
+      (owner, id) => owner === 0 && !cityHexes.has(id) && engine.state.hexes.improvement[id] === 0,
+    );
+    if (hex < 0) throw new Error('свой свободный гекс для укрепления не найден');
+
+    engine.select(hex);
+    const available = engine.snapshot();
+    if (!available.selection || !available.selection.fort.ok) {
+      throw new Error('выбранный гекс не допускает строительство укрепления');
+    }
+    const send = vi.fn();
+    const buttonName = t('action.fort' as MessageKey);
+    render(
+      <HexCard s={available.selection} view={available.view} map={mapResult.map} send={send} />,
+    );
+    const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    expect(send).toHaveBeenCalledWith({ t: 'build', hex, kind: 'fort' });
+
+    cleanup();
+    const player = engine.state.players[0];
+    if (!player) throw new Error('игрок не найден');
+    player.gold = 0 as Fp;
+    engine.select(hex);
+    const unaffordable = engine.snapshot();
+    if (!unaffordable.selection?.fort || unaffordable.selection.fort.ok) {
+      throw new Error('ожидалось укрепление, доступное по правилам, но не по золоту');
+    }
+    expect(unaffordable.selection.fort.reason).toBe('notEnoughGold');
+    send.mockClear();
+    render(
+      <HexCard
+        s={unaffordable.selection}
+        view={unaffordable.view}
+        map={mapResult.map}
+        send={send}
+      />,
+    );
+    const disabledButton = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
+    expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
+    const reasonId = disabledButton.getAttribute('aria-describedby');
+    expect(reasonId).toBeTruthy();
+    const reason = document.getElementById(reasonId ?? '');
+    expect(reason?.textContent).toBe('Не хватает золота');
+    expect(reason?.parentElement).toBe(disabledButton.parentElement);
+    expect(disabledButton.compareDocumentPosition(reason as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     fireEvent.click(disabledButton);
     expect(send).not.toHaveBeenCalled();
   });

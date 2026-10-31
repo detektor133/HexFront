@@ -75,6 +75,10 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     return;
   }
   engine = created;
+  const initialGold = msg.initialGold;
+  if (initialGold !== undefined && engine.state.players[0]) {
+    engine.state.players[0].gold = initialGold as (typeof engine.state.players)[0]['gold'];
+  }
   for (const pending of pendingCommands) {
     if (pending.t === 'command') engine.queue(pending.cmd);
   }

@@ -304,7 +304,7 @@ function useSandbox(
         if (m.t === 'error') return setError(m.errors.join('; '));
         scheduleMessage(m);
       },
-      { telemetry: debug },
+      { telemetry: debug, initialGold: readLocalMatchSetup(window.location.search).initialGold },
     );
     matchRef.current = match;
     match.setView(null, !debug);
