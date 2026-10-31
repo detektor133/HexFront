@@ -391,7 +391,7 @@
   Доступные строительство, улучшение и набор в `HexCard` используют утверждённую в `docs/art/ui.md` светлую приподнятую плашку `ui.surface2` с `ui.borderStrong`, `shadow.hard`, текстом `ui.ink` и акцентом `selection.color`; сплошная чёрная заливка T17bb удаляется.
   *Приёмка:* Playwright `@layout` проверяет вычисленные цвета, рамку и тень доступных действий строительства, улучшения и набора на 360/1024/1920 px. `pnpm verify --changed` проходит.
 
-- [ ] **T17bmb. Компоновка содержимого HexCard** (`apps/client/src/dev/HexCard.module.css`, `apps/client/test`, `apps/client/tests/e2e`).
+- [x] **T17bmb. Компоновка содержимого HexCard** (`apps/client/src/dev/HexCard.module.css`, `apps/client/test`, `apps/client/tests/e2e`).
   Заголовок, параметры, цены и строки набора получают читаемые отступы и не перекрываются.
   *Приёмка:* Playwright `@layout` проверяет отсутствие переполнения и перекрытия заголовка, параметров, цен и строк набора на 360/1024/1920 px. Снимки визуального гейта подтверждают компоновку карточки. `pnpm verify --changed` проходит.
 
