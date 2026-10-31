@@ -120,13 +120,12 @@ interface Box {
 }
 
 async function boxes(locator: Locator): Promise<Box[]> {
-  const result: Box[] = [];
-  for (const element of await locator.all()) {
-    const box = await element.boundingBox();
-    expect(box).not.toBeNull();
-    if (box) result.push(box);
-  }
-  return result;
+  return locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    }),
+  );
 }
 
 function expectNoOverlap(rects: readonly Box[]): void {
