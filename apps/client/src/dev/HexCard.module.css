@@ -2,10 +2,13 @@
 .card {
   position: absolute;
   /* Над нижней панелью армий (--dock-h задаёт страница). */
+  left: var(--space-lg);
+  bottom: calc(var(--dock-h, 0px) + var(--space-md));
   z-index: 2;
   box-sizing: border-box;
   width: max-content;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - var(--dock-h, 0px) - var(--space-md) - var(--space-md));
   overflow-y: auto;
   scrollbar-width: none;
   padding: var(--space-md);
@@ -16,6 +19,9 @@
 }
 
 .cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
   min-height: 0;
 }
 
@@ -26,7 +32,7 @@
 }
 
 .title {
-  margin: 0 0 var(--space-sm);
+  margin: 0;
   font-size: var(--font-size-body);
   font-weight: 500;
 }
@@ -98,7 +104,7 @@
 
 .good,
 .bad {
-  margin: var(--space-sm) 0 0;
+  margin: 0;
   font-size: var(--font-size-caption);
   color: var(--status-success);
 }
@@ -108,11 +114,11 @@
 }
 
 .progress {
-  margin-top: var(--space-sm);
+  margin-top: 0;
 }
 
 .progressText {
-  margin: var(--space-sm) 0 var(--space-xs);
+  margin: 0;
   font-size: var(--font-size-caption);
 }
 
@@ -131,7 +137,7 @@
 .action {
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .button {
@@ -207,6 +213,7 @@
 
 @media (max-width: 600px) {
   .card {
+    left: var(--space-md);
     width: calc(100vw - 16px);
     max-width: calc(100vw - 16px);
   }
@@ -229,7 +236,7 @@
 
 .recruitControl {
   display: grid;
-  grid-template-columns: 1fr minmax(70px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(70px, 1fr) auto;
   align-items: center;
   gap: var(--space-sm);
   font-size: var(--font-size-caption);
