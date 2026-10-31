@@ -405,7 +405,7 @@
 - [x] **T17bmcb. Недоступное действие rebuild в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
   DOM-тест проверяет команду `rebuildSupply`, состояние доступности, отображение причины нехватки золота или блокировки правилами для `rebuild` и запрет отправки команды в недоступном состоянии. Причины недоступности не перекрываются.
 
-- [ ] **T17bmcc. Недоступное действие foundCity в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
+- [x] **T17bmcc. Недоступное действие foundCity в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
   DOM-тест проверяет команду `foundCity`, состояние доступности, отображение причины нехватки золота или блокировки правилом для `foundCity` и запрет отправки команды в недоступном состоянии. Причины недоступности не перекрываются.
 
 - [ ] **T17bmcd. Недоступное действие improve в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
