@@ -447,7 +447,7 @@
   *Приёмка:* DOM-тест для каждого класса платного действия проверяет общий компонент и видимое число цены; поиск не находит старых самодельных контуров; `pnpm verify --changed` проходит.
   *Уточнение plan:* классы платных действий для DOM-проверки: `upgrade`, `rebuild`, `foundCity`, `improve`, `fort`, `depot` и найм `infantry`, `armor`, `artillery`; для каждого проверяются общий компонент `Price`/`GoldIcon` и видимое число цены.
 
-- [ ] **T17bq. Светлый стиль налогового, настроечного и паузного окон** (`apps/client/src/dev/{Hud.tsx,Hud.module.css}`, `apps/client/src/match/{PauseMenu.tsx,PauseMenu.module.css}`, `apps/client/test`, `apps/client/tests/e2e`).
+- [x] **T17bq. Светлый стиль налогового, настроечного и паузного окон** (`apps/client/src/dev/{Hud.tsx,Hud.module.css}`, `apps/client/src/match/{PauseMenu.tsx,PauseMenu.module.css}`, `apps/client/test`, `apps/client/tests/e2e`).
   Три всплывающих окна используют иерархию из `docs/art/ui.md`: `ui.surface` для окна, `ui.surface2` для групп и доступных действий, `ui.border` для разделения, `ui.ink`/`ui.ink2` для текста. Настройка налога, параметры и команды паузы остаются рабочими; попапы не перекрывают HUD и не выходят за экран.
   *Приёмка:* DOM-тест проверяет открытие, закрытие, изменение налога и команды паузы; Playwright `@layout` проверяет вычисленные стили, привязку каждого попапа к кнопке, отсутствие пересечения с HUD и переполнения на 360/1024/1920 px. `pnpm verify --changed` проходит.
 
