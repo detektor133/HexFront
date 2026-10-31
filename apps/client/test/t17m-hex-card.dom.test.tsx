@@ -11,6 +11,7 @@ import {
   inBounds,
   loadMap,
   neighbors,
+  type Fp,
   type ConstructionCheck,
   type MapStatic,
 } from '@hexfront/sim';
@@ -376,6 +377,7 @@ describe('T17m: карточка клетки', () => {
     connectedEngine.state.hexes.road[connectedHex] = 1;
     connectedEngine.state.hexes.building[connectedHex] = BUILDING.depot;
     connectedEngine.select(connectedHex);
+    send.mockClear();
     const connected = connectedEngine.snapshot();
     if (!connected.selection?.rebuild || connected.selection.rebuild.ok) {
       throw new Error('реальный подключённый склад не вернул notIsolated');
@@ -386,6 +388,45 @@ describe('T17m: карточка клетки', () => {
     const connectedButton = screen.getByRole('button', { name: /Проложить дорогу/u });
     expect((connectedButton as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Город связан со столицей')).toBeTruthy();
+    expect(connectedButton.getAttribute('aria-describedby')).toBeTruthy();
+    fireEvent.click(connectedButton);
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.queryByText('Не хватает золота')).toBeNull();
+  });
+
+  it('показывает только причину нехватки золота для доступного по правилам rebuild', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const capital = engine.state.cities.find(
+      (city) => city.id === engine.state.players[0]?.capitalCityId,
+    );
+    if (!capital) throw new Error('столица игрока не найдена');
+    const isolatedHex = neighbors(hexFromId(capital.hex, mapResult.map.width))
+      .filter((point) => inBounds(point, mapResult.map.width, mapResult.map.height))
+      .map((point) => hexId(point, mapResult.map.width))
+      .find((id) => !engine.state.cities.some((city) => city.hex === id));
+    if (isolatedHex === undefined) throw new Error('гекс для изолированного склада не найден');
+    engine.state.hexes.owner[isolatedHex] = 0;
+    engine.state.hexes.building[isolatedHex] = BUILDING.depot;
+    const player = engine.state.players[0];
+    if (!player) throw new Error('игрок не найден');
+    player.gold = 0 as Fp;
+    engine.select(isolatedHex);
+    const message = engine.snapshot();
+    const selection = message.selection;
+    if (!selection?.rebuild?.ok || selection.rebuild.affordable) {
+      throw new Error('ожидался доступный по правилам план без достаточного золота');
+    }
+    const send = vi.fn();
+    render(<HexCard s={selection} view={message.view} map={mapResult.map} send={send} />);
+    const button = screen.getByRole('button', { name: /Проложить дорогу/u });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    const reasonId = button.getAttribute('aria-describedby');
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId ?? '')?.textContent).toBe('Не хватает золота');
+    expect(screen.queryByText('Город связан со столицей')).toBeNull();
+    fireEvent.click(button);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('берёт внешнюю высоту содержимого с padding и рамкой', () => {
