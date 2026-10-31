@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,13 +17,26 @@ import { t } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { Selection, ViewPayload } from '../src/local/messages.ts';
 
+const projectRoot = process.cwd().endsWith(join('apps', 'client'))
+  ? resolve(process.cwd(), '../..')
+  : process.cwd();
 const mapJson: unknown = JSON.parse(
-  readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
+  readFileSync(join(projectRoot, 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
 const mapResult = loadMap(mapJson);
 if (!mapResult.ok) throw new Error(mapResult.errors.join('; '));
 const map = mapResult.map;
 const FIXED_ONE = 1000 as Fp;
+const hexCardCss = readFileSync(
+  join(projectRoot, 'apps/client/src/dev/HexCard.module.css'),
+  'utf8',
+);
+
+function cssRule(className: string): string {
+  const rule = hexCardCss.match(new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`));
+  if (!rule?.[1]) throw new Error(`CSS-правило .${className} не найдено`);
+  return rule[1];
+}
 
 describe('кнопка закрытия карточки клетки', () => {
   it('показывает локализованное доступное имя для выбранной клетки', () => {
@@ -158,7 +171,15 @@ describe('07/T17ay: состояния строительства и найма'
       expect((blockedButton as HTMLButtonElement).disabled).toBe(true);
       const reasonId = blockedButton.getAttribute('aria-describedby');
       expect(reasonId).toBeTruthy();
-      expect(document.getElementById(reasonId ?? '')?.textContent).toBe(reason);
+      const reasonElement = document.getElementById(reasonId ?? '');
+      expect(reasonElement?.textContent).toBe(reason);
+      expect(reasonElement?.parentElement).toBe(blockedButton.parentElement);
+      expect(blockedButton.compareDocumentPosition(reasonElement as Node)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(cssRule('action')).toMatch(/display:\s*flex\s*;/u);
+      expect(cssRule('action')).toMatch(/flex-direction:\s*column\s*;/u);
+      expect(cssRule('reason')).not.toMatch(/(?:position:\s*(?:absolute|fixed)|transform:)/u);
       fireEvent.click(blockedButton);
       expect(blockedSend).not.toHaveBeenCalled();
     }
