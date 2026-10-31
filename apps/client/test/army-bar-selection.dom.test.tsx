@@ -103,6 +103,61 @@ describe('07/T17aj: выбор армии через панель', () => {
     expect(send).toHaveBeenCalledWith({ t: 'startOffensive', armyId: target.id });
   });
 
+  it('07/T17bkfb: кнопка ■ отправляет stopOffensive для своей армии', () => {
+    const { view, armies } = viewWithTwoArmiesOnOneHex();
+    const target = armies[0];
+    if (!target) throw new Error('Целевая армия не найдена');
+    const send = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        public observe(): void {}
+        public disconnect(): void {}
+      },
+    );
+
+    render(
+      createElement(ArmyBar, {
+        view: {
+          ...view,
+          plans: [
+            ...view.plans,
+            {
+              armyId: target.id,
+              kind: 'front',
+              edges: [],
+              hexes: [],
+              offensive: { edges: [], hexes: [], active: true, progressTick: 0, taken: [] },
+              zone: [],
+              stuck: false,
+              facing: [],
+              lost: [],
+              startWanted: true,
+            },
+          ],
+        },
+        selected: null,
+        partial: [],
+        onSelect: vi.fn(),
+        send,
+        onPick: vi.fn(),
+        tool: null,
+        onTool: vi.fn(),
+      }),
+    );
+
+    const targetName = armyName(target);
+    const armyCard = screen.getByText(targetName, { exact: true }).closest('[class*="card"]');
+    expect(armyCard).toBeTruthy();
+    const stopButton = armyCard?.querySelector<HTMLButtonElement>('button[aria-label="Стоп"]');
+    expect(stopButton).toBeTruthy();
+    if (!stopButton) throw new Error('Кнопка «Стоп» целевой армии не найдена');
+
+    fireEvent.click(stopButton);
+
+    expect(send).toHaveBeenCalledWith({ t: 'stopOffensive', armyId: target.id });
+  });
+
   it('обычный клик по каждой карточке выбирает её armyId', () => {
     const { view, armies } = viewWithTwoArmiesOnOneHex();
     const onSelect = vi.fn();
