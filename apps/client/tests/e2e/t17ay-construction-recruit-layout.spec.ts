@@ -38,8 +38,8 @@ test('@layout T17ay: отключённые действия показываю�
   const recruit = armorSlider.locator('xpath=following::button[1]');
   await expect(recruit).toBeEnabled();
   await expect(recruit).toHaveClass(/accent/u);
-  await expect(recruit).toHaveCSS('background-color', 'rgb(34, 33, 30)');
-  await expect(recruit).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(recruit).toHaveCSS('background-color', 'rgb(246, 245, 241)');
+  await expect(recruit).toHaveCSS('color', 'rgb(34, 33, 30)');
   await recruit.focus();
   await expect(recruit).toHaveCSS('outline-style', 'solid');
   await recruit.click();

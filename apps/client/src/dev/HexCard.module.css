@@ -153,12 +153,10 @@
 }
 
 .accent {
-  background: var(--ui-ink);
-  color: var(--ui-surface);
-}
-
-.accent .price {
-  color: var(--ui-surface);
+  background: var(--ui-surface2);
+  border-left-color: var(--selection-color);
+  box-shadow: var(--shadow-hard);
+  color: var(--ui-ink);
 }
 
 .button:not(:disabled):hover {
