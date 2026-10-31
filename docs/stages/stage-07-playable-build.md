@@ -411,7 +411,7 @@
 - [x] **T17bmcd. Недоступное действие improve в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
   DOM-тест проверяет команду `improve`, состояние доступности, отображение причины нехватки золота и запрет отправки команды в недоступном состоянии. Причины недоступности не перекрываются.
 
-- [ ] **T17bmce. Недоступное действие fort в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
+- [x] **T17bmce. Недоступное действие fort в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
   DOM-тест проверяет команду `build` с видом `fort`, состояние доступности, отображение причины нехватки золота и запрет отправки команды в недоступном состоянии. Причины недоступности не перекрываются.
 
 - [ ] **T17bmcf. Недоступное действие depot в HexCard** (`apps/client/src/dev/HexCard.tsx`, `apps/client/test`).
