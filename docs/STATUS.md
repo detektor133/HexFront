@@ -8,7 +8,7 @@
 | Последнее обновление | 2026-10-30 |
 | Коммерческий веб-релиз | 2026-11-08 — этапы 07–10 полностью, не MVP |
 
-Очередь: 07/T17av → 07/T17awa → 07/T17awb → 07/T17axa → 07/T17axb → 07/T17axc → 07/T17ay → 07/T17baa → 07/T17baba → 07/T17babb → 07/T17babc → 07/T17bb → 07/T17bc → 07/T17bda → 07/T17bdb → 07/T17bdc → 07/T17bea → 07/T17beba → 07/T17bebb → 07/T17beca → 07/T17becb → 07/T17bfa → 07/T17bfba → 07/T17bfbb → 07/T17bfbc → 07/T17bfc → 07/T17bfd → 07/T17bfe → 07/T17bia → 07/T17bib → 07/T17br → 07/T17bsa → 07/T17bsb → 07/T17bo → 07/T17bj → 07/T17bka → 07/T17bkb → 07/T17bkc → 07/T17bkd → 07/T17bke → 07/T17bkf → 07/T17bkg → 07/T17bl → 07/T17bm → 07/T17bn → 07/T17bp → 07/T17bq → 07/T17 → 07/T18
+Очередь: 07/T17av → 07/T17awa → 07/T17awb → 07/T17axa → 07/T17axb → 07/T17axc → 07/T17ay → 07/T17baa → 07/T17baba → 07/T17babb → 07/T17babc → 07/T17bb → 07/T17bc → 07/T17bda → 07/T17bdb → 07/T17bdc → 07/T17bea → 07/T17beba → 07/T17bebb → 07/T17beca → 07/T17becb → 07/T17bfa → 07/T17bfba → 07/T17bfbb → 07/T17bfbc → 07/T17bfc → 07/T17bfd → 07/T17bfe → 07/T17bia → 07/T17bib → 07/T17br → 07/T17bsa → 07/T17bsb → 07/T17bo → 07/T17bj → 07/T17bka → 07/T17bkb → 07/T17bkc → 07/T17bkd → 07/T17bke → 07/T17bkfa → 07/T17bkfb → 07/T17bkg → 07/T17bl → 07/T17bm → 07/T17bn → 07/T17bp → 07/T17bq → 07/T17 → 07/T18
 
 Релизный календарь после этапа 07: `docs/RELEASE-2026-11-08.md`.
 
