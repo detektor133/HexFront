@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const VIEWPORTS = [360, 1024, 1920] as const;
 const SURFACE = 'rgb(255, 255, 255)';
@@ -12,6 +12,11 @@ for (const width of VIEWPORTS) {
     page,
   }) => {
     const height = 900;
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') pageErrors.push(message.text());
+    });
     await page.setViewportSize({ width, height });
     await page.goto('/match?map=small');
 
@@ -19,7 +24,7 @@ for (const width of VIEWPORTS) {
     await expect(hud).toBeVisible();
     const taxButton = page.getByRole('button', { name: /Налог|Tax/u });
     await expect(taxButton).toBeVisible();
-    await taxButton.click();
+    await clickWithDiagnostics(page, taxButton, 'кнопка налога', pageErrors);
     const taxPopup = page.getByRole('dialog', { name: /Налог|Tax/u });
     await expect(taxPopup).toBeVisible();
     await expect(taxPopup).toHaveCSS('background-color', SURFACE);
@@ -29,12 +34,12 @@ for (const width of VIEWPORTS) {
     await expect(taxSlider).toHaveCSS('border-top-color', BORDER);
     await expect(taxPopup.locator('p').first()).toHaveCSS('color', INK2);
     await expectAnchoredBelow(taxPopup, taxButton, hud, width, height);
-    await taxButton.click();
+    await clickWithDiagnostics(page, taxButton, 'кнопка налога для закрытия', pageErrors);
     await expect(taxPopup).toBeHidden();
 
     const settingsButton = page.getByRole('button', { name: /Настройки|Settings/u });
     await expect(settingsButton).toBeVisible();
-    await settingsButton.click();
+    await clickWithDiagnostics(page, settingsButton, 'кнопка настроек', pageErrors);
     const settingsPopup = page.getByRole('dialog', { name: /Настройки|Settings/u });
     await expect(settingsPopup).toBeVisible();
     await expect(settingsPopup).toHaveCSS('background-color', SURFACE);
@@ -44,12 +49,12 @@ for (const width of VIEWPORTS) {
     await expect(setting).toHaveCSS('border-top-color', BORDER);
     await expect(setting).toHaveCSS('color', INK);
     await expectAnchoredBelow(settingsPopup, settingsButton, hud, width, height);
-    await settingsButton.click();
+    await clickWithDiagnostics(page, settingsButton, 'кнопка настроек для закрытия', pageErrors);
     await expect(settingsPopup).toBeHidden();
 
     const pauseButton = page.getByRole('button', { name: /Пауза|Pause/u });
     await expect(pauseButton).toBeVisible();
-    await pauseButton.click();
+    await clickWithDiagnostics(page, pauseButton, 'кнопка паузы', pageErrors);
     const pauseMenu = page.getByRole('dialog', { name: /Пауза|Pause/u });
     await expect(pauseMenu).toBeVisible();
     await expect(pauseMenu).toHaveCSS('background-color', SURFACE);
@@ -75,6 +80,50 @@ for (const width of VIEWPORTS) {
     expect(Math.abs(menuBounds.y + menuBounds.height / 2 - height / 2)).toBeLessThanOrEqual(1);
     expect(Math.abs(menuBounds.width - 280)).toBeLessThanOrEqual(1);
   });
+}
+
+async function clickWithDiagnostics(
+  page: Page,
+  button: Locator,
+  label: string,
+  pageErrors: string[],
+): Promise<void> {
+  try {
+    await button.click();
+  } catch (error) {
+    const [buttonState, pageState] = await Promise.all([
+      button
+        .evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            text: element.textContent?.trim(),
+            ariaLabel: element.getAttribute('aria-label'),
+            disabled: 'disabled' in element && element.disabled,
+            visible: bounds.width > 0 && bounds.height > 0 && style.visibility !== 'hidden',
+            bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+            pointerEvents: style.pointerEvents,
+            position: style.position,
+            zIndex: style.zIndex,
+          };
+        })
+        .catch((diagnosticError: unknown) => ({
+          unavailable: String(diagnosticError),
+        })),
+      page.evaluate(() => ({
+        url: location.href,
+        readyState: document.readyState,
+        title: document.title,
+        bodyText: document.body.innerText.slice(0, 1200),
+        viewport: { width: innerWidth, height: innerHeight },
+      })),
+    ]);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${reason}\nДиагностика клика «${label}»: ${JSON.stringify({ buttonState, pageState, pageErrors: pageErrors.slice(-10) })}`,
+      { cause: error },
+    );
+  }
 }
 
 async function awaitNoOverflow(popup: Locator): Promise<void> {
