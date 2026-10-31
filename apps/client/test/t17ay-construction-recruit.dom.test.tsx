@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -94,6 +96,30 @@ function renderCard(selection: Selection, view: ReturnType<typeof getFixtures>['
   return send;
 }
 
+function makeUnaffordable(kind: string, selection: Selection): Selection {
+  if (kind === 'upgrade' || kind === 'rebuild') {
+    const city = selection.city;
+    if (!city) throw new Error('платное действие не содержит город');
+    return {
+      ...selection,
+      city: {
+        ...city,
+        ...(kind === 'upgrade' ? { upgrade: unaffordable } : {}),
+        ...(kind === 'rebuild' && city.rebuild?.ok
+          ? { rebuild: { ...city.rebuild, affordable: false } }
+          : {}),
+      },
+    };
+  }
+  if (kind === 'infantry' || kind === 'armor' || kind === 'artillery') {
+    return {
+      ...selection,
+      recruit: [{ type: kind, amounts: [{ soldiers: FIXED_ONE, check: unaffordableRecruit }] }],
+    };
+  }
+  return { ...selection, [kind]: unaffordable } as Selection;
+}
+
 function expectThreeStates(
   makeSelection: (state: 'available' | 'unaffordable' | 'forbidden') => Selection,
   label: RegExp,
@@ -126,6 +152,8 @@ function expectThreeStates(
       const button = screen.getByRole('button', { name: label });
       expect((button as HTMLButtonElement).disabled).toBe(true);
       expect(button.className).not.toMatch(/\b\S*accent\S*\b/u);
+      expect(button.querySelector('[data-gold-icon="true"]')).not.toBeNull();
+      expect(button.textContent).toContain('1');
       expect(
         screen.getByText(
           /Не хватает золота|Не хватает людей|Нет пути по своей земле|На гексе уже есть постройка|Максимальный уровень/u,
@@ -334,21 +362,78 @@ describe('07/T17ay: состояния строительства и найма'
     }
   });
 
-  it('критерий 07/T17ay: одна общая иконка монет содержит два контура и используется в HUD и карточке', () => {
-    const { city, view } = getFixtures();
-    renderCard(city, view);
-    const prices = Array.from(document.querySelectorAll('button svg')).filter(
-      (icon) => icon.querySelectorAll('circle').length > 0,
-    );
-    expect(prices.length).toBeGreaterThan(0);
-    expect(prices.every((icon) => icon.querySelectorAll('circle').length === 2)).toBe(true);
+  it('критерий 07/T17bp: все платные действия показывают общую иконку Tabler и цену', () => {
+    const fixtures = getFixtures();
+    const city = fixtures.city.city;
+    if (!city) throw new Error('городская карточка не содержит город');
+    const nonCity = fixtures.nonCity;
+    const cases = [
+      [
+        'upgrade',
+        { ...fixtures.city, city: { ...city, upgrade: available } },
+        new RegExp(t('action.upgrade'), 'u'),
+      ],
+      [
+        'rebuild',
+        {
+          ...fixtures.city,
+          city: {
+            ...city,
+            rebuild: {
+              ok: true,
+              cityHex: city.hex,
+              path: [city.hex],
+              toBuild: [city.hex],
+              cost: FIXED_ONE,
+              affordable: true,
+            },
+          },
+        },
+        new RegExp(t('action.rebuild'), 'u'),
+      ],
+      ...(
+        [
+          ['foundCity', 'foundCity', new RegExp(t('action.foundCity'), 'u')],
+          ['improve', 'improve', new RegExp(t('action.improve'), 'u')],
+          ['fort', 'fort', new RegExp(t('action.fort'), 'u')],
+          ['depot', 'depot', new RegExp(t('action.depot'), 'u')],
+        ] as const
+      ).map(([kind, key, label]) => [kind, { ...nonCity, [key]: available }, label] as const),
+      ...(['infantry', 'armor', 'artillery'] as const).map(
+        (type) =>
+          [
+            type,
+            {
+              ...fixtures.city,
+              recruit: [{ type, amounts: [{ soldiers: FIXED_ONE, check: availableRecruit }] }],
+            },
+            new RegExp(t(`unit.${type}`), 'u'),
+          ] as const,
+      ),
+    ] as const;
+    for (const [kind, selection, label] of cases) {
+      for (const affordable of [true, false]) {
+        cleanup();
+        const state = affordable
+          ? (selection as Selection)
+          : makeUnaffordable(kind, selection as Selection);
+        renderCard(state as Selection, fixtures.view);
+        const button = screen.getByRole('button', { name: label });
+        expect(button.textContent).toContain('1');
+        const icon = button.querySelector('[data-gold-icon="true"]');
+        expect(icon).not.toBeNull();
+        expect(icon?.getAttribute('viewBox')).toBe('0 0 24 24');
+        expect(icon?.querySelector('circle')).toBeNull();
+        expect(button.querySelectorAll('svg:not([data-gold-icon="true"]) circle')).toHaveLength(0);
+      }
+    }
 
-    const hexCardSource = readFileSync(
-      join(process.cwd(), 'apps/client/src/dev/HexCard.tsx'),
-      'utf8',
+    const iconSource = readFileSync(join(projectRoot, 'apps/client/src/ui/gold-icon.tsx'), 'utf8');
+    expect(iconSource).toMatch(/IconCoin/u);
+    expect(iconSource).not.toMatch(/<circle|<path|includePathContours|M0 0M0 0/u);
+    const cardSource = readFileSync(join(projectRoot, 'apps/client/src/dev/HexCard.tsx'), 'utf8');
+    expect(cardSource).not.toMatch(
+      /<svg[^>]*coin|M0 0M0 0|<circle[^>]*className=\{styles\.coin\}/u,
     );
-    const hudSource = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.tsx'), 'utf8');
-    expect(hexCardSource).toMatch(/GoldIcon/u);
-    expect(hudSource).toMatch(/gold:\s*IconCoin/u);
   });
 });
