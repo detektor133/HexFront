@@ -5,7 +5,6 @@
   box-sizing: border-box;
   gap: var(--space-sm);
   padding: var(--space-lg);
-  box-sizing: border-box;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
@@ -25,14 +24,8 @@
   padding: 0 var(--space-md);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface2);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
-}
-
-.primary {
-  background: var(--ui-ink);
-  border-color: var(--ui-ink);
-  color: var(--ui-surface);
 }
