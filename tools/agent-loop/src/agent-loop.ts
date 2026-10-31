@@ -16,7 +16,15 @@ import {
   type Step,
 } from './context.ts';
 import { taskDirtyTree } from './dirty-work.ts';
-import { currentBranch, dirtyFiles, head, makeGit, remoteHead, syncWithOrigin } from './git.ts';
+import {
+  controlChanged,
+  currentBranch,
+  dirtyFiles,
+  head,
+  makeGit,
+  remoteHead,
+  syncWithOrigin,
+} from './git.ts';
 import { parseIssueCommand, STOP_LABEL } from './github.ts';
 import { processIssues } from './issues.ts';
 import { planEnabled, selectPlannedTask } from './plan.ts';
@@ -34,6 +42,7 @@ import {
   taskMark,
 } from './stage-file.ts';
 import { loadState } from './state.ts';
+import { RESTART_FOR_CONTROL_CHANGE } from './supervisor.ts';
 import { promoteWorkspace, taskWorkspace, type TaskWorkspace } from './task-workspace.ts';
 import { processTask } from './tasks.ts';
 
@@ -335,6 +344,7 @@ async function recoverShelved(context: LoopContext): Promise<void> {
 /** Цикл по одной задаче в ветке этапа. */
 async function runSingle(context: LoopContext): Promise<number> {
   const { config } = context;
+  let controlHead = await head(context.git);
   let waiting = false;
   for (;;) {
     let step: Step;
@@ -345,6 +355,12 @@ async function runSingle(context: LoopContext): Promise<number> {
       if (config.once) return 1;
       step = 'idle';
     }
+    const currentHead = await head(context.git);
+    if (await controlChanged(context.git, controlHead, currentHead)) {
+      await context.say('код агентного цикла обновился; перезапускаю рабочий процесс');
+      return RESTART_FOR_CONTROL_CHANGE;
+    }
+    controlHead = currentHead;
     if (step === 'worked') {
       waiting = false;
       continue;

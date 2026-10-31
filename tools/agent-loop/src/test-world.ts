@@ -440,6 +440,13 @@ export async function runWorld(world: World): Promise<Outcome> {
     }
     if (sub === 'rev-parse')
       return ok(`c${first?.startsWith('origin/') ? origin : first === 'HEAD^' ? head - 1 : head}`);
+    if (sub === 'diff' && first === '--quiet' && args.includes('--')) {
+      const paths = args.slice(args.indexOf('--') + 1);
+      const changed = unionFiles(resolveCommit(args[2] ?? ''), resolveCommit(args[3] ?? '')).some(
+        (file) => paths.some((path) => file === path || file.startsWith(`${path}/`)),
+      );
+      return { ...ok(), code: changed ? 1 : 0 };
+    }
     if (sub === 'diff' && first === '--quiet')
       return { ...ok(), code: world.merged === true ? 0 : 1 };
     if (sub === 'diff') return ok(files.join('\n'));

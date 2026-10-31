@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "depcheck": "depcruise packages apps tools --config .dependency-cruiser.cjs",
     "test": "vitest run",
@@ -28,7 +28,7 @@
     "probe:memory": "node --experimental-strip-types apps/client/scripts/memory-probe.ts",
     "commit-check": "node --experimental-strip-types tools/commit-check/src/cli.ts",
     "ci:wait": "node --experimental-strip-types tools/ci-wait/src/cli.ts",
-    "agent:run": "node --experimental-strip-types tools/agent-loop/src/cli.ts",
+    "agent:run": "node --experimental-strip-types tools/agent-loop/src/supervisor.ts",
     "tokens": "node --experimental-strip-types tools/tokens/src/cli.ts",
     "prepare": "git config core.hooksPath .githooks"
   },

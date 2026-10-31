@@ -6,7 +6,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { promotePending, runWorkspaceTask } from './agent-loop.ts';
 import { save, type LoopContext } from './context.ts';
-import { head, makeGit, mergedIntoMain, remoteHead, syncWithOrigin, type Git } from './git.ts';
+import {
+  controlChanged,
+  head,
+  makeGit,
+  mergedIntoMain,
+  remoteHead,
+  syncWithOrigin,
+  type Git,
+} from './git.ts';
 import { defaultRunCommand } from './process.ts';
 import { loadState } from './state.ts';
 import { promoteWorkspace, taskWorkspace } from './task-workspace.ts';
@@ -124,6 +132,17 @@ afterEach(async () => {
 // сотни миллисекунд, поэтому 5 с по умолчанию проверяли бы скорость ПК, а не код
 // (2026-10-14: $stage-close 06 остановился на таймауте). Предел — защита от зависания.
 describe('сведение ветки с origin на настоящем git', { timeout: 60_000 }, () => {
+  it('отличает обновление управляющего кода от продуктового коммита', async () => {
+    const { mine, dirs } = await repos();
+    const root = dirs[0] ?? '';
+    const initial = await head(mine);
+    await commitFile(mine, root, 'product.txt', 'изменение продукта');
+    const product = await head(mine);
+    expect(await controlChanged(mine, initial, product)).toBe(false);
+    await commitFile(mine, root, 'package.json', '{"scripts":{"agent:run":"new"}}');
+    expect(await controlChanged(mine, initial, await head(mine))).toBe(true);
+  });
+
   it('после красного CI переносит проверенное дерево на собственный опубликованный коммит до push', async () => {
     const { mine, root, context } = await workspaceRepo();
     await mine.run(['push', 'origin', 'stage-06']);
@@ -159,6 +178,48 @@ describe('сведение ветки с origin на настоящем git', { 
     expect(await remoteHead(mine)).toBe(published);
     expect(await publishReviewed(context, '06/T1j5', published)).toBeUndefined();
     expect(await remoteHead(mine)).toBe(repaired);
+  });
+
+  it('после отказа non-fast-forward перечитывает origin и переносит исправление', async () => {
+    const { mine, other, root, otherRoot, context } = await workspaceRepo();
+    await mine.run(['push', 'origin', 'stage-06']);
+    const base = await head(mine);
+    await other.run(['pull', '--ff-only', 'origin', 'stage-06']);
+    await writeFile(join(otherRoot, 'task.txt'), 'первая версия');
+    await other.run(['add', 'task.txt']);
+    await other.run(['commit', '-m', 'test(client): первая версия', '-m', 'Этап: 06/T1j5']);
+    const published = await head(other);
+    await writeFile(join(root, 'task.txt'), 'исправленная версия');
+    await mine.run(['add', 'task.txt']);
+    await mine.run(['commit', '-m', 'test(client): исправление', '-m', 'Этап: 06/T1j5']);
+    const sourceTree = await mine.run(['rev-parse', 'HEAD^{tree}']);
+    let race = true;
+    const racingCommand: typeof defaultRunCommand = async (name, args, options) => {
+      if (name === 'git' && args[0] === 'push' && race) {
+        race = false;
+        await other.run(['push', 'origin', 'stage-06']);
+      }
+      return defaultRunCommand(name, args, options);
+    };
+    const racingContext: LoopContext = {
+      ...context,
+      git: makeGit(racingCommand, root),
+    };
+    racingContext.state.activeTask = {
+      task: '06/T1j5',
+      base,
+      workspaceRoot: root,
+      remoteBase: published,
+      workPrompt: '$task 06/T1j5',
+      phase: 'ci',
+      findings: [],
+      ciRetries: 1,
+    };
+
+    expect(await publishReviewed(racingContext, '06/T1j5', published)).toBe('worked');
+    expect(await mine.run(['rev-parse', 'HEAD^'])).toBe(published);
+    expect(await mine.run(['rev-parse', 'HEAD^{tree}'])).toBe(sourceTree);
+    expect(racingContext.state.activeTask.phase).toBe('pre-push');
   });
 
   it('не пересобирает задачу поверх чужого коммита', async () => {

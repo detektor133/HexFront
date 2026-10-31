@@ -28,6 +28,24 @@ export const currentBranch = (git: Git): Promise<string> => git.run(['branch', '
 export const publishBranch = async (git: Git): Promise<string> =>
   git.targetBranch ?? currentBranch(git);
 export const head = (git: Git): Promise<string> => git.run(['rev-parse', 'HEAD']);
+/** Код или правила цикла изменились между двумя опубликованными HEAD. */
+export async function controlChanged(git: Git, before: string, after: string): Promise<boolean> {
+  if (before === after) return false;
+  const result = await git.attempt([
+    'diff',
+    '--quiet',
+    before,
+    after,
+    '--',
+    'tools/agent-loop/src',
+    '.agents/skills',
+    'package.json',
+    'AGENTS.md',
+  ]);
+  if (result.code > 1)
+    throw new Error(result.stderr.trim() || 'git diff управляющего кода не прошёл');
+  return result.code === 1;
+}
 /** SHA опубликованной ветки без сетевого запроса; fetch до начала задачи обновляет этот ref. */
 export async function remoteHead(git: Git): Promise<string> {
   const branch = await publishBranch(git);

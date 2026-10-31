@@ -592,6 +592,7 @@ export async function publishReviewed(
   context: LoopContext,
   task: string,
   expectedRemote: string,
+  pushRetried = false,
 ): Promise<Step | undefined> {
   const branch = await publishBranch(context.git);
   const fetched = await context.git.attempt(['fetch', 'origin', branch]);
@@ -635,6 +636,8 @@ export async function publishReviewed(
     return 'worked';
   }
   const pushed = await context.git.attempt(['push', 'origin', `HEAD:${branch}`]);
+  if (pushed.code !== 0 && !pushRetried && /non-fast-forward|fetch first/iu.test(pushed.stderr))
+    return publishReviewed(context, task, expectedRemote, true);
   if (pushed.code !== 0)
     return backoff(context, `${task}: push проверенного HEAD не прошёл`, pushed.stderr.trim());
   await rememberPublished(context, task, local);
