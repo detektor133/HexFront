@@ -266,10 +266,31 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'true',
     );
+    expect(
+      screen
+        .getByRole('button', {
+          name: `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`,
+        })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(
+      screen
+        .getByRole('button', {
+          name: `${t(`unit.${otherArmyUnit.type}` as MessageKey)} · ${formatSoldiers(otherArmyUnit.soldiers)}`,
+        })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: secondRow }));
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'false',
     );
+    expect(
+      screen
+        .getByRole('button', {
+          name: `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`,
+        })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: secondRow }));
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'true',
