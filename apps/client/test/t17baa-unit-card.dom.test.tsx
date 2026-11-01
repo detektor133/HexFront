@@ -39,10 +39,30 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     if (!laterArmy || !earlierArmy) throw new Error('неполная фикстура армий');
     const templateUnit = source.units.find((unit) => unit.owner === source.playerId);
     if (!templateUnit) throw new Error('для фикстуры нужен свой отряд');
-    const first = { ...templateUnit, id: 9101, soldiers: 110_000 as typeof templateUnit.soldiers };
-    const second = { ...templateUnit, id: 9102, soldiers: 120_000 as typeof templateUnit.soldiers };
-    const third = { ...templateUnit, id: 9103, soldiers: 130_000 as typeof templateUnit.soldiers };
-    const fourth = { ...templateUnit, id: 9100, soldiers: 140_000 as typeof templateUnit.soldiers };
+    const first = {
+      ...templateUnit,
+      id: 9101,
+      type: 'infantry' as const,
+      soldiers: 110_000 as typeof templateUnit.soldiers,
+    };
+    const second = {
+      ...templateUnit,
+      id: 9102,
+      type: 'armor' as const,
+      soldiers: 120_000 as typeof templateUnit.soldiers,
+    };
+    const third = {
+      ...templateUnit,
+      id: 9103,
+      type: 'artillery' as const,
+      soldiers: 130_000 as typeof templateUnit.soldiers,
+    };
+    const fourth = {
+      ...templateUnit,
+      id: 9100,
+      type: 'armor' as const,
+      soldiers: 140_000 as typeof templateUnit.soldiers,
+    };
     const view = {
       ...source,
       armies: armies.map((army, index) => ({ ...army, number: index === 0 ? 2 : 1 })),
@@ -90,6 +110,16 @@ describe('07/T17baa: закрытие карточки отряда', () => {
         rows: [`${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`],
       },
     ]);
+    for (const unit of [first, second, third, fourth]) {
+      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+      const plate = screen.getByRole('button', { name: label });
+      expect(plate.getAttribute('aria-pressed')).toBe('true');
+      expect(plate.querySelector(`[data-unit-type="${unit.type}"]`)).toBeTruthy();
+    }
+    for (const army of armies) {
+      const label = t('army.numbered').replace('{n}', String(army.number));
+      expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true');
+    }
     expect(container.textContent).not.toContain('Выбрано отрядов');
   });
 
@@ -257,6 +287,16 @@ describe('07/T17bdb: выбор из сгруппированной карточ
       name: t('army.numbered').replace('{n}', String(army.number)),
     });
     fireEvent.click(groupButton);
+    expect(groupButton.getAttribute('aria-pressed')).toBe('true');
+    const armyGroup = groupButton.closest('section');
+    if (!armyGroup) throw new Error('группа армии не найдена');
+    const armyUnitButtons = Array.from(armyGroup.querySelectorAll('ul button[aria-pressed]'));
+    expect(armyUnitButtons).toHaveLength(
+      view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === army.id).length,
+    );
+    for (const unitButton of armyUnitButtons) {
+      expect(unitButton.getAttribute('aria-pressed')).toBe('true');
+    }
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'true',
     );

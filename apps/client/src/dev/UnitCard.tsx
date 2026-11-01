@@ -15,6 +15,7 @@ import styles from './HexCard.module.css';
 import { armyName } from './army-name.ts';
 import { measureCardHeight } from './card-measurement.ts';
 import { toggleUnitSelection, type Picked } from './sandbox-selection.ts';
+import { UnitGlyph } from './unit-glyph.tsx';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
@@ -195,17 +196,26 @@ export function UnitCard(props: {
                     </button>
                   </h3>
                   <ul className={styles.unitList}>
-                    {group.map((unit) => (
-                      <li key={unit.id}>
-                        <button
-                          type="button"
-                          aria-pressed={picked.units.includes(unit.id)}
-                          onClick={() => props.onPick(toggleUnitSelection(view, picked, [unit.id]))}
-                        >
-                          {t(`unit.${unit.type}` as MessageKey)} · {formatSoldiers(unit.soldiers)}
-                        </button>
-                      </li>
-                    ))}
+                    {group.map((unit) => {
+                      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+                      return (
+                        <li key={unit.id}>
+                          <IconButton
+                            className={styles.unitPlate}
+                            label={label}
+                            aria-pressed={picked.units.includes(unit.id)}
+                            onClick={() =>
+                              props.onPick(toggleUnitSelection(view, picked, [unit.id]))
+                            }
+                          >
+                            <UnitGlyph className={styles.unitGlyph} type={unit.type} />
+                            <span>{t(`unit.${unit.type}` as MessageKey)}</span>
+                            <span aria-hidden="true"> · </span>
+                            <span>{formatSoldiers(unit.soldiers)}</span>
+                          </IconButton>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </section>
               );

@@ -12,6 +12,7 @@ import {
 import styles from './HexCard.module.css';
 import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
+import { UnitGlyph } from './unit-glyph.tsx';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
 import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
@@ -80,22 +81,6 @@ function ActionButton(props: {
 // Набор в своём городе (03/T12): доступный — с ценой; не хватает только золота — с ценой и
 // причиной; недоступный по правилам — disabled с постоянной причиной (ui.md).
 
-// Глиф рода войск в сетке 14×14 — как на фишке (art/units.md, «Глифы»).
-function UnitGlyph(props: { type: RecruitOption['type'] }): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 14 14" className={styles.glyph} aria-hidden="true">
-      {props.type === 'infantry' && <polyline points="2,10 7,5 12,10" />}
-      {props.type === 'armor' && <polygon points="7,2 12,7 7,12 2,7" />}
-      {props.type === 'artillery' && (
-        <>
-          <path d="M2 10 A5 5 0 0 1 12 10" />
-          <circle cx="7" cy="10" r="1.75" className={styles.glyphDot} />
-        </>
-      )}
-    </svg>
-  );
-}
-
 // Цена со значком золота — монета по сетке иконок (линия, round), цвет — как у числа.
 function Price(props: { value: string; ok: boolean }): React.JSX.Element {
   return (
@@ -126,7 +111,7 @@ function RecruitButton(props: {
     <div className={styles.action}>
       <label className={styles.recruitControl}>
         <span className={styles.recruit}>
-          <UnitGlyph type={o.type} />
+          <UnitGlyph className={styles.glyph} type={o.type} />
           {label}
         </span>
         <input

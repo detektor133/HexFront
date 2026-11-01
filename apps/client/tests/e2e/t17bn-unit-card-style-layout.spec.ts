@@ -35,8 +35,8 @@ for (const viewport of viewports) {
       return {
         cardSurface: getComputedStyle(element).backgroundColor,
         cardBorder: getComputedStyle(element).borderTopColor,
-        surface: getComputedStyle(group).backgroundColor,
-        border: getComputedStyle(group).borderTopColor,
+        groupSurface: getComputedStyle(group).backgroundColor,
+        groupBorderStyle: getComputedStyle(group).borderTopStyle,
         heading: getComputedStyle(heading).color,
         actionSurface: getComputedStyle(headingButton).backgroundColor,
         marker: getComputedStyle(marker).backgroundColor,
@@ -45,10 +45,10 @@ for (const viewport of viewports) {
     });
     expect(initial.cardSurface).toBe('rgb(255, 255, 255)');
     expect(initial.cardBorder).toBe('rgb(217, 215, 207)');
-    expect(initial.surface).toBe('rgb(246, 245, 241)');
-    expect(initial.border).toBe('rgb(217, 215, 207)');
+    expect(initial.groupSurface).toBe('rgba(0, 0, 0, 0)');
+    expect(initial.groupBorderStyle).toBe('none');
     expect(initial.heading).toBe('rgb(91, 90, 85)');
-    expect(initial.actionSurface).toBe('rgb(246, 245, 241)');
+    expect(initial.actionSurface).toBe('rgba(0, 0, 0, 0)');
     const armyPalette = [
       'rgb(123, 63, 140)',
       'rgb(11, 127, 142)',
@@ -65,6 +65,7 @@ for (const viewport of viewports) {
         rows.nth(index).evaluate((element) => ({
           background: getComputedStyle(element).backgroundColor,
           color: getComputedStyle(element).color,
+          selected: element.getAttribute('aria-pressed') === 'true',
           borderTopColor: getComputedStyle(element).borderTopColor,
           borderTopStyle: getComputedStyle(element).borderTopStyle,
           borderTopWidth: getComputedStyle(element).borderTopWidth,
@@ -72,11 +73,13 @@ for (const viewport of viewports) {
       ),
     );
     expect(rowStyles[0]?.background).toBe('rgb(246, 245, 241)');
-    expect(rowStyles[1]?.background).toBe('rgb(255, 255, 255)');
+    expect(rowStyles[1]?.background).toBe('rgb(246, 245, 241)');
     expect(rowStyles[0]?.color).toBe('rgb(34, 33, 30)');
     expect(rowStyles[1]?.color).toBe('rgb(34, 33, 30)');
     for (const rowStyle of rowStyles) {
-      expect(rowStyle?.borderTopColor).toBe('rgb(217, 215, 207)');
+      expect(rowStyle?.borderTopColor).toBe(
+        rowStyle?.selected ? 'rgb(201, 154, 46)' : 'rgb(217, 215, 207)',
+      );
       expect(rowStyle?.borderTopStyle).toBe('solid');
       expect(rowStyle?.borderTopWidth).toBe('1px');
     }

@@ -69,9 +69,8 @@
 
 .unitGroup {
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface2);
+  display: grid;
+  gap: var(--space-xs);
 }
 
 .groupTitle {
@@ -98,17 +97,12 @@
 }
 
 .groupTitle button {
-  background: var(--ui-surface2);
-}
-
-.groupTitle button[aria-pressed='true'],
-.unitList button[aria-pressed='true'] {
-  background: var(--ui-surface2);
-}
-
-.groupTitle button:hover,
-.unitList button:hover {
-  background: var(--ui-surface2);
+  min-height: var(--touch-target-min);
+  padding: 0;
+  background: transparent;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
 }
 
 .groupTitle button:focus-visible,
@@ -120,23 +114,62 @@
 }
 
 .armyMarker {
-  width: var(--space-sm);
-  height: var(--space-sm);
-  flex: 0 0 var(--space-sm);
-  border: 1px solid var(--ui-border);
-  border-radius: 50%;
+  width: calc(var(--space-xs) + var(--space-xs) / 2);
+  height: var(--space-lg);
+  flex: 0 0 calc(var(--space-xs) + var(--space-xs) / 2);
+  border-radius: 0;
 }
 
 .unitList {
-  margin: var(--space-xs) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: var(--font-size-caption);
   color: var(--ui-ink);
 }
 
-.unitList button {
-  border-top: 1px solid var(--ui-border);
+.unitList li {
+  min-width: 0;
+}
+
+.unitList .unitPlate {
+  width: auto;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-chip);
+  background: var(--ui-surface2);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.unitList .unitPlate[aria-pressed='true'] {
+  border-color: var(--selection-color);
+  box-shadow: inset 0 0 0 1px var(--selection-color);
+}
+
+.unitList .unitPlate:hover {
+  border-color: var(--selection-color);
+}
+
+.unitGlyph {
+  width: calc(var(--space-lg) + var(--space-xs) / 2);
+  height: calc(var(--space-lg) + var(--space-xs) / 2);
+  flex: 0 0 calc(var(--space-lg) + var(--space-xs) / 2);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.unitGlyph circle,
+.glyph circle {
+  fill: currentColor;
+  stroke: none;
 }
 
 .good,
@@ -298,11 +331,6 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.glyphDot {
-  fill: currentColor;
-  stroke: none;
 }
 
 /* Кнопка закрытия сохраняет сенсорную область, не добавляя отдельную плитку. */
