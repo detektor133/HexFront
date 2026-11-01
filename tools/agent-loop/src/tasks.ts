@@ -223,9 +223,13 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
       const verdict = await runReview(
         context,
         task,
-        `Узкая проверка без нового коммита: исполнитель сообщил «${message.trim()}». Проверь только ` +
-          `пункт «${finding.text}» по текущему HEAD. Если он уже закрыт предыдущим патчем — OK; ` +
-          'иначе верни тот же конкретный блокер.',
+        `Узкая независимая проверка спорного пункта «${finding.text}» по текущему HEAD. ` +
+          `Исполнитель не создал коммит и оспорил фактическую предпосылку: «${message.trim()}». ` +
+          'Сначала попытайся опровергнуть замечание: проверь реальный путь вызова, иерархию ' +
+          'преобразований и существующий целевой тест. Если поведение уже отвечает критерию, ' +
+          'верни OK без требования правки или коммита. Если дефект подтверждён, верни ВОЗВРАТ ' +
+          'с конкретным воспроизводимым контрпримером и наблюдаемым результатом текущего HEAD; ' +
+          'повтор прежнего вывода без проверки не является доказательством.',
       );
       if (typeof verdict === 'string') return verdict;
       if (verdict.ok) {
@@ -234,7 +238,7 @@ async function followUp(context: LoopContext, task: string, message: string): Pr
         active.phase = active.findings.length === 0 ? 'review' : 'work';
         await save(context);
         await context.say(
-          `узкий review ${task}: пункт уже исправлен предыдущим патчем, осталось ${active.findings.length} пунктов`,
+          `узкий review ${task}: пункт снят после независимой проверки, осталось ${active.findings.length} пунктов`,
         );
         return 'worked';
       }
