@@ -61,6 +61,7 @@ export interface ChipState {
 export interface Chip {
   readonly root: Container;
   draw(s: ChipState): void;
+  width(): number;
   /** Разрешение текста: при приближении его растеризуют заново, чтобы число было чётким. */
   setResolution(r: number): void;
   destroy(): void;
@@ -173,7 +174,7 @@ function marks(p: Parts, s: ChipState, sq: number): void {
   }
 }
 
-function drawChip(p: Parts, s: ChipState): void {
+function drawChip(p: Parts, s: ChipState): number {
   const top = -H / 2;
   const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX + TEXT_SLACK);
   const attackSlot =
@@ -194,6 +195,7 @@ function drawChip(p: Parts, s: ChipState): void {
   drawAttackArrow(g, s, sq);
   marks(p, s, sq);
   if (s.retreating) drawRetreatHatch(g, left, top, w);
+  return w + Math.max(OUTLINE, tokens.selection.width, 2);
 }
 
 /** Белая диагональная штриховка отступления остаётся внутри корпуса фишки. */
@@ -245,17 +247,23 @@ export function createChip(): Chip {
   label.resolution = textResolution;
   content.addChild(g, label);
   const parts: Parts = { g, label };
+  let width = 0;
   return {
     root,
     draw(s) {
       label.text = formatSoldiers(s.soldiers);
       label.style.fill = s.ghost ? s.color : tokens.ui.ink;
       g.clear();
-      if (s.ghost) drawGhost(parts, s);
-      else drawChip(parts, s);
+      if (s.ghost) {
+        drawGhost(parts, s);
+        width = 0;
+      } else {
+        width = drawChip(parts, s);
+      }
       content.alpha = s.retreating ? RETREAT_ALPHA : 1;
       content.scale.set(1);
     },
+    width: () => width,
     setResolution(r) {
       if (label.resolution === r) return;
       label.resolution = r;

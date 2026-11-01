@@ -28,6 +28,7 @@ import { armyName } from '../src/dev/army-name.ts';
 import { cityChipShift } from '../src/dev/chip-place.ts';
 import { edgeMid } from '../src/dev/plan-edges.ts';
 import type * as SplitDragModule from '../src/dev/split-drag.ts';
+import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { hexCenter, type Point } from '../src/render/hex-geometry.ts';
@@ -387,10 +388,19 @@ describe('07/T17ap: непрерывный росчерк планов чере�
     const units = view.units.filter(
       (unit) => unit.owner === view.playerId && unit.order !== 'retreat',
     );
-    const centers = units.map((unit) => ({
-      unit,
-      point: world.toGlobal(hexCenter(hexFromId(unit.hex, map.width), radius)),
-    }));
+    const groups = chipGroups(view);
+    const centers = units.map((unit) => {
+      const group = groups.find((candidate) => candidate.units[0]?.id === unit.id);
+      const city = view.cities.find((candidate) => candidate.hex === unit.hex);
+      const center = hexCenter(hexFromId(unit.hex, map.width), radius);
+      return {
+        unit,
+        point: world.toGlobal({
+          x: center.x,
+          y: center.y + (group?.stackOffset ?? 0) + (city ? cityChipShift(city.level, radius) : 0),
+        }),
+      };
+    });
     let pair: (typeof centers)[number][] | null = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
     for (const first of centers) {

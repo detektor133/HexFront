@@ -14,22 +14,34 @@ export interface Picked {
 
 export const NOTHING_PICKED: Picked = { hex: null, units: [], target: null };
 
-/** Выбирает свои фишки, центры которых попали в прямоугольник рамки. */
+/** Выбирает свои фишки с ненулевым пересечением видимого прямоугольника фишки и рамки. */
 export function selectUnitsInRect(
   view: PlayerView,
   from: Point,
   to: Point,
-  center: (hex: number) => Point,
+  bounds: (unitId: number) => {
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+    readonly bottom: number;
+  } | null,
 ): readonly number[] {
   const left = Math.min(from.x, to.x);
   const right = Math.max(from.x, to.x);
   const top = Math.min(from.y, to.y);
   const bottom = Math.max(from.y, to.y);
+  if (left === right || top === bottom) return [];
   return view.units
     .filter((u) => u.owner === view.playerId && u.order !== 'retreat')
     .filter((u) => {
-      const point = center(u.hex);
-      return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+      const chip = bounds(u.id);
+      return (
+        chip !== null &&
+        chip.left < right &&
+        chip.right > left &&
+        chip.top < bottom &&
+        chip.bottom > top
+      );
     })
     .map((u) => u.id);
 }

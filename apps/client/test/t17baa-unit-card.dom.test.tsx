@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, loadMap } from '@hexfront/sim';
+import { loadMap } from '@hexfront/sim';
 
 import { installMatchMocks } from './t17q-match.ts';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
@@ -13,8 +13,6 @@ import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
-import { hexCenter } from '../src/render/hex-geometry.ts';
-import { tokens } from '../src/theme/tokens.ts';
 
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
@@ -148,7 +146,7 @@ describe('07/T17baa: закрытие карточки отряда', () => {
         snapshot: { ...source.snapshot, view: selectedView },
       }),
     };
-    const { getSelection } = installMatchMocks(engine, mapJson);
+    const { getSelection, getChipBounds } = installMatchMocks(engine, mapJson);
     window.history.replaceState({}, '', '/?debug=1');
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
 
@@ -159,10 +157,11 @@ describe('07/T17baa: закрытие карточки отряда', () => {
       expect(screen.queryByRole('button', { name: t('onboarding.disable') })).toBeNull(),
     );
     await waitFor(() => expect(getSelection()).toBeDefined());
-    const center = hexCenter(hexFromId(unit.hex, map.width), tokens.map.hexRadius);
+    const bounds = getChipBounds()?.(unit.id);
+    if (!bounds) throw new Error('видимая область фишки не подготовлена');
     getSelection()?.(
-      { x: center.x - 1, y: center.y - 1 },
-      { x: center.x + 1, y: center.y + 1 },
+      { x: bounds.left, y: bounds.top },
+      { x: bounds.right, y: bounds.bottom },
       'end',
     );
     const closeButton = await screen.findByRole('button', { name: t('unit.close') });

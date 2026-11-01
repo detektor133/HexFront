@@ -8,6 +8,13 @@ import type { FromWorker } from '../src/local/messages.ts';
 import type { Point } from '../src/render/hex-geometry.ts';
 import type { MapView, MapViewOptions, MapViewState, TapKind } from '../src/render/map-view.ts';
 
+type ChipBounds = (unitId: number) => {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+} | null;
+
 export function installMatchMocks(
   engine: LocalEngine,
   matchMap: unknown,
@@ -15,8 +22,14 @@ export function installMatchMocks(
   getTap: () => ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
   getSelection: () =>
     ((from: Point, to: Point, phase: 'start' | 'move' | 'end') => void) | undefined;
+  getChipBounds: () => ChipBounds | undefined;
   emit: () => void;
 } {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+  }));
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({
@@ -26,6 +39,7 @@ export function installMatchMocks(
   );
   let tap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
   let selection: ((from: Point, to: Point, phase: 'start' | 'move' | 'end') => void) | undefined;
+  let chipBounds: ChipBounds | undefined;
   let onMessage: ((message: FromWorker) => void) | undefined;
   const emit = (): void => onMessage?.(engine.snapshot());
 
@@ -58,11 +72,14 @@ export function installMatchMocks(
   vi.doMock('../src/render/map-view.ts', () => ({
     createMapView: async (
       _host: HTMLElement,
-      _map: MapStatic,
-      _options: MapViewOptions,
+      map: MapStatic,
+      options: MapViewOptions,
       _onState: (state: MapViewState) => void,
       onTap?: (hex: { q: number; r: number }, kind: TapKind, world: Point) => void,
     ): Promise<MapView> => {
+      const layer = options.midLayer?.(map, options.radius) as
+        { readonly chipBounds?: ChipBounds } | undefined;
+      chipBounds = layer?.chipBounds;
       tap = onTap;
       return {
         configure: vi.fn(),
@@ -90,5 +107,10 @@ export function installMatchMocks(
       };
     },
   }));
-  return { getTap: () => tap, getSelection: () => selection, emit };
+  return {
+    getTap: () => tap,
+    getSelection: () => selection,
+    getChipBounds: () => chipBounds,
+    emit,
+  };
 }

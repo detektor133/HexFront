@@ -49,7 +49,7 @@ import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { OnboardingHints } from '../match/OnboardingHints.tsx';
-import { hexCenter, type Point } from '../render/hex-geometry.ts';
+import type { Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -364,8 +364,11 @@ function useSandbox(
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
         const units = viewRef.current
-          ? selectUnitsInRect(viewRef.current, from, to, (id) =>
-              hexCenter(hexFromId(id, map.width), tokens.map.hexRadius),
+          ? selectUnitsInRect(
+              viewRef.current,
+              from,
+              to,
+              (id) => layerRef.current?.chipBounds(id) ?? null,
             )
           : [];
         pick({ hex: null, units, target: null });

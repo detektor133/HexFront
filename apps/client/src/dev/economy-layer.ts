@@ -32,7 +32,7 @@ import {
   drawTerritoryLabels,
   territoryLabelsKey,
 } from './territory-labels.ts';
-import { createUnitLayer } from './unit-layer.ts';
+import { createUnitLayer, type UnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
@@ -112,6 +112,7 @@ export interface EconomyLayer {
    */
   setOrderTarget(t: OrderTarget | null): void;
   chipAt(hex: number): Point;
+  chipBounds: UnitLayer['chipBounds'];
   unitsAt(world: Point): readonly number[];
   frame(nowMs: number): void;
   destroy(): void;
@@ -652,6 +653,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     chipAt(hex) {
       return unitLayer.chipAt(hex);
+    },
+    chipBounds(unitId) {
+      return unitLayer.chipBounds(unitId);
     },
     unitsAt(world) {
       return unitLayer.unitsAt(world);

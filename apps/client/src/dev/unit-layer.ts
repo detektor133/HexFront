@@ -57,6 +57,13 @@ export interface UnitLayer {
   battleMarkerState(sourceHex: number, targetHex: number): number | null;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
+  /** Видимая область фишки отряда в мировых координатах. */
+  chipBounds(unitId: number): {
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+    readonly bottom: number;
+  } | null;
   /** Возвращает отряды фишки под мировой точкой, включая её текущую позицию. */
   unitsAt(world: Point): readonly number[];
   frame(nowMs: number): void;
@@ -428,6 +435,21 @@ export function createUnitLayer(
     },
     chipAt(hex) {
       return base(hex);
+    },
+    chipBounds(unitId) {
+      const entry = entries.find((candidate) => candidate.units.includes(unitId));
+      if (!entry) return null;
+      const at = drawnAt.get(entry.key) ?? entry.at(1);
+      const width = chips.get(entry.key)?.width();
+      if (width === undefined || width <= 0) return null;
+      const halfWidth = (width * CHIP_WORLD) / 2;
+      const halfHeight = chipHalf();
+      return {
+        left: at.x - halfWidth,
+        right: at.x + halfWidth,
+        top: at.y - halfHeight,
+        bottom: at.y + halfHeight,
+      };
     },
     unitsAt(world) {
       const halfHeight = chipHalf();

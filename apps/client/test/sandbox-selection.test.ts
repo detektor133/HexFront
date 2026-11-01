@@ -93,7 +93,7 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(neutral && isHostile(view, neutral.hex)).toBe(true);
   });
 
-  it('рамка включает только свой неотступающий отряд с центром внутри', () => {
+  it('рамка выбирает видимую часть собственной фишки, исключая нулевое пересечение', () => {
     const own = view.units.find((unit) => unit.owner === view.playerId);
     const enemy = view.units.find((unit) => unit.owner !== view.playerId);
     if (!own || !enemy) throw new Error('нужны собственный и чужой отряды');
@@ -106,12 +106,36 @@ describe('песочница: выбор и приказы как в HoI4', () =
         { ...own, id: 10_004, hex: 6, order: 'idle' },
       ],
     };
-    const selected = selectUnitsInRect(fixture, { x: 4.5, y: 4.5 }, { x: 5.5, y: 5.5 }, (hex) => ({
-      x: hex,
-      y: hex,
-    }));
+    const positions = new Map([
+      [10_001, 5],
+      [10_002, 5],
+      [10_003, 5],
+      [10_004, 6],
+    ]);
+    const selected = selectUnitsInRect(
+      fixture,
+      { x: 5.4, y: 4.5 },
+      { x: 5.6, y: 5.5 },
+      (unitId) => {
+        const x = unitId === 10_004 ? undefined : positions.get(unitId);
+        return x === undefined ? null : { left: x - 0.5, right: x + 0.5, top: 4.5, bottom: 5.5 };
+      },
+    );
 
     expect(selected).toEqual([10_001]);
+    expect(
+      selectUnitsInRect(fixture, { x: 5.5, y: 4.5 }, { x: 6, y: 5.5 }, () => ({
+        left: 4.5,
+        right: 5.5,
+        top: 4.5,
+        bottom: 5.5,
+      })),
+    ).toEqual([]);
+    const chipBounds = () => ({ left: 5, right: 6, top: 4, bottom: 6 });
+    expect(selectUnitsInRect(fixture, { x: 5.5, y: 4.5 }, { x: 5.5, y: 5.5 }, chipBounds)).toEqual(
+      [],
+    );
+    expect(selectUnitsInRect(fixture, { x: 5.2, y: 5 }, { x: 5.8, y: 5 }, chipBounds)).toEqual([]);
   });
 });
 
