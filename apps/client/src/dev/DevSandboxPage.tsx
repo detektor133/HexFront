@@ -43,6 +43,12 @@ import {
   type SnapshotTelemetryCounts,
   type WorkerTelemetry,
 } from './telemetry.ts';
+import {
+  createPickedState,
+  createSandboxPicker,
+  createSandboxGrab,
+  tapUnit,
+} from './unit-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
@@ -122,7 +128,7 @@ function useSandbox(
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
-  const pickedRef = useRef<Picked>(NOTHING_PICKED);
+  const pickedRef = useRef(createPickedState());
   const mapViewRef = useRef<MapView | null>(null);
   const toolRef = useRef<ToolState | null>(null);
   const armyRef = useRef<number | null>(null);
@@ -152,18 +158,19 @@ function useSandbox(
     snapshotTelemetryRef.current = createSnapshotTelemetry();
   }
 
-  const pick = useCallback((p: Picked) => {
-    if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
-    pickedRef.current = p;
-    setPicked(p);
-    // Подсвечивается что-то одно: выбраны все отряды армии — армия выбрана сама; выбран гекс —
-    // армия не выбрана (07-controls.md, «Что выбрано»).
-    const v = viewRef.current;
-    if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
-    else if (p.hex !== null) setArmyRef.current(null);
-    layerRef.current?.setRoadPreview(null);
-    if (v) layerRef.current?.setView(v, p);
-  }, []);
+  const pick = useCallback(
+    createSandboxPicker(pickedRef.current, setPicked, (p, previous) => {
+      if (p.hex !== previous.hex) matchRef.current?.select(p.hex);
+      // Подсвечивается что-то одно: выбраны все отряды армии — армия выбрана сама; выбран гекс —
+      // армия не выбрана (07-controls.md, «Что выбрано»).
+      const v = viewRef.current;
+      if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
+      else if (p.hex !== null) setArmyRef.current(null);
+      layerRef.current?.setRoadPreview(null);
+      if (v) layerRef.current?.setView(v, p);
+    }),
+    [],
+  );
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
   const setFog = useCallback((on: boolean) => {
     matchRef.current?.setView(observerIdRef.current, on);
@@ -264,7 +271,7 @@ function useSandbox(
       snapshotTelemetryRef.current?.track(applied);
       viewRef.current = view;
       workerTelemetryRef.current = m.telemetry ?? null;
-      layerRef.current?.setView(view, pickedRef.current);
+      layerRef.current?.setView(view, pickedRef.current.current);
       setMsg(applied);
       const nextEvents = appendEvents(
         eventsRef.current,
@@ -321,14 +328,19 @@ function useSandbox(
       }
       const hex = hexId(h, map.width);
       if (input.tap(world, kind) || input.onHandle(world)) return;
-      if (kind === 'select') return pick(selectHex(current, pickedRef.current, hex));
+      const unitLayer = layerRef.current;
+      if (unitLayer) {
+        const unitPick = tapUnit(world, current, pickedRef.current.current, unitLayer);
+        if (unitPick) return pick(unitPick);
+      }
+      if (kind === 'select') return pick(selectHex(current, pickedRef.current.current, hex));
       order(hex);
     };
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
     const order = (hex: number): void => {
       const current = viewRef.current;
       if (!current) return;
-      const next = orderHex(current, pickedRef.current, hex);
+      const next = orderHex(current, pickedRef.current.current, hex);
       if (next.cmd) match.send(next.cmd);
       pick(next.picked);
     };
@@ -336,7 +348,7 @@ function useSandbox(
       map,
       radius: tokens.map.hexRadius,
       view: () => viewRef.current,
-      picked: () => pickedRef.current,
+      picked: () => pickedRef.current.current,
       tool: () => toolRef.current !== null,
       chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
       setTarget: (t) => layerRef.current?.setOrderTarget(t),
@@ -359,7 +371,7 @@ function useSandbox(
       v.setBottomInset(dockHeightRef.current);
       v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
-      v.setGrab((world) => input.grab(world) ?? splitGrab(world));
+      v.setGrab(createSandboxGrab(input.grab, splitGrab));
       v.setOrderHooks(hooks);
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
@@ -374,7 +386,7 @@ function useSandbox(
         pick({ hex: null, units, target: null });
       });
       if (initialScale > 0) v.setScale(initialScale);
-      const hex = pickedRef.current.hex;
+      const hex = pickedRef.current.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
       if (pendingMessage) {
         const next = pendingMessage;

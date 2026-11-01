@@ -6,7 +6,7 @@ import { Container } from 'pixi.js';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, loadMap, type MapStatic } from '@hexfront/sim';
+import { loadMap, type MapStatic, type PlayerView } from '@hexfront/sim';
 
 import { ArmyBar } from '../src/dev/ArmyBar.tsx';
 import { armyName } from '../src/dev/army-name.ts';
@@ -15,7 +15,9 @@ import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
 import type { FromWorker } from '../src/local/messages.ts';
-import type { Point } from '../src/render/hex-geometry.ts';
+import { createGesture } from '../src/render/gesture.ts';
+import { pixelToHex, type Point } from '../src/render/hex-geometry.ts';
+import { attachInput } from '../src/render/map-view.ts';
 import type { MapView, MapViewOptions, TapKind } from '../src/render/map-view.ts';
 
 const mapJson: unknown = JSON.parse(
@@ -260,7 +262,12 @@ describe('07/T17aj: выбор фишки на карте', () => {
   });
 
   it('через MatchPage и onTap не выбирает фишки по промежутку между ними', async () => {
-    const { view, units } = viewWithTwoArmiesOnOneHex();
+    const sourceView = viewWithTwoArmiesOnOneHex();
+    const first = sourceView.units[0];
+    if (!first) throw new Error('Фикстуре нужен исходный отряд');
+    const third = { ...first, id: first.id + 10_000, type: 'artillery' as const };
+    const units = [...sourceView.units, third];
+    const view = { ...sourceView.view, units };
     const sourceEngine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in sourceEngine) throw new Error(sourceEngine.errors.join('; '));
     const source = sourceEngine.snapshot();
@@ -269,8 +276,22 @@ describe('07/T17aj: выбор фишки на карте', () => {
       view,
       snapshot: { ...source.snapshot, view },
     };
-    let onTap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
-    let layer: { chipAt(hex: number): Point } | undefined;
+    let canvas: HTMLCanvasElement | undefined;
+    const strokeEvents: string[] = [];
+    let layer:
+      | {
+          chipAt(hex: number): Point;
+          chipBounds(
+            unitId: number,
+          ): { left: number; right: number; top: number; bottom: number } | null;
+          unitsAt(world: Point): readonly number[];
+          setView(
+            view: PlayerView,
+            picked: { hex: null; units: number[]; target: null },
+            nowMs: number,
+          ): void;
+        }
+      | undefined;
     const selectUnitsSpy = vi.fn();
 
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
@@ -309,14 +330,47 @@ describe('07/T17aj: выбор фишки на карте', () => {
     });
     vi.doMock('../src/render/map-view.ts', () => ({
       createMapView: async (
-        _host: HTMLElement,
+        host: HTMLElement,
         map: MapStatic,
         options: MapViewOptions,
         _state: unknown,
         handler: (hex: { q: number; r: number }, kind: TapKind, world: Point) => void,
       ): Promise<MapView> => {
-        layer = options.midLayer?.(map, 10) as { chipAt(hex: number): Point } | undefined;
-        onTap = handler;
+        layer = options.midLayer?.(map, 10) as typeof layer;
+        canvas = document.createElement('canvas');
+        canvas.getBoundingClientRect = () => ({
+          x: 0,
+          y: 0,
+          left: 0,
+          top: 0,
+          right: 1000,
+          bottom: 1000,
+          width: 1000,
+          height: 1000,
+          toJSON: () => ({}),
+        });
+        canvas.setPointerCapture = () => undefined;
+        host.appendChild(canvas);
+        const gesture = createGesture(
+          {
+            drawing: () => true,
+            press: () => undefined,
+            release: () => undefined,
+            canHold: () => false,
+            cancelZone: () => false,
+            inside: () => true,
+          },
+          (event) => {
+            if (event.t === 'tap')
+              handler(pixelToHex(event.at, options.radius), event.kind, event.at);
+            if (event.t === 'stroke') strokeEvents.push(event.phase);
+          },
+        );
+        const detach = attachInput(canvas, gesture, {
+          zoom: () => undefined,
+          pressed: () => undefined,
+          idle: () => undefined,
+        });
         return {
           configure: () => undefined,
           setScale: () => undefined,
@@ -337,7 +391,10 @@ describe('07/T17aj: выбор фишки на карте', () => {
             textures: 0,
             canvasTextTextures: null,
           }),
-          destroy: () => undefined,
+          destroy: () => {
+            detach();
+            canvas?.remove();
+          },
         } as MapView;
       },
     }));
@@ -345,21 +402,106 @@ describe('07/T17aj: выбор фишки на карте', () => {
     const { MatchPage } = await import('../src/match/MatchPage.tsx');
     render(<MatchPage />);
     await waitFor(() => {
-      expect(onTap).toBeDefined();
+      expect(canvas).toBeDefined();
       expect(layer).toBeDefined();
     });
 
-    const firstUnit = units[0];
-    if (!firstUnit || !onTap || !layer) throw new Error('Реальный путь карты не инициализирован');
+    if (!canvas || !layer) throw new Error('Реальный путь карты не инициализирован');
     const loadedMap = loadMap(mapJson);
     if (!loadedMap.ok) throw new Error(loadedMap.errors.join('; '));
-    const hex = hexFromId(firstUnit.hex, loadedMap.map.width);
-    const point = layer.chipAt(firstUnit.hex);
-    act(() => onTap?.(hex, 'select', point));
-    expect(selectUnitsSpy).not.toHaveBeenCalled();
+    const activeCanvas = canvas;
+    for (const unit of units) {
+      const bounds = layer.chipBounds(unit.id);
+      if (!bounds) throw new Error(`Фишка отряда ${unit.id} не создана`);
+      const point = { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
+      expect(layer.unitsAt(point)).toEqual([unit.id]);
+      act(() => {
+        fireEvent.pointerDown(activeCanvas, {
+          pointerId: 1,
+          button: 0,
+          clientX: point.x,
+          clientY: point.y,
+        });
+        fireEvent.pointerUp(activeCanvas, {
+          pointerId: 1,
+          button: 0,
+          clientX: point.x,
+          clientY: point.y,
+        });
+      });
+      expect(selectUnitsSpy).toHaveBeenLastCalledWith(view, expect.anything(), [unit.id]);
+    }
+    const centers = units.map((unit) => {
+      const bounds = layer?.chipBounds(unit.id);
+      if (!bounds) throw new Error(`Фишка отряда ${unit.id} не найдена`);
+      return (bounds.top + bounds.bottom) / 2;
+    });
+    const gap = { x: layer.chipAt(first.hex).x, y: ((centers[0] ?? 0) + (centers[1] ?? 0)) / 2 };
+    expect(layer.unitsAt(gap)).toEqual([]);
+    act(() => {
+      fireEvent.pointerDown(activeCanvas, {
+        pointerId: 1,
+        button: 0,
+        clientX: gap.x,
+        clientY: gap.y,
+      });
+      fireEvent.pointerUp(activeCanvas, {
+        pointerId: 1,
+        button: 0,
+        clientX: gap.x,
+        clientY: gap.y,
+      });
+    });
+    expect(selectUnitsSpy).toHaveBeenCalledTimes(3);
 
-    act(() => onTap?.(hex, 'select', { x: point.x + 1, y: point.y }));
-    expect(selectUnitsSpy).not.toHaveBeenCalled();
+    const selectedId = third.id;
+    const movingView = {
+      ...view,
+      units: units.map((unit) =>
+        unit.id === selectedId
+          ? { ...unit, order: 'move' as const, path: [unit.hex + 1], moveTicks: 1, moveTotal: 10 }
+          : unit,
+      ),
+    };
+    const nowMs = 1_000;
+    act(() => layer?.setView(movingView, { hex: null, units: [selectedId], target: null }, nowMs));
+    const movingBounds = layer.chipBounds(selectedId);
+    if (!movingBounds) throw new Error('Движущаяся фишка не найдена');
+    const movingPoint = {
+      x: (movingBounds.left + movingBounds.right) / 2,
+      y: (movingBounds.top + movingBounds.bottom) / 2,
+    };
+    expect(Number.isFinite(movingPoint.x) && Number.isFinite(movingPoint.y)).toBe(true);
+    expect(layer.unitsAt(movingPoint)).toEqual([selectedId]);
+    const pickedBeforeDrag = selectUnitsSpy.mock.results.at(-1)?.value;
+    expect(pickedBeforeDrag).toEqual({
+      hex: null,
+      units: [selectedId],
+      target: null,
+    });
+    act(() => {
+      fireEvent.pointerDown(activeCanvas, {
+        pointerId: 1,
+        button: 0,
+        clientX: movingPoint.x,
+        clientY: movingPoint.y,
+      });
+      fireEvent.pointerMove(activeCanvas, {
+        pointerId: 1,
+        button: 0,
+        clientX: movingPoint.x + 12,
+        clientY: movingPoint.y,
+      });
+      fireEvent.pointerUp(activeCanvas, {
+        pointerId: 1,
+        button: 0,
+        clientX: movingPoint.x + 12,
+        clientY: movingPoint.y,
+      });
+    });
+    expect(strokeEvents).toEqual(['start', 'move', 'end']);
+    expect(selectUnitsSpy).toHaveBeenCalledTimes(3);
+    expect(selectUnitsSpy.mock.results.at(-1)?.value).toBe(pickedBeforeDrag);
   });
 });
 

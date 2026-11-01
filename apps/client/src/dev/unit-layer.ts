@@ -453,14 +453,20 @@ export function createUnitLayer(
     },
     unitsAt(world) {
       const halfHeight = chipHalf();
+      let closest: { readonly unitId: number; readonly distance: number } | null = null;
       for (const entry of entries) {
         if (entry.units.length === 0) continue;
         const at = drawnAt.get(entry.key) ?? entry.at(1);
-        if (Math.abs(world.x - at.x) <= radius && Math.abs(world.y - at.y) <= halfHeight) {
-          return entry.units;
-        }
+        const halfWidth = ((chips.get(entry.key)?.width() ?? 0) * CHIP_WORLD) / 2;
+        if (Math.abs(world.x - at.x) > halfWidth || Math.abs(world.y - at.y) > halfHeight) continue;
+        const unitId = entry.units[0];
+        if (unitId === undefined) continue;
+        const dx = world.x - at.x;
+        const dy = world.y - at.y;
+        const distance = dx * dx + dy * dy;
+        if (closest === null || distance < closest.distance) closest = { unitId, distance };
       }
-      return [];
+      return closest ? [closest.unitId] : [];
     },
     setScale(scale) {
       k = 1 / scale;
