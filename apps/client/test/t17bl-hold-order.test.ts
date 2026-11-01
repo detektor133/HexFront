@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
-import { CHIP_WORLD, cityChipShift } from '../src/dev/chip-place.ts';
+import { cityChipShift } from '../src/dev/chip-place.ts';
 import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
@@ -98,7 +98,7 @@ class TestWorker {
     harness.unitHex = tappedUnit?.hex ?? 0;
     harness.unitStackOffset = tappedUnit
       ? (chipGroups(snapshot.view).find((group) => group.units[0]?.id === tappedUnit.id)
-          ?.stackOffset ?? 0) * CHIP_WORLD
+          ?.stackOffset ?? 0)
       : 0;
     harness.unitCityLevel =
       snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
@@ -148,8 +148,8 @@ function selectedArmyCard(): HTMLElement {
   return card;
 }
 
-function selectedUnitsCard(): HTMLElement {
-  return screen.getByRole('region', { name: /Selected units|Выбранные отряды/u });
+function selectedUnitCard(): HTMLElement {
+  return screen.getByRole('region', { name: / · \d/u });
 }
 
 async function renderSurface(): Promise<void> {
@@ -325,7 +325,8 @@ describe('07/T17bl: удержание и команды матча', () => {
       clientX: tapPoint.x,
       clientY: tapPoint.y,
     });
-    await waitFor(() => expect(selectedUnitsCard()).toBeTruthy());
+    await waitFor(() => expect(selectedUnitCard()).toBeTruthy());
+    const selectedTitle = selectedUnitCard().getAttribute('aria-label');
     nowMs = 100;
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 0,
@@ -344,7 +345,7 @@ describe('07/T17bl: удержание и команды матча', () => {
     harness.app.ticker.callbacks.forEach((callback) =>
       callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
     );
-    expect(selectedUnitsCard()).toBeTruthy();
+    expect(selectedUnitCard().getAttribute('aria-label')).toBe(selectedTitle);
   });
 
   it('отправляет ПКМ через MapView без радиальных секторов', async () => {

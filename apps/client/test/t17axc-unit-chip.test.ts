@@ -14,7 +14,7 @@ import {
   type UnitView,
 } from '@hexfront/sim';
 
-import { CHIP_WORLD, chipHalf } from '../src/dev/chip-place.ts';
+import { chipHalf } from '../src/dev/chip-place.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
@@ -321,8 +321,8 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       const second = ordered[1];
       const third = ordered[2];
       if (!first || !second || !third) throw new Error('Стопка должна содержать три фишки');
-      expect((second.position.y - first.position.y) * CHIP_WORLD).toBeCloseTo(28);
-      expect((third.position.y - second.position.y) * CHIP_WORLD).toBeCloseTo(28);
+      expect(second.position.y - first.position.y).toBeCloseTo(28);
+      expect(third.position.y - second.position.y).toBeCloseTo(28);
       expect(second.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - second.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());

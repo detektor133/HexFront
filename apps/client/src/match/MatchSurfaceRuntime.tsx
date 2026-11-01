@@ -77,14 +77,13 @@ export function focusUnitOnDoubleTap(options: {
   view: PlayerView;
   map: MapStatic;
   hex: { readonly q: number; readonly r: number };
-  picked: Picked;
   hit: readonly number[];
   pick: (picked: Picked) => void;
   centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
 }): void {
   const { view, map, hit } = options;
   if (hit.length === 0) return;
-  const next = selectUnits(view, options.picked, hit);
+  const next = selectUnits(view, NOTHING_PICKED, hit);
   options.pick(next);
   const unit = view.units.find((candidate) => hit.includes(candidate.id));
   options.centerOn(
@@ -96,7 +95,6 @@ export function focusUnitOnDoubleTap(options: {
 export function createDoubleTapHandler(options: {
   getView: () => PlayerView | null;
   map: MapStatic;
-  getPicked: () => Picked;
   getHit: (world: Point) => readonly number[];
   pick: (picked: Picked) => void;
   centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
@@ -110,7 +108,6 @@ export function createDoubleTapHandler(options: {
       view,
       map: options.map,
       hex,
-      picked: options.getPicked(),
       hit,
       pick: options.pick,
       centerOn: options.centerOn,
@@ -443,7 +440,6 @@ export function useSandbox(
     const onDoubleTap = createDoubleTapHandler({
       getView: () => viewRef.current,
       map,
-      getPicked: () => pickedRef.current,
       getHit: (world) => layerRef.current?.unitsAt(world) ?? [],
       pick,
       centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),

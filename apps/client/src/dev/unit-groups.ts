@@ -1,7 +1,5 @@
 import type { PlayerView, UnitView } from '@hexfront/sim';
 
-import { CHIP_WORLD } from './chip-place.ts';
-
 /** Позиция фишки отдельного отряда в стопке. */
 export interface ChipGroup {
   readonly key: string;
@@ -34,7 +32,7 @@ export function chipGroups(v: PlayerView): ChipGroup[] {
         key: `u${unit.id}`,
         units: [unit],
         moving: inTransit(unit),
-        stackOffset: ((index - middle) * 28) / CHIP_WORLD,
+        stackOffset: (index - middle) * 28,
       });
     }
   }

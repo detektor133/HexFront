@@ -1,9 +1,13 @@
 import { Application } from 'pixi.js';
 import { useEffect, useRef } from 'react';
 
+import { FP, loadMap, type Fp } from '@hexfront/sim';
+
 import styles from './DevUnitsPage.module.css';
 import { createChip, type ChipState } from './unit-chips.ts';
+import { createUnitLayer } from './unit-layer.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { createLocalEngine } from '../local/engine.ts';
 import { armyColor, relationColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -178,6 +182,49 @@ const STACK_STATES: readonly Sample[] = [
   },
 ];
 
+function addStackScene(app: Application, width: number, height: number, mapJson: unknown): void {
+  const loaded = loadMap(mapJson);
+  if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+  const engine = createLocalEngine(mapJson, 42, 2);
+  if ('errors' in engine) throw new Error(engine.errors.join('; '));
+  const view = engine.snapshot().view;
+  const original = view.units.find((unit) => unit.owner === view.playerId);
+  if (!original) throw new Error('Свой отряд не найден');
+  const units = STACK_STATES.map(({ state }, index) => ({
+    ...original,
+    id: original.id + index,
+    type: state.type,
+    soldiers: (state.soldiers * FP) as Fp,
+    org: Math.round(state.org * FP) as Fp,
+    supplyLevel: Math.round((state.supply ?? 0) * FP) as Fp,
+    armyId: index === 1 ? 2 : 1,
+    order: 'idle' as const,
+    moveTicks: 0,
+    moveTotal: 0,
+    path: [],
+    fireTarget: -1,
+    attackState: null,
+  }));
+  const layer = createUnitLayer(loaded.map.width, tokens.map.hexRadius, () => ({
+    x: width / 2,
+    y: height / 2,
+  }));
+  layer.setView(
+    {
+      ...view,
+      cities: [],
+      units,
+      armies: [
+        { id: 1, number: 1, name: '1', auto: false },
+        { id: 2, number: 2, name: '2', auto: false },
+      ],
+    },
+    { hex: null, units: [units[1]?.id ?? -1], target: null },
+    0,
+  );
+  app.stage.addChild(layer.container);
+}
+
 /** Отладочная страница всех состояний фишки из `docs/art/units.md`. */
 export function DevUnitsPage(): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -189,15 +236,23 @@ export function DevUnitsPage(): React.JSX.Element {
     if (!host) return;
     const app = new Application();
     let alive = true;
+    let initialized = false;
     void app
       .init({ background: tokens.map.background, resizeTo: host, antialias: true })
-      .then(() => {
+      .then(async () => {
+        initialized = true;
         if (!alive) {
           app.destroy({ removeView: true }, { children: true, context: true });
           return;
         }
         host.appendChild(app.canvas);
         const width = Math.max(1, host.clientWidth);
+        if (stackScene) {
+          const response = await fetch('/maps/small.json');
+          const mapJson: unknown = await response.json();
+          if (alive) addStackScene(app, width, host.clientHeight, mapJson);
+          return;
+        }
         samples.forEach((sample, index) => {
           const chip = createChip();
           const columns = width >= 900 ? 2 : 1;
@@ -220,19 +275,25 @@ export function DevUnitsPage(): React.JSX.Element {
       });
     return () => {
       alive = false;
-      app.destroy({ removeView: true }, { children: true, context: true });
+      if (initialized) app.destroy({ removeView: true }, { children: true, context: true });
     };
   }, [samples, stackScene]);
 
   return (
     <main className={styles.page}>
       <h1 className={styles.title}>{t('dev.units.title')}</h1>
-      <div ref={hostRef} className={styles.canvas} data-testid="units-stage" />
-      <div className={styles.labels}>
-        {samples.map((sample, index) => (
-          <span key={`${sample.label}-${index}`}>{t(sample.label)}</span>
-        ))}
-      </div>
+      <div
+        ref={hostRef}
+        className={stackScene ? `${styles.canvas} ${styles.stackCanvas}` : styles.canvas}
+        data-testid="units-stage"
+      />
+      {!stackScene && (
+        <div className={styles.labels}>
+          {samples.map((sample, index) => (
+            <span key={`${sample.label}-${index}`}>{t(sample.label)}</span>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

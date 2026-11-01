@@ -13,7 +13,6 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { CHIP_WORLD } from '../src/dev/chip-place.ts';
 import { armySelection, selectHex } from '../src/dev/sandbox-selection.ts';
 import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -78,7 +77,7 @@ describe('фишки отрядов (07/T17bt)', () => {
       expect(groups, `тик ${t}`).toHaveLength(3);
       expect(groups.map((g) => g.units[0]?.id)).toEqual([...ids].sort((x, y) => x - y));
       for (const [index, group] of groups.entries()) {
-        expect(group.stackOffset * CHIP_WORLD).toBeCloseTo((index - 1) * 28);
+        expect(group.stackOffset).toBeCloseTo((index - 1) * 28);
       }
     }
     expect(moving).toBeGreaterThan(10);
