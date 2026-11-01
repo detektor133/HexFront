@@ -16,6 +16,7 @@ import {
 
 import { chipHalf } from '../src/dev/chip-place.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
+import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
 import { tokens } from '../src/theme/tokens.ts';
@@ -334,7 +335,9 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
           throw new Error('Содержимое фишки не найдено');
         return { root, graphic, label };
       });
-      expect(rendered.map(({ label }) => label.text)).toEqual(['1,2к', '620', '180']);
+      expect(rendered.map(({ label }) => label.text)).toEqual(
+        units.map(({ soldiers }) => formatSoldiers(soldiers)),
+      );
 
       const bounds = rendered.map(({ graphic }) => graphic.getBounds());
       for (let index = 0; index < bounds.length - 1; index += 1) {
