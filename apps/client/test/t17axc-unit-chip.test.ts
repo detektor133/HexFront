@@ -220,6 +220,44 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
             0,
           );
           expect(spies[primitive]).toHaveBeenCalled();
+          if (type === 'infantry') {
+            const lines = spies.lineTo.mock.calls;
+            const first = lines.at(-2)?.slice(0, 2);
+            const second = lines.at(-1)?.slice(0, 2);
+            if (!first || !second) throw new Error('Сегменты глифа пехоты не найдены');
+            const [firstX, firstY] = first;
+            const [secondX, secondY] = second;
+            if (
+              firstX === undefined ||
+              firstY === undefined ||
+              secondX === undefined ||
+              secondY === undefined
+            )
+              throw new Error('Координаты глифа пехоты неполные');
+            expect([secondX - firstX, secondY - firstY]).toEqual([5, 5]);
+          }
+          if (type === 'armor') {
+            const points = spies.poly.mock.calls.at(-1)?.[0];
+            if (!points) throw new Error('Координаты глифа брони не найдены');
+            const coordinates = points.flatMap((point) =>
+              typeof point === 'number' ? [point] : [point.x, point.y],
+            );
+            expect(
+              coordinates.slice(2).map((coordinate, index) => {
+                const origin = coordinates[index];
+                if (origin === undefined)
+                  throw new Error('Нарушена последовательность точек глифа');
+                return coordinate - origin;
+              }),
+            ).toEqual([5, 5, -5, 5, -5, -5]);
+          }
+          if (type === 'artillery') {
+            const arc = spies.arc.mock.calls.at(-1);
+            const circle = spies.circle.mock.calls.at(-1);
+            expect(arc?.slice(2)).toEqual([5, Math.PI, 0]);
+            expect(circle?.slice(0, 2)).toEqual(arc?.slice(0, 2));
+            expect(circle?.[2]).toBe(1.75);
+          }
           if (primitive !== 'lineTo') expect(spies.lineTo).not.toHaveBeenCalled();
           if (type === 'artillery') expect(spies.circle).toHaveBeenCalled();
           else expect(spies.circle).not.toHaveBeenCalled();
