@@ -971,6 +971,47 @@ describe('последовательный конвейер задачи', () =>
     );
   });
 
+  it('новый конкретный пункт узкого review передаёт исполнителю без остановки plan', async () => {
+    const oldFinding = 'ТЕСТ: рамка не проверяет движущуюся фишку';
+    const newFinding = 'ТЕСТ: городское смещение не изолировано от смещения стопки';
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'target-review',
+          findings: [{ kind: 'ТЕСТ', text: oldFinding }],
+          findingRetries: 1,
+        },
+      },
+      sessions: [
+        review(`ВОЗВРАТ\n- ${newFinding}`),
+        {
+          answer: 'Исправлена проверка сдвига города.',
+          writes: { 'packages/sim/test/task.test.ts': "it('город', () => {});\n" },
+          files: ['packages/sim/test/task.test.ts'],
+          commit: true,
+          push: false,
+        },
+        review('OK'),
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain(newFinding);
+    expect(run.lines).toContain('узкий review 06/T1j5-Б1: найден новый пункт, передаю исполнителю');
+    expect(run.lines.join('\n')).not.toContain('plan не изменил повторно отклонённый пункт');
+  });
+
   it('после первого повторного возврата зовёт plan, после второго — тоже plan, и только затем останавливается', async () => {
     const finding = 'ТЕСТ: тест не проверяет границы';
     const run = await runWorld({

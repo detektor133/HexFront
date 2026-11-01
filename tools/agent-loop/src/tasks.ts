@@ -846,6 +846,20 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     if (!verdict.ok) {
       context.config.board?.count('returns');
       if (targeted) {
+        const previous = active.findings[0];
+        const next = batchReviewFindings([...verdict.findings, ...active.findings.slice(1)]);
+        if (
+          previous !== undefined &&
+          next[0] !== undefined &&
+          (next[0].kind !== previous.kind || next[0].text !== previous.text)
+        ) {
+          active.findings = next;
+          active.findingRetries = 0;
+          active.phase = 'work';
+          await save(context);
+          await context.say(`узкий review ${task}: найден новый пункт, передаю исполнителю`);
+          return { step: 'worked', done: false };
+        }
         active.findingRetries = (active.findingRetries ?? 0) + 1;
         if (active.findingRetries >= 2) {
           const streak = active.fixStreak;
@@ -869,7 +883,7 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
           );
           return { step: 'worked', done: false };
         }
-        active.findings = batchReviewFindings([...verdict.findings, ...active.findings.slice(1)]);
+        active.findings = next;
         await save(context);
         await context.say(
           `узкий review ${task}: пункт не принят, запускаю диагностику plan перед повтором`,
