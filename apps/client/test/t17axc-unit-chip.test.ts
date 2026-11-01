@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { BitmapText, Graphics, GraphicsContext } from 'pixi.js';
+import { BitmapText, Graphics, GraphicsContext, type Container } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -38,6 +38,10 @@ function sourceView(): {
   const unit = view.units.find((candidate) => candidate.owner === view.playerId);
   if (!unit) throw new Error('Свой отряд не найден');
   return { view: { ...view, units: [unit] }, width: loaded.map.width, unitId: unit.id };
+}
+
+function screenYPositions(roots: readonly Container[]): number[] {
+  return roots.map((root) => root.getGlobalPosition().y);
 }
 
 function withOrder(
@@ -322,8 +326,14 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       const second = ordered[1];
       const third = ordered[2];
       if (!first || !second || !third) throw new Error('Стопка должна содержать три фишки');
-      expect(second.position.y - first.position.y).toBeCloseTo(28);
-      expect(third.position.y - second.position.y).toBeCloseTo(28);
+      const screenY = screenYPositions(ordered);
+      const firstY = screenY[0];
+      const secondY = screenY[1];
+      const thirdY = screenY[2];
+      if (firstY === undefined || secondY === undefined || thirdY === undefined)
+        throw new Error('Экранные координаты стопки не найдены');
+      expect(secondY - firstY).toBeCloseTo(28);
+      expect(thirdY - secondY).toBeCloseTo(28);
       expect(second.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - second.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
@@ -418,8 +428,14 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       const second = ordered[1];
       const third = ordered[2];
       if (!first || !second || !third) throw new Error('Стопка не содержит три фишки');
-      expect(second.position.y - first.position.y).toBeCloseTo(28);
-      expect(third.position.y - second.position.y).toBeCloseTo(28);
+      const screenY = screenYPositions(ordered);
+      const firstY = screenY[0];
+      const secondY = screenY[1];
+      const thirdY = screenY[2];
+      if (firstY === undefined || secondY === undefined || thirdY === undefined)
+        throw new Error('Экранные координаты перехода не найдены');
+      expect(secondY - firstY).toBeCloseTo(28);
+      expect(thirdY - secondY).toBeCloseTo(28);
       const from = hexCenter(hexFromId(original.hex, width), tokens.map.hexRadius);
       expect(Math.hypot(first.position.x - from.x, first.position.y - from.y + 28)).toBeGreaterThan(
         0,
@@ -451,8 +467,14 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         const updated = [...updatedRoots].sort((a, b) => a.position.y - b.position.y);
         const [low, middle, high] = updated;
         if (!low || !middle || !high) throw new Error('Переход потерял фишку отряда');
-        expect(middle.position.y - low.position.y).toBeCloseTo(28);
-        expect(high.position.y - middle.position.y).toBeCloseTo(28);
+        const screenY = screenYPositions(updated);
+        const lowY = screenY[0];
+        const middleY = screenY[1];
+        const highY = screenY[2];
+        if (lowY === undefined || middleY === undefined || highY === undefined)
+          throw new Error('Экранные координаты перехода не найдены');
+        expect(middleY - lowY).toBeCloseTo(28);
+        expect(highY - middleY).toBeCloseTo(28);
         const frameData = updated.map((root) => {
           const content = root.children[0];
           const graphic = content?.children[0];
