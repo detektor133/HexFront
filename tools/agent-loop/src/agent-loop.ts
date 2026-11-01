@@ -131,6 +131,11 @@ export async function promotePending(context: LoopContext): Promise<Step | undef
 /** Один шаг: Issue, закрытый этап или задача очереди. */
 async function tick(context: LoopContext): Promise<Step> {
   const { config, git, state } = context;
+  if (config.board?.takeRetries().includes(MAIN_AGENT) && state.parked !== undefined) {
+    delete state.parked;
+    await save(context);
+    await context.say('остановка снята по команде «повторить»');
+  }
   if (state.retryAfter !== undefined) {
     if (state.retryAfter > config.now()) return 'idle';
     // Пауза кончилась: без удаления каждое ожидание считало бы её снова истёкшей и сразу будило цикл.
