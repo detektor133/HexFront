@@ -144,7 +144,7 @@ describe('армии — группы отрядов', () => {
     expect(s.unitsOf('A')).toHaveLength(3);
   });
 
-  it('разделение оставляет новый отряд в армии, слияние — в армии отряда с меньшим id', () => {
+  it('разделение оставляет новый отряд в армии; резерв нельзя слить с армией', () => {
     const s = scenario(MAP, { legend });
     const a = s.unit('A', 'infantry', 300, at(1, 1));
     const b = s.unit('A', 'infantry', 100, at(1, 1));
@@ -158,8 +158,8 @@ describe('армии — группы отрядов', () => {
     expect(fresh?.armyId).toBe(army);
     s.cmd('A', merge([b, fresh?.id ?? -1]));
     s.runTicks(1);
-    // b (id меньше) в резерве — слитый отряд остаётся в резерве.
+    expect(s.rejections()).toEqual(['unitInReserve']);
     expect(s.unitById(b)?.armyId).toBeNull();
-    expect(s.unitById(b)?.soldiers).toBe(200_000);
+    expect(s.unitById(b)?.soldiers).toBe(100_000);
   });
 });

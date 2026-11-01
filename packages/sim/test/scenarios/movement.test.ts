@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { applyCommands } from '../../src/commands/apply.ts';
 import { intDiv } from '../../src/math/int.ts';
 import { findPath } from '../../src/queries/unit-path.ts';
 import { at, city, merge, move, own, road, scenario, split, type At } from '../scenario/dsl.ts';
@@ -20,6 +21,12 @@ const legend = {
 };
 
 const idOf = (s: ReturnType<typeof scenario>, w: At): number => w.col + w.row * s.state.map.width;
+
+function setUnitArmy(s: ReturnType<typeof scenario>, unitId: number, armyId: number): void {
+  const unit = s.unitById(unitId);
+  if (!unit) throw new Error(`отряд ${unitId} не найден`);
+  unit.armyId = armyId;
+}
 
 /** Сколько тиков отряд идёт до гекса-цели (или -1, если не дошёл за limit тиков). */
 function ticksToArrive(
@@ -286,6 +293,9 @@ describe('чужие отряды, разделение, слияние', () => 
     const s = scenario(LINE, { legend });
     const a = s.unit('A', 'infantry', 300, at(1, 1));
     const b = s.unit('A', 'infantry', 100, at(1, 1));
+    const armyId = 1;
+    setUnitArmy(s, a, armyId);
+    setUnitArmy(s, b, armyId);
     s.setOrg(a, 60);
     s.cmd('A', merge([a, b]));
     s.runTicks(1);
@@ -307,6 +317,46 @@ describe('чужие отряды, разделение, слияние', () => 
     s.cmd('A', merge([a]));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['notSameHex', 'notSameType', 'invalidAmount']);
+  });
+
+  it('слияние принимает одну армию и отклоняет разные армии и резерв без мутации', () => {
+    const s = scenario(LINE, { legend });
+    const acceptedA = s.unit('A', 'infantry', 100, at(1, 1));
+    const acceptedB = s.unit('A', 'infantry', 100, at(1, 1));
+    const otherArmyA = s.unit('A', 'infantry', 100, at(1, 1));
+    const otherArmyB = s.unit('A', 'infantry', 100, at(1, 1));
+    const reserveA = s.unit('A', 'infantry', 100, at(1, 1));
+    const reserveB = s.unit('A', 'infantry', 100, at(1, 1));
+    const armyUnit = s.unit('A', 'infantry', 100, at(1, 1));
+    const sharedArmy = 10;
+    setUnitArmy(s, acceptedA, sharedArmy);
+    setUnitArmy(s, acceptedB, sharedArmy);
+    setUnitArmy(s, otherArmyA, 11);
+    setUnitArmy(s, otherArmyB, 12);
+    setUnitArmy(s, armyUnit, sharedArmy);
+    const unchanged = [otherArmyA, otherArmyB, reserveA, reserveB, armyUnit].map((id) =>
+      JSON.stringify(s.unitById(id)),
+    );
+
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'merge', unitIds: [acceptedA, acceptedB] } },
+      { playerId: 0, cmd: { t: 'merge', unitIds: [otherArmyA, otherArmyB] } },
+      { playerId: 0, cmd: { t: 'merge', unitIds: [reserveA, reserveB] } },
+      { playerId: 0, cmd: { t: 'merge', unitIds: [reserveA, armyUnit] } },
+    ]);
+
+    expect(s.unitById(acceptedA)?.soldiers).toBe(200_000);
+    expect(s.unitById(acceptedB)).toBeUndefined();
+    expect(s.state.events.map((event) => event.t === 'commandRejected' && event.reason)).toEqual([
+      'notSameArmy',
+      'unitInReserve',
+      'unitInReserve',
+    ]);
+    expect(
+      [otherArmyA, otherArmyB, reserveA, reserveB, armyUnit].map((id) =>
+        JSON.stringify(s.unitById(id)),
+      ),
+    ).toEqual(unchanged);
   });
 });
 

@@ -78,6 +78,8 @@ function validateMerge(units: readonly Unit[]): Validation {
   if (!first || units.length < 2) return rejected('invalidAmount');
   if (units.some((a) => a.hex !== first.hex)) return rejected('notSameHex');
   if (units.some((a) => a.type !== first.type)) return rejected('notSameType');
+  if (units.some((a) => a.armyId === null)) return rejected('unitInReserve');
+  if (units.some((a) => a.armyId !== first.armyId)) return rejected('notSameArmy');
   return OK;
 }
 

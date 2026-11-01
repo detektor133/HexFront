@@ -92,6 +92,8 @@ export const REJECT_REASONS = [
   'hexFull',
   'notSameHex',
   'notSameType',
+  'notSameArmy',
+  'unitInReserve',
   'badOrder',
   'unknownArmy',
   'notOwnArmy',
