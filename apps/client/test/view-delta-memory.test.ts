@@ -53,7 +53,7 @@ function bitmapTexts(node: Container): BitmapText[] {
   return result;
 }
 
-const chipState = (soldiers: number, count: number = 1): ChipState => ({
+const chipState = (soldiers: number): ChipState => ({
   color: '#000000',
   army: null,
   type: 'infantry',
@@ -61,7 +61,6 @@ const chipState = (soldiers: number, count: number = 1): ChipState => ({
   org: 1,
   supply: 1,
   starving: false,
-  count,
   selected: false,
   retreating: false,
   encircled: false,
@@ -155,23 +154,23 @@ describe('дельты вида и текст карты (07/T15)', () => {
     expect(deltaSource).not.toMatch(/JSON\.stringify\(\s*view\b/u);
   });
 
-  it('критерий 3: обновление чисел солдат и отрядов на фишке 10 000 раз сохраняет те же объекты текста и меняет text', () => {
+  it('критерий 3: обновление числа солдат на фишке 10 000 раз сохраняет объект текста и меняет text', () => {
     installCanvasStub();
     const chip = createChip();
-    chip.draw(chipState(100, 2));
+    chip.draw(chipState(100));
     const initial = bitmapTexts(chip.root);
-    expect(initial).toHaveLength(2);
-    const labels = initial as [BitmapText, BitmapText];
+    expect(initial).toHaveLength(1);
+    const label = initial[0];
+    if (!label) throw new Error('Число солдат не отрендерено');
 
     for (let value = 0; value < 10_000; value += 1) {
-      chip.draw(chipState((value + 1) * 1000 + 1000, 3));
+      chip.draw(chipState((value + 1) * 1000 + 1000));
     }
 
     const updated = bitmapTexts(chip.root);
-    expect(updated).toHaveLength(2);
-    expect(updated).toContain(labels[0]);
-    expect(updated).toContain(labels[1]);
-    expect([labels[0].text, labels[1].text].sort()).toEqual([formatSoldiers(10_001_000), '3']);
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toBe(label);
+    expect(label.text).toBe(formatSoldiers(10_001_000));
     chip.destroy();
   });
 

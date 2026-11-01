@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 
-import { Graphics, GraphicsContext } from 'pixi.js';
+import { BitmapText, Graphics, GraphicsContext } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { hexFromId, hexId, loadMap, neighbors, type PlayerView } from '@hexfront/sim';
+import { FP, hexFromId, hexId, loadMap, neighbors, type Fp, type PlayerView } from '@hexfront/sim';
 
+import { CHIP_WORLD, chipHalf } from '../src/dev/chip-place.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { hexCenter } from '../src/render/hex-geometry.ts';
@@ -152,6 +153,71 @@ describe('07/T17axc: состояние атаки на фишке отряда'
       } finally {
         layer.destroy();
       }
+    }
+  });
+});
+
+describe('07/T17bt: вертикальная стопка отдельных фишек', () => {
+  it('рисует три самостоятельных отряда со своими числами и непересекающимися позициями', () => {
+    const { view: source, width } = sourceView();
+    const original = source.units[0];
+    if (!original) throw new Error('Свой отряд не найден');
+    const army = source.armies[0];
+    if (!army) throw new Error('Армия фикстуры не найдена');
+    const secondArmy = { ...army, id: army.id + 1, number: army.number + 1 };
+    const units = [
+      {
+        ...original,
+        id: original.id,
+        type: 'infantry' as const,
+        soldiers: (1250 * FP) as Fp,
+        org: 900 as Fp,
+      },
+      {
+        ...original,
+        id: original.id + 1,
+        type: 'armor' as const,
+        soldiers: (620 * FP) as Fp,
+        org: 700 as Fp,
+        armyId: secondArmy.id,
+      },
+      {
+        ...original,
+        id: original.id + 2,
+        type: 'artillery' as const,
+        soldiers: (180 * FP) as Fp,
+        org: 500 as Fp,
+      },
+    ];
+    const view: PlayerView = { ...source, units, armies: [...source.armies, secondArmy] };
+    const layer = createUnitLayer(width, tokens.map.hexRadius, (hex) =>
+      hexCenter(hexFromId(hex, width), tokens.map.hexRadius),
+    );
+    try {
+      layer.setView(view, { hex: null, units: [], target: null }, 0);
+      const chipsLayer = layer.container.children[0];
+      if (!chipsLayer) throw new Error('Слой фишек не найден');
+      const roots = chipsLayer.children.slice(1);
+      expect(roots).toHaveLength(3);
+      const ordered = [...roots].sort((a, b) => a.position.y - b.position.y);
+      const first = ordered[0];
+      const second = ordered[1];
+      const third = ordered[2];
+      if (!first || !second || !third) throw new Error('Стопка должна содержать три фишки');
+      expect((second.position.y - first.position.y) * CHIP_WORLD).toBeCloseTo(28);
+      expect((third.position.y - second.position.y) * CHIP_WORLD).toBeCloseTo(28);
+      expect(second.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
+      expect(third.position.y - second.position.y).toBeGreaterThan(2 * chipHalf());
+      expect(third.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
+      expect(
+        ordered.map((root) => {
+          const content = root.children[0];
+          const label = content?.children[1];
+          return label instanceof BitmapText ? label.text : null;
+        }),
+      ).toEqual(['1,2к', '620', '180']);
+    } finally {
+      layer.destroy();
     }
   });
 });

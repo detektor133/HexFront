@@ -1,8 +1,8 @@
 // Фишка отряда (art/units.md, «Фишка отряда», CR-005). Всё — внутри прямоугольника фишки:
 // слева закладка цвета армии, квадрат цвета отношения (свои — зелёные, враги — красные) с глифом
-// рода войск, в его углу — число отрядов в стопке; справа на белой плашке — число солдат и два
-// вертикальных столбика: организация `chip.org` и снабжение `chip.supply` (жёлтый/красный при
-// нехватке). Выбранная фишка — золотая рамка `selection` по краю. Размеры — px при масштабе 1.
+// рода войск; справа на белой плашке — число солдат и два вертикальных столбика: организация
+// `chip.org` и снабжение `chip.supply` (жёлтый/красный при нехватке). Выбранная фишка — золотая
+// рамка `selection` по краю. Размеры — px при масштабе 1.
 import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { DIRECTIONS, type UnitType } from '@hexfront/sim';
@@ -24,9 +24,6 @@ const OUTLINE = 1.5;
 const BAR_W = 4;
 const BAR_GAP = 2;
 const BAR_INSET = 4;
-/** Цифра стопки: кружок в правом нижнем углу квадрата. */
-const COUNT_R = 5;
-const COUNT_PX = 8;
 const ATTACK_SLOT = 12;
 const ATTACK_ARROW = 10;
 /** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
@@ -53,7 +50,6 @@ export interface ChipState {
   readonly supply: number | null;
   /** Идёт истощение — отряд теряет солдат от нехватки снабжения. */
   readonly starving: boolean;
-  readonly count: number;
   readonly selected: boolean;
   readonly retreating: boolean;
   readonly encircled: boolean;
@@ -106,7 +102,6 @@ function vbar(g: Graphics, x: number, top: number, h: number, share: number, col
 interface Parts {
   readonly g: Graphics;
   readonly label: BitmapText;
-  readonly count: BitmapText;
 }
 
 function barsWidth(s: ChipState): number {
@@ -161,30 +156,14 @@ function body(g: Graphics, s: ChipState, left: number, w: number): number {
     g.rect(sq + r, top, SQUARE - r, H).fill(s.color);
   }
   g.roundRect(left, top, w, H, r).stroke(border);
-  // Есть цифра стопки в углу — глиф чуть выше и левее, чтобы не перекрывался.
-  const shift = s.count > 1 ? 2.5 : 0;
-  glyph(
-    g,
-    s.type,
-    sq + (SQUARE - GLYPH) / 2 - shift,
-    top + (H - GLYPH) / 2 - shift,
-    tokens.ui.surface,
-  );
+  glyph(g, s.type, sq + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, tokens.ui.surface);
   return sq;
 }
 
-// Отметки внутри квадрата: стопка (цифра), нехватка снабжения (треугольник), «держать» (полоса).
+// Отметка внутри квадрата: нехватка снабжения.
 function marks(p: Parts, s: ChipState, sq: number): void {
   const { g } = p;
   const top = -H / 2;
-  const cx = sq + SQUARE - COUNT_R - 1;
-  const cy = top + H - COUNT_R - 1;
-  p.count.visible = s.count > 1;
-  if (s.count > 1) {
-    g.circle(cx, cy, COUNT_R).fill(tokens.ui.surface);
-    p.count.text = String(s.count);
-    p.count.position.set(cx, cy + 0.5);
-  }
   if (s.supply !== null && (s.supply < LOW_SUPPLY || s.starving)) {
     const x = sq + SQUARE - WARN / 2 - 2;
     const y = top + WARN / 2 + 2;
@@ -246,7 +225,6 @@ function drawGhost(p: Parts, s: ChipState): void {
   glyph(g, s.type, left + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, s.color);
   vbar(g, left + w - BAR_INSET - BAR_W, top + 4, H - 8, s.org, s.color);
   p.label.position.set(left + SQUARE + PAD + text / 2, 0);
-  p.count.visible = false;
 }
 
 /** Создаёт фишку; перерисовка — только при смене состояния (раз в снимок), не каждый кадр. */
@@ -262,14 +240,11 @@ export function createChip(): Chip {
     fill: tokens.ui.ink,
   } as const;
   const label = new BitmapText({ text: '', style: { ...font, fontSize: LABEL_PX } });
-  const count = new BitmapText({ text: '', style: { ...font, fontSize: COUNT_PX } });
   label.anchor.set(0.5, 0.5);
-  count.anchor.set(0.5, 0.5);
   const textResolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
   label.resolution = textResolution;
-  count.resolution = textResolution;
-  content.addChild(g, label, count);
-  const parts: Parts = { g, label, count };
+  content.addChild(g, label);
+  const parts: Parts = { g, label };
   return {
     root,
     draw(s) {
@@ -284,7 +259,6 @@ export function createChip(): Chip {
     setResolution(r) {
       if (label.resolution === r) return;
       label.resolution = r;
-      count.resolution = r;
     },
     destroy() {
       root.destroy({ children: true, context: true });

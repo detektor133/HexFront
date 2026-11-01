@@ -229,22 +229,10 @@ export function createUnitLayer(
     return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p };
   };
 
-  function stateOf(units: readonly UnitView[], v: PlayerView): ChipState {
-    const byType = new Map<string, number>();
-    let soldiers = 0;
-    for (const u of units) {
-      soldiers += u.soldiers;
-      byType.set(u.type, (byType.get(u.type) ?? 0) + u.soldiers);
-    }
-    const first = units[0] as UnitView;
-    let type = first.type;
-    for (const u of units) if ((byType.get(u.type) ?? 0) > (byType.get(type) ?? 0)) type = u.type;
-    const weighted = (f: (u: UnitView) => number): number =>
-      units.reduce((s, u) => s + f(u) * u.soldiers, 0) / Math.max(1, soldiers);
-    const army = v.armies.find((a) => a.id === first.armyId);
-    const oneArmy = army !== undefined && units.every((u) => u.armyId === army.id);
-    const mine = first.owner === v.playerId;
-    const attack = mine ? units.find((u) => u.order === 'attack' && u.target >= 0) : undefined;
+  function stateOf(unit: UnitView, v: PlayerView): ChipState {
+    const army = v.armies.find((a) => a.id === unit.armyId);
+    const mine = unit.owner === v.playerId;
+    const attack = mine && unit.order === 'attack' && unit.target >= 0 ? unit : undefined;
     const attackDirection =
       attack !== undefined
         ? neighbors(hexFromId(attack.hex, width)).findIndex((hex) => {
@@ -253,17 +241,16 @@ export function createUnitLayer(
           })
         : -1;
     return {
-      color: relationColor(first.owner, v.playerId),
-      army: oneArmy ? armyColor(army.number) : null,
-      type,
-      soldiers,
-      org: weighted((u) => u.org) / ORG_MAX,
-      supply: mine ? weighted((u) => u.supplyLevel ?? FULL) / FULL : null,
-      starving: units.some((u) => u.starving === true),
-      count: units.length,
-      selected: units.some((u) => picked.units.includes(u.id)),
-      retreating: units.some((u) => u.order === 'retreat'),
-      encircled: mine && units.some((u) => u.encircled === true),
+      color: relationColor(unit.owner, v.playerId),
+      army: army ? armyColor(army.number) : null,
+      type: unit.type,
+      soldiers: unit.soldiers,
+      org: unit.org / ORG_MAX,
+      supply: mine ? (unit.supplyLevel ?? FULL) / FULL : null,
+      starving: unit.starving === true,
+      selected: picked.units.includes(unit.id),
+      retreating: unit.order === 'retreat',
+      encircled: mine && unit.encircled === true,
       ghost: false,
       attackDirection: attackDirection >= 0 ? attackDirection : null,
     };
@@ -271,14 +258,18 @@ export function createUnitLayer(
 
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
-    // Одна фишка — отряды в одном гексе или идущие одним переходом (art/units.md, «Группа отрядов»).
     for (const g of chipGroups(v)) {
-      const first = g.units[0] as UnitView;
+      const unit = g.units[0] as UnitView;
       out.push({
         key: g.key,
-        units: g.units.map((u) => u.id),
-        state: stateOf(g.units, v),
-        at: g.moving ? (f) => unitAt(first, f) : () => base(first.hex),
+        units: [unit.id],
+        state: stateOf(unit, v),
+        at: g.moving
+          ? (f) => {
+              const position = unitAt(unit, f);
+              return { x: position.x, y: position.y + g.stackOffset };
+            }
+          : () => ({ x: base(unit.hex).x, y: base(unit.hex).y + g.stackOffset }),
       });
     }
     for (const r of v.recruits) {
@@ -296,7 +287,6 @@ export function createUnitLayer(
           org: r.progressTicks / Math.max(1, r.totalTicks),
           supply: null,
           starving: false,
-          count: 1,
           selected: false,
           retreating: false,
           encircled: false,

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Container } from 'pixi.js';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -230,7 +231,7 @@ describe('07/T17aj: выбор армии через панель', () => {
 });
 
 describe('07/T17aj: выбор фишки на карте', () => {
-  it('возвращает оба отряда одной тесной фишки, не различая армии', () => {
+  it('держит фишки отрядов разных армий отдельно с доступным промежутком', () => {
     const { view, units } = viewWithTwoArmiesOnOneHex();
     const loaded = loadMap(mapJson);
     if (!loaded.ok) throw new Error(loaded.errors.join('; '));
@@ -238,14 +239,27 @@ describe('07/T17aj: выбор фишки на карте', () => {
     const layer = createUnitLayer(loaded.map.width, 10, () => ({ x: 0, y: 0 }));
     try {
       layer.setView(view, { hex: null, units: [], target: null }, 0);
-      const point = layer.chipAt(units[0]?.hex ?? 0);
-      expect(layer.unitsAt(point)).toEqual(units.map((unit) => unit.id));
+      expect(layer.unitsAt(layer.chipAt(units[0]?.hex ?? 0))).toEqual([]);
+      const chipsLayer = layer.container.children[0];
+      if (!(chipsLayer instanceof Container)) throw new Error('Слой фишек не найден');
+      const positions = chipsLayer.children.slice(1).map((chip) => chip.position);
+      expect(positions).toHaveLength(2);
+      const [first, second] = positions;
+      if (!first || !second) throw new Error('Нужны две отдельные фишки');
+      const ordered = [first, second].sort((a, b) => a.y - b.y);
+      expect(layer.unitsAt(ordered[0] ?? { x: 0, y: 0 })).toEqual([
+        Math.min(...units.map((unit) => unit.id)),
+      ]);
+      expect(layer.unitsAt(ordered[1] ?? { x: 0, y: 0 })).toEqual([
+        Math.max(...units.map((unit) => unit.id)),
+      ]);
+      expect(layer.unitsAt({ x: 0, y: (first.y + second.y) / 2 })).toEqual([]);
     } finally {
       layer.destroy();
     }
   });
 
-  it('через MatchPage и onTap выбирает весь тесный чип, а не отдельную армию', async () => {
+  it('через MatchPage и onTap не выбирает фишки по промежутку между ними', async () => {
     const { view, units } = viewWithTwoArmiesOnOneHex();
     const sourceEngine = createLocalEngine(mapJson, 42, 2);
     if ('errors' in sourceEngine) throw new Error(sourceEngine.errors.join('; '));
@@ -255,7 +269,6 @@ describe('07/T17aj: выбор фишки на карте', () => {
       view,
       snapshot: { ...source.snapshot, view },
     };
-    const selectedCalls: readonly number[] = units.map((unit) => unit.id);
     let onTap: ((hex: { q: number; r: number }, kind: TapKind, world: Point) => void) | undefined;
     let layer: { chipAt(hex: number): Point } | undefined;
     const selectUnitsSpy = vi.fn();
@@ -343,15 +356,10 @@ describe('07/T17aj: выбор фишки на карте', () => {
     const hex = hexFromId(firstUnit.hex, loadedMap.map.width);
     const point = layer.chipAt(firstUnit.hex);
     act(() => onTap?.(hex, 'select', point));
-    await waitFor(() =>
-      expect(selectUnitsSpy).toHaveBeenCalledWith(view, expect.anything(), selectedCalls),
-    );
-    expect(selectUnitsSpy.mock.calls.at(-1)?.[2]).toEqual(selectedCalls);
-    expect(selectUnitsSpy.mock.results.at(-1)?.value.units).toEqual(selectedCalls);
+    expect(selectUnitsSpy).not.toHaveBeenCalled();
 
     act(() => onTap?.(hex, 'select', { x: point.x + 1, y: point.y }));
-    expect(selectUnitsSpy.mock.calls.at(-1)?.[2]).toEqual(selectedCalls);
-    expect(selectUnitsSpy.mock.results.at(-1)?.value.units).toEqual([]);
+    expect(selectUnitsSpy).not.toHaveBeenCalled();
   });
 });
 

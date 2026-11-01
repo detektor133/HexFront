@@ -13,6 +13,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { CHIP_WORLD } from '../src/dev/chip-place.ts';
 import { armySelection, selectHex } from '../src/dev/sandbox-selection.ts';
 import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -55,8 +56,8 @@ function farPlain(v: PlayerView, from: number): number {
   return h;
 }
 
-describe('группы движения (04/T15)', () => {
-  it('стопка из 3 отрядов на марше — одна фишка с «3» на каждом снимке пути', () => {
+describe('фишки отрядов (07/T17bt)', () => {
+  it('сохраняет три отдельные фишки в стабильном порядке на общем переходе', () => {
     const { e, view } = start(false);
     const [a, b] = e.state.units.filter((u) => u.owner === 0);
     if (!a || !b) throw new Error('нет стартовых отрядов');
@@ -74,13 +75,16 @@ describe('группы движения (04/T15)', () => {
       if (march.every((u) => u.hex === to && u.path.length === 0)) break;
       if (march.some((u) => u.moveTotal > 0)) moving += 1;
       const groups = chipGroups(v).filter((g) => g.units.some((u) => ids.includes(u.id)));
-      expect(groups, `тик ${t}`).toHaveLength(1);
-      expect(groups[0]?.units.map((u) => u.id).sort()).toEqual([...ids].sort());
+      expect(groups, `тик ${t}`).toHaveLength(3);
+      expect(groups.map((g) => g.units[0]?.id)).toEqual([...ids].sort((x, y) => x - y));
+      for (const [index, group] of groups.entries()) {
+        expect(group.stackOffset * CHIP_WORLD).toBeCloseTo((index - 1) * 28);
+      }
     }
     expect(moving).toBeGreaterThan(10);
   });
 
-  it('разошедшиеся отряды — разные фишки', () => {
+  it('разошедшиеся отряды сохраняют отдельные фишки', () => {
     const { e, view } = start();
     let v = view();
     const [a, b] = v.units.filter((u) => u.owner === v.playerId);

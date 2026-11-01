@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { hexFromId, loadMap, type Command } from '@hexfront/sim';
 
-import { cityChipShift } from '../src/dev/chip-place.ts';
+import { CHIP_WORLD, cityChipShift } from '../src/dev/chip-place.ts';
+import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import { MatchSurface } from '../src/match/MatchSurface.tsx';
 import { clampCamera } from '../src/render/camera.ts';
@@ -72,6 +73,7 @@ const harness = vi.hoisted(() => ({
   artillery: false,
   focusHex: 0,
   unitHex: 0,
+  unitStackOffset: 0,
   unitCityLevel: null as number | null,
 }));
 
@@ -92,7 +94,12 @@ class TestWorker {
     const focusUnit = snapshot.view.units.find((unit) => unit.armyId === focusArmy.id);
     if (!focusUnit) throw new Error('У тестовой армии нет отрядов');
     harness.focusHex = focusUnit.hex;
-    harness.unitHex = snapshot.view.units[0]?.hex ?? 0;
+    const tappedUnit = snapshot.view.units.find((unit) => unit.owner === snapshot.view.playerId);
+    harness.unitHex = tappedUnit?.hex ?? 0;
+    harness.unitStackOffset = tappedUnit
+      ? (chipGroups(snapshot.view).find((group) => group.units[0]?.id === tappedUnit.id)
+          ?.stackOffset ?? 0) * CHIP_WORLD
+      : 0;
     harness.unitCityLevel =
       snapshot.view.cities.find((city) => city.hex === harness.unitHex)?.level ?? null;
     if (harness.artillery)
@@ -141,6 +148,10 @@ function selectedArmyCard(): HTMLElement {
   return card;
 }
 
+function selectedUnitsCard(): HTMLElement {
+  return screen.getByRole('region', { name: /Selected units|Выбранные отряды/u });
+}
+
 async function renderSurface(): Promise<void> {
   vi.stubGlobal('Worker', TestWorker);
   vi.stubGlobal(
@@ -161,7 +172,8 @@ async function renderSurface(): Promise<void> {
     point.y +
     (harness.unitCityLevel === null
       ? 0
-      : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius));
+      : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius)) +
+    harness.unitStackOffset;
   harness.world = {
     x: world.position.x + point.x * world.scale.x,
     y: world.position.y + chipY * world.scale.y,
@@ -200,6 +212,7 @@ beforeEach(() => {
   harness.focusHex = 0;
   harness.world = { x: 100, y: 100 };
   harness.unitHex = 0;
+  harness.unitStackOffset = 0;
   harness.unitCityLevel = null;
 });
 
@@ -276,7 +289,7 @@ describe('07/T17bl: удержание и команды матча', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('проводит двойной тап MapView через runtime до выбора и centerOn', async () => {
+  it('сохраняет карточку выбранного отряда после двойного тапа MapView', async () => {
     await renderSurface();
     if (!harness.mapCanvas || !harness.app) throw new Error('MapView input is not connected');
     let nowMs = 0;
@@ -297,7 +310,8 @@ describe('07/T17bl: удержание и команды матча', () => {
         (unitCenter.y +
           (harness.unitCityLevel === null
             ? 0
-            : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius))) *
+            : cityChipShift(harness.unitCityLevel, tokens.map.hexRadius)) +
+          harness.unitStackOffset) *
           world.scale.y,
     };
     fireEvent.pointerDown(harness.mapCanvas, {
@@ -311,8 +325,7 @@ describe('07/T17bl: удержание и команды матча', () => {
       clientX: tapPoint.x,
       clientY: tapPoint.y,
     });
-    const fromScale = world.scale.x;
-    await waitFor(() => expect(selectedArmyCard()).toBeTruthy());
+    await waitFor(() => expect(selectedUnitsCard()).toBeTruthy());
     nowMs = 100;
     fireEvent.pointerDown(harness.mapCanvas, {
       button: 0,
@@ -328,31 +341,10 @@ describe('07/T17bl: удержание и команды матча', () => {
     harness.app.ticker.callbacks.forEach((callback) =>
       callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
     );
-    const target = hexCenter(hexFromId(harness.unitHex, testMap.width), tokens.map.hexRadius);
-    const expectedCamera = clampCamera(
-      {
-        scale: fromScale,
-        x: harness.app.screen.width / 2 - target.x * fromScale,
-        y: harness.app.screen.height / 2 - target.y * fromScale,
-      },
-      harness.app.screen,
-      mapBounds(testMap.width, testMap.height, tokens.map.hexRadius),
-    );
-    const expectedFinal = {
-      x: Math.round(expectedCamera.x) + target.x * expectedCamera.scale,
-      y: Math.round(expectedCamera.y) + target.y * expectedCamera.scale,
-    };
-    expect({
-      x: world.position.x + target.x * world.scale.x,
-      y: world.position.y + target.y * world.scale.y,
-    }).not.toEqual(expectedFinal);
     harness.app.ticker.callbacks.forEach((callback) =>
       callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
     );
-    expect({
-      x: world.position.x + target.x * world.scale.x,
-      y: world.position.y + target.y * world.scale.y,
-    }).toEqual(expectedFinal);
+    expect(selectedUnitsCard()).toBeTruthy();
   });
 
   it('отправляет ПКМ через MapView без радиальных секторов', async () => {

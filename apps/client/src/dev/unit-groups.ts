@@ -1,40 +1,42 @@
-// Группы отрядов для фишек (art/units.md, «Группа отрядов»): одна фишка — все отряды одного игрока
-// в одном месте карты: стоящие в одном гексе или идущие одним переходом (из того же гекса в тот же
-// гекс с одинаковым прогрессом). Разошедшиеся отряды — разные фишки.
 import type { PlayerView, UnitView } from '@hexfront/sim';
 
-/** Группа отрядов одной фишки. */
+import { CHIP_WORLD } from './chip-place.ts';
+
+/** Позиция фишки отдельного отряда в стопке. */
 export interface ChipGroup {
-  /** Ключ фишки: у стоящих — игрок и гекс, у идущих — переход и меньший id группы. */
   readonly key: string;
   readonly units: readonly UnitView[];
-  /** Группа идёт переходом между гексами. */
   readonly moving: boolean;
+  readonly stackOffset: number;
 }
 
-// Отряд сейчас в переходе между гексами (отступающие рисуются в своём гексе).
 const inTransit = (u: UnitView): boolean =>
   u.moveTotal > 0 && u.path.length > 0 && u.order !== 'retreat';
 
-/**
- * Группы отрядов снимка по порядку появления: стоящие — по гексу, идущие — по переходу и
- * прогрессу.
- * @returns группы; у каждого отряда — ровно одна
- */
+/** Возвращает отдельную фишку на каждый отряд с устойчивым смещением внутри стопки. */
 export function chipGroups(v: PlayerView): ChipGroup[] {
-  const groups = new Map<string, { moving: boolean; units: UnitView[] }>();
-  for (const u of v.units) {
-    const at = inTransit(u)
-      ? `m${u.owner}:${u.hex}>${u.path[0] ?? -1}:${u.moveTicks}/${u.moveTotal}`
-      : `h${u.owner}:${u.hex}`;
-    const g = groups.get(at);
-    if (g) g.units.push(u);
-    else groups.set(at, { moving: inTransit(u), units: [u] });
+  const buckets = new Map<string, UnitView[]>();
+  for (const unit of v.units) {
+    const at = inTransit(unit) ? `m${unit.hex}>${unit.path[0] ?? -1}` : `h${unit.hex}`;
+    const bucket = buckets.get(at);
+    if (bucket) bucket.push(unit);
+    else buckets.set(at, [unit]);
   }
-  // Прогресс перехода меняется каждый тик — ключ фишки идущей группы от него не зависит.
-  return [...groups].map(([at, g]) => {
-    const minId = Math.min(...g.units.map((u) => u.id));
-    const key = g.moving ? `${at.slice(0, at.lastIndexOf(':'))}:u${minId}` : at;
-    return { key, units: g.units, moving: g.moving };
-  });
+
+  const result: ChipGroup[] = [];
+  for (const units of buckets.values()) {
+    units.sort((a, b) => a.id - b.id);
+    const middle = (units.length - 1) / 2;
+    for (let index = 0; index < units.length; index += 1) {
+      const unit = units[index];
+      if (!unit) continue;
+      result.push({
+        key: `u${unit.id}`,
+        units: [unit],
+        moving: inTransit(unit),
+        stackOffset: ((index - middle) * 28) / CHIP_WORLD,
+      });
+    }
+  }
+  return result;
 }
