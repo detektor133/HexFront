@@ -191,6 +191,49 @@ describe('07/T17axc: состояние атаки на фишке отряда'
 });
 
 describe('07/T17bt: вертикальная стопка отдельных фишек', () => {
+  it('сопоставляет каждый тип отряда с его глифом на пути слоя фишек', () => {
+    const source = sourceView();
+    const original = source.view.units[0];
+    if (!original) throw new Error('Свой отряд не найден');
+    const types = [
+      { type: 'infantry', primitive: 'lineTo' },
+      { type: 'armor', primitive: 'poly' },
+      { type: 'artillery', primitive: 'arc' },
+    ] as const;
+    const spies = {
+      lineTo: vi.spyOn(Graphics.prototype, 'lineTo'),
+      poly: vi.spyOn(Graphics.prototype, 'poly'),
+      arc: vi.spyOn(Graphics.prototype, 'arc'),
+      circle: vi.spyOn(Graphics.prototype, 'circle'),
+    };
+
+    try {
+      for (const { type, primitive } of types) {
+        Object.values(spies).forEach((spy) => spy.mockClear());
+        const layer = createUnitLayer(source.width, tokens.map.hexRadius, (hex) =>
+          hexCenter(hexFromId(hex, source.width), tokens.map.hexRadius),
+        );
+        try {
+          layer.setView(
+            { ...source.view, units: [{ ...original, type }] },
+            { hex: null, units: [], target: null },
+            0,
+          );
+          expect(spies[primitive]).toHaveBeenCalled();
+          if (primitive !== 'lineTo') expect(spies.lineTo).not.toHaveBeenCalled();
+          if (type === 'artillery') expect(spies.circle).toHaveBeenCalled();
+          else expect(spies.circle).not.toHaveBeenCalled();
+          if (type !== 'artillery') expect(spies.arc).not.toHaveBeenCalled();
+          if (type !== 'armor') expect(spies.poly).not.toHaveBeenCalled();
+        } finally {
+          layer.destroy();
+        }
+      }
+    } finally {
+      Object.values(spies).forEach((spy) => spy.mockRestore());
+    }
+  });
+
   it('рисует три самостоятельных отряда со своими числами и непересекающимися позициями', () => {
     const { view: source, width } = sourceView();
     const original = source.units[0];
