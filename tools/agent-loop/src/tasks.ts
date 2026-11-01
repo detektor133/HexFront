@@ -8,6 +8,7 @@ import {
   lastLines,
   park,
   readStage,
+  resourceBackoff,
   runSkill,
   save,
   session,
@@ -21,6 +22,7 @@ import {
   batchReviewFindings,
   diagnoseFinding,
   findingPrompt,
+  isResourceFailure,
   isTestTimeout,
   testTimedOut,
   verifyTouchedTests,
@@ -750,11 +752,18 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     delete active.workAttempt;
     if (roundBase !== undefined)
       updateFixStreak(active, await changedPathsBetween(context, roundBase));
+    active.phase = 'verify';
+    await save(context);
+  }
+  if (active.phase === 'verify') {
+    const finding = active.findings[0];
     const failure = await verifyTouchedTests(
       context,
       await changedPathsBetween(context, active.base),
     );
     if (failure !== undefined) {
+      if (isResourceFailure(failure))
+        return { step: await resourceBackoff(context, `проверки задачи ${task}`), done: false };
       const currentHead = await head(context.git);
       const signature = checkFailureSignature(failure);
       const repeated =
@@ -809,6 +818,8 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
           done: false,
         };
       if (checked.code !== 0) {
+        if (isResourceFailure(`${checked.stdout}\n${checked.stderr}`))
+          return { step: await resourceBackoff(context, `полный check ${task}`), done: false };
         const failure = prePushFailure(checked.stdout, checked.stderr);
         const diagnosis = await runReview(
           context,
@@ -1000,6 +1011,8 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
       result = await runPrePush();
     }
     if (result.code !== 0) {
+      if (isResourceFailure(`${result.stdout}\n${result.stderr}`))
+        return { step: await resourceBackoff(context, `локальная приёмка ${task}`), done: false };
       active.findings = [
         {
           kind: 'КОД',

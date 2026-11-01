@@ -126,6 +126,11 @@ const failureOutput = (stdout: string, stderr: string): string =>
 export const isTestTimeout = (output: string): boolean =>
   /\b(?:Test timed out in \d+ms|Test timeout of \d+ms exceeded)\b/iu.test(output);
 
+export const isResourceFailure = (output: string): boolean =>
+  /(?:memory allocation of \d+ bytes failed|failed to allocate memory|heap out of memory|\bENOMEM\b)/iu.test(
+    output,
+  );
+
 /** Лог verify хранит точную причину, которую краткая консольная сводка обрезает. */
 export async function testTimedOut(root: string, stdout: string, stderr: string): Promise<boolean> {
   const output = `${stdout}\n${stderr}`;

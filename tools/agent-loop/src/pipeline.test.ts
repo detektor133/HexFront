@@ -74,6 +74,40 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('нехватка памяти после коммита сохраняет HEAD для повторной проверки без кодера', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit()],
+      verify: ['verify: FAIL build\nmemory allocation of 312304 bytes failed'],
+    });
+
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual(['$task 06/T1j5-Б1']);
+    expect(run.state?.activeTask?.phase).toBe('verify');
+    expect(run.state?.activeTask?.findings).toEqual([]);
+    expect(run.state?.retryAfter).toBeDefined();
+    expect(run.lines.join('\n')).toContain('системе не хватило памяти');
+  });
+
+  it('после освобождения памяти повторяет проверку сохранённого HEAD', async () => {
+    const run = await runWorld({
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'c0',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'verify',
+          findings: [],
+        },
+      },
+      sessions: [review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts[0]).toContain('$review 06/T1j5-Б1');
+    expect(run.prompts.join('\n')).not.toContain('$task 06/T1j5-Б1');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('повторный таймаут рабочего verify остаётся красным', async () => {
     const run = await runWorld({
       sessions: [codeCommit()],
@@ -136,6 +170,21 @@ describe('последовательный конвейер задачи', () =>
     expect(run.commitDepthsAtPrePush).toEqual([1, 1]);
     expect(run.prompts).toHaveLength(2);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('нехватка памяти полного gate не создаёт пункт КОД и не зовёт исполнителя', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      prePush: ['pre-push: FAIL\nmemory allocation of 312304 bytes failed'],
+    });
+
+    expect(run.state?.activeTask?.phase).toBe('pre-push');
+    expect(run.state?.activeTask?.findings).toEqual([]);
+    expect(run.state?.retryAfter).toBeDefined();
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
   });
 
   it('повторный таймаут полного gate остаётся красным и запрещает push', async () => {

@@ -60,6 +60,7 @@ export interface LoopContext {
 const CI_TIMEOUT_MS = 660_000;
 /** Пауза после сбоя codex (обычно кончился лимит), мс. */
 const RETRY_MS = 30 * 60_000;
+const RESOURCE_RETRY_MS = 2 * 60_000;
 
 /**
  * Ожидания, которые снимаются сами, без нового коммита: их проверка повторяется каждый шаг.
@@ -145,6 +146,16 @@ export async function backoff(context: LoopContext, reason: string, answer: stri
   context.config.board?.pause(agentName(context), `${reason} — повтор через ${minutes(RETRY_MS)}`);
   await context.say(`сбой: ${reason} — следующая попытка через ${minutes(RETRY_MS)}`);
   if (answer.trim() !== '') await context.say(lastLines(answer, 10));
+  return 'idle';
+}
+
+/** Нехватка памяти не является дефектом задачи: повторяется та же проверка без сессии Codex. */
+export async function resourceBackoff(context: LoopContext, gate: string): Promise<Step> {
+  context.state.retryAfter = context.config.now() + RESOURCE_RETRY_MS;
+  await save(context);
+  const reason = `${gate}: системе не хватило памяти — повтор проверки через 2 мин`;
+  context.config.board?.pause(agentName(context), reason);
+  await context.say(reason);
   return 'idle';
 }
 

@@ -23,6 +23,7 @@ export interface ActiveTask {
   readonly workPrompt: string;
   phase:
     | 'work'
+    | 'verify'
     | 'review'
     | 'target-review'
     | 'consolidate'
