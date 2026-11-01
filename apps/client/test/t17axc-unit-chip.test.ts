@@ -384,4 +384,55 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       layer.destroy();
     }
   });
+
+  it('сохраняет три отдельные фишки и их вертикальный шаг на общем переходе', () => {
+    const { view: source, width } = sourceView();
+    const original = source.units[0];
+    if (!original) throw new Error('Свой отряд не найден');
+    const next = neighbors(hexFromId(original.hex, width))[0];
+    if (!next) throw new Error('Соседний гекс не найден');
+    const target = hexId(next, width);
+    const units = [
+      { ...original, id: original.id, type: 'infantry' as const, soldiers: (1250 * FP) as Fp },
+      { ...original, id: original.id + 1, type: 'armor' as const, soldiers: (620 * FP) as Fp },
+      { ...original, id: original.id + 2, type: 'artillery' as const, soldiers: (180 * FP) as Fp },
+    ].map((unit) => ({
+      ...unit,
+      path: [target],
+      moveTotal: 10,
+      moveTicks: 4,
+    }));
+    const layer = createUnitLayer(width, tokens.map.hexRadius, (hex) =>
+      hexCenter(hexFromId(hex, width), tokens.map.hexRadius),
+    );
+    try {
+      layer.setView({ ...source, units }, { hex: null, units: [], target: null }, 0);
+      layer.frame(50);
+
+      const chipsLayer = layer.container.children[0];
+      if (!chipsLayer) throw new Error('Слой фишек не найден');
+      const roots = chipsLayer.children.slice(1);
+      expect(roots).toHaveLength(3);
+      const ordered = [...roots].sort((a, b) => a.position.y - b.position.y);
+      const first = ordered[0];
+      const second = ordered[1];
+      const third = ordered[2];
+      if (!first || !second || !third) throw new Error('Стопка не содержит три фишки');
+      expect(second.position.y - first.position.y).toBeCloseTo(28);
+      expect(third.position.y - second.position.y).toBeCloseTo(28);
+      const from = hexCenter(hexFromId(original.hex, width), tokens.map.hexRadius);
+      expect(Math.hypot(first.position.x - from.x, first.position.y - from.y + 28)).toBeGreaterThan(
+        0,
+      );
+      const labels = ordered.map((root) => {
+        const content = root.children[0];
+        const label = content?.children[1];
+        if (!(label instanceof BitmapText)) throw new Error('Число фишки не найдено');
+        return label.text;
+      });
+      expect(labels).toEqual(units.map(({ soldiers }) => formatSoldiers(soldiers)));
+    } finally {
+      layer.destroy();
+    }
+  });
 });
