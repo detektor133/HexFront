@@ -48,7 +48,7 @@
 | `MINE_GOLD_PER_S` | 1,0 |
 | `CITY_MIN_DISTANCE` | 4 |
 | `NEUTRAL_CITIES_PER_PLAYER` | 1,5 |
-| `NEUTRAL_GARRISON` по уровню 1/2/3 | 150 / 300 / 600 |
+| `NEUTRAL_GARRISON` по уровню 1/2/3 | 37 / 75 / 150 (четверть прежних значений, округление вниз) |
 
 ## Генератор карт
 
