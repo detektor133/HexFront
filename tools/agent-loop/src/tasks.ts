@@ -857,55 +857,23 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     if (!verdict.ok) {
       context.config.board?.count('returns');
       if (targeted) {
-        const previous = active.findings[0];
-        const next = batchReviewFindings([...verdict.findings, ...active.findings.slice(1)]);
-        if (
-          previous !== undefined &&
-          next[0] !== undefined &&
-          (next[0].kind !== previous.kind || next[0].text !== previous.text)
-        ) {
-          active.findings = next;
-          active.findingRetries = 0;
-          active.phase = 'work';
-          await save(context);
-          await context.say(`узкий review ${task}: найден новый пункт, передаю исполнителю`);
-          return { step: 'worked', done: false };
-        }
-        active.findingRetries = (active.findingRetries ?? 0) + 1;
-        if (active.findingRetries >= 2) {
-          const streak = active.fixStreak;
-          const rejected = active.findings[0];
-          active.findings = [
-            {
-              kind: 'ПЛАН',
-              text:
-                `ПЛАН: узкий review дважды не принял один и тот же пункт по задаче ${task}` +
-                (streak !== undefined
-                  ? ` (файл ${streak.file} патчится ${streak.count} раз(а) подряд в этой задаче)`
-                  : '') +
-                ` — реши, нужен ли цельный редизайн механизма вместо продолжения точечных попыток. Отклонённый пункт: ${rejected?.text ?? ''}`,
-            },
-          ];
-          active.findingRetries = 0;
-          active.phase = 'work';
-          await save(context);
-          await context.say(
-            `узкий review ${task}: пункт дважды не принят — зову plan оценить переделку перед остановкой`,
-          );
-          return { step: 'worked', done: false };
-        }
-        active.findings = next;
+        active.findings = [
+          {
+            kind: 'ПЕРЕДЕЛАТЬ',
+            text:
+              'ПЕРЕДЕЛАТЬ: узкий review отклонил последнюю правку. ' +
+              `Текущие доказанные дефекты: ${verdict.findings.map((item) => item.text).join(' | ')}. ` +
+              'Замени обходящий реальный путь тестовый стык или продуктовый механизм. ' +
+              'Проверь, что описанная reviewer регрессия делает тест красным; ' +
+              'новые ассерты поверх прежней подмены не закрывают дефект.',
+          },
+          ...active.findings.slice(1),
+        ];
+        active.findingRetries = 0;
+        active.phase = 'work';
         await save(context);
-        await context.say(
-          `узкий review ${task}: пункт не принят, запускаю диагностику plan перед повтором`,
-        );
-        const step = await diagnoseFinding(
-          context,
-          task,
-          active.findings[0] as ReviewFinding,
-          true,
-        );
-        return { step, done: false };
+        await context.say(`узкий review ${task}: исправление не принято, меняю способ проверки`);
+        return { step: 'worked', done: false };
       }
       const nextFindings = batchReviewFindings(verdict.findings);
       if (!targeted) active.fullReviewRounds = (active.fullReviewRounds ?? 0) + 1;

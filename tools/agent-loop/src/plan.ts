@@ -118,6 +118,15 @@ export async function runPlan(
   if (dirty && !['уточнено', 'разбито', 'вопрос'].includes(outcome))
     return park(context, `plan:${task}`, `$plan ${task} оставил незакоммиченные файлы — проверь`);
   let after = await readStage(context.config.root);
+  if (
+    outcome === 'разбито' &&
+    before.stageText === after.stageText &&
+    before.status === after.status &&
+    parseQueue(after.status).some((queued) => queued.startsWith(task) && queued !== task)
+  ) {
+    outcome = 'не трогал';
+    await context.say(`$plan ${task}: разбиение уже записано, повторная правка не нужна`);
+  }
   if (outcome === 'разбито') {
     const repaired = restoreMissingSplitParent(task, before, after);
     if (repaired !== undefined) {

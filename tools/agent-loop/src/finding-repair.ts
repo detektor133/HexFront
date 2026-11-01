@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { park, save, type LoopContext, type Step } from './context.ts';
+import { head } from './git.ts';
 import { runPlan } from './plan.ts';
 import type { ReviewFinding } from './review.ts';
 
@@ -53,6 +54,24 @@ export async function diagnoseFinding(
   retryOnce = false,
   question?: string,
 ): Promise<Step> {
+  const active = context.state.activeTask;
+  if (
+    active?.task === task &&
+    finding.kind !== 'ПЛАН' &&
+    (await head(context.git)) !== active.base
+  ) {
+    active.findings[0] = {
+      kind: 'ПЕРЕДЕЛАТЬ',
+      text:
+        `ПЕРЕДЕЛАТЬ: работа уже начата, а review всё ещё отвергает механизм. ${finding.text} ` +
+        'Замени способ подготовки состояния или тестовый стык, который обходит проверяемый путь; ' +
+        'покажи, что описанная reviewer регрессия теперь делает тест красным.',
+    };
+    active.phase = 'work';
+    await save(context);
+    await context.say(`${task}: вместо позднего разбиения передаю переделку той же роли`);
+    return 'worked';
+  }
   const planned = await runPlan(
     context,
     task,
@@ -66,7 +85,6 @@ export async function diagnoseFinding(
       `plan:${task}`,
       `${task}: критерий требует решения владельца после диагностики plan`,
     );
-  const active = context.state.activeTask;
   if (planned.outcome === 'инфраструктура') {
     if (active !== undefined) {
       active.findings[0] = {

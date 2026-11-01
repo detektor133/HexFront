@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
 import { loadState } from './state.ts';
-import { fixtureStage, fixtureStatus, runWorld, setMark, type Session } from './test-world.ts';
+import { fixtureStage, runWorld, setMark, type Session } from './test-world.ts';
 
 const codeCommit = (answer = 'Код готов.'): Session => ({
   answer,
@@ -1073,14 +1073,17 @@ describe('последовательный конвейер задачи', () =>
       '$review 06/T1j5-Б1',
     ]);
     expect(run.prompts[1]).toContain(newFinding);
-    expect(run.lines).toContain('узкий review 06/T1j5-Б1: найден новый пункт, передаю исполнителю');
+    expect(run.prompts[1]).toContain('ПЕРЕДЕЛАТЬ:');
+    expect(run.lines).toContain(
+      'узкий review 06/T1j5-Б1: исправление не принято, меняю способ проверки',
+    );
     expect(run.lines.join('\n')).not.toContain('plan не изменил повторно отклонённый пункт');
   });
 
-  it('после первого повторного возврата зовёт plan, после второго — тоже plan, и только затем останавливается', async () => {
-    const finding = 'ТЕСТ: тест не проверяет границы';
+  it('перефразирование того же дефекта не сбрасывает переделку тестового пути', async () => {
+    const finding = 'ТЕСТ: тест вызывает callback вместо реального ввода';
+    const reworded = 'ТЕСТ: реальный ввод карты обойдён вызовом callback';
     const run = await runWorld({
-      spec: true,
       plan: true,
       state: {
         activeTask: {
@@ -1094,86 +1097,29 @@ describe('последовательный конвейер задачи', () =>
       },
       sessions: [
         review(`ВОЗВРАТ\n- ${finding}`),
-        { answer: 'PLAN: не трогал', push: false },
         {
-          answer: 'РЕМОНТ: ИСПРАВЛЕНО\nСПЕК: packages/sim/test/task.test.ts',
-          writes: { 'packages/sim/test/task.test.ts': "it('границы', () => {});\n" },
+          answer: 'Усилены утверждения старого теста.',
+          writes: { 'packages/sim/test/task.test.ts': "it('callback', () => {});\n" },
           commit: true,
           push: false,
         },
-        review(`ВОЗВРАТ\n- ${finding}`),
-        { answer: 'PLAN: не трогал', push: false },
+        review(`ВОЗВРАТ\n- ${reworded}`),
+        codeCommit('Заменена фикстура, проверяется реальный ввод.'),
+        review('OK'),
+        review('OK'),
       ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
     });
 
-    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+    expect(run.prompts.slice(0, 4).map((prompt) => prompt.split('\n')[0])).toEqual([
       '$review 06/T1j5-Б1',
-      '$plan 06/T1j5-Б1',
       '$task 06/T1j5-Б1',
       '$review 06/T1j5-Б1',
-      '$plan 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
     ]);
-    expect(run.prompts[4]).toContain('узкий review дважды не принял один и тот же пункт');
-    expect(run.lines).toContain(
-      'жду: 06/T1j5-Б1: plan не изменил повторно отклонённый пункт; автоматический повтор той же роли запрещён',
-    );
-  });
-
-  it('второй подряд отказ узкого review может закончиться не остановкой, а разбиением задачи', async () => {
-    const finding = 'КОД: неверный путь';
-    const split = fixtureStage.replace(
-      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.',
-      '- [ ] **T1j5-Б1. Фитнес по метрикам самой особи** (tools/evolve).\n  *Приёмка:* тесты.\n' +
-        '- [ ] **T1j5-Б1a. Часть первая** (tools/evolve).\n  *Приёмка:* тесты.\n' +
-        '- [ ] **T1j5-Б1b. Часть вторая** (tools/evolve).\n  *Проверка:* интеграция.',
-    );
-    const splitStatus = fixtureStatus.replace(
-      'Очередь: 06/T1j5-Б1 → 06/T1i → 06/T1e',
-      'Очередь: 06/T1j5-Б1a → 06/T1j5-Б1b → 06/T1i → 06/T1e',
-    );
-    const run = await runWorld({
-      plan: true,
-      state: {
-        activeTask: {
-          task: '06/T1j5-Б1',
-          base: 'c0',
-          remoteBase: 'c0',
-          workPrompt: '$task 06/T1j5-Б1',
-          phase: 'target-review',
-          findings: [{ kind: 'КОД', text: finding }],
-          findingRetries: 1,
-          fixStreak: { file: 'apps/client/src/dev/Hud.module.css', count: 3 },
-        },
-      },
-      sessions: [
-        review(`ВОЗВРАТ\n- ${finding}`),
-        {
-          answer: 'Объём на деле больше одной подсистемы — разбита на 2 подзадачи.\nPLAN: разбито',
-          stage: split,
-          status: splitStatus,
-          commit: true,
-          files: ['docs/stages/stage-06-bots-balance.md', 'docs/STATUS.md', 'docs/DECISIONS.md'],
-        },
-        review('OK'),
-        { answer: 'Текст первой подзадачи достаточен.\nPLAN: не трогал' },
-      ],
-      maxRounds: 1,
-    });
-
-    // Разбиение не отменяет уже закоммиченную работу исходной задачи: её review проходит
-    // дальше обычным порядком (pre-push → CI → docs-коммит), а очередь уже ведёт на первую
-    // подзадачу — цикл успевает начать и её проверку текста роль plan в рамках того же прогона.
-    expect(run.prompts.slice(0, 3).map((prompt) => prompt.split('\n')[0])).toEqual([
-      '$review 06/T1j5-Б1',
-      '$plan 06/T1j5-Б1',
-      '$review 06/T1j5-Б1',
-    ]);
-    expect(run.prompts[1]).toContain('узкий review дважды не принял один и тот же пункт');
-    expect(run.prompts[1]).toContain('Hud.module.css патчится 3 раз(а) подряд');
-    expect(run.lines).toContain('$plan 06/T1j5-Б1: разбито');
-    expect(run.lines).not.toContain(
-      expect.stringContaining('автоматический повтор той же роли запрещён'),
-    );
+    expect(run.prompts[3]).toContain(reworded);
+    expect(run.prompts[3]).toContain('Замени проблемный подход');
+    expect(run.prompts.join('\n')).not.toContain('$plan 06/T1j5-Б1');
   });
 
   it('финальный review второй круг подряд находит новые пункты — зовёт plan, а не очередной патч', async () => {
@@ -1212,6 +1158,36 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain(
       '06/T1j5-Б1: plan не нашёл конфликт требований, даю исправляющей роли последнюю попытку',
     );
+  });
+
+  it('после начала кода передаёт повторный дефект на переделку без позднего разбиения', async () => {
+    const run = await runWorld({
+      plan: true,
+      state: {
+        activeTask: {
+          task: '06/T1j5-Б1',
+          base: 'base-before-work',
+          remoteBase: 'c0',
+          workPrompt: '$task 06/T1j5-Б1',
+          phase: 'review',
+          findings: [],
+          fullReviewRounds: 1,
+        },
+      },
+      sessions: [
+        review('ВОЗВРАТ\n- ТЕСТ: проверяемый путь подменён'),
+        codeCommit('Исправлен тестовый стык.'),
+        review('OK'),
+      ],
+      maxRounds: 1,
+    });
+
+    expect(run.prompts.slice(0, 2).map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$review 06/T1j5-Б1',
+      '$task 06/T1j5-Б1',
+    ]);
+    expect(run.prompts[1]).toContain('ПЕРЕДЕЛАТЬ:');
+    expect(run.prompts.join('\n')).not.toContain('$plan 06/T1j5-Б1');
   });
 
   it('не паркует пакет замечаний, если plan не дописал служебный PLAN-маркер', async () => {
