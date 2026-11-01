@@ -431,6 +431,28 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         return label.text;
       });
       expect(labels).toEqual(units.map(({ soldiers }) => formatSoldiers(soldiers)));
+
+      const initialX = ordered.reduce((sum, root) => sum + root.position.x, 0) / ordered.length;
+      for (const moveTicks of [5, 6, 7]) {
+        layer.setView(
+          {
+            ...source,
+            units: units.map((unit) => ({ ...unit, moveTicks })),
+          },
+          { hex: null, units: [], target: null },
+          moveTicks * 100,
+        );
+        const updatedRoots = chipsLayer.children.slice(1);
+        expect(updatedRoots).toHaveLength(3);
+        const updated = [...updatedRoots].sort((a, b) => a.position.y - b.position.y);
+        const [low, middle, high] = updated;
+        if (!low || !middle || !high) throw new Error('Переход потерял фишку отряда');
+        expect(middle.position.y - low.position.y).toBeCloseTo(28);
+        expect(high.position.y - middle.position.y).toBeCloseTo(28);
+        expect(
+          updated.reduce((sum, root) => sum + root.position.x, 0) / updated.length,
+        ).toBeGreaterThan(initialX);
+      }
     } finally {
       layer.destroy();
     }
