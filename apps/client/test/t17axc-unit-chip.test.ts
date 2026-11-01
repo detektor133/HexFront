@@ -426,11 +426,15 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       );
       const labels = ordered.map((root) => {
         const content = root.children[0];
+        const graphic = content?.children[0];
         const label = content?.children[1];
-        if (!(label instanceof BitmapText)) throw new Error('Число фишки не найдено');
-        return label.text;
+        if (!(graphic instanceof Graphics) || !(label instanceof BitmapText))
+          throw new Error('Примитивы фишки не найдены');
+        return { label: label.text, graphic: graphicSignature(graphic) };
       });
-      expect(labels).toEqual(units.map(({ soldiers }) => formatSoldiers(soldiers)));
+      expect(labels.map(({ label }) => label)).toEqual(
+        units.map(({ soldiers }) => formatSoldiers(soldiers)),
+      );
 
       const initialX = ordered.reduce((sum, root) => sum + root.position.x, 0) / ordered.length;
       for (const moveTicks of [5, 6, 7]) {
@@ -449,6 +453,15 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         if (!low || !middle || !high) throw new Error('Переход потерял фишку отряда');
         expect(middle.position.y - low.position.y).toBeCloseTo(28);
         expect(high.position.y - middle.position.y).toBeCloseTo(28);
+        const frameData = updated.map((root) => {
+          const content = root.children[0];
+          const graphic = content?.children[0];
+          const label = content?.children[1];
+          if (!(graphic instanceof Graphics) || !(label instanceof BitmapText))
+            throw new Error('Кадр перехода потерял примитив фишки');
+          return { label: label.text, graphic: graphicSignature(graphic) };
+        });
+        expect(frameData).toEqual(labels);
         expect(
           updated.reduce((sum, root) => sum + root.position.x, 0) / updated.length,
         ).toBeGreaterThan(initialX);
