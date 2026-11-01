@@ -995,19 +995,17 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
   }
   if (active.phase === 'pre-push') {
     await context.say(`… локальная приёмка ${task}`);
+    const checkedHead = await head(context.git);
     const runPrePush = (): ReturnType<typeof context.config.runCommand> =>
       context.config.runCommand('pnpm', ['verify:prepush'], {
         cwd: context.config.root,
         timeoutMs: 20 * 60_000,
       });
     let result = await runPrePush();
-    if (
-      result.code !== 0 &&
-      (await testTimedOut(context.config.root, result.stdout, result.stderr))
-    ) {
-      await context.say(
-        `локальная приёмка ${task}: таймаут теста, повторяю тот же gate на том же HEAD`,
-      );
+    if (result.code !== 0 && isResourceFailure(`${result.stdout}\n${result.stderr}`))
+      return { step: await resourceBackoff(context, `локальная приёмка ${task}`), done: false };
+    if (result.code !== 0 && (await head(context.git)) === checkedHead) {
+      await context.say(`локальная приёмка ${task}: красный gate, повторяю на том же HEAD`);
       result = await runPrePush();
     }
     if (result.code !== 0) {

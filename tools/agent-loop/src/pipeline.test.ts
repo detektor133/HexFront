@@ -139,6 +139,7 @@ describe('последовательный конвейер задачи', () =>
           '+ "дочерний элемент группы 2 выходит за группу"',
           ...Array.from({ length: 8 }, (_, index) => `хвост ${index}`),
         ].join('\n'),
+        'pre-push: FAIL\nдочерний элемент группы 2 выходит за группу',
         'pre-push: OK',
       ],
       ci: ['success https://ci/task', 'success https://ci/docs'],
@@ -153,8 +154,8 @@ describe('последовательный конвейер задачи', () =>
     ]);
     expect(run.prompts[2]).toContain('КОД: локальная приёмка перед push красная');
     expect(run.prompts[2]).toContain('дочерний элемент группы 2 выходит за группу');
-    expect(run.prePushCalls).toBe(2);
-    expect(run.pushesAtPrePush).toEqual([0, 0]);
+    expect(run.prePushCalls).toBe(3);
+    expect(run.pushesAtPrePush).toEqual([0, 0, 0]);
     expect(run.pushes).toBe(2);
     expect(run.ciCalls).toBe(2);
   });
@@ -169,6 +170,21 @@ describe('последовательный конвейер задачи', () =>
     expect(run.prePushCalls).toBe(2);
     expect(run.commitDepthsAtPrePush).toEqual([1, 1]);
     expect(run.prompts).toHaveLength(2);
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('разовый сбой браузерного gate перепроверяет на том же HEAD без вызова кодера', async () => {
+    const run = await runWorld({
+      sessions: [codeCommit(), review('OK')],
+      prePush: ['pre-push: FAIL\ngetByRole banner not found', 'pre-push: OK'],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prePushCalls).toBe(2);
+    expect(run.prompts.map((prompt) => prompt.split('\n')[0])).toEqual([
+      '$task 06/T1j5-Б1',
+      '$review 06/T1j5-Б1',
+    ]);
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
