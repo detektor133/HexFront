@@ -3,7 +3,16 @@ import { readFileSync } from 'node:fs';
 import { BitmapText, Graphics, GraphicsContext } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FP, hexFromId, hexId, loadMap, neighbors, type Fp, type PlayerView } from '@hexfront/sim';
+import {
+  FP,
+  hexFromId,
+  hexId,
+  loadMap,
+  neighbors,
+  type Fp,
+  type PlayerView,
+  type UnitView,
+} from '@hexfront/sim';
 
 import { CHIP_WORLD, chipHalf } from '../src/dev/chip-place.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
@@ -89,6 +98,30 @@ function normalizedSegments(graphic: Graphics): Array<[number, number]> {
   return segments;
 }
 
+function graphicSignature(graphic: Graphics): string {
+  return JSON.stringify(
+    graphic.context.instructions.map((instruction) => {
+      const data = instruction.data;
+      if (typeof data !== 'object' || data === null) return { action: instruction.action };
+      const path = 'path' in data ? data.path : undefined;
+      const style = 'style' in data ? data.style : undefined;
+      return {
+        action: instruction.action,
+        path:
+          typeof path === 'object' && path !== null && 'instructions' in path
+            ? path.instructions
+            : null,
+        style:
+          typeof style === 'object' && style !== null
+            ? Object.fromEntries(
+                Object.entries(style).filter(([, value]) => typeof value !== 'object'),
+              )
+            : null,
+      };
+    }),
+  );
+}
+
 describe('07/T17axc: состояние атаки на фишке отряда', () => {
   it('показывает указатель в атаке и убирает его при переходах idle → attack → idle/retreat', () => {
     const stroke = vi.spyOn(GraphicsContext.prototype, 'stroke');
@@ -172,6 +205,7 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         type: 'infantry' as const,
         soldiers: (1250 * FP) as Fp,
         org: 900 as Fp,
+        supplyLevel: 900 as Fp,
       },
       {
         ...original,
@@ -179,6 +213,7 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         type: 'armor' as const,
         soldiers: (620 * FP) as Fp,
         org: 700 as Fp,
+        supplyLevel: 600 as Fp,
         armyId: secondArmy.id,
       },
       {
@@ -187,6 +222,7 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         type: 'artillery' as const,
         soldiers: (180 * FP) as Fp,
         org: 500 as Fp,
+        supplyLevel: 300 as Fp,
       },
     ];
     const view: PlayerView = { ...source, units, armies: [...source.armies, secondArmy] };
@@ -209,13 +245,57 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       expect(second.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - second.position.y).toBeGreaterThan(2 * chipHalf());
       expect(third.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
-      expect(
-        ordered.map((root) => {
-          const content = root.children[0];
-          const label = content?.children[1];
-          return label instanceof BitmapText ? label.text : null;
-        }),
-      ).toEqual(['1,2к', '620', '180']);
+      const rendered = ordered.map((root) => {
+        const content = root.children[0];
+        const graphic = content?.children[0];
+        const label = content?.children[1];
+        if (!(graphic instanceof Graphics) || !(label instanceof BitmapText))
+          throw new Error('Содержимое фишки не найдено');
+        return { root, graphic, label };
+      });
+      expect(rendered.map(({ label }) => label.text)).toEqual(['1,2к', '620', '180']);
+
+      const bounds = rendered.map(({ graphic }) => graphic.getBounds());
+      for (let index = 0; index < bounds.length - 1; index += 1) {
+        const current = bounds[index];
+        const next = bounds[index + 1];
+        if (!current || !next) throw new Error('Границы фишки не найдены');
+        expect(current.y + current.height).toBeLessThanOrEqual(next.y);
+      }
+
+      const graphics = rendered.map(({ graphic }) => graphicSignature(graphic));
+      expect(new Set(graphics).size).toBe(3);
+
+      const renderVariant = (changed: UnitView): string => {
+        const variantLayer = createUnitLayer(width, tokens.map.hexRadius, (hex) =>
+          hexCenter(hexFromId(hex, width), tokens.map.hexRadius),
+        );
+        try {
+          variantLayer.setView(
+            { ...view, units: [changed] },
+            { hex: null, units: [], target: null },
+            0,
+          );
+          const graphic = variantLayer.container.children[0]?.children[1]?.children[0]?.children[0];
+          if (!(graphic instanceof Graphics)) throw new Error('Графика варианта не найдена');
+          return graphicSignature(graphic);
+        } finally {
+          variantLayer.destroy();
+        }
+      };
+
+      for (const [index, unit] of units.entries()) {
+        expect(graphics[index]).toBe(renderVariant(unit));
+        const withoutArmy = { ...unit, armyId: -1 };
+        const changedOrg = { ...unit, org: (unit.org === 0 ? 1 : 0) as Fp };
+        const changedSupply = {
+          ...unit,
+          supplyLevel: (unit.supplyLevel === 0 ? 1000 : 0) as Fp,
+        };
+        expect(graphics[index]).not.toBe(renderVariant(withoutArmy));
+        expect(graphics[index]).not.toBe(renderVariant(changedOrg));
+        expect(graphics[index]).not.toBe(renderVariant(changedSupply));
+      }
     } finally {
       layer.destroy();
     }
