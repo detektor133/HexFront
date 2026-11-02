@@ -606,7 +606,7 @@
   *Приёмка:* DOM-тест проверяет, что в плашке нет слова типа, а доступное имя содержит тип и число солдат; в заголовке группы нет названия армии, оно есть в доступном имени; выбор группы даёт прежний `Picked`. `pnpm verify --changed` проходит.
   *Уточнение plan:* Фраза приёмки «в плашке нет слова типа, а доступное имя содержит тип и число солдат» относится к 07/T17dba по таблице трассировки T17db и не является критерием T17dbb. Для T17dbb DOM-тест проверяет только заголовок группы: название армии отсутствует в отображаемом содержимом и присутствует в доступном имени кнопки группы; выбор группы даёт прежний Picked.
 
-- [ ] **T17dbc. Геометрия окна плашек отрядов** (`apps/client/src/dev/UnitCard.tsx`, `apps/client/src/dev/HexCard.module.css`, `apps/client/tests/e2e`, `docs/art/ui.md`).
+- [x] **T17dbc. Геометрия окна плашек отрядов** (`apps/client/src/dev/UnitCard.tsx`, `apps/client/src/dev/HexCard.module.css`, `apps/client/tests/e2e`, `docs/art/ui.md`).
   *Приёмка:* Playwright `@layout` проверяет отсутствие переполнения окна при 360/1024/1920 px. `pnpm verify --changed` проходит.
   *Уточнение plan:* Под «окном» понимается карточка выбранных отрядов в фикстуре `/dev/sandbox?map=small&seed=42&unitCard=groups-style` (`t17bwc-unit-card-layout.spec.ts`): при ширинах 360/1024/1920 px её границы остаются внутри viewport, а `scrollWidth <= clientWidth` и `scrollHeight <= clientHeight`.
 
