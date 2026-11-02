@@ -649,6 +649,7 @@
 - [ ] **T17cebc. Размещение кнопки благоустройства [CR-011]** (`apps/client/src/dev/{HexCard.tsx,HexCard.module.css}`, `apps/client/tests/e2e`).
   Зависит от T17ceba: проверяет размещение готовой кнопки.
   *Приёмка:* Playwright `@layout` проверяет размещение кнопки в карточке обычной клетки без переполнения на 1024/1920 px. `pnpm verify --changed` проходит.
+  *Уточнение plan:* Детерминированный сценарий обычной клетки открывается через `/dev/sandbox?map=small&seed=42&select=724` (существующая фикстура `apps/client/tests/e2e/t17bma-hex-card-actions-layout.spec.ts`).
 
 
 
