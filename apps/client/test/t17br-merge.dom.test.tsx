@@ -10,6 +10,18 @@ import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
+import type { IconButtonProps } from '../src/ui/icon-button.tsx';
+
+vi.mock('../src/ui/icon-button.tsx', async (importOriginal) => {
+  const actual = (await importOriginal()) as {
+    IconButton: (props: IconButtonProps) => React.JSX.Element;
+  };
+  return {
+    IconButton: (props: IconButtonProps) => (
+      <actual.IconButton {...props} data-icon-button="true" />
+    ),
+  };
+});
 
 const tinyMap: unknown = JSON.parse(
   readFileSync(new URL('../../../packages/mapgen/maps/tiny.json', import.meta.url), 'utf8'),
@@ -108,8 +120,12 @@ describe('07/T17br: слияние из карточки выбранных от
 
     const card = screen.getByRole('region', { name: t('unit.groups') });
     expect(card.querySelectorAll('li')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: t('unit.merge') })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: t('unit.merge') }));
+    const button = screen.getByRole('button', { name: t('unit.merge') });
+    expect(button.getAttribute('data-icon-button')).toBe('true');
+    expect(button.getAttribute('title')).toBe(t('unit.merge'));
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg')).toBeTruthy();
+    fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'merge', unitIds: [first.id, second.id] });
   });
 

@@ -10,6 +10,19 @@ import { UnitCard } from '../src/dev/UnitCard.tsx';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
+import type { IconButtonProps } from '../src/ui/icon-button.tsx';
+
+vi.mock('../src/ui/icon-button.tsx', async (importOriginal) => {
+  const actual = (await importOriginal()) as {
+    IconButton: (props: IconButtonProps) => React.JSX.Element;
+  };
+  return {
+    IconButton: (props: IconButtonProps) => (
+      <actual.IconButton {...props} data-icon-button="true" />
+    ),
+  };
+});
+
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
 );
@@ -65,7 +78,13 @@ describe('07/T17bsa: деление пополам кнопкой карточк
     [121, 60],
   ])('передаёт половину целых солдат для %i человек', (people, half) => {
     const { send } = selectedCard(people * FP);
-    fireEvent.click(screen.getByRole('button', { name: t('unit.split') }));
+    const button = screen.getByRole('button', { name: t('unit.split') });
+    expect(button.getAttribute('data-icon-button')).toBe('true');
+    expect(button.className).toContain('button');
+    expect(button.getAttribute('title')).toBe(t('unit.split'));
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg')).toBeTruthy();
+    fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({
       t: 'split',
       unitId: 9701,
@@ -86,7 +105,10 @@ describe('07/T17bsa: деление пополам кнопкой карточк
           : undefined;
     const { send } = selectedCard(soldiers, options);
     const button = screen.getByRole('button', { name: t('unit.split') }) as HTMLButtonElement;
+    expect(button.getAttribute('data-icon-button')).toBe('true');
     expect(button.disabled).toBe(true);
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg')).toBeTruthy();
     expect(screen.getByText(t(reason), { selector: '[role="status"]' })).toBeTruthy();
     fireEvent.click(button);
     expect(send).not.toHaveBeenCalled();

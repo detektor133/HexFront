@@ -1,4 +1,4 @@
-import { IconX } from '@tabler/icons-react';
+import { IconArrowsJoin2, IconScissors, IconX } from '@tabler/icons-react';
 import { useLayoutEffect, useRef } from 'react';
 
 import {
@@ -224,9 +224,9 @@ export function UnitCard(props: {
         )}
         {units.length === 1 && (
           <>
-            <button
-              type="button"
+            <IconButton
               className={styles.button}
+              label={t('unit.split')}
               disabled={splitReason !== null}
               onClick={() =>
                 props.send({
@@ -236,21 +236,21 @@ export function UnitCard(props: {
                 })
               }
             >
-              {t('unit.split')}
-            </button>
+              <IconScissors className={styles.icon} size={16} aria-hidden="true" />
+            </IconButton>
             {splitReason && <p role="status">{t(splitReason)}</p>}
           </>
         )}
         {mergeReason ? (
           <p role="status">{t(mergeReason)}</p>
         ) : units.length > 1 ? (
-          <button
-            type="button"
+          <IconButton
             className={styles.button}
+            label={t('unit.merge')}
             onClick={() => props.send({ t: 'merge', unitIds: units.map((unit) => unit.id) })}
           >
-            {t('unit.merge')}
-          </button>
+            <IconArrowsJoin2 className={styles.icon} size={16} aria-hidden="true" />
+          </IconButton>
         ) : null}
       </div>
     </section>
