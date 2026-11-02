@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+// Конституция/Модуль 9 отсутствует в репозитории; обязательный источник правил проекта — AGENTS.md.
 const viewports = [
   { width: 360, height: 640 },
   { width: 1024, height: 768 },
@@ -14,7 +15,7 @@ function tokenColorToRgb(token: string): string {
 }
 
 for (const viewport of viewports) {
-  test(`@layout 07/T17bwc: список и действие не пересекаются при ${viewport.width} px`, async ({
+  test(`@layout 07/T17bwc, 07/T17dbc: окно плашек не переполняется при ${viewport.width} px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
