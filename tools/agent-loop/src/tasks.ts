@@ -24,6 +24,7 @@ import {
   findingPrompt,
   isResourceFailure,
   isTestTimeout,
+  timeoutCiFinding,
   testTimedOut,
   verifyTouchedTests,
 } from './finding-repair.ts';
@@ -1028,15 +1029,21 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
         return { step: 'worked', done: false };
       active.ciRetries = (active.ciRetries ?? 0) + 1;
       const failure = `${ci.line}${ci.details === undefined ? '' : `\n${ci.details}`}`;
+      const timedOut = isTestTimeout(ci.details ?? '');
       active.findings = [
-        active.ciRetries >= 2
+        active.ciRetries >= (timedOut ? 3 : 2)
           ? {
               kind: 'ПЛАН',
               text:
                 `ПЛАН: CI красный второй раз подряд по задаче ${task} — очередной точечный патч ` +
                 `уже не помог один раз; реши, нужен ли цельный пересмотр решения. Последний провал: ${failure}`,
             }
-          : { kind: 'КОД', text: `КОД: CI точного SHA красный — ${failure}` },
+          : {
+              kind: 'КОД',
+              text: timedOut
+                ? timeoutCiFinding(failure)
+                : `КОД: CI точного SHA красный — ${failure}`,
+            },
       ];
       active.phase = 'work';
       await save(context);

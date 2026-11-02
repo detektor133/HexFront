@@ -144,6 +144,23 @@ const failureOutput = (stdout: string, stderr: string): string =>
 export const isTestTimeout = (output: string): boolean =>
   /\b(?:Test timed out in \d+ms|Test timeout of \d+ms exceeded)\b/iu.test(output);
 
+const FAILED_SPEC_RE = /(?:apps|packages|tools)\/[\w-]+\/tests?\/[\w./-]+?\.(?:spec|test)\.tsx?/u;
+
+/**
+ * Замечание кодеру, когда тест всё ещё упирается в лимит времени после перезапуска job того же SHA:
+ * причина в медленном раннере, поэтому правится только лимит этого теста, а не код задачи.
+ */
+export function timeoutCiFinding(failure: string): string {
+  const spec = FAILED_SPEC_RE.exec(failure)?.[0];
+  const where = spec === undefined ? 'упавшей спеки' : `спеки ${spec}`;
+  return (
+    'КОД: CI красный из-за лимита времени теста: job того же SHA уже перезапускали, таймаут повторился. ' +
+    `Это не дефект продукта задачи. Измерь время упавшего теста локально и увеличь лимит только в файле ${where} ` +
+    '(test.setTimeout или test.slow()), не ослабляя ни одного ассерта и не меняя продуктовый код. ' +
+    `Последний провал: ${failure}`
+  );
+}
+
 export const isResourceFailure = (output: string): boolean =>
   /(?:memory allocation of \d+ bytes failed|failed to allocate memory|heap out of memory|\bENOMEM\b)/iu.test(
     output,

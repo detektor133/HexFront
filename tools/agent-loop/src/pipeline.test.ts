@@ -1466,6 +1466,32 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('таймаут, повторившийся после перезапуска job, даёт кодеру замечание о лимите теста, а не ПЛАН', async () => {
+    const timeout =
+      '1) [desktop] › apps/client/tests/e2e/t17bq-popup-layout.spec.ts:11:3\nTest timeout of 30000ms exceeded.';
+    const run = await runWorld({
+      sessions: [
+        codeCommit(),
+        review('OK'),
+        codeCommit('Увеличен лимит времени теста.'),
+        review('OK'),
+        review('OK'),
+      ],
+      ci: [
+        `${timeout}\nrun_attempt=1\nfailure job=check https://github.com/acme/game/actions/runs/123`,
+        `${timeout}\nrun_attempt=2\nfailure job=check https://github.com/acme/game/actions/runs/123`,
+        'success https://github.com/acme/game/actions/runs/125',
+        'success https://github.com/acme/game/actions/runs/126',
+      ],
+    });
+
+    expect(run.reruns).toEqual([123]);
+    const fix = run.prompts.find((prompt) => prompt.includes('лимита времени теста'));
+    expect(fix).toContain('apps/client/tests/e2e/t17bq-popup-layout.spec.ts');
+    expect(fix).not.toContain('ПЛАН:');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('останавливает задачу, если исполнитель push-нул до review', async () => {
     const run = await runWorld({ sessions: [{ ...codeCommit(), push: true }] });
 
