@@ -5,10 +5,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loadMap } from '@hexfront/sim';
+import { loadMap, type PlayerView, type UnitView } from '@hexfront/sim';
 
 import { installMatchMocks } from './t17q-match.ts';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
+import { armyName } from '../src/dev/army-name.ts';
 import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
@@ -23,6 +24,13 @@ if (!loadedMap.ok) throw new Error(loadedMap.errors.join('; '));
 const map = loadedMap.map;
 
 afterEach(cleanup);
+
+function unitPlateLabel(view: PlayerView, unit: UnitView): string {
+  const viewedUnit = view.units.find((item) => item.id === unit.id) ?? unit;
+  const army = view.armies.find((item) => item.id === viewedUnit.armyId);
+  const armyLabel = army ? armyName(army) : t('army.reserve');
+  return `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)} · ${armyLabel}`;
+}
 
 describe('07/T17baa: закрытие карточки отряда', () => {
   it('показывает выбранные отряды группами по номеру армии и отдельно резерв', () => {
@@ -96,24 +104,22 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     expect(groups).toEqual([
       {
         heading: t('army.numbered').replace('{n}', '1'),
-        rows: [
-          `${t(`unit.${fourth.type}` as MessageKey)} · ${formatSoldiers(fourth.soldiers)}`,
-          `${t(`unit.${third.type}` as MessageKey)} · ${formatSoldiers(third.soldiers)}`,
-        ],
+        rows: [formatSoldiers(fourth.soldiers), formatSoldiers(third.soldiers)],
       },
       {
         heading: t('army.numbered').replace('{n}', '2'),
-        rows: [`${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`],
+        rows: [formatSoldiers(first.soldiers)],
       },
       {
         heading: t('army.reserve'),
-        rows: [`${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`],
+        rows: [formatSoldiers(second.soldiers)],
       },
     ]);
     for (const unit of [first, second, third, fourth]) {
-      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+      const label = unitPlateLabel(view, unit);
       const plate = screen.getByRole('button', { name: label });
       expect(plate.getAttribute('aria-pressed')).toBe('true');
+      expect(plate.textContent).toBe(formatSoldiers(unit.soldiers));
       expect(plate.querySelector(`[data-unit-type="${unit.type}"]`)).toBeTruthy();
     }
     for (const army of armies) {
@@ -121,6 +127,51 @@ describe('07/T17baa: закрытие карточки отряда', () => {
       expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true');
     }
     expect(container.textContent).not.toContain('Выбрано отрядов');
+  });
+
+  it('сохраняет Picked при переключении плашки отряда', () => {
+    const engine = createLocalEngine(mapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const source = engine.snapshot().view;
+    const template = source.units.find(
+      (item) => item.owner === source.playerId && item.armyId !== null,
+    );
+    if (!template || template.armyId === null) {
+      throw new Error('для фикстуры нужен отряд своей армии');
+    }
+    const unit = { ...template, id: 9701 };
+    const peer = {
+      ...template,
+      id: 9702,
+      soldiers: (template.soldiers + 1_000) as typeof template.soldiers,
+    };
+    const view = {
+      ...source,
+      units: [...source.units.filter((item) => item.owner !== source.playerId), unit, peer],
+    };
+    const army = source.armies.find((item) => item.id === unit.armyId);
+    if (!army) throw new Error('для фикстуры нужна армия отряда');
+    const label = unitPlateLabel(source, unit);
+    const onPick = vi.fn<(picked: Picked) => void>();
+
+    render(
+      <UnitCard
+        view={view}
+        map={map}
+        picked={{ hex: null, units: [unit.id, peer.id], target: null }}
+        send={() => undefined}
+        onPick={onPick}
+      />,
+    );
+    const plate = screen.getByRole('button', { name: label });
+    expect(plate.getAttribute('aria-label')).toBe(label);
+    expect(plate.getAttribute('title')).toBe(label);
+    expect(plate.getAttribute('aria-pressed')).toBe('true');
+    expect(plate.textContent).toBe(formatSoldiers(unit.soldiers));
+
+    fireEvent.click(plate);
+
+    expect(onPick).toHaveBeenCalledWith({ hex: null, units: [peer.id], target: null });
   });
 
   it('закрывает выбранный отряд локализованной кнопкой без игровой команды', () => {
@@ -259,7 +310,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     }
 
     render(<InteractiveCard />);
-    const secondRow = `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`;
+    const secondRow = unitPlateLabel(view, second);
     const secondButton = screen.getByRole('button', { name: secondRow });
     expect(secondButton.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(secondButton);
@@ -269,14 +320,14 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(
       screen
         .getByRole('button', {
-          name: `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`,
+          name: unitPlateLabel(view, reserve),
         })
         .getAttribute('aria-pressed'),
     ).toBe('true');
     expect(
       screen
         .getByRole('button', {
-          name: `${t(`unit.${otherArmyUnit.type}` as MessageKey)} · ${formatSoldiers(otherArmyUnit.soldiers)}`,
+          name: unitPlateLabel(view, otherArmyUnit),
         })
         .getAttribute('aria-pressed'),
     ).toBe('true');
@@ -287,7 +338,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(
       screen
         .getByRole('button', {
-          name: `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`,
+          name: unitPlateLabel(view, reserve),
         })
         .getAttribute('aria-pressed'),
     ).toBe('true');
@@ -300,7 +351,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(screen.getByRole('button', { name: otherGroupLabel })).toBeTruthy();
     expect(
       screen.getByRole('button', {
-        name: `${t(`unit.${otherArmyUnit.type}` as MessageKey)} · ${formatSoldiers(otherArmyUnit.soldiers)}`,
+        name: unitPlateLabel(view, otherArmyUnit),
       }),
     ).toBeTruthy();
 
@@ -365,7 +416,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
       );
     }
     render(<InteractiveCard />);
-    const firstRow = `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`;
+    const firstRow = unitPlateLabel(view, first);
     fireEvent.click(screen.getByRole('button', { name: firstRow }));
     const remaining = `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`;
     expect(screen.getByRole('region', { name: remaining })).toBeTruthy();

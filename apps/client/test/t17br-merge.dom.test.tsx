@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap } from '@hexfront/sim';
 
+import { armyName } from '../src/dev/army-name.ts';
 import type { Picked } from '../src/dev/sandbox-selection.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
@@ -32,6 +33,12 @@ const loadedMap = loaded.map;
 const engine = createLocalEngine(tinyMap, 42, 2);
 if ('errors' in engine) throw new Error(engine.errors.join('; '));
 const source = engine.snapshot();
+
+function unitPlateLabel(unit: (typeof source.view.units)[number]): string {
+  const army = source.view.armies.find((item) => item.id === unit.armyId);
+  const armyLabel = army ? armyName(army) : t('army.reserve');
+  return `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)} · ${armyLabel}`;
+}
 
 afterEach(() => {
   cleanup();
@@ -171,7 +178,7 @@ describe('07/T17br: слияние из карточки выбранных от
 
     const row = screen
       .getAllByRole('button', {
-        name: `${t(`unit.${retreating.type}` as MessageKey)} · ${formatSoldiers(retreating.soldiers)}`,
+        name: unitPlateLabel(retreating),
       })
       .find((button) => button.getAttribute('aria-pressed') === 'false');
     expect(row).toBeTruthy();

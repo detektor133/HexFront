@@ -197,7 +197,12 @@ export function UnitCard(props: {
                   </h3>
                   <ul className={styles.unitList}>
                     {group.map((unit) => {
-                      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)}`;
+                      const army =
+                        unit.armyId === null
+                          ? undefined
+                          : view.armies.find((item) => item.id === unit.armyId);
+                      const armyLabel = army ? armyName(army) : t('army.reserve');
+                      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)} · ${armyLabel}`;
                       return (
                         <li key={unit.id}>
                           <IconButton
@@ -209,8 +214,6 @@ export function UnitCard(props: {
                             }
                           >
                             <UnitGlyph className={styles.unitGlyph} type={unit.type} />
-                            <span>{t(`unit.${unit.type}` as MessageKey)}</span>
-                            <span aria-hidden="true"> · </span>
                             <span>{formatSoldiers(unit.soldiers)}</span>
                           </IconButton>
                         </li>

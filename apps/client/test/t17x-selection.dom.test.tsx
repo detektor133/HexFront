@@ -511,7 +511,7 @@ describe('07/T17x: выбор через реальный путь /match', () =
     );
     expect(selectedRows).toHaveLength(3);
     expect(selectedRows.map((row) => row.textContent)).toEqual(
-      expect.arrayContaining(['Пехота · 111', 'Пехота · 222', 'Бронетехника · 333']),
+      expect.arrayContaining(['111', '222', '333']),
     );
     expect(selectedCard.textContent).not.toContain('555');
     expect(selectedCard.textContent).toContain('444');
