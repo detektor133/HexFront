@@ -722,7 +722,7 @@ describe('последовательный конвейер задачи', () =>
     expect(run.lines.join('\n')).not.toContain('добавлены чужие файлы');
   });
 
-  it('после перезапуска сохраняет паузу активной задачи по лимиту Codex', async () => {
+  it('после перезапуска снимает паузу активной задачи по лимиту Codex и продолжает её', async () => {
     const run = await runWorld({
       dirty: 'packages/sim/src/task.ts',
       state: {
@@ -741,9 +741,8 @@ describe('последовательный конвейер задачи', () =>
       sessions: [codeCommit()],
     });
 
-    expect(run.prompts).toEqual([]);
-    expect(run.state?.retryAfter).toBe(100_000);
-    expect(run.state?.activeTask?.workDirtyPaths).toEqual(['packages/sim/src/task.ts']);
+    expect(run.prompts[0]).toContain('$task 06/T1j5-Б1');
+    expect(run.state?.retryAfter).toBeUndefined();
   });
 
   it('сохраняет исходный HEAD, если Codex создал коммит и затем сообщил сбой', async () => {

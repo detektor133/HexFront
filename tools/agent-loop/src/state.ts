@@ -64,6 +64,8 @@ export interface ActiveTask {
   ciRetries?: number;
   /** Один диагностический повтор старого красного CI без лога перед вызовом исполнителя. */
   ciDiagnosticRecheck?: string;
+  /** Подряд красных локальных приёмок на одном и том же наборе проверок. */
+  prePushFailure?: { readonly key: string; readonly count: number };
   /** Визуальный гейт уже просил у исполнителя недостающий @layout-сценарий в этой задаче. */
   visualTestAsked?: boolean;
   /** После таймаута CI ждём новую попытку того же SHA, не повторяя сломанный run. */

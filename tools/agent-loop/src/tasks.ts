@@ -38,6 +38,7 @@ import {
   reparentReviewedCommit,
 } from './git.ts';
 import { runPlan } from './plan.ts';
+import { failedChecks, failureKey, prePushFinding } from './prepush-failure.ts';
 import { runReview, type ReviewFinding } from './review.ts';
 import {
   forbiddenPaths,
@@ -980,18 +981,37 @@ async function runPhase(context: LoopContext): Promise<TaskRun> {
     if (result.code !== 0) {
       if (isResourceFailure(`${result.stdout}\n${result.stderr}`))
         return { step: await resourceBackoff(context, `локальная приёмка ${task}`), done: false };
-      active.findings = [
-        {
-          kind: 'КОД',
-          text: `КОД: локальная приёмка перед push красная — ${prePushFailure(result.stdout, result.stderr)}`,
-        },
-      ];
+      const checks = failedChecks(`${result.stdout}\n${result.stderr}`);
+      const key = failureKey(checks);
+      const repeat =
+        key !== '' && active.prePushFailure?.key === key ? active.prePushFailure.count : 0;
+      if (repeat >= 2)
+        return {
+          step: await park(
+            context,
+            `prepush-repeat:${task}`,
+            `${task}: локальная приёмка красная ${repeat + 1}-й раз подряд на тех же проверках (${key.replaceAll('|', ', ')}); исполнитель не меняет результат — нужен разбор владельца`,
+          ),
+          done: false,
+        };
+      const touched = (await context.git.run(['diff', '--name-only', `${active.base}..HEAD`]))
+        .split(/\r?\n/u)
+        .filter(Boolean);
+      const found = prePushFinding(
+        prePushFailure(result.stdout, result.stderr),
+        checks,
+        touched,
+        repeat,
+      );
+      active.prePushFailure = { key: found.key, count: repeat + 1 };
+      active.findings = [{ kind: 'КОД', text: found.text }];
       active.findingRetries = 0;
       active.phase = 'work';
       await save(context);
       await context.say(`локальная приёмка ${task}: FAIL, push запрещён`);
       return { step: 'worked', done: false };
     }
+    delete active.prePushFailure;
     active.phase = 'visual';
     await save(context);
     await context.say(`локальная приёмка ${task}: OK`);
