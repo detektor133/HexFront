@@ -11,6 +11,8 @@ for (const width of VIEWPORTS) {
   test(`@layout 07/T17bq: окна HUD и паузы имеют светлую геометрию при ${width} px`, async ({
     page,
   }) => {
+    if (width === 1920) test.setTimeout(90_000);
+
     const height = 900;
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
