@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  SUPPLY_REBUILD_COST_PER_HEX,
   hexFromId,
   hexId,
   inBounds,
@@ -522,6 +523,27 @@ export function SandboxSurface({
   const [observerH, setObserverH] = useState(0);
   const { army } = sb;
   const view = sb.msg?.view;
+  const selectedHex = sb.msg?.selection;
+  const cityCardFixture = new URLSearchParams(window.location.search).get('cityCard');
+  const cardSelection =
+    cityCardFixture === 'rebuild' && selectedHex?.city
+      ? {
+          ...selectedHex,
+          city: {
+            ...selectedHex.city,
+            isCapital: false,
+            link: 'isolated' as const,
+            rebuild: {
+              ok: true as const,
+              cityHex: selectedHex.city.hex,
+              path: [selectedHex.city.hex],
+              toBuild: [],
+              cost: SUPPLY_REBUILD_COST_PER_HEX,
+              affordable: true,
+            },
+          },
+        }
+      : selectedHex;
   const unitCardFixture = new URLSearchParams(window.location.search).get('unitCard');
   const fixtureSourceUnit = view?.units.find(
     (unit) => unit.order !== 'retreat' && unit.armyId !== null,
@@ -635,9 +657,9 @@ export function SandboxSurface({
             : {})}
         />
       )}
-      {view && map && sb.picked.units.length === 0 && !sb.tool && sb.msg?.selection && (
+      {view && map && sb.picked.units.length === 0 && !sb.tool && cardSelection && (
         <HexCard
-          s={sb.msg.selection}
+          s={cardSelection}
           view={view}
           map={map}
           send={sb.send}

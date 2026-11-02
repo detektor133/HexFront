@@ -14,9 +14,11 @@ import {
   inBounds,
   loadMap,
   neighbors,
+  SUPPLY_REBUILD_COST_PER_HEX,
   type Fp,
   type ConstructionCheck,
   type MapStatic,
+  type RebuildPlan,
 } from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
@@ -58,6 +60,8 @@ const smallMapJson: unknown = JSON.parse(
 
 const mapResult = loadMap(mapJson);
 if (!mapResult.ok) throw new Error(mapResult.errors.join('; '));
+const smallMapResult = loadMap(smallMapJson);
+if (!smallMapResult.ok) throw new Error(smallMapResult.errors.join('; '));
 
 afterEach(() => {
   cleanup();
@@ -355,7 +359,7 @@ describe('T17m: карточка клетки', () => {
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
     const actionLabels = (selection: Selection): string[] =>
       visibleActions(selection, 0, 0, false)
-        .filter(({ kind }) => kind !== 'upgrade')
+        .filter(({ kind }) => kind !== 'upgrade' && kind !== 'rebuild')
         .map(({ kind }) => t(`action.${kind}` as MessageKey));
     const getActionLabels = (): string[] =>
       screen
@@ -377,6 +381,69 @@ describe('T17m: карточка клетки', () => {
     expect(getActionLabels()).toEqual(actionLabels(prepared));
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
+  });
+
+  it('перестраивает связь кнопкой у статуса города и блокирует оба отказа', () => {
+    const engine = createLocalEngine(smallMapJson, 42, 2);
+    if ('errors' in engine) throw new Error(engine.errors.join('; '));
+    const city = engine.state.cities.find(
+      (item) => item.id !== engine.state.players[0]?.capitalCityId,
+    );
+    if (!city) throw new Error('некапитальный город игрока не найден');
+    city.owner = 0;
+    engine.state.hexes.owner[city.hex] = 0;
+    engine.select(city.hex);
+    const message = engine.snapshot();
+    const selected = message.selection;
+    const cityInfo = selected?.city;
+    if (!selected || !cityInfo) throw new Error('карточка города не открыта');
+    const plan: RebuildPlan = {
+      ok: true,
+      cityHex: city.hex,
+      path: [city.hex],
+      toBuild: [],
+      cost: SUPPLY_REBUILD_COST_PER_HEX,
+      affordable: true,
+    };
+    const send = vi.fn();
+    render(
+      <HexCard
+        s={{ ...selected, city: { ...cityInfo, rebuild: plan } }}
+        view={message.view}
+        map={smallMapResult.map}
+        send={send}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Проложить дорогу' });
+    const status = button.parentElement?.parentElement;
+    if (!status) throw new Error('строка состояния связи не найдена');
+    expect(status.className).toContain('linkStatus');
+    expect(status.querySelector('p')?.textContent).toBeTruthy();
+    expect(status.contains(button)).toBe(true);
+    expect(button.getAttribute('title')).toBe('Проложить дорогу');
+    expect(button.textContent).toContain(formatFp(plan.cost));
+    fireEvent.click(button);
+    expect(send).toHaveBeenCalledWith({ t: 'rebuildSupply', cityId: city.id });
+
+    for (const [rebuild, reason] of [
+      [{ ok: false, reason: 'notIsolated' }, 'Город связан со столицей'],
+      [{ ...plan, affordable: false }, 'Не хватает золота'],
+    ] as readonly [RebuildPlan, string][]) {
+      cleanup();
+      send.mockClear();
+      const unavailable = {
+        ...selected,
+        city: { ...cityInfo, rebuild },
+      };
+      render(<HexCard s={unavailable} view={message.view} map={smallMapResult.map} send={send} />);
+      const unavailableButton = screen.getByRole('button', { name: 'Проложить дорогу' });
+      expect((unavailableButton as HTMLButtonElement).disabled).toBe(true);
+      const reasonId = unavailableButton.getAttribute('aria-describedby');
+      expect(reasonId).toBeTruthy();
+      expect(document.getElementById(reasonId ?? '')?.textContent).toBe(reason);
+      fireEvent.click(unavailableButton);
+      expect(send).not.toHaveBeenCalled();
+    }
   });
 
   it('показывает дорогу в карточке изолированного склада и скрывает для подключённого', () => {

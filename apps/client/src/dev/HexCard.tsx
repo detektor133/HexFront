@@ -1,4 +1,4 @@
-import { IconArrowUp, IconX } from '@tabler/icons-react';
+import { IconArrowUp, IconRoute2, IconX } from '@tabler/icons-react';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -47,7 +47,7 @@ function ActionButton(props: {
           aria-describedby={reasonId}
           title={compact ? label : undefined}
         >
-          {compact ? <IconArrowUp size={14} aria-hidden="true" /> : <span>{label}</span>}
+          {compact ? compactActionIcon(a.kind) : <span>{label}</span>}
           {compact && a.cost > 0 && <Price value={formatFp(a.cost)} ok={false} />}
         </button>
         <span id={reasonId} className={compact ? styles.reason : styles.hint}>
@@ -74,7 +74,7 @@ function ActionButton(props: {
           clearPreview();
         }}
       >
-        {compact ? <IconArrowUp size={14} aria-hidden="true" /> : <span>{label}</span>}
+        {compact ? compactActionIcon(a.kind) : <span>{label}</span>}
         {compact ? (
           a.cost > 0 && <Price value={formatFp(a.cost)} ok={a.affordable} />
         ) : (
@@ -87,6 +87,14 @@ function ActionButton(props: {
         </span>
       )}
     </div>
+  );
+}
+
+function compactActionIcon(kind: HexAction['kind']): React.JSX.Element {
+  return kind === 'rebuild' ? (
+    <IconRoute2 size={14} aria-hidden="true" />
+  ) : (
+    <IconArrowUp size={14} aria-hidden="true" />
   );
 }
 
@@ -221,6 +229,7 @@ export function HexCard(props: {
   const c = visible ? s.city : null;
   // Снабжение, золото и связь со столицей есть только у своего города.
   const mine = c !== null && c.owner === view.playerId;
+  const hasLinkStatus = mine && c !== null && !c.isCapital;
   const title = c
     ? `${c.isCapital ? t('card.capital') : t('card.city')} · ${t('card.level')} ${c.level}`
     : t(`terrain.${terrain}` as MessageKey);
@@ -264,10 +273,24 @@ export function HexCard(props: {
           {mine && <MetricRow name="gold" value={formatRate(c.goldPerS)} />}
         </dl>
         {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
-        {mine && !c.isCapital && (
-          <p className={c.link === 'isolated' ? styles.bad : styles.good}>
-            {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
-          </p>
+        {hasLinkStatus && c && (
+          <div className={styles.linkStatus}>
+            <p className={c.link === 'isolated' ? styles.bad : styles.good}>
+              {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
+            </p>
+            {actions
+              .filter((a) => a.kind === 'rebuild')
+              .map((a) => (
+                <ActionButton
+                  key={a.kind}
+                  a={a}
+                  send={send}
+                  blockedText={blockedText(a, s, view)}
+                  compact
+                  {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
+                />
+              ))}
+          </div>
         )}
         {job && (
           <div className={styles.progress}>
@@ -290,13 +313,14 @@ export function HexCard(props: {
           </p>
         )}
         {actions
-          .filter((a) => a.kind !== 'upgrade')
+          .filter((a) => a.kind !== 'upgrade' && !(hasLinkStatus && a.kind === 'rebuild'))
           .map((a) => (
             <ActionButton
               key={a.kind}
               a={a}
               send={send}
               blockedText={blockedText(a, s, view)}
+              {...(c && a.kind === 'rebuild' ? { compact: true } : {})}
               {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
             />
           ))}
