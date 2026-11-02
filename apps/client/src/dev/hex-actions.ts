@@ -20,13 +20,19 @@ export interface HexAction {
 }
 
 // «Основать город» — путь к росту государства, поэтому причина недоступности видна всегда.
-function foundCityAction(check: ConstructionCheck, hex: number): HexAction {
+function foundCityAction(check: ConstructionCheck, hex: number, foundCityCost: number): HexAction {
   const cmd: Command = { t: 'foundCity', hex };
   if (check.ok) return { kind: 'foundCity', cost: check.cost, affordable: true, cmd };
   if (check.reason === 'notEnoughGold' && check.cost !== undefined) {
     return { kind: 'foundCity', cost: check.cost, affordable: false, cmd };
   }
-  return { kind: 'foundCity', cost: 0, affordable: false, cmd, blocked: check.reason };
+  return {
+    kind: 'foundCity',
+    cost: check.cost ?? foundCityCost,
+    affordable: false,
+    cmd,
+    blocked: check.reason,
+  };
 }
 
 function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): HexAction {
@@ -58,6 +64,7 @@ export function visibleActions(
   owner: number,
   humanId: number,
   busy: boolean,
+  foundCityCost = 0,
 ): HexAction[] {
   if (owner !== humanId || busy) return [];
   const hex = s.hex;
@@ -70,7 +77,7 @@ export function visibleActions(
       out.push(rebuildAction(r, { t: 'rebuildSupply', cityId: city.id }));
     }
   } else {
-    out.push(foundCityAction(s.foundCity, hex));
+    out.push(foundCityAction(s.foundCity, hex, foundCityCost));
     out.push(fromCheck('improve', s.improve, { t: 'improve', hex }));
     out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
     if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));

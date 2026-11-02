@@ -39,9 +39,9 @@ describe('действия карточки гекса', () => {
   });
 
   it('запрещённые по правилам видимы с причиной, «не хватает золота» — видимо с ценой', () => {
-    const actions = visibleActions(plain(), 0, 0, false);
+    const actions = visibleActions(plain(), 0, 0, false, 120_000);
     expect(actions.map((a) => [a.kind, a.cost, a.affordable, a.blocked])).toEqual([
-      ['foundCity', 0, false, 'cityTooClose'],
+      ['foundCity', 120_000, false, 'cityTooClose'],
       ['improve', 20_000, true, undefined],
       ['fort', 60_000, false, undefined],
       ['depot', 0, false, 'depotTooClose'],

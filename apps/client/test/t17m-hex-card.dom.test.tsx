@@ -359,7 +359,7 @@ describe('T17m: карточка клетки', () => {
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
     const actionLabels = (selection: Selection): string[] =>
       visibleActions(selection, 0, 0, false)
-        .filter(({ kind }) => kind !== 'upgrade' && kind !== 'rebuild')
+        .filter(({ kind }) => kind !== 'upgrade' && kind !== 'rebuild' && kind !== 'foundCity')
         .map(({ kind }) => t(`action.${kind}` as MessageKey));
     const getActionLabels = (): string[] =>
       screen
@@ -379,6 +379,7 @@ describe('T17m: карточка клетки', () => {
     cleanup();
     render(<HexCard s={prepared} view={message.view} map={mapResult.map} send={() => undefined} />);
     expect(getActionLabels()).toEqual(actionLabels(prepared));
+    expect(screen.getByRole('button', { name: t('action.foundCity') })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
   });

@@ -239,7 +239,14 @@ export function HexCard(props: {
   const road = visible
     ? view.constructions.find((x) => x.hex === s.hex && x.kind === 'road')
     : undefined;
-  const actions = visibleActions(s, visible ? owner : -1, view.playerId, job !== undefined);
+  const foundCityCost = view.me.foundCityCost;
+  const actions = visibleActions(
+    s,
+    visible ? owner : -1,
+    view.playerId,
+    job !== undefined,
+    foundCityCost,
+  );
   const upgrade = actions.find((action) => action.kind === 'upgrade');
   const improvement = visible ? (view.hexes.improvement[s.hex] ?? 0) : 0;
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
@@ -320,7 +327,7 @@ export function HexCard(props: {
               a={a}
               send={send}
               blockedText={blockedText(a, s, view)}
-              {...(c && a.kind === 'rebuild' ? { compact: true } : {})}
+              {...(a.kind === 'foundCity' || (c && a.kind === 'rebuild') ? { compact: true } : {})}
               {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
             />
           ))}

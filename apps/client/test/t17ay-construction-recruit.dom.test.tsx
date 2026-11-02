@@ -177,12 +177,16 @@ describe('07/T17ay: состояния строительства и найма'
 
     const send = renderCard({ ...nonCity, foundCity: available }, view);
     expect(screen.getByRole('region')).toBeTruthy();
-    const button = screen.getByRole('button', { name: /Основать город/u });
+    const button = screen.getByRole('button', { name: t('action.foundCity') });
+    expect(button.getAttribute('title')).toBe(t('action.foundCity'));
+    expect(button.textContent).not.toContain(t('action.foundCity'));
+    expect(button.querySelector('[data-gold-icon="true"]')).not.toBeNull();
+    expect(button.querySelector('[data-gold-icon="true"]')?.parentElement?.textContent).toBe('1');
     expect((button as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(button);
     expect(send).toHaveBeenCalledExactlyOnceWith({ t: 'foundCity', hex: nonCity.hex });
 
-    for (const [check, expectedReason, otherReason] of [
+    for (const [check] of [
       [unaffordable, 'Не хватает золота', 'Ближе 4 гексов к другому городу'],
       [
         { ok: false, reason: 'cityTooClose' } as ConstructionCheck,
@@ -192,11 +196,21 @@ describe('07/T17ay: состояния строительства и найма'
     ] as const) {
       cleanup();
       const blockedSend = renderCard({ ...nonCity, foundCity: check }, view);
-      const blockedButton = screen.getByRole('button', { name: /Основать город/u });
+      const expectedReason =
+        check === unaffordable ? reasonText('notEnoughGold') : reasonText('cityTooClose');
+      const otherReason =
+        check === unaffordable ? reasonText('cityTooClose') : reasonText('notEnoughGold');
+      const blockedButton = screen.getByRole('button', { name: t('action.foundCity') });
+      expect(blockedButton.getAttribute('title')).toBe(t('action.foundCity'));
       expect((blockedButton as HTMLButtonElement).disabled).toBe(true);
       const reasonId = blockedButton.getAttribute('aria-describedby');
       expect(reasonId).toBeTruthy();
       expect(document.getElementById(reasonId ?? '')?.textContent).toBe(expectedReason);
+      if (check === unaffordable) {
+        expect(
+          blockedButton.querySelector('[data-gold-icon="true"]')?.parentElement?.textContent,
+        ).toBe('1');
+      }
       expect(screen.queryByText(otherReason)).toBeNull();
       const reasonElement = document.getElementById(reasonId ?? '');
       expect(reasonElement?.parentElement).toBe(blockedButton.parentElement);
@@ -205,7 +219,7 @@ describe('07/T17ay: состояния строительства и найма'
       );
       expect(cssRule('action')).toMatch(/display:\s*flex\s*;/u);
       expect(cssRule('action')).toMatch(/flex-direction:\s*column\s*;/u);
-      expect(cssRule(expectedReason.startsWith('Ближе') ? 'hint' : 'reason')).not.toMatch(
+      expect(cssRule(check === unaffordable ? 'reason' : 'hint')).not.toMatch(
         /(?:position:\s*(?:absolute|fixed)|transform:)/u,
       );
       fireEvent.click(blockedButton);
