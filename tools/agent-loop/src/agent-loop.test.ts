@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultRunCommand } from './agent-loop.ts';
+import { clearInterruptedBackoff, defaultRunCommand } from './agent-loop.ts';
 import {
   closedStageBranch,
   commandTask,
@@ -10,6 +10,7 @@ import {
   selectTask,
   taskMark,
 } from './stage-file.ts';
+import type { LoopState } from './state.ts';
 import { fixtureStage, fixtureStatus, setMark } from './test-world.ts';
 
 describe('разбор файла этапа', () => {
@@ -59,6 +60,38 @@ describe('разбор файла этапа', () => {
 });
 
 describe('запуск процесса', () => {
+  it('снимает будущую паузу при ручном перезапуске незавершённой задачи', () => {
+    const state: Pick<LoopState, 'activeTask' | 'retryAfter'> = {
+      activeTask: {
+        task: '07/T17ceca',
+        base: 'abc',
+        workPrompt: '$task 07/T17ceca',
+        phase: 'review',
+        findings: [],
+      },
+      retryAfter: 2_000,
+    };
+
+    expect(clearInterruptedBackoff(state, 1_000)).toBe(true);
+    expect(state.retryAfter).toBeUndefined();
+  });
+
+  it('не трогает истёкшую паузу: её завершит обычный шаг цикла', () => {
+    const state: Pick<LoopState, 'activeTask' | 'retryAfter'> = {
+      activeTask: {
+        task: '07/T17ceca',
+        base: 'abc',
+        workPrompt: '$task 07/T17ceca',
+        phase: 'review',
+        findings: [],
+      },
+      retryAfter: 1_000,
+    };
+
+    expect(clearInterruptedBackoff(state, 1_000)).toBe(false);
+    expect(state.retryAfter).toBe(1_000);
+  });
+
   it('передаёт спецсимволы через stdin без изменений', async () => {
     const input = 'строка "кавычки" $next & | > <\nвторая строка';
     const result = await defaultRunCommand('node', ['-e', 'process.stdin.pipe(process.stdout)'], {

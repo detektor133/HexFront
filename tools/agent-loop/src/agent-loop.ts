@@ -42,6 +42,7 @@ import {
   taskMark,
 } from './stage-file.ts';
 import { loadState } from './state.ts';
+import type { LoopState } from './state.ts';
 import { RESTART_FOR_CONTROL_CHANGE } from './supervisor.ts';
 import { promoteWorkspace, taskWorkspace, type TaskWorkspace } from './task-workspace.ts';
 import { processTask } from './tasks.ts';
@@ -53,6 +54,17 @@ export {
   type CommandResult,
   type RunCommand,
 } from './process.ts';
+
+/** Снимает устаревшую паузу, когда владелец вручную перезапустил цикл с незавершённой задачей. */
+export function clearInterruptedBackoff(
+  state: Pick<LoopState, 'activeTask' | 'retryAfter'>,
+  now: number,
+): boolean {
+  if (state.activeTask === undefined || state.retryAfter === undefined || state.retryAfter <= now)
+    return false;
+  delete state.retryAfter;
+  return true;
+}
 
 /** Убирает память задачи, которую ведущая сессия уже закрыла и опубликовала во время остановки цикла. */
 async function reconcileExternallyCompletedTask(context: LoopContext): Promise<void> {
@@ -309,6 +321,12 @@ export async function runAgentLoop(config: AgentConfig): Promise<number> {
   if (config.dryRun) {
     await describe(context);
     return 0;
+  }
+  if (clearInterruptedBackoff(context.state, config.now())) {
+    await save(context);
+    config.board?.task(MAIN_AGENT, context.state.activeTask?.task ?? '');
+    config.board?.end(MAIN_AGENT, 'перезапуск снял паузу после сбоя — повторяю задачу');
+    await context.say('ручной перезапуск снял паузу после сбоя Codex');
   }
   // Ожидание активной задачи переживает перезапуск: повтор роли разрешает только новый коммит.
   // Ожидания вне задачи владелец по-прежнему может повторить простым перезапуском цикла.
