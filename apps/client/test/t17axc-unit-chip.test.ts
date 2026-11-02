@@ -15,6 +15,7 @@ import {
 } from '@hexfront/sim';
 
 import { chipHalf } from '../src/dev/chip-place.ts';
+import { CHIP_STACK_STEP } from '../src/dev/unit-groups.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -332,10 +333,10 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       const thirdY = screenY[2];
       if (firstY === undefined || secondY === undefined || thirdY === undefined)
         throw new Error('Экранные координаты стопки не найдены');
-      expect(secondY - firstY).toBeCloseTo(28);
-      expect(thirdY - secondY).toBeCloseTo(28);
-      expect(second.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
-      expect(third.position.y - second.position.y).toBeGreaterThan(2 * chipHalf());
+      expect(secondY - firstY).toBeCloseTo(CHIP_STACK_STEP);
+      expect(thirdY - secondY).toBeCloseTo(CHIP_STACK_STEP);
+      expect(second.position.y - first.position.y).toBeCloseTo(2 * chipHalf());
+      expect(third.position.y - second.position.y).toBeCloseTo(2 * chipHalf());
       expect(third.position.y - first.position.y).toBeGreaterThan(2 * chipHalf());
       const rendered = ordered.map((root) => {
         const content = root.children[0];
@@ -434,12 +435,12 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
       const thirdY = screenY[2];
       if (firstY === undefined || secondY === undefined || thirdY === undefined)
         throw new Error('Экранные координаты перехода не найдены');
-      expect(secondY - firstY).toBeCloseTo(28);
-      expect(thirdY - secondY).toBeCloseTo(28);
+      expect(secondY - firstY).toBeCloseTo(CHIP_STACK_STEP);
+      expect(thirdY - secondY).toBeCloseTo(CHIP_STACK_STEP);
       const from = hexCenter(hexFromId(original.hex, width), tokens.map.hexRadius);
-      expect(Math.hypot(first.position.x - from.x, first.position.y - from.y + 28)).toBeGreaterThan(
-        0,
-      );
+      expect(
+        Math.hypot(first.position.x - from.x, first.position.y - from.y + CHIP_STACK_STEP),
+      ).toBeGreaterThan(0);
       const labels = ordered.map((root) => {
         const content = root.children[0];
         const graphic = content?.children[0];
@@ -473,8 +474,8 @@ describe('07/T17bt: вертикальная стопка отдельных ф�
         const highY = screenY[2];
         if (lowY === undefined || middleY === undefined || highY === undefined)
           throw new Error('Экранные координаты перехода не найдены');
-        expect(middleY - lowY).toBeCloseTo(28);
-        expect(highY - middleY).toBeCloseTo(28);
+        expect(middleY - lowY).toBeCloseTo(CHIP_STACK_STEP);
+        expect(highY - middleY).toBeCloseTo(CHIP_STACK_STEP);
         const frameData = updated.map((root) => {
           const content = root.children[0];
           const graphic = content?.children[0];

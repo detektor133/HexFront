@@ -201,10 +201,12 @@ describe('07/T17bu: ввод карты и выбор отдельной фиш�
     const b1 = bounds[1];
     const b2 = bounds[2];
     if (!b0 || !b1 || !b2) throw new Error('Не найдены границы стека');
-    const gap = { x: (b1.left + b1.right) / 2, y: (b1.bottom + b2.top) / 2 };
-    const selected = pickedRef.current;
-    click(screenPoint(gap));
-    expect(pickedRef.current).toEqual(selected);
+    // Фишки впритык: промежутка нет; мимо стопки фишка не находится (гекс выбирает вызывающий код).
+    expect(b1.bottom).toBeCloseTo(b2.top, 0);
+    const outside = { x: (b2.left + b2.right) / 2, y: b2.bottom + 3 };
+    expect(layer.unitsAt(outside)).toEqual([]);
+    click(screenPoint(outside));
+    expect(pickedRef.current.units).toEqual([third.id]);
 
     const selectedBeforeDrag = pickedRef.current;
     const center = layer.chipAt(first.hex);

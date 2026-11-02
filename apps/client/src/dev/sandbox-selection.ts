@@ -78,6 +78,14 @@ export function selectHex(view: PlayerView, picked: Picked, hex: number): Picked
   return { hex, units: [], target: null };
 }
 
+/**
+ * Нажатие мимо фишек (решение владельца 2026-11-02): отряды выбираются только точным нажатием
+ * на фишку; нажатие по гексу выбирает сам гекс.
+ */
+export function selectHexOnly(hex: number): Picked {
+  return { hex, units: [], target: null };
+}
+
 /** Выбирает отряды, найденные hit-test фишки, сохраняя семантику повторного тапа. */
 export function selectUnits(view: PlayerView, picked: Picked, ids: readonly number[]): Picked {
   const units = view.units

@@ -97,14 +97,14 @@ describe('фронт армии с «А» — только граница с в�
 });
 
 describe('автослияние отрядов (04/T26)', () => {
-  it('армия без плана сливает два однотипных отряда в одном гексе', () => {
+  it('армия без плана не сливает однотипные отряды в одном гексе сама (решение 2026-11-02)', () => {
     const s = scenario(MAP, { legend });
     const id = army(s, 2);
     const owned = s.state.armies.find((a) => a.id === id);
     if (owned) owned.auto = true;
     s.setTick((FRONT_ALLOC_TICKS - (id % FRONT_ALLOC_TICKS)) % FRONT_ALLOC_TICKS);
     frontSystem(s.state);
-    expect(s.unitsOf('A').filter((u) => u.armyId === id)).toHaveLength(1);
+    expect(s.unitsOf('A').filter((u) => u.armyId === id)).toHaveLength(2);
   });
 
   it('после слияния лишних отрядов на линии не запускает обратное деление', () => {

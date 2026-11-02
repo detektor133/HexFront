@@ -14,7 +14,7 @@ import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
-import type { MatchState, Unit } from '../state/types.ts';
+import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
 // Отряд идёт на своё место или встаёт на нём в оборону.
@@ -71,16 +71,17 @@ function coverLine(state: MatchState, armyId: number, owner: number): void {
 const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b.id;
 
 // Одно слияние за распределение: пара должна быть однотипной, в одном гексе и не в бою.
-function autoMerge(state: MatchState, armyId: number): void {
-  const plan = state.plans.find((p) => p.armyId === armyId);
-  const need = plan ? planHexes(state, plan).length : 0;
-  const armyUnits = allUnits(state).filter((u) => u.armyId === armyId && u.type !== 'artillery');
-  const eligible = armyUnits.filter(
-    (u) => !u.inBattle && (plan !== undefined || u.order === 'idle'),
+// Только для армии с планом (фронт/наступление/оборона) — её расстановку ведёт commander
+// (решение владельца 2026-11-02); армия без плана не сливается сама, только вручную.
+function autoMerge(state: MatchState, plan: ArmyPlan): void {
+  const need = planHexes(state, plan).length;
+  const armyUnits = allUnits(state).filter(
+    (u) => u.armyId === plan.armyId && u.type !== 'artillery',
   );
+  const eligible = armyUnits.filter((u) => !u.inBattle);
   for (const type of ['infantry', 'armor'] as const) {
     const sameType = armyUnits.filter((u) => u.type === type);
-    if (plan && sameType.length <= need) continue;
+    if (sameType.length <= need) continue;
     const candidates = eligible.filter((u) => u.type === type).sort(bySize);
     for (const first of candidates) {
       const second = candidates.find((u) => u.id !== first.id && u.hex === first.hex);
@@ -96,7 +97,7 @@ function runPlan(state: MatchState, armyId: number): void {
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
-  autoMerge(state, armyId);
+  autoMerge(state, plan);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
@@ -114,13 +115,10 @@ function runPlan(state: MatchState, armyId: number): void {
   }
 }
 
-/** Раз в FRONT_ALLOC_TICKS раздаёт места отрядам армии с планом; армии — в разные тики. */
+/** Раз в FRONT_ALLOC_TICKS раздаёт места отрядам армии с планом; армии — в разные тики.
+ * Армия без плана не трогается — слияние и расстановка её отрядов только вручную. */
 export function frontSystem(state: MatchState): void {
   for (const plan of state.plans) {
     if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan.armyId);
-  }
-  for (const army of state.armies) {
-    if (state.plans.some((p) => p.armyId === army.id)) continue;
-    if ((state.tick + army.id) % FRONT_ALLOC_TICKS === 0) autoMerge(state, army.id);
   }
 }

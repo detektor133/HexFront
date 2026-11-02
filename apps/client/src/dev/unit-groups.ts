@@ -1,5 +1,7 @@
 import type { PlayerView, UnitView } from '@hexfront/sim';
 
+import { chipHalf } from './chip-place.ts';
+
 /** Позиция фишки отдельного отряда в стопке. */
 export interface ChipGroup {
   readonly key: string;
@@ -10,6 +12,10 @@ export interface ChipGroup {
 
 const inTransit = (u: UnitView): boolean =>
   u.moveTotal > 0 && u.path.length > 0 && u.order !== 'retreat';
+
+/** Шаг стопки впритык (решение владельца 2026-11-02): фишки с рамкой выбора соприкасаются
+ * краями, без зазора и без перекрытия — высота фишки с рамкой, `units.md`, «Стопка отрядов». */
+export const CHIP_STACK_STEP = 2 * chipHalf();
 
 /** Возвращает отдельную фишку на каждый отряд с устойчивым смещением внутри стопки. */
 export function chipGroups(v: PlayerView): ChipGroup[] {
@@ -32,7 +38,7 @@ export function chipGroups(v: PlayerView): ChipGroup[] {
         key: `u${unit.id}`,
         units: [unit],
         moving: inTransit(unit),
-        stackOffset: (index - middle) * 28,
+        stackOffset: (index - middle) * CHIP_STACK_STEP,
       });
     }
   }

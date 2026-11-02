@@ -23,7 +23,7 @@ import {
   armySelection,
   NOTHING_PICKED,
   orderHex,
-  selectHex,
+  selectHexOnly,
   selectUnits,
   selectUnitsInRect,
   type Picked,
@@ -430,9 +430,7 @@ export function useSandbox(
       if (kind === 'select') {
         const hit = layerRef.current?.unitsAt(world) ?? [];
         return pick(
-          hit.length > 0
-            ? selectUnits(current, pickedRef.current, hit)
-            : selectHex(current, pickedRef.current, hex),
+          hit.length > 0 ? selectUnits(current, pickedRef.current, hit) : selectHexOnly(hex),
         );
       }
       order(hex);

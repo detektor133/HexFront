@@ -117,8 +117,7 @@ describe('07/T17q: нижняя привязка ArmyBar', () => {
       if (!tap) throw new Error('обработчик карты не установлен');
       const select = async (hex: number): Promise<void> => {
         const point = hexFromId(hex, loadedMap.width);
-        act(() => tap(point, 'select', { x: 100, y: 100 }));
-        act(() => tap(point, 'select', { x: 100, y: 100 }));
+        act(() => tap(point, 'select', { x: -100000, y: -100000 }));
         expect(engine.snapshot().selection?.hex).toBe(hex);
         await waitFor(() =>
           expect(document.querySelector('section[class*="card"]')).not.toBeNull(),

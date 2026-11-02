@@ -29,7 +29,7 @@ import {
   armySelection,
   NOTHING_PICKED,
   orderHex,
-  selectHex,
+  selectHexOnly,
   selectUnitsInRect,
   type Picked,
 } from './sandbox-selection.ts';
@@ -333,7 +333,7 @@ function useSandbox(
         const unitPick = tapUnit(world, current, pickedRef.current.current, unitLayer);
         if (unitPick) return pick(unitPick);
       }
-      if (kind === 'select') return pick(selectHex(current, pickedRef.current.current, hex));
+      if (kind === 'select') return pick(selectHexOnly(hex));
       order(hex);
     };
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.

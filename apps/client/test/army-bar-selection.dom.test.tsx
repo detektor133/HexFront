@@ -11,6 +11,7 @@ import { loadMap, type MapStatic, type PlayerView } from '@hexfront/sim';
 import { ArmyBar } from '../src/dev/ArmyBar.tsx';
 import { armyName } from '../src/dev/army-name.ts';
 import type * as SandboxSelection from '../src/dev/sandbox-selection.ts';
+import { CHIP_STACK_STEP } from '../src/dev/unit-groups.ts';
 import { createUnitLayer } from '../src/dev/unit-layer.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
@@ -241,7 +242,6 @@ describe('07/T17aj: выбор фишки на карте', () => {
     const layer = createUnitLayer(loaded.map.width, 10, () => ({ x: 0, y: 0 }));
     try {
       layer.setView(view, { hex: null, units: [], target: null }, 0);
-      expect(layer.unitsAt(layer.chipAt(units[0]?.hex ?? 0))).toEqual([]);
       const chipsLayer = layer.container.children[0];
       if (!(chipsLayer instanceof Container)) throw new Error('Слой фишек не найден');
       const positions = chipsLayer.children.slice(1).map((chip) => chip.position);
@@ -255,7 +255,8 @@ describe('07/T17aj: выбор фишки на карте', () => {
       expect(layer.unitsAt(ordered[1] ?? { x: 0, y: 0 })).toEqual([
         Math.max(...units.map((unit) => unit.id)),
       ]);
-      expect(layer.unitsAt({ x: 0, y: (first.y + second.y) / 2 })).toEqual([]);
+      const lowest = Math.max(first.y, second.y);
+      expect(layer.unitsAt({ x: 0, y: lowest + CHIP_STACK_STEP })).toEqual([]);
     } finally {
       layer.destroy();
     }
