@@ -608,6 +608,7 @@
 
 - [ ] **T17dbc. Геометрия окна плашек отрядов** (`apps/client/src/dev/UnitCard.tsx`, `apps/client/src/dev/HexCard.module.css`, `apps/client/tests/e2e`, `docs/art/ui.md`).
   *Приёмка:* Playwright `@layout` проверяет отсутствие переполнения окна при 360/1024/1920 px. `pnpm verify --changed` проходит.
+  *Уточнение plan:* Под «окном» понимается карточка выбранных отрядов в фикстуре `/dev/sandbox?map=small&seed=42&unitCard=groups-style` (`t17bwc-unit-card-layout.spec.ts`): при ширинах 360/1024/1920 px её границы остаются внутри viewport, а `scrollWidth <= clientWidth` и `scrollHeight <= clientHeight`.
 
   *Трассировка T17db:*
 
