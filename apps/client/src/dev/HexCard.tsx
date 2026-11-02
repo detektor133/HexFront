@@ -7,6 +7,7 @@ import {
   type Command,
   type MapStatic,
   type PlayerView,
+  IMPROVEMENT_COST,
 } from '@hexfront/sim';
 
 import styles from './HexCard.module.css';
@@ -239,6 +240,7 @@ export function HexCard(props: {
   const road = visible
     ? view.constructions.find((x) => x.hex === s.hex && x.kind === 'road')
     : undefined;
+  const improvement = visible ? (view.hexes.improvement[s.hex] ?? 0) : 0;
   const foundCityCost = view.me.foundCityCost;
   const actions = visibleActions(
     s,
@@ -246,9 +248,9 @@ export function HexCard(props: {
     view.playerId,
     job !== undefined,
     foundCityCost,
+    IMPROVEMENT_COST[Math.min(improvement, IMPROVEMENT_COST.length - 1)] ?? 0,
   );
   const upgrade = actions.find((action) => action.kind === 'upgrade');
-  const improvement = visible ? (view.hexes.improvement[s.hex] ?? 0) : 0;
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
@@ -275,7 +277,18 @@ export function HexCard(props: {
             value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
           />
           <MetricRow name="growth" value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
-          {improvement > 0 && <MetricRow name="improvement" value={String(improvement)} />}
+          {(improvement > 0 || actions.some((a) => a.kind === 'improve')) && (
+            <>
+              <MetricRow name="improvement" value={String(improvement)} />
+              {actions
+                .filter((a) => a.kind === 'improve')
+                .map((a) => (
+                  <dd key={a.kind} className={styles.levelValue}>
+                    <ActionButton a={a} send={send} blockedText={blockedText(a, s, view)} compact />
+                  </dd>
+                ))}
+            </>
+          )}
           {mine && <MetricRow name="supply" value={formatFp(c.supply)} />}
           {mine && <MetricRow name="gold" value={formatRate(c.goldPerS)} />}
         </dl>
@@ -320,14 +333,21 @@ export function HexCard(props: {
           </p>
         )}
         {actions
-          .filter((a) => a.kind !== 'upgrade' && !(hasLinkStatus && a.kind === 'rebuild'))
+          .filter(
+            (a) =>
+              a.kind !== 'upgrade' &&
+              a.kind !== 'improve' &&
+              !(hasLinkStatus && a.kind === 'rebuild'),
+          )
           .map((a) => (
             <ActionButton
               key={a.kind}
               a={a}
               send={send}
               blockedText={blockedText(a, s, view)}
-              {...(a.kind === 'foundCity' || (c && a.kind === 'rebuild') ? { compact: true } : {})}
+              {...(a.kind === 'foundCity' || a.kind === 'improve' || (c && a.kind === 'rebuild')
+                ? { compact: true }
+                : {})}
               {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
             />
           ))}

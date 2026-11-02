@@ -35,12 +35,17 @@ function foundCityAction(check: ConstructionCheck, hex: number, foundCityCost: n
   };
 }
 
-function fromCheck(kind: ActionKind, check: ConstructionCheck, cmd: Command): HexAction {
+function fromCheck(
+  kind: ActionKind,
+  check: ConstructionCheck,
+  cmd: Command,
+  blockedCost = 0,
+): HexAction {
   if (check.ok) return { kind, cost: check.cost, affordable: true, cmd };
   if (check.reason === 'notEnoughGold' && check.cost !== undefined) {
     return { kind, cost: check.cost, affordable: false, cmd };
   }
-  return { kind, cost: 0, affordable: false, cmd, blocked: check.reason };
+  return { kind, cost: blockedCost, affordable: false, cmd, blocked: check.reason };
 }
 
 function rebuildAction(plan: NonNullable<Selection['rebuild']>, target: Command): HexAction {
@@ -65,6 +70,7 @@ export function visibleActions(
   humanId: number,
   busy: boolean,
   foundCityCost = 0,
+  improveBlockedCost = 0,
 ): HexAction[] {
   if (owner !== humanId || busy) return [];
   const hex = s.hex;
@@ -78,7 +84,7 @@ export function visibleActions(
     }
   } else {
     out.push(foundCityAction(s.foundCity, hex, foundCityCost));
-    out.push(fromCheck('improve', s.improve, { t: 'improve', hex }));
+    out.push(fromCheck('improve', s.improve, { t: 'improve', hex }, improveBlockedCost));
     out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
     if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));
   }

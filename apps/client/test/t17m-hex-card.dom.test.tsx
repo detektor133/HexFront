@@ -12,6 +12,7 @@ import {
   hexFromId,
   hexId,
   inBounds,
+  IMPROVEMENT_COST,
   loadMap,
   neighbors,
   SUPPLY_REBUILD_COST_PER_HEX,
@@ -359,7 +360,10 @@ describe('T17m: карточка клетки', () => {
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
     const actionLabels = (selection: Selection): string[] =>
       visibleActions(selection, 0, 0, false)
-        .filter(({ kind }) => kind !== 'upgrade' && kind !== 'rebuild' && kind !== 'foundCity')
+        .filter(
+          ({ kind }) =>
+            kind !== 'upgrade' && kind !== 'rebuild' && kind !== 'foundCity' && kind !== 'improve',
+        )
         .map(({ kind }) => t(`action.${kind}` as MessageKey));
     const getActionLabels = (): string[] =>
       screen
@@ -575,6 +579,8 @@ describe('T17m: карточка клетки', () => {
       <HexCard s={available.selection} view={available.view} map={mapResult.map} send={send} />,
     );
     const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
+    expect(button.getAttribute('title')).toBe(buttonName);
+    expect(button.textContent).toContain(formatFp(available.selection.improve.cost));
     expect((button as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'improve', hex });
@@ -603,7 +609,14 @@ describe('T17m: карточка клетки', () => {
     const reasonId = disabledButton.getAttribute('aria-describedby');
     expect(reasonId).toBeTruthy();
     const reason = document.getElementById(reasonId ?? '');
+    const improveCost = unaffordable.selection.improve.cost;
+    if (improveCost === undefined) throw new Error('цена благоустройства не рассчитана');
+    expect(disabledButton.textContent).toContain(formatFp(improveCost));
     expect(reason?.textContent).toBe('Не хватает золота');
+    expect(reason?.className).toMatch(/reason/u);
+    expect(reason?.getAttribute('hidden')).toBeNull();
+    expect(getComputedStyle(reason as HTMLElement).display).not.toBe('none');
+    expect(getComputedStyle(reason as HTMLElement).visibility).not.toBe('hidden');
     expect(reason?.parentElement).toBe(disabledButton.parentElement);
     expect(disabledButton.compareDocumentPosition(reason as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -611,6 +624,30 @@ describe('T17m: карточка клетки', () => {
     expect(screen.queryByText(/максимальный уровень/u)).toBeNull();
     fireEvent.click(disabledButton);
     expect(send).not.toHaveBeenCalled();
+
+    cleanup();
+    engine.state.hexes.improvement[hex] = IMPROVEMENT_COST.length;
+    engine.select(hex);
+    const ruleBlocked = engine.snapshot();
+    if (!ruleBlocked.selection?.improve || ruleBlocked.selection.improve.ok) {
+      throw new Error('ожидалось благоустройство, запрещённое максимальным уровнем');
+    }
+    render(
+      <HexCard s={ruleBlocked.selection} view={ruleBlocked.view} map={mapResult.map} send={send} />,
+    );
+    const ruleBlockedButton = screen.getByRole('button', { name: buttonName });
+    expect(ruleBlockedButton.getAttribute('title')).toBe(buttonName);
+    expect((ruleBlockedButton as HTMLButtonElement).disabled).toBe(true);
+    const ruleReasonId = ruleBlockedButton.getAttribute('aria-describedby');
+    const ruleReason = document.getElementById(ruleReasonId ?? '');
+    const ruleBlockedCost = IMPROVEMENT_COST[IMPROVEMENT_COST.length - 1];
+    if (ruleBlockedCost === undefined) throw new Error('Цена максимального уровня не найдена');
+    expect(ruleBlockedButton.textContent).toContain(formatFp(ruleBlockedCost));
+    expect(ruleReason?.textContent).toBe('Максимальный уровень');
+    expect(ruleReason?.className).toMatch(/reason/u);
+    expect(ruleReason?.getAttribute('hidden')).toBeNull();
+    expect(getComputedStyle(ruleReason as HTMLElement).display).not.toBe('none');
+    expect(getComputedStyle(ruleReason as HTMLElement).visibility).not.toBe('hidden');
   });
 
   it('отправляет build fort для доступного гекса и блокирует его при нехватке золота', () => {
