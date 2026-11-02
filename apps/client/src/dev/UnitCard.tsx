@@ -176,6 +176,7 @@ export function UnitCard(props: {
                         selectableGroup.every((unit) => picked.units.includes(unit.id))
                       }
                       disabled={selectableGroup.length === 0}
+                      aria-label={army ? armyName(army) : t('army.reserve')}
                       onClick={() =>
                         props.onPick(
                           toggleUnitSelection(
@@ -192,7 +193,7 @@ export function UnitCard(props: {
                         data-army-number={army?.number}
                         style={{ backgroundColor: army ? armyColor(army.number) : undefined }}
                       />
-                      {army ? armyName(army) : t('army.reserve')}
+                      {army ? army.number : t('army.reserve')}
                     </button>
                   </h3>
                   <ul className={styles.unitList}>

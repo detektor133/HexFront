@@ -103,11 +103,11 @@ describe('07/T17baa: закрытие карточки отряда', () => {
     });
     expect(groups).toEqual([
       {
-        heading: t('army.numbered').replace('{n}', '1'),
+        heading: '1',
         rows: [formatSoldiers(fourth.soldiers), formatSoldiers(third.soldiers)],
       },
       {
-        heading: t('army.numbered').replace('{n}', '2'),
+        heading: '2',
         rows: [formatSoldiers(first.soldiers)],
       },
       {
@@ -123,8 +123,10 @@ describe('07/T17baa: закрытие карточки отряда', () => {
       expect(plate.querySelector(`[data-unit-type="${unit.type}"]`)).toBeTruthy();
     }
     for (const army of armies) {
-      const label = t('army.numbered').replace('{n}', String(army.number));
-      expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true');
+      const label = armyName(army);
+      const groupButton = screen.getByRole('button', { name: label });
+      expect(groupButton.textContent).toBe(String(army.number));
+      expect(groupButton.getAttribute('aria-pressed')).toBe('true');
     }
     expect(container.textContent).not.toContain('Выбрано отрядов');
   });
@@ -347,7 +349,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
       'true',
     );
 
-    const otherGroupLabel = t('army.numbered').replace('{n}', String(otherArmy.number));
+    const otherGroupLabel = armyName(otherArmy);
     expect(screen.getByRole('button', { name: otherGroupLabel })).toBeTruthy();
     expect(
       screen.getByRole('button', {
@@ -356,8 +358,10 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     ).toBeTruthy();
 
     const groupButton = screen.getByRole('button', {
-      name: t('army.numbered').replace('{n}', String(army.number)),
+      name: armyName(army),
     });
+    expect(groupButton.textContent).toBe(String(army.number));
+    expect(groupButton.textContent).not.toContain(armyName(army));
     fireEvent.click(groupButton);
     expect(groupButton.getAttribute('aria-pressed')).toBe('true');
     const armyGroup = groupButton.closest('section');
@@ -372,9 +376,7 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     expect(screen.getByRole('button', { name: secondRow }).getAttribute('aria-pressed')).toBe(
       'true',
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: t('army.numbered').replace('{n}', String(army.number)) }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: armyName(army) }));
     fireEvent.click(screen.getByRole('button', { name: otherGroupLabel }));
     expect(screen.queryByRole('region', { name: t('unit.groups') })).toBeNull();
     const detailed = `${t(`unit.${reserve.type}` as MessageKey)} · ${formatSoldiers(reserve.soldiers)}`;

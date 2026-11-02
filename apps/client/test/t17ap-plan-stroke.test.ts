@@ -362,7 +362,9 @@ describe('07/T17ap: непрерывный росчерк планов чере�
       expect(selectedCard).not.toBeNull();
       return selectedCard as HTMLElement;
     });
-    expect(card.textContent).toContain(armyName(army));
+    const groupButton = card.querySelector<HTMLButtonElement>('h3 button');
+    expect(groupButton?.getAttribute('aria-label')).toBe(armyName(army));
+    expect(groupButton?.textContent).toBe(String(army.number));
     expect(card.querySelectorAll('ul button')).toHaveLength(2);
     expect(armyCard.getAttribute('aria-pressed')).toBe('true');
 
