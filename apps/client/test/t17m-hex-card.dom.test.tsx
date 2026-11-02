@@ -573,11 +573,13 @@ describe('T17m: карточка клетки', () => {
     if (!available.selection || !available.selection.improve.ok) {
       throw new Error('выбранный гекс не допускает благоустройство');
     }
+    expect(available.selection.hex).toBe(hex);
     const send = vi.fn();
     const buttonName = t('action.improve' as MessageKey);
     render(
       <HexCard s={available.selection} view={available.view} map={mapResult.map} send={send} />,
     );
+    expect(screen.getByRole('region')).toBeTruthy();
     const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
     expect(button.getAttribute('title')).toBe(buttonName);
     expect(button.textContent).toContain(formatFp(available.selection.improve.cost));
@@ -626,6 +628,7 @@ describe('T17m: карточка клетки', () => {
     expect(send).not.toHaveBeenCalled();
 
     cleanup();
+    player.gold = IMPROVEMENT_COST[IMPROVEMENT_COST.length - 1] ?? (0 as Fp);
     engine.state.hexes.improvement[hex] = IMPROVEMENT_COST.length;
     engine.select(hex);
     const ruleBlocked = engine.snapshot();
@@ -648,6 +651,8 @@ describe('T17m: карточка клетки', () => {
     expect(ruleReason?.getAttribute('hidden')).toBeNull();
     expect(getComputedStyle(ruleReason as HTMLElement).display).not.toBe('none');
     expect(getComputedStyle(ruleReason as HTMLElement).visibility).not.toBe('hidden');
+    fireEvent.click(ruleBlockedButton);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('отправляет build fort для доступного гекса и блокирует его при нехватке золота', () => {
