@@ -18,6 +18,7 @@ import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
 import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
+import { MetricIcon, MetricRow } from '../ui/metric-icon.tsx';
 
 function ActionButton(props: {
   a: HexAction;
@@ -147,6 +148,7 @@ function RecruitButton(props: {
       )}
       {check.timeS !== undefined && (
         <span className={styles.time}>
+          <MetricIcon name="time" />
           {formatFp(check.timeS)} {t('card.seconds')}
         </span>
       )}
@@ -231,16 +233,14 @@ export function HexCard(props: {
         </div>
         <dl className={styles.stats}>
           <Row label={t('card.owner')} value={ownerText} />
-          <Row
-            label={t('card.pop')}
+          <MetricRow
+            name="population"
             value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
           />
-          <Row label={t('card.growth')} value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
-          {improvement > 0 && (
-            <Row label={t('card.improvementLevel')} value={String(improvement)} />
-          )}
-          {mine && <Row label={t('card.supply')} value={formatFp(c.supply)} />}
-          {mine && <Row label={t('card.gold')} value={formatRate(c.goldPerS)} />}
+          <MetricRow name="growth" value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
+          {improvement > 0 && <MetricRow name="improvement" value={String(improvement)} />}
+          {mine && <MetricRow name="supply" value={formatFp(c.supply)} />}
+          {mine && <MetricRow name="gold" value={formatRate(c.goldPerS)} />}
         </dl>
         {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
         {mine && !c.isCapital && (
@@ -252,6 +252,7 @@ export function HexCard(props: {
           <div className={styles.progress}>
             <p className={styles.progressText}>
               {t('card.building')}: {t(`build.${job.kind}` as MessageKey)} · {t('card.left')}{' '}
+              <MetricIcon name="time" />{' '}
               {Math.ceil((job.totalTicks - job.progressTicks) / TICKS_PER_S)} {t('card.seconds')}
             </p>
             <div className={styles.bar}>
@@ -279,7 +280,7 @@ export function HexCard(props: {
         {recruiting && (
           <p className={styles.progressText}>
             {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}
-            {formatSoldiers(recruiting.soldiers)} · {t('card.left')}{' '}
+            {formatSoldiers(recruiting.soldiers)} · <MetricIcon name="time" /> {t('card.left')}{' '}
             {Math.ceil((recruiting.totalTicks - recruiting.progressTicks) / TICKS_PER_S)}{' '}
             {t('card.seconds')}
           </p>

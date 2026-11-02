@@ -12,7 +12,10 @@ import { createLocalEngine } from '../src/local/engine.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 
 const hudCss = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.module.css'), 'utf8');
-const hudSource = readFileSync(join(process.cwd(), 'apps/client/src/dev/Hud.tsx'), 'utf8');
+const metricIconSource = readFileSync(
+  join(process.cwd(), 'apps/client/src/ui/metric-icon.tsx'),
+  'utf8',
+);
 const tokensJson = readFileSync(join(process.cwd(), 'docs/art/tokens.json'), 'utf8');
 
 const mapJson: unknown = JSON.parse(
@@ -91,7 +94,7 @@ describe('07/T17k: компактный HUD', () => {
       'IconClock',
       'IconTrophy',
     ]) {
-      expect(hudSource).toContain(iconName);
+      expect(metricIconSource).toContain(iconName);
     }
     expect(tokensJson).toContain('"color": "#C99A2E"');
     expect(hudCss).toContain('.goldIcon {\n  color: var(--selection-color);\n}');

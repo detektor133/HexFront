@@ -15,7 +15,7 @@ const MAP_JSON: unknown = JSON.parse(
 const LOADED_MAP = loadMap(MAP_JSON);
 if (!LOADED_MAP.ok) throw new Error(LOADED_MAP.errors.join('; '));
 const LOADED_MAP_VALUE = LOADED_MAP.map;
-const HUD_SOURCE = readFileSync('apps/client/src/dev/Hud.tsx', 'utf8');
+const HUD_SOURCE = readFileSync('apps/client/src/ui/metric-icon.tsx', 'utf8');
 
 const VIEWPORTS = [360, 768, 1440] as const;
 const LABELS = ['Люди', 'Золото', 'Налог', 'Снабжение', 'Время', 'Место'] as const;

@@ -422,6 +422,6 @@ describe('07/T17bdb: выбор из сгруппированной карточ
     fireEvent.click(screen.getByRole('button', { name: firstRow }));
     const remaining = `${t(`unit.${second.type}` as MessageKey)} · ${formatSoldiers(second.soldiers)}`;
     expect(screen.getByRole('region', { name: remaining })).toBeTruthy();
-    expect(screen.getByText(t('unit.org'))).toBeTruthy();
+    expect(screen.getByLabelText(t('unit.org'), { selector: 'svg' })).toBeTruthy();
   });
 });

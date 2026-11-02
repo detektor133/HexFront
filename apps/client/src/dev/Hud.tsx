@@ -1,11 +1,3 @@
-import {
-  IconClock,
-  IconCoin,
-  IconPackage,
-  IconPercentage,
-  IconTrophy,
-  IconUsers,
-} from '@tabler/icons-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -31,34 +23,10 @@ import {
   formatRateFull,
 } from '../i18n/format.ts';
 import { IconButton } from '../ui/icon-button.tsx';
-
-type MetricIconName = 'people' | 'gold' | 'tax' | 'supply' | 'time' | 'place';
-
-const METRIC_ICONS = {
-  people: IconUsers,
-  gold: IconCoin,
-  tax: IconPercentage,
-  supply: IconPackage,
-  time: IconClock,
-  place: IconTrophy,
-} as const;
-
-function MetricIcon(props: { name: MetricIconName; label: string }): React.JSX.Element {
-  const Icon = METRIC_ICONS[props.name];
-  return (
-    <Icon
-      size={14}
-      stroke={2}
-      title={props.label}
-      aria-label={props.label}
-      className={`${styles.metricIcon} ${props.name === 'gold' ? styles.goldIcon : ''}`}
-    />
-  );
-}
+import { MetricIcon, type MetricIconName } from '../ui/metric-icon.tsx';
 
 function Slot(props: {
   icon: MetricIconName;
-  label: string;
   value: string;
   fullValue?: string;
   rate?: string;
@@ -68,7 +36,10 @@ function Slot(props: {
 }): React.JSX.Element {
   return (
     <div className={styles.slot}>
-      <MetricIcon name={props.icon} label={props.label} />
+      <MetricIcon
+        name={props.icon}
+        className={`${styles.metricIcon} ${props.icon === 'gold' ? styles.goldIcon : ''}`}
+      />
       <span className={styles.slotText}>
         <span
           className={`${styles.value} ${props.tone ? styles[props.tone] : ''}`}
@@ -247,7 +218,6 @@ export function Hud(props: {
     <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
         icon="people"
-        label={t('hud.people')}
         value={formatCompact(s.popTotal)}
         fullValue={formatFp(s.popTotal)}
         rate={formatRate(s.popGrowthPerS)}
@@ -256,7 +226,6 @@ export function Hud(props: {
       />
       <Slot
         icon="gold"
-        label={t('hud.gold')}
         value={formatCompact(me.gold)}
         fullValue={formatFp(me.gold)}
         rate={formatRate(net)}
@@ -278,7 +247,7 @@ export function Hud(props: {
             })
           }
         >
-          <MetricIcon name="tax" label={t('hud.tax')} />
+          <MetricIcon name="tax" {...(styles.metricIcon ? { className: styles.metricIcon } : {})} />
           <span className={styles.slotText}>
             <span className={styles.value}>{formatPercent(me.taxTarget)}</span>
           </span>
@@ -313,16 +282,11 @@ export function Hud(props: {
       </div>
       <Slot
         icon="supply"
-        label={t('hud.supply')}
         value={formatPercent(s.supplyLevel)}
         {...(supplyTone ? { tone: supplyTone } : {})}
       />
-      <Slot icon="time" label={t('hud.time')} value={formatClock(view.tick, TICKS_PER_S)} />
-      <Slot
-        icon="place"
-        label={t('hud.place')}
-        value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`}
-      />
+      <Slot icon="time" value={formatClock(view.tick, TICKS_PER_S)} />
+      <Slot icon="place" value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`} />
       {view.victoryHold && (
         <span
           className={styles.victoryHold}

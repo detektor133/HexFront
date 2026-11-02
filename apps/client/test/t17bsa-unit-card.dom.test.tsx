@@ -8,7 +8,7 @@ import { FP, loadMap, MAX_UNITS_PER_HEX, type Fp } from '@hexfront/sim';
 
 import { UnitCard } from '../src/dev/UnitCard.tsx';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
-import { formatSoldiers } from '../src/i18n/format.ts';
+import { formatFp, formatPercent, formatSoldiers } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { IconButtonProps } from '../src/ui/icon-button.tsx';
 
@@ -29,6 +29,10 @@ const mapJson: unknown = JSON.parse(
 const loadedMap = loadMap(mapJson);
 if (!loadedMap.ok) throw new Error(loadedMap.errors.join('; '));
 const map = loadedMap.map;
+const unitCardSource = readFileSync(
+  join(process.cwd(), 'apps/client/src/dev/UnitCard.tsx'),
+  'utf8',
+);
 
 afterEach(cleanup);
 
@@ -42,6 +46,8 @@ function selectedCard(soldiers: number, options?: { retreat?: boolean; full?: bo
     ...template,
     id: 9701,
     soldiers: soldiers as Fp,
+    org: (777 * FP) as Fp,
+    supplyLevel: 625 as Fp,
     order: options?.retreat ? ('retreat' as const) : ('idle' as const),
   };
   const peers = options?.full
@@ -71,6 +77,27 @@ function selectedCard(soldiers: number, options?: { retreat?: boolean; full?: bo
   expect(screen.getByRole('region', { name: label })).toBeTruthy();
   return { send };
 }
+
+describe('07/T17cca: общие иконки показателей карточки отряда', () => {
+  it('использует общие иконки и сохраняет значения показателей отряда', () => {
+    selectedCard(120 * FP);
+
+    expect(unitCardSource).toContain("import { MetricRow } from '../ui/metric-icon.tsx';");
+    const supply = screen.getByLabelText(t('unit.supply'), { selector: 'svg' });
+    const organization = screen.getByLabelText(t('unit.org'), { selector: 'svg' });
+    expect(supply.getAttribute('data-metric-icon')).toBe('supply');
+    expect(organization.getAttribute('data-metric-icon')).toBe('organization');
+    expect(supply.querySelector('title')?.textContent).toBe(t('unit.supply'));
+    expect(organization.querySelector('title')?.textContent).toBe(t('unit.org'));
+    const values = Array.from(
+      document.querySelectorAll('dl[class] dd'),
+      (node) => node.textContent,
+    );
+    expect(values).toContain(formatFp(777 * FP));
+    expect(values).toContain(formatPercent(625));
+    expect(screen.getByRole('region', { name: /120/u })).toBeTruthy();
+  });
+});
 
 describe('07/T17bsa: деление пополам кнопкой карточки', () => {
   it.each([

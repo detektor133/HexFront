@@ -13,7 +13,7 @@ const mapJson: unknown = JSON.parse(
 const loaded = loadMap(mapJson);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 const loadedMap = loaded.map;
-const hudSource = readFileSync('apps/client/src/dev/Hud.tsx', 'utf8');
+const hudSource = readFileSync('apps/client/src/ui/metric-icon.tsx', 'utf8');
 
 function mockRuntime(): void {
   const engine = createLocalEngine(mapJson, 42, 2);

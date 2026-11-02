@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -22,12 +23,31 @@ import { HexCard } from '../src/dev/HexCard.tsx';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
 import { visibleActions } from '../src/dev/hex-actions.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
+import { formatFp, formatRate } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { LocalMatch } from '../src/local/local-match.ts';
 import type { FromWorker, Selection } from '../src/local/messages.ts';
 import { computeMatchLayout, validateMatchLayout } from '../src/match/layout.ts';
 import type { Point } from '../src/render/hex-geometry.ts';
 import type { MapView, MapViewOptions, MapViewState, TapKind } from '../src/render/map-view.ts';
+import type * as MetricIconModule from '../src/ui/metric-icon.tsx';
+
+vi.mock('../src/ui/metric-icon.tsx', async (importOriginal) => {
+  const actual = await importOriginal<typeof MetricIconModule>();
+  return {
+    ...actual,
+    MetricIcon: (props: ComponentProps<typeof actual.MetricIcon>) => (
+      <span data-testid={`shared-metric-icon-${props.name}`}>
+        <actual.MetricIcon {...props} />
+      </span>
+    ),
+    MetricRow: (props: ComponentProps<typeof actual.MetricRow>) => (
+      <span data-testid={`shared-metric-row-${props.name}`}>
+        <actual.MetricRow {...props} />
+      </span>
+    ),
+  };
+});
 
 const mapJson: unknown = JSON.parse(
   readFileSync(join(process.cwd(), 'packages/mapgen/maps/tiny.json'), 'utf8'),
@@ -173,7 +193,7 @@ describe('T17m: карточка клетки', () => {
 
       await select(firstHex);
       expect(measuredHeights).toContain(248);
-      expect(getCard().textContent).toMatch(/Население/u);
+      expect(screen.getByLabelText('Население', { selector: 'svg' })).toBeTruthy();
       expect(getCard().textContent).toContain('нейтральный');
       const firstTitle = getCard().getAttribute('aria-label');
       const firstContent = getCard().textContent;
@@ -215,13 +235,34 @@ describe('T17m: карточка клетки', () => {
 
     expect(screen.getByText(/Столица/u)).toBeTruthy();
     expect(screen.getByText('вы')).toBeTruthy();
-    expect(screen.getByText('Население')).toBeTruthy();
-    expect(screen.getByText('Рост')).toBeTruthy();
-    expect(screen.getByText('Снабжение')).toBeTruthy();
-    expect(screen.getByText('Золото')).toBeTruthy();
-
+    for (const [name, label] of [
+      ['population', 'Население'],
+      ['growth', 'Рост'],
+      ['supply', 'Снабжение'],
+      ['gold', 'Золото'],
+    ] as const) {
+      const sharedIcon = screen.getByTestId(`shared-metric-row-${name}`);
+      const icon = within(sharedIcon).getByLabelText(label, { selector: 'svg' });
+      expect(icon.getAttribute('data-metric-icon')).toBe(name);
+      expect(icon.querySelector('title')?.textContent).toBe(label);
+    }
     const city = message.selection.city;
     if (!city) throw new Error('город для подготовленных данных не найден');
+    expect(message.view.hexes.pop[city.hex]).toBeGreaterThan(0);
+    expect(message.view.hexes.growth[city.hex]).toBeGreaterThan(0);
+    expect(city.supply).toBeGreaterThan(0);
+    expect(city.goldPerS).not.toBe(0);
+    const metricValues = Array.from(
+      document.querySelectorAll('dl[class] dd'),
+      (node) => node.textContent,
+    );
+    expect(metricValues).toContain(
+      `${formatFp(message.view.hexes.pop[city.hex] ?? 0)} / ${formatFp(message.selection.popCap)}`,
+    );
+    expect(metricValues).toContain(formatRate(message.view.hexes.growth[city.hex] ?? 0));
+    expect(metricValues).toContain(formatFp(city.supply));
+    expect(metricValues).toContain(formatRate(city.goldPerS));
+
     const improvements = message.view.hexes.improvement.slice();
     improvements[city.hex] = 2;
     const preparedView = {
@@ -285,10 +326,20 @@ describe('T17m: карточка клетки', () => {
         send={() => undefined}
       />,
     );
-    expect(screen.getByText(/Благоустройство, ур\./u)).toBeTruthy();
+    const improvementIcon = screen.getByLabelText('Благоустройство', { selector: 'svg' });
+    expect(improvementIcon.getAttribute('data-metric-icon')).toBe('improvement');
+    expect(screen.getByText('2')).toBeTruthy();
     expect(screen.getByText(/Строится/u)).toBeTruthy();
     expect(screen.getByText(/Прокладка дороги/u)).toBeTruthy();
     expect(screen.getByText(/Набор/u)).toBeTruthy();
+    const buildingLine = screen.getByText(/Строится/u).closest('p');
+    if (!buildingLine) throw new Error('строка активной стройки не найдена');
+    expect(
+      within(buildingLine)
+        .getByLabelText('Время', { selector: 'svg' })
+        .getAttribute('data-metric-icon'),
+    ).toBe('time');
+    expect(screen.getAllByLabelText('Время', { selector: 'svg' })).toHaveLength(2);
 
     // Без активной стройки на гексе (не busy) видны и свои кнопки города.
     cleanup();
@@ -747,7 +798,7 @@ describe('T17m: карточка клетки', () => {
       />,
     );
     expect(screen.queryByRole('group', { name: 'В армию' })).toBeNull();
-    expect(screen.getByText('Организованность')).toBeTruthy();
+    expect(screen.getByLabelText('Организованность', { selector: 'svg' })).toBeTruthy();
     expect(document.querySelector('dl')).not.toBeNull();
     expect(screen.getByRole('status', { name: t('unit.artilleryNoTarget') })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Слить' })).toBeNull();

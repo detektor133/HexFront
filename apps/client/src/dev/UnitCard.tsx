@@ -20,6 +20,7 @@ import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { IconButton } from '../ui/icon-button.tsx';
+import { MetricRow } from '../ui/metric-icon.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
@@ -35,9 +36,9 @@ function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
   const army = view.armies.find((a) => a.id === u.armyId);
   return (
     <dl className={styles.stats}>
-      <Row label={t('unit.org')} value={formatFp(u.org)} />
-      <Row
-        label={t('unit.supply')}
+      <MetricRow name="organization" value={formatFp(u.org)} />
+      <MetricRow
+        name="supply"
         value={u.encircled ? t('unit.encircled') : formatPercent(u.supplyLevel ?? (FP as Fp))}
       />
       <Row label={t('unit.order')} value={t(`order.${u.order}` as MessageKey)} />
