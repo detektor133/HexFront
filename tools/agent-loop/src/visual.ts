@@ -53,6 +53,13 @@ async function missingVisualTest(
  * таблица трассировки: в них названы проверки соседних подзадач (например, `@layout` у T17ccb),
  * и требовать их от этой задачи нельзя.
  */
+/** Требует ли сама задача сценарий `@layout`: он назван в строке её приёмки, а не просто упомянут. */
+export function requiresLayout(criterion: string): boolean {
+  return criterion
+    .split('\n')
+    .some((line) => /(?:^|[^а-яё])Приёмка/iu.test(line) && line.includes('@layout'));
+}
+
 export function ownCriterion(block: string): string {
   return block
     .split('\n')
@@ -205,7 +212,7 @@ async function applyVisualFindings(
   const relevant = grounded.filter(
     (finding) =>
       (scope.layoutSpecs.length > 0 ||
-        scope.criterion.includes('@layout') ||
+        requiresLayout(scope.criterion) ||
         finding.kind !== 'ТЕСТ') &&
       [...scope.changedUi, ...scope.layoutSpecs].some((path) => finding.text.includes(path)),
   );
@@ -239,15 +246,15 @@ export async function runVisualGate(
 ): Promise<Step | undefined> {
   const scope = await visualScope(context, task, base);
   if (scope.changedUi.length === 0) return undefined;
-  if (scope.criterion.includes('@layout') && scope.layoutSpecs.length === 0) {
+  if (requiresLayout(scope.criterion) && scope.layoutSpecs.length === 0) {
     const active = context.state.activeTask;
-    // Один запрос на задачу: исполнитель уже ответил, что сценария нет и почему, повторять незачем.
-    if (active?.visualTestAsked === true) {
-      await context.say(
-        `визуальный гейт ${task}: @layout-сценария по-прежнему нет, гейт пропущен после ответа исполнителя`,
+    // Один запрос на задачу: если сценария всё ещё нет, решает владелец, а не молчаливый пропуск.
+    if (active?.visualTestAsked === true)
+      return park(
+        context,
+        `visual-layout:${task}`,
+        `${task}: критерий требует @layout, исполнитель ответил, что сценария нет; нужно решение владельца (поправить критерий или добавить сценарий)`,
       );
-      return undefined;
-    }
     if (active !== undefined) active.visualTestAsked = true;
     return missingVisualTest(
       context,

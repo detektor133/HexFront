@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fixtureStage, runWorld, type Session } from './test-world.ts';
+import { ownCriterion, requiresLayout } from './visual.ts';
 
 const codeCommit = (path: string, answer = 'Код готов.'): Session => ({
   answer,
@@ -130,7 +131,7 @@ describe('визуальный гейт перед push', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
-  it('просит недостающий @layout у исполнителя один раз, а не по кругу', async () => {
+  it('просит недостающий @layout один раз, затем останавливается для решения владельца', async () => {
     const run = await runWorld({
       stage: fixtureStage.replace('*Приёмка:* тесты.', '*Приёмка:* Playwright @layout.'),
       sessions: [
@@ -144,8 +145,8 @@ describe('визуальный гейт перед push', () => {
     });
 
     expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(2);
-    expect(run.lines.join('\n')).toContain('гейт пропущен после ответа исполнителя');
-    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+    expect(run.lines.join('\n')).toContain('нужно решение владельца');
+    expect(run.lines).not.toContain('готово: 06/T1j5-Б1');
   });
 
   it('дефект, найденный только на снимке, уходит обычным пунктом КОД исполнителю', async () => {
@@ -251,5 +252,27 @@ describe('визуальный гейт перед push', () => {
     });
     expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
     expect(run.lines.some((line) => line.includes('неподтверждённых'))).toBe(true);
+  });
+});
+
+describe('критерий визуального гейта', () => {
+  const split = [
+    '- [ ] **T1a. Иконки**',
+    '  Описание: `@layout` упомянут в описании.',
+    '  *Приёмка:* DOM-тест.',
+    '  Исходный составной критерий: «DOM-тест; Playwright `@layout` проверяет геометрию.»',
+    '  | Приёмка: Playwright `@layout` проверяет геометрию. | T1b |',
+  ].join('\n');
+
+  it('цитата родителя и трассировка не считаются собственным требованием @layout', () => {
+    expect(requiresLayout(ownCriterion(split))).toBe(false);
+  });
+
+  it('@layout в строке приёмки самой задачи — требование', () => {
+    expect(
+      requiresLayout(
+        '- [ ] **T1b. Геометрия**\n  *Приёмка:* Playwright `@layout` проверяет ширину.',
+      ),
+    ).toBe(true);
   });
 });
