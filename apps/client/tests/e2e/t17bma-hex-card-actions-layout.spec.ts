@@ -1,7 +1,50 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 const WIDTHS = [360, 1024, 1920] as const;
+const IMPROVEMENT_WIDTHS = [1024, 1920] as const;
 const ENABLED_ACTION = 'button[class*="button"][class*="accent"]:enabled';
+
+for (const width of IMPROVEMENT_WIDTHS) {
+  test(`@layout 07/T17cebc: кнопка благоустройства в карточке обычной клетки без переполнения при ${width} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/dev/sandbox?map=small&seed=42&select=724');
+
+    const card = page.locator('section[aria-label]').filter({
+      has: page.getByRole('button', { name: /close hex card|закрыть карточку клетки/i }),
+    });
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute(
+      'aria-label',
+      /^(Вода|Равнина|Лес|Холмы|Горы|Пустыня, степь|Water|Plains|Forest|Hills|Mountains|Desert, steppe)$/,
+    );
+
+    const improvement = card.getByRole('button', {
+      name: /improve|благоустроить/i,
+    });
+    await expect(improvement).toBeVisible();
+    await expect(improvement).toBeEnabled();
+
+    const cardBox = await card.boundingBox();
+    const buttonBox = await improvement.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(buttonBox).not.toBeNull();
+    if (!cardBox || !buttonBox) throw new Error('карточка или кнопка не имеет геометрии');
+    expect(buttonBox.x).toBeGreaterThanOrEqual(cardBox.x);
+    expect(buttonBox.y).toBeGreaterThanOrEqual(cardBox.y);
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+    expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+    await expect(card).toHaveJSProperty(
+      'scrollWidth',
+      await card.evaluate((node) => node.clientWidth),
+    );
+    await expect(card).toHaveJSProperty(
+      'scrollHeight',
+      await card.evaluate((node) => node.clientHeight),
+    );
+  });
+}
 
 for (const width of WIDTHS) {
   test(`@layout 07/T17bma: доступные действия HexCard светлые при ${width} px`, async ({
