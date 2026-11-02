@@ -267,14 +267,15 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   // Плашка прогноза — поверх фишек.
   const plates = new Container();
   const territoryLabels = new Container();
+  // Слои карты (art/style-guide.md): армии (10) ниже подписей городов и государств (12).
   top.addChild(
     borders,
     fog,
     planLayer.container,
     marks,
+    unitLayer.container,
     labels,
     territoryLabels,
-    unitLayer.container,
     plates,
   );
   let view: PlayerView | null = null;
