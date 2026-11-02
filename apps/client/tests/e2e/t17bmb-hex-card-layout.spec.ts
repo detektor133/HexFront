@@ -62,12 +62,12 @@ for (const width of WIDTHS) {
       buttons.map((button) => {
         const price = button.querySelector('span:has(svg)');
         const label = button.querySelector(':scope > span:not(:has(svg))');
-        if (!price || !label) return null;
+        if (!price) return null;
         const box = (element: Element) => {
           const rect = element.getBoundingClientRect();
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         };
-        return { button: box(button), price: box(price), label: box(label) };
+        return { button: box(button), price: box(price), label: label ? box(label) : null };
       }),
     );
     expect(pricedRows.length).toBeGreaterThan(0);
@@ -76,9 +76,11 @@ for (const width of WIDTHS) {
         throw new Error('Цена, подпись или кнопка не имеет границ');
       }
       expect(row.price.width).toBeGreaterThan(0);
-      expect(row.label.width).toBeGreaterThan(0);
       expect(isInside(row.price, row.button)).toBe(true);
-      expect(intersects(row.price, row.label)).toBe(false);
+      if (row.label) {
+        expect(row.label.width).toBeGreaterThan(0);
+        expect(intersects(row.price, row.label)).toBe(false);
+      }
     }
 
     const recruitRows = await sliders.evaluateAll((inputs) =>

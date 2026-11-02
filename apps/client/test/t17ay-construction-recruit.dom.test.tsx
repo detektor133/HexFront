@@ -15,7 +15,7 @@ import {
 } from '@hexfront/sim';
 
 import { HexCard } from '../src/dev/HexCard.tsx';
-import { t } from '../src/i18n/dict.ts';
+import { reasonText, t } from '../src/i18n/dict.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 import type { Selection, ViewPayload } from '../src/local/messages.ts';
 
@@ -225,26 +225,31 @@ describe('07/T17ay: состояния строительства и найма'
     expect(prepared.city?.id).toBe(city.id);
     expect(prepared.hex).toBe(city.hex);
     const send = renderCard(prepared, fixtures.view);
-    const button = screen.getByRole('button', { name: /Улучшить город/u });
+    const button = screen.getByRole('button', { name: /upgrade city|Улучшить город/iu });
     expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(button.getAttribute('title')).toBe(t('action.upgrade'));
+    expect(button.textContent).toBe('1');
+    expect(button.parentElement?.parentElement?.textContent).toContain(String(city.level));
     fireEvent.click(button);
     expect(send).toHaveBeenCalledExactlyOnceWith({ t: 'upgradeCity', cityId: city.id });
 
     for (const [upgrade, reason] of [
-      [unaffordable, 'Не хватает золота'],
-      [{ ok: false, reason: 'maxLevel' } as ConstructionCheck, 'Максимальный уровень'],
+      [unaffordable, 'notEnoughGold'],
+      [{ ok: false, reason: 'maxLevel' } as ConstructionCheck, 'maxLevel'],
     ] as const) {
       cleanup();
       const blockedSend = renderCard(
         { ...fixtures.city, city: { ...city, upgrade } },
         fixtures.view,
       );
-      const blockedButton = screen.getByRole('button', { name: /Улучшить город/u });
+      const blockedButton = screen.getByRole('button', { name: /upgrade city|Улучшить город/iu });
       expect((blockedButton as HTMLButtonElement).disabled).toBe(true);
+      expect(blockedButton.textContent).not.toMatch(/upgrade city|улучшить город/iu);
+      if (reason === 'notEnoughGold') expect(blockedButton.textContent).toBe('1');
       const reasonId = blockedButton.getAttribute('aria-describedby');
       expect(reasonId).toBeTruthy();
       const reasonElement = document.getElementById(reasonId ?? '');
-      expect(reasonElement?.textContent).toBe(reason);
+      expect(reasonElement?.textContent).toBe(reasonText(reason));
       expect(reasonElement?.parentElement).toBe(blockedButton.parentElement);
       expect(blockedButton.compareDocumentPosition(reasonElement as Node)).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -274,7 +279,7 @@ describe('07/T17ay: состояния строительства и найма'
                 : { ok: false, reason: 'maxLevel' },
         },
       }),
-      /Улучшить город/u,
+      /upgrade city|Улучшить город/iu,
     );
   });
 

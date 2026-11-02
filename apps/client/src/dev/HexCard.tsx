@@ -1,4 +1,4 @@
-import { IconX } from '@tabler/icons-react';
+import { IconArrowUp, IconX } from '@tabler/icons-react';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -24,6 +24,7 @@ function ActionButton(props: {
   a: HexAction;
   send: (cmd: Command) => void;
   blockedText: string | null;
+  compact?: boolean;
   onRoadPreview?: (path: readonly number[] | null) => void;
 }): React.JSX.Element | null {
   const { a } = props;
@@ -32,32 +33,38 @@ function ActionButton(props: {
   const hint =
     a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
   const preview = a.kind === 'rebuild' ? a.previewPath : undefined;
+  const label = t(`action.${a.kind}` as MessageKey);
+  const compact = props.compact === true;
   const clearPreview = (): void => props.onRoadPreview?.(null);
   if (a.blocked) {
     return (
-      <div className={styles.action}>
+      <div className={`${styles.action}${compact ? ` ${styles.levelAction}` : ''}`}>
         <button
           type="button"
           className={`${styles.button} ${styles.muted}`}
           disabled
+          aria-label={compact ? label : undefined}
           aria-describedby={reasonId}
+          title={compact ? label : undefined}
         >
-          <span>{t(`action.${a.kind}` as MessageKey)}</span>
+          {compact ? <IconArrowUp size={14} aria-hidden="true" /> : <span>{label}</span>}
+          {compact && a.cost > 0 && <Price value={formatFp(a.cost)} ok={false} />}
         </button>
-        <span id={reasonId} className={styles.hint}>
+        <span id={reasonId} className={compact ? styles.reason : styles.hint}>
           {props.blockedText ?? reasonText(a.blocked)}
         </span>
       </div>
     );
   }
   return (
-    <div className={styles.action}>
+    <div className={`${styles.action}${compact ? ` ${styles.levelAction}` : ''}`}>
       <button
         type="button"
         className={`${styles.button}${a.affordable ? ` ${styles.accent}` : ''}`}
         disabled={!a.affordable}
+        aria-label={compact ? label : undefined}
         {...(!a.affordable ? { 'aria-describedby': reasonId } : {})}
-        title={hint ?? undefined}
+        title={compact ? label : (hint ?? undefined)}
         onMouseEnter={() => preview && props.onRoadPreview?.(preview)}
         onMouseLeave={clearPreview}
         onFocus={() => preview && props.onRoadPreview?.(preview)}
@@ -67,8 +74,12 @@ function ActionButton(props: {
           clearPreview();
         }}
       >
-        <span>{t(`action.${a.kind}` as MessageKey)}</span>
-        <Price value={formatFp(a.cost)} ok={a.affordable} />
+        {compact ? <IconArrowUp size={14} aria-hidden="true" /> : <span>{label}</span>}
+        {compact ? (
+          a.cost > 0 && <Price value={formatFp(a.cost)} ok={a.affordable} />
+        ) : (
+          <Price value={formatFp(a.cost)} ok={a.affordable} />
+        )}
       </button>
       {!a.affordable && (
         <span id={reasonId} className={styles.reason}>
@@ -220,6 +231,7 @@ export function HexCard(props: {
     ? view.constructions.find((x) => x.hex === s.hex && x.kind === 'road')
     : undefined;
   const actions = visibleActions(s, visible ? owner : -1, view.playerId, job !== undefined);
+  const upgrade = actions.find((action) => action.kind === 'upgrade');
   const improvement = visible ? (view.hexes.improvement[s.hex] ?? 0) : 0;
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
@@ -233,6 +245,15 @@ export function HexCard(props: {
         </div>
         <dl className={styles.stats}>
           <Row label={t('card.owner')} value={ownerText} />
+          {c && (
+            <>
+              <dt>{t('card.level')}</dt>
+              <dd className={styles.levelValue}>
+                <span>{c.level}</span>
+                {upgrade && <ActionButton a={upgrade} send={send} blockedText={null} compact />}
+              </dd>
+            </>
+          )}
           <MetricRow
             name="population"
             value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
@@ -268,15 +289,17 @@ export function HexCard(props: {
             {t('dev.economy.roadJob')} · {c.roadJob.built} {t('dev.economy.of')} {c.roadJob.total}
           </p>
         )}
-        {actions.map((a) => (
-          <ActionButton
-            key={a.kind}
-            a={a}
-            send={send}
-            blockedText={blockedText(a, s, view)}
-            {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
-          />
-        ))}
+        {actions
+          .filter((a) => a.kind !== 'upgrade')
+          .map((a) => (
+            <ActionButton
+              key={a.kind}
+              a={a}
+              send={send}
+              blockedText={blockedText(a, s, view)}
+              {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
+            />
+          ))}
         {recruiting && (
           <p className={styles.progressText}>
             {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}

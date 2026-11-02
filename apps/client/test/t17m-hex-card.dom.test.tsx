@@ -354,7 +354,9 @@ describe('T17m: карточка клетки', () => {
     expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
     const actionLabels = (selection: Selection): string[] =>
-      visibleActions(selection, 0, 0, false).map(({ kind }) => t(`action.${kind}` as MessageKey));
+      visibleActions(selection, 0, 0, false)
+        .filter(({ kind }) => kind !== 'upgrade')
+        .map(({ kind }) => t(`action.${kind}` as MessageKey));
     const getActionLabels = (): string[] =>
       screen
         .getAllByRole('button')

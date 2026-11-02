@@ -18,6 +18,22 @@ for (const width of WIDTHS) {
     const upgrade = card.getByRole('button', { name: /upgrade city|улучшить город/i });
     await expect(upgrade).toBeVisible();
     await expect(upgrade).toBeEnabled();
+    await expect(upgrade).toHaveAttribute('title', /upgrade city|улучшить город/i);
+    const level = upgrade.locator('xpath=../..');
+    await expect(level).toBeVisible();
+    await expect(level.locator('span').first()).toHaveText(/\d+/u);
+    const levelBox = await level.boundingBox();
+    const upgradeBox = await upgrade.boundingBox();
+    const valueBox = await level.locator('span').first().boundingBox();
+    expect(levelBox).not.toBeNull();
+    expect(upgradeBox).not.toBeNull();
+    expect(valueBox).not.toBeNull();
+    if (!levelBox || !upgradeBox || !valueBox)
+      throw new Error('Уровень или кнопка не имеют границ');
+    expect(upgradeBox.x).toBeGreaterThanOrEqual(levelBox.x);
+    expect(upgradeBox.y + upgradeBox.height).toBeLessThanOrEqual(levelBox.y + levelBox.height);
+    expect(upgradeBox.x + upgradeBox.width).toBeLessThanOrEqual(levelBox.x + levelBox.width);
+    expect(upgradeBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width);
 
     // Песочница не задаёт правило недоступности upgrade, поэтому измеряется управляемый CSS-срез.
     const reasonId = await upgrade.evaluate((button) => {

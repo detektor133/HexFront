@@ -27,10 +27,7 @@ for (const width of WIDTHS) {
       has: page.getByRole('button', { name: /close hex card|закрыть карточку клетки/i }),
     });
     await expect(cityCard).toBeVisible();
-    const upgrade = cityCard
-      .locator(ENABLED_ACTION)
-      .filter({ hasText: /upgrade|улучш/i })
-      .first();
+    const upgrade = cityCard.getByRole('button', { name: /upgrade city|улучшить город/i });
     await expect(upgrade).toBeVisible();
     await expect(upgrade).toBeEnabled();
     await expectLightAction(upgrade);
