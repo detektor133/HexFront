@@ -469,5 +469,6 @@
 2026-11-02 · 07/T17dba · Приёмка заголовка группы отнесена к T17dbb согласно таблице трассировки; T17dba проверяет только плашку отряда · `docs/stages/stage-07-playable-build.md` · Этап: 07/infra
 
 2026-11-02 · 07/T17dbb · Уточнена приёмка заголовка группы: проверка содержимого плашки отряда отнесена к T17dba согласно трассировке T17db · `docs/stages/stage-07-playable-build.md` · Этап: 07/infra
+2026-11-02 · 07/T17cd · Разделены независимые действия улучшения города (`upgradeCity`) и восстановления связи (`rebuildSupply`) на последовательные подзадачи T17cda/T17cdb; исходный блок сохранён, критерии трассированы, очередь заменяет родителя подзадачами · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md` · Этап: 07/infra
 2026-11-02 · 07/T17dbc · Геометрия окна уточнена по существующей фикстуре `/dev/sandbox?map=small&seed=42&unitCard=groups-style`: границы карточки внутри viewport, `scrollWidth <= clientWidth`, `scrollHeight <= clientHeight` при 360/1024/1920 px · `docs/stages/stage-07-playable-build.md`, `apps/client/tests/e2e/t17bwc-unit-card-layout.spec.ts` · Этап: 07/infra
 2026-11-02 · 07/T17cc · Разделены независимые механизмы общих иконок показателей и геометрии строк карточек; сохранены исходные критерии и зависимость проверки геометрии от реализации иконок · `docs/stages/stage-07-playable-build.md`, `docs/STATUS.md` · Этап: 07/infra
