@@ -110,6 +110,44 @@ describe('визуальный гейт перед push', () => {
     expect(run.lines).toContain('готово: 06/T1j5-Б1');
   });
 
+  it('цитата исходного критерия и трассировка разбитой задачи не требуют @layout от неё', async () => {
+    const stage = fixtureStage.replace(
+      '*Приёмка:* тесты.',
+      [
+        '*Приёмка:* DOM-тест.',
+        '  Исходный составной критерий: «DOM-тест; Playwright `@layout` проверяет геометрию.» Геометрию выполняет T2x.',
+        '  | Приёмка: Playwright `@layout` проверяет геометрию. | 06/T2x |',
+      ].join('\n'),
+    );
+    const run = await runWorld({
+      stage,
+      sessions: [codeCommit('apps/client/src/dev/Hud.module.css'), review('OK'), review('OK')],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(1);
+    expect(run.lines.join('\n')).not.toContain('сценарий не добавлен');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
+  it('просит недостающий @layout у исполнителя один раз, а не по кругу', async () => {
+    const run = await runWorld({
+      stage: fixtureStage.replace('*Приёмка:* тесты.', '*Приёмка:* Playwright @layout.'),
+      sessions: [
+        codeCommit('apps/client/src/dev/Hud.module.css'),
+        review('OK'),
+        { answer: 'Сценарий @layout принадлежит соседней задаче.', push: false },
+        review('OK'),
+        review('OK'),
+      ],
+      ci: ['success https://ci/task', 'success https://ci/docs'],
+    });
+
+    expect(run.prompts.filter((prompt) => prompt.startsWith('$task'))).toHaveLength(2);
+    expect(run.lines.join('\n')).toContain('гейт пропущен после ответа исполнителя');
+    expect(run.lines).toContain('готово: 06/T1j5-Б1');
+  });
+
   it('дефект, найденный только на снимке, уходит обычным пунктом КОД исполнителю', async () => {
     const run = await runWorld({
       sessions: [

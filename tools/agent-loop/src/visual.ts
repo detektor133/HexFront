@@ -48,6 +48,19 @@ async function missingVisualTest(
   return 'worked';
 }
 
+/**
+ * Критерий самой задачи. У разбитых задач в блоке остаются цитата исходного составного критерия и
+ * таблица трассировки: в них названы проверки соседних подзадач (например, `@layout` у T17ccb),
+ * и требовать их от этой задачи нельзя.
+ */
+export function ownCriterion(block: string): string {
+  return block
+    .split('\n')
+    .filter((line) => !/^\s*(?:Исходный составной критерий|\*Трассировка)/u.test(line))
+    .filter((line) => !line.trimStart().startsWith('|'))
+    .join('\n');
+}
+
 interface VisualScope {
   readonly changedUi: string[];
   readonly layoutSpecs: string[];
@@ -77,7 +90,7 @@ async function visualScope(context: LoopContext, task: string, base: string): Pr
   return {
     changedUi: paths.filter((path) => UI_GLOBS.some((glob) => glob.test(path))),
     layoutSpecs: tagged.filter((path): path is string => path !== null),
-    criterion: taskBlock(stage.stageText, task),
+    criterion: ownCriterion(taskBlock(stage.stageText, task)),
   };
 }
 
@@ -226,12 +239,22 @@ export async function runVisualGate(
 ): Promise<Step | undefined> {
   const scope = await visualScope(context, task, base);
   if (scope.changedUi.length === 0) return undefined;
-  if (scope.criterion.includes('@layout') && scope.layoutSpecs.length === 0)
+  if (scope.criterion.includes('@layout') && scope.layoutSpecs.length === 0) {
+    const active = context.state.activeTask;
+    // Один запрос на задачу: исполнитель уже ответил, что сценария нет и почему, повторять незачем.
+    if (active?.visualTestAsked === true) {
+      await context.say(
+        `визуальный гейт ${task}: @layout-сценария по-прежнему нет, гейт пропущен после ответа исполнителя`,
+      );
+      return undefined;
+    }
+    if (active !== undefined) active.visualTestAsked = true;
     return missingVisualTest(
       context,
       task,
       'в задаче требуется @layout, но её сценарий не добавлен',
     );
+  }
   const shots = await captureVisualShots(context, task, scope.layoutSpecs);
   if (typeof shots === 'string') return shots;
   const beforeHead = await head(context.git);
