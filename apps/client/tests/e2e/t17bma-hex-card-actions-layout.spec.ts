@@ -57,10 +57,7 @@ for (const width of WIDTHS) {
       has: page.getByRole('button', { name: /close hex card|закрыть карточку клетки/i }),
     });
     await expect(constructionCard).toBeVisible();
-    const construction = constructionCard
-      .locator(ENABLED_ACTION)
-      .filter({ hasText: /found|depot|fort|склад|укреп|основать/i })
-      .first();
+    const construction = constructionCard.getByRole('button', { name: /fort|укреп/i });
     await expect(construction).toBeVisible();
     await expect(construction).toBeEnabled();
     await expectLightAction(construction);

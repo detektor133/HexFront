@@ -24,7 +24,7 @@ import {
 
 import { HexCard } from '../src/dev/HexCard.tsx';
 import { UnitCard } from '../src/dev/UnitCard.tsx';
-import { visibleActions } from '../src/dev/hex-actions.ts';
+import { visibleActions, type ActionKind } from '../src/dev/hex-actions.ts';
 import { t, type MessageKey } from '../src/i18n/dict.ts';
 import { formatFp, formatRate } from '../src/i18n/format.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
@@ -358,19 +358,23 @@ describe('T17m: карточка клетки', () => {
     );
     expect(screen.getByRole('button', { name: /Улучшить город/u })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Проложить дорогу/u })).toBeTruthy();
+    const allActionLabels = (
+      ['upgrade', 'rebuild', 'foundCity', 'improve', 'fort', 'depot'] satisfies ActionKind[]
+    ).map((kind) => t(`action.${kind}` as MessageKey));
     const actionLabels = (selection: Selection): string[] =>
-      visibleActions(selection, 0, 0, false)
-        .filter(
-          ({ kind }) =>
-            kind !== 'upgrade' && kind !== 'rebuild' && kind !== 'foundCity' && kind !== 'improve',
-        )
-        .map(({ kind }) => t(`action.${kind}` as MessageKey));
-    const getActionLabels = (): string[] =>
-      screen
+      visibleActions(selection, 0, 0, false).map(({ kind }) => t(`action.${kind}` as MessageKey));
+    const getActionLabels = (): string[] => {
+      return screen
         .getAllByRole('button')
-        .filter((button) => button.getAttribute('aria-label') === null)
-        .map((button) => button.firstElementChild?.textContent?.trim() ?? '');
-    expect(getActionLabels()).toEqual(actionLabels(preparedSelection));
+        .map(
+          (button) =>
+            button.getAttribute('aria-label') ??
+            button.firstElementChild?.textContent?.trim() ??
+            '',
+        )
+        .filter((label) => allActionLabels.includes(label));
+    };
+    expect(getActionLabels().sort()).toEqual(actionLabels(preparedSelection).sort());
 
     const prepared = {
       ...message.selection,
@@ -382,7 +386,7 @@ describe('T17m: карточка клетки', () => {
     };
     cleanup();
     render(<HexCard s={prepared} view={message.view} map={mapResult.map} send={() => undefined} />);
-    expect(getActionLabels()).toEqual(actionLabels(prepared));
+    expect(getActionLabels().sort()).toEqual(actionLabels(prepared).sort());
     expect(screen.getByRole('button', { name: t('action.foundCity') })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Улучшить город/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Проложить дорогу/u })).toBeNull();
@@ -676,6 +680,12 @@ describe('T17m: карточка клетки', () => {
     );
     const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
     expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(button.getAttribute('title')).toBe(buttonName);
+    expect(button.querySelector('svg')).not.toBeNull();
+    expect(button.textContent).toBe(formatFp(available.selection.fort.cost));
+    expect(
+      screen.getByLabelText('Укрепление', { selector: 'svg' }).getAttribute('data-metric-icon'),
+    ).toBe('fort');
     fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'build', hex, kind: 'fort' });
 
@@ -689,6 +699,8 @@ describe('T17m: карточка клетки', () => {
       throw new Error('ожидалось укрепление, доступное по правилам, но не по золоту');
     }
     expect(unaffordable.selection.fort.reason).toBe('notEnoughGold');
+    const unaffordableFortCost = unaffordable.selection.fort.cost;
+    if (unaffordableFortCost === undefined) throw new Error('цена укрепления не передана');
     send.mockClear();
     render(
       <HexCard
@@ -700,10 +712,15 @@ describe('T17m: карточка клетки', () => {
     );
     const disabledButton = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
     expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
+    expect(disabledButton.getAttribute('title')).toBe(buttonName);
+    expect(disabledButton.textContent).toBe(formatFp(unaffordableFortCost));
     const reasonId = disabledButton.getAttribute('aria-describedby');
     expect(reasonId).toBeTruthy();
     const reason = document.getElementById(reasonId ?? '');
     expect(reason?.textContent).toBe('Не хватает золота');
+    expect(reason?.getAttribute('hidden')).toBeNull();
+    expect(getComputedStyle(reason as HTMLElement).display).not.toBe('none');
+    expect(getComputedStyle(reason as HTMLElement).visibility).not.toBe('hidden');
     expect(reason?.parentElement).toBe(disabledButton.parentElement);
     expect(disabledButton.compareDocumentPosition(reason as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,

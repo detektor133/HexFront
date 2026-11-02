@@ -251,6 +251,7 @@ export function HexCard(props: {
     IMPROVEMENT_COST[Math.min(improvement, IMPROVEMENT_COST.length - 1)] ?? 0,
   );
   const upgrade = actions.find((action) => action.kind === 'upgrade');
+  const fort = actions.find((action) => action.kind === 'fort');
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
@@ -279,14 +280,38 @@ export function HexCard(props: {
           <MetricRow name="growth" value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
           {(improvement > 0 || actions.some((a) => a.kind === 'improve')) && (
             <>
-              <MetricRow name="improvement" value={String(improvement)} />
-              {actions
-                .filter((a) => a.kind === 'improve')
-                .map((a) => (
-                  <dd key={a.kind} className={styles.levelValue}>
-                    <ActionButton a={a} send={send} blockedText={blockedText(a, s, view)} compact />
-                  </dd>
-                ))}
+              <dt>
+                <MetricIcon name="improvement" />
+              </dt>
+              <dd className={styles.levelValue}>
+                <span>{improvement}</span>
+                {actions
+                  .filter((a) => a.kind === 'improve')
+                  .map((a) => (
+                    <ActionButton
+                      key={a.kind}
+                      a={a}
+                      send={send}
+                      blockedText={blockedText(a, s, view)}
+                      compact
+                    />
+                  ))}
+              </dd>
+            </>
+          )}
+          {fort && (
+            <>
+              <dt>
+                <MetricIcon name="fort" />
+              </dt>
+              <dd className={styles.levelValue}>
+                <ActionButton
+                  a={fort}
+                  send={send}
+                  blockedText={blockedText(fort, s, view)}
+                  compact
+                />
+              </dd>
             </>
           )}
           {mine && <MetricRow name="supply" value={formatFp(c.supply)} />}
@@ -337,6 +362,7 @@ export function HexCard(props: {
             (a) =>
               a.kind !== 'upgrade' &&
               a.kind !== 'improve' &&
+              a.kind !== 'fort' &&
               !(hasLinkStatus && a.kind === 'rebuild'),
           )
           .map((a) => (
