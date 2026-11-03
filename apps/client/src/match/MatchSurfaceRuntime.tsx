@@ -38,6 +38,7 @@ import {
   type WorkerTelemetry,
 } from '../dev/telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
+import { createHotkeyHandler } from '../input/hotkeys.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -504,24 +505,22 @@ export function useSandbox(
         applyMessage(next);
       }
     });
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.code === 'Space' && !e.repeat) {
-        const latest = eventsRef.current.at(-1);
-        if (latest?.hex !== null && latest?.hex !== undefined) {
-          e.preventDefault();
-          mapViewRef.current?.centerOn(hexFromId(latest.hex, map.width));
-        }
-        return;
-      }
-      if (e.key !== 'Escape') return;
-      mapViewRef.current?.cancel();
-      if (toolRef.current) {
+    const onKey = createHotkeyHandler({
+      latestEventHex: () => eventsRef.current.at(-1)?.hex ?? null,
+      centerOnHex: (hex) => mapViewRef.current?.centerOn(hexFromId(hex, map.width)),
+      cancelMap: () => mapViewRef.current?.cancel(),
+      toolActive: () => toolRef.current !== null,
+      cancelTool: () => {
         input.cancel();
         setTool(null);
-        return;
-      }
-      pick(NOTHING_PICKED);
-    };
+      },
+      clearPick: () => pick(NOTHING_PICKED),
+      view: () => viewRef.current,
+      picked: () => pickedRef.current,
+      selectedArmy: () => armyRef.current,
+      setArmy: (id) => setArmyRef.current(id),
+      send: (cmd) => matchRef.current?.send(cmd),
+    });
     window.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
