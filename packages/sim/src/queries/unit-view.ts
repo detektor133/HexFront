@@ -32,6 +32,8 @@ export interface UnitView {
   readonly path: readonly HexId[];
   /** Своя артиллерия: по кому бьёт сейчас, иначе -1. */
   readonly fireTarget: number;
+  /** Свой отряд: гекс сбора при приказе gather, иначе -1. */
+  readonly gather?: HexId;
   /** Атакующий неартиллерийский отряд получает бонус от своей артиллерии. */
   readonly artillerySupport: boolean;
   readonly attackState?: AttackState | null;
@@ -77,6 +79,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         armyId: mine ? u.armyId : null,
         path: mine ? [...u.path] : [],
         fireTarget: mine ? u.fireTarget : -1,
+        gather: mine ? u.gather : -1,
         artillerySupport:
           mine &&
           u.type !== 'artillery' &&

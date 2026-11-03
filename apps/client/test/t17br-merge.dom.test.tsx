@@ -137,37 +137,30 @@ describe('07/T17br: слияние из карточки выбранных от
   });
 
   it.each([
-    ['одного отряда', null, 'unit.mergeNeedMore'],
-    [
-      'разных типов',
-      (unit: ReturnType<typeof ownUnit>) => ({ ...unit, type: 'armor' as const, id: 9802 }),
-      'unit.mergeDifferentTypes',
-    ],
-    [
-      'из разных гексов',
-      (unit: ReturnType<typeof ownUnit>) => ({ ...unit, hex: unit.hex + 1, id: 9802 }),
-      'unit.mergeDifferentHexes',
-    ],
-  ] as const)(
-    'не отправляет merge при выборе %s и показывает причину',
-    async (_case, alter, reason) => {
-      const template = ownUnit();
-      const first = { ...template, id: 9801 };
-      const second = alter?.({ ...template, id: 9802 }) ?? null;
-      const units = second ? [first, second] : [first];
-      const send = await renderSelected(units, second ? [first.id, second.id] : [first.id]);
+    ['разных типов', (unit: ReturnType<typeof ownUnit>) => ({ ...unit, type: 'armor' as const })],
+    ['из разных гексов', (unit: ReturnType<typeof ownUnit>) => ({ ...unit, hex: unit.hex + 1 })],
+  ] as const)('отправляет gather при выборе отрядов %s', async (_case, alter) => {
+    const template = ownUnit();
+    const first = { ...template, id: 9801 };
+    const second = { ...alter(template), id: 9802 };
+    const send = await renderSelected([first, second], [first.id, second.id]);
 
-      const card = second
-        ? screen.getByRole('region', { name: t('unit.groups') })
-        : screen.getByRole('region', {
-            name: `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`,
-          });
-      expect(card.querySelectorAll('li')).toHaveLength(second ? 2 : 0);
-      expect(screen.queryByRole('button', { name: t('unit.merge') })).toBeNull();
-      expect(screen.getByRole('status').textContent).toBe(t(reason as MessageKey));
-      expect(send).not.toHaveBeenCalled();
-    },
-  );
+    expect(screen.queryByRole('button', { name: t('unit.merge') })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: t('unit.gather') }));
+    expect(send).toHaveBeenCalledExactlyOnceWith({ t: 'gather', unitIds: [first.id, second.id] });
+  });
+
+  it('не отправляет команду для одного отряда и показывает состояние сбора', async () => {
+    const template = ownUnit();
+    const first = { ...template, id: 9801, gather: 5 };
+    const send = await renderSelected([first], [first.id]);
+
+    expect(screen.queryByRole('button', { name: t('unit.merge') })).toBeNull();
+    expect(screen.getAllByRole('status').map((node) => node.textContent)).toContain(
+      t('unit.mergeNeedMore'),
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
 
   it('показывает причину после выбора строки отступающего отряда', async () => {
     const template = ownUnit();

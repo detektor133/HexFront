@@ -102,11 +102,15 @@ export function UnitCard(props: {
         ? 'unit.mergeNotOwn'
         : units.some((unit) => unit.order === 'retreat')
           ? 'reason.retreating'
-          : units.some((unit) => unit.type !== first.type)
-            ? 'unit.mergeDifferentTypes'
-            : units.some((unit) => unit.hex !== first.hex)
-              ? 'unit.mergeDifferentHexes'
-              : null;
+          : null;
+  // Одна кнопка: совместимые в одном гексе сливаются сразу, остальные идут на сбор (CR-010).
+  const mergeable =
+    first.armyId !== null &&
+    units.every(
+      (unit) => unit.hex === first.hex && unit.type === first.type && unit.armyId === first.armyId,
+    );
+  const gathering = units.find((unit) => (unit.gather ?? -1) >= 0);
+  const gatherLabel = gathering?.gather;
   const splitReason: MessageKey | null =
     units.length !== 1
       ? null
@@ -250,12 +254,23 @@ export function UnitCard(props: {
         ) : units.length > 1 ? (
           <IconButton
             className={`${styles.button} ${styles.iconAction}`}
-            label={t('unit.merge')}
-            onClick={() => props.send({ t: 'merge', unitIds: units.map((unit) => unit.id) })}
+            label={mergeable ? t('unit.merge') : t('unit.gather')}
+            onClick={() =>
+              props.send({
+                t: mergeable ? 'merge' : 'gather',
+                unitIds: units.map((unit) => unit.id),
+              })
+            }
           >
             <IconArrowsJoin2 className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         ) : null}
+        {gatherLabel !== undefined && (
+          <p role="status">
+            {t('unit.gathering')} {gatherLabel % props.map.width}·
+            {Math.floor(gatherLabel / props.map.width)}
+          </p>
+        )}
       </div>
     </section>
   );
