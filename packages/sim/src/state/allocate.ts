@@ -1,6 +1,7 @@
 // Расчёт мест отрядов армии на линии плана (CR-002): вес угрозы, равномерность при равной
 // угрозе, броня на равнину, артиллерия позади линии. Состояние не меняет.
 // GDD: docs/gdd/07-controls.md — «Распределение».
+import { atWar } from './relations.ts';
 import { ARTY_RANGE, MAX_UNITS_PER_HEX, OFFENSIVE_FACING_WEIGHT } from '../balance.ts';
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
@@ -35,7 +36,8 @@ function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<
   for (const h of line) {
     const near = new Set(around(state, h));
     let enemy = 0;
-    for (const u of state.units) if (u.owner !== owner && near.has(u.hex)) enemy += u.soldiers;
+    for (const u of state.units)
+      if (atWar(state, owner, u.owner) && near.has(u.hex)) enemy += u.soldiers;
     out.set(h, FP + intDiv(enemy, THREAT_SOLDIERS));
   }
   return out;

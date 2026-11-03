@@ -20,6 +20,7 @@ export * from './queries/path-preview.ts';
 export * from './queries/road-path.ts';
 export * from './state/network.ts';
 export * from './queries/player-view.ts';
+export * from './state/relations.ts';
 export {
   checkConstruction,
   foundCityCost,

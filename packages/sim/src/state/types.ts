@@ -243,6 +243,13 @@ export type GameEvent =
       readonly playerId: number;
       readonly cityId: number;
     }
+  | {
+      readonly t: 'warDeclared' | 'treatyMade' | 'treatyBroken' | 'treatyOffered';
+      readonly playerId: number;
+      readonly targetId: number;
+      /** pact или alliance (договор); для войны — какой договор нарушен или null. */
+      readonly kind: 'pact' | 'alliance' | null;
+    }
   | { readonly t: 'playerEliminated'; readonly playerId: number }
   | { readonly t: 'offensiveDone'; readonly playerId: number; readonly armyId: number }
   | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
@@ -255,6 +262,25 @@ export type GameEvent =
 
 /** Как выиграна партия (08-match.md, «Победа»). */
 export type WinReason = 'cities' | 'lastStanding' | 'score';
+
+/** Отношение пары игроков (дипломатия, CR-007). */
+export type Relation = 'peace' | 'war' | 'pact' | 'alliance';
+
+/** Предложение договора: pact или alliance, действует OFFER_TTL_TICKS. */
+export interface TreatyOffer {
+  readonly from: number;
+  readonly to: number;
+  readonly kind: 'pact' | 'alliance';
+  readonly tick: number;
+}
+
+export interface Diplomacy {
+  /** Симметричная матрица игроков n × n, индекс a * n + b. */
+  relation: Relation[];
+  /** Нарушений договоров у каждого игрока: разорванные пакты и союзы, война против партнёра. */
+  violations: number[];
+  offers: TreatyOffer[];
+}
 
 export interface MatchState {
   tick: number;
@@ -286,6 +312,8 @@ export interface MatchState {
   supplyRevision: number;
   nextId: number;
   events: GameEvent[];
+  /** Дипломатия; нет — все игроки в войне друг с другом (режим без дипломатии). */
+  diplomacy?: Diplomacy;
   /** Победитель или -1; матч не замораживается — остановку делает сервер. */
   winner: number;
   /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и оставшиеся тики; -1 — никто. */

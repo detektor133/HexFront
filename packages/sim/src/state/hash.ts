@@ -147,6 +147,20 @@ function hashConstructions(s: Hasher, state: MatchState): void {
  * Хэш всего изменяемого состояния и идентичности карты; события тика не входят.
  * @returns 8 шестнадцатеричных символов (FNV-1a, 32 бита)
  */
+function hashDiplomacy(s: Hasher, state: MatchState): void {
+  const d = state.diplomacy;
+  if (!d) return;
+  const codes = { peace: 0, war: 1, pact: 2, alliance: 3 } as const;
+  for (const r of d.relation) int(s, codes[r]);
+  for (const v of d.violations) int(s, v);
+  for (const o of d.offers) {
+    int(s, o.from);
+    int(s, o.to);
+    int(s, o.kind === 'pact' ? 0 : 1);
+    int(s, o.tick);
+  }
+}
+
 export function hashState(state: MatchState): string {
   const s: Hasher = { h: FNV_OFFSET };
   int(s, state.tick);
@@ -174,5 +188,6 @@ export function hashState(state: MatchState): string {
   int(s, state.winner);
   int(s, state.holdPlayer);
   int(s, state.holdTicks);
+  hashDiplomacy(s, state);
   return s.h.toString(16).padStart(8, '0');
 }

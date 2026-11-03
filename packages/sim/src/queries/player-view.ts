@@ -17,6 +17,8 @@ import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
+import { OFFER_TTL_TICKS, relationOf } from '../state/relations.ts';
+import type { Relation } from '../state/types.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import {
@@ -57,6 +59,8 @@ export interface PlayerView {
   readonly winner: number;
   readonly playerId: number;
   readonly victoryHold?: VictoryHold | null;
+  /** Дипломатия (CR-007): есть только в матче с дипломатией. */
+  readonly diplomacy?: DiplomacyView;
   readonly ranking?: readonly PlayerRanking[];
   readonly hexes: {
     readonly owner: Int16Array;
@@ -236,6 +240,7 @@ export function playerView(
   const memoryRoad = vision?.road[playerId];
   const memoryImprovement = vision?.improvement[playerId];
   const memoryBuilding = vision?.building[playerId];
+  const diplomacy = diplomacyView(state, playerId);
   const ranking = Array.from(viewContext.scores, (score, id) => ({
     id,
     score,
@@ -248,6 +253,7 @@ export function playerView(
     playerId,
     victoryHold: victoryHold(state),
     ranking,
+    ...(diplomacy ? { diplomacy } : {}),
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
@@ -439,5 +445,29 @@ export function commanderView(
     players: state.players,
     constructions: [],
     recruits: [],
+  };
+}
+
+/** Что игрок знает о дипломатии: свои отношения с каждым, нарушения всех, предложения ему и от него. */
+export interface DiplomacyView {
+  /** Отношение игрока к каждому игроку по индексу (к себе — peace). */
+  readonly relations: readonly Relation[];
+  /** Нарушений договоров у каждого игрока (видно всем). */
+  readonly violations: readonly number[];
+  readonly incoming: readonly { readonly from: number; readonly kind: 'pact' | 'alliance' }[];
+  readonly outgoing: readonly { readonly to: number; readonly kind: 'pact' | 'alliance' }[];
+}
+
+function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {
+  const d = state.diplomacy;
+  if (!d) return null;
+  const live = d.offers.filter((o) => state.tick - o.tick < OFFER_TTL_TICKS);
+  return {
+    relations: state.players.map((p) =>
+      p.id === playerId ? 'peace' : relationOf(state, playerId, p.id),
+    ),
+    violations: [...d.violations],
+    incoming: live.filter((o) => o.to === playerId).map((o) => ({ from: o.from, kind: o.kind })),
+    outgoing: live.filter((o) => o.from === playerId).map((o) => ({ to: o.to, kind: o.kind })),
   };
 }

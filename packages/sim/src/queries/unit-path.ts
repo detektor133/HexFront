@@ -17,6 +17,7 @@ import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush, type MinHeap } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { atWar, protectsFrom } from '../state/relations.ts';
 import type { MatchState } from '../state/types.ts';
 import { unitIndex } from '../state/unit-index.ts';
 
@@ -41,10 +42,27 @@ export function ownUnitsAt(state: MatchState, owner: number, hex: HexId): number
  * Войти в такой гекс можно только через бой.
  */
 export function isHostileHex(state: MatchState, owner: number, hex: HexId): boolean {
-  if ((unitIndex(state).unitsByHex[hex] ?? []).some((unit) => unit.owner !== owner)) return true;
+  if ((unitIndex(state).unitsByHex[hex] ?? []).some((unit) => atWar(state, owner, unit.owner))) {
+    return true;
+  }
   const city = unitIndex(state).cityByHex[hex];
-  if (!city || city.owner === owner) return false;
+  if (!city || city.owner === owner || (city.owner >= 0 && !atWar(state, owner, city.owner))) {
+    return false;
+  }
   return city.defenders > 0;
+}
+
+/**
+ * Гекс неприкосновенен для отряда игрока owner: его территория, отряды или город принадлежат
+ * игроку не в войне и не союзнику (дипломатия, CR-007) — войти нельзя, пока не объявлена война.
+ */
+export function peaceBlocked(state: MatchState, owner: number, hex: HexId): boolean {
+  if (!state.diplomacy) return false;
+  const land = state.hexes.owner[hex] ?? -1;
+  if (protectsFrom(state, owner, land)) return true;
+  const city = unitIndex(state).cityByHex[hex];
+  if (city && protectsFrom(state, owner, city.owner)) return true;
+  return (unitIndex(state).unitsByHex[hex] ?? []).some((u) => protectsFrom(state, owner, u.owner));
 }
 
 /** Зона контроля: рядом с гексом стоит отряд другого игрока. */
@@ -53,7 +71,9 @@ function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
   for (const n of neighbors(hexFromId(hex, width))) {
     if (!inBounds(n, width, height)) continue;
     const id = hexId(n, width);
-    if ((unitIndex(state).unitsByHex[id] ?? []).some((unit) => unit.owner !== owner)) return true;
+    if ((unitIndex(state).unitsByHex[id] ?? []).some((unit) => atWar(state, owner, unit.owner))) {
+      return true;
+    }
   }
   return false;
 }
@@ -108,6 +128,7 @@ function minStepTicks(type: UnitType): number {
  * не должны быть заняты врагом или заполнены своими отрядами; цель может быть вражеской (атака).
  */
 function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boolean {
+  if (peaceBlocked(state, m.owner, hex)) return false;
   if (moveTerrain(state, hex) === null) return false;
   if (m.type === 'artillery' && state.hexes.owner[hex] !== m.owner) return false;
   if (isGoal) return true;

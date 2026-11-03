@@ -17,6 +17,7 @@ import {
   type Ground,
 } from '../queries/battle-math.ts';
 import { captureHex } from '../state/capture.ts';
+import { atWar } from '../state/relations.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
 import type { City, MatchState, Unit } from '../state/types.ts';
 import { allUnits, moveUnit, removeUnits } from '../state/unit-index.ts';
@@ -67,7 +68,7 @@ function battleAt(state: MatchState, hex: HexId): Battle | null {
   const first = attackers[0];
   if (!first) return null;
   const defenders = allUnits(state).filter(
-    (u) => u.hex === hex && u.owner !== first.owner && u.soldiers > 0,
+    (u) => u.hex === hex && atWar(state, first.owner, u.owner) && u.soldiers > 0,
   );
   const city = activeCity(state, hex, first.owner);
   if (defenders.length === 0 && !city) return null;
@@ -206,7 +207,9 @@ function fleeLoneArtillery(state: MatchState, hex: HexId): void {
   const attackers = attackersOf(state, hex);
   const first = attackers[0];
   if (!first || activeCity(state, hex, first.owner)) return;
-  const defenders = allUnits(state).filter((u) => u.hex === hex && u.owner !== first.owner);
+  const defenders = allUnits(state).filter(
+    (u) => u.hex === hex && atWar(state, first.owner, u.owner),
+  );
   if (defenders.length === 0 || defenders.some((u) => u.type !== 'artillery')) return;
   const hexes = attackers.map((a) => a.hex);
   const lost = defenders.filter((u) => !retreatOrCapitulate(state, u, hexes, ARTY_FLEE_LOSS));

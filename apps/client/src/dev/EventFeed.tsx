@@ -28,6 +28,10 @@ export function eventLabel(event: GameEvent['t']): Parameters<typeof t>[0] {
     case 'matchWon':
     case 'constructionDone':
     case 'constructionCancelled':
+    case 'warDeclared':
+    case 'treatyMade':
+    case 'treatyBroken':
+    case 'treatyOffered':
       return `event.${event}`;
     default:
       return assertNever(event);

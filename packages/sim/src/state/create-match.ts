@@ -1,4 +1,5 @@
 // Создание матча из карты по правилам старта. GDD: docs/gdd/08-match.md — «Старт».
+import { createDiplomacy } from './relations.ts';
 import {
   MILITIA_PER_LEVEL,
   NEUTRAL_HEX_POP_RATIO,
@@ -30,6 +31,8 @@ export interface PlayerSetup {
 
 export interface MatchOptions {
   readonly fog?: boolean;
+  /** Дипломатия: по умолчанию все в мире, войну объявляют (CR-007); нет — все в войне. */
+  readonly diplomacy?: boolean;
 }
 
 function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchState {
@@ -205,5 +208,7 @@ export function createMatch(
   rebuildUnitIndex(state);
   recomputeAllNetworks(state);
   state.vision = createVisionState(state.players.length, state.hexes.owner.length);
+  if (options.diplomacy === true) state.diplomacy = createDiplomacy(players.length);
+
   return state;
 }

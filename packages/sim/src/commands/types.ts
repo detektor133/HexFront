@@ -59,6 +59,11 @@ export type Command =
   | { readonly t: 'setArmyAuto'; readonly armyId: number; readonly on: boolean }
   /** Настройка «Автокомандование» для новых армий (CR-006). */
   | { readonly t: 'setAutoCommand'; readonly on: boolean }
+  /** Дипломатия (CR-007): объявить войну; предложить пакт/союз; ответить; разорвать договор. */
+  | { readonly t: 'declareWar'; readonly target: number }
+  | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: 'pact' | 'alliance' }
+  | { readonly t: 'answerTreaty'; readonly from: number; readonly accept: boolean }
+  | { readonly t: 'breakTreaty'; readonly target: number }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {
@@ -117,6 +122,10 @@ export const REJECT_REASONS = [
   'notEnemy',
   'retreating',
   'inBattle',
+  /** Дипломатия выключена или игрок не найден (CR-007). */
+  'badPlayer',
+  'sameRelation',
+  'noOffer',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

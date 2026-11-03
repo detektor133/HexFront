@@ -4,8 +4,9 @@ import { MAX_UNITS_PER_HEX, ORG_AFTER_RETREAT } from '../balance.ts';
 import { gatherSystem } from './gather.ts';
 import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
-import { isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
+import { isHostileHex, ownUnitsAt, peaceBlocked, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
+import { isAllied } from '../state/relations.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 import { moveUnit } from '../state/unit-index.ts';
 
@@ -20,6 +21,7 @@ function stop(unit: Unit): void {
 // Гекс стал непроходимым: отряд встаёт.
 function blocked(state: MatchState, unit: Unit, next: HexId): boolean {
   if (state.map.terrain[next] === TERRAIN.water) return true;
+  if (peaceBlocked(state, unit.owner, next)) return true;
   return unit.type === 'artillery' && state.hexes.owner[next] !== unit.owner;
 }
 
@@ -60,7 +62,11 @@ function arrive(state: MatchState, unit: Unit, next: HexId): void {
   unit.path.shift();
   unit.moveTicks = 0;
   unit.moveTotal = 0;
-  if (unit.type !== 'artillery') captureHex(state, next, unit.owner);
+  // Союзную землю проходят без захвата (CR-007).
+  const land = state.hexes.owner[next] ?? -1;
+  if (unit.type !== 'artillery' && !isAllied(state, unit.owner, land)) {
+    captureHex(state, next, unit.owner);
+  }
   if (unit.path.length === 0 && unit.order === 'move') unit.order = 'idle';
 }
 
