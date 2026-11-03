@@ -207,7 +207,7 @@ describe('слои границ и тумана', () => {
     }
   });
 
-  it('пересоздаёт подпись через setView при изменении ширины с прежними центром и кеглем', () => {
+  it('обновляет подпись через setView при изменении ширины с прежними центром и кеглем', () => {
     installTextCanvasStub();
     vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
     const selection = { hex: null, units: [], target: null };
@@ -239,7 +239,6 @@ describe('слои границ и тумана', () => {
       expect(updated).toBeInstanceOf(Text);
       if (!(updated instanceof Text)) throw new Error('Подпись второй территории не создана');
 
-      expect(updated).not.toBe(previous);
       expect({ x: updated.x, y: updated.y }).toEqual(previousPosition);
       expect(updated.width).toBeGreaterThan(previousWidth);
     } finally {

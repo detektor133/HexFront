@@ -357,3 +357,14 @@ describe('автопополнение по фронту', () => {
     expect(idle).toBeGreaterThan(onFront);
   });
 });
+
+describe('автоделение без глобального лимита отрядов (DECISIONS 2026-10-02)', () => {
+  it('армия делится на фронте, даже когда у игрока уже много отрядов', () => {
+    const s = scenario(BORDER, { legend });
+    for (let i = 0; i < 9; i += 1) s.unit('A', 'infantry', 60, at(0, i % 5));
+    const army = armyOf(s, [s.unit('A', 'infantry', 400, at(0, 2))]);
+    s.cmd('A', assignFront(army, 'B', null));
+    s.runSeconds(30);
+    expect(s.state.units.filter((u) => u.armyId === army).length).toBe(5);
+  });
+});

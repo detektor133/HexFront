@@ -93,46 +93,79 @@ function measuredTextWidth(text: Text): number {
   return text.width;
 }
 
-/** Рисует подписи государств на первых двух уровнях детализации. */
+/** Шаг размера шрифта подписи, px: подписи в одном шаге делят одну текстуру (память GPU). */
+const FONT_STEP = 2;
+
+interface LabelState {
+  readonly texts: Map<string, Text>;
+  glyphs: Graphics[];
+}
+
+const labelStates = new WeakMap<Container, LabelState>();
+
+/**
+ * Рисует подписи государств на первых двух уровнях детализации. Тексты переиспользуются между
+ * перерисовками (ключ: игрок, имя, шаг размера), а точный размер добирается масштабом: рост
+ * территории не плодит новые текстуры.
+ */
 export function drawTerritoryLabels(
   container: Container,
   labels: readonly TerritoryLabel[],
   scale: number,
   detail: 1 | 2 | 3,
 ): void {
-  if (detail === 3) return;
-  for (const label of labels) {
-    const text = new Text({
-      text: label.name,
-      style: {
-        fontFamily: tokens.font.ui.family,
-        fontWeight: '400',
-        fontSize: label.fontSize,
-        fill: playerLine(label.playerId),
-        stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
-      },
-    });
-    text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
-    text.anchor.set(0.5);
+  const state = labelStates.get(container) ?? { texts: new Map<string, Text>(), glyphs: [] };
+  labelStates.set(container, state);
+  for (const g of state.glyphs) g.destroy();
+  state.glyphs = [];
+  const keep = new Set<string>();
+  for (const label of detail === 3 ? [] : labels) {
+    const size = Math.max(FONT_STEP, Math.round(label.fontSize / FONT_STEP) * FONT_STEP);
+    const key = `${label.playerId}|${label.name}|${size}`;
+    keep.add(key);
+    let text = state.texts.get(key);
+    if (!text) {
+      text = new Text({
+        text: label.name,
+        style: {
+          fontFamily: tokens.font.ui.family,
+          fontWeight: '400',
+          fontSize: size,
+          fill: playerLine(label.playerId),
+          stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
+        },
+      });
+      text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
+      text.anchor.set(0.5);
+      state.texts.set(key, text);
+      container.addChild(text);
+    }
+    const extra = label.fontSize / size;
     text.scale.set(
-      territoryLabelWidthScale(measuredTextWidth(text), label.maxWidth) / scale,
-      1 / scale,
+      (territoryLabelWidthScale(measuredTextWidth(text) * extra, label.maxWidth) * extra) / scale,
+      extra / scale,
     );
     text.position.set(label.at.x, label.at.y);
-    container.addChild(text);
+  }
+  for (const [key, text] of state.texts) {
+    if (keep.has(key)) continue;
+    container.removeChild(text);
+    text.destroy();
+    state.texts.delete(key);
+  }
+  for (const label of detail === 3 ? [] : labels) {
     const glyph = label.offer ?? label.relation;
-    if (glyph !== null) {
-      const color =
-        label.offer !== null
-          ? tokens.status.warning
-          : label.relation === 'war'
-            ? tokens.status.danger
-            : label.relation === 'alliance'
-              ? tokens.relation.ally
-              : tokens.ui.ink2;
-      const below = { x: label.at.x, y: label.at.y + (label.fontSize * 0.5 + 9) / scale };
-      drawRelationGlyph(container, glyph, below, scale, color);
-    }
+    if (glyph === null) continue;
+    const color =
+      label.offer !== null
+        ? tokens.status.warning
+        : label.relation === 'war'
+          ? tokens.status.danger
+          : label.relation === 'alliance'
+            ? tokens.relation.ally
+            : tokens.ui.ink2;
+    const below = { x: label.at.x, y: label.at.y + (label.fontSize * 0.5 + 9) / scale };
+    state.glyphs.push(drawRelationGlyph(container, glyph, below, scale, color));
   }
 }
 
@@ -152,7 +185,7 @@ function drawRelationGlyph(
   at: { readonly x: number; readonly y: number },
   scale: number,
   color: string,
-): void {
+): Graphics {
   const g = new Graphics();
   const draw = (stroke: { color: string; width: number }): void => {
     if (kind === 'war') {
@@ -169,4 +202,5 @@ function drawRelationGlyph(
   g.scale.set(1 / scale);
   g.position.set(at.x, at.y);
   container.addChild(g);
+  return g;
 }

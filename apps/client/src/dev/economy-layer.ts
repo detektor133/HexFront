@@ -556,7 +556,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     const nextTerritoryKey = territoryLabelsKey(nextTerritoryLabels, scale, level);
     if (nextTerritoryKey !== territoryKey) {
       territoryKey = nextTerritoryKey;
-      territoryLabels.removeChildren().forEach((child) => child.destroy());
       drawTerritoryLabels(territoryLabels, nextTerritoryLabels, scale, level);
     }
     if (selected.hex !== null) {
