@@ -2,6 +2,7 @@
 // автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель».
 import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
+import { SLOT_DETACHED } from '../state/allocate.ts';
 import { trimAutoFront } from '../state/front.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 
@@ -107,7 +108,12 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       return;
     }
     case 'assignUnits':
-      for (const u of state.units) if (cmd.unitIds.includes(u.id)) u.armyId = cmd.armyId;
+      // Передача возвращает отряд под план новой армии (снимает ручную «свободу», SLOT_DETACHED).
+      for (const u of state.units) {
+        if (!cmd.unitIds.includes(u.id)) continue;
+        u.armyId = cmd.armyId;
+        if (u.slot === SLOT_DETACHED) u.slot = -1;
+      }
       return;
     case 'setAutoReinforce': {
       const player = state.players[playerId];

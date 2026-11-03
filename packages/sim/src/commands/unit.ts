@@ -7,6 +7,7 @@ import { FP, intDiv, type Fp } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { planGather } from '../queries/gather.ts';
 import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
+import { SLOT_DETACHED } from '../state/allocate.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 import { addUnit, removeUnits } from '../state/unit-index.ts';
 
@@ -253,6 +254,8 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         if (path && path.length > 0) {
           part.path = path;
           part.order = 'move';
+          // Вытянутая вручную часть свободна от плана армии (решение владельца 2026-11-03).
+          if (state.plans.some((p) => p.armyId === part.armyId)) part.slot = SLOT_DETACHED;
         }
       }
       return;

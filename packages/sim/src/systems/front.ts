@@ -76,7 +76,7 @@ const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b
 function autoMerge(state: MatchState, plan: ArmyPlan): void {
   const need = planHexes(state, plan).length;
   const armyUnits = allUnits(state).filter(
-    (u) => u.armyId === plan.armyId && u.type !== 'artillery',
+    (u) => planControls(u, plan.armyId) && u.type !== 'artillery',
   );
   const eligible = armyUnits.filter((u) => !u.inBattle);
   for (const type of ['infantry', 'armor'] as const) {

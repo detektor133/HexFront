@@ -226,10 +226,11 @@ describe('линия фронта (CR-002)', () => {
     expect(hexes.every((h) => col(h) === 2)).toBe(true);
   });
 
-  it('ручной приказ снимает отряд с места; выполнив его, отряд возвращается на фронт', () => {
+  it('ручной приказ снимает отряд с плана: он остаётся там, куда пришёл; передача в армию возвращает под план', () => {
     const s = scenario(BORDER, { legend });
     const ids = infantry(s, 1);
-    s.cmd('A', assignFront(armyOf(s, ids), 'B', null));
+    const army = armyOf(s, ids);
+    s.cmd('A', assignFront(army, 'B', null));
     s.runSeconds(20);
     const onFront = s.unitById(ids[0] ?? -1)?.hex;
     expect(col(onFront ?? -1)).toBe(2);
@@ -241,6 +242,9 @@ describe('линия фронта (CR-002)', () => {
       arrived = s.unitById(ids[0] ?? -1)?.hex === hexOf(at(0, 0));
     }
     expect(arrived).toBe(true);
+    s.runSeconds(20);
+    expect(col(s.unitById(ids[0] ?? -1)?.hex ?? -1)).toBe(0);
+    s.cmd('A', assignUnits(ids, army));
     s.runSeconds(20);
     expect(col(s.unitById(ids[0] ?? -1)?.hex ?? -1)).toBe(2);
   });

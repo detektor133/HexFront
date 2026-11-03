@@ -82,18 +82,18 @@ describe('автокомандование: флаг и команды (04/T19, 
     expect(autoOf(s, army)).toBe(true);
   });
 
-  it('ручной приказ отряду армии выключает её auto; передача отрядов — у обеих армий', () => {
+  it('ручной приказ отряду и передача отрядов auto не выключают (решение 2026-11-03)', () => {
     const s = scenario(FIELD, { legend });
     const first = armyWithUnit(s);
     s.cmd('A', move([{ unitOf: 'A', index: 0 }], at(0, 0)));
     s.runTicks(1);
-    expect(autoOf(s, first.army)).toBe(false);
+    expect(autoOf(s, first.army)).toBe(true);
     const second = armyWithUnit(s);
-    s.cmd('A', raw({ t: 'setArmyAuto', armyId: first.army, on: true }));
+    const before = autoOf(s, second.army);
     s.cmd('A', assignUnits([first.unit], second.army));
     s.runTicks(1);
-    expect(autoOf(s, first.army)).toBe(false);
-    expect(autoOf(s, second.army)).toBe(false);
+    expect(autoOf(s, first.army)).toBe(true);
+    expect(autoOf(s, second.army)).toBe(before);
   });
 
   it('▶ «Начать», ■ «Стоп» и переименование auto не выключают', () => {
@@ -119,7 +119,7 @@ describe('автокомандование: флаг и команды (04/T19, 
       if (manual === 'move') s.cmd('A', move([unit], at(0, 4)));
       else s.cmd('A', split({ unitOf: 'A', index: 0 }, 100));
       s.runTicks(1);
-      expect(autoOf(s, army)).toBe(false);
+      expect(autoOf(s, army)).toBe(true);
       const path = s.unitById(unit)?.path ?? [];
       // Приказ commander отклонён: отряд идёт по ручному приказу (или стоит после деления).
       if (manual === 'move') expect(path.at(-1)).toBe(0 + 4 * 8);

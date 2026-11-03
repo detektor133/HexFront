@@ -167,6 +167,24 @@ export function frontLinePath(
   owner: number,
   points: readonly EdgeId[],
 ): EdgeId[] | null {
+  const whole = runPath(g, owner, points);
+  if (whole) return whole;
+  // Точки не соединить одной цепочкой (разорванные куски границы): один мазок — несколько
+  // участков, каждая связная группа точек — отдельный участок фронта армии.
+  const groups: EdgeId[][] = [];
+  for (const p of points) {
+    const last = groups.at(-1);
+    if (last && frontEdgePath(g, owner, [...last, p])) last.push(p);
+    else groups.push([p]);
+  }
+  const out: EdgeId[] = [];
+  for (const group of groups) {
+    for (const e of runPath(g, owner, group) ?? []) if (!out.includes(e)) out.push(e);
+  }
+  return out.length > 0 ? out : null;
+}
+
+function runPath(g: LineGround, owner: number, points: readonly EdgeId[]): EdgeId[] | null {
   const path = frontEdgePath(g, owner, points);
   if (!path) return null;
   const arc = borderArc(g, owner, path);

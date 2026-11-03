@@ -41,9 +41,12 @@ function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<
   return out;
 }
 
+/** Место отряда: отдан вручную и свободен от плана, пока его не передадут в армию заново. */
+export const SLOT_DETACHED = -2;
+
 /** Отряд армии, которым сейчас может распоряжаться план. */
 export function planControls(u: Unit, armyId: number): boolean {
-  if (u.armyId !== armyId || u.order === 'retreat') return false;
+  if (u.armyId !== armyId || u.order === 'retreat' || u.slot === SLOT_DETACHED) return false;
   return u.order === 'idle' || (u.order === 'move' && u.slot >= 0);
 }
 

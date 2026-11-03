@@ -157,7 +157,7 @@ describe('локальный режим', () => {
     expect(rejected.view.recruits).toHaveLength(1);
   });
 
-  it('армии с auto всех игроков ведёт commander; ручная команда игрока выключает auto (CR-006)', () => {
+  it('армии с auto всех игроков ведёт commander; ручной приказ отряду auto не выключает (CR-006)', () => {
     const e = engine();
     const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;
     const before = [owned(0), owned(1)];
@@ -168,26 +168,19 @@ describe('локальный режим', () => {
     const unit = e.state.units.find((u) => u.armyId === army?.id);
     e.queue({ t: 'move', unitIds: [unit?.id ?? -1], to: unit?.hex ?? 0 });
     e.tick();
-    expect(e.state.armies.find((a) => a.id === army?.id)?.auto).toBe(false);
+    expect(e.state.armies.find((a) => a.id === army?.id)?.auto).toBe(true);
   });
 
-  it('ручной приказ или деление → auto выключен, commander армию больше не трогает (04/T22a)', () => {
+  it('ручной приказ или деление отряду: auto остаётся, ручное побеждает решение commander (04/T22a)', () => {
     for (const manual of ['split', 'move'] as const) {
       const e = engine();
       const [unit] = e.state.units.filter((u) => u.owner === HUMAN_ID);
       if (!unit) throw new Error('нет стартового отряда');
-      // Первый тик — ход commander игрока 0: ручное действие в том же тике побеждает.
       if (manual === 'split') e.queue({ t: 'split', unitId: unit.id, soldiers: (50 * FP) as Fp });
       else e.queue({ t: 'move', unitIds: [unit.id], to: unit.hex });
       e.tick();
       const army = e.state.armies.find((a) => a.owner === HUMAN_ID);
-      expect(army?.auto).toBe(false);
-      const ids = e.state.units.filter((u) => u.armyId === army?.id).map((u) => u.id);
-      for (let i = 0; i < 100; i += 1) {
-        e.tick();
-        const moved = e.state.units.filter((u) => ids.includes(u.id) && u.path.length > 0);
-        expect(moved, `тик ${e.state.tick}`).toEqual([]);
-      }
+      expect(army?.auto).toBe(true);
     }
   });
 

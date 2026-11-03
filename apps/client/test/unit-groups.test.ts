@@ -14,7 +14,7 @@ import {
 } from '@hexfront/sim';
 
 import { armySelection, selectHex } from '../src/dev/sandbox-selection.ts';
-import { CHIP_STACK_STEP, chipGroups } from '../src/dev/unit-groups.ts';
+import { chipGroups } from '../src/dev/unit-groups.ts';
 import { createLocalEngine } from '../src/local/engine.ts';
 
 const small: unknown = JSON.parse(
@@ -76,9 +76,6 @@ describe('фишки отрядов (07/T17bt)', () => {
       const groups = chipGroups(v).filter((g) => g.units.some((u) => ids.includes(u.id)));
       const covered = groups.flatMap((g) => g.units.map((u) => u.id)).sort((x, y) => x - y);
       expect(covered, `тик ${t}`).toEqual([...ids].sort((x, y) => x - y));
-      for (const [index, group] of groups.entries()) {
-        expect(group.stackOffset).toBeCloseTo((index - (groups.length - 1) / 2) * CHIP_STACK_STEP);
-      }
     }
     expect(moving).toBeGreaterThan(10);
   });

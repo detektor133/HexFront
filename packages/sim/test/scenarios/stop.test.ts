@@ -57,7 +57,7 @@ describe('остановка отрядов', () => {
     expect(JSON.stringify(s.state.units)).toBe(before);
   });
 
-  it('как ручной приказ выключает auto армии отряда', () => {
+  it('стоп auto армии отряда не выключает', () => {
     const s = make();
     const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', createArmy('Первая'));
@@ -72,6 +72,6 @@ describe('остановка отрядов', () => {
     s.cmd('A', raw({ t: 'stop', unitIds: [id] }));
     s.runTicks(1);
 
-    expect(army.auto).toBe(false);
+    expect(army.auto).toBe(true);
   });
 });
