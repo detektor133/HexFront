@@ -13,6 +13,7 @@ export * from './state/hash.ts';
 export { indexMatchesUnits, rebuildUnitIndex } from './state/unit-index.ts';
 export * from './commands/types.ts';
 export { applyCommands, validate } from './commands/apply.ts';
+export { MAX_VIA_POINTS } from './commands/unit.ts';
 export * from './step.ts';
 export * from './queries/city.ts';
 export * from './queries/path-preview.ts';

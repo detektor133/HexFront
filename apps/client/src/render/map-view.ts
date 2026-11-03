@@ -127,7 +127,7 @@ export async function createMapView(
   map: MapStatic,
   initial: MapViewOptions,
   onState: (s: MapViewState) => void,
-  onTap?: (hex: Hex, kind: TapKind, world: Point) => void,
+  onTap?: (hex: Hex, kind: TapKind, world: Point, shift: boolean) => void,
   onDoubleTap?: (hex: Hex, world: Point) => void,
 ): Promise<MapView> {
   let opts = initial;
@@ -267,7 +267,7 @@ export async function createMapView(
         cam = zoomAt(cam, e.factor, e.at.x, e.at.y, cameraView(), bounds);
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
-        onTap?.(pixelToHex(world, opts.radius), e.kind, world);
+        onTap?.(pixelToHex(world, opts.radius), e.kind, world, e.shift);
       } else if (e.t === 'selection') {
         const from = toWorld(e.at);
         const to = toWorld(e.to);

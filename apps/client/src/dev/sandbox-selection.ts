@@ -151,6 +151,7 @@ export function orderHex(
   view: PlayerView,
   picked: Picked,
   hex: number,
+  via: readonly number[] = [],
 ): { readonly picked: Picked; readonly cmd: Command | null } {
   const mine = pickedUnits(view, picked);
   if (mine.length === 0) return { picked: selectHex(view, picked, hex), cmd: null };
@@ -160,8 +161,12 @@ export function orderHex(
     if (attackers.length === 0) return { picked: done, cmd: null };
     return { picked: done, cmd: { t: 'attack', unitIds: attackers.map((u) => u.id), target: hex } };
   }
-  if (mine.every((u) => u.hex === hex)) return { picked: done, cmd: null };
-  return { picked: done, cmd: { t: 'move', unitIds: mine.map((u) => u.id), to: hex } };
+  if (via.length === 0 && mine.every((u) => u.hex === hex)) return { picked: done, cmd: null };
+  const unitIds = mine.map((u) => u.id);
+  return {
+    picked: done,
+    cmd: via.length > 0 ? { t: 'move', unitIds, to: hex, via } : { t: 'move', unitIds, to: hex },
+  };
 }
 
 /** Свои выбранные отряды (есть в снимке), для прогноза и отмены приказа удержанием. */

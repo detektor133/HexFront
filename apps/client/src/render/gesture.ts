@@ -17,7 +17,7 @@ export type StrokePhase = 'start' | 'move' | 'end' | 'cancel';
 export type TapKind = 'select' | 'order';
 
 export type GestureEvent =
-  | { readonly t: 'tap'; readonly at: Point; readonly kind: TapKind }
+  | { readonly t: 'tap'; readonly at: Point; readonly kind: TapKind; readonly shift: boolean }
   | { readonly t: 'pan'; readonly dx: number; readonly dy: number }
   | {
       readonly t: 'selection';
@@ -74,6 +74,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   let downMs = 0;
   let button = 0;
   let mouse = true;
+  let shift = false;
   // Приказ удержанием: палец уходил с фишки выбранных отрядов (возврат на неё — отмена).
   let leftZone = false;
   let lastTap: { readonly at: Point; readonly ms: number } | null = null;
@@ -93,7 +94,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
   };
 
   return {
-    down(id, at, btn, ms, _withShift = false, isMouse = true) {
+    down(id, at, btn, ms, withShift = false, isMouse = true) {
       active.set(id, at);
       if (active.size > 1) {
         // Второй палец — всегда карта: росчерк, деление и приказ удержанием отменяются.
@@ -110,6 +111,7 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
       downMs = ms;
       button = btn;
       mouse = isMouse;
+      shift = withShift;
       leftZone = false;
       if (btn === 0) deps.press(at);
     },
@@ -177,7 +179,8 @@ export function createGesture(deps: GestureDeps, emit: (e: GestureEvent) => void
           emit({ t: 'doubleTap', at });
           lastTap = null;
         } else {
-          emit({ t: 'tap', at, kind: button === RIGHT_BUTTON ? 'order' : 'select' });
+          const kind = button === RIGHT_BUTTON ? 'order' : 'select';
+          emit({ t: 'tap', at, kind, shift });
           if (button === 0) lastTap = { at, ms };
         }
       }

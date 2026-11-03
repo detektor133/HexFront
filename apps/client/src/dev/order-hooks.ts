@@ -25,6 +25,8 @@ export interface OrderDeps {
   setPlanHover?(world: Point | null): void;
   /** Приказ выбранным отрядам в гекс (orderHex + отправка). */
   order(hex: number): void;
+  /** Курсор над гексом: подсказка маршрута (черновик или путь до курсора). */
+  routeHover?(hex: number | null): void;
 }
 
 /** Хуки карты для приказа удержанием и наведения. */
@@ -80,7 +82,9 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
     hover(world) {
       d.setPlanHover?.(world);
       const busy = d.tool() || d.picked().units.length === 0;
-      show(world && !busy ? hexAt(world) : null, true);
+      const hex = world && !busy ? hexAt(world) : null;
+      d.routeHover?.(hex);
+      show(hex, true);
     },
   };
 }

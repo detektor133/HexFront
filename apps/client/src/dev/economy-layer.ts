@@ -26,6 +26,8 @@ import { drawConstructions } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
+import type { RouteView } from './route-draft.ts';
+import { drawRoute } from './route-draw.ts';
 import type { SplitOverlay } from './split-drag.ts';
 import {
   buildTerritoryLabels,
@@ -111,6 +113,8 @@ export interface EconomyLayer {
    * ним, если там враг; null — убрать.
    */
   setOrderTarget(t: OrderTarget | null): void;
+  /** Подсказка маршрута: путь, время в пути и точки; null — убрать. */
+  setRoute(r: RouteView | null): void;
   chipAt(hex: number): Point;
   chipBounds: UnitLayer['chipBounds'];
   unitsAt(world: Point): readonly number[];
@@ -285,6 +289,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let roadPreviewPath: readonly number[] | null = null;
   let split: SplitOverlay | null = null;
   let orderTarget: OrderTarget | null = null;
+  let route: RouteView | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
   const reducedMotion =
@@ -573,6 +578,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       // Над целевым гексом, выше фишек (art/units.md, «Плашка прогноза»).
       if (orderTarget.badge) drawForecastPlate(plates, orderTarget.badge, at, k, PLATE_LIFT_PX);
     }
+    if (route) drawRoute(marks, plates, route, center, k);
   }
 
   const roadSignature = (v: PlayerView): string =>
@@ -650,6 +656,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     setOrderTarget(t) {
       orderTarget = t;
+      redraw();
+    },
+    setRoute(r) {
+      route = r;
       redraw();
     },
     chipAt(hex) {
