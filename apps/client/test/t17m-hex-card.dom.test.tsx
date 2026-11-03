@@ -425,11 +425,7 @@ describe('T17m: карточка клетки', () => {
       />,
     );
     const button = screen.getByRole('button', { name: 'Проложить дорогу' });
-    const status = button.parentElement?.parentElement;
-    if (!status) throw new Error('строка состояния связи не найдена');
-    expect(status.className).toContain('linkStatus');
-    expect(status.querySelector('p')?.textContent).toBeTruthy();
-    expect(status.contains(button)).toBe(true);
+    expect(document.querySelector('p[class*="good"], p[class*="bad"]')?.textContent).toBeTruthy();
     expect(button.getAttribute('title')).toBe('Проложить дорогу');
     expect(button.textContent).toContain(formatFp(plan.cost));
     fireEvent.click(button);
@@ -684,9 +680,6 @@ describe('T17m: карточка клетки', () => {
     expect(button.getAttribute('title')).toBe(buttonName);
     expect(button.querySelector('svg')).not.toBeNull();
     expect(button.textContent).toBe(formatFp(available.selection.fort.cost));
-    expect(
-      screen.getByLabelText('Укрепление', { selector: 'svg' }).getAttribute('data-metric-icon'),
-    ).toBe('fort');
     fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'build', hex, kind: 'fort' });
 
@@ -795,7 +788,6 @@ describe('T17m: карточка клетки', () => {
     expect((button as HTMLButtonElement).disabled).toBe(false);
     expect(button.getAttribute('title')).toBe(buttonName);
     expect(button.textContent).toBe(formatFp(available.selection.depot.cost));
-    expect(screen.getByTestId('shared-metric-icon-supply')).toBeTruthy();
     fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'build', hex, kind: 'depot' });
 

@@ -1,5 +1,14 @@
-import { IconArrowUp, IconPlus, IconRoute2, IconUserPlus, IconX } from '@tabler/icons-react';
-import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  IconArrowUp,
+  IconBuildingCastle,
+  IconChevronsUp,
+  IconPackage,
+  IconRoute2,
+  IconShield,
+  IconUserPlus,
+  IconX,
+} from '@tabler/icons-react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TERRAIN_NAMES,
@@ -93,14 +102,19 @@ function ActionButton(props: {
   );
 }
 
+// Иконка плитки — объект действия; цена показана на самой плитке, название — в title.
+const ACTION_ICONS = {
+  rebuild: IconRoute2,
+  depot: IconPackage,
+  fort: IconShield,
+  foundCity: IconBuildingCastle,
+  upgrade: IconChevronsUp,
+  improve: IconArrowUp,
+} as const;
+
 function compactActionIcon(kind: HexAction['kind']): React.JSX.Element {
-  return kind === 'rebuild' ? (
-    <IconRoute2 size={14} aria-hidden="true" />
-  ) : kind === 'depot' || kind === 'fort' || kind === 'foundCity' ? (
-    <IconPlus size={14} aria-hidden="true" />
-  ) : (
-    <IconArrowUp size={14} aria-hidden="true" />
-  );
+  const Icon = ACTION_ICONS[kind];
+  return <Icon size={22} stroke={1.75} aria-hidden="true" />;
 }
 
 // Набор в своём городе (03/T12): доступный — с ценой; не хватает только золота — с ценой и
@@ -150,7 +164,7 @@ function RecruitButton(props: {
     : reasonText('notEnoughPeople');
   const blocked = !check || (!check.ok && check.reason !== 'notEnoughGold');
   return (
-    <div className={styles.action}>
+    <div className={`${styles.action} ${styles.recruitBlock}`}>
       <div className={styles.recruitControl}>
         <div className={styles.recruitTypes} role="group" aria-label={t('recruit.type')}>
           {props.options.map((option) => {
@@ -234,15 +248,6 @@ function RecruitButton(props: {
   );
 }
 
-function Row(props: { label: string; value: string }): React.JSX.Element {
-  return (
-    <>
-      <dt className={styles.label}>{props.label}</dt>
-      <dd>{props.value}</dd>
-    </>
-  );
-}
-
 // Причина недоступности основания: для населения — с числами, иначе — общий текст отказа.
 function blockedText(a: HexAction, s: Selection, view: PlayerView): string | null {
   if (!a.blocked) return null;
@@ -308,104 +313,34 @@ export function HexCard(props: {
     foundCityCost,
     IMPROVEMENT_COST[Math.min(improvement, IMPROVEMENT_COST.length - 1)] ?? 0,
   );
-  const upgrade = actions.find((action) => action.kind === 'upgrade');
-  const fort = actions.find((action) => action.kind === 'fort');
   const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
+          <div>
+            <h2 className={styles.title}>{title}</h2>
+            <p className={styles.subtitle}>{ownerText}</p>
+          </div>
           <IconButton className={styles.iconButton} label={t('card.close')} onClick={props.onClose}>
             <IconX className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         </div>
         <dl className={styles.stats}>
-          <Row label={t('card.owner')} value={ownerText} />
-          {c && (
-            <>
-              <dt className={`${styles.label} ${styles.actionLabel}`}>{t('card.level')}</dt>
-              <dd className={styles.levelValue}>
-                <span className={styles.levelText}>{c.level}</span>
-                {upgrade && <ActionButton a={upgrade} send={send} blockedText={null} compact />}
-              </dd>
-            </>
-          )}
           <MetricRow
             name="population"
             value={`${formatFp(view.hexes.pop[s.hex] ?? 0)} / ${formatFp(s.popCap)}`}
           />
           <MetricRow name="growth" value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
-          {(improvement > 0 || actions.some((a) => a.kind === 'improve')) && (
-            <>
-              <dt className={styles.actionLabel}>
-                <MetricIcon name="improvement" />
-              </dt>
-              <dd className={styles.levelValue}>
-                <span className={styles.levelText}>{improvement}</span>
-                {actions
-                  .filter((a) => a.kind === 'improve')
-                  .map((a) => (
-                    <ActionButton
-                      key={a.kind}
-                      a={a}
-                      send={send}
-                      blockedText={blockedText(a, s, view)}
-                      compact
-                    />
-                  ))}
-              </dd>
-            </>
-          )}
-          {fort && (
-            <>
-              <dt className={styles.actionLabel}>
-                <MetricIcon name="fort" />
-              </dt>
-              <dd className={styles.levelValue}>
-                <ActionButton
-                  a={fort}
-                  send={send}
-                  blockedText={blockedText(fort, s, view)}
-                  compact
-                />
-              </dd>
-            </>
-          )}
-          {actions
-            .filter((a) => a.kind === 'depot')
-            .map((a) => (
-              <Fragment key={a.kind}>
-                <dt className={styles.actionLabel}>
-                  <MetricIcon name="supply" />
-                </dt>
-                <dd className={styles.levelValue}>
-                  <ActionButton a={a} send={send} blockedText={blockedText(a, s, view)} compact />
-                </dd>
-              </Fragment>
-            ))}
+          {improvement > 0 && <MetricRow name="improvement" value={String(improvement)} />}
           {mine && <MetricRow name="supply" value={formatFp(c.supply)} />}
           {mine && <MetricRow name="gold" value={formatRate(c.goldPerS)} />}
         </dl>
         {/* Связь со столицей у самой столицы не показывается — она и есть узел сети. */}
         {hasLinkStatus && c && (
-          <div className={styles.linkStatus}>
-            <p className={c.link === 'isolated' ? styles.bad : styles.good}>
-              {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
-            </p>
-            {actions
-              .filter((a) => a.kind === 'rebuild')
-              .map((a) => (
-                <ActionButton
-                  key={a.kind}
-                  a={a}
-                  send={send}
-                  blockedText={blockedText(a, s, view)}
-                  compact
-                  {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
-                />
-              ))}
-          </div>
+          <p className={c.link === 'isolated' ? styles.bad : styles.good}>
+            {t(c.link === 'isolated' ? 'dev.economy.isolated' : 'dev.economy.connected')}
+          </p>
         )}
         {job && (
           <div className={styles.progress}>
@@ -427,27 +362,20 @@ export function HexCard(props: {
             {t('dev.economy.roadJob')} · {c.roadJob.built} {t('dev.economy.of')} {c.roadJob.total}
           </p>
         )}
-        {actions
-          .filter(
-            (a) =>
-              a.kind !== 'upgrade' &&
-              a.kind !== 'improve' &&
-              a.kind !== 'fort' &&
-              a.kind !== 'depot' &&
-              !(hasLinkStatus && a.kind === 'rebuild'),
-          )
-          .map((a) => (
-            <ActionButton
-              key={a.kind}
-              a={a}
-              send={send}
-              blockedText={blockedText(a, s, view)}
-              {...(a.kind === 'foundCity' || a.kind === 'improve' || (c && a.kind === 'rebuild')
-                ? { compact: true }
-                : {})}
-              {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
-            />
-          ))}
+        {actions.length > 0 && (
+          <div className={styles.tiles}>
+            {actions.map((a) => (
+              <ActionButton
+                key={a.kind}
+                a={a}
+                send={send}
+                blockedText={blockedText(a, s, view)}
+                compact
+                {...(props.onRoadPreview ? { onRoadPreview: props.onRoadPreview } : {})}
+              />
+            ))}
+          </div>
+        )}
         {recruiting && (
           <p className={styles.progressText}>
             {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}

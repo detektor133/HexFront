@@ -24,10 +24,9 @@ import { MetricRow } from '../ui/metric-icon.tsx';
 
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
-    <>
-      <dt className={styles.label}>{props.label}</dt>
+    <div title={props.label}>
       <dd>{props.value}</dd>
-    </>
+    </div>
   );
 }
 

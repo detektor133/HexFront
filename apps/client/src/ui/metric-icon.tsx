@@ -73,11 +73,11 @@ export function MetricIcon(props: {
 
 export function MetricRow(props: { name: MetricIconName; value: string }): React.JSX.Element {
   return (
-    <>
+    <div>
       <dt>
         <MetricIcon name={props.name} />
       </dt>
       <dd>{props.value}</dd>
-    </>
+    </div>
   );
 }
