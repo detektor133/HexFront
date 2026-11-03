@@ -6,7 +6,13 @@ import type { Fp } from '../math/int.ts';
 
 export type Command =
   | { readonly t: 'setTax'; readonly rate: Fp }
-  | { readonly t: 'move'; readonly unitIds: readonly number[]; readonly to: HexId }
+  | {
+      readonly t: 'move';
+      readonly unitIds: readonly number[];
+      readonly to: HexId;
+      /** Промежуточные точки маршрута по порядку, не больше MAX_VIA_POINTS (CR-012). */
+      readonly via?: readonly HexId[];
+    }
   | { readonly t: 'attack'; readonly unitIds: readonly number[]; readonly target: HexId }
   | {
       readonly t: 'assignFront';

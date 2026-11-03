@@ -32,12 +32,45 @@ function ownUnits(state: MatchState, playerId: number, ids: readonly number[]): 
   return { ok: true, units };
 }
 
-function validateMove(state: MatchState, units: readonly Unit[], to: HexId): Validation {
-  if (!Number.isInteger(to) || to < 0 || to >= state.hexes.owner.length) return rejected('badHex');
+/** Наибольшее число промежуточных точек приказа `move`. */
+export const MAX_VIA_POINTS = 5;
+
+const validHex = (state: MatchState, hex: HexId): boolean =>
+  Number.isInteger(hex) && hex >= 0 && hex < state.hexes.owner.length;
+
+/** Путь по звеньям from → via… → to; null — недостижимое звено. */
+function routePath(
+  state: MatchState,
+  unit: Unit,
+  via: readonly HexId[],
+  to: HexId,
+): HexId[] | null {
+  const path: HexId[] = [];
+  let from = unit.hex;
+  for (const point of [...via, to]) {
+    const leg = findPath(state, from, point, unit.type, unit.owner);
+    if (!leg) return null;
+    path.push(...leg);
+    from = point;
+  }
+  return path;
+}
+
+function validateMove(
+  state: MatchState,
+  units: readonly Unit[],
+  to: HexId,
+  via: readonly HexId[] = [],
+): Validation {
+  if (!validHex(state, to) || !via.every((point) => validHex(state, point))) {
+    return rejected('badHex');
+  }
+  if (via.length > MAX_VIA_POINTS) return rejected('badOrder');
   for (const a of units) {
-    if (a.hex === to) continue;
-    if (ownUnitsAt(state, a.owner, to) >= MAX_UNITS_PER_HEX) return rejected('hexFull');
-    if (!findPath(state, a.hex, to, a.type, a.owner)) return rejected('noPath');
+    if (a.hex === to && via.length === 0) continue;
+    if (ownUnitsAt(state, a.owner, to) >= MAX_UNITS_PER_HEX && a.hex !== to)
+      return rejected('hexFull');
+    if (!routePath(state, a, via, to)) return rejected('noPath');
   }
   return OK;
 }
@@ -100,7 +133,7 @@ export function validateUnitCommand(
   if (owned.units.some((u) => u.order === 'retreat')) return rejected('retreating');
   switch (cmd.t) {
     case 'move':
-      return validateMove(state, owned.units, cmd.to);
+      return validateMove(state, owned.units, cmd.to, cmd.via);
     case 'attack':
       return validateAttack(state, owned.units, cmd.target);
     case 'bombard':
@@ -192,7 +225,9 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'attack':
       for (const a of owned.units) {
         const path =
-          findPath(state, a.hex, cmd.t === 'move' ? cmd.to : cmd.target, a.type, a.owner) ?? [];
+          (cmd.t === 'move'
+            ? routePath(state, a, cmd.via ?? [], cmd.to)
+            : findPath(state, a.hex, cmd.target, a.type, a.owner)) ?? [];
         // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
         const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
         if (!sameStep) stop(a);
