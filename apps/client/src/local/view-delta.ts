@@ -216,15 +216,24 @@ function replacePlans(
 }
 
 function applyHexChanges(view: PlayerView, changes: readonly HexChange[]): PlayerView['hexes'] {
+  // Копируем лишь массивы, в которых есть изменения: остальные делятся с прошлым видом,
+  // иначе каждый тик (10 Гц) аллоцирует по 8 больших массивов и душит GC.
+  const touched = new Set<keyof PlayerView['hexes']>();
+  for (const change of changes) {
+    for (const key of Object.keys(change))
+      if (key !== 'id') touched.add(key as keyof PlayerView['hexes']);
+  }
+  const own = <K extends keyof PlayerView['hexes']>(key: K): PlayerView['hexes'][K] =>
+    touched.has(key) ? (view.hexes[key].slice() as PlayerView['hexes'][K]) : view.hexes[key];
   const hexes = {
-    owner: view.hexes.owner.slice(),
-    pop: view.hexes.pop.slice(),
-    improvement: view.hexes.improvement.slice(),
-    building: view.hexes.building.slice(),
-    road: view.hexes.road.slice(),
-    link: view.hexes.link.slice(),
-    growth: view.hexes.growth.slice(),
-    visible: view.hexes.visible.slice(),
+    owner: own('owner'),
+    pop: own('pop'),
+    improvement: own('improvement'),
+    building: own('building'),
+    road: own('road'),
+    link: own('link'),
+    growth: own('growth'),
+    visible: own('visible'),
   };
   for (const change of changes) {
     if (change.owner !== undefined) hexes.owner[change.id] = change.owner;

@@ -171,7 +171,37 @@ export function createPlanLayer(
     const index = Math.min(w.length - 1, Math.max(0, level - 1 + detailShift));
     return (w[index] ?? w[1] ?? 3) * k;
   };
-  const runsOf = (edges: readonly EdgeId[]): Point[][] => edgeRuns(map, radius, edges);
+  // Геометрия граней не меняется, пока не изменились сами грани: кэш по ключу спасает от пересчёта
+  // каждый тик, при наведении и в кадрах перехода.
+  const runCache = new Map<string, Point[][]>();
+  const runsOf = (edges: readonly EdgeId[]): Point[][] => {
+    const key = edges.join(',');
+    const hit = runCache.get(key);
+    if (hit) return hit;
+    if (runCache.size > 256) runCache.clear();
+    const runs = edgeRuns(map, radius, edges);
+    runCache.set(key, runs);
+    return runs;
+  };
+  // «Центр тяжести» чужой земли считается обходом всей карты — пересчитываем лишь при смене владельцев.
+  let enemyCache: { owner: unknown; player: number; x: number; y: number; n: number } | null = null;
+  const enemyCentroid = (v: PlayerView): { x: number; y: number; n: number } => {
+    if (enemyCache && enemyCache.owner === v.hexes.owner && enemyCache.player === v.playerId) {
+      return enemyCache;
+    }
+    let x = 0;
+    let y = 0;
+    let n = 0;
+    v.hexes.owner.forEach((o, id) => {
+      if (o < 0 || o === v.playerId) return;
+      const c = center(id);
+      x += c.x;
+      y += c.y;
+      n += 1;
+    });
+    enemyCache = { owner: v.hexes.owner, player: v.playerId, x, y, n };
+    return enemyCache;
+  };
 
   function polyline(pts: readonly Point[]): void {
     const [first, ...rest] = pts;
@@ -220,16 +250,7 @@ export function createPlanLayer(
     const [first] = pts;
     if (!first) return;
     const w = width(tokens.front.width);
-    let ex = 0;
-    let ey = 0;
-    let n = 0;
-    v.hexes.owner.forEach((o, id) => {
-      if (o < 0 || o === v.playerId) return;
-      const c = center(id);
-      ex += c.x;
-      ey += c.y;
-      n += 1;
-    });
+    const { x: ex, y: ey, n } = enemyCentroid(v);
     const style = { cap: 'round', join: 'round', alpha } as const;
     polyline(pts);
     g.stroke({ ...style, color: tokens.front.casing, width: w + 2 * tokens.front.casingWidth * k });
@@ -394,6 +415,14 @@ export function createPlanLayer(
     }
   }
 
+  const hoverNearForecast = (): boolean => {
+    if (!last || hover === null) return false;
+    const [v, , selectedArmy] = last;
+    const plan = v.plans.find((p) => p.armyId === selectedArmy);
+    if (plan?.kind !== 'front') return false;
+    return isPointNearPath(hover, runsOf(plan.offensive?.edges ?? []), 14 * k);
+  };
+
   const reduced =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const tweens = createFrontTweens(reduced);
@@ -439,8 +468,10 @@ export function createPlanLayer(
       if (split) drawSplit(split);
     },
     setHover(world) {
+      const before = hoverNearForecast();
       hover = world;
-      if (last) this.setView(...last);
+      // Перерисовка нужна, только если карточка прогноза появилась или исчезла.
+      if (last && hoverNearForecast() !== before) this.setView(...last);
     },
     frame(nowMs) {
       // Ещё один кадр после конца перехода — линия встаёт точно в новое положение.

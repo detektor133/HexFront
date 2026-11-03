@@ -177,7 +177,6 @@ function matchPlayerColors(selected: string): readonly PlayerColorId[] {
 
 interface Sandbox {
   readonly msg: ViewMessage | null;
-  readonly replay: readonly PlayerView[];
   readonly error: string | null;
   readonly picked: Picked;
   readonly lastReject: string | null;
@@ -229,7 +228,6 @@ export function useSandbox(
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
-  const [replay, setReplay] = useState<readonly PlayerView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [lastReject, setLastReject] = useState<string | null>(null);
@@ -389,12 +387,6 @@ export function useSandbox(
           : deltaApplier.applyDelta(m.delta);
       const view = applyHudPreview(receivedView, hudPreview);
       const applied = { ...m, view } as ViewMessage;
-      if (view.tick % 10 === 0 || view.winner >= 0) {
-        setReplay((current) => {
-          if (current.at(-1)?.tick === view.tick) return current;
-          return [...current, view].slice(-151);
-        });
-      }
       snapshotTelemetryRef.current?.track(applied);
       viewRef.current = view;
       applyStartCameraToView(view);
@@ -592,7 +584,6 @@ export function useSandbox(
 
   return {
     msg,
-    replay,
     error,
     picked,
     lastReject,
