@@ -1,0 +1,171 @@
+/* Окно отрядов: узкий вертикальный список плашек как у фишек и ряд маленьких кнопок (HoI4). */
+.card {
+  position: absolute;
+  left: var(--space-lg);
+  bottom: calc(var(--dock-h, 0px) + var(--space-md));
+  z-index: 2;
+  box-sizing: border-box;
+  width: 168px;
+  max-height: calc(100vh - var(--dock-h, 0px) - 2 * var(--space-md));
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: var(--space-sm);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.card::-webkit-scrollbar {
+  display: none;
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 22px;
+}
+
+.plate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-xs) 0 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-chip);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+
+.list:has(> .plate:only-child) .plate {
+  cursor: default;
+}
+
+.plate:not(:only-child) {
+  cursor: pointer;
+}
+
+.badge {
+  display: grid;
+  flex: 0 0 30px;
+  align-self: stretch;
+  place-items: center;
+  background: var(--relation-own);
+  color: var(--ui-surface);
+}
+
+.glyph {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.glyph circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.soldiers {
+  flex: 1;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bars {
+  display: flex;
+  gap: 2px;
+  align-self: stretch;
+  padding: 4px 0;
+}
+
+.track {
+  position: relative;
+  width: 4px;
+  background: var(--chip-track);
+}
+
+.fill {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--chip-org);
+}
+
+.fill[data-kind='supply'] {
+  background: var(--chip-supply);
+}
+
+.fill[data-kind='low'] {
+  background: var(--status-danger);
+}
+
+.close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-ink2);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.action {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.action:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.action:not(:disabled):hover {
+  border-color: var(--selection-color);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--status-success);
+}
+
+.note[data-bad='true'] {
+  color: var(--status-danger);
+}

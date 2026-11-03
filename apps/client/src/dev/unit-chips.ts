@@ -56,6 +56,8 @@ export interface ChipState {
   readonly ghost: boolean;
   /** Направление к целевому соседнему гексу; null — приказа атаки нет. */
   readonly attackDirection?: number | null;
+  /** Число одинаковых отрядов в стопке; нет или 1 — один отряд. */
+  readonly count?: number;
 }
 
 export interface Chip {
@@ -257,7 +259,10 @@ export function createChip(): Chip {
   return {
     root,
     draw(s) {
-      label.text = formatSoldiers(s.soldiers);
+      label.text =
+        (s.count ?? 1) > 1
+          ? `${formatSoldiers(s.soldiers)} ×${s.count}`
+          : formatSoldiers(s.soldiers);
       label.style.fill = s.ghost ? s.color : tokens.ui.ink;
       g.clear();
       if (s.ghost) {

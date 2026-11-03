@@ -30,13 +30,23 @@ export function chipGroups(v: PlayerView): ChipGroup[] {
   const result: ChipGroup[] = [];
   for (const units of buckets.values()) {
     units.sort((a, b) => a.id - b.id);
-    const middle = (units.length - 1) / 2;
-    for (let index = 0; index < units.length; index += 1) {
-      const unit = units[index];
-      if (!unit) continue;
+    // Одинаковые отряды одной армии с одним приказом — одна фишка с числом (HoI4: стопка).
+    const merged = new Map<string, UnitView[]>();
+    for (const unit of units) {
+      const key = `${unit.owner}|${unit.type}|${unit.armyId}|${unit.order}|${unit.target}`;
+      const same = merged.get(key);
+      if (same) same.push(unit);
+      else merged.set(key, [unit]);
+    }
+    const stacks = [...merged.values()];
+    const middle = (stacks.length - 1) / 2;
+    for (let index = 0; index < stacks.length; index += 1) {
+      const stack = stacks[index];
+      const unit = stack?.[0];
+      if (!stack || !unit) continue;
       result.push({
         key: `u${unit.id}`,
-        units: [unit],
+        units: stack,
         moving: inTransit(unit),
         stackOffset: (index - middle) * CHIP_STACK_STEP,
       });

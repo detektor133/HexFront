@@ -3,8 +3,8 @@ import { useLayoutEffect, useRef } from 'react';
 
 import {
   FP,
-  ORG_MAX,
   MAX_UNITS_PER_HEX,
+  ORG_MAX,
   type Command,
   type Fp,
   type MapStatic,
@@ -12,52 +12,54 @@ import {
   type UnitView,
 } from '@hexfront/sim';
 
-import styles from './HexCard.module.css';
-import { armyName } from './army-name.ts';
+import styles from './UnitCard.module.css';
 import { measureCardHeight } from './card-measurement.ts';
-import { toggleUnitSelection, type Picked } from './sandbox-selection.ts';
+import type { Picked } from './sandbox-selection.ts';
 import { UnitGlyph } from './unit-glyph.tsx';
 import { t, type MessageKey } from '../i18n/dict.ts';
-import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
+import { formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { IconButton } from '../ui/icon-button.tsx';
-import { MetricIcon } from '../ui/metric-icon.tsx';
 
-function Bar(props: {
-  kind: 'org' | 'supply';
-  share: number;
-  text: string;
-  low: boolean;
+/** Плашка отряда как фишка на карте: знак цвета армии, число солдат, столбики организации и снабжения. */
+function UnitPlate(props: {
+  u: UnitView;
+  view: PlayerView;
+  onClick?: (() => void) | undefined;
 }): React.JSX.Element {
+  const { u, view } = props;
+  const army = view.armies.find((a) => a.id === u.armyId);
+  const org = Math.max(0, Math.min(1, u.org / ORG_MAX));
+  const supply = Math.max(0, Math.min(1, (u.supplyLevel ?? FP) / FP));
+  const label = `${t(`unit.${u.type}` as MessageKey)} · ${formatSoldiers(u.soldiers)}`;
   return (
-    <div className={styles.bar} title={props.text}>
-      <MetricIcon name={props.kind === 'org' ? 'organization' : 'supply'} />
-      <div className={styles.barTrack} role="img" aria-label={props.text}>
-        <div
-          className={styles.barFill}
-          data-kind={props.kind}
-          data-low={props.low}
-          style={{ width: `${Math.round(Math.max(0, Math.min(1, props.share)) * 100)}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** Организация и снабжение полосками, без цифр и подписей (значения — в подсказке). */
-function UnitBars(props: { u: UnitView }): React.JSX.Element {
-  const { u } = props;
-  const supply = u.supplyLevel ?? FP;
-  return (
-    <div className={styles.bars}>
-      <Bar kind="org" share={u.org / ORG_MAX} text={formatFp(u.org)} low={u.org / ORG_MAX < 0.25} />
-      <Bar
-        kind="supply"
-        share={supply / FP}
-        text={u.encircled ? t('unit.encircled') : formatPercent(supply as Fp)}
-        low={u.encircled === true || supply / FP < 0.5}
-      />
-    </div>
+    <button
+      type="button"
+      className={styles.plate}
+      title={label}
+      aria-label={label}
+      onClick={props.onClick}
+    >
+      <span
+        className={styles.badge}
+        style={army ? { background: armyColor(army.number) } : undefined}
+      >
+        <UnitGlyph className={styles.glyph} type={u.type} />
+      </span>
+      <span className={styles.soldiers}>{formatSoldiers(u.soldiers)}</span>
+      <span className={styles.bars} aria-hidden="true">
+        <span className={styles.track}>
+          <span className={styles.fill} style={{ height: `${org * 100}%` }} />
+        </span>
+        <span className={styles.track}>
+          <span
+            className={styles.fill}
+            data-kind={u.encircled || supply < 0.5 ? 'low' : 'supply'}
+            style={{ height: `${supply * 100}%` }}
+          />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -71,17 +73,13 @@ function ArtilleryStatus({ unit }: { unit: UnitView }): React.JSX.Element | null
         ? 'unit.artillerySupport'
         : null;
   return key ? (
-    <p
-      role="status"
-      aria-label={t(key)}
-      className={key === 'unit.artilleryNoTarget' ? styles.bad : styles.good}
-    >
+    <p role="status" className={styles.note} data-bad={key === 'unit.artilleryNoTarget'}>
       {t(key)}
     </p>
   ) : null;
 }
 
-/** Карточка выбранных отрядов песочницы: состав и приказы (атака — без подтверждения, 04/T16). */
+/** Окно выбранных отрядов: список плашек и ряд маленьких кнопок (разделить, слить/собрать, стоп). */
 export function UnitCard(props: {
   view: PlayerView;
   map: MapStatic;
@@ -107,221 +105,104 @@ export function UnitCard(props: {
   const { view, picked } = props;
   const units = picked.units
     .map((id) => view.units.find((u) => u.id === id))
-    .filter((u): u is UnitView => u !== undefined);
+    .filter((u): u is UnitView => u !== undefined)
+    .sort((a, b) => a.id - b.id);
   const [first] = units;
   if (!first) return null;
-  const mergeReason: MessageKey | null =
-    units.length < 2
-      ? 'unit.mergeNeedMore'
-      : units.some((unit) => unit.owner !== view.playerId)
-        ? 'unit.mergeNotOwn'
-        : units.some((unit) => unit.order === 'retreat')
-          ? 'reason.retreating'
-          : null;
-  // Одна кнопка: совместимые в одном гексе сливаются сразу, остальные идут на сбор (CR-010).
+  const mine = units.every((u) => u.owner === view.playerId);
   const mergeable =
     first.armyId !== null &&
-    units.every(
-      (unit) => unit.hex === first.hex && unit.type === first.type && unit.armyId === first.armyId,
-    );
-  const gathering = units.find((unit) => (unit.gather ?? -1) >= 0);
-  const gatherLabel = gathering?.gather;
+    units.every((u) => u.hex === first.hex && u.type === first.type && u.armyId === first.armyId);
+  const mergeReason: MessageKey | null = units.some((u) => u.order === 'retreat')
+    ? 'reason.retreating'
+    : null;
   const splitReason: MessageKey | null =
     units.length !== 1
       ? null
-      : first.owner !== view.playerId
-        ? 'reason.notOwnUnit'
-        : first.soldiers < 2 * FP
-          ? 'unit.splitNeedMore'
-          : first.order === 'retreat'
-            ? 'reason.retreating'
-            : view.units.filter((unit) => unit.owner === view.playerId && unit.hex === first.hex)
-                  .length >= MAX_UNITS_PER_HEX
-              ? 'reason.hexFull'
-              : null;
-  const army = first.armyId === null ? undefined : view.armies.find((a) => a.id === first.armyId);
-  const title =
-    units.length === 1
-      ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
-      : t('unit.groups');
-  const selectedGroups = units.reduce<Map<number | null, UnitView[]>>((result, unit) => {
-    const group = result.get(unit.armyId) ?? [];
-    group.push(unit);
-    result.set(unit.armyId, group);
-    return result;
-  }, new Map());
-  const groups = [...selectedGroups.keys()].map(
-    (armyId) =>
-      [
-        armyId,
-        view.units.filter((unit) => unit.owner === view.playerId && unit.armyId === armyId),
-      ] as const,
-  );
-  const orderedGroups = groups.sort(([left], [right]) => {
-    if (left === null) return right === null ? 0 : 1;
-    if (right === null) return -1;
-    const leftNumber = view.armies.find((army) => army.id === left)?.number ?? left;
-    const rightNumber = view.armies.find((army) => army.id === right)?.number ?? right;
-    return leftNumber - rightNumber;
-  });
-  for (const [, group] of orderedGroups) group.sort((left, right) => left.id - right.id);
+      : first.soldiers < 2 * FP
+        ? 'unit.splitNeedMore'
+        : first.order === 'retreat'
+          ? 'reason.retreating'
+          : view.units.filter((u) => u.owner === view.playerId && u.hex === first.hex).length >=
+              MAX_UNITS_PER_HEX
+            ? 'reason.hexFull'
+            : null;
+  const gathering = units.find((u) => (u.gather ?? -1) >= 0)?.gather;
+  const title = units.length === 1 ? t(`unit.${first.type}` as MessageKey) : t('unit.groups');
+  const tip = (base: MessageKey, reason: MessageKey | null): string =>
+    reason ? `${t(base)}: ${t(reason)}` : t(base);
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
-      <div ref={contentRef} className={styles.cardBody}>
-        <div className={styles.header}>
-          {units.length === 1 ? (
-            <div className={styles.unitHead}>
-              <span
-                className={styles.unitBadge}
-                style={{
-                  backgroundColor: army ? armyColor(army.number) : undefined,
-                }}
-              >
-                <UnitGlyph className={styles.unitGlyph} type={first.type} />
-              </span>
-              <div>
-                <h2 className={styles.unitSoldiers}>{formatSoldiers(first.soldiers)}</h2>
-                <p className={styles.unitKind}>{t(`unit.${first.type}` as MessageKey)}</p>
-              </div>
-            </div>
-          ) : (
-            <h2 className={styles.title}>{title}</h2>
-          )}
-          <IconButton
-            className={styles.iconButton}
-            label={t('unit.close')}
-            onClick={() => props.onPick({ hex: null, units: [], target: null })}
-          >
-            <IconX className={styles.icon} size={16} aria-hidden="true" />
-          </IconButton>
+      <div ref={contentRef} className={styles.body}>
+        <IconButton
+          className={styles.close}
+          label={t('unit.close')}
+          onClick={() => props.onPick({ hex: null, units: [], target: null })}
+        >
+          <IconX size={14} aria-hidden="true" />
+        </IconButton>
+        <div className={styles.list}>
+          {units.map((u) => (
+            <UnitPlate
+              key={u.id}
+              u={u}
+              view={view}
+              onClick={
+                units.length > 1
+                  ? () => props.onPick({ hex: null, units: [u.id], target: null })
+                  : undefined
+              }
+            />
+          ))}
         </div>
-        {units.length === 1 && <UnitBars u={first} />}
         {units.length === 1 && <ArtilleryStatus unit={first} />}
-        {units.length > 1 && (
-          <div className={styles.unitGroups}>
-            {orderedGroups.map(([armyId, group]) => {
-              const army =
-                armyId === null ? undefined : view.armies.find((item) => item.id === armyId);
-              const selectableGroup = group;
-              return (
-                <section className={styles.unitGroup} key={armyId ?? 'reserve'}>
-                  <h3 className={styles.groupTitle}>
-                    <button
-                      type="button"
-                      aria-pressed={
-                        selectableGroup.length > 0 &&
-                        selectableGroup.every((unit) => picked.units.includes(unit.id))
-                      }
-                      disabled={selectableGroup.length === 0}
-                      aria-label={army ? armyName(army) : t('army.reserve')}
-                      onClick={() =>
-                        props.onPick(
-                          toggleUnitSelection(
-                            view,
-                            picked,
-                            selectableGroup.map((unit) => unit.id),
-                          ),
-                        )
-                      }
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={styles.armyMarker}
-                        data-army-number={army?.number}
-                        style={{ backgroundColor: army ? armyColor(army.number) : undefined }}
-                      />
-                      {army ? army.number : t('army.reserve')}
-                    </button>
-                  </h3>
-                  <ul className={styles.unitList}>
-                    {group.map((unit) => {
-                      const army =
-                        unit.armyId === null
-                          ? undefined
-                          : view.armies.find((item) => item.id === unit.armyId);
-                      const armyLabel = army ? armyName(army) : t('army.reserve');
-                      const label = `${t(`unit.${unit.type}` as MessageKey)} · ${formatSoldiers(unit.soldiers)} · ${armyLabel}`;
-                      return (
-                        <li key={unit.id}>
-                          <IconButton
-                            className={styles.unitPlate}
-                            label={label}
-                            aria-pressed={picked.units.includes(unit.id)}
-                            onClick={() =>
-                              props.onPick(toggleUnitSelection(view, picked, [unit.id]))
-                            }
-                          >
-                            <UnitGlyph className={styles.unitGlyph} type={unit.type} />
-                            <span>{formatSoldiers(unit.soldiers)}</span>
-                          </IconButton>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
+        {gathering !== undefined && (
+          <p role="status" className={styles.note}>
+            {t('unit.gathering')} {gathering % props.map.width}·
+            {Math.floor(gathering / props.map.width)}
+          </p>
         )}
-        {first.owner === view.playerId && (
-          <div className={styles.tiles}>
+        {mine && (
+          <div className={styles.actions}>
             {units.length === 1 && (
-              <div className={styles.levelAction}>
-                <IconButton
-                  className={styles.button}
-                  label={splitReason ? `${t('unit.split')}: ${t(splitReason)}` : t('unit.split')}
-                  disabled={splitReason !== null}
-                  onClick={() =>
-                    props.send({
-                      t: 'split',
-                      unitId: first.id,
-                      soldiers: (Math.floor(first.soldiers / (2 * FP)) * FP) as Fp,
-                    })
-                  }
-                >
-                  <IconScissors size={26} aria-hidden="true" />
-                </IconButton>
-              </div>
+              <IconButton
+                className={styles.action}
+                label={tip('unit.split', splitReason)}
+                disabled={splitReason !== null}
+                onClick={() =>
+                  props.send({
+                    t: 'split',
+                    unitId: first.id,
+                    soldiers: (Math.floor(first.soldiers / (2 * FP)) * FP) as Fp,
+                  })
+                }
+              >
+                <IconScissors size={18} aria-hidden="true" />
+              </IconButton>
             )}
             {units.length > 1 && (
-              <div className={styles.levelAction}>
-                <IconButton
-                  className={styles.button}
-                  label={
-                    mergeReason
-                      ? `${mergeable ? t('unit.merge') : t('unit.gather')}: ${t(mergeReason)}`
-                      : mergeable
-                        ? t('unit.merge')
-                        : t('unit.gather')
-                  }
-                  disabled={mergeReason !== null}
-                  onClick={() =>
-                    props.send({
-                      t: mergeable ? 'merge' : 'gather',
-                      unitIds: units.map((unit) => unit.id),
-                    })
-                  }
-                >
-                  <IconArrowsJoin2 size={26} aria-hidden="true" />
-                </IconButton>
-              </div>
-            )}
-            <div className={styles.levelAction}>
               <IconButton
-                className={styles.button}
-                label={t('unit.stop')}
-                onClick={() => props.send({ t: 'stop', unitIds: units.map((unit) => unit.id) })}
+                className={styles.action}
+                label={tip(mergeable ? 'unit.merge' : 'unit.gather', mergeReason)}
+                disabled={mergeReason !== null}
+                onClick={() =>
+                  props.send({
+                    t: mergeable ? 'merge' : 'gather',
+                    unitIds: units.map((u) => u.id),
+                  })
+                }
               >
-                <IconPlayerStop size={26} aria-hidden="true" />
+                <IconArrowsJoin2 size={18} aria-hidden="true" />
               </IconButton>
-            </div>
+            )}
+            <IconButton
+              className={styles.action}
+              label={t('unit.stop')}
+              onClick={() => props.send({ t: 'stop', unitIds: units.map((u) => u.id) })}
+            >
+              <IconPlayerStop size={18} aria-hidden="true" />
+            </IconButton>
           </div>
-        )}
-        {gatherLabel !== undefined && (
-          <p role="status">
-            {t('unit.gathering')} {gatherLabel % props.map.width}·
-            {Math.floor(gatherLabel / props.map.width)}
-          </p>
         )}
       </div>
     </section>

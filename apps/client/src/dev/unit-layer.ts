@@ -278,14 +278,30 @@ export function createUnitLayer(
     return attackShift(center(unit.hex), center(unit.target));
   }
 
+  // Стопка одинаковых отрядов: сумма солдат, средняя организация, число отрядов в подписи.
+  function stackState(units: readonly UnitView[], v: PlayerView): ChipState {
+    const first = units[0] as UnitView;
+    const state = stateOf(first, v);
+    if (units.length === 1) return state;
+    const soldiers = units.reduce((sum, u) => sum + u.soldiers, 0);
+    const org = units.reduce((sum, u) => sum + u.org, 0) / units.length / ORG_MAX;
+    return {
+      ...state,
+      soldiers,
+      org,
+      count: units.length,
+      selected: units.some((u) => picked.units.includes(u.id)),
+    };
+  }
+
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
     for (const g of chipGroups(v)) {
       const unit = g.units[0] as UnitView;
       out.push({
         key: g.key,
-        units: [unit.id],
-        state: stateOf(unit, v),
+        units: g.units.map((u) => u.id),
+        state: stackState(g.units, v),
         at: g.moving
           ? (f) => {
               const position = unitAt(unit, f);
@@ -476,20 +492,19 @@ export function createUnitLayer(
     },
     unitsAt(world) {
       const halfHeight = chipHalf();
-      let closest: { readonly unitId: number; readonly distance: number } | null = null;
+      let closest: { readonly ids: readonly number[]; readonly distance: number } | null = null;
       for (const entry of entries) {
         if (entry.units.length === 0) continue;
         const at = drawnAt.get(entry.key) ?? entry.at(1);
         const halfWidth = ((chips.get(entry.key)?.width() ?? 0) * CHIP_WORLD) / 2;
         if (Math.abs(world.x - at.x) > halfWidth || Math.abs(world.y - at.y) > halfHeight) continue;
-        const unitId = entry.units[0];
-        if (unitId === undefined) continue;
+        const ids = entry.units;
         const dx = world.x - at.x;
         const dy = world.y - at.y;
         const distance = dx * dx + dy * dy;
-        if (closest === null || distance < closest.distance) closest = { unitId, distance };
+        if (closest === null || distance < closest.distance) closest = { ids, distance };
       }
-      return closest ? [closest.unitId] : [];
+      return closest ? closest.ids : [];
     },
     setScale(scale) {
       k = 1 / scale;

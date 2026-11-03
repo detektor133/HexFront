@@ -56,7 +56,7 @@ function farPlain(v: PlayerView, from: number): number {
 }
 
 describe('фишки отрядов (07/T17bt)', () => {
-  it('сохраняет три отдельные фишки в стабильном порядке на общем переходе', () => {
+  it('одинаковые отряды армии стопкой в одну фишку, остальные — в стабильном порядке', () => {
     const { e, view } = start(false);
     const [a, b] = e.state.units.filter((u) => u.owner === 0);
     if (!a || !b) throw new Error('нет стартовых отрядов');
@@ -74,10 +74,10 @@ describe('фишки отрядов (07/T17bt)', () => {
       if (march.every((u) => u.hex === to && u.path.length === 0)) break;
       if (march.some((u) => u.moveTotal > 0)) moving += 1;
       const groups = chipGroups(v).filter((g) => g.units.some((u) => ids.includes(u.id)));
-      expect(groups, `тик ${t}`).toHaveLength(3);
-      expect(groups.map((g) => g.units[0]?.id)).toEqual([...ids].sort((x, y) => x - y));
+      const covered = groups.flatMap((g) => g.units.map((u) => u.id)).sort((x, y) => x - y);
+      expect(covered, `тик ${t}`).toEqual([...ids].sort((x, y) => x - y));
       for (const [index, group] of groups.entries()) {
-        expect(group.stackOffset).toBeCloseTo((index - 1) * CHIP_STACK_STEP);
+        expect(group.stackOffset).toBeCloseTo((index - (groups.length - 1) / 2) * CHIP_STACK_STEP);
       }
     }
     expect(moving).toBeGreaterThan(10);
