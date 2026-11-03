@@ -68,7 +68,13 @@ export interface Chip {
 }
 
 // Глифы 14×14, stroke 2, round (units.md, «Глифы»).
-function glyph(g: Graphics, type: UnitType, x: number, y: number, color: string): void {
+export function drawTypeGlyph(
+  g: Graphics,
+  type: UnitType,
+  x: number,
+  y: number,
+  color: string,
+): void {
   const stroke = { color, width: 2, cap: 'round', join: 'round' } as const;
   if (type === 'infantry') {
     g.moveTo(x + 2, y + 10)
@@ -157,7 +163,7 @@ function body(g: Graphics, s: ChipState, left: number, w: number): number {
     g.rect(sq + r, top, SQUARE - r, H).fill(s.color);
   }
   g.roundRect(left, top, w, H, r).stroke(border);
-  glyph(g, s.type, sq + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, tokens.ui.surface);
+  drawTypeGlyph(g, s.type, sq + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, tokens.ui.surface);
   return sq;
 }
 
@@ -224,7 +230,7 @@ function drawGhost(p: Parts, s: ChipState): void {
   g.moveTo(left, top).lineTo(left, top + H);
   g.moveTo(left + w, top).lineTo(left + w, top + H);
   g.stroke({ color: s.color, width: OUTLINE });
-  glyph(g, s.type, left + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, s.color);
+  drawTypeGlyph(g, s.type, left + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, s.color);
   vbar(g, left + w - BAR_INSET - BAR_W, top + 4, H - 8, s.org, s.color);
   p.label.position.set(left + SQUARE + PAD + text / 2, 0);
 }

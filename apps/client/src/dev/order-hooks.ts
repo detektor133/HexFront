@@ -4,6 +4,7 @@
 // на вражеский гекс при выбранных отрядах — прогноз.
 import { forecastBattle, hexId, inBounds, type MapStatic, type PlayerView } from '@hexfront/sim';
 
+import type { MarkerAnchor } from './battle-panel.ts';
 import type { OrderTarget } from './economy-layer.ts';
 import { forecastBadge } from './forecast-plate.ts';
 import { isHostile, pickedOwn, type Picked } from './sandbox-selection.ts';
@@ -27,6 +28,9 @@ export interface OrderDeps {
   order(hex: number): void;
   /** Курсор над гексом: подсказка маршрута (черновик или путь до курсора). */
   routeHover?(hex: number | null): void;
+  /** Маркер боя под мировой точкой (null — мимо). */
+  markerAt?(world: Point): MarkerAnchor | null;
+  setBattlePanel?(m: MarkerAnchor | null): void;
 }
 
 /** Хуки карты для приказа удержанием и наведения. */
@@ -81,8 +85,11 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
     },
     hover(world) {
       d.setPlanHover?.(world);
+      // Панель боя точнее прогноза по гексу под ней: пока она открыта, плашка прогноза скрыта.
+      const marker = world ? (d.markerAt?.(world) ?? null) : null;
+      d.setBattlePanel?.(marker);
       const busy = d.tool() || d.picked().units.length === 0;
-      const hex = world && !busy ? hexAt(world) : null;
+      const hex = world && !busy && !marker ? hexAt(world) : null;
       d.routeHover?.(hex);
       show(hex, true);
     },

@@ -14,6 +14,7 @@ import {
   type UnitView,
 } from '@hexfront/sim';
 
+import { markerAt, type MarkerAnchor } from './battle-panel.ts';
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 import { CHIP_WORLD, chipHalf, cityChipShift } from './chip-place.ts';
@@ -44,6 +45,8 @@ const RES_STEP = 0.5;
 const ARTY_RANGE_HEXES = 2;
 /** Маркер боя (units.md): ⌀16, обводка 2. */
 const FULL = 1000;
+/** Радиус наведения на маркер боя, px экрана при масштабе фишек. */
+const MARKER_HIT_PX = 16;
 const ENCIRCLED_MS = 3000;
 const ENCIRCLED_DASH = 6;
 const ENCIRCLED_GAP = 5;
@@ -55,6 +58,8 @@ export interface UnitLayer {
   cacheTelemetry(): UnitLayerCacheTelemetry;
   /** Возвращает состояние маркера боя для пары исходного и целевого гексов или null, если маркера нет. */
   battleMarkerState(sourceHex: number, targetHex: number): number | null;
+  /** Маркер боя под мировой точкой или null. */
+  battleMarkerAt(world: Point): MarkerAnchor | null;
   /** Где стоит фишка гекса (под городом — сдвинута вниз). */
   chipAt(hex: number): Point;
   /** Видимая область фишки отряда в мировых координатах. */
@@ -166,6 +171,7 @@ export function createUnitLayer(
   const cities = new Map<number, number>();
   const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
   const battleMarkerColors = new Map<string, string>();
+  const markerAnchors = new Map<string, MarkerAnchor>();
 
   function battleAdvantage(u: UnitView, v: PlayerView): number | null {
     if (u.attackState !== null && u.attackState !== undefined) return u.attackState.advantage;
@@ -217,6 +223,7 @@ export function createUnitLayer(
       if (previous?.container) battles.removeChild(previous.container);
       if (current.container) battles.addChild(current.container);
     }
+    markerAnchors.set(key, { sourceHex: u.hex, targetHex: u.target, at: edgeCenter });
     current?.container?.position.set(edgeCenter.x, edgeCenter.y);
     current?.container?.scale.set(CHIP_WORLD * pulse);
   }
@@ -392,6 +399,7 @@ export function createUnitLayer(
       marker.destroy();
       battleMarkers.delete(key);
       battleMarkerColors.delete(key);
+      markerAnchors.delete(key);
     }
   }
 
@@ -420,6 +428,9 @@ export function createUnitLayer(
 
   const layer: UnitLayer = {
     container,
+    battleMarkerAt(world) {
+      return markerAt(markerAnchors.values(), world, MARKER_HIT_PX * CHIP_WORLD);
+    },
     battleMarkerState(sourceHex, targetHex) {
       return battleMarkers.get(`${sourceHex}->${targetHex}`)?.object?.state ?? null;
     },

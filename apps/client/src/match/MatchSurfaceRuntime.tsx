@@ -524,6 +524,8 @@ export function useSandbox(
       setPlanHover: (world) => layerRef.current?.setPlanHover(world),
       order,
       routeHover: (hex) => route.hover(hex),
+      markerAt: (world) => layerRef.current?.battleMarkerAt(world) ?? null,
+      setBattlePanel: (m) => layerRef.current?.setBattlePanel(m),
     });
     const options = {
       radius: tokens.map.hexRadius,

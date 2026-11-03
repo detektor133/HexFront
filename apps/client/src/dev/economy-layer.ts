@@ -15,6 +15,7 @@ import {
   type Direction,
 } from '@hexfront/sim';
 
+import { battleSides, drawBattlePanel, type MarkerAnchor } from './battle-panel.ts';
 import { captureProgress, cityFlashAlpha } from './battle-visuals.ts';
 import type {
   EconomyLayerCacheTelemetry,
@@ -115,6 +116,9 @@ export interface EconomyLayer {
   setOrderTarget(t: OrderTarget | null): void;
   /** Подсказка маршрута: путь, время в пути и точки; null — убрать. */
   setRoute(r: RouteView | null): void;
+  /** Маркер боя под курсором: панель двух сторон; null — убрать. */
+  setBattlePanel(m: MarkerAnchor | null): void;
+  battleMarkerAt: UnitLayer['battleMarkerAt'];
   chipAt(hex: number): Point;
   chipBounds: UnitLayer['chipBounds'];
   unitsAt(world: Point): readonly number[];
@@ -290,6 +294,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let split: SplitOverlay | null = null;
   let orderTarget: OrderTarget | null = null;
   let route: RouteView | null = null;
+  let battlePanel: MarkerAnchor | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
   const reducedMotion =
@@ -579,6 +584,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       if (orderTarget.badge) drawForecastPlate(plates, orderTarget.badge, at, k, PLATE_LIFT_PX);
     }
     if (route) drawRoute(marks, plates, route, center, k);
+    if (battlePanel && view) {
+      drawBattlePanel(plates, battleSides(view, battlePanel.targetHex), battlePanel.at, k);
+    }
   }
 
   const roadSignature = (v: PlayerView): string =>
@@ -661,6 +669,15 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     setRoute(r) {
       route = r;
       redraw();
+    },
+    setBattlePanel(m) {
+      if (m?.sourceHex === battlePanel?.sourceHex && m?.targetHex === battlePanel?.targetHex)
+        return;
+      battlePanel = m;
+      redraw();
+    },
+    battleMarkerAt(world) {
+      return unitLayer.battleMarkerAt(world);
     },
     chipAt(hex) {
       return unitLayer.chipAt(hex);
