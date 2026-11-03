@@ -27,8 +27,6 @@ import { drawConstructions } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
-import type { RouteView } from './route-draft.ts';
-import { drawRoute } from './route-draw.ts';
 import type { SplitOverlay } from './split-drag.ts';
 import {
   buildTerritoryLabels,
@@ -115,7 +113,6 @@ export interface EconomyLayer {
    */
   setOrderTarget(t: OrderTarget | null): void;
   /** Подсказка маршрута: путь, время в пути и точки; null — убрать. */
-  setRoute(r: RouteView | null): void;
   /** Маркер боя под курсором: панель двух сторон; null — убрать. */
   setBattlePanel(m: MarkerAnchor | null): void;
   battleMarkerAt: UnitLayer['battleMarkerAt'];
@@ -293,7 +290,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let roadPreviewPath: readonly number[] | null = null;
   let split: SplitOverlay | null = null;
   let orderTarget: OrderTarget | null = null;
-  let route: RouteView | null = null;
   let battlePanel: MarkerAnchor | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
@@ -583,7 +579,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       // Над целевым гексом, выше фишек (art/units.md, «Плашка прогноза»).
       if (orderTarget.badge) drawForecastPlate(plates, orderTarget.badge, at, k, PLATE_LIFT_PX);
     }
-    if (route) drawRoute(marks, plates, route, center, k);
     if (battlePanel && view) {
       drawBattlePanel(plates, battleSides(view, battlePanel.targetHex), battlePanel.at, k);
     }
@@ -664,10 +659,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     setOrderTarget(t) {
       orderTarget = t;
-      redraw();
-    },
-    setRoute(r) {
-      route = r;
       redraw();
     },
     setBattlePanel(m) {

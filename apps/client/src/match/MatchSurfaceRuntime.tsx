@@ -18,14 +18,11 @@ import { applyHudPreview, readHudPreview } from '../dev/hud-preview.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import { createRouteDraft, type RouteDraft } from '../dev/route-draft.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
-  isHostile,
   NOTHING_PICKED,
   orderHex,
-  pickedOwn,
   selectHexOnly,
   selectUnits,
   selectUnitsInRect,
@@ -221,7 +218,6 @@ export function useSandbox(
 ): Sandbox {
   const matchRef = useRef<LocalMatch | null>(null);
   const layerRef = useRef<EconomyLayer | null>(null);
-  const routeRef = useRef<RouteDraft | null>(null);
   const viewRef = useRef<PlayerView | null>(null);
   const pickedRef = useRef<Picked>(NOTHING_PICKED);
   const mapViewRef = useRef<MapView | null>(null);
@@ -442,7 +438,7 @@ export function useSandbox(
       (m) => {
         if (m.t === 'error') return setError(m.errors.join('; '));
         // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
-        if (m.t === 'pathPreview') return routeRef.current?.reply(m.requestId, m.preview);
+        if (m.t === 'pathPreview') return;
         scheduleMessage(m);
       },
       {
@@ -466,29 +462,14 @@ export function useSandbox(
     const initialSelect = params.get('select');
     if (initialSelect !== null) pick({ hex: Number(initialSelect), units: [], target: null });
     const initialScale = Number(params.get('scale'));
-    const route = createRouteDraft({
-      unitIds: () =>
-        viewRef.current ? pickedOwn(viewRef.current, pickedRef.current).map((u) => u.id) : [],
-      request: (id, ids, to, via) => match.previewPath?.(id, ids, to, via),
-      show: (r) => layerRef.current?.setRoute(r),
-      schedule: (run) => requestAnimationFrame(run),
-    });
-    routeRef.current = route;
-    const onTap = (
-      h: { q: number; r: number },
-      kind: TapKind,
-      world: Point,
-      shift: boolean,
-    ): void => {
+    const onTap = (h: { q: number; r: number }, kind: TapKind, world: Point): void => {
       const current = viewRef.current;
       if (!current || !inBounds(h, map.width, map.height)) {
         return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
       if (input.tap(world, kind) || input.onHandle(world)) return;
-      if (kind === 'order' && shift && !isHostile(current, hex)) return route.add(hex);
       if (kind === 'select') {
-        route.clear();
         const hit = layerRef.current?.unitsAt(world) ?? [];
         return pick(
           hit.length > 0 ? selectUnits(current, pickedRef.current, hit) : selectHexOnly(hex),
@@ -511,7 +492,6 @@ export function useSandbox(
       getPicked: () => pickedRef.current,
       send: (command) => match.send(command),
       pick,
-      takeVia: () => route.take(),
     });
     const hooks = createOrderHooks({
       map,
@@ -523,7 +503,6 @@ export function useSandbox(
       setTarget: (t) => layerRef.current?.setOrderTarget(t),
       setPlanHover: (world) => layerRef.current?.setPlanHover(world),
       order,
-      routeHover: (hex) => route.hover(hex),
       markerAt: (world) => layerRef.current?.battleMarkerAt(world) ?? null,
       setBattlePanel: (m) => layerRef.current?.setBattlePanel(m),
     });
@@ -581,7 +560,6 @@ export function useSandbox(
         setTool(null);
       },
       clearPick: () => {
-        route.clear();
         pick(NOTHING_PICKED);
       },
       view: () => viewRef.current,

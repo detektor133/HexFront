@@ -90,7 +90,6 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
       d.setBattlePanel?.(marker);
       const busy = d.tool() || d.picked().units.length === 0;
       const hex = world && !busy && !marker ? hexAt(world) : null;
-      d.routeHover?.(hex);
       show(hex, true);
     },
   };
