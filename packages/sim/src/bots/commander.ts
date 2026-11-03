@@ -4,6 +4,7 @@
 // земля — занять без плана, нейтральный город — штурм при прогнозе «успех», в приоритете; ▶ без
 // линии — построить линию; лишние отряды резерва — в самую слабую армию. Сам на игроков не наступает.
 import { commanderLine } from './commander-line.ts';
+import { strike } from './commander-strike.ts';
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
@@ -339,6 +340,10 @@ export function decide(
     ...seedExpansion(view, armyId, commanderContext),
   ];
   const units = armyUnits(view, armyId);
+  // Бот: свободные отряды бьют по вражескому городу, если прогноз боя — победа (commander-strike).
+  const struck = bot ? strike(map, view, units.filter(idle)) : [];
+  const striking = new Set(struck.flatMap((c) => (c.t === 'move' ? c.unitIds : [])));
+  out.push(...struck);
   const expansion =
     lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1
       ? (view.armies.at(-1)?.id ?? null)
@@ -350,7 +355,14 @@ export function decide(
       out.push({ t: 'assignFront', armyId, edges: [...piece.edges] });
       return out;
     }
-    out.push(...retake(map, view, plan.lost, units));
+    out.push(
+      ...retake(
+        map,
+        view,
+        plan.lost,
+        units.filter((u) => !striking.has(u.id)),
+      ),
+    );
     if (plan.startWanted && !plan.offensive) {
       const line = commanderLine(map, view, plan.edges, piece.enemy, lineDepth);
       if (line.length > 0) {
@@ -360,7 +372,14 @@ export function decide(
     return out;
   }
   if (plan) out.push({ t: 'clearPlan', armyId });
-  out.push(...expand(map, view, units, commanderContext));
+  out.push(
+    ...expand(
+      map,
+      view,
+      units.filter((u) => !striking.has(u.id)),
+      commanderContext,
+    ),
+  );
   return out;
 }
 
