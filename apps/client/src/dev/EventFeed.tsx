@@ -1,3 +1,4 @@
+import { IconArrowBackUp, IconBuildingCastle, IconFlag, IconSkull } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import type { GameEvent } from '@hexfront/sim';
@@ -40,6 +41,16 @@ function label(event: GameEvent, localPlayerId: number): string {
   return t(eventLabel(event.t));
 }
 
+/** Иконка записи вместо текстовой подписи; текст остаётся в title и aria-label. */
+function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: number }) {
+  const { event } = props;
+  if (event.t === 'unitDestroyed') return <IconSkull size={18} aria-hidden />;
+  if (event.t === 'unitCapitulated') return <IconFlag size={18} aria-hidden />;
+  if (event.t === 'unitRetreated') return <IconArrowBackUp size={18} aria-hidden />;
+  if (event.t === 'cityCaptured') return <IconBuildingCastle size={18} aria-hidden />;
+  return null;
+}
+
 export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
   readonly localPlayerId?: number;
@@ -69,13 +80,14 @@ export function EventFeed(props: {
                   background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
                 }}
               />
-              <span>{label(item.event, props.localPlayerId ?? 0)}</span>
+              <EventIcon event={item.event} localPlayerId={props.localPlayerId ?? 0} />
             </>
           );
           const className = `${styles.item} ${item.important ? styles.important : ''}`;
+          const text = label(item.event, props.localPlayerId ?? 0);
 
           return item.hex === null || item.hex === undefined ? (
-            <div className={className} key={item.id}>
+            <div className={className} key={item.id} title={text} aria-label={text} role="img">
               {content}
             </div>
           ) : (
@@ -83,6 +95,8 @@ export function EventFeed(props: {
               className={className}
               key={item.id}
               type="button"
+              title={text}
+              aria-label={text}
               onClick={() => props.onFocus(item)}
             >
               {content}

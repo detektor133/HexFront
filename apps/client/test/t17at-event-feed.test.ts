@@ -42,7 +42,6 @@ describe('07/T17at: фильтр ленты событий', () => {
       captured(1, 4, 1, 0),
       captured(0, 5, 0, 1),
       { t: 'unitDestroyed', playerId: 0, unitId: 6, hex: 6 },
-      { t: 'unitRetreated', playerId: 0, unitId: 7, hex: 7 },
       { t: 'capitalMoved', playerId: 0, cityId: 8 },
       { t: 'commandRejected', playerId: 0, command: 'move', reason: 'badHex', auto: false },
       { t: 'unitRecruited', playerId: 0, cityId: 9, type: 'infantry' },

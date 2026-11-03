@@ -29,7 +29,7 @@ export function isImportantEvent(event: GameEvent): boolean {
 }
 
 function isVisibleEvent(event: GameEvent, localPlayerId: number): boolean {
-  if (event.t === 'unitDestroyed' || event.t === 'unitCapitulated') {
+  if (event.t === 'unitDestroyed' || event.t === 'unitCapitulated' || event.t === 'unitRetreated') {
     return event.playerId === localPlayerId;
   }
   return (
