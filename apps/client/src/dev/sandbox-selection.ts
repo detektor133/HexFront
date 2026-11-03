@@ -92,7 +92,10 @@ export function selectUnits(view: PlayerView, picked: Picked, ids: readonly numb
     .filter((u) => ids.includes(u.id) && u.owner === view.playerId)
     .map((u) => u.id);
   if (units.length === 0) return selectHex(view, picked, picked.hex ?? -1);
-  const same = units.every((id) => picked.units.includes(id));
+  // Повторный тап снимает выбор только когда выбраны ровно эти отряды; тап по одной фишке из
+  // выбранной стопки или группы сужает выбор до неё.
+  const same =
+    units.length === picked.units.length && units.every((id) => picked.units.includes(id));
   if (!same) return { hex: null, units, target: null };
   const first = view.units.find((u) => u.id === units[0]);
   return { hex: first?.hex ?? null, units: [], target: null };

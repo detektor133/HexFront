@@ -643,6 +643,7 @@ export function SandboxSurface({
           onSelect={sb.setArmy}
           send={sb.send}
           onPick={sb.pick}
+          pickedUnits={sb.picked.units}
           tool={sb.tool}
           onTool={sb.setTool}
         />

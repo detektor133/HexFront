@@ -229,6 +229,8 @@ function ArmyCard(props: {
   onAuto: () => void;
   onRename: (name: string) => void;
   onClick: () => void;
+  /** ПКМ: если выбраны отряды — перевести их в эту армию, иначе выбрать армию. */
+  onContextAction: () => void;
   onDoubleClick?: () => void;
 }): React.JSX.Element {
   const { stats, run } = props;
@@ -248,7 +250,7 @@ function ArmyCard(props: {
   const select = (): void => props.onClick();
   const selectFromContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
     event.preventDefault();
-    select();
+    props.onContextAction();
   };
   return (
     <div className={`${styles.card} ${frame}`}>
@@ -362,6 +364,8 @@ export function ArmyBar(props: {
   selected: number | null;
   /** Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке. */
   partial: readonly number[];
+  /** Выбранные сейчас отряды (для ПКМ по карточке армии). */
+  pickedUnits: readonly number[];
   onSelect: (armyId: number | null) => void;
   onFocusArmy?: (armyId: number) => void;
   /** Номера занятых групп управления — значки-цифры. */
@@ -488,6 +492,14 @@ export function ArmyBar(props: {
                   onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
+                  onContextAction={() => {
+                    const ids = props.pickedUnits.filter((id) => mine.some((u) => u.id === id));
+                    if (ids.length > 0 && !ids.every((id) => units.some((u) => u.id === id))) {
+                      send({ t: 'assignUnits', unitIds: ids, armyId: a.id });
+                    } else {
+                      select(a.id, units);
+                    }
+                  }}
                   onDoubleClick={() => props.onFocusArmy?.(a.id)}
                 />
               );

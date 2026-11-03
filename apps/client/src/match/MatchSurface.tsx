@@ -243,6 +243,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
           partial={partial.filter((a) => a !== army)}
+          pickedUnits={sb.picked.units}
           onHeight={handleArmyBarHeight}
           onSelect={sb.setArmy}
           onFocusArmy={sb.focusArmy}
