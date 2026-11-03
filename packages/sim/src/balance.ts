@@ -92,7 +92,7 @@ export const EUROPE_MAP_TARGET_PLAYERS = 30;
 export const MAPGEN_MAX_PLAYERS = 100;
 export const NEUTRAL_CITIES_PER_PLAYER: Fp = fp(1.5);
 /** Гарнизон нейтрального города по уровню 1/2/3, солдат. */
-export const NEUTRAL_GARRISON: readonly [Fp, Fp, Fp] = [fp(150), fp(300), fp(600)];
+export const NEUTRAL_GARRISON: readonly [Fp, Fp, Fp] = [fp(37), fp(75), fp(150)];
 
 // Население и налог
 

@@ -194,7 +194,7 @@ function chooseCities(
       r: candidate.r,
       name: cityName(id),
       level,
-      garrison: [150, 300, 600][level - 1] ?? 150,
+      garrison: [37, 75, 150][level - 1] ?? 37,
     });
     if (cities.length === target) return cities;
   }

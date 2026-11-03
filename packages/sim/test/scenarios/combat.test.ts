@@ -225,13 +225,29 @@ describe('города: ополчение и гарнизон', () => {
     `,
       { legend },
     );
-    const att = s.unit('A', 'infantry', 100, at(2, 1));
+    const att = s.unit('A', 'infantry', 20, at(2, 1));
     s.cmd('A', attack([att], at(3, 1)));
     s.runSeconds(5);
     const after = s.cityAt(at(3, 1))?.defenders ?? 0;
-    expect(after).toBeLessThan(150 * FP);
+    expect(after).toBeLessThan(37 * FP);
     s.runSeconds(30);
     expect(s.cityAt(at(3, 1))?.defenders).toBeLessThanOrEqual(after);
+  });
+
+  it('07/T17cb: стартовые 100 пехотинцев захватывают нейтральный город уровня 1', () => {
+    const s = scenario(
+      `
+      ~  ~  ~  ~
+      A1 a  a  N1
+      ~  ~  ~  ~
+    `,
+      { legend },
+    );
+    expect(s.cityAt(at(3, 1))?.defenders).toBe(37 * FP);
+    const att = s.unit('A', 'infantry', 100, at(2, 1));
+    s.cmd('A', attack([att], at(3, 1)));
+    s.runSeconds(90);
+    expect(s.owner(at(3, 1))).toBe('A');
   });
 
   it('ополчение защищает город вместе с отрядами и восстанавливается вне боя', () => {
