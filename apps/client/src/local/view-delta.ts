@@ -49,6 +49,7 @@ const METADATA_FIELDS: readonly (keyof ViewMetadata)[] = [
   'me',
   'constructions',
   'recruits',
+  'diplomacy',
 ];
 
 function sameHexShape(left: PlayerView, right: PlayerView): boolean {

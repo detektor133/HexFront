@@ -35,6 +35,7 @@ export type ViewMetadata = Pick<
   | 'me'
   | 'constructions'
   | 'recruits'
+  | 'diplomacy'
 >;
 
 export interface ViewDelta {

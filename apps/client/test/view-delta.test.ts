@@ -158,3 +158,18 @@ describe('применение дельта-снимков на клиенте',
     expect(() => applier.applyDelta({ ...delta(), baseTick: 0 })).toThrow('Неверная база дельты');
   });
 });
+
+describe('дипломатия в дельте (CR-007)', () => {
+  it('изменение отношений доходит до клиента через дельту', () => {
+    const before = makeView();
+    const after: PlayerView = {
+      ...before,
+      tick: 2,
+      diplomacy: { relations: ['peace', 'war'], violations: [0, 1], incoming: [], outgoing: [] },
+    };
+    const delta = buildViewDelta(before, after, []);
+    const applier = new ViewDeltaApplier();
+    applier.applySnapshot({ t: 'snapshot', tick: 1, view: before });
+    expect(applier.applyDelta(delta).diplomacy?.relations).toEqual(['peace', 'war']);
+  });
+});
