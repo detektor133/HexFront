@@ -727,6 +727,24 @@ describe('T17m: карточка клетки', () => {
     );
     fireEvent.click(disabledButton);
     expect(send).not.toHaveBeenCalled();
+
+    cleanup();
+    engine.state.hexes.building[hex] = BUILDING.fort;
+    engine.select(hex);
+    const ruleBlocked = engine.snapshot();
+    if (!ruleBlocked.selection?.fort || ruleBlocked.selection.fort.ok) {
+      throw new Error('ожидался запрет укрепления правилом существующей постройки');
+    }
+    expect(ruleBlocked.selection.fort.reason).toBe('buildingExists');
+    send.mockClear();
+    render(
+      <HexCard s={ruleBlocked.selection} view={ruleBlocked.view} map={mapResult.map} send={send} />,
+    );
+    const ruleBlockedButton = screen.getByRole('button', { name: buttonName });
+    expect((ruleBlockedButton as HTMLButtonElement).disabled).toBe(true);
+    expect(ruleBlockedButton.getAttribute('title')).toBe(buttonName);
+    fireEvent.click(ruleBlockedButton);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('отправляет build depot для доступного гекса и блокирует его при нехватке золота', () => {
