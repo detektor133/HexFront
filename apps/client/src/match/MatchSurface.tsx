@@ -246,6 +246,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onHeight={handleArmyBarHeight}
           onSelect={sb.setArmy}
           onFocusArmy={sb.focusArmy}
+          groups={sb.groupDigits}
           send={sb.send}
           onPick={sb.pick}
           tool={sb.tool}

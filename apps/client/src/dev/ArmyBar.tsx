@@ -364,6 +364,8 @@ export function ArmyBar(props: {
   partial: readonly number[];
   onSelect: (armyId: number | null) => void;
   onFocusArmy?: (armyId: number) => void;
+  /** Номера занятых групп управления — значки-цифры. */
+  groups?: readonly number[];
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
   tool: ToolState | null;
@@ -457,6 +459,13 @@ export function ArmyBar(props: {
               }}
             />
           </div>
+        )}
+        {props.groups && props.groups.length > 0 && (
+          <ul className={styles.groups} aria-label={t('army.groups')}>
+            {props.groups.map((digit) => (
+              <li key={digit}>{digit}</li>
+            ))}
+          </ul>
         )}
         <div className={styles.strip} onWheel={onStripWheel}>
           <div className={styles.stripContent}>

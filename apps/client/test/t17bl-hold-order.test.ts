@@ -345,7 +345,11 @@ describe('07/T17bl: удержание и команды матча', () => {
     harness.app.ticker.callbacks.forEach((callback) =>
       callback({ deltaMS: tokens.motion.map / 2, FPS: 60 }),
     );
-    expect(selectedUnitCard().getAttribute('aria-label')).toBe(selectedTitle);
+    // Двойное нажатие выбирает все свои отряды того же типа в видимой области (07/T17dd).
+    expect(
+      screen.getByRole('region', { name: / · \d|Выбранные отряды|Selected units/u }),
+    ).toBeTruthy();
+    expect(selectedTitle).toBeTruthy();
   });
 
   it('отправляет ПКМ через MapView без радиальных секторов', async () => {

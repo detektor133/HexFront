@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PlayerView } from '@hexfront/sim';
 
+import { ControlGroups } from '../src/input/control-groups.ts';
 import { createHotkeyHandler, type HotkeyContext } from '../src/input/hotkeys.ts';
 
 const view = {
@@ -31,6 +32,8 @@ function setup(overrides: Partial<HotkeyContext> = {}) {
     selectedArmy: () => 10,
     setArmy: vi.fn(),
     send: vi.fn(),
+    groups: new ControlGroups(),
+    selectUnits: vi.fn(),
     ...overrides,
   } satisfies HotkeyContext;
   const handler = createHotkeyHandler(ctx);
@@ -99,5 +102,21 @@ describe('07/T17dc: реестр горячих клавиш', () => {
     expect(ctx.cancelMap).not.toHaveBeenCalled();
     expect(ctx.setArmy).not.toHaveBeenCalled();
     expect(ctx.centerOnHex).not.toHaveBeenCalled();
+  });
+
+  it('07/T17dd: Shift+цифра запоминает, цифра вызывает, повтор центрирует, погибшие и чужие исчезают', () => {
+    const { ctx, press } = setup();
+    press({ code: 'Digit3', key: '3', shiftKey: true });
+    press({ code: 'Digit3', key: '3' });
+    expect(ctx.selectUnits).toHaveBeenLastCalledWith([1]);
+    expect(ctx.centerOnHex).not.toHaveBeenCalled();
+    press({ code: 'Digit3', key: '3' });
+    expect(ctx.centerOnHex).toHaveBeenCalledWith(7);
+    expect(ctx.groups.occupied(new Set([1]))).toEqual([3]);
+    expect(ctx.groups.occupied(new Set([2]))).toEqual([]);
+    const dead = setup({ view: () => ({ ...view, units: [] }) as unknown as PlayerView });
+    dead.ctx.groups.store(4, [1]);
+    dead.press({ code: 'Digit4', key: '4' });
+    expect(dead.ctx.selectUnits).not.toHaveBeenCalled();
   });
 });

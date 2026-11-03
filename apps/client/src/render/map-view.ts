@@ -107,6 +107,8 @@ export interface MapView {
   setGrab(grab: ((world: Point) => StrokeHandler | null) | null): void;
   /** Приказ удержанием и наведение мыши. */
   setOrderHooks(hooks: OrderHooks | null): void;
+  /** Видимая область карты в мировых координатах. */
+  visibleWorldRect?(): { readonly from: Point; readonly to: Point };
   /** Отменяет текущий жест и его прогноз. */
   cancel(): void;
   /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
@@ -363,6 +365,10 @@ export async function createMapView(
       stroking = false;
       hooks?.cancel();
       clearSelectionFrame();
+    },
+    visibleWorldRect() {
+      const size = view();
+      return { from: toWorld({ x: 0, y: 0 }), to: toWorld({ x: size.width, y: size.height }) };
     },
     sceneStats() {
       const graphicsInstructions: number[] = [];

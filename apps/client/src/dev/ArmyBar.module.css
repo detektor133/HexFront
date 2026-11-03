@@ -1,5 +1,28 @@
 /* Панель армий как в HoI4 (ui.md, «Панель армий», CR-005): ряд карточек армий внизу экрана,
    над ним — приказы выбранной армии иконками. Текста минимум: подписи — в подсказках. */
+.groups {
+  display: flex;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: auto;
+}
+
+.groups li {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-xl);
+  height: var(--space-xl);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
 .dock {
   position: absolute;
   z-index: 2;

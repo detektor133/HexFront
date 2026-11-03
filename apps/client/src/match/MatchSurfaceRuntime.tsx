@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import {
   hexFromId,
@@ -38,6 +38,7 @@ import {
   type WorkerTelemetry,
 } from '../dev/telemetry.ts';
 import { reasonText, t } from '../i18n/dict.ts';
+import { ControlGroups } from '../input/control-groups.ts';
 import { createHotkeyHandler } from '../input/hotkeys.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
@@ -74,21 +75,44 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
 
 type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
 type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
+/**
+ * Двойное нажатие на фишку: выбираются все свои отряды того же типа в видимой области; камера
+ * центрируется только если таких отрядов нет, кроме нажатой (07-controls.md).
+ */
 export function focusUnitOnDoubleTap(options: {
   view: PlayerView;
   map: MapStatic;
   hex: { readonly q: number; readonly r: number };
   hit: readonly number[];
+  visible: { readonly from: Point; readonly to: Point } | null;
+  chipBounds: (unitId: number) => {
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+    readonly bottom: number;
+  } | null;
   pick: (picked: Picked) => void;
   centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
 }): void {
   const { view, map, hit } = options;
   if (hit.length === 0) return;
-  const next = selectUnits(view, NOTHING_PICKED, hit);
-  options.pick(next);
-  const unit = view.units.find((candidate) => hit.includes(candidate.id));
+  const pressed = selectUnits(view, NOTHING_PICKED, hit);
+  const tapped = view.units.find((candidate) => pressed.units.includes(candidate.id));
+  const sameType = tapped
+    ? selectUnitsInRect(
+        view,
+        options.visible?.from ?? { x: 0, y: 0 },
+        options.visible?.to ?? { x: 0, y: 0 },
+        options.chipBounds,
+      ).filter((id) => view.units.find((u) => u.id === id)?.type === tapped.type)
+    : [];
+  if (tapped && sameType.some((id) => id !== tapped.id)) {
+    options.pick({ hex: null, units: sameType, target: null });
+    return;
+  }
+  options.pick(pressed);
   options.centerOn(
-    hexFromId(unit?.hex ?? hexId(options.hex, map.width), map.width),
+    hexFromId(tapped?.hex ?? hexId(options.hex, map.width), map.width),
     tokens.motion.map,
   );
 }
@@ -97,6 +121,13 @@ export function createDoubleTapHandler(options: {
   getView: () => PlayerView | null;
   map: MapStatic;
   getHit: (world: Point) => readonly number[];
+  getVisible: () => { readonly from: Point; readonly to: Point } | null;
+  chipBounds: (unitId: number) => {
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+    readonly bottom: number;
+  } | null;
   pick: (picked: Picked) => void;
   centerOn: (hex: { readonly q: number; readonly r: number }, durationMs: number) => void;
 }): (hex: { readonly q: number; readonly r: number }, world: Point) => void {
@@ -110,6 +141,8 @@ export function createDoubleTapHandler(options: {
       map: options.map,
       hex,
       hit,
+      visible: options.getVisible(),
+      chipBounds: options.chipBounds,
       pick: options.pick,
       centerOn: options.centerOn,
     });
@@ -167,6 +200,7 @@ interface Sandbox {
   setTool(t: ToolState | null): void;
   setArmy(id: number | null): void;
   focusArmy(id: number): void;
+  groupDigits: number[];
   setRoadPreview(path: readonly number[] | null): void;
   setDockHeight(height: number, leaderboardWidth?: number): void;
   setHudHeight(height: number, leaderboardWidth?: number): void;
@@ -186,6 +220,9 @@ export function useSandbox(
   const pickedRef = useRef<Picked>(NOTHING_PICKED);
   const mapViewRef = useRef<MapView | null>(null);
   const toolRef = useRef<ToolState | null>(null);
+  const groups = useMemo(() => new ControlGroups(), []);
+  const [groupTick, bumpGroups] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => groups.subscribe(bumpGroups), [groups]);
   const armyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
@@ -440,6 +477,8 @@ export function useSandbox(
       getView: () => viewRef.current,
       map,
       getHit: (world) => layerRef.current?.unitsAt(world) ?? [],
+      getVisible: () => mapViewRef.current?.visibleWorldRect?.() ?? null,
+      chipBounds: (id) => layerRef.current?.chipBounds(id) ?? null,
       pick,
       centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),
     });
@@ -520,6 +559,8 @@ export function useSandbox(
       selectedArmy: () => armyRef.current,
       setArmy: (id) => setArmyRef.current(id),
       send: (cmd) => matchRef.current?.send(cmd),
+      groups,
+      selectUnits: (ids) => pick({ hex: null, units: [...ids], target: null }),
     });
     window.addEventListener('keydown', onKey);
     return () => {
@@ -534,6 +575,12 @@ export function useSandbox(
       eventsRef.current = [];
     };
   }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
+
+  // groupTick меняется при записи группы; состав отрядов берётся из последнего вида.
+  const groupDigits = useMemo(
+    () => groups.occupied(new Set(msg?.view.units.map((u) => u.id) ?? [])),
+    [groups, msg, groupTick],
+  );
 
   return {
     msg,
@@ -566,6 +613,7 @@ export function useSandbox(
     setTool,
     setArmy,
     focusArmy,
+    groupDigits,
     setRoadPreview,
     setDockHeight(height, leaderboardWidth) {
       dockHeightRef.current = height;

@@ -51,6 +51,7 @@ import {
   tapUnit,
 } from './unit-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
+import { ControlGroups } from '../input/control-groups.ts';
 import { createHotkeyHandler } from '../input/hotkeys.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
@@ -133,6 +134,7 @@ function useSandbox(
   const pickedRef = useRef(createPickedState());
   const mapViewRef = useRef<MapView | null>(null);
   const toolRef = useRef<ToolState | null>(null);
+  const groups = useMemo(() => new ControlGroups(), []);
   const armyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
   const [army, setArmyState] = useState<number | null>(null);
@@ -412,6 +414,8 @@ function useSandbox(
       selectedArmy: () => armyRef.current,
       setArmy: (id) => setArmyRef.current(id),
       send: (cmd) => matchRef.current?.send(cmd),
+      groups,
+      selectUnits: (ids) => pick({ hex: null, units: [...ids], target: null }),
     });
     window.addEventListener('keydown', onKey);
     return () => {

@@ -1,5 +1,6 @@
 import type { Command, PlayerView } from '@hexfront/sim';
 
+import type { ControlGroups } from './control-groups.ts';
 import type { Picked } from '../dev/sandbox-selection.ts';
 
 /** Что реестру горячих клавиш нужно от страницы матча; обе страницы передают свои ссылки. */
@@ -18,6 +19,9 @@ export interface HotkeyContext {
   selectedArmy(): number | null;
   setArmy(id: number | null): void;
   send(cmd: Command): void;
+  groups: ControlGroups;
+  /** Выбирает отряды на карте. */
+  selectUnits(ids: readonly number[]): void;
 }
 
 function isTextTarget(target: EventTarget | null): boolean {
@@ -45,13 +49,35 @@ function centerOnSelection(ctx: HotkeyContext): boolean {
 }
 
 function stopSelected(ctx: HotkeyContext): boolean {
-  const view = ctx.view();
-  if (!view) return false;
-  const unitIds = view.units
-    .filter((u) => u.owner === view.playerId && ctx.picked().units.includes(u.id))
-    .map((u) => u.id);
+  const unitIds = ownPicked(ctx);
   if (unitIds.length === 0) return false;
   ctx.send({ t: 'stop', unitIds });
+  return true;
+}
+
+function ownPicked(ctx: HotkeyContext): number[] {
+  const view = ctx.view();
+  if (!view) return [];
+  return view.units
+    .filter((u) => u.owner === view.playerId && ctx.picked().units.includes(u.id))
+    .map((u) => u.id);
+}
+
+// Shift+1…9 запоминает выбранные свои отряды, 1…9 вызывает; повтор подряд центрирует камеру.
+function controlGroup(ctx: HotkeyContext, digit: number, store: boolean): boolean {
+  if (store) {
+    const ids = ownPicked(ctx);
+    ctx.groups.store(digit, ids);
+    return ids.length > 0;
+  }
+  const view = ctx.view();
+  if (!view) return false;
+  const own = new Set(view.units.filter((u) => u.owner === view.playerId).map((u) => u.id));
+  const { units, repeat } = ctx.groups.recall(digit, own);
+  if (units.length === 0) return false;
+  ctx.selectUnits(units);
+  const first = view.units.find((u) => units.includes(u.id));
+  if (repeat && first) ctx.centerOnHex(first.hex);
   return true;
 }
 
@@ -62,7 +88,7 @@ function escape(ctx: HotkeyContext): void {
 }
 
 /**
- * Единый обработчик `keydown` матча: Esc, Space, Tab/Shift+Tab, C, Delete.
+ * Единый обработчик `keydown` матча: Esc, Space, Tab/Shift+Tab, C, Delete, группы 1–9.
  * Ввод в полях и сочетания с Ctrl/Meta/Alt не перехватываются.
  */
 export function createHotkeyHandler(ctx: HotkeyContext): (e: KeyboardEvent) => void {
@@ -82,6 +108,8 @@ export function createHotkeyHandler(ctx: HotkeyContext): (e: KeyboardEvent) => v
     } else if (e.key === 'Tab') handled = cycleArmy(ctx, e.shiftKey ? -1 : 1);
     else if (e.code === 'KeyC' && !e.repeat) handled = centerOnSelection(ctx);
     else if (e.key === 'Delete') handled = stopSelected(ctx);
+    else if (/^Digit[1-9]$/u.test(e.code) && !e.repeat)
+      handled = controlGroup(ctx, Number(e.code.slice(5)), e.shiftKey);
     if (handled) e.preventDefault();
   };
 }
