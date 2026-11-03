@@ -71,6 +71,14 @@
   gap: var(--space-xs);
 }
 
+.depotValue {
+  align-items: flex-start;
+}
+
+.depotValue > [data-metric-icon='supply'] {
+  margin-top: calc((var(--touch-target-min) - 14px) / 2);
+}
+
 .levelValue .levelAction {
   display: flex;
   flex-direction: column;

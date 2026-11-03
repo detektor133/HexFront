@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ConstructionCheck, Fp } from '@hexfront/sim';
+import { DEPOT_COST, type ConstructionCheck, type Fp } from '@hexfront/sim';
 
 import { visibleActions } from '../src/dev/hex-actions.ts';
 import type { Selection } from '../src/local/messages.ts';
@@ -44,7 +44,7 @@ describe('действия карточки гекса', () => {
       ['foundCity', 120_000, false, 'cityTooClose'],
       ['improve', 20_000, true, undefined],
       ['fort', 60_000, false, undefined],
-      ['depot', 0, false, 'depotTooClose'],
+      ['depot', DEPOT_COST, false, 'depotTooClose'],
     ]);
   });
 

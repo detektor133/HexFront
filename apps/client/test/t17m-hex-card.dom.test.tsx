@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BUILDING,
+  DEPOT_COST,
   DEPOT_MIN_DISTANCE,
   distance,
   hexFromId,
@@ -792,6 +793,9 @@ describe('T17m: карточка клетки', () => {
     );
     const button = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
     expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(button.getAttribute('title')).toBe(buttonName);
+    expect(button.textContent).toBe(formatFp(available.selection.depot.cost));
+    expect(screen.getByTestId('shared-metric-icon-supply')).toBeTruthy();
     fireEvent.click(button);
     expect(send).toHaveBeenCalledWith({ t: 'build', hex, kind: 'depot' });
 
@@ -816,6 +820,8 @@ describe('T17m: карточка клетки', () => {
     );
     const disabledButton = screen.getByRole('button', { name: new RegExp(buttonName, 'u') });
     expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
+    expect(disabledButton.getAttribute('title')).toBe(buttonName);
+    expect(disabledButton.textContent).toBe(formatFp(DEPOT_COST));
     const reasonId = disabledButton.getAttribute('aria-describedby');
     expect(reasonId).toBeTruthy();
     const reason = document.getElementById(reasonId ?? '');
@@ -825,6 +831,20 @@ describe('T17m: карточка клетки', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     fireEvent.click(disabledButton);
+    expect(send).not.toHaveBeenCalled();
+
+    cleanup();
+    const ruleBlocked = {
+      ...available.selection,
+      depot: { ok: false, reason: 'depotTooClose' } as ConstructionCheck,
+    };
+    render(<HexCard s={ruleBlocked} view={available.view} map={depotMapResult.map} send={send} />);
+    const ruleBlockedButton = screen.getByRole('button', { name: buttonName });
+    expect((ruleBlockedButton as HTMLButtonElement).disabled).toBe(true);
+    expect(ruleBlockedButton.getAttribute('title')).toBe(buttonName);
+    expect(ruleBlockedButton.textContent).toBe(formatFp(DEPOT_COST));
+    expect(screen.getByText('Склад слишком близко')).toBeTruthy();
+    fireEvent.click(ruleBlockedButton);
     expect(send).not.toHaveBeenCalled();
   });
 

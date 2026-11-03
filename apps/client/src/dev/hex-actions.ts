@@ -1,7 +1,7 @@
 // Какие действия показать в карточке выбранного гекса (ui.md, «Карточка выбранного»):
 // только возможные; «не хватает золота» — с ценой; недоступные по правилам — скрыты,
 // кроме «Основать город»: она видна всегда, недоступная — с причиной.
-import type { Command, ConstructionCheck, RejectReason } from '@hexfront/sim';
+import { DEPOT_COST, type Command, type ConstructionCheck, type RejectReason } from '@hexfront/sim';
 
 import type { Selection } from '../local/messages.ts';
 
@@ -88,6 +88,6 @@ export function visibleActions(
     out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
     if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));
   }
-  out.push(fromCheck('depot', s.depot, { t: 'build', hex, kind: 'depot' }));
+  out.push(fromCheck('depot', s.depot, { t: 'build', hex, kind: 'depot' }, DEPOT_COST));
   return out;
 }

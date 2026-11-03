@@ -1,5 +1,5 @@
-import { IconArrowUp, IconRoute2, IconX } from '@tabler/icons-react';
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { IconArrowUp, IconPackage, IconRoute2, IconX } from '@tabler/icons-react';
+import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TERRAIN_NAMES,
@@ -94,6 +94,8 @@ function ActionButton(props: {
 function compactActionIcon(kind: HexAction['kind']): React.JSX.Element {
   return kind === 'rebuild' ? (
     <IconRoute2 size={14} aria-hidden="true" />
+  ) : kind === 'depot' ? (
+    <IconPackage size={14} aria-hidden="true" />
   ) : (
     <IconArrowUp size={14} aria-hidden="true" />
   );
@@ -301,6 +303,7 @@ export function HexCard(props: {
           )}
           {fort && (
             <>
+              <dt aria-hidden="true" />
               <dd className={styles.levelValue}>
                 <MetricIcon name="fort" />
                 <ActionButton
@@ -312,6 +315,17 @@ export function HexCard(props: {
               </dd>
             </>
           )}
+          {actions
+            .filter((a) => a.kind === 'depot')
+            .map((a) => (
+              <Fragment key={a.kind}>
+                <dt aria-hidden="true" />
+                <dd className={`${styles.levelValue} ${styles.depotValue}`}>
+                  <MetricIcon name="supply" />
+                  <ActionButton a={a} send={send} blockedText={blockedText(a, s, view)} compact />
+                </dd>
+              </Fragment>
+            ))}
           {mine && <MetricRow name="supply" value={formatFp(c.supply)} />}
           {mine && <MetricRow name="gold" value={formatRate(c.goldPerS)} />}
         </dl>
@@ -361,6 +375,7 @@ export function HexCard(props: {
               a.kind !== 'upgrade' &&
               a.kind !== 'improve' &&
               a.kind !== 'fort' &&
+              a.kind !== 'depot' &&
               !(hasLinkStatus && a.kind === 'rebuild'),
           )
           .map((a) => (

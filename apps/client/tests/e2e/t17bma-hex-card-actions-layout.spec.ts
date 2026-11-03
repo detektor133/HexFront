@@ -3,6 +3,7 @@ import { expect, test, type Locator } from '@playwright/test';
 const WIDTHS = [360, 1024, 1920] as const;
 const IMPROVEMENT_WIDTHS = [1024, 1920] as const;
 const FORT_WIDTHS = [1024, 1920] as const;
+const DEPOT_WIDTHS = [1024, 1920] as const;
 const ENABLED_ACTION = 'button[class*="button"][class*="accent"]:enabled';
 
 for (const width of FORT_WIDTHS) {
@@ -35,6 +36,56 @@ for (const width of FORT_WIDTHS) {
     expect(buttonBox).not.toBeNull();
     if (!cardBox || !iconBox || !buttonBox) {
       throw new Error('карточка, знак укрепления или кнопка не имеет геометрии');
+    }
+    expect(buttonBox.x - (iconBox.x + iconBox.width)).toBeGreaterThanOrEqual(0);
+    expect(buttonBox.x - (iconBox.x + iconBox.width)).toBeLessThanOrEqual(4);
+    expect(
+      Math.abs(buttonBox.y + buttonBox.height / 2 - (iconBox.y + iconBox.height / 2)),
+    ).toBeLessThanOrEqual(1);
+    expect(buttonBox.x).toBeGreaterThanOrEqual(cardBox.x);
+    expect(buttonBox.y).toBeGreaterThanOrEqual(cardBox.y);
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+    expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+    await expect(card).toHaveJSProperty(
+      'scrollWidth',
+      await card.evaluate((node) => node.clientWidth),
+    );
+    await expect(card).toHaveJSProperty(
+      'scrollHeight',
+      await card.evaluate((node) => node.clientHeight),
+    );
+  });
+}
+
+for (const width of DEPOT_WIDTHS) {
+  test(`@layout 07/T17ced: кнопка склада рядом со знаком в карточке обычной клетки без переполнения при ${width} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/dev/sandbox?map=small&seed=42&select=724');
+
+    const card = page.locator('section[aria-label]').filter({
+      has: page.getByRole('button', { name: /close hex card|закрыть карточку клетки/i }),
+    });
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute(
+      'aria-label',
+      /^(Вода|Равнина|Лес|Холмы|Горы|Пустыня, степь|Water|Plains|Forest|Hills|Mountains|Desert, steppe)$/,
+    );
+
+    const depotIcon = card.locator('[data-metric-icon="supply"]');
+    const depotButton = card.getByRole('button', { name: /depot|склад/i });
+    await expect(depotIcon).toBeVisible();
+    await expect(depotButton).toBeVisible();
+
+    const cardBox = await card.boundingBox();
+    const iconBox = await depotIcon.boundingBox();
+    const buttonBox = await depotButton.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(iconBox).not.toBeNull();
+    expect(buttonBox).not.toBeNull();
+    if (!cardBox || !iconBox || !buttonBox) {
+      throw new Error('карточка, знак склада или кнопка не имеет геометрии');
     }
     expect(buttonBox.x - (iconBox.x + iconBox.width)).toBeGreaterThanOrEqual(0);
     expect(buttonBox.x - (iconBox.x + iconBox.width)).toBeLessThanOrEqual(4);
