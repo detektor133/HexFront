@@ -121,6 +121,7 @@ function unit(
     focus: -1,
     fireTarget: -1,
     slot: -1,
+    gather: -1,
   };
   state.nextId += 1;
   addUnit(state, u);

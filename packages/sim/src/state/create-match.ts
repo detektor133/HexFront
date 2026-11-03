@@ -174,6 +174,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
       focus: -1,
       fireTarget: -1,
       slot: -1,
+      gather: -1,
     });
     state.nextId += 1;
   }

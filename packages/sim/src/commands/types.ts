@@ -31,6 +31,8 @@ export type Command =
   | { readonly t: 'merge'; readonly unitIds: readonly number[] }
   /** Отмена приказа движения и атаки; отряд остаётся в гексе, где стоит. */
   | { readonly t: 'stop'; readonly unitIds: readonly number[] }
+  /** Сбор: отряды идут в область, найденную симуляцией, и сливаются по прибытии (CR-010). */
+  | { readonly t: 'gather'; readonly unitIds: readonly number[] }
   | { readonly t: 'bombard'; readonly unitId: number; readonly targetUnitId: number | null }
   | {
       readonly t: 'recruit';

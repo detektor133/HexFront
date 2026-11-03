@@ -536,6 +536,7 @@ function makeScenario(
         focus: -1,
         fireTarget: -1,
         slot: -1,
+        gather: -1,
       };
       addUnit(state, unit);
       return id;

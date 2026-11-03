@@ -57,6 +57,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     focus: -1,
     fireTarget: -1,
     slot: -1,
+    gather: -1,
   };
   addUnit(state, unit);
   state.nextId += 1;

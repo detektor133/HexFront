@@ -37,6 +37,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'move':
     case 'attack':
     case 'stop':
+    case 'gather':
     case 'split':
     case 'merge':
     case 'bombard':
@@ -88,6 +89,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'move':
     case 'attack':
     case 'stop':
+    case 'gather':
     case 'split':
     case 'merge':
     case 'bombard':

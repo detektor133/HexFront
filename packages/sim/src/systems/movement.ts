@@ -1,6 +1,7 @@
 // Переходы отрядов гекс за гексом, захват пустых гексов, атака врага на пути, отсчёт отступления. Путь не пересчитывается (05-armies.md, «Движение»).
 // GDD: docs/gdd/05-armies.md — «Движение», «Захват», «Приказы»
 import { MAX_UNITS_PER_HEX, ORG_AFTER_RETREAT } from '../balance.ts';
+import { gatherSystem } from './gather.ts';
 import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { isHostileHex, ownUnitsAt, stepTicks } from '../queries/unit-path.ts';
@@ -91,4 +92,5 @@ export function movementSystem(state: MatchState): void {
     if (unit.order === 'move') advance(state, unit);
     else if (unit.order === 'retreat') retreatTick(unit);
   }
+  gatherSystem(state);
 }

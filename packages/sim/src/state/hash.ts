@@ -91,6 +91,8 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.focus);
     int(s, a.fireTarget);
     int(s, a.slot);
+    // Только активный сбор: без него хэш матча прежний.
+    if (a.gather >= 0) int(s, a.gather);
   }
   int(s, state.armies.length);
   for (const a of state.armies) {

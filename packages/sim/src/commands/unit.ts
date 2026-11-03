@@ -4,13 +4,14 @@ import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
+import { planGather } from '../queries/gather.ts';
 import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 import { addUnit, removeUnits } from '../state/unit-index.ts';
 
 export type UnitCommand = Extract<
   Command,
-  { t: 'move' | 'attack' | 'stop' | 'split' | 'merge' | 'bombard' }
+  { t: 'move' | 'attack' | 'stop' | 'gather' | 'split' | 'merge' | 'bombard' }
 >;
 
 type Owned =
@@ -116,6 +117,8 @@ export function validateUnitCommand(
         : rejected('unknownUnit');
     case 'merge':
       return validateMerge(owned.units);
+    case 'gather':
+      return planGather(state, playerId, owned.units) ? OK : rejected('noPath');
     case 'stop':
       return owned.units.some((unit) => unit.inBattle) ? rejected('inBattle') : OK;
   }
@@ -154,6 +157,7 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
     focus: -1,
     fireTarget: -1,
     slot: -1,
+    gather: -1,
   };
   addUnit(state, part);
   state.nextId += 1;
@@ -194,6 +198,7 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         if (!sameStep) stop(a);
         // Ручной приказ снимает отряд с места в плане армии; освободившись, он вернётся в план.
         a.slot = -1;
+        a.gather = -1;
         a.path = path;
         a.order = path.length > 0 ? 'move' : 'idle';
       }
@@ -218,9 +223,24 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'merge':
       mergeUnits(state, owned.units);
       return;
+    case 'gather': {
+      const targets = planGather(state, playerId, owned.units);
+      if (!targets) return;
+      for (const unit of owned.units) {
+        const to = targets.get(unit.id) ?? unit.hex;
+        stop(unit);
+        unit.slot = -1;
+        unit.target = -1;
+        unit.gather = to;
+        unit.path = findPath(state, unit.hex, to, unit.type, unit.owner) ?? [];
+        unit.order = unit.path.length > 0 ? 'move' : 'idle';
+      }
+      return;
+    }
     case 'stop':
       for (const unit of owned.units) {
         stop(unit);
+        unit.gather = -1;
         unit.slot = -1;
         unit.target = -1;
         if (unit.order === 'move' || unit.order === 'attack') unit.order = 'idle';
