@@ -1,6 +1,6 @@
 // Набор: очереди и появление отрядов.
 // GDD: docs/gdd/05-armies.md — «Набор»
-import { MAX_UNITS_PER_HEX, ORG_MAX } from '../balance.ts';
+import { MAX_UNITS_PER_HEX, ORG_MAX, TICKS_PER_S } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
@@ -86,7 +86,20 @@ function reinforce(state: MatchState, r: Recruitment): boolean {
  * Двигает наборы на тик. Потеря города отменяет набор без возврата людей и золота; если всем
  * своим гексам не хватает места, готовый отряд ждёт в очереди.
  */
+// Автопополнение (CR-001): раз в секунду весь резерв игрока уходит в самую нуждающуюся армию.
+function distributeReserve(state: MatchState): void {
+  if (state.tick % TICKS_PER_S !== 0) return;
+  for (const player of state.players) {
+    if (!player.autoReinforce) continue;
+    for (const unit of state.units) {
+      if (unit.owner !== player.id || unit.armyId !== null || unit.order === 'retreat') continue;
+      unit.armyId = neediestArmy(state, player.id);
+    }
+  }
+}
+
 export function recruitSystem(state: MatchState): void {
+  distributeReserve(state);
   const remaining: Recruitment[] = [];
   for (const r of state.recruits) {
     const city = state.cities.find((c) => c.id === r.cityId);

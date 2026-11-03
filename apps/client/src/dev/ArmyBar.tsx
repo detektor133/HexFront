@@ -1,3 +1,4 @@
+import { IconRobot } from '@tabler/icons-react';
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -17,6 +18,7 @@ import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -25,6 +27,8 @@ const FULL = 1000;
 
 /** Сводка армии: средние по солдатам организация и снабжение (0..1), отряды в истощении. */
 export interface ArmyStats {
+  /** Всего солдат в армии. */
+  readonly soldiers: number;
   readonly org: number;
   readonly supply: number;
   readonly starving: number;
@@ -38,6 +42,7 @@ export function armyStats(units: readonly UnitView[]): ArmyStats {
   const avg = (f: (u: UnitView) => number): number =>
     units.reduce((s, u) => s + f(u) * u.soldiers, 0) / Math.max(1, soldiers);
   return {
+    soldiers,
     org: avg((u) => u.org) / ORG_MAX,
     supply: avg((u) => u.supplyLevel ?? FULL) / FULL,
     starving: units.filter((u) => u.starving === true).length,
@@ -204,7 +209,9 @@ function AutoBadge(props: { on: boolean; onClick: () => void }): React.JSX.Eleme
       aria-pressed={props.on}
       onClick={props.onClick}
     >
-      <span className={props.on ? styles.autoOn : styles.autoOff}>{t('army.autoLetter')}</span>
+      <span className={props.on ? styles.autoOn : styles.autoOff}>
+        <IconRobot size={16} aria-hidden="true" />
+      </span>
     </IconButton>
   );
 }
@@ -290,6 +297,9 @@ function ArmyCard(props: {
                 {props.name}
               </button>
             )}
+            <span className={styles.troops} title={t('unit.soldiers')}>
+              {formatSoldiers(stats.soldiers)}
+            </span>
             {stats.fighting && (
               <span title={t('army.fighting')}>
                 <Icon name="fighting" className={styles.fightingIcon} />

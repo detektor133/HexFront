@@ -191,7 +191,7 @@
   align-items: center;
   justify-content: center;
   width: var(--touch-target-min);
-  height: 44px;
+  height: 36px;
   padding: 0;
   background: none;
   border: 0;
@@ -204,9 +204,9 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: calc(var(--touch-target-min) / 2);
-  height: 22px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-chip);
   font-family: var(--font-ui-family);
   font-size: 13px;
   font-weight: 500;
@@ -378,4 +378,13 @@
   .dock {
     padding: 0 var(--space-sm) var(--space-sm);
   }
+}
+
+/* Число войск армии в заголовке справа от названия. */
+.troops {
+  margin-left: auto;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-ink);
 }
