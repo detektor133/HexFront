@@ -157,6 +157,13 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
     case 'select':
       engine?.select(msg.hex);
       return;
+    case 'previewPath':
+      post({
+        t: 'pathPreview',
+        requestId: msg.requestId,
+        preview: engine?.previewPath(msg.unitIds, msg.to, msg.via) ?? null,
+      });
+      return;
     case 'ack':
       if (msg.seq !== snapshotSeq) return;
       lastAckMs = performance.now() - lastSnapshotAt;

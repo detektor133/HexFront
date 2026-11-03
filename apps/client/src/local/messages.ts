@@ -1,6 +1,7 @@
 // Сообщения между страницей и Web Worker локального режима (overview.md, «Локальный режим»).
 import type { DeltaMessage, SnapshotMessage } from '@hexfront/protocol';
 import type {
+  PathPreview,
   Command,
   ConstructionCheck,
   CityInfo,
@@ -67,6 +68,13 @@ export type ToWorker =
   | { readonly t: 'observer'; readonly playerId: number | null }
   | { readonly t: 'view'; readonly playerId: number | null; readonly fog: boolean }
   | { readonly t: 'select'; readonly hex: number | null }
+  | {
+      readonly t: 'previewPath';
+      readonly requestId: number;
+      readonly unitIds: readonly number[];
+      readonly to: number;
+      readonly via: readonly number[];
+    }
   | { readonly t: 'ack'; readonly seq: number };
 
 export interface ViewPayload {
@@ -96,5 +104,14 @@ export type DeltaViewPayload =
   | (DeltaViewPayloadBase & { readonly kind: 'snapshot'; readonly snapshot: SnapshotMessage })
   | (DeltaViewPayloadBase & { readonly kind: 'delta'; readonly delta: DeltaMessage });
 
+export interface PathPreviewReply {
+  readonly t: 'pathPreview';
+  readonly requestId: number;
+  readonly preview: PathPreview | null;
+}
+
 export type FromWorker =
-  ViewPayload | DeltaViewPayload | { readonly t: 'error'; readonly errors: readonly string[] };
+  | ViewPayload
+  | DeltaViewPayload
+  | PathPreviewReply
+  | { readonly t: 'error'; readonly errors: readonly string[] };

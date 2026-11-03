@@ -313,6 +313,8 @@ function useSandbox(
       readLocalMatchSetup(window.location.search),
       (m) => {
         if (m.t === 'error') return setError(m.errors.join('; '));
+        // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
+        if (m.t === 'pathPreview') return;
         scheduleMessage(m);
       },
       { telemetry: debug, initialGold: readLocalMatchSetup(window.location.search).initialGold },

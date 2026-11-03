@@ -3,6 +3,8 @@
 import type { SnapshotMessage } from '@hexfront/protocol';
 import {
   canFoundCity,
+  previewPath,
+  type PathPreview,
   checkConstruction,
   checkRecruit,
   COST_POP_PER_SOLDIER,
@@ -42,6 +44,8 @@ export interface LocalEngine {
   queue(cmd: Command): void;
   setFog(on: boolean): void;
   setObserver(playerId: number | null): void;
+  /** Путь и время для выбранных отрядов игрока; состояние не меняется. */
+  previewPath(unitIds: readonly number[], to: number, via: readonly number[]): PathPreview | null;
   setView(playerId: number | null, fog: boolean): void;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
@@ -164,6 +168,9 @@ export function createLocalEngine(
     },
     select(hex) {
       selected = hex;
+    },
+    previewPath(unitIds, to, via) {
+      return previewPath(state, observerId ?? 0, unitIds, to, via);
     },
     advance,
     tick() {

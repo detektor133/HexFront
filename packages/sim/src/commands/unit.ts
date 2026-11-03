@@ -39,7 +39,7 @@ const validHex = (state: MatchState, hex: HexId): boolean =>
   Number.isInteger(hex) && hex >= 0 && hex < state.hexes.owner.length;
 
 /** Путь по звеньям from → via… → to; null — недостижимое звено. */
-function routePath(
+export function routePath(
   state: MatchState,
   unit: Unit,
   via: readonly HexId[],

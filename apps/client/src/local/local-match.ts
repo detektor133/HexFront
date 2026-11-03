@@ -12,6 +12,13 @@ export interface LocalMatch {
   setObserver(playerId: number | null): void;
   setView(playerId: number | null, fog: boolean): void;
   select(hex: number | null): void;
+  /** Ответ придёт в onMessage сообщением `pathPreview` с тем же requestId. */
+  previewPath?(
+    requestId: number,
+    unitIds: readonly number[],
+    to: number,
+    via: readonly number[],
+  ): void;
   ack(seq: number): void;
   dispose(): void;
 }
@@ -61,6 +68,8 @@ export function startLocalMatch(
     setObserver: (playerId) => post({ t: 'observer', playerId }),
     setView: (playerId, fog) => post({ t: 'view', playerId, fog }),
     select: (hex) => post({ t: 'select', hex }),
+    previewPath: (requestId, unitIds, to, via) =>
+      post({ t: 'previewPath', requestId, unitIds, to, via }),
     ack: (seq) => post({ t: 'ack', seq }),
     dispose: () => worker.terminate(),
   };
