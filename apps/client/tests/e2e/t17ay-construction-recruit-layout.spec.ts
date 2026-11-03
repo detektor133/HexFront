@@ -30,7 +30,12 @@ test('@layout T17ay: отключённые действия показываю�
     .toEqual(blockedBefore);
 
   await page.goto('/dev/economy?map=small&seed=42&select=765');
-  const armorSlider = page.getByRole('slider').nth(1);
+  const cityCard = page.locator('section[aria-label]').filter({
+    has: page.getByRole('button', { name: /close hex card|закрыть карточку клетки/i }),
+  });
+  await expect(cityCard).toBeVisible();
+  await cityCard.getByRole('button', { name: /armor|бронетехника/i }).click();
+  const armorSlider = cityCard.getByRole('slider', { name: /soldier count|число солдат/i });
   await expect(armorSlider).toBeVisible();
   const maximum = await armorSlider.getAttribute('max');
   expect(maximum).not.toBeNull();
@@ -40,7 +45,8 @@ test('@layout T17ay: отключённые действия показываю�
   await expect(recruit).toHaveClass(/accent/u);
   await expect(recruit).toHaveCSS('background-color', 'rgb(246, 245, 241)');
   await expect(recruit).toHaveCSS('color', 'rgb(34, 33, 30)');
-  await recruit.focus();
+  await armorSlider.focus();
+  await page.keyboard.press('Tab');
   await expect(recruit).toHaveCSS('outline-style', 'solid');
   await recruit.click();
   const unaffordable = page

@@ -359,17 +359,21 @@ describe('07/T17ay: состояния строительства и найма'
         view,
       );
       if (check === forbiddenRecruit) {
-        const button = screen.queryByRole('button', { name: new RegExp(_title, 'iu') });
-        expect(button).not.toBeNull();
-        if (!button) continue;
-        expect((button as HTMLButtonElement).disabled).toBe(true);
+        const typeButton = screen.getByRole('button', { name: new RegExp(_title, 'iu') });
+        expect((typeButton as HTMLButtonElement).disabled).toBe(false);
+        expect(typeButton.getAttribute('aria-pressed')).toBe('true');
+        const button = screen.getByRole('button', { name: 'Набор' }) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
         expect(button.className).not.toMatch(/\b\S*accent\S*\b/u);
         expect(screen.queryByText(/Не хватает людей/iu)).not.toBeNull();
         fireEvent.click(button);
         expect(send).not.toHaveBeenCalled();
       } else {
-        const button = screen.getByRole('button', { name: new RegExp(_title, 'iu') });
-        expect((button as HTMLButtonElement).disabled).toBe(check !== availableRecruit);
+        const typeButton = screen.getByRole('button', { name: new RegExp(_title, 'iu') });
+        expect((typeButton as HTMLButtonElement).disabled).toBe(false);
+        expect(typeButton.getAttribute('aria-pressed')).toBe('true');
+        const button = screen.getByRole('button', { name: 'Набор' }) as HTMLButtonElement;
+        expect(button.disabled).toBe(check !== availableRecruit);
         if (check === availableRecruit) {
           expect(button.className).toMatch(/accent/u);
         } else {
@@ -437,9 +441,15 @@ describe('07/T17ay: состояния строительства и найма'
           ? (selection as Selection)
           : makeUnaffordable(kind, selection as Selection);
         renderCard(state as Selection, fixtures.view);
-        const button = screen.getByRole('button', { name: label });
-        expect(button.textContent).toContain('1');
-        const icon = button.querySelector('[data-gold-icon="true"]');
+        const isRecruit = kind === 'infantry' || kind === 'armor' || kind === 'artillery';
+        const button = screen.getByRole('button', {
+          name: isRecruit ? t('recruit.queue') : label,
+        });
+        const priceContainer = isRecruit
+          ? screen.getByRole('group', { name: 'Тип войск' }).parentElement
+          : button;
+        expect(priceContainer?.textContent).toContain('1');
+        const icon = priceContainer?.querySelector('[data-gold-icon="true"]');
         expect(icon).not.toBeNull();
         expect(icon?.getAttribute('viewBox')).toBe('0 0 24 24');
         expect(icon?.querySelector('circle')).toBeNull();

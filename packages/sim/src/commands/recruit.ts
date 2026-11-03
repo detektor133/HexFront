@@ -123,7 +123,16 @@ export function checkRecruit(
   soldiers: Fp,
 ): RecruitCheck {
   const reason = checkRules(state, playerId, cityId, type, soldiers);
-  if (reason) return fail(reason);
+  if (reason) {
+    if (isUnitType(type) && Number.isInteger(soldiers) && soldiers >= RECRUIT_MIN) {
+      return {
+        ...fail(reason),
+        cost: fpMul(soldiers, COST_GOLD_PER_SOLDIER[type]),
+        timeS: recruitTimeS(type, soldiers),
+      };
+    }
+    return fail(reason);
+  }
   const cost = fpMul(soldiers, COST_GOLD_PER_SOLDIER[type]);
   const timeS = recruitTimeS(type, soldiers);
   const gold = state.players[playerId]?.gold ?? 0;

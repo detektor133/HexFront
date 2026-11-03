@@ -42,7 +42,7 @@ for (const width of WIDTHS) {
     const stats = card.locator('dl');
     await expect(stats.locator('dt')).not.toHaveCount(0);
     const sliders = card.getByRole('slider');
-    await expect(sliders).toHaveCount(3);
+    await expect(sliders).toHaveCount(1);
     const pricedActions = card.locator('button:has(span > svg)');
     await expect(pricedActions).not.toHaveCount(0);
 
@@ -107,7 +107,7 @@ for (const width of WIDTHS) {
         };
       }),
     );
-    expect(recruitRows).toHaveLength(3);
+    expect(recruitRows).toHaveLength(1);
     for (const row of recruitRows) {
       expect(row).not.toBeNull();
       if (!row) throw new Error('Строка набора не имеет границ');

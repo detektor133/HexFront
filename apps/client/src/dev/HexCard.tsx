@@ -1,4 +1,4 @@
-import { IconArrowUp, IconPackage, IconRoute2, IconX } from '@tabler/icons-react';
+import { IconArrowUp, IconPackage, IconRoute2, IconUserPlus, IconX } from '@tabler/icons-react';
 import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -7,7 +7,9 @@ import {
   type Command,
   type MapStatic,
   type PlayerView,
+  type UnitType,
   IMPROVEMENT_COST,
+  RECRUIT_MIN,
 } from '@hexfront/sim';
 
 import styles from './HexCard.module.css';
@@ -115,63 +117,115 @@ function Price(props: { value: string; ok: boolean }): React.JSX.Element {
 }
 
 function RecruitButton(props: {
-  o: RecruitOption;
+  options: readonly RecruitOption[];
   send: (cmd: Command) => void;
   cityId: number;
 }): React.JSX.Element | null {
   const reasonId = useId();
-  const [soldiers, setSoldiers] = useState(
-    props.o.amounts[0]?.soldiers ?? (0 as RecruitAmount['soldiers']),
+  const [type, setType] = useState<UnitType>(
+    props.options.some((option) => option.type === 'infantry')
+      ? 'infantry'
+      : (props.options[0]?.type ?? 'infantry'),
   );
-  const { o } = props;
+  const [soldiers, setSoldiers] = useState(RECRUIT_MIN);
+  const o = props.options.find((option) => option.type === type);
+  if (!o) return null;
   const amount: RecruitAmount | undefined = o.amounts.find((x) => x.soldiers === soldiers);
-  if (!amount) return null;
-  const { check } = amount;
-  const label = t(`unit.${o.type}` as MessageKey);
-  const reason = check.ok ? null : reasonText(check.reason);
-  const blocked = !check.ok && check.reason !== 'notEnoughGold';
+  const current =
+    amount ??
+    o.amounts.reduce<RecruitAmount | undefined>(
+      (nearest, candidate) =>
+        !nearest || Math.abs(candidate.soldiers - soldiers) < Math.abs(nearest.soldiers - soldiers)
+          ? candidate
+          : nearest,
+      undefined,
+    );
+  const selectedSoldiers = current?.soldiers ?? RECRUIT_MIN;
+  const check = current?.check;
+  const label = t(`unit.${type}` as MessageKey);
+  const reason = check
+    ? check.ok
+      ? null
+      : reasonText(check.reason)
+    : reasonText('notEnoughPeople');
+  const blocked = !check || (!check.ok && check.reason !== 'notEnoughGold');
   return (
     <div className={styles.action}>
-      <label className={styles.recruitControl}>
-        <span className={styles.recruit}>
-          <UnitGlyph className={styles.glyph} type={o.type} />
-          {label}
-        </span>
-        <input
-          type="range"
-          min={o.amounts[0]?.soldiers ?? 0}
-          max={o.amounts.at(-1)?.soldiers ?? 0}
-          step={o.amounts[1] ? o.amounts[1].soldiers - (o.amounts[0]?.soldiers ?? 0) : 1}
-          value={soldiers}
-          aria-label={`${label}: ${formatSoldiers(soldiers)}`}
-          onChange={(event) => {
-            const next = o.amounts.find((x) => x.soldiers === Number(event.currentTarget.value));
-            if (next) setSoldiers(next.soldiers);
-          }}
-        />
-        <span>{formatSoldiers(soldiers)}</span>
-      </label>
-      <button
-        type="button"
-        className={`${styles.button}${check.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
-        disabled={!check.ok}
-        aria-label={`${label} ${formatSoldiers(soldiers)}`}
-        {...(reason ? { 'aria-describedby': reasonId } : {})}
-        title={label}
-        onClick={() => props.send({ t: 'recruit', cityId: props.cityId, type: o.type, soldiers })}
-      >
-        <span>{t('recruit.queue')}</span>
-        {check.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
-      </button>
+      <div className={styles.recruitControl}>
+        <div className={styles.recruitTypes} role="group" aria-label={t('recruit.type')}>
+          {props.options.map((option) => {
+            const typeLabel = t(`unit.${option.type}` as MessageKey);
+            return (
+              <button
+                key={option.type}
+                type="button"
+                className={styles.recruitType}
+                aria-label={typeLabel}
+                aria-pressed={option.type === type}
+                disabled={option.amounts.length === 0}
+                title={typeLabel}
+                onClick={() => {
+                  setType(option.type);
+                  const nearest = option.amounts.reduce<RecruitAmount | undefined>(
+                    (best, candidate) =>
+                      !best ||
+                      Math.abs(candidate.soldiers - selectedSoldiers) <
+                        Math.abs(best.soldiers - selectedSoldiers)
+                        ? candidate
+                        : best,
+                    undefined,
+                  );
+                  if (nearest) setSoldiers(nearest.soldiers);
+                }}
+              >
+                <UnitGlyph className={styles.glyph} type={option.type} />
+              </button>
+            );
+          })}
+        </div>
+        <label className={styles.recruitRange}>
+          <span>{label}</span>
+          <input
+            type="range"
+            min={o.amounts[0]?.soldiers ?? RECRUIT_MIN}
+            max={o.amounts.at(-1)?.soldiers ?? RECRUIT_MIN}
+            step={
+              o.amounts[1] ? o.amounts[1].soldiers - (o.amounts[0]?.soldiers ?? 0) : RECRUIT_MIN
+            }
+            value={selectedSoldiers}
+            disabled={o.amounts.length === 0}
+            aria-label={t('recruit.amount')}
+            onChange={(event) => {
+              const next = o.amounts.find((x) => x.soldiers === Number(event.currentTarget.value));
+              if (next) setSoldiers(next.soldiers);
+            }}
+          />
+          <span>{formatSoldiers(selectedSoldiers)}</span>
+        </label>
+        {check?.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
+        {check?.timeS !== undefined && (
+          <span className={styles.time}>
+            <MetricIcon name="time" />
+            {formatFp(check.timeS)} {t('card.seconds')}
+          </span>
+        )}
+        <button
+          type="button"
+          className={`${styles.button}${check?.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
+          disabled={!check?.ok}
+          aria-label={t('recruit.queue')}
+          {...(reason ? { 'aria-describedby': reasonId } : {})}
+          title={t('recruit.queue')}
+          onClick={() =>
+            props.send({ t: 'recruit', cityId: props.cityId, type, soldiers: selectedSoldiers })
+          }
+        >
+          <IconUserPlus size={16} aria-hidden="true" />
+        </button>
+      </div>
       {reason && (
         <span id={reasonId} className={styles.reason}>
           {reason}
-        </span>
-      )}
-      {check.timeS !== undefined && (
-        <span className={styles.time}>
-          <MetricIcon name="time" />
-          {formatFp(check.timeS)} {t('card.seconds')}
         </span>
       )}
     </div>
@@ -398,9 +452,7 @@ export function HexCard(props: {
             {t('card.seconds')}
           </p>
         )}
-        {c &&
-          !recruiting &&
-          s.recruit.map((o) => <RecruitButton key={o.type} o={o} send={send} cityId={c.id} />)}
+        {c && !recruiting && <RecruitButton options={s.recruit} send={send} cityId={c.id} />}
       </div>
     </section>
   );

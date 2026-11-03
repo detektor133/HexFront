@@ -23,7 +23,7 @@ for (const width of WIDTHS) {
       await expect(card.locator('h2')).toContainText(selection.heading);
       const stats = card.locator('dl');
       await expect(stats.locator('dt')).not.toHaveCount(0);
-      if (selection.kind === 'город') await expect(card.getByRole('slider')).toHaveCount(3);
+      if (selection.kind === 'город') await expect(card.getByRole('slider')).toHaveCount(1);
       else await expect(card.getByRole('slider')).toHaveCount(0);
 
       const geometry = await stats.evaluate((element) => {

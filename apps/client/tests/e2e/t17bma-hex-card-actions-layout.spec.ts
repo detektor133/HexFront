@@ -4,7 +4,6 @@ const WIDTHS = [360, 1024, 1920] as const;
 const IMPROVEMENT_WIDTHS = [1024, 1920] as const;
 const FORT_WIDTHS = [1024, 1920] as const;
 const DEPOT_WIDTHS = [1024, 1920] as const;
-const ENABLED_ACTION = 'button[class*="button"][class*="accent"]:enabled';
 
 for (const width of FORT_WIDTHS) {
   test(`@layout 07/T17cecc: кнопка укрепления рядом со знаком в карточке обычной клетки без переполнения при ${width} px`, async ({
@@ -175,14 +174,10 @@ for (const width of WIDTHS) {
     await expect(upgrade).toBeEnabled();
     await expectLightAction(upgrade);
 
-    const sliders = page.getByRole('slider');
-    const recruitSlider = sliders.nth(1);
+    const recruitSlider = cityCard.getByRole('slider', { name: /soldier count|число солдат/i });
     await expect(recruitSlider).toBeVisible();
     await recruitSlider.fill((await recruitSlider.getAttribute('max')) ?? '');
-    const recruit = cityCard
-      .locator(ENABLED_ACTION)
-      .filter({ hasText: /recruit|набор/i })
-      .first();
+    const recruit = cityCard.getByRole('button', { name: /recruit|набор/i });
     await expect(recruit).toBeVisible();
     await expect(recruit).toBeEnabled();
     await expectLightAction(recruit);

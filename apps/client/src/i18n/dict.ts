@@ -289,6 +289,8 @@ const ru = {
   'army.fighting': 'В бою',
   'army.encircled': 'В окружении',
   'recruit.queue': 'Набор',
+  'recruit.type': 'Тип войск',
+  'recruit.amount': 'Число солдат',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -582,6 +584,8 @@ const en: Record<MessageKey, string> = {
   'army.fighting': 'In battle',
   'army.encircled': 'Encircled',
   'recruit.queue': 'Recruiting',
+  'recruit.type': 'Unit type',
+  'recruit.amount': 'Soldier count',
 };
 
 export const lang =
