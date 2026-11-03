@@ -301,10 +301,8 @@ export function HexCard(props: {
           )}
           {fort && (
             <>
-              <dt>
-                <MetricIcon name="fort" />
-              </dt>
               <dd className={styles.levelValue}>
+                <MetricIcon name="fort" />
                 <ActionButton
                   a={fort}
                   send={send}
