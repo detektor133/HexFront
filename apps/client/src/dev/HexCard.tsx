@@ -1,4 +1,4 @@
-import { IconArrowUp, IconPackage, IconRoute2, IconUserPlus, IconX } from '@tabler/icons-react';
+import { IconArrowUp, IconPlus, IconRoute2, IconUserPlus, IconX } from '@tabler/icons-react';
 import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -96,8 +96,8 @@ function ActionButton(props: {
 function compactActionIcon(kind: HexAction['kind']): React.JSX.Element {
   return kind === 'rebuild' ? (
     <IconRoute2 size={14} aria-hidden="true" />
-  ) : kind === 'depot' ? (
-    <IconPackage size={14} aria-hidden="true" />
+  ) : kind === 'depot' || kind === 'fort' || kind === 'foundCity' ? (
+    <IconPlus size={14} aria-hidden="true" />
   ) : (
     <IconArrowUp size={14} aria-hidden="true" />
   );

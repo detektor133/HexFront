@@ -90,18 +90,18 @@
   gap: var(--space-xs);
 }
 
-.levelValue .levelAction {
+.levelAction {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-xs);
 }
 
-.levelValue .levelAction .reason {
+.levelAction .reason {
   max-inline-size: 22ch;
 }
 
-.levelValue .button {
+.levelAction .button {
   display: inline-flex;
   justify-content: center;
   gap: var(--space-xs);
