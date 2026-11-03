@@ -202,16 +202,18 @@ function RecruitButton(props: {
           />
           <span>{formatSoldiers(selectedSoldiers)}</span>
         </label>
-        {check?.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
-        {check?.timeS !== undefined && (
-          <span className={styles.time}>
-            <MetricIcon name="time" />
-            {formatFp(check.timeS)} {t('card.seconds')}
-          </span>
-        )}
+        <span className={styles.recruitInfo}>
+          {check?.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
+          {check?.timeS !== undefined && (
+            <span className={styles.time}>
+              <MetricIcon name="time" />
+              {formatFp(check.timeS)} {t('card.seconds')}
+            </span>
+          )}
+        </span>
         <button
           type="button"
-          className={`${styles.button}${check?.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
+          className={`${styles.button} ${styles.recruitAction}${check?.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
           disabled={!check?.ok}
           aria-label={t('recruit.queue')}
           {...(reason ? { 'aria-describedby': reasonId } : {})}
@@ -235,7 +237,7 @@ function RecruitButton(props: {
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
     <>
-      <dt>{props.label}</dt>
+      <dt className={styles.label}>{props.label}</dt>
       <dd>{props.value}</dd>
     </>
   );
@@ -322,9 +324,9 @@ export function HexCard(props: {
           <Row label={t('card.owner')} value={ownerText} />
           {c && (
             <>
-              <dt>{t('card.level')}</dt>
+              <dt className={`${styles.label} ${styles.actionLabel}`}>{t('card.level')}</dt>
               <dd className={styles.levelValue}>
-                <span>{c.level}</span>
+                <span className={styles.levelText}>{c.level}</span>
                 {upgrade && <ActionButton a={upgrade} send={send} blockedText={null} compact />}
               </dd>
             </>
@@ -336,11 +338,11 @@ export function HexCard(props: {
           <MetricRow name="growth" value={formatRate(view.hexes.growth[s.hex] ?? 0)} />
           {(improvement > 0 || actions.some((a) => a.kind === 'improve')) && (
             <>
-              <dt>
+              <dt className={styles.actionLabel}>
                 <MetricIcon name="improvement" />
               </dt>
               <dd className={styles.levelValue}>
-                <span>{improvement}</span>
+                <span className={styles.levelText}>{improvement}</span>
                 {actions
                   .filter((a) => a.kind === 'improve')
                   .map((a) => (
@@ -357,9 +359,10 @@ export function HexCard(props: {
           )}
           {fort && (
             <>
-              <dt aria-hidden="true" />
-              <dd className={styles.levelValue}>
+              <dt className={styles.actionLabel}>
                 <MetricIcon name="fort" />
+              </dt>
+              <dd className={styles.levelValue}>
                 <ActionButton
                   a={fort}
                   send={send}
@@ -373,9 +376,10 @@ export function HexCard(props: {
             .filter((a) => a.kind === 'depot')
             .map((a) => (
               <Fragment key={a.kind}>
-                <dt aria-hidden="true" />
-                <dd className={`${styles.levelValue} ${styles.depotValue}`}>
+                <dt className={styles.actionLabel}>
                   <MetricIcon name="supply" />
+                </dt>
+                <dd className={styles.levelValue}>
                   <ActionButton a={a} send={send} blockedText={blockedText(a, s, view)} compact />
                 </dd>
               </Fragment>

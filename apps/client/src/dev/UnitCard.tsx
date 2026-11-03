@@ -25,7 +25,7 @@ import { MetricRow } from '../ui/metric-icon.tsx';
 function Row(props: { label: string; value: string }): React.JSX.Element {
   return (
     <>
-      <dt>{props.label}</dt>
+      <dt className={styles.label}>{props.label}</dt>
       <dd>{props.value}</dd>
     </>
   );
@@ -230,7 +230,7 @@ export function UnitCard(props: {
         {units.length === 1 && (
           <>
             <IconButton
-              className={styles.button}
+              className={`${styles.button} ${styles.iconAction}`}
               label={t('unit.split')}
               disabled={splitReason !== null}
               onClick={() =>
@@ -250,7 +250,7 @@ export function UnitCard(props: {
           <p role="status">{t(mergeReason)}</p>
         ) : units.length > 1 ? (
           <IconButton
-            className={styles.button}
+            className={`${styles.button} ${styles.iconAction}`}
             label={t('unit.merge')}
             onClick={() => props.send({ t: 'merge', unitIds: units.map((unit) => unit.id) })}
           >

@@ -46,43 +46,59 @@
 
 .stats {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-xs) var(--space-md);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-xs);
   margin: 0;
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
+/* Метка и иконка прижаты к значению: иконка и действие одной строки стоят вплотную. */
 .stats dt {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--ui-ink2);
+}
+
+.stats dt.label {
+  padding-inline-end: var(--space-sm);
+}
+
+/* Строка с кнопкой: метка выровнена по самой кнопке, причина недоступности остаётся ниже. */
+.stats dt.actionLabel {
+  align-self: start;
+  min-height: var(--touch-target-min);
+}
+
+.levelText {
+  line-height: var(--touch-target-min);
 }
 
 .stats dd {
   min-width: 0;
   margin: 0;
-  text-align: right;
+  text-align: left;
   overflow-wrap: anywhere;
 }
 
 .levelValue {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-xs);
-}
-
-.depotValue {
+  display: flex;
   align-items: flex-start;
-}
-
-.depotValue > [data-metric-icon='supply'] {
-  margin-top: calc((var(--touch-target-min) - 14px) / 2);
+  justify-content: flex-start;
+  gap: var(--space-xs);
 }
 
 .levelValue .levelAction {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-xs);
+}
+
+.levelValue .levelAction .reason {
+  max-inline-size: 22ch;
 }
 
 .levelValue .button {
@@ -279,6 +295,13 @@
   cursor: pointer;
 }
 
+.iconAction {
+  align-self: flex-start;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  padding: 0 var(--space-xs);
+}
+
 .button:disabled {
   cursor: not-allowed;
 }
@@ -361,10 +384,36 @@
 
 .recruitControl {
   display: grid;
-  grid-template-columns: auto minmax(70px, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'types info action'
+    'range range range';
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-caption);
+}
+
+.recruitControl .recruitTypes {
+  grid-area: types;
+}
+
+.recruitControl .recruitRange {
+  grid-area: range;
+}
+
+.recruitInfo {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.recruitControl .recruitAction {
+  grid-area: action;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  padding: 0 var(--space-xs);
 }
 
 .recruitTypes {
@@ -402,7 +451,7 @@
 
 .recruitRange {
   display: grid;
-  grid-template-columns: auto minmax(70px, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-sm);
   min-width: 0;
@@ -411,21 +460,6 @@
 .recruitRange input {
   accent-color: var(--ui-ink);
   min-width: 0;
-}
-
-@media (max-width: 600px) {
-  .recruitControl {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .recruitTypes,
-  .recruitRange {
-    grid-column: 1 / -1;
-  }
-
-  .recruitRange {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
 }
 
 .time {
