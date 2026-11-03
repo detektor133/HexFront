@@ -286,6 +286,11 @@ function expand(
   const core = (h: HexId): number =>
     capital === undefined ? 0 : distance(hexOf(map, capital), hexOf(map, h));
   const empty = context.emptyNeutral;
+  const mine = Array.from(view.hexes.owner, (o, h) => (o === view.playerId ? h : -1)).filter(
+    (h) => h >= 0,
+  );
+  const borderGap = (h: HexId): number =>
+    Math.min(...mine.map((m) => distance(hexOf(map, m), hexOf(map, h))), Number.MAX_SAFE_INTEGER);
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   const out: Command[] = [];
   for (const u of units.filter(idle)) {
@@ -306,8 +311,10 @@ function expand(
     const fromUnit = (h: HexId): number => distance(at, hexOf(map, h));
     // Расстояния на карте меньше LAND_KEY, поэтому ключ — «сначала к столице, потом к отряду».
     const fromCore = (h: HexId): number => core(h) * LAND_KEY + fromUnit(h);
+    // Нейтральный город — только у своей границы: за далёким городом отряд тянул бы червяка
+    // через ничью землю вместо целостного государства.
     const winnable = cities.filter(
-      (h) => forecastBattle(map, view, [u.id], h).outcome === 'victory',
+      (h) => borderGap(h) <= 1 && forecastBattle(map, view, [u.id], h).outcome === 'victory',
     );
     const target = nearest(winnable, fromUnit) ?? nearest(empty, fromCore);
     if (target === null) continue;
@@ -340,15 +347,19 @@ export function decide(
     ...seedExpansion(view, armyId, commanderContext),
   ];
   const units = armyUnits(view, armyId);
-  // Бот: свободные отряды бьют по вражескому городу, если прогноз боя — победа (commander-strike).
-  const struck = bot ? strike(map, view, units.filter(idle)) : [];
-  const striking = new Set(struck.flatMap((c) => (c.t === 'move' ? c.unitIds : [])));
-  out.push(...struck);
   const expansion =
     lineDepth !== undefined && commanderContext.emptyNeutral.length > 0 && view.armies.length > 1
       ? (view.armies.at(-1)?.id ?? null)
       : null;
   const piece = piecesOf(map, view, expansion, commanderContext).get(armyId);
+  // Бот: свободные отряды бьют по вражескому городу, если прогноз боя — победа (commander-strike).
+  // Пока рядом есть ничья земля и нет контакта с врагом, армия растит государство, а не воюет.
+  const struck =
+    bot && (piece !== undefined || commanderContext.emptyNeutral.length === 0)
+      ? strike(map, view, units.filter(idle))
+      : [];
+  const striking = new Set(struck.flatMap((c) => (c.t === 'move' ? c.unitIds : [])));
+  out.push(...struck);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {
     if (plan?.kind !== 'front' || !plan.edges.some((e) => piece.edges.includes(e))) {

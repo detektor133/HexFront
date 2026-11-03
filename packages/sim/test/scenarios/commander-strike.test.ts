@@ -5,8 +5,8 @@ import { playerView } from '../../src/queries/player-view.ts';
 import { at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
 
 const MAP = `
-  A1 a  a  a  a  .  .  B1
-  a  a  a  a  a  .  .  b
+  A1 a  a  a  a  b  b  B1
+  a  a  a  a  a  b  b  b
 `;
 const legend = {
   A1: city('A', 3, { capital: true }),
