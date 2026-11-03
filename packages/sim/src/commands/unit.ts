@@ -4,6 +4,7 @@ import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
+import { forecastInState } from '../queries/forecast.ts';
 import { planGather } from '../queries/gather.ts';
 import { findPath, isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Unit, MatchState } from '../state/types.ts';
@@ -45,10 +46,13 @@ export function routePath(
   via: readonly HexId[],
   to: HexId,
 ): HexId[] | null {
+  // Слабый враг (победа по прогнозу) не преграда: отряд дойдёт и атакует его сам (meetEnemy).
+  const weakEnemy = (hex: HexId): boolean =>
+    unit.type !== 'artillery' && forecastInState(state, [unit], hex).outcome === 'victory';
   const path: HexId[] = [];
   let from = unit.hex;
   for (const point of [...via, to]) {
-    const leg = findPath(state, from, point, unit.type, unit.owner);
+    const leg = findPath(state, from, point, unit.type, unit.owner, false, weakEnemy);
     if (!leg) return null;
     path.push(...leg);
     from = point;

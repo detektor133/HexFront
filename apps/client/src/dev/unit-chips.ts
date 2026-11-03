@@ -29,6 +29,8 @@ const ATTACK_ARROW = 10;
 /** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
 const WARN = 8;
 const LABEL_PX = 12;
+const COUNT_PX = 11;
+const COUNT_R = 8;
 const RETREAT_ALPHA = 0.6;
 /** Пунктир фишки-призрака набора, px. */
 const GHOST_DASH = 3;
@@ -111,6 +113,8 @@ function vbar(g: Graphics, x: number, top: number, h: number, share: number, col
 interface Parts {
   readonly g: Graphics;
   readonly label: BitmapText;
+  /** Число отрядов стопки в кружке на правом верхнем углу фишки. */
+  readonly count: BitmapText;
 }
 
 function barsWidth(s: ChipState): number {
@@ -202,8 +206,21 @@ function drawChip(p: Parts, s: ChipState): number {
   vbar(g, x, barTop, barH, s.org, tokens.chip.org);
   drawAttackArrow(g, s, sq);
   marks(p, s, sq);
+  drawCount(p, s, left + w, top);
   if (s.retreating) drawRetreatHatch(g, left, top, w);
   return w + Math.max(OUTLINE, tokens.selection.width, 2);
+}
+
+function drawCount(p: Parts, s: ChipState, right: number, top: number): void {
+  const n = s.count ?? 1;
+  p.count.visible = n > 1;
+  if (n <= 1) return;
+  p.count.text = String(n);
+  p.count.position.set(right - 2, top + 2);
+  p.g
+    .circle(right - 2, top + 2, COUNT_R)
+    .fill(tokens.ui.ink)
+    .stroke({ color: tokens.ui.surface, width: 1.5 });
 }
 
 /** Белая диагональная штриховка отступления остаётся внутри корпуса фишки. */
@@ -253,16 +270,19 @@ export function createChip(): Chip {
   label.anchor.set(0.5, 0.5);
   const textResolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
   label.resolution = textResolution;
-  content.addChild(g, label);
-  const parts: Parts = { g, label };
+  const count = new BitmapText({
+    text: '',
+    style: { ...font, fontSize: COUNT_PX, fill: tokens.ui.surface },
+  });
+  count.anchor.set(0.5, 0.5);
+  count.resolution = textResolution;
+  content.addChild(g, label, count);
+  const parts: Parts = { g, label, count };
   let width = 0;
   return {
     root,
     draw(s) {
-      label.text =
-        (s.count ?? 1) > 1
-          ? `${formatSoldiers(s.soldiers)} ×${s.count}`
-          : formatSoldiers(s.soldiers);
+      label.text = formatSoldiers(s.soldiers);
       label.style.fill = s.ghost ? s.color : tokens.ui.ink;
       g.clear();
       if (s.ghost) {
@@ -278,6 +298,7 @@ export function createChip(): Chip {
     setResolution(r) {
       if (label.resolution === r) return;
       label.resolution = r;
+      count.resolution = r;
     },
     destroy() {
       root.destroy({ children: true, context: true });

@@ -70,6 +70,8 @@ export interface Mover {
   readonly type: UnitType;
   readonly owner: number;
   readonly supplyLevel: Fp;
+  /** Вражеский гекс, который можно пройти с боем (слабый враг по прогнозу); иначе враг — преграда. */
+  readonly passHostile?: (hex: HexId) => boolean;
 }
 
 /**
@@ -109,7 +111,7 @@ function canEnter(state: MatchState, m: Mover, hex: HexId, isGoal: boolean): boo
   if (moveTerrain(state, hex) === null) return false;
   if (m.type === 'artillery' && state.hexes.owner[hex] !== m.owner) return false;
   if (isGoal) return true;
-  if (isHostileHex(state, m.owner, hex)) return false;
+  if (isHostileHex(state, m.owner, hex)) return m.passHostile?.(hex) ?? false;
   return ownUnitsAt(state, m.owner, hex) < MAX_UNITS_PER_HEX;
 }
 
@@ -211,9 +213,15 @@ export function findPath(
   type: UnitType,
   owner: number,
   ownLand = false,
+  passHostile?: (hex: HexId) => boolean,
 ): HexId[] | null {
   if (from === to) return [];
-  const mover: Mover = { type, owner, supplyLevel: FP as Fp };
+  const mover: Mover = {
+    type,
+    owner,
+    supplyLevel: FP as Fp,
+    ...(passHostile ? { passHostile } : {}),
+  };
   if (!canEnter(state, mover, to, true)) return null;
   const { width } = state.map;
   const goal = hexFromId(to, width);
