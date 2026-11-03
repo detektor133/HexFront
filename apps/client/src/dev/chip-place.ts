@@ -25,3 +25,12 @@ export function starRadius(level: number, radius: number): number {
 export function cityChipShift(level: number, radius: number): number {
   return starRadius(level, radius) + GAP + chipHalf();
 }
+
+/**
+ * Сдвиг фишки атакующего к цели (units.md, «В бою»): середина между центром своего гекса и
+ * серединой общей грани, то есть четверть расстояния до центра соседнего гекса цели.
+ * @returns смещение в единицах мира
+ */
+export function attackShift(from: { x: number; y: number }, to: { x: number; y: number }) {
+  return { x: (to.x - from.x) / 4, y: (to.y - from.y) / 4 };
+}

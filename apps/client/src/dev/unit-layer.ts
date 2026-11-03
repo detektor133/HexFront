@@ -17,7 +17,7 @@ import {
 import { markerAt, type MarkerAnchor } from './battle-panel.ts';
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
-import { CHIP_WORLD, chipHalf, cityChipShift } from './chip-place.ts';
+import { CHIP_WORLD, attackShift, chipHalf, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, isRetreatSoon, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
@@ -272,6 +272,14 @@ export function createUnitLayer(
     };
   }
 
+  // Своя фишка с приказом атаки стоит ближе к цели; плавность даёт общее сглаживание позиции.
+  function attackSlide(unit: UnitView, v: PlayerView): Point {
+    if (unit.owner !== v.playerId || unit.order !== 'attack' || unit.target < 0) {
+      return { x: 0, y: 0 };
+    }
+    return attackShift(center(unit.hex), center(unit.target));
+  }
+
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
     for (const g of chipGroups(v)) {
@@ -285,7 +293,11 @@ export function createUnitLayer(
               const position = unitAt(unit, f);
               return { x: position.x, y: position.y + g.stackOffset };
             }
-          : () => ({ x: base(unit.hex).x, y: base(unit.hex).y + g.stackOffset }),
+          : () => {
+              const at = base(unit.hex);
+              const shift = attackSlide(unit, v);
+              return { x: at.x + shift.x, y: at.y + g.stackOffset + shift.y };
+            },
       });
     }
     for (const r of v.recruits) {
