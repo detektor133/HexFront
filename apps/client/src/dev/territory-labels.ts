@@ -1,4 +1,4 @@
-import { Text, type Container } from 'pixi.js';
+import { Graphics, Text, type Container } from 'pixi.js';
 
 import { hexFromId, type PlayerView } from '@hexfront/sim';
 
@@ -12,11 +12,15 @@ export interface TerritoryLabel {
   readonly at: { readonly x: number; readonly y: number };
   readonly fontSize: number;
   readonly maxWidth: number;
+  /** Отношение к игроку-зрителю: значок под названием; null — мир или свой (CR-007). */
+  readonly relation: 'war' | 'pact' | 'alliance' | null;
+  /** Входящее предложение от этого государства: значок предложенного договора. */
+  readonly offer: 'pact' | 'alliance' | null;
 }
 
 /** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
 export function buildTerritoryLabels(
-  view: Pick<PlayerView, 'hexes' | 'players'>,
+  view: Pick<PlayerView, 'hexes' | 'players' | 'diplomacy' | 'playerId'>,
   mapWidth: number,
   hexRadius: number,
 ): readonly TerritoryLabel[] {
@@ -57,6 +61,8 @@ export function buildTerritoryLabels(
         name,
         fontSize,
         maxWidth: sum.maxX - sum.minX,
+        relation: relationOfLabel(view, player.id),
+        offer: view.diplomacy?.incoming.find((o) => o.from === player.id)?.kind ?? null,
         at: { x: (sum.minX + sum.maxX) / 2, y: sum.y / sum.count },
       },
     ];
@@ -69,7 +75,7 @@ export function territoryLabelsKey(
   scale: number,
   detail: 1 | 2 | 3,
 ): string {
-  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.fontSize}:${label.maxWidth}:${label.at.x}:${label.at.y}`).join(',')}`;
+  return `${scale}|${detail}|${labels.map((label) => `${label.playerId}:${label.name}:${label.fontSize}:${label.maxWidth}:${label.relation}:${label.offer}:${label.at.x}:${label.at.y}`).join(',')}`;
 }
 
 /** Возвращает горизонтальный коэффициент подписи, чтобы её ширина не превышала территорию. */
@@ -114,5 +120,53 @@ export function drawTerritoryLabels(
     );
     text.position.set(label.at.x, label.at.y);
     container.addChild(text);
+    const glyph = label.offer ?? label.relation;
+    if (glyph !== null) {
+      const color =
+        label.offer !== null
+          ? tokens.status.warning
+          : label.relation === 'war'
+            ? tokens.status.danger
+            : label.relation === 'alliance'
+              ? tokens.relation.ally
+              : tokens.ui.ink2;
+      const below = { x: label.at.x, y: label.at.y + (label.fontSize * 0.5 + 9) / scale };
+      drawRelationGlyph(container, glyph, below, scale, color);
+    }
   }
+}
+
+function relationOfLabel(
+  view: Pick<PlayerView, 'diplomacy' | 'playerId'>,
+  playerId: number,
+): TerritoryLabel['relation'] {
+  if (playerId === view.playerId) return null;
+  const relation = view.diplomacy?.relations[playerId];
+  return relation === 'war' || relation === 'pact' || relation === 'alliance' ? relation : null;
+}
+
+/** Значок отношения 12 px под названием: война — скрещённые линии, пакт — кружок с чертой, союз — два кольца. */
+function drawRelationGlyph(
+  container: Container,
+  kind: 'war' | 'pact' | 'alliance',
+  at: { readonly x: number; readonly y: number },
+  scale: number,
+  color: string,
+): void {
+  const g = new Graphics();
+  const draw = (stroke: { color: string; width: number }): void => {
+    if (kind === 'war') {
+      g.moveTo(-5, -5).lineTo(5, 5).moveTo(5, -5).lineTo(-5, 5);
+    } else if (kind === 'pact') {
+      g.circle(0, 0, 5).moveTo(-3, 0).lineTo(3, 0);
+    } else {
+      g.circle(-3, 0, 4).circle(3, 0, 4);
+    }
+    g.stroke({ ...stroke, cap: 'round' });
+  };
+  draw({ color: tokens.ui.surface, width: 4.5 });
+  draw({ color, width: 2 });
+  g.scale.set(1 / scale);
+  g.position.set(at.x, at.y);
+  container.addChild(g);
 }

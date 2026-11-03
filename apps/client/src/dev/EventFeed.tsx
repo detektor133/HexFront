@@ -1,4 +1,12 @@
-import { IconArrowBackUp, IconBuildingCastle, IconFlag, IconSkull } from '@tabler/icons-react';
+import {
+  IconArrowBackUp,
+  IconBuildingCastle,
+  IconFlag,
+  IconHeartHandshake,
+  IconLinkOff,
+  IconSkull,
+  IconSwords,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import type { GameEvent } from '@hexfront/sim';
@@ -52,6 +60,11 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
   if (event.t === 'unitCapitulated') return <IconFlag size={18} aria-hidden />;
   if (event.t === 'unitRetreated') return <IconArrowBackUp size={18} aria-hidden />;
   if (event.t === 'cityCaptured') return <IconBuildingCastle size={18} aria-hidden />;
+  if (event.t === 'warDeclared') return <IconSwords size={18} aria-hidden />;
+  if (event.t === 'treatyMade' || event.t === 'treatyOffered') {
+    return <IconHeartHandshake size={18} aria-hidden />;
+  }
+  if (event.t === 'treatyBroken') return <IconLinkOff size={18} aria-hidden />;
   return null;
 }
 

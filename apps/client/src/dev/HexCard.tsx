@@ -21,6 +21,7 @@ import {
   RECRUIT_MIN,
 } from '@hexfront/sim';
 
+import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import styles from './HexCard.module.css';
 import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
@@ -332,6 +333,7 @@ export function HexCard(props: {
             <IconX className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         </div>
+        <DiplomacyBlock view={view} other={owner} send={send} />
         <dl className={styles.stats}>
           <MetricRow
             name="population"

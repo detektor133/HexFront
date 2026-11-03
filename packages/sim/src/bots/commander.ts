@@ -5,6 +5,7 @@
 // линии — построить линию; лишние отряды резерва — в самую слабую армию. Сам на игроков не наступает.
 import { commanderLine } from './commander-line.ts';
 import { strike } from './commander-strike.ts';
+import { warWith } from './war.ts';
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
@@ -59,7 +60,12 @@ export interface CommanderContext {
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
 
 // Куски границы с каждым врагом (до дипломатии все игроки — враги), по первой грани.
-function enemyPieces(g: Ground, me: number, ownedHexes?: readonly HexId[]): Piece[] {
+function enemyPieces(
+  g: Ground,
+  me: number,
+  isEnemy: (player: number) => boolean,
+  ownedHexes?: readonly HexId[],
+): Piece[] {
   const out: Piece[] = [];
   const seen = new Set<EdgeId>();
   const borders =
@@ -72,7 +78,7 @@ function enemyPieces(g: Ground, me: number, ownedHexes?: readonly HexId[]): Piec
         );
   for (const e of borders) {
     const enemy = g.hexes.owner[edgeOther(g, e)] ?? -1;
-    if (enemy < 0 || seen.has(e)) continue;
+    if (!isEnemy(enemy) || seen.has(e)) continue;
     const edges = borderSegmentEdges(g, me, enemy, e);
     for (const x of edges) seen.add(x);
     if (edges.length > 0) out.push({ enemy, edges });
@@ -213,7 +219,8 @@ function retake(map: MapStatic, view: PlayerView, lost: readonly HexId[], units:
   const out: Command[] = [];
   const used = new Set<number>();
   for (const h of lost) {
-    if ((view.hexes.owner[h] ?? -1) < 0 || view.hexes.owner[h] === view.playerId) continue;
+    const holder = view.hexes.owner[h] ?? -1;
+    if (holder < 0 || holder === view.playerId || !warWith(view, holder)) continue;
     const ready = units
       .filter((u) => idle(u) && !used.has(u.id))
       .sort(
@@ -405,7 +412,12 @@ export function createCommanderContext(
 ): CommanderContext {
   return {
     emptyNeutral: emptyNeutral(map, view, ownedHexes),
-    enemyPieces: enemyPieces({ map, hexes: view.hexes }, view.playerId, ownedHexes),
+    enemyPieces: enemyPieces(
+      { map, hexes: view.hexes },
+      view.playerId,
+      (player) => warWith(view, player),
+      ownedHexes,
+    ),
     assigned: new Map(),
   };
 }

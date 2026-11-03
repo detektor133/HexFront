@@ -2,6 +2,7 @@
 // идут на вражеский город, если прогноз боя — «победа». Цель выбирается по пользе (ценность города
 // / расстояние), а не по ближайшей границе; сила — минимальный набор ближайших отрядов, которому
 // прогноз обещает победу, остальные остаются на месте. Только армии ботов: люди командуют сами.
+import { warWith } from './war.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
@@ -19,7 +20,7 @@ interface Target {
 
 function targets(view: PlayerView): Target[] {
   return view.cities
-    .filter((c) => c.owner >= 0 && c.owner !== view.playerId)
+    .filter((c) => warWith(view, c.owner))
     .map((c) => ({ hex: c.hex, value: c.level * (c.isCapital ? CAPITAL_VALUE_MULT : 1) }));
 }
 

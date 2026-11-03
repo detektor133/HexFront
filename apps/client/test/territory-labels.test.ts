@@ -73,7 +73,17 @@ describe('подписи территорий', () => {
     const container = new Container();
     drawTerritoryLabels(
       container,
-      [{ playerId: 1, name: 'Юг', at: { x: 0, y: 0 }, fontSize: 12, maxWidth: 100 }],
+      [
+        {
+          playerId: 1,
+          name: 'Юг',
+          at: { x: 0, y: 0 },
+          fontSize: 12,
+          maxWidth: 100,
+          relation: null,
+          offer: null,
+        },
+      ],
       1,
       1,
     );
@@ -89,7 +99,17 @@ describe('подписи территорий', () => {
     const container = new Container();
     drawTerritoryLabels(
       container,
-      [{ playerId: 1, name: 'Юг', at: { x: 0, y: 0 }, fontSize: 12, maxWidth: 100 }],
+      [
+        {
+          playerId: 1,
+          name: 'Юг',
+          at: { x: 0, y: 0 },
+          fontSize: 12,
+          maxWidth: 100,
+          relation: null,
+          offer: null,
+        },
+      ],
       1,
       1,
     );

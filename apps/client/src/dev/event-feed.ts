@@ -17,6 +17,16 @@ export function eventHex(event: GameEvent, view: PlayerView): number | null {
   if (event.t === 'cityCaptured' || event.t === 'capitalMoved') {
     return view.cities.find((city) => city.id === event.cityId)?.hex ?? null;
   }
+  if (
+    event.t === 'warDeclared' ||
+    event.t === 'treatyMade' ||
+    event.t === 'treatyBroken' ||
+    event.t === 'treatyOffered'
+  ) {
+    // Щелчок ведёт к столице другой стороны: там открывается карточка с дипломатией.
+    const other = event.playerId === view.playerId ? event.targetId : event.playerId;
+    return view.cities.find((city) => city.owner === other && city.isCapital)?.hex ?? null;
+  }
   if (event.t === 'offensiveDone') {
     const army = view.armies.find((candidate) => candidate.id === event.armyId);
     return view.units.find((unit) => unit.armyId === army?.id)?.hex ?? null;
@@ -25,12 +35,28 @@ export function eventHex(event: GameEvent, view: PlayerView): number | null {
 }
 
 export function isImportantEvent(event: GameEvent): boolean {
-  return event.t === 'unitDestroyed' || event.t === 'unitCapitulated' || event.t === 'cityCaptured';
+  return (
+    event.t === 'unitDestroyed' ||
+    event.t === 'unitCapitulated' ||
+    event.t === 'cityCaptured' ||
+    event.t === 'warDeclared'
+  );
 }
 
 function isVisibleEvent(event: GameEvent, localPlayerId: number): boolean {
   if (event.t === 'unitDestroyed' || event.t === 'unitCapitulated' || event.t === 'unitRetreated') {
     return event.playerId === localPlayerId;
+  }
+  if (
+    event.t === 'warDeclared' ||
+    event.t === 'treatyMade' ||
+    event.t === 'treatyBroken' ||
+    event.t === 'treatyOffered'
+  ) {
+    // Предложение интересно только адресату; остальное — обеим сторонам.
+    return event.t === 'treatyOffered'
+      ? event.targetId === localPlayerId
+      : event.playerId === localPlayerId || event.targetId === localPlayerId;
   }
   return (
     event.t === 'cityCaptured' &&

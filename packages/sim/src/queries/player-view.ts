@@ -428,6 +428,9 @@ export function commanderView(
     playerId,
     victoryHold: null,
     ranking: [],
+    ...(diplomacyView(state, playerId)
+      ? { diplomacy: diplomacyView(state, playerId) as DiplomacyView }
+      : {}),
     hexes: {
       owner: hexes.owner,
       pop: hexes.pop,

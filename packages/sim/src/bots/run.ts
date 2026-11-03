@@ -5,6 +5,7 @@
 import { brainDecide, resolveBotWeights, type BotWeightsByPlayer } from './brain.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
+import { diplomacyCommands } from './diplomacy.ts';
 import {
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
@@ -124,6 +125,9 @@ export function botCommands(
     if (p.id % thinkTicks !== state.tick % thinkTicks) continue;
     const commands = brainDecide(state, p.id, tickContext, level, weights);
     for (const cmd of commands) {
+      out.push({ playerId: p.id, cmd });
+    }
+    for (const cmd of diplomacyCommands(state, p.id, tickContext)) {
       out.push({ playerId: p.id, cmd });
     }
   }

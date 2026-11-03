@@ -1,0 +1,78 @@
+/* Дипломатия в карточке чужой территории: отношение, нарушения и маленькие кнопки действий. */
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--ui-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: var(--font-size-caption);
+}
+
+.relation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--ui-ink2);
+}
+
+.relation[data-relation='war'] {
+  color: var(--status-danger);
+}
+
+.relation[data-relation='alliance'] {
+  color: var(--relation-ally);
+}
+
+.violations {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ui-ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+.offer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-caption);
+  color: var(--status-warning);
+}
+
+.offer > span {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.action {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.action:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.action:not(:disabled):hover {
+  border-color: var(--selection-color);
+}
