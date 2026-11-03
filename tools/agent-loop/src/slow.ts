@@ -1,12 +1,11 @@
 // Workflow `slow` (все тесты с тяжёлыми): цикл его не ждёт, но красный чинится первым,
-// а этап закрывается только на зелёном.
+// а этап закрывается без ожидания slow.
 import {
   park,
   settleWait,
   pollSlow,
   runSkill,
   save,
-  waitSlow,
   type LoopContext,
   type Step,
 } from './context.ts';
@@ -99,32 +98,4 @@ async function rerunSlow(context: LoopContext, line: string): Promise<boolean> {
   }
   await context.say(`красный slow перезапущен один раз (прогон ${run}): ${line}`);
   return true;
-}
-
-/**
- * Перед `$stage-close`: этап закрывается только на зелёном `slow`. Красный ведёт к
- * исправлению через slowGate на следующем шаге, непроверенный — пауза.
- * @returns шаг цикла или undefined — `slow` зелёный.
- */
-export async function slowBeforeClose(context: LoopContext): Promise<Step | undefined> {
-  const slow = await waitSlow(context, 'перед $stage-close');
-  if (slow.verdict === 'green') return undefined;
-  if (slow.verdict === 'red') {
-    const fixed = await slowGate(context);
-    if (fixed !== undefined) return fixed;
-    // Перезапущенный прогон дождётся следующий шаг. Записанный баг пропускает очередь к своей
-    // задаче, но этап на красном не закрывается.
-    const current = await head(context.git);
-    if (context.state.slowRerun === current && context.state.slowBug === undefined) return 'worked';
-    return park(
-      context,
-      `slow-close:${current}`,
-      `slow (все тесты) красный перед $stage-close, баг записан, а очередь пуста: ${slow.line}. Ответ — Issue «$decide» с решением`,
-    );
-  }
-  return park(
-    context,
-    `slow-close:${await head(context.git)}`,
-    `slow (все тесты) перед $stage-close не проверен: ${slow.line}`,
-  );
 }

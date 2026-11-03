@@ -49,6 +49,9 @@ const CLIENT_BUILD_SETUP = fileURLToPath(
 /** @returns проекты Vitest; `withSlow` — вместе с тяжёлыми файлами (`pnpm test:all`). */
 export function testProjects(withSlow: boolean) {
   return PROJECTS.flatMap((root) => {
+    // Тесты самого агентного цикла (40 файлов) не гоняются на каждый коммит: ночной `slow` и
+    // `pnpm test:all` их запускают. Менял цикл — запусти `pnpm test:all:projects --project agent-loop`.
+    if (!withSlow && root === 'tools/agent-loop') return [];
     const slow = SLOW_TESTS.filter((file) => file.startsWith(`${root}/`)).map((file) =>
       file.slice(root.length + 1),
     );

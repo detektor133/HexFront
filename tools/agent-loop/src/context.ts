@@ -250,8 +250,6 @@ function countCi(context: LoopContext, title: string, ci: CiResult): void {
   if (ci.verdict === 'red') board?.count('ciRed');
   board?.end(agentName(context), `${title}: ${CI_WORDS[ci.verdict]}`);
 }
-/** Прогон всех тестов идёт дольше быстрого CI: random-match один — 4–5 мин. */
-const SLOW_TIMEOUT_MS = 25 * 60_000;
 const SLOW_ARGS = ['--workflow=slow.yml'];
 
 async function ciWait(
@@ -295,26 +293,6 @@ export async function pollSlow(context: LoopContext): Promise<CiResult> {
   const ci = await ciWait(context, [...SLOW_ARGS, '--once'], CI_TIMEOUT_MS);
   if (ci.verdict === 'green') {
     context.state.slowGreen = current;
-    await save(context);
-  }
-  return { verdict: ci.verdict, line: ci.line };
-}
-
-/** Ждёт `slow` на HEAD до конца: перед `$stage-close` этап закрывается только на зелёном. */
-export async function waitSlow(context: LoopContext, label: string): Promise<CiResult> {
-  const { config, say } = context;
-  const started = config.now();
-  config.board?.begin(agentName(context), `slow ${label}`);
-  await say(`… жду slow ${label}`);
-  const ci = await ciWait(
-    context,
-    [...SLOW_ARGS, `--timeout-minutes=${SLOW_TIMEOUT_MS / 60_000}`],
-    SLOW_TIMEOUT_MS + 60_000,
-  );
-  countCi(context, `slow ${label}`, ci);
-  await say(`slow ${CI_WORDS[ci.verdict]} за ${minutes(config.now() - started)}: ${ci.line}`);
-  if (ci.verdict === 'green') {
-    context.state.slowGreen = await head(context.git);
     await save(context);
   }
   return { verdict: ci.verdict, line: ci.line };

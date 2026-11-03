@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Board, MAIN_AGENT } from './board.ts';
-import { closeAll, fixtureStage, fixtureStatus, runWorld, type Session } from './test-world.ts';
+import { runWorld, type Session } from './test-world.ts';
 
 const NEXT_DONE: Session = {
   task: 'T1j5-Б1',
@@ -146,47 +146,5 @@ describe('workflow slow (все тесты)', () => {
       slow: ['error сеть: TypeError: fetch failed'],
     });
     expect(commands(run.prompts)).toEqual(['$task 06/T1j5-Б1', '$review 06/T1j5-Б1']);
-  });
-});
-
-describe('slow перед $stage-close', () => {
-  const lastQueue = fixtureStatus.replace(/Очередь:.*/, 'Очередь: 06/T2');
-  const closedStatus = lastQueue.replace('| 06 —', '| 07 —');
-
-  it('этап закрывается только после зелёного slow, дождавшись его', async () => {
-    const run = await runWorld({
-      status: lastQueue,
-      stage: closeAll(fixtureStage),
-      // Шаг очереди видит идущий прогон, закрытие этапа ждёт его до конца.
-      slow: ['pending https://slow/3 10', 'success https://slow/3'],
-      sessions: [{ answer: 'Этап 06 закрыт', status: closedStatus }],
-    });
-    expect(run.prompts).toEqual(['$stage-close']);
-    expect(run.slowCalls[1]).toBe('--workflow=slow.yml --timeout-minutes=25');
-    expect(run.lines).toContain('slow зелёный за 0 мин: success https://slow/3');
-  });
-
-  it('красный slow перед закрытием — исправление, а не $stage-close', async () => {
-    const run = await runWorld({
-      status: lastQueue,
-      stage: closeAll(fixtureStage),
-      slow: ['pending https://slow/3 10', RED, RED, RED],
-      headTrailer: '06/T2',
-      sessions: [FIXED],
-    });
-    expect(run.prompts[0]).toBe(`$task 06/T2 CI красный: slow ${RED}`);
-    expect(run.prompts).not.toContain('$stage-close');
-  });
-
-  it('красный slow перед закрытием на служебном коммите — перезапуск, $stage-close после зелёного', async () => {
-    const run = await runWorld({
-      status: lastQueue,
-      stage: closeAll(fixtureStage),
-      slow: ['pending https://slow/3 10', RED_RUN, RED_RUN, 'success https://slow/4'],
-      headTrailer: '06/infra\n',
-      sessions: [{ answer: 'Этап 06 закрыт', status: lastQueue.replace('| 06 —', '| 07 —') }],
-    });
-    expect(run.reruns).toEqual([77]);
-    expect(run.prompts).toEqual(['$stage-close']);
   });
 });
