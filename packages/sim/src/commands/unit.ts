@@ -1,4 +1,4 @@
-// Команды отрядов: move, attack, split, merge, bombard.
+// Команды отрядов: move, attack, stop, split, merge, bombard.
 // GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
@@ -10,7 +10,7 @@ import { addUnit, removeUnits } from '../state/unit-index.ts';
 
 export type UnitCommand = Extract<
   Command,
-  { t: 'move' | 'attack' | 'split' | 'merge' | 'bombard' }
+  { t: 'move' | 'attack' | 'stop' | 'split' | 'merge' | 'bombard' }
 >;
 
 type Owned =
@@ -116,6 +116,8 @@ export function validateUnitCommand(
         : rejected('unknownUnit');
     case 'merge':
       return validateMerge(owned.units);
+    case 'stop':
+      return owned.units.some((unit) => unit.inBattle) ? rejected('inBattle') : OK;
   }
 }
 
@@ -215,6 +217,14 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
       return;
     case 'merge':
       mergeUnits(state, owned.units);
+      return;
+    case 'stop':
+      for (const unit of owned.units) {
+        stop(unit);
+        unit.slot = -1;
+        unit.target = -1;
+        if (unit.order === 'move' || unit.order === 'attack') unit.order = 'idle';
+      }
       return;
   }
 }

@@ -29,6 +29,8 @@ export type Command =
       readonly to?: HexId;
     }
   | { readonly t: 'merge'; readonly unitIds: readonly number[] }
+  /** Отмена приказа движения и атаки; отряд остаётся в гексе, где стоит. */
+  | { readonly t: 'stop'; readonly unitIds: readonly number[] }
   | { readonly t: 'bombard'; readonly unitId: number; readonly targetUnitId: number | null }
   | {
       readonly t: 'recruit';
@@ -106,6 +108,7 @@ export const REJECT_REASONS = [
   'noOffensive',
   'notEnemy',
   'retreating',
+  'inBattle',
 ] as const;
 
 export type RejectReason = (typeof REJECT_REASONS)[number];

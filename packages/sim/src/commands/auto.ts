@@ -31,6 +31,7 @@ function touched(state: MatchState, cmd: Command): number[] {
       return [cmd.armyId];
     case 'move':
     case 'attack':
+    case 'stop':
     case 'merge':
       return armiesOf(state, cmd.unitIds);
     case 'split':
