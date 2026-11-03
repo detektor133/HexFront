@@ -57,12 +57,12 @@ function ActionButton(props: {
           disabled
           aria-label={compact ? label : undefined}
           aria-describedby={reasonId}
-          title={compact ? label : undefined}
+          title={compact ? `${label}: ${props.blockedText ?? reasonText(a.blocked)}` : undefined}
         >
           {compact ? compactActionIcon(a.kind) : <span>{label}</span>}
           {compact && a.cost > 0 && <Price value={formatFp(a.cost)} ok={false} />}
         </button>
-        <span id={reasonId} className={compact ? styles.reason : styles.hint}>
+        <span id={reasonId} className={compact ? styles.srOnly : styles.hint}>
           {props.blockedText ?? reasonText(a.blocked)}
         </span>
       </div>
@@ -76,7 +76,13 @@ function ActionButton(props: {
         disabled={!a.affordable}
         aria-label={compact ? label : undefined}
         {...(!a.affordable ? { 'aria-describedby': reasonId } : {})}
-        title={compact ? label : (hint ?? undefined)}
+        title={
+          compact
+            ? a.affordable
+              ? label
+              : `${label}: ${reasonText('notEnoughGold')}`
+            : (hint ?? undefined)
+        }
         onMouseEnter={() => preview && props.onRoadPreview?.(preview)}
         onMouseLeave={clearPreview}
         onFocus={() => preview && props.onRoadPreview?.(preview)}
@@ -94,7 +100,7 @@ function ActionButton(props: {
         )}
       </button>
       {!a.affordable && (
-        <span id={reasonId} className={styles.reason}>
+        <span id={reasonId} className={styles.srOnly}>
           {reasonText('notEnoughGold')}
         </span>
       )}
@@ -240,7 +246,7 @@ function RecruitButton(props: {
         </button>
       </div>
       {reason && (
-        <span id={reasonId} className={styles.reason}>
+        <span id={reasonId} className={styles.srOnly}>
           {reason}
         </span>
       )}

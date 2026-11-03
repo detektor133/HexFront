@@ -296,7 +296,7 @@ export function createUnitLayer(
 
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
-    for (const g of chipGroups(v)) {
+    for (const g of chipGroups(v, new Set(picked.units))) {
       const unit = g.units[0] as UnitView;
       out.push({
         key: g.key,

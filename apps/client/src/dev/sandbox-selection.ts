@@ -161,7 +161,14 @@ export function orderHex(
     if (attackers.length === 0) return { picked: done, cmd: null };
     return { picked: done, cmd: { t: 'attack', unitIds: attackers.map((u) => u.id), target: hex } };
   }
-  if (via.length === 0 && mine.every((u) => u.hex === hex)) return { picked: done, cmd: null };
+  // Приказ на гекс, где отряды уже стоят: наступающие и идущие останавливаются (как в HoI4).
+  if (via.length === 0 && mine.every((u) => u.hex === hex)) {
+    const moving = mine.filter((u) => u.order === 'attack' || u.order === 'move');
+    return {
+      picked: done,
+      cmd: moving.length > 0 ? { t: 'stop', unitIds: moving.map((u) => u.id) } : null,
+    };
+  }
   const unitIds = mine.map((u) => u.id);
   return {
     picked: done,

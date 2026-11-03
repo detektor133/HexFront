@@ -45,7 +45,7 @@ describe('остановка отрядов', () => {
     const f = s.unitById(fighting);
     if (!a || !f) throw new Error('отряды не созданы');
     a.order = 'retreat';
-    f.inBattle = true;
+    f.inBattle = true; // из боя остановиться можно (как в HoI4)
     const before = JSON.stringify(s.state.units);
 
     const reasons = [[enemy], [999], [retreating], [fighting], [own1, fighting]].map((unitIds) => {
@@ -53,7 +53,7 @@ describe('остановка отрядов', () => {
       return result.ok ? 'ok' : result.reason;
     });
 
-    expect(reasons).toEqual(['notOwnUnit', 'unknownUnit', 'retreating', 'inBattle', 'inBattle']);
+    expect(reasons).toEqual(['notOwnUnit', 'unknownUnit', 'retreating', 'ok', 'ok']);
     expect(JSON.stringify(s.state.units)).toBe(before);
   });
 

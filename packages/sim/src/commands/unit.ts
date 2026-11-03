@@ -153,7 +153,7 @@ export function validateUnitCommand(
     case 'gather':
       return planGather(state, playerId, owned.units) ? OK : rejected('noPath');
     case 'stop':
-      return owned.units.some((unit) => unit.inBattle) ? rejected('inBattle') : OK;
+      return OK;
   }
 }
 

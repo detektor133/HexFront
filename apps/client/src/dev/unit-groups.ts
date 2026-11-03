@@ -18,7 +18,7 @@ const inTransit = (u: UnitView): boolean =>
 export const CHIP_STACK_STEP = 2 * chipHalf();
 
 /** Возвращает отдельную фишку на каждый отряд с устойчивым смещением внутри стопки. */
-export function chipGroups(v: PlayerView): ChipGroup[] {
+export function chipGroups(v: PlayerView, expanded: ReadonlySet<number> = new Set()): ChipGroup[] {
   const buckets = new Map<string, UnitView[]>();
   for (const unit of v.units) {
     const at = inTransit(unit) ? `m${unit.hex}>${unit.path[0] ?? -1}` : `h${unit.hex}`;
@@ -38,7 +38,10 @@ export function chipGroups(v: PlayerView): ChipGroup[] {
       if (same) same.push(unit);
       else merged.set(key, [unit]);
     }
-    const stacks = [...merged.values()];
+    // Выбранная стопка раскрывается в столбик отдельных фишек, пока выделена.
+    const stacks = [...merged.values()].flatMap((s) =>
+      s.some((u) => expanded.has(u.id)) ? s.map((u) => [u]) : [s],
+    );
     const middle = (stacks.length - 1) / 2;
     for (let index = 0; index < stacks.length; index += 1) {
       const stack = stacks[index];
