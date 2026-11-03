@@ -125,6 +125,7 @@
   --chip-org: #2E7D4F;
   --chip-supply: #3A6EA5;
   --chip-track: #E4E2DA;
+  --chip-retreat-warn-share: 0.25;
   --fog-hatch: #22211E;
   --fog-hatch-alpha: 0.08;
   --fog-hatch-spacing: 6;

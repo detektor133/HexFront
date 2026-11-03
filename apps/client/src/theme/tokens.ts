@@ -255,7 +255,8 @@ export const tokens = {
   "chip": {
     "org": "#2E7D4F",
     "supply": "#3A6EA5",
-    "track": "#E4E2DA"
+    "track": "#E4E2DA",
+    "retreatWarnShare": 0.25
   },
   "fog": {
     "hatch": "#22211E",
