@@ -56,13 +56,6 @@ export interface ChipState {
   readonly ghost: boolean;
   /** Направление к целевому соседнему гексу; null — приказа атаки нет. */
   readonly attackDirection?: number | null;
-  /** Свой отряд в бою с организацией у порога отступления: значок «скоро отступит». */
-  readonly retreatWarn?: boolean;
-}
-
-/** Организация (0..1), с которой в бою свой отряд получает значок скорого отступления. */
-export function isRetreatSoon(org: number, inBattle: boolean, mine: boolean): boolean {
-  return mine && inBattle && org <= tokens.chip.retreatWarnShare;
 }
 
 export interface Chip {
@@ -184,17 +177,6 @@ function marks(p: Parts, s: ChipState, sq: number): void {
     g.poly([x, y - WARN / 2, x + WARN / 2, y + WARN / 2, x - WARN / 2, y + WARN / 2])
       .fill(s.starving ? tokens.status.danger : tokens.status.lowSupply)
       .stroke({ color: tokens.ui.surface, width: 1 });
-  }
-  if (s.retreatWarn === true) {
-    // Стрелка «назад» на белом кружке в правом нижнем углу квадрата; без анимации.
-    const x = sq + SQUARE - WARN / 2 - 2;
-    const y = -top - WARN / 2 - 2;
-    g.circle(x, y, WARN / 2 + 1).fill(tokens.ui.surface);
-    g.moveTo(x + 2.5, y - 2)
-      .lineTo(x - 2, y - 2)
-      .lineTo(x - 2, y + 2)
-      .stroke({ color: tokens.status.warning, width: 1.5, cap: 'round', join: 'round' });
-    g.poly([x - 4, y + 1, x - 2, y + 4, x, y + 1]).fill(tokens.status.warning);
   }
 }
 

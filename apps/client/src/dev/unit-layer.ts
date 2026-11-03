@@ -19,7 +19,7 @@ import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
 import { CHIP_WORLD, attackShift, chipHalf, cityChipShift } from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
-import { createChip, isRetreatSoon, type Chip, type ChipState } from './unit-chips.ts';
+import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
 import {
   createBattleMarker,
@@ -267,8 +267,6 @@ export function createUnitLayer(
       encircled: mine && unit.encircled === true,
       ghost: false,
       attackDirection: attackDirection >= 0 ? attackDirection : null,
-      retreatWarn:
-        unit.order !== 'retreat' && isRetreatSoon(unit.org / ORG_MAX, unit.inBattle === true, mine),
     };
   }
 

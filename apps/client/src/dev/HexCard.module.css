@@ -520,3 +520,75 @@
   align-self: stretch;
   width: calc(var(--space-xs) + var(--space-xs) / 2);
 }
+
+/* Окно отряда: крупный знак рода войск с цветом армии, число солдат, полоски и плитки действий. */
+.unitHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.unitBadge {
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: var(--radius-chip);
+  background: var(--relation-own);
+  color: var(--ui-surface);
+}
+
+.unitBadge .unitGlyph {
+  width: 28px;
+  height: 28px;
+}
+
+.unitSoldiers {
+  margin: 0;
+  font-size: var(--font-size-display);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.unitKind {
+  margin: 2px 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--ui-ink2);
+}
+
+.bars {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--ui-ink2);
+}
+
+.barTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--chip-track);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--chip-org);
+}
+
+.barFill[data-kind='supply'] {
+  background: var(--chip-supply);
+}
+
+.barFill[data-low='true'] {
+  background: var(--status-danger);
+}

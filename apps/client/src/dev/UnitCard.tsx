@@ -1,8 +1,9 @@
-import { IconArrowsJoin2, IconScissors, IconX } from '@tabler/icons-react';
+import { IconArrowsJoin2, IconPlayerStop, IconScissors, IconX } from '@tabler/icons-react';
 import { useLayoutEffect, useRef } from 'react';
 
 import {
   FP,
+  ORG_MAX,
   MAX_UNITS_PER_HEX,
   type Command,
   type Fp,
@@ -20,29 +21,43 @@ import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatPercent, formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { IconButton } from '../ui/icon-button.tsx';
-import { MetricRow } from '../ui/metric-icon.tsx';
+import { MetricIcon } from '../ui/metric-icon.tsx';
 
-function Row(props: { label: string; value: string }): React.JSX.Element {
+function Bar(props: {
+  kind: 'org' | 'supply';
+  share: number;
+  text: string;
+  low: boolean;
+}): React.JSX.Element {
   return (
-    <div title={props.label}>
-      <dd>{props.value}</dd>
+    <div className={styles.bar} title={props.text}>
+      <MetricIcon name={props.kind === 'org' ? 'organization' : 'supply'} />
+      <div className={styles.barTrack} role="img" aria-label={props.text}>
+        <div
+          className={styles.barFill}
+          data-kind={props.kind}
+          data-low={props.low}
+          style={{ width: `${Math.round(Math.max(0, Math.min(1, props.share)) * 100)}%` }}
+        />
+      </div>
     </div>
   );
 }
 
-function UnitRows(props: { u: UnitView; view: PlayerView }): React.JSX.Element {
-  const { u, view } = props;
-  const army = view.armies.find((a) => a.id === u.armyId);
+/** Организация и снабжение полосками, без цифр и подписей (значения — в подсказке). */
+function UnitBars(props: { u: UnitView }): React.JSX.Element {
+  const { u } = props;
+  const supply = u.supplyLevel ?? FP;
   return (
-    <dl className={styles.stats}>
-      <MetricRow name="organization" value={formatFp(u.org)} />
-      <MetricRow
-        name="supply"
-        value={u.encircled ? t('unit.encircled') : formatPercent(u.supplyLevel ?? (FP as Fp))}
+    <div className={styles.bars}>
+      <Bar kind="org" share={u.org / ORG_MAX} text={formatFp(u.org)} low={u.org / ORG_MAX < 0.25} />
+      <Bar
+        kind="supply"
+        share={supply / FP}
+        text={u.encircled ? t('unit.encircled') : formatPercent(supply as Fp)}
+        low={u.encircled === true || supply / FP < 0.5}
       />
-      <Row label={t('unit.order')} value={t(`order.${u.order}` as MessageKey)} />
-      <Row label={t('unit.army')} value={army ? armyName(army) : t('army.reserve')} />
-    </dl>
+    </div>
   );
 }
 
@@ -124,6 +139,7 @@ export function UnitCard(props: {
                   .length >= MAX_UNITS_PER_HEX
               ? 'reason.hexFull'
               : null;
+  const army = first.armyId === null ? undefined : view.armies.find((a) => a.id === first.armyId);
   const title =
     units.length === 1
       ? `${t(`unit.${first.type}` as MessageKey)} · ${formatSoldiers(first.soldiers)}`
@@ -153,7 +169,24 @@ export function UnitCard(props: {
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
+          {units.length === 1 ? (
+            <div className={styles.unitHead}>
+              <span
+                className={styles.unitBadge}
+                style={{
+                  backgroundColor: army ? armyColor(army.number) : undefined,
+                }}
+              >
+                <UnitGlyph className={styles.unitGlyph} type={first.type} />
+              </span>
+              <div>
+                <h2 className={styles.unitSoldiers}>{formatSoldiers(first.soldiers)}</h2>
+                <p className={styles.unitKind}>{t(`unit.${first.type}` as MessageKey)}</p>
+              </div>
+            </div>
+          ) : (
+            <h2 className={styles.title}>{title}</h2>
+          )}
           <IconButton
             className={styles.iconButton}
             label={t('unit.close')}
@@ -162,7 +195,7 @@ export function UnitCard(props: {
             <IconX className={styles.icon} size={16} aria-hidden="true" />
           </IconButton>
         </div>
-        {units.length === 1 && <UnitRows u={first} view={view} />}
+        {units.length === 1 && <UnitBars u={first} />}
         {units.length === 1 && <ArtilleryStatus unit={first} />}
         {units.length > 1 && (
           <div className={styles.unitGroups}>
@@ -230,41 +263,60 @@ export function UnitCard(props: {
             })}
           </div>
         )}
-        {units.length === 1 && (
-          <>
-            <IconButton
-              className={`${styles.button} ${styles.iconAction}`}
-              label={t('unit.split')}
-              disabled={splitReason !== null}
-              onClick={() =>
-                props.send({
-                  t: 'split',
-                  unitId: first.id,
-                  soldiers: (Math.floor(first.soldiers / (2 * FP)) * FP) as Fp,
-                })
-              }
-            >
-              <IconScissors className={styles.icon} size={16} aria-hidden="true" />
-            </IconButton>
-            {splitReason && <p role="status">{t(splitReason)}</p>}
-          </>
+        {first.owner === view.playerId && (
+          <div className={styles.tiles}>
+            {units.length === 1 && (
+              <div className={styles.levelAction}>
+                <IconButton
+                  className={styles.button}
+                  label={splitReason ? `${t('unit.split')}: ${t(splitReason)}` : t('unit.split')}
+                  disabled={splitReason !== null}
+                  onClick={() =>
+                    props.send({
+                      t: 'split',
+                      unitId: first.id,
+                      soldiers: (Math.floor(first.soldiers / (2 * FP)) * FP) as Fp,
+                    })
+                  }
+                >
+                  <IconScissors size={26} aria-hidden="true" />
+                </IconButton>
+              </div>
+            )}
+            {units.length > 1 && (
+              <div className={styles.levelAction}>
+                <IconButton
+                  className={styles.button}
+                  label={
+                    mergeReason
+                      ? `${mergeable ? t('unit.merge') : t('unit.gather')}: ${t(mergeReason)}`
+                      : mergeable
+                        ? t('unit.merge')
+                        : t('unit.gather')
+                  }
+                  disabled={mergeReason !== null}
+                  onClick={() =>
+                    props.send({
+                      t: mergeable ? 'merge' : 'gather',
+                      unitIds: units.map((unit) => unit.id),
+                    })
+                  }
+                >
+                  <IconArrowsJoin2 size={26} aria-hidden="true" />
+                </IconButton>
+              </div>
+            )}
+            <div className={styles.levelAction}>
+              <IconButton
+                className={styles.button}
+                label={t('unit.stop')}
+                onClick={() => props.send({ t: 'stop', unitIds: units.map((unit) => unit.id) })}
+              >
+                <IconPlayerStop size={26} aria-hidden="true" />
+              </IconButton>
+            </div>
+          </div>
         )}
-        {mergeReason ? (
-          <p role="status">{t(mergeReason)}</p>
-        ) : units.length > 1 ? (
-          <IconButton
-            className={`${styles.button} ${styles.iconAction}`}
-            label={mergeable ? t('unit.merge') : t('unit.gather')}
-            onClick={() =>
-              props.send({
-                t: mergeable ? 'merge' : 'gather',
-                unitIds: units.map((unit) => unit.id),
-              })
-            }
-          >
-            <IconArrowsJoin2 className={styles.icon} size={16} aria-hidden="true" />
-          </IconButton>
-        ) : null}
         {gatherLabel !== undefined && (
           <p role="status">
             {t('unit.gathering')} {gatherLabel % props.map.width}·
