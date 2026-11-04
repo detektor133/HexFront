@@ -422,9 +422,7 @@ export function createPlanLayer(
     return isPointNearPath(hover, runsOf(plan.offensive?.edges ?? []), 14 * k);
   };
 
-  const reduced =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const tweens = createFrontTweens(reduced);
+  const tweens = createFrontTweens();
   let last: Parameters<PlanLayer['setView']> | null = null;
   let animating = false;
 

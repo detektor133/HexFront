@@ -191,6 +191,13 @@ export type ArmyPlan =
       readonly lost?: readonly HexId[];
       /** Нажата ▶ у армии с auto без линии наступления: линию строит commander (CR-006). */
       readonly startWanted?: boolean;
+      /**
+       * Фронт направления: игрок-цель (или -1), на границу с блоком которой фронт лежит ровно, без
+       * эвристик «поездки» граней; пересчитывается по границе, когда сменился владелец гекса.
+       */
+      readonly derived?: number;
+      /** Версия владельцев гексов (`supplyRevision`), по которой пересчитан фронт направления. */
+      readonly rev?: number;
     }
   | {
       readonly armyId: number;

@@ -3,15 +3,24 @@
 // росла сплошной, без червей. Приоритет волны выбирает ИИ: ничьи города, затем чужие столицы;
 // клик, если он есть, лишь переносит приоритет в свою точку; соседний ничей город с гарнизоном — штурмом, если прогноз
 // не «Поражение». Армия без плана: фронтом её отряды не управляет никто, кроме этой системы.
-import { EXPAND_RADIUS_BASE, EXPAND_RADIUS_MAX, EXPAND_SOLDIERS_PER_HEX } from '../balance.ts';
+import {
+  EXPAND_RADIUS_BASE,
+  EXPAND_RADIUS_MAX,
+  EXPAND_SOLDIERS_PER_HEX,
+  MAX_UNITS_PER_HEX,
+  SWARM_PART,
+  SWARM_PARTS_PER_TICK,
+  SWARM_SAFE,
+} from '../balance.ts';
 import { releaseDirection } from '../commands/release.ts';
+import { splitUnit } from '../commands/unit.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import { intDiv } from '../math/int.ts';
+import { intDiv, type Fp } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
-import { findPath } from '../queries/unit-path.ts';
+import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
-import { allUnits } from '../state/unit-index.ts';
+import { allUnits, removeUnits } from '../state/unit-index.ts';
 
 const NEUTRAL = -1;
 
@@ -60,6 +69,48 @@ function send(state: MatchState, unit: Unit, hex: HexId): boolean {
   return true;
 }
 
+// Рой: гексов для занятия больше, чем свободных отрядов, — крупные отряды отделяют части и
+// отправляют их на свободные гексы, а не занимают землю по гексу за отряд. Вдали от чужих отрядов:
+// мелкая часть рядом с врагом гибнет.
+function swarm(state: MatchState, army: Army, free: Unit[], open: readonly HexId[]): void {
+  const { width } = state.map;
+  const foes = allUnits(state).filter((u) => u.owner !== army.owner);
+  const safe = open.filter((h) =>
+    foes.every((e) => distance(hexFromId(e.hex, width), hexFromId(h, width)) > SWARM_SAFE),
+  );
+  let missing = safe.length - free.length;
+  const taken = new Set<HexId>();
+  for (const unit of [...free].sort((a, b) => b.soldiers - a.soldiers || a.id - b.id)) {
+    for (
+      let n = 0;
+      n < SWARM_PARTS_PER_TICK &&
+      missing > 0 &&
+      unit.soldiers >= 2 * SWARM_PART &&
+      ownUnitsAt(state, unit.owner, unit.hex) < MAX_UNITS_PER_HEX;
+      n += 1
+    ) {
+      const here = hexFromId(unit.hex, width);
+      const hex = safe
+        .filter((h) => !taken.has(h))
+        .sort(
+          (a, b) =>
+            distance(here, hexFromId(a, width)) - distance(here, hexFromId(b, width)) || a - b,
+        )[0];
+      if (hex === undefined) return;
+      const part = splitUnit(state, unit, SWARM_PART);
+      if (send(state, part, hex)) {
+        taken.add(hex);
+        missing -= 1;
+      } else {
+        // Части некуда идти — она возвращается в отряд, а не остаётся лишней мелочью.
+        unit.soldiers = (unit.soldiers + part.soldiers) as Fp;
+        removeUnits(state, [part]);
+        return;
+      }
+    }
+  }
+}
+
 /**
  * Один шаг занятия: простаивающие отряды армии получают ближайшие к клику свободные гексы;
  * когда занимать больше нечего, направление уходит в покой.
@@ -87,14 +138,23 @@ export function expandNeutral(state: MatchState, army: Army): void {
         u.org > 0,
     )
     .sort((a, b) => a.id - b.id);
-  const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
   const free2 = new Set(free.map((u) => u.id));
   const { width } = state.map;
-  const claimed = new Set(
-    allUnits(state)
-      .filter((u) => u.armyId === army.id && u.path.length > 0)
-      .map((u) => u.path.at(-1) as HexId),
+  const claimedHexes = (): Set<HexId> =>
+    new Set(
+      allUnits(state)
+        .filter((u) => u.armyId === army.id && u.path.length > 0)
+        .map((u) => u.path.at(-1) as HexId),
+    );
+  const before = claimedHexes();
+  swarm(
+    state,
+    army,
+    free,
+    targets(state, army, focus, radius).filter((h) => !before.has(h)),
   );
+  const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
+  const claimed = claimedHexes();
   const open = targets(state, army, focus, radius).filter((h) => !claimed.has(h));
   for (const hex of open) {
     const at = hexFromId(hex, width);

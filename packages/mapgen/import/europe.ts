@@ -7,6 +7,7 @@ import {
   FEATURE,
   TERRAIN,
   encodeBase64,
+  distance,
   hexFromId,
   hexId,
   neighbor,
@@ -17,8 +18,7 @@ import {
   type MapJson,
 } from '@hexfront/sim';
 
-import { CITY_NAMES, generateMap } from '../src/map.ts';
-import { PASSABLE_HEXES_PER_PLAYER } from '../src/params.ts';
+import { CITY_NAMES, chooseCities, largestRoadableLand } from '../src/map.ts';
 import { generateRoads } from '../src/roads.ts';
 
 const SOURCES = {
@@ -139,39 +139,86 @@ function inside(point: Point, shapes: readonly Shape[]): boolean {
   );
 }
 
-function gridSize(): { width: number; height: number; min: Point; max: Point } {
-  const corners = [
-    project(BOUNDS.minLon, BOUNDS.minLat),
-    project(BOUNDS.minLon, BOUNDS.maxLat),
-    project(BOUNDS.maxLon, BOUNDS.minLat),
-    project(BOUNDS.maxLon, BOUNDS.maxLat),
-  ];
-  const min = {
-    x: Math.min(...corners.map((point) => point.x)),
-    y: Math.min(...corners.map((point) => point.y)),
-  };
-  const max = {
-    x: Math.max(...corners.map((point) => point.x)),
-    y: Math.max(...corners.map((point) => point.y)),
-  };
-  const area = TARGET_PLAYERS * PASSABLE_HEXES_PER_PLAYER * 1.35;
+interface Grid {
+  readonly width: number;
+  readonly height: number;
+  readonly min: Point;
+  readonly max: Point;
+}
+
+/** Всего гексов сетки: хватает на 30 спавнов с зазором и сушу побольше воды. */
+const GRID_HEXES = 9000;
+
+// Прямоугольник проекции: ширина — по долготам на 50° с.ш., высота — по широтам на 10° в.д., без
+// срезанных углов: у границы карты тоже настоящая суша, а не вода.
+function gridSize(): Grid {
+  const west = project(BOUNDS.minLon, 50).x;
+  const east = project(BOUNDS.maxLon, 50).x;
+  const south = project(10, BOUNDS.minLat).y;
+  const north = project(10, BOUNDS.maxLat).y;
+  const min = { x: west, y: south };
+  const max = { x: east, y: north };
+  // Шаг гекса flat-top: 1,5 R по x и √3 R по y, поэтому ширина/высота сетки = 1,1547 × пропорция.
   const ratio = (max.x - min.x) / (max.y - min.y);
-  const width = Math.ceil(Math.sqrt(area * ratio));
-  return { width, height: Math.ceil(area / width), min, max };
+  const width = Math.ceil(Math.sqrt(GRID_HEXES * ratio * 1.1547));
+  return { width, height: Math.ceil(GRID_HEXES / width), min, max };
+}
+
+// Центр гекса (even-q: нечётные столбцы сдвинуты вниз на полгекса) в проекции; север сверху.
+function hexPoint(grid: Grid, col: number, row: number): Point {
+  const rows = grid.height + 0.5;
+  return {
+    x: grid.min.x + ((col + 0.5) / grid.width) * (grid.max.x - grid.min.x),
+    y: grid.max.y - ((row + 0.5 * (col & 1) + 0.5) / rows) * (grid.max.y - grid.min.y),
+  };
+}
+
+// Обратное преобразование: ближайший гекс к точке проекции.
+function pointHex(grid: Grid, point: Point): Hex {
+  const col = Math.max(
+    0,
+    Math.min(
+      grid.width - 1,
+      Math.round(((point.x - grid.min.x) / (grid.max.x - grid.min.x)) * grid.width - 0.5),
+    ),
+  );
+  const rows = grid.height + 0.5;
+  const row = Math.max(
+    0,
+    Math.min(
+      grid.height - 1,
+      Math.round(
+        ((grid.max.y - point.y) / (grid.max.y - grid.min.y)) * rows - 0.5 - 0.5 * (col & 1),
+      ),
+    ),
+  );
+  return hexFromId(col + row * grid.width, grid.width);
+}
+
+// Детерминированный шум 0–99 по клетке: лес и холмы пятнами из нескольких гексов, а не диагональными
+// полосами проекции.
+function noise(col: number, row: number): number {
+  let h = Math.imul(col, 374761393) + Math.imul(row, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) % 100;
 }
 
 function terrainAt(
   point: Point,
+  col: number,
+  row: number,
   land: readonly Shape[],
   lakes: readonly Shape[],
   mountains: readonly Shape[],
 ): number {
   if (!inside(point, land) || inside(point, lakes)) return TERRAIN.water;
-  if (inside(point, mountains)) return TERRAIN.mountains;
-  const value = Math.abs(Math.trunc(point.x / 1000) * 31 + Math.trunc(point.y / 1000) * 17) % 100;
-  if (value < 12) return TERRAIN.desert;
-  if (value > 68) return TERRAIN.forest;
-  return value % 7 === 0 ? TERRAIN.hills : TERRAIN.plains;
+  // В хребтах каждый третий гекс — холмы: проходы через горы, а не сплошная стена.
+  if (inside(point, mountains)) {
+    return noise(col, row) % 3 === 0 ? TERRAIN.hills : TERRAIN.mountains;
+  }
+  const value = noise(Math.floor(col / 3), Math.floor(row / 3));
+  if (value > 62) return TERRAIN.forest;
+  return value % 9 === 0 ? TERRAIN.hills : TERRAIN.plains;
 }
 
 function directionBetween(from: Hex, to: Hex): Direction | null {
@@ -182,158 +229,142 @@ function directionBetween(from: Hex, to: Hex): Direction | null {
   return null;
 }
 
-function connectNodes(
-  terrain: Uint8Array,
-  nodes: readonly Hex[],
-  width: number,
-  height: number,
-): void {
-  const anchor = nodes[0];
-  if (!anchor) return;
-  for (const node of nodes) {
-    const target = hexId(node, width);
-    const previous = new Int32Array(width * height).fill(-1);
-    const queue = [hexId(anchor, width)];
-    previous[queue[0] as number] = queue[0] as number;
-    for (let cursor = 0; cursor < queue.length; cursor += 1) {
-      const currentId = queue[cursor];
-      if (currentId === undefined || currentId === target) break;
-      for (const next of neighbors(hexFromId(currentId, width))) {
-        if (next.q < 0 || next.r < 0 || next.q >= width || next.r >= height) continue;
-        const nextId = hexId(next, width);
-        if (previous[nextId] !== -1) continue;
-        previous[nextId] = currentId;
-        queue.push(nextId);
-      }
-    }
-    for (
-      let current = target;
-      current !== previous[current] && current >= 0;
-      current = previous[current] ?? -1
-    ) {
-      terrain[current] = TERRAIN.plains;
-    }
-  }
-}
-
-function riverEdges(
-  shapes: readonly Shape[],
-  min: Point,
-  max: Point,
-  width: number,
-  height: number,
-): [number, number, number][] {
+function riverEdges(shapes: readonly Shape[], grid: Grid): [number, number, number][] {
   const edges: [number, number, number][] = [];
+  const seen = new Set<string>();
   for (const shape of shapes)
     for (const part of shape.parts)
       for (let index = 1; index < part.length; index += 1) {
         const previous = part[index - 1];
         const current = part[index];
         if (!previous || !current) continue;
-        const a = hexFromId(
-          Math.max(
-            0,
-            Math.min(
-              width * height - 1,
-              Math.round(((previous.y - min.y) / (max.y - min.y)) * height) * width +
-                Math.round(((previous.x - min.x) / (max.x - min.x)) * width),
-            ),
-          ),
-          width,
-        );
-        const b = hexFromId(
-          Math.max(
-            0,
-            Math.min(
-              width * height - 1,
-              Math.round(((current.y - min.y) / (max.y - min.y)) * height) * width +
-                Math.round(((current.x - min.x) / (max.x - min.x)) * width),
-            ),
-          ),
-          width,
-        );
+        const a = pointHex(grid, previous);
+        const b = pointHex(grid, current);
         const direction = directionBetween(a, b);
-        if (direction !== null && direction <= 2) {
-          const next = neighbor(a, direction);
-          if (next.q >= 0 && next.r >= 0 && next.q < width && next.r < height)
-            edges.push([a.q, a.r, direction]);
-        }
+        if (direction === null) continue;
+        // Грань хранится от меньшей к большей из трёх «прямых» сторон (0–2), как в формате карты.
+        const [from, side] =
+          direction <= 2
+            ? ([a, direction] as const)
+            : ([b, ((direction + 3) % 6) as Direction] as const);
+        const key = `${from.q},${from.r},${side}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        edges.push([from.q, from.r, side]);
       }
   return edges;
 }
 
+/** Спавны с зазором не меньше MIN_SPAWN_GAP, порядок — от самого далёкого от выбранных: любой префикс разнесён. */
+const MIN_SPAWN_GAP = 7;
+
+function chooseEuropeSpawns(
+  terrain: Uint8Array,
+  land: ReadonlySet<number>,
+  width: number,
+  height: number,
+): Hex[] {
+  const candidates = Array.from(land)
+    .sort((a, b) => a - b)
+    .map((id) => hexFromId(id, width))
+    .filter((hex) => {
+      const code = terrain[hexId(hex, width)];
+      if (code !== TERRAIN.plains && code !== TERRAIN.forest) return false;
+      const around = [hex, ...neighbors(hex)].filter(
+        (n) => n.q >= 0 && n.r >= 0 && n.q < width && n.r < height,
+      );
+      return around.filter((n) => terrain[hexId(n, width)] !== TERRAIN.water).length >= 7;
+    });
+  const spawns: Hex[] = [];
+  const first = candidates[Math.floor(candidates.length / 2)];
+  if (!first) throw new Error('Европа: нет суши для спавнов');
+  spawns.push(first);
+  const nearest = new Map<number, number>(
+    candidates.map((hex) => [hexId(hex, width), distance(hex, first)]),
+  );
+  while (spawns.length < TARGET_PLAYERS) {
+    let best: Hex | null = null;
+    let bestGap = MIN_SPAWN_GAP - 1;
+    for (const hex of candidates) {
+      const gap = nearest.get(hexId(hex, width)) ?? 0;
+      if (gap > bestGap) {
+        best = hex;
+        bestGap = gap;
+      }
+    }
+    if (!best) break;
+    spawns.push(best);
+    for (const hex of candidates) {
+      const id = hexId(hex, width);
+      nearest.set(id, Math.min(nearest.get(id) ?? 0, distance(hex, best)));
+    }
+  }
+  if (spawns.length < TARGET_PLAYERS) {
+    throw new Error(`Европа: разместилось ${spawns.length} спавнов из ${TARGET_PLAYERS}`);
+  }
+  return spawns;
+}
+
 function buildMap(seed: number, shapes: Record<keyof typeof SOURCES, Shape[]>): MapJson {
   const grid = gridSize();
-  const base = generateMap(seed, {
-    width: grid.width,
-    height: grid.height,
-    players: TARGET_PLAYERS,
-  });
-  const terrain = new Uint8Array(base.width * base.height);
+  const { width, height } = grid;
+  const options = { width, height, players: TARGET_PLAYERS };
+  const terrain = new Uint8Array(width * height);
   const features = new Uint8Array(terrain.length);
   for (let id = 0; id < terrain.length; id += 1) {
-    const point = {
-      x: grid.min.x + (((id % base.width) + 0.5) / base.width) * (grid.max.x - grid.min.x),
-      y:
-        grid.min.y +
-        ((Math.floor(id / base.width) + 0.5) / base.height) * (grid.max.y - grid.min.y),
-    };
-    terrain[id] = terrainAt(point, shapes.land, shapes.lakes, shapes.mountains);
+    const point = hexPoint(grid, id % width, Math.floor(id / width));
+    terrain[id] = terrainAt(
+      point,
+      id % width,
+      Math.floor(id / width),
+      shapes.land,
+      shapes.lakes,
+      shapes.mountains,
+    );
   }
-  for (const spawn of base.spawns)
-    for (const hex of [
-      spawn,
-      ...Array.from({ length: 6 }, (_, direction) => neighbor(spawn, direction as Direction)),
-    ]) {
-      if (hex.q >= 0 && hex.r >= 0 && hex.q < base.width && hex.r < base.height)
-        terrain[hexId(hex, base.width)] = TERRAIN.plains;
-    }
-  for (const city of base.cities) terrain[hexId(city, base.width)] = TERRAIN.plains;
-  connectNodes(terrain, [...base.cities, ...base.spawns], base.width, base.height);
   for (let id = 0; id < terrain.length; id += 1)
     if (terrain[id] === TERRAIN.mountains) {
-      for (const hex of [
-        hexFromId(id, base.width),
-        ...Array.from({ length: 6 }, (_, direction) =>
-          neighbor(hexFromId(id, base.width), direction as Direction),
-        ),
-      ]) {
-        if (hex.q < 0 || hex.r < 0 || hex.q >= base.width || hex.r >= base.height) continue;
-        const next = hexId(hex, base.width);
+      for (const hex of neighbors(hexFromId(id, width))) {
+        if (hex.q < 0 || hex.r < 0 || hex.q >= width || hex.r >= height) continue;
+        const next = hexId(hex, width);
         if (terrain[next] === TERRAIN.plains) terrain[next] = TERRAIN.hills;
       }
       if (id % 15 === 0) features[id] = FEATURE.pass;
     }
-  const roadTerrain = new Uint8Array(terrain.length).fill(TERRAIN.plains);
-  const roads = generateRoads(roadTerrain, features, [...base.cities, ...base.spawns], {
-    width: base.width,
-    height: base.height,
-    players: TARGET_PLAYERS,
-  });
-  roads.forEach((road, id) => {
-    if (road === 1) terrain[id] = TERRAIN.plains;
-  });
+  // Спавны и города — только на материковой суше: никаких островов с игроками и мостов через море.
+  const land = largestRoadableLand(terrain, features, options);
+  const spawns = chooseEuropeSpawns(terrain, land, width, height);
+  for (const spawn of spawns)
+    for (const hex of [spawn, ...neighbors(spawn)]) {
+      if (hex.q >= 0 && hex.r >= 0 && hex.q < width && hex.r < height)
+        features[hexId(hex, width)] = FEATURE.none;
+    }
+  const cities = chooseCities(seed, terrain, features, spawns, land, options);
+  const roads = generateRoads(terrain, features, [...cities, ...spawns], options);
   return {
-    ...base,
+    version: 1,
     id: `europe-natural-earth-10m-${PROJECTION.toLowerCase().replace(':', '')}`,
+    width,
+    height,
     terrain: encodeBase64(terrain),
     features: Array.from(features).flatMap((feature, id) =>
       feature === FEATURE.none
         ? []
         : [
             {
-              ...hexFromId(id, base.width),
+              ...hexFromId(id, width),
               type:
                 feature === FEATURE.pass ? 'pass' : feature === FEATURE.mine ? 'mine' : 'fertile',
             },
           ],
     ),
-    riverEdges: riverEdges(shapes.rivers, grid.min, grid.max, base.width, base.height),
+    riverEdges: riverEdges(shapes.rivers, grid),
     roads: encodeBase64(packBits(roads)),
-    cities: base.cities.map((city, index) => ({
+    cities: cities.map((city, index) => ({
       ...city,
       name: CITY_NAMES[index % CITY_NAMES.length] ?? city.name,
     })),
+    spawns,
   };
 }
 

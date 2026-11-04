@@ -257,7 +257,7 @@ function prepare(
     return { army, strike };
   }
   if (front.length === 0) return null;
-  placeFront(state, army.id, front);
+  placeFront(state, army.id, front, cmd.target);
   const plan = state.plans.find((p) => p.armyId === army.id);
   return plan?.kind === 'front' ? { army, strike } : null;
 }

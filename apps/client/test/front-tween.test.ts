@@ -107,7 +107,7 @@ describe('плавный переход линии фронта (04/T13)', () =>
   });
 
   it('удаляет армии без фронта и сообщает размер кэша', () => {
-    const tweens = createFrontTweens(false);
+    const tweens = createFrontTweens();
     const target = [line(0, 0, 100)];
 
     tweens.runs(1, 'front-1', target, 0);

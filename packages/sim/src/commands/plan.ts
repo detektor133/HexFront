@@ -186,8 +186,19 @@ function setPlan(state: MatchState, plan: ArmyPlan): void {
  * Ставит фронт армии направления по готовым цепочкам граней, не соединяя куски через чужую
  * границу: фронт лежит только там, где стоит цель.
  */
-export function placeFront(state: MatchState, armyId: number, edges: readonly number[]): void {
-  setPlan(state, { armyId, kind: 'front', edges: [...edges], offensive: null });
+export function placeFront(
+  state: MatchState,
+  armyId: number,
+  edges: readonly number[],
+  derived?: number,
+): void {
+  setPlan(state, {
+    armyId,
+    kind: 'front',
+    edges: [...edges],
+    offensive: null,
+    ...(derived === undefined ? {} : { derived, rev: state.supplyRevision }),
+  });
 }
 
 /** Применяет команду плана. Вызывается только после успешной проверки. */

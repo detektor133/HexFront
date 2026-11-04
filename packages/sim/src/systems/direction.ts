@@ -14,8 +14,27 @@ import {
 import { placeFront } from '../commands/plan.ts';
 import type { MatchState } from '../state/types.ts';
 
-/** Обновляет фронты, удары и занятие направлений; раз в секунду. */
+// Фронт направления — не «едущая» линия, а сама граница с блоком цели: любая смена владельца гекса
+// пересчитывает его целиком и точно. Лишних граней, которые потом надо было бы исправлять, нет.
+function syncFronts(state: MatchState): void {
+  state.plans.forEach((plan, i) => {
+    if (plan.kind !== 'front' || plan.derived === undefined) return;
+    if (plan.rev === state.supplyRevision) return;
+    const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
+    if (owner === undefined) return;
+    const edges = borderPieces(state, owner, plan.derived).flat();
+    const same = edges.length === plan.edges.length && edges.every((e, k) => e === plan.edges[k]);
+    state.plans[i] = {
+      ...plan,
+      edges: edges.length === 0 || same ? plan.edges : edges,
+      rev: state.supplyRevision,
+    };
+  });
+}
+
+/** Обновляет фронты (каждый тик), удары и занятие направлений (раз в секунду). */
 export function maintainDirections(state: MatchState): void {
+  syncFronts(state);
   commandAssaults(state);
   if (state.tick % TICKS_PER_S !== 0) return;
   for (const army of [...state.armies]) {
@@ -43,19 +62,9 @@ export function maintainDirections(state: MatchState): void {
     if (dir.mode === 'attack' && state.tick % (AXIS_REFRESH_S * TICKS_PER_S) === 0) {
       refreshStrike(state, army);
     }
+    // Фронта нет (его сняли руками) — ставим по границе с блоком цели.
+    if (state.plans.some((p) => p.armyId === army.id && p.kind === 'front')) continue;
     const edges = borderPieces(state, army.owner, dir.target).flat();
-    if (edges.length === 0) continue;
-    const index = state.plans.findIndex((p) => p.armyId === army.id);
-    const plan = state.plans[index];
-    if (plan?.kind !== 'front') {
-      placeFront(state, army.id, edges);
-      continue;
-    }
-    // Фронт лежит ровно на границе с блоком цели: лишние грани (чужая граница) убираются, новые
-    // куски добавляются. Наступление и места отрядов при этом сохраняются.
-    const wanted = new Set(edges);
-    const planned = new Set(plan.edges);
-    if (edges.every((e) => planned.has(e)) && plan.edges.every((e) => wanted.has(e))) continue;
-    state.plans[index] = { ...plan, edges };
+    if (edges.length > 0) placeFront(state, army.id, edges, dir.target);
   }
 }

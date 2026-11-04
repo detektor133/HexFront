@@ -82,7 +82,7 @@ function passableCount(center: Hex, terrain: Uint8Array, options: MapOptions): n
   }).length;
 }
 
-function largestRoadableLand(
+export function largestRoadableLand(
   terrain: Uint8Array,
   features: Uint8Array,
   options: MapOptions,
@@ -159,7 +159,7 @@ function clearSpawnFeatures(
   }
 }
 
-function chooseCities(
+export function chooseCities(
   seed: number,
   terrain: Uint8Array,
   features: Uint8Array,

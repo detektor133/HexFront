@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
+import { borderPieces } from '../../src/commands/launch.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { lineRuns } from '../../src/systems/offensive.ts';
 import { assignUnits, at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
@@ -122,5 +123,40 @@ describe('штурм городов и резерв направлением', (
     s.runSeconds(10);
     const army = s.state.armies.find((a) => a.owner === 0 && a.dir?.target === 1);
     expect(s.unitById(reserve)?.armyId).toBe(army?.id);
+  });
+});
+
+describe('фронт направления — сама граница', () => {
+  it('фронт всегда ровно на границе с целью, а между тиками меняется только локально', () => {
+    const s = war();
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 1200 } },
+    ]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.dir?.target === 1);
+    let previous: ReadonlySet<number> | null = null;
+    let exact = 0;
+    let biggestJump = 0;
+    for (let t = 0; t < 1200; t += 1) {
+      s.runTicks(1);
+      const plan = s.state.plans.find((p) => p.armyId === army?.id);
+      if (plan?.kind !== 'front') throw new Error('нет фронта');
+      const edges = new Set(plan.edges);
+      if (plan.rev === s.state.supplyRevision) {
+        const border = new Set(borderPieces(s.state, 0, 1).flat());
+        // Цель выбыла или границы нет — фронту не за что держаться, проверять нечего.
+        if (border.size === 0) break;
+        expect([...edges].every((e) => border.has(e))).toBe(true);
+        expect([...border].every((e) => edges.has(e))).toBe(true);
+        exact += 1;
+      }
+      if (previous) {
+        const changed = [...edges].filter((e) => !previous?.has(e)).length;
+        biggestJump = Math.max(biggestJump, changed);
+      }
+      previous = edges;
+    }
+    expect(exact).toBeGreaterThan(100);
+    // Один захват двигает несколько граней, но не весь фронт (в нём больше 80 граней).
+    expect(biggestJump).toBeLessThan(60);
   });
 });

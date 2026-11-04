@@ -155,28 +155,17 @@ export interface FrontTweens {
   cacheTelemetry(): FrontTweenCacheTelemetry;
 }
 
-/** Переходы линий фронта; reduced — prefers-reduced-motion: линия встаёт сразу. */
-export function createFrontTweens(reduced: boolean): FrontTweens {
+/** Линии фронта по армиям: показывает точную границу, без перетекания. */
+export function createFrontTweens(): FrontTweens {
   const byArmy = new Map<number, Tween>();
-  const share = (tw: Tween, now: number): number =>
-    reduced ? 1 : easeMap((now - tw.start) / tokens.motion.map);
   return {
-    runs(armyId, key, target, nowMs) {
-      const tw = byArmy.get(armyId);
-      if (!tw) {
-        byArmy.set(armyId, { key, from: target, to: target, start: -Infinity });
-        return target;
-      }
-      if (tw.key !== key) {
-        const shown = tweenRuns(tw.from, tw.to, share(tw, nowMs));
-        byArmy.set(armyId, { key, from: shown, to: target, start: nowMs });
-      }
-      const now = byArmy.get(armyId) ?? tw;
-      return tweenRuns(now.from, now.to, share(now, nowMs));
+    // Линия фронта — сама граница: она встаёт ровно туда, где граница сейчас. Перетекание всей
+    // линии из прежнего положения в новое выглядело как перерисовка всего фронта на каждый захват.
+    runs(armyId, key, target) {
+      byArmy.set(armyId, { key, from: target, to: target, start: -Infinity });
+      return target;
     },
-    active(nowMs) {
-      if (reduced) return false;
-      for (const tw of byArmy.values()) if (nowMs - tw.start < tokens.motion.map) return true;
+    active() {
       return false;
     },
     keep(armyIds) {

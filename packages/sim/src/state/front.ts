@@ -113,6 +113,8 @@ export function trimAutoFront(state: MatchState, armyId: number): void {
 export function followFrontsNear(state: MatchState, hex: HexId): void {
   state.plans.forEach((plan, i) => {
     if (plan.kind !== 'front') return;
+    // Фронт направления пересчитывается по границе целиком (`maintainDirections`), а не «едет».
+    if (plan.derived !== undefined) return;
     if (!plan.edges.some((e) => edgeHex(e) === hex || edgeOther(state, e) === hex)) return;
     const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
     if (owner === undefined) return;
