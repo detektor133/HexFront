@@ -256,6 +256,10 @@ export const AXIS_REFRESH_S = 5;
 export const AXIS_DONE_PERCENT = 70;
 /** Бот: одна ось на каждые столько граней фронта (широкий фронт — несколько осей). */
 export const BOT_AXIS_EDGES = 14;
+/** Штурм городов направлением: дальность поиска, размер группы и период решений. */
+export const ASSAULT_REACH = 10;
+export const ASSAULT_MAX_UNITS = 8;
+export const ASSAULT_PERIOD_S = 2;
 /** Наибольший набор, который ИИ ставит за раз при закупке под заказ армии. */
 export const PROCURE_BATCH: Fp = fp(300);
 export const MAX_UNITS_PER_HEX = 3;

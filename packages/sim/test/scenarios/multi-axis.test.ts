@@ -86,3 +86,41 @@ describe('слияние мелочи', () => {
     expect(s.unitsOf('A')[0]?.soldiers).toBe(112_000);
   });
 });
+
+describe('штурм городов и резерв направлением', () => {
+  const MAP = `
+    A1 a  a  a  b  b  b  b  b  b  b  b
+    a  a  a  a  b  b  b  b  b  b  b  b
+    a  a  a  a  b  b  b  b  b  b  B1 b
+    a  a  a  a  b  b  b  b  b  b  b  b
+    a  a  a  a  b  b  b  b  b  b  b  b
+  `;
+  function assault() {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    for (let r = 0; r < 5; r += 1) s.unit('A', 'infantry', 300, at(3, r));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: 1 } }]);
+    return s;
+  }
+
+  it('группа отрядов идёт на город врага и берёт его', () => {
+    const s = assault();
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 1500 } },
+    ]);
+    s.runSeconds(240);
+    // Город врага взят: у игрока два города (свой и вражеский).
+    expect(s.state.cities.filter((c) => c.owner === 0).length).toBe(2);
+  });
+
+  it('свободный резерв вливается в наступающую армию, а не стоит в тылу', () => {
+    const s = assault();
+    const reserve = s.unit('A', 'infantry', 300, at(0, 4));
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 300 } },
+    ]);
+    s.runSeconds(10);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.dir?.target === 1);
+    expect(s.unitById(reserve)?.armyId).toBe(army?.id);
+  });
+});

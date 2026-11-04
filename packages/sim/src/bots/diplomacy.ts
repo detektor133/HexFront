@@ -102,7 +102,8 @@ export function diplomacyCommands(
     if (r.threat < FP || proposed.has(r.id)) continue;
     const rel = relationOf(state, me, r.id);
     if (rel === 'pact' || rel === 'alliance') continue;
-    out.push({ t: 'proposeTreaty', target: r.id, kind: 'pact' });
+    // С воюющим — мир, с остальными — пакт.
+    out.push({ t: 'proposeTreaty', target: r.id, kind: rel === 'war' ? 'peace' : 'pact' });
   }
   return out;
 }

@@ -18,7 +18,7 @@ import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { OFFER_TTL_TICKS, relationOf } from '../state/relations.ts';
-import type { Relation } from '../state/types.ts';
+import type { Relation, TreatyKind } from '../state/types.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import {
@@ -469,8 +469,8 @@ export interface DiplomacyView {
   readonly relations: readonly Relation[];
   /** Нарушений договоров у каждого игрока (видно всем). */
   readonly violations: readonly number[];
-  readonly incoming: readonly { readonly from: number; readonly kind: 'pact' | 'alliance' }[];
-  readonly outgoing: readonly { readonly to: number; readonly kind: 'pact' | 'alliance' }[];
+  readonly incoming: readonly { readonly from: number; readonly kind: TreatyKind }[];
+  readonly outgoing: readonly { readonly to: number; readonly kind: TreatyKind }[];
 }
 
 function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {

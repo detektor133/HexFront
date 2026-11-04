@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadMap } from '@hexfront/sim';
 
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
-import { t } from '../i18n/dict.ts';
+import { t, type MessageKey } from '../i18n/dict.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
@@ -16,14 +16,34 @@ import { tokens } from '../theme/tokens.ts';
 const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
 const NICKNAME_KEY = 'hexfront.nickname';
+const MAP_KEY = 'hexfront.map';
+const PLAYERS_KEY = 'hexfront.players';
+
+/** Карты меню: название, размер в гексах и можно ли выбирать число игроков. */
+const MAPS = [
+  { id: 'europe', size: '76×64', choosePlayers: true },
+  { id: 'gen', size: '80×60', choosePlayers: false },
+  { id: 'small', size: '40×30', choosePlayers: false },
+  { id: 'tiny', size: '20×15', choosePlayers: false },
+] as const;
+type MenuMap = (typeof MAPS)[number]['id'];
+
+const PLAYERS_MIN = 2;
+const PLAYERS_MAX = 30;
+const PLAYERS_DEFAULT = 12;
 const COLOR_KEY = 'hexfront.color';
 
 function readStorage(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
 }
 
-function matchUrl(nickname: string, color: string): string {
-  const url = new URL(quickMatchUrl(), window.location.origin);
+// Ссылка на матч: случайная карта — как раньше (готовые зёрна), остальные — по id карты.
+function matchUrl(nickname: string, color: string, map: MenuMap, players: number): string {
+  const start =
+    map === 'gen'
+      ? quickMatchUrl()
+      : `/match?map=${map}&seed=42&players=${map === 'europe' ? players : 2}`;
+  const url = new URL(start, window.location.origin);
   if (nickname !== '') url.searchParams.set('name', nickname);
   url.searchParams.set('color', color);
   return `${url.pathname}?${url.searchParams.toString()}`;
@@ -37,6 +57,17 @@ export function MainMenu(): React.JSX.Element {
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
+  const [map, setMap] = useState<MenuMap>(() => {
+    const saved = readStorage(MAP_KEY, 'europe');
+    return MAPS.find((m) => m.id === saved)?.id ?? 'europe';
+  });
+  const [players, setPlayers] = useState<number>(() => {
+    const saved = Number(readStorage(PLAYERS_KEY, String(PLAYERS_DEFAULT)));
+    return Number.isInteger(saved)
+      ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, saved))
+      : PLAYERS_DEFAULT;
+  });
+  const chooser = MAPS.find((m) => m.id === map);
 
   useEffect(() => {
     let disposed = false;
@@ -112,6 +143,8 @@ export function MainMenu(): React.JSX.Element {
 
   const handlePlay = (): void => {
     localStorage.setItem(NICKNAME_KEY, nickname);
+    localStorage.setItem(MAP_KEY, map);
+    localStorage.setItem(PLAYERS_KEY, String(players));
   };
 
   return (
@@ -123,6 +156,36 @@ export function MainMenu(): React.JSX.Element {
           {t('menu.title')}
         </h1>
         <p className={styles.subtitle}>{t('menu.subtitle')}</p>
+        <div className={styles.field}>
+          <span className={styles.label}>{t('menu.map')}</span>
+          <div className={styles.segmented} role="radiogroup" aria-label={t('menu.map')}>
+            {MAPS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={m.id === map}
+                className={`${styles.segment} ${m.id === map ? styles.chosen : ''}`}
+                onClick={() => setMap(m.id)}
+              >
+                <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
+                <small>{m.size}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        {chooser?.choosePlayers && (
+          <label className={styles.field}>
+            <span className={styles.label}>{`${t('menu.players')}: ${players}`}</span>
+            <input
+              type="range"
+              min={PLAYERS_MIN}
+              max={PLAYERS_MAX}
+              value={players}
+              onChange={(event) => setPlayers(Number(event.target.value))}
+            />
+          </label>
+        )}
         <div className={styles.identityRow}>
           <div ref={colorsRef} className={styles.colorPicker}>
             {!isColorPickerOpen &&
@@ -183,7 +246,7 @@ export function MainMenu(): React.JSX.Element {
         <a
           className={styles.play}
           role="button"
-          href={matchUrl(nickname, color)}
+          href={matchUrl(nickname, color, map, players)}
           onClick={handlePlay}
         >
           {t('menu.play')}

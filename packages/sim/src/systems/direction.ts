@@ -2,6 +2,7 @@
 // держит фронт на всех кусках границы с ним и его союзниками, включая появившиеся позже, и ни на
 // какой другой; кончившийся удар ИИ повторяет по новой обстановке, выбывший игрок снимает
 // направление; ничья земля занимается отрядами.
+import { commandAssaults } from './assault.ts';
 import { expandNeutral } from './expand.ts';
 import { AXIS_REFRESH_S, TICKS_PER_S } from '../balance.ts';
 import {
@@ -15,6 +16,7 @@ import type { MatchState } from '../state/types.ts';
 
 /** Обновляет фронты, удары и занятие направлений; раз в секунду. */
 export function maintainDirections(state: MatchState): void {
+  commandAssaults(state);
   if (state.tick % TICKS_PER_S !== 0) return;
   for (const army of [...state.armies]) {
     const dir = army.dir;

@@ -204,6 +204,9 @@
 | `AXIS_REFRESH_S` | 5 `[ТЮНИНГ]` |
 | `AXIS_DONE_PERCENT` | 70 `[ТЮНИНГ]` |
 | `BOT_AXIS_EDGES` | 14 `[ТЮНИНГ]` |
+| `ASSAULT_REACH` | 10 `[ТЮНИНГ]` |
+| `ASSAULT_MAX_UNITS` | 8 `[ТЮНИНГ]` |
+| `ASSAULT_PERIOD_S` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_FACING_RANGE` | 3 |
 | `COMMANDER_LINE_DEPTH` | 3 |
 | `FRONT_SPLIT_MIN` | 50 |

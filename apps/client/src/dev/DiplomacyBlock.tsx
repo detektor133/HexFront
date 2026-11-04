@@ -3,15 +3,22 @@ import {
   IconHeartHandshake,
   IconLink,
   IconLinkOff,
+  IconPeace,
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
 
-import type { Command, PlayerView, Relation } from '@hexfront/sim';
+import type { Command, PlayerView, Relation, TreatyKind } from '@hexfront/sim';
 
 import styles from './DiplomacyBlock.module.css';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { IconButton } from '../ui/icon-button.tsx';
+
+/** Подпись входящего предложения по виду договора. */
+export function offerKey(kind: TreatyKind): MessageKey {
+  if (kind === 'peace') return 'diplomacy.offerPeace';
+  return kind === 'pact' ? 'diplomacy.offerPact' : 'diplomacy.offerAlliance';
+}
 
 /** Значок отношения: мир — без значка (null). */
 export function RelationIcon(props: {
@@ -57,9 +64,7 @@ export function DiplomacyBlock(props: {
       </div>
       {incoming && (
         <div className={styles.offer} role="status">
-          <span>
-            {t(incoming.kind === 'pact' ? 'diplomacy.offerPact' : 'diplomacy.offerAlliance')}
-          </span>
+          <span>{t(offerKey(incoming.kind))}</span>
           <IconButton
             className={styles.action}
             label={t('diplomacy.accept')}
@@ -86,7 +91,17 @@ export function DiplomacyBlock(props: {
             <IconSwords size={18} aria-hidden="true" />
           </IconButton>
         )}
-        {(relation === 'peace' || relation === 'war') && (
+        {relation === 'war' && (
+          <IconButton
+            className={styles.action}
+            label={t('diplomacy.peace')}
+            disabled={outgoing}
+            onClick={() => send({ t: 'proposeTreaty', target: other, kind: 'peace' })}
+          >
+            <IconPeace size={18} aria-hidden="true" />
+          </IconButton>
+        )}
+        {relation === 'peace' && (
           <IconButton
             className={styles.action}
             label={t('diplomacy.pact')}

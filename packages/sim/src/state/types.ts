@@ -264,8 +264,8 @@ export type GameEvent =
       readonly t: 'warDeclared' | 'treatyMade' | 'treatyBroken' | 'treatyOffered';
       readonly playerId: number;
       readonly targetId: number;
-      /** pact или alliance (договор); для войны — какой договор нарушен или null. */
-      readonly kind: 'pact' | 'alliance' | null;
+      /** peace, pact или alliance (договор); для войны — какой договор нарушен или null. */
+      readonly kind: TreatyKind | null;
     }
   | { readonly t: 'playerEliminated'; readonly playerId: number }
   | { readonly t: 'offensiveDone'; readonly playerId: number; readonly armyId: number }
@@ -283,11 +283,14 @@ export type WinReason = 'cities' | 'lastStanding' | 'score';
 /** Отношение пары игроков (дипломатия, CR-007). */
 export type Relation = 'peace' | 'war' | 'pact' | 'alliance';
 
-/** Предложение договора: pact или alliance, действует OFFER_TTL_TICKS. */
+/** Вид договора: мир (из войны), пакт о ненападении, союз. */
+export type TreatyKind = 'peace' | 'pact' | 'alliance';
+
+/** Предложение договора, действует OFFER_TTL_TICKS. */
 export interface TreatyOffer {
   readonly from: number;
   readonly to: number;
-  readonly kind: 'pact' | 'alliance';
+  readonly kind: TreatyKind;
   readonly tick: number;
 }
 

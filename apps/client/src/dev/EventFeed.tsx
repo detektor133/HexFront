@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 
 import type { Command, GameEvent, PlayerView } from '@hexfront/sim';
 
+import { offerKey } from './DiplomacyBlock.tsx';
 import styles from './EventFeed.module.css';
 import type { EventFeedItem } from './event-feed.ts';
 import { visibleEvents } from './event-feed.ts';
@@ -147,9 +148,7 @@ export function EventFeed(props: {
           ) : (
             <IconLink size={18} aria-hidden />
           )}
-          <span className={styles.name}>
-            {`${t(offer.kind === 'pact' ? 'diplomacy.offerPact' : 'diplomacy.offerAlliance')}: ${nameOf(offer.from)}`}
-          </span>
+          <span className={styles.name}>{`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}</span>
           <IconButton
             className={styles.answer}
             label={t('diplomacy.accept')}

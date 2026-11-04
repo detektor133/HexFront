@@ -1,7 +1,11 @@
 import { QUICK_MATCH_SEEDS } from '../routes.ts';
 
+/** Карты матча: готовые (Европа, малая, крошечная) и сгенерированная по зерну. */
+export const MAP_IDS = ['europe', 'gen', 'small', 'tiny'] as const;
+export type MapId = (typeof MAP_IDS)[number];
+
 export interface MapRequest {
-  readonly id: 'small' | 'gen';
+  readonly id: MapId;
   readonly seed: number;
   readonly players: number;
 }
@@ -25,7 +29,7 @@ export function readMapRequest(search: string): MapRequest {
   );
   const seed = integerParam(params, 'seed', DEFAULT_SEED);
   return {
-    id: params.get('map') === 'gen' ? 'gen' : 'small',
+    id: MAP_IDS.find((id) => id === params.get('map')) ?? 'small',
     seed,
     players,
   };
@@ -33,7 +37,7 @@ export function readMapRequest(search: string): MapRequest {
 
 /** Возвращает URL карты, которую отдаёт dev-сервер или production-сборка. */
 export function mapUrl(request: MapRequest): string {
-  if (request.id === 'small') return '/maps/small.json';
+  if (request.id !== 'gen') return `/maps/${request.id}.json`;
   if (
     request.players === 30 &&
     QUICK_MATCH_SEEDS.includes(request.seed as (typeof QUICK_MATCH_SEEDS)[number])

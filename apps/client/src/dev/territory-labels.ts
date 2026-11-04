@@ -1,6 +1,6 @@
 import { Graphics, Text, type Container } from 'pixi.js';
 
-import { hexFromId, type PlayerView } from '@hexfront/sim';
+import { hexFromId, type PlayerView, type TreatyKind } from '@hexfront/sim';
 
 import { hexCenter } from '../render/hex-geometry.ts';
 import { playerLine } from '../theme/colors.ts';
@@ -15,7 +15,7 @@ export interface TerritoryLabel {
   /** Отношение к игроку-зрителю: значок под названием; null — мир или свой (CR-007). */
   readonly relation: 'war' | 'pact' | 'alliance' | null;
   /** Входящее предложение от этого государства: значок предложенного договора. */
-  readonly offer: 'pact' | 'alliance' | null;
+  readonly offer: TreatyKind | null;
 }
 
 /** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
@@ -154,7 +154,8 @@ export function drawTerritoryLabels(
     state.texts.delete(key);
   }
   for (const label of detail === 3 ? [] : labels) {
-    const glyph = label.offer ?? label.relation;
+    // Предложение мира рисуется значком пакта: отдельного значка у мира нет.
+    const glyph = label.offer === 'peace' ? 'pact' : (label.offer ?? label.relation);
     if (glyph === null) continue;
     const color =
       label.offer !== null

@@ -34,8 +34,9 @@ export function validateDiplomacy(
       return now === 'war' ? rejected('sameRelation') : OK;
     case 'proposeTreaty':
       if (now === 'alliance' || now === cmd.kind) return rejected('sameRelation');
-      // Союз — только с тем, с кем уже мир или пакт; из войны — только пакт (перемирие).
-      return now === 'war' && cmd.kind === 'alliance' ? rejected('sameRelation') : OK;
+      // Из войны — только мир; пакт и союз — с тем, с кем уже мир (союз ещё и из пакта).
+      if (now === 'war') return cmd.kind === 'peace' ? OK : rejected('sameRelation');
+      return cmd.kind === 'peace' ? rejected('sameRelation') : OK;
     case 'answerTreaty':
       return liveOffer(state, cmd.from, playerId) ? OK : rejected('noOffer');
     case 'breakTreaty':

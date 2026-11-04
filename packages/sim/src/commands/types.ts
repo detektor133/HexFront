@@ -3,6 +3,7 @@
 import type { UnitType } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
+import type { TreatyKind } from '../state/types.ts';
 
 export type Command =
   | { readonly t: 'setTax'; readonly rate: Fp }
@@ -67,7 +68,7 @@ export type Command =
   | { readonly t: 'setAutoCommand'; readonly on: boolean }
   /** Дипломатия (CR-007): объявить войну; предложить пакт/союз; ответить; разорвать договор. */
   | { readonly t: 'declareWar'; readonly target: number }
-  | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: 'pact' | 'alliance' }
+  | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: TreatyKind }
   | { readonly t: 'answerTreaty'; readonly from: number; readonly accept: boolean }
   | { readonly t: 'breakTreaty'; readonly target: number }
   /**

@@ -164,7 +164,7 @@ function hashDiplomacy(s: Hasher, state: MatchState): void {
   for (const o of d.offers) {
     int(s, o.from);
     int(s, o.to);
-    int(s, o.kind === 'pact' ? 0 : 1);
+    int(s, o.kind === 'pact' ? 0 : o.kind === 'alliance' ? 1 : 2);
     int(s, o.tick);
   }
 }

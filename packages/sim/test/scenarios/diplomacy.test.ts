@@ -56,8 +56,13 @@ describe('дипломатия', () => {
     run(s, 1, { t: 'declareWar', target: 0 } as never);
     expect(atWar(s.state, 0, 1)).toBe(true);
     expect(s.state.diplomacy?.violations).toEqual([0, 1]);
+    // Из войны предлагается мир, а не пакт; пакт — уже из мира.
+    run(s, 0, { t: 'proposeTreaty', target: 1, kind: 'peace' } as never);
+    run(s, 1, { t: 'answerTreaty', from: 0, accept: true } as never);
+    expect(relationOf(s.state, 0, 1)).toBe('peace');
     run(s, 0, { t: 'proposeTreaty', target: 1, kind: 'pact' } as never);
     run(s, 1, { t: 'answerTreaty', from: 0, accept: true } as never);
+    expect(relationOf(s.state, 0, 1)).toBe('pact');
     run(s, 0, { t: 'breakTreaty', target: 1 } as never);
     expect(relationOf(s.state, 0, 1)).toBe('peace');
     expect(s.state.diplomacy?.violations).toEqual([1, 1]);
