@@ -6,15 +6,21 @@ import { consolidate } from './consolidate.ts';
 import { maintainDirections } from './direction.ts';
 import {
   FRONT_ALLOC_TICKS,
+  FRONT_COVER_STRIDE,
+  FRONT_FULL_COVER,
   FRONT_REALLOC_GAIN_MIN,
+  FRONT_SPLIT_LONG,
   FRONT_SPLIT_MIN,
+  FRONT_THREAT_RANGE,
   MAX_UNITS_PER_HEX,
 } from '../balance.ts';
 import { mergeUnits, splitUnit } from '../commands/unit.ts';
+import { distance, hexFromId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
+import { atWar } from '../state/relations.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -43,6 +49,23 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
   u.order = 'move';
 }
 
+// Сколько отрядов нужно линии: угрожаемые гексы (чужой отряд рядом) закрываем все, остальные —
+// по одному отряду на FRONT_COVER_STRIDE гексов. Закрывать каждый гекс 100-гексового фронта значило
+// раздробить армию на мелочь, которую враг бьёт крупными отрядами.
+function coverNeed(state: MatchState, plan: ArmyPlan, owner: number): number {
+  const line = planHexes(state, plan);
+  if (line.length <= FRONT_FULL_COVER) return line.length;
+  const { width } = state.map;
+  const foes = allUnits(state).filter((u) => u.owner !== owner && atWar(state, owner, u.owner));
+  const threatened = line.filter((h) =>
+    foes.some((u) => distance(hexFromId(u.hex, width), hexFromId(h, width)) <= FRONT_THREAT_RANGE),
+  ).length;
+  return Math.min(
+    line.length,
+    Math.max(threatened, intDiv(line.length + FRONT_COVER_STRIDE - 1, FRONT_COVER_STRIDE)),
+  );
+}
+
 /**
  * Автоделение (05-armies.md, CR-005): пока пехоты и брони армии меньше, чем гексов линии,
  * самый большой отряд (при равенстве — меньший id) делится пополам, если обе половины не меньше
@@ -51,14 +74,16 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
 function coverLine(state: MatchState, armyId: number, owner: number): void {
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
-  const need = planHexes(state, plan).length;
+  const need = coverNeed(state, plan, owner);
+  const splitMin =
+    planHexes(state, plan).length > FRONT_FULL_COVER ? FRONT_SPLIT_LONG : FRONT_SPLIT_MIN;
   for (;;) {
     const units = allUnits(state).filter((u) => planControls(u, armyId) && u.type !== 'artillery');
     // Глобального лимита отрядов нет (DECISIONS 2026-10-02): ограничивают только гекс и минимум деления.
     if (units.length >= need) return;
     let best: Unit | null = null;
     for (const u of units) {
-      if (u.soldiers < 2 * FRONT_SPLIT_MIN || ownUnitsAt(state, owner, u.hex) >= MAX_UNITS_PER_HEX)
+      if (u.soldiers < 2 * splitMin || ownUnitsAt(state, owner, u.hex) >= MAX_UNITS_PER_HEX)
         continue;
       if (!best || u.soldiers > best.soldiers) best = u;
     }
@@ -72,8 +97,8 @@ const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b
 // Одно слияние за распределение: пара должна быть однотипной, в одном гексе и не в бою.
 // Только для армии с планом (фронт/наступление/оборона) — её расстановку ведёт commander
 // (решение владельца 2026-11-02); армия без плана не сливается сама, только вручную.
-function autoMerge(state: MatchState, plan: ArmyPlan): void {
-  const need = planHexes(state, plan).length;
+function autoMerge(state: MatchState, plan: ArmyPlan, owner: number): void {
+  const need = coverNeed(state, plan, owner);
   const armyUnits = allUnits(state).filter(
     (u) => planControls(u, plan.armyId) && u.type !== 'artillery',
   );
@@ -96,7 +121,7 @@ function runPlan(state: MatchState, armyId: number): void {
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
-  autoMerge(state, plan);
+  autoMerge(state, plan, owner);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = allUnits(state).filter((u) => planControls(u, plan.armyId));

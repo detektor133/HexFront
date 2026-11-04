@@ -193,12 +193,16 @@
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_MAX` | 10 `[ТЮНИНГ]` |
-| `MERGE_SMALL_BELOW` | 25 `[ТЮНИНГ]` |
-| `MERGE_SMALL_RADIUS` | 3 `[ТЮНИНГ]` |
+| `MERGE_SMALL_TINY` | 25 `[ТЮНИНГ]` |
+| `MERGE_SMALL_BELOW` | 150 `[ТЮНИНГ]` |
+| `CONSOLIDATE_CROWD` | 12 `[ТЮНИНГ]` |
+| `MERGE_SMALL_RADIUS` | 4 `[ТЮНИНГ]` |
+| `CONSOLIDATE_MAX` | 300 `[ТЮНИНГ]` |
+| `CONSOLIDATE_SAFE` | 3 `[ТЮНИНГ]` |
 | `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
 | `SWARM_PARTS_PER_TICK` | 2 `[ТЮНИНГ]` |
 | `SWARM_SAFE` | 6 `[ТЮНИНГ]` |
-| `SWARM_PART` | 100 `[ТЮНИНГ]` |
+| `SWARM_PART` | 150 `[ТЮНИНГ]` |
 | `AXIS_SOLDIERS` | 300 `[ТЮНИНГ]` |
 | `AXIS_MAX` | 4 `[ТЮНИНГ]` |
 | `AXIS_REFRESH_S` | 5 `[ТЮНИНГ]` |
@@ -210,6 +214,10 @@
 | `OFFENSIVE_FACING_RANGE` | 3 |
 | `COMMANDER_LINE_DEPTH` | 3 |
 | `FRONT_SPLIT_MIN` | 50 |
+| `FRONT_FULL_COVER` | 12 `[ТЮНИНГ]` |
+| `FRONT_SPLIT_LONG` | 150 `[ТЮНИНГ]` |
+| `FRONT_COVER_STRIDE` | 6 `[ТЮНИНГ]` |
+| `FRONT_THREAT_RANGE` | 3 `[ТЮНИНГ]` |
 | `FRONT_REALLOC_GAIN_MIN` | 0,15 |
 
 ## Обзор и победа

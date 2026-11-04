@@ -4,7 +4,7 @@ import { applyCommands } from '../../src/commands/apply.ts';
 import { borderPieces } from '../../src/commands/launch.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { lineRuns } from '../../src/systems/offensive.ts';
-import { assignUnits, at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
+import { at, city, own, scenario } from '../scenario/dsl.ts';
 
 const legend = {
   A1: city('A', 1, { capital: true }),
@@ -61,7 +61,7 @@ describe('несколько линий наступления', () => {
 });
 
 describe('слияние мелочи', () => {
-  it('мелкие отряды одной армии стягиваются и сливаются', () => {
+  it('мелкие отряды резерва стягиваются и сливаются', () => {
     const s = scenario(
       `
       A1 a  a  a  a  a
@@ -72,16 +72,7 @@ describe('слияние мелочи', () => {
     s.unit('A', 'infantry', 5, at(1, 0));
     s.unit('A', 'infantry', 7, at(2, 0));
     s.unit('A', 'infantry', 100, at(3, 1));
-    s.cmd('A', createArmy(''));
-    s.runTicks(1);
-    const army = s.armiesOf('A').at(-1)?.id ?? -1;
-    s.cmd(
-      'A',
-      assignUnits(
-        s.unitsOf('A').map((u) => u.id),
-        army,
-      ),
-    );
+    // Резерв (без армии) тоже стягивается: отряды сливаются в один.
     s.runSeconds(30);
     expect(s.unitsOf('A').length).toBe(1);
     expect(s.unitsOf('A')[0]?.soldiers).toBe(112_000);

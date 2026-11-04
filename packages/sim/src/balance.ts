@@ -238,15 +238,22 @@ export const EXPAND_RADIUS_BASE = 3;
 export const EXPAND_SOLDIERS_PER_HEX = 100;
 export const EXPAND_RADIUS_MAX = 10;
 /** Слияние мелочи: отряд меньше порога стягивается к ближайшему своему в радиусе, раз в период. */
-export const MERGE_SMALL_BELOW: Fp = fp(25);
-export const MERGE_SMALL_RADIUS = 3;
+export const MERGE_SMALL_TINY: Fp = fp(25);
+/** В «толпе» (отрядов в армии больше CONSOLIDATE_CROWD) мелочью считается всё, что меньше этого. */
+export const MERGE_SMALL_BELOW: Fp = fp(150);
+export const CONSOLIDATE_CROWD = 12;
+export const MERGE_SMALL_RADIUS = 4;
+/** Предел отряда при слиянии мелочи и при вливании колонны в затор, солдат. */
+export const CONSOLIDATE_MAX: Fp = fp(300);
+/** Мелочь не стягивается, пока враг ближе стольких гексов: фронт у врага не трогаем. */
+export const CONSOLIDATE_SAFE = 3;
 export const CONSOLIDATE_PERIOD_S = 2;
 /** Рой на ничьей земле: сколько частей отряд отделяет за тик (ИИ-командир бота). */
 export const SWARM_PARTS_PER_TICK = 2;
 /** Рой не занимает гексы ближе этого числа гексов к чужим отрядам. */
 export const SWARM_SAFE = 6;
 /** Размер части, которую рой отделяет от отряда. */
-export const SWARM_PART: Fp = fp(100);
+export const SWARM_PART: Fp = fp(150);
 /** Оси удара направления: одна на каждые AXIS_SOLDIERS солдат заказа, не больше AXIS_MAX. */
 export const AXIS_SOLDIERS = 300;
 export const AXIS_MAX = 4;
@@ -327,6 +334,16 @@ export const OFFENSIVE_FACING_RANGE = 3;
 export const COMMANDER_LINE_DEPTH = 3;
 /** Автоделение на линии плана: часть не меньше шага набора (05-armies.md, CR-005). */
 export const FRONT_SPLIT_MIN: Fp = fp(50);
+/**
+ * Автоделение закрывает все гексы короткой линии (до FRONT_FULL_COVER гексов); у длинной — угрожаемые
+ * гексы, а остальным хватает одного отряда на FRONT_COVER_STRIDE гексов.
+ */
+export const FRONT_FULL_COVER = 12;
+/** Длинную линию (больше FRONT_FULL_COVER гексов) армия делит не мельче чем на такие части. */
+export const FRONT_SPLIT_LONG: Fp = fp(150);
+export const FRONT_COVER_STRIDE = 6;
+/** Гекс линии угрожаем, если чужой отряд ближе стольких гексов. */
+export const FRONT_THREAT_RANGE = 3;
 export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);
 
 // Обзор и победа
