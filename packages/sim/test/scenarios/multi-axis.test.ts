@@ -200,4 +200,33 @@ describe('занятие ничьей земли: штурм ничьего го
     s.runSeconds(240);
     expect(s.state.cities.filter((c) => c.owner === 0).length).toBe(2);
   });
+
+  it('далёкий город не тянет войска: земля растёт плотно, штурма нет, пока он не рядом', () => {
+    const far = `
+      A1 a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  n5
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+      a  a  a  .  .  .  .  .  .  .  .  .  .  .  .  .  . 
+    `;
+    const s = scenario(far, { legend: open });
+    for (let i = 0; i < 4; i += 1) s.unit('A', 'infantry', 100, at(2, 2 * i));
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 400 } },
+    ]);
+    s.runSeconds(40);
+    expect(s.state.units.some((u) => u.order === 'attack')).toBe(false);
+    const width = s.state.map.width;
+    const columns = Array.from(
+      { length: width },
+      (_, c) => s.state.hexes.owner.filter((o, h) => o === 0 && h % width === c).length,
+    );
+    // Малая армия растит землю от своей границы, а не червём к далёкому городу.
+    expect(columns.slice(-4).every((n) => n === 0)).toBe(true);
+    expect(columns[3]).toBeGreaterThanOrEqual(6);
+  });
 });

@@ -197,6 +197,9 @@
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_MAX` | 10 `[ТЮНИНГ]` |
 | `EXPAND_MOUNTAIN_PENALTY` | 8 `[ТЮНИНГ]` |
+| `EXPAND_PULL_RANGE` | 6 `[ТЮНИНГ]` |
+| `EXPAND_STORM_GAP` | 2 `[ТЮНИНГ]` |
+| `EXPAND_COMPACT_WEIGHT` | 3 `[ТЮНИНГ]` |
 | `MERGE_SMALL_TINY` | 25 `[ТЮНИНГ]` |
 | `MERGE_SMALL_BELOW` | 150 `[ТЮНИНГ]` |
 | `CONSOLIDATE_CROWD` | 12 `[ТЮНИНГ]` |

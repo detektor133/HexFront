@@ -1,6 +1,6 @@
 // Pixi-сцена карты: слои рельефа и камера с перетаскиванием, колесом, щипком и инерцией.
 // ADR-0005: карта рисуется Pixi императивно, React только управляет параметрами.
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, CullerPlugin, extensions, Graphics } from 'pixi.js';
 
 import type { Hex, MapStatic } from '@hexfront/sim';
 
@@ -120,6 +120,9 @@ const VELOCITY_SMOOTHING = 0.8;
 /** Если палец замер дольше этого перед отпусканием, инерции нет. */
 const INERTIA_MAX_PAUSE_MS = 80;
 
+/** Плагин отсечения подключается один раз на страницу, а не на каждую карту. */
+let cullerAdded = false;
+
 /** Создаёт карту в host и сообщает масштаб, детализацию и fps через onState. */
 export async function createMapView(
   host: HTMLElement,
@@ -130,6 +133,11 @@ export async function createMapView(
   onDoubleTap?: (hex: Hex, world: Point) => void,
 ): Promise<MapView> {
   let opts = initial;
+  // Фишки вне экрана не рисуются: в большой войне их сотни, а на экране — десятки.
+  if (!cullerAdded) {
+    extensions.add(CullerPlugin);
+    cullerAdded = true;
+  }
   const app = new Application();
   // Телефон: разрешение не выше 2 и без MSAA — шейдеры карты сглаживают края сами, а лишние
   // пиксели на слабом GPU дороже всего.

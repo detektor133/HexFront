@@ -17,10 +17,12 @@ const HINT_TEXT: Record<
   OnboardingHintId,
   { title: Parameters<typeof t>[0]; text: Parameters<typeof t>[0] }
 > = {
+  expand: { title: 'onboarding.expand.title', text: 'onboarding.expand.text' },
   tax: { title: 'onboarding.tax.title', text: 'onboarding.tax.text' },
   foundCity: { title: 'onboarding.city.title', text: 'onboarding.city.text' },
-  front: { title: 'onboarding.front.title', text: 'onboarding.front.text' },
-  offensive: { title: 'onboarding.offensive.title', text: 'onboarding.offensive.text' },
+  attack: { title: 'onboarding.attack.title', text: 'onboarding.attack.text' },
+  hold: { title: 'onboarding.hold.title', text: 'onboarding.hold.text' },
+  depot: { title: 'onboarding.depot.title', text: 'onboarding.depot.text' },
 };
 
 function readDismissed(): Set<OnboardingHintId> {

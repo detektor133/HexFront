@@ -297,6 +297,7 @@ function sameState(a: ChipState, b: ChipState): boolean {
 /** Создаёт фишку; перерисовка — только при смене состояния (раз в снимок), не каждый кадр. */
 export function createChip(): Chip {
   const root = new Container();
+  root.cullable = true;
   const content = new Container();
   root.addChild(content);
   const g = new Graphics();

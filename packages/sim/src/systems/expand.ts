@@ -6,10 +6,13 @@
 import {
   ASSAULT_MAX_UNITS,
   ASSAULT_REACH,
+  EXPAND_COMPACT_WEIGHT,
   EXPAND_MOUNTAIN_PENALTY,
+  EXPAND_PULL_RANGE,
   EXPAND_RADIUS_BASE,
   EXPAND_RADIUS_MAX,
   EXPAND_SOLDIERS_PER_HEX,
+  EXPAND_STORM_GAP,
   MAX_UNITS_PER_HEX,
   SWARM_PART,
   SWARM_PARTS_PER_TICK,
@@ -34,8 +37,33 @@ function around(state: MatchState, hex: HexId): HexId[] {
     .map((n) => hexId(n, width));
 }
 
+// Есть ли свой гекс не дальше `gap` гексов (по кольцам соседей).
+function nearOwn(state: MatchState, hex: HexId, owner: number, gap: number): boolean {
+  let ring: HexId[] = [hex];
+  const seen = new Set<HexId>(ring);
+  for (let step = 0; step < gap; step += 1) {
+    const next: HexId[] = [];
+    for (const h of ring) {
+      for (const n of around(state, h)) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        if (state.hexes.owner[n] === owner) return true;
+        next.push(n);
+      }
+    }
+    ring = next;
+  }
+  return false;
+}
+
 // Свободные для занятия гексы: ничья суша у клика, примыкающая к своей земле, без отряда на ней.
-function targets(state: MatchState, army: Army, focus: HexId[], radius: number): HexId[] {
+function targets(
+  state: MatchState,
+  army: Army,
+  focus: HexId[],
+  radius: number,
+  pull: boolean,
+): HexId[] {
   const { width } = state.map;
   const marks = focus.map((h) => hexFromId(h, width));
   const away = (h: HexId): number =>
@@ -50,9 +78,18 @@ function targets(state: MatchState, army: Army, focus: HexId[], radius: number):
     if (!around(state, h).some((n) => state.hexes.owner[n] === army.owner)) continue;
     out.push(h);
   }
+  // Территориальная целостность: раньше занимаются гексы с большим числом своих соседей (дыры и
+  // бухты), цель волны тянет лишь вблизи — иначе земля вытягивается червём к далёкому городу.
   // Горы — в последнюю очередь: медленно, снабжение хуже, отряды там гибнут у стен городов.
-  const cost = (h: HexId): number =>
-    away(h) + (state.map.terrain[h] === TERRAIN.mountains ? EXPAND_MOUNTAIN_PENALTY : 0);
+  const reach = pull ? EXPAND_PULL_RANGE : Number.POSITIVE_INFINITY;
+  const cost = (h: HexId): number => {
+    const own = around(state, h).filter((n) => state.hexes.owner[n] === army.owner).length;
+    return (
+      (6 - own) * EXPAND_COMPACT_WEIGHT +
+      Math.min(away(h), reach) +
+      (state.map.terrain[h] === TERRAIN.mountains ? EXPAND_MOUNTAIN_PENALTY : 0)
+    );
+  };
   return out.sort((a, b) => cost(a) - cost(b) || a - b);
 }
 
@@ -139,6 +176,8 @@ function storm(
   );
   for (const city of state.cities) {
     if (city.owner !== NEUTRAL || underAssault.has(city.hex)) continue;
+    // Город далеко от своей земли стал бы анклавом: сначала земля дорастает до него.
+    if (!nearOwn(state, city.hex, army.owner, EXPAND_STORM_GAP)) continue;
     if (
       focus.length > 0 &&
       Number.isFinite(radius) &&
@@ -206,11 +245,13 @@ export function expandNeutral(state: MatchState, army: Army): void {
     state,
     army,
     free,
-    targets(state, army, focus, radius).filter((h) => !before.has(h)),
+    targets(state, army, focus, radius, click === undefined).filter((h) => !before.has(h)),
   );
   const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
   const claimed = claimedHexes();
-  const open = targets(state, army, focus, radius).filter((h) => !claimed.has(h));
+  const open = targets(state, army, focus, radius, click === undefined).filter(
+    (h) => !claimed.has(h),
+  );
   storm(state, army, free, free2, focus, radius);
   for (const hex of open) {
     const at = hexFromId(hex, width);
