@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FP } from '../../src/math/int.ts';
+import { playerView } from '../../src/queries/player-view.ts';
 import { playerPlace } from '../../src/queries/score.ts';
 import { citySupply } from '../../src/state/supply.ts';
 import { playerIncomePerSecond } from '../../src/systems/economy.ts';
@@ -95,6 +96,23 @@ describe('выбывание', () => {
     s.runSeconds(2);
     expect(s.player('B').status).toBe('eliminated');
     expect(s.unitsOf('B')).toHaveLength(0);
+  });
+
+  it('без городов вид показывает остаток отсрочки в секундах, с городами поля нет', () => {
+    const s = scenario(
+      `
+      A1 a  b  B1
+    `,
+      { legend },
+    );
+    const idB = s.player('B').id;
+    expect(playerView(s.state, idB).me.graceLeftS).toBeUndefined();
+    s.unit('B', 'infantry', 100, at(2, 0));
+    s.setOwner(at(3, 0), 'A');
+    s.runSeconds(10);
+    const left = playerView(s.state, idB).me.graceLeftS;
+    expect(left).toBeGreaterThanOrEqual(49);
+    expect(left).toBeLessThanOrEqual(50);
   });
 
   it('взял город за 60 с — остаётся в игре, город становится столицей', () => {

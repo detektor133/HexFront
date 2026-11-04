@@ -10,7 +10,7 @@ import {
   type AttackState,
   type UnitView,
 } from './unit-view.ts';
-import { RECRUIT_STEP, TICKS_PER_S, type UnitType } from '../balance.ts';
+import { NO_CITY_GRACE_S, RECRUIT_STEP, TICKS_PER_S, type UnitType } from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
@@ -129,6 +129,8 @@ export interface PlayerView {
     readonly place: number;
     /** Живых игроков в матче. */
     readonly players: number;
+    /** Секунд до выбывания, пока нет городов (08-match.md, «Выбывание»); нет поля — города есть. */
+    readonly graceLeftS?: number;
   };
   readonly constructions: readonly {
     readonly id: number;
@@ -196,7 +198,17 @@ function summary(
     score: context.scores[playerId] ?? playerScore(state, playerId),
     place: context.places[playerId] ?? playerPlace(state, playerId),
     players: state.players.filter((p) => p.status === 'alive').length,
+    ...graceLeft(state, playerId),
   };
+}
+
+// Остаток 60-секундной отсрочки безгородья, секунды с округлением вверх.
+function graceLeft(state: MatchState, playerId: number): { readonly graceLeftS?: number } {
+  const player = state.players[playerId];
+  if (!player || player.status !== 'alive' || player.noCityTicks <= 0) return {};
+  const total = intDiv(NO_CITY_GRACE_S * TICKS_PER_S, FP);
+  const left = Math.max(0, total - player.noCityTicks);
+  return { graceLeftS: intDiv(left + TICKS_PER_S - 1, TICKS_PER_S) };
 }
 
 /**

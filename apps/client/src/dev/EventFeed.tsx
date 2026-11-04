@@ -75,10 +75,15 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
 type Offer = NonNullable<PlayerView['diplomacy']>['incoming'][number];
 
 /** Записи ленты: события и входящие предложения дипломатии (последние висят, пока не отвечены). */
-export function feedRows(items: readonly EventFeedItem[], offers: readonly Offer[]): number {
+export function feedRows(
+  items: readonly EventFeedItem[],
+  offers: readonly Offer[],
+  graceLeftS?: number,
+): number {
+  const grace = graceLeftS === undefined ? 0 : 1;
   return Math.min(
     4,
-    items.filter((item) => item.event.t !== 'treatyOffered').length + offers.length,
+    items.filter((item) => item.event.t !== 'treatyOffered').length + offers.length + grace,
   );
 }
 
@@ -99,6 +104,8 @@ export function EventFeed(props: {
   readonly offers?: readonly Offer[];
   readonly nameOf?: (playerId: number) => string;
   readonly send?: (cmd: Command) => void;
+  /** Секунд до выбывания при отсутствии городов; нет — города есть. */
+  readonly graceLeftS?: number | undefined;
   readonly localPlayerId?: number;
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
@@ -115,11 +122,20 @@ export function EventFeed(props: {
   // Предложения показываются из состояния (с кнопками ответа), а не одноразовой записью.
   const items = visibleEvents(props.items, now).filter((item) => item.event.t !== 'treatyOffered');
   const offers = props.offers ?? [];
-  if (items.length === 0 && offers.length === 0) return null;
+  const grace = props.graceLeftS;
+  if (items.length === 0 && offers.length === 0 && grace === undefined) return null;
   const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
   const me = props.localPlayerId ?? 0;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
+      {grace !== undefined && (
+        <div className={`${styles.item} ${styles.important}`} role="alert">
+          <IconBuildingCastle size={18} aria-hidden />
+          <span
+            className={styles.name}
+          >{`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}</span>
+        </div>
+      )}
       {offers.map((offer) => (
         <div className={`${styles.item} ${styles.offer}`} key={`offer:${offer.from}`} role="status">
           <span

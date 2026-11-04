@@ -586,6 +586,7 @@ export function SandboxSurface({
         offers={view?.diplomacy?.incoming ?? []}
         nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
         send={sb.send}
+        graceLeftS={view?.me.graceLeftS}
         {...(view ? { localPlayerId: view.playerId } : {})}
         now={performance.now()}
         onFocus={sb.focusEvent}
