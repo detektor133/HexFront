@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
 import { validate } from '../../src/commands/apply.ts';
+import { borderPieces } from '../../src/commands/launch.ts';
+import { distance, hexFromId } from '../../src/math/hex.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
@@ -79,43 +81,84 @@ describe('наступление одной командой', () => {
     applyCommands(s.state, [{ playerId: 0, cmd }]);
 
     const army = s.state.armies.find((a) => a.owner === 0);
-    const plan = s.state.plans.find((p) => p.armyId === army?.id);
-    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(true);
+    // Ничья земля — отряды без плана: они идут занимать гексы у клика.
+    expect(army?.dir).toMatchObject({ target: -1, mode: 'attack' });
+    expect(s.state.plans.some((p) => p.armyId === army?.id)).toBe(false);
+    s.runSeconds(20);
+    expect(s.state.hexes.owner.filter((o) => o === 0).length).toBeGreaterThan(8);
   });
 
-  it('удар по ничьей земле — участок у клика, а не кольцо по всей границе; новый клик его переставляет', () => {
+  it('удар по игроку: фронт — вся граница с ним, линия наступления — стена у клика', () => {
     const wide = `
-      .  .  .  .  .  .  .  .  .  .  .
-      .  a  a  a  a  a  a  a  a  a  .
-      .  a  a  a  a  a  a  a  a  a  .
-      .  a  a  A1 a  a  a  a  a  a  .
-      .  a  a  a  a  a  a  a  a  a  .
-      .  a  a  a  a  a  a  a  a  a  .
-      .  .  .  .  .  .  .  .  .  .  B1
+      A1 a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  B1
+      a  a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  b
+      a  a  a  a  b  b  b  b  b  b  b
     `;
     const s = scenario(wide, { legend });
     s.state.diplomacy = createDiplomacy(s.state.players.length);
-    for (const row of [1, 2, 3, 4, 5]) s.unit('A', 'infantry', 300, at(5, row));
+    for (const row of [0, 2, 4, 6]) s.unit('A', 'infantry', 300, at(3, row));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: 1 } }]);
     const width = s.state.map.width;
-    const click = (col: number, row: number): number => at(col, row).col + at(col, row).row * width;
-    const cmd = { t: 'launchOffensive', target: -1, soldiers: 300, hex: click(10, 0) } as const;
-    applyCommands(s.state, [{ playerId: 0, cmd }]);
+    const click = at(6, 7).col + at(6, 7).row * width;
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 300, hex: click } },
+    ]);
 
     const army = s.state.armies.find((a) => a.owner === 0);
-    const first = s.state.plans.find((p) => p.armyId === army?.id);
-    const edges = first?.kind === 'front' ? [...first.edges] : [];
-    expect(edges.length).toBeGreaterThan(0);
-    // Вся своя граница с ничьей землёй заметно длиннее участка удара.
-    expect(edges.length).toBeLessThanOrEqual(2 * 12 + 1);
-    expect(edges.length).toBeLessThan(30);
+    const plan = s.state.plans.find((p) => p.armyId === army?.id);
+    if (plan?.kind !== 'front' || !plan.offensive) throw new Error('нет наступления');
+    const border = borderPieces(s.state, 0, 1).flat();
+    // Фронт закрывает всю границу с игроком, а линия лежит впереди участка у клика.
+    expect(plan.edges.length).toBe(border.length);
+    const lineHexes = plan.offensive.hexes.map((h) => hexFromId(h, width));
+    const target = hexFromId(click, width);
+    expect(lineHexes.every((h) => distance(h, target) <= 8)).toBe(true);
+    expect(plan.offensive.hexes.length).toBeLessThan(border.length);
+  });
 
+  it('занять ничью землю: армия доходит до линии и берёт гексы, а не застывает на фронте', () => {
+    const wide = `
+      .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  a  a  a  a  a  a  a  .  .  .  .
+      .  .  a  a  a  a  a  a  a  .  .  .  .
+      .  .  a  a  a  A1 a  a  a  .  .  .  .
+      .  .  a  a  a  a  a  a  a  .  .  .  .
+      .  .  a  a  a  a  a  a  a  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  B1
+    `;
+    const s = scenario(wide, { legend });
+    for (const row of [2, 3, 4, 5, 6]) s.unit('A', 'infantry', 300, at(5, row));
+    const mine = (): number => s.state.hexes.owner.filter((o) => o === 0).length;
+    const before = mine();
+    const width = s.state.map.width;
+    const hex = at(11, 4).col + at(11, 4).row * width;
     applyCommands(s.state, [
-      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 300, hex: click(0, 6) } },
+      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 1500, hex } },
     ]);
-    const second = s.state.plans.find((p) => p.armyId === army?.id);
-    const moved = second?.kind === 'front' ? [...second.edges] : [];
-    expect(moved.length).toBeGreaterThan(0);
-    expect(moved.some((e) => !edges.includes(e))).toBe(true);
+    s.runSeconds(120);
+    expect(mine()).toBeGreaterThan(before + 6);
+  });
+
+  it('новый кусок границы с целью получает фронт сам: направление «держать» поддерживает его', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    const count = (): number => {
+      const plan = s.state.plans.find((p) => p.armyId === army?.id);
+      return plan?.kind === 'front' ? plan.edges.length : 0;
+    };
+    const before = count();
+    // Враг оказался внутри нашей земли: появился отдельный кусок границы.
+    s.setOwner(at(0, 3), 'B');
+    s.runSeconds(3);
+    expect(count()).toBeGreaterThan(before);
   });
 
   it('0 солдат снимает направление: фронт убран, отряды в резерве, армия расформирована', () => {

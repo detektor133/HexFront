@@ -511,15 +511,6 @@ export function ArmyBar(props: {
               <IconButton
                 type="button"
                 className={styles.iconButton}
-                label={t('army.auto')}
-                aria-pressed={view.me.autoReinforce}
-                onClick={() => send({ t: 'setAutoReinforce', on: !view.me.autoReinforce })}
-              >
-                <Icon name="auto" />
-              </IconButton>
-              <IconButton
-                type="button"
-                className={styles.iconButton}
                 label={t('army.new')}
                 onClick={() => send({ t: 'createArmy', name: '' })}
               >

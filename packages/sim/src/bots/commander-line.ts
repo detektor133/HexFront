@@ -48,7 +48,8 @@ function depthFromFront(g: Ground, front: readonly EdgeId[], enemy: number, limi
 /**
  * Линия наступления армии с фронтом на врага enemy: грани между гексами на глубине D от фронта и
  * гексами глубже, D — COMMANDER_LINE_DEPTH или глубина ближайшего вражеского города, если меньше.
- * Грани упорядочены вдоль фронта.
+ * Грани упорядочены вдоль фронта. `keep` оставляет лишь нужные гексы линии — стена впереди, а не
+ * кольцо вокруг фронта.
  * @returns грани линии (точки для setOffensiveLine); пусто — строить нечего
  */
 export function commanderLine(
@@ -57,17 +58,19 @@ export function commanderLine(
   front: readonly EdgeId[],
   enemy: number,
   maxDepth: number = COMMANDER_LINE_DEPTH,
+  keep?: (hex: HexId) => boolean,
 ): EdgeId[] {
   const g = { map, hexes: view.hexes };
   const dist = depthFromFront(g, front, enemy, maxDepth + 1);
-  let depth = maxDepth;
+  // Земли цели может быть мельче заказанной глубины (узкий перешеек, край карты): берём её дно.
+  let depth = Math.min(maxDepth, Math.max(0, ...dist.values()));
   for (const c of view.cities) {
     const d = dist.get(c.hex);
     if (c.owner === enemy && d !== undefined && d < depth) depth = d;
   }
   const line: EdgeId[] = [];
   for (const [h, d] of [...dist].sort((a, b) => a[0] - b[0])) {
-    if (d !== depth) continue;
+    if (d !== depth || (keep && !keep(h))) continue;
     for (let dir = 0; dir < 6; dir += 1) {
       const e = edgeOf(h, dir);
       const n = edgeOther(g, e);
@@ -91,5 +94,7 @@ export function commanderLine(
     return best;
   };
   const ordered = line.sort((a, b) => at(a) - at(b) || a - b);
-  return offensiveEdgePath(g, ordered) ?? [];
+  const path = offensiveEdgePath(g, ordered) ?? [];
+  // Срез по `keep` мог разорвать линию: тогда строим без него.
+  return path.length === 0 && keep ? commanderLine(map, view, front, enemy, maxDepth) : path;
 }

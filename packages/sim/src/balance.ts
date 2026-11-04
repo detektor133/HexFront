@@ -233,6 +233,10 @@ export const RECRUIT_PER_100_S: ByUnit<Fp> = {
 export const RECRUIT_MIN: Fp = fp(50);
 export const RECRUIT_STEP: Fp = fp(50);
 export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);
+/** Радиус занятия ничьей земли вокруг клика: база, надбавка за каждые N солдат заказа и предел. */
+export const EXPAND_RADIUS_BASE = 3;
+export const EXPAND_SOLDIERS_PER_HEX = 100;
+export const EXPAND_RADIUS_MAX = 10;
 /** Наибольший набор, который ИИ ставит за раз при закупке под заказ армии. */
 export const PROCURE_BATCH: Fp = fp(300);
 export const MAX_UNITS_PER_HEX = 3;

@@ -157,8 +157,19 @@ describe('локальный режим', () => {
     expect(rejected.view.recruits).toHaveLength(1);
   });
 
+  it('у человека по умолчанию нет автокомандования: его армии ведёт только он сам', () => {
+    const e = engine();
+    expect(e.state.players[HUMAN_ID]?.autoCommand).toBe(false);
+    expect(e.state.armies.filter((a) => a.owner === HUMAN_ID).every((a) => !a.auto)).toBe(true);
+    const owned = (): number => e.state.hexes.owner.filter((o) => o === HUMAN_ID).length;
+    const before = owned();
+    for (let i = 0; i < 300; i += 1) e.tick();
+    expect(owned()).toBe(before);
+  });
+
   it('армии с auto всех игроков ведёт commander; ручной приказ отряду auto не выключает (CR-006)', () => {
     const e = engine();
+    for (const a of e.state.armies) if (a.owner === HUMAN_ID) a.auto = true;
     const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;
     const before = [owned(0), owned(1)];
     for (let i = 0; i < 300; i += 1) e.tick();
@@ -174,6 +185,7 @@ describe('локальный режим', () => {
   it('ручной приказ или деление отряду: auto остаётся, ручное побеждает решение commander (04/T22a)', () => {
     for (const manual of ['split', 'move'] as const) {
       const e = engine();
+      for (const a of e.state.armies) if (a.owner === HUMAN_ID) a.auto = true;
       const [unit] = e.state.units.filter((u) => u.owner === HUMAN_ID);
       if (!unit) throw new Error('нет стартового отряда');
       if (manual === 'split') e.queue({ t: 'split', unitId: unit.id, soldiers: (50 * FP) as Fp });

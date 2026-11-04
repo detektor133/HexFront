@@ -56,7 +56,7 @@ export interface ArmyView {
   /** Заказанная численность, солдат: ИИ закупает и подводит недостающих (меню страны). */
   readonly wanted?: number;
   /** Направление армии: цель (id игрока или -1 — ничья земля) и режим. */
-  readonly dir?: { readonly target: number; readonly mode: 'hold' | 'attack' };
+  readonly dir?: { readonly target: number; readonly mode: 'hold' | 'attack' | 'idle' };
 }
 
 /** Отряды для снимка игрока playerId. */

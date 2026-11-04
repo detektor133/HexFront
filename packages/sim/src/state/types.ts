@@ -218,7 +218,12 @@ export interface Army {
    * Направление армии: цель (id игрока или -1 — ничья земля) и режим. «hold» держит всю границу с
    * игроком (фронт обновляется по мере появления новых кусков), «attack» ведёт наступление.
    */
-  dir?: { readonly target: number; readonly mode: 'hold' | 'attack' };
+  dir?: {
+    readonly target: number;
+    readonly mode: 'hold' | 'attack' | 'idle';
+    /** Гекс клика наступления: удар повторяется, пока он не взят. */
+    readonly hex?: number;
+  };
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */

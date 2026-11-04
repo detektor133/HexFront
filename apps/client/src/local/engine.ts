@@ -116,6 +116,13 @@ export function createLocalEngine(
     name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
   }));
   const state = createMatch(loaded.map, setup, seed, { fog, diplomacy });
+  // Человек сам ведёт войска (меню направлений): автокомандование стартовой армии выключено, иначе
+  // commander двигал бы отряды и сбрасывал планы. У ботов оно остаётся — это их мозг.
+  if (!bots.includes(HUMAN_ID)) {
+    const me = state.players[HUMAN_ID];
+    if (me) me.autoCommand = false;
+    for (const army of state.armies) if (army.owner === HUMAN_ID) army.auto = false;
+  }
   let pending: Command[] = [];
   let selected: number | null = null;
   let observerId: number | null = null;

@@ -105,7 +105,8 @@ function hashEntities(s: Hasher, state: MatchState): void {
     if (a.wanted !== undefined) int(s, a.wanted);
     if (a.dir !== undefined) {
       int(s, a.dir.target);
-      int(s, a.dir.mode === 'hold' ? 0 : 1);
+      int(s, a.dir.mode === 'hold' ? 0 : a.dir.mode === 'attack' ? 1 : 2);
+      if (a.dir.hex !== undefined) int(s, a.dir.hex);
     }
   }
   int(s, state.plans.length);
