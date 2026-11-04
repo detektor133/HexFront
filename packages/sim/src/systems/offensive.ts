@@ -2,9 +2,16 @@
 // Наступают только отряды на гранях фронта, смотрящих на линию, и только шагом, после которого
 // они строго ближе к линии; за линию не идут.
 // GDD: docs/gdd/07-controls.md — «Линия наступления».
-import { MAX_UNITS_PER_HEX, OFFENSIVE_STEP_TICKS, OFFENSIVE_STOP_ORG } from '../balance.ts';
+import {
+  MAX_UNITS_PER_HEX,
+  OFFENSIVE_STEP_TICKS,
+  OFFENSIVE_STOP_ORG,
+  OFFENSIVE_STUCK_TICKS,
+  OFFENSIVE_WEDGE_MIN_OWN,
+} from '../balance.ts';
 import { setOffensive } from '../commands/plan.ts';
-import type { HexId } from '../math/hex.ts';
+import { TERRAIN } from '../map/types.ts';
+import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import { edgeAt } from '../state/contour.ts';
@@ -45,6 +52,17 @@ function pickStep(
     return n;
   }
   return null;
+}
+
+// Сколько соседей гекса опираются на игрока: свои, вода и край карты. Шаг в гекс с одной опорой —
+// клин-«червяк»; берег и край стены не открывают, иначе у воды остались бы дыры.
+function ownNeighbors(state: MatchState, owner: number, hex: HexId): number {
+  const { width, height } = state.map;
+  return neighbors(hexFromId(hex, width)).filter((n) => {
+    if (!inBounds(n, width, height)) return true;
+    const id = hexId(n, width);
+    return state.hexes.owner[id] === owner || state.map.terrain[id] === TERRAIN.water;
+  }).length;
 }
 
 // Свободный отряд армии: стоит, не в бою, не артиллерия, org не ниже порога.
@@ -105,10 +123,15 @@ function advance(state: MatchState, plan: FrontPlan): void {
   const facing = new Set(facingHexes(state, plan.edges, dist));
   const taken = new Set<HexId>();
   let progress = state.units.some((u) => u.armyId === plan.armyId && u.inBattle);
+  // Волна: армия идёт сплошным фронтом, выступ в одну клетку ждёт соседей. Если наступление
+  // упёрлось (узкий перешеек, берег), клин разрешён, иначе армия застряла бы навсегда.
+  const stuck = state.tick - off.progressTick > OFFENSIVE_STUCK_TICKS;
   for (const u of state.units) {
     const near = neighborsIn(state, u.hex, enclaves);
     if (!advancing(u, plan.armyId, facing) && !(near.length > 0 && free(u, plan.armyId))) continue;
-    const toward = facing.has(u.hex) ? stepsToward(state, owner, u.hex, dist) : [];
+    const toward = (facing.has(u.hex) ? stepsToward(state, owner, u.hex, dist) : []).filter(
+      (n) => stuck || ownNeighbors(state, owner, n) >= OFFENSIVE_WEDGE_MIN_OWN,
+    );
     const steps = [...toward, ...near.filter((h) => !toward.includes(h))];
     const step = pickStep(state, u, steps, taken);
     if (step === null) continue;

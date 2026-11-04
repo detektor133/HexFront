@@ -23,6 +23,8 @@ export const FRONT_ALLOC_TICKS = 50;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;
+/** Минимум своих соседей у гекса, куда наступающий шагает: без «клина» в одну клетку. */
+export const OFFENSIVE_WEDGE_MIN_OWN = 2;
 /**
  * Период вызова commander для игрока (все его армии с автокомандованием — в один тик; игроки
  * распределены по тикам по id), тиков (07-controls.md, CR-006).
