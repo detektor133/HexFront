@@ -445,6 +445,7 @@ export function useSandbox(
       },
       {
         telemetry: debug,
+        initialGold: setup.initialGold,
         playerName:
           setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
         playerColors: matchPlayerColors(
