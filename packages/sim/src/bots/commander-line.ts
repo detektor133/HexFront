@@ -16,6 +16,9 @@ export interface LineView {
   readonly cities: readonly { readonly hex: HexId; readonly owner: number }[];
 }
 
+/** Чей гекс считается вражеским: игрок цели или весь его блок. */
+type Enemy = (owner: number) => boolean;
+
 function around(map: MapStatic, h: HexId): HexId[] {
   return neighbors(hexFromId(h, map.width))
     .filter((n) => inBounds(n, map.width, map.height))
@@ -23,12 +26,12 @@ function around(map: MapStatic, h: HexId): HexId[] {
 }
 
 // Шагов от фронта по земле врага (поиск в ширину от гексов врага за гранями фронта).
-function depthFromFront(g: Ground, front: readonly EdgeId[], enemy: number, limit: number) {
+function depthFromFront(g: Ground, front: readonly EdgeId[], isEnemy: Enemy, limit: number) {
   const dist = new Map<HexId, number>();
   const queue: HexId[] = [];
   for (const e of front) {
     const n = edgeOther(g, e);
-    if (n < 0 || g.hexes.owner[n] !== enemy || dist.has(n)) continue;
+    if (n < 0 || !isEnemy(g.hexes.owner[n] as number) || dist.has(n)) continue;
     dist.set(n, 1);
     queue.push(n);
   }
@@ -37,7 +40,8 @@ function depthFromFront(g: Ground, front: readonly EdgeId[], enemy: number, limi
     const d = dist.get(h) as number;
     if (d >= limit) continue;
     for (const n of around(g.map, h)) {
-      if (dist.has(n) || g.hexes.owner[n] !== enemy || g.map.terrain[n] === TERRAIN.water) continue;
+      if (dist.has(n) || !isEnemy(g.hexes.owner[n] as number) || g.map.terrain[n] === TERRAIN.water)
+        continue;
       dist.set(n, d + 1);
       queue.push(n);
     }
@@ -56,17 +60,19 @@ export function commanderLine(
   map: MapStatic,
   view: LineView,
   front: readonly EdgeId[],
-  enemy: number,
+  enemyOrBloc: number | Enemy,
   maxDepth: number = COMMANDER_LINE_DEPTH,
   keep?: (hex: HexId) => boolean,
 ): EdgeId[] {
   const g = { map, hexes: view.hexes };
-  const dist = depthFromFront(g, front, enemy, maxDepth + 1);
+  const isEnemy: Enemy =
+    typeof enemyOrBloc === 'number' ? (who) => who === enemyOrBloc : enemyOrBloc;
+  const dist = depthFromFront(g, front, isEnemy, maxDepth + 1);
   // Земли цели может быть мельче заказанной глубины (узкий перешеек, край карты): берём её дно.
   let depth = Math.min(maxDepth, Math.max(0, ...dist.values()));
   for (const c of view.cities) {
     const d = dist.get(c.hex);
-    if (c.owner === enemy && d !== undefined && d < depth) depth = d;
+    if (isEnemy(c.owner) && d !== undefined && d < depth) depth = d;
   }
   const line: EdgeId[] = [];
   for (const [h, d] of [...dist].sort((a, b) => a[0] - b[0])) {
@@ -96,5 +102,8 @@ export function commanderLine(
   const ordered = line.sort((a, b) => at(a) - at(b) || a - b);
   const path = offensiveEdgePath(g, ordered) ?? [];
   // Срез по `keep` мог разорвать линию: тогда строим без него.
-  return path.length === 0 && keep ? commanderLine(map, view, front, enemy, maxDepth) : path;
+  if (path.length > 0) return path;
+  if (keep) return commanderLine(map, view, front, enemyOrBloc, maxDepth);
+  // Дно земли цели у края карты линии не даёт: берём слой мельче.
+  return maxDepth > 1 ? commanderLine(map, view, front, enemyOrBloc, maxDepth - 1) : [];
 }

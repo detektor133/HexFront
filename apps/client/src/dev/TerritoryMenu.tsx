@@ -32,14 +32,14 @@ export function TerritoryMenu(props: {
   readonly view: PlayerView;
   /** Игрок, чья это земля, или -1 — ничья земля. */
   readonly other: number;
-  /** Гекс нажатия: у ничьей земли выбирает кусок границы. */
+  /** Гекс нажатия (меню им не пользуется: ось удара выбирает ИИ). */
   readonly hex: number;
   /** Точка нажатия в координатах страницы. */
   readonly at: { readonly x: number; readonly y: number };
   readonly send: (cmd: Command) => void;
   readonly onClose: () => void;
 }): React.JSX.Element | null {
-  const { view, other, hex, at, send, onClose } = props;
+  const { view, other, at, send, onClose } = props;
   const max = ownSoldiers(view);
   // Уже поставленное направление: слайдер показывает его заказ, а не заново половину армии.
   const existing = view.armies.find((a) => a.dir?.target === other);
@@ -69,8 +69,8 @@ export function TerritoryMenu(props: {
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - 220));
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
-  // Ничья земля выбирает кусок границы по гексу клика; у игрока берётся вся граница с ним.
-  const where = neutral ? { hex } : {};
+  // Клик не выбирает место удара: ось наступления и приоритет занятия определяет ИИ.
+  const where = {};
   const go = (command: Command): void => {
     send(command);
     onClose();

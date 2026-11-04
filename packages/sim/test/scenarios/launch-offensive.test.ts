@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { applyCommands } from '../../src/commands/apply.ts';
 import { validate } from '../../src/commands/apply.ts';
 import { borderPieces } from '../../src/commands/launch.ts';
-import { distance, hexFromId } from '../../src/math/hex.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
@@ -88,7 +87,7 @@ describe('наступление одной командой', () => {
     expect(s.state.hexes.owner.filter((o) => o === 0).length).toBeGreaterThan(8);
   });
 
-  it('удар по игроку: фронт — вся граница с ним, линия наступления — стена у клика', () => {
+  it('удар по игроку: фронт — вся граница с ним, линию наступления строит ИИ, клик не нужен', () => {
     const wide = `
       A1 a  a  a  b  b  b  b  b  b  b
       a  a  a  a  b  b  b  b  b  b  b
@@ -113,12 +112,47 @@ describe('наступление одной командой', () => {
     const plan = s.state.plans.find((p) => p.armyId === army?.id);
     if (plan?.kind !== 'front' || !plan.offensive) throw new Error('нет наступления');
     const border = borderPieces(s.state, 0, 1).flat();
-    // Фронт закрывает всю границу с игроком, а линия лежит впереди участка у клика.
+    // Фронт закрывает всю границу с игроком, а линия — лишь участок удара, выбранный ИИ.
     expect(plan.edges.length).toBe(border.length);
-    const lineHexes = plan.offensive.hexes.map((h) => hexFromId(h, width));
-    const target = hexFromId(click, width);
-    expect(lineHexes.every((h) => distance(h, target) <= 8)).toBe(true);
+    expect(plan.offensive.hexes.length).toBeGreaterThan(0);
     expect(plan.offensive.hexes.length).toBeLessThan(border.length);
+  });
+
+  it('фронт стоит только на границе с целью, а не на границе с другим соседом', () => {
+    const three = `
+      A1 a  a  b  b  B1
+      a  a  a  b  b  b
+      a  a  a  c  c  C1
+      a  a  a  c  c  c
+    `;
+    const s = scenario(three, {
+      legend: { ...legend, c: own('C'), C1: city('C', 1, { capital: true }) },
+    });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    for (const row of [0, 1, 2, 3]) s.unit('A', 'infantry', 300, at(2, row));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: 1 } }]);
+    // Клик по земле другого соседа ничего не меняет: ось и фронт определяет ИИ.
+    const click = at(4, 3).col + at(4, 3).row * s.state.map.width;
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 300, hex: click } },
+    ]);
+    s.runSeconds(5);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    const plan = s.state.plans.find((p) => p.armyId === army?.id);
+    if (plan?.kind !== 'front') throw new Error('нет фронта');
+    expect(plan.edges.length).toBeGreaterThan(0);
+    const owners = new Set(
+      plan.edges.map((e) => {
+        const hex = Math.floor(e / 6);
+        return s.state.hexes.owner[hex];
+      }),
+    );
+    expect([...owners]).toEqual([0]);
+    const facing = plan.edges.every((e) => {
+      const border = borderPieces(s.state, 0, 1).flat();
+      return border.includes(e);
+    });
+    expect(facing).toBe(true);
   });
 
   it('занять ничью землю: армия доходит до линии и берёт гексы, а не застывает на фронте', () => {
@@ -137,10 +171,8 @@ describe('наступление одной командой', () => {
     for (const row of [2, 3, 4, 5, 6]) s.unit('A', 'infantry', 300, at(5, row));
     const mine = (): number => s.state.hexes.owner.filter((o) => o === 0).length;
     const before = mine();
-    const width = s.state.map.width;
-    const hex = at(11, 4).col + at(11, 4).row * width;
     applyCommands(s.state, [
-      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 1500, hex } },
+      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 1500 } },
     ]);
     s.runSeconds(120);
     expect(mine()).toBeGreaterThan(before + 6);

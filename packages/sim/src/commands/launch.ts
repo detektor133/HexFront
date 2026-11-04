@@ -1,18 +1,19 @@
 // Направление одной командой (07-controls.md, «Меню страны»): армия направления набирает отряды
-// под заданное число солдат и ставит фронт на границу с целью — соседом или ничьей землёй.
-// Наступление (`launchOffensive`) бьёт в сторону клика: участок фронта у места клика, ширина и
-// глубина — от числа войск; удержание (`holdBorder`) держит всю границу с игроком, пока цель жива,
-// и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
+// под заданное число солдат и ставит фронт на границу с целью (соседом, его союзниками при войне
+// с ними, или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
+// обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
+// с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
 import { ARMY_NAME_MAX, executeArmyCommand } from './army.ts';
-import { executePlanCommand, removePlan, validatePlanCommand } from './plan.ts';
+import { pickAxis, type Strike } from './axis.ts';
+import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
 import { OK, rejected, type Validation } from './types.ts';
 import { commanderLine } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { FP, intDiv } from '../math/int.ts';
+import { FP } from '../math/int.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { borderEdges, borderSegmentEdges, edgeHex, type EdgeId } from '../state/edges.ts';
-import { atWar } from '../state/relations.ts';
+import { atWar, isAllied } from '../state/relations.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { expandNeutral } from '../systems/expand.ts';
@@ -23,16 +24,6 @@ const SOLDIERS_MAX = 1_000_000;
 /** Ничья земля как цель направления. */
 export const NEUTRAL_TARGET = -1;
 
-/** Сколько солдат приходится на одну грань участка удара: больше войск — шире удар. */
-const SOLDIERS_PER_EDGE = 100;
-const WINDOW_MIN = 2;
-const WINDOW_MAX = 12;
-/** Глубина шага линии наступления: не меньше DEPTH_MIN, не больше DEPTH_MAX гексов. */
-const DEPTH_MIN = 3;
-const DEPTH_MAX = 4;
-/** Запас по бокам стены удара, гексов. */
-const WALL_SPREAD = 2;
-
 /** Аргументы направления: цель (id игрока или -1), заказ солдат и гекс клика. */
 export interface DirectionCommand {
   readonly target: number;
@@ -40,61 +31,54 @@ export interface DirectionCommand {
   readonly hex?: number;
 }
 
-/** Куски своей границы с целью, каждый — упорядоченная цепочка граней. */
+/**
+ * Блок цели: она сама и её союзники, с которыми мы воюем, — для ИИ это общее полотно врагов.
+ * Ничья земля — отдельная цель без союзников.
+ * @returns признак «гекс этого владельца — враг направления»
+ */
+export function blocOf(
+  state: MatchState,
+  playerId: number,
+  target: number,
+): (who: number) => boolean {
+  if (target === NEUTRAL_TARGET) return (who) => who === NEUTRAL_TARGET;
+  const bloc = new Set<number>([target]);
+  for (const p of state.players) {
+    if (p.id !== playerId && isAllied(state, target, p.id) && atWar(state, playerId, p.id)) {
+      bloc.add(p.id);
+    }
+  }
+  return (who) => bloc.has(who);
+}
+
+/** Куски своей границы с блоком цели, каждый — упорядоченная цепочка граней. */
 export function borderPieces(state: MatchState, playerId: number, target: number): EdgeId[][] {
+  const isEnemy = blocOf(state, playerId, target);
   const pieces: EdgeId[][] = [];
   const seen = new Set<EdgeId>();
   for (const e of borderEdges(state, playerId)) {
     if (seen.has(e)) continue;
-    const piece = borderSegmentEdges(state, playerId, target, e);
+    const piece = borderSegmentEdges(state, playerId, isEnemy, e);
     for (const x of piece) seen.add(x);
     if (piece.length > 0) pieces.push(piece);
   }
   return pieces;
 }
 
-// Участок удара: цепочка границы у гекса клика, шириной по числу войск, и расстояние от него до
-// клика — глубина линии наступления.
+// Участок удара выбирает ИИ: клик игрока в выборе оси не участвует.
 function strikeFront(state: MatchState, playerId: number, cmd: DirectionCommand): Strike {
-  const pieces = borderPieces(state, playerId, cmd.target);
-  if (cmd.hex === undefined) return { edges: pieces.flat(), depth: DEPTH_MIN, gap: 0 };
-  const { width } = state.map;
-  const at = hexFromId(cmd.hex, width);
-  let piece: EdgeId[] = [];
-  let index = 0;
-  let gap = Number.MAX_SAFE_INTEGER;
-  for (const candidate of pieces) {
-    for (let i = 0; i < candidate.length; i += 1) {
-      const d = distance(at, hexFromId(edgeHex(candidate[i] as EdgeId), width));
-      if (d < gap) {
-        piece = candidate;
-        index = i;
-        gap = d;
-      }
-    }
-  }
-  if (piece.length === 0) return { edges: [], depth: DEPTH_MIN, gap: 0 };
-  const half = Math.min(WINDOW_MAX, Math.max(WINDOW_MIN, intDiv(cmd.soldiers, SOLDIERS_PER_EDGE)));
-  // Глубина шага — до клика, но от DEPTH_MIN до DEPTH_MAX: дальняя линия сужается в точку и даёт
-  // червяка, поэтому до клика удар идёт шагами и повторяется (`continueStrike`).
-  return {
-    edges: piece.slice(Math.max(0, index - half), index + half + 1),
-    depth: Math.min(DEPTH_MAX, Math.max(DEPTH_MIN, gap)),
-    gap,
-  };
+  return pickAxis(
+    state,
+    playerId,
+    blocOf(state, playerId, cmd.target),
+    borderPieces(state, playerId, cmd.target),
+    cmd.soldiers,
+  );
 }
 
-/** Участок удара: грани границы у клика и глубина линии наступления. */
-export interface Strike {
-  readonly edges: EdgeId[];
-  readonly depth: number;
-  /** Расстояние от участка до клика, гексов. */
-  readonly gap: number;
-}
-
-// Фронт направления: у игрока — вся граница с ним (нигде нет дыр), у ничьей земли — участок удара.
-function frontOf(state: MatchState, playerId: number, target: number, strike: Strike): EdgeId[] {
-  return target === NEUTRAL_TARGET ? strike.edges : borderPieces(state, playerId, target).flat();
+// Фронт направления: у игрока — вся граница с блоком цели (нигде нет дыр и ничего лишнего).
+function frontOf(state: MatchState, playerId: number, target: number): EdgeId[] {
+  return borderPieces(state, playerId, target).flat();
 }
 
 function validateDirection(
@@ -122,8 +106,7 @@ function validateDirection(
   if (badHex) return rejected('badHex');
   // Снять направление можно и без границы; остальное требует контакта с целью.
   if (cmd.soldiers === 0) return OK;
-  const contact = strikeFront(state, playerId, { target: cmd.target, soldiers: cmd.soldiers });
-  return contact.edges.length > 0 ? OK : rejected('noFront');
+  return borderPieces(state, playerId, cmd.target).length > 0 ? OK : rejected('noFront');
 }
 
 /**
@@ -225,13 +208,19 @@ function prepare(
   army.dir = {
     target: cmd.target,
     mode,
-    ...(mode === 'attack' && cmd.hex !== undefined ? { hex: cmd.hex } : {}),
+    // Клик нужен только занятию ничьей земли — как приоритет; ось удара по игроку выбирает ИИ.
+    ...(mode === 'attack' && cmd.target === NEUTRAL_TARGET && cmd.hex !== undefined
+      ? { hex: cmd.hex }
+      : {}),
   };
-  // Фронт — вся граница с игроком, чтобы нигде на ней не было дыр; у ничьей земли — участок удара.
-  const strike = strikeFront(state, playerId, cmd);
-  const front = frontOf(state, playerId, cmd.target, strike);
+  // Фронт — вся граница с блоком цели, чтобы нигде на ней не было дыр и не было лишнего.
   const neutral = cmd.target === NEUTRAL_TARGET;
-  const anchors = neutral && cmd.hex !== undefined ? [cmd.hex] : front.map((e) => edgeHex(e));
+  const front = neutral ? [] : frontOf(state, playerId, cmd.target);
+  const strike: Strike = neutral ? { edges: [], depth: 0 } : strikeFront(state, playerId, cmd);
+  const anchors =
+    neutral && cmd.hex !== undefined
+      ? [cmd.hex]
+      : (neutral ? borderPieces(state, playerId, cmd.target).flat() : front).map((e) => edgeHex(e));
   let have = allUnits(state)
     .filter((u) => u.armyId === army.id)
     .reduce((sum, u) => sum + u.soldiers, 0);
@@ -249,33 +238,20 @@ function prepare(
     removePlan(state, army.id);
     return { army, strike };
   }
-  executePlanCommand(state, playerId, { t: 'assignFront', armyId: army.id, edges: front });
+  if (front.length === 0) return null;
+  placeFront(state, army.id, front);
   const plan = state.plans.find((p) => p.armyId === army.id);
   return plan?.kind === 'front' ? { army, strike } : null;
 }
 
-// Линия наступления по участку удара на глубину strike.depth и старт; false — строить нечего.
-function startStrike(
-  state: MatchState,
-  army: Army,
-  target: number,
-  strike: Strike,
-  click: HexId | undefined,
-): boolean {
-  const { width } = state.map;
-  // Стена впереди: в линию идут гексы не дальше от клика, чем клик от фронта, плюс запас по бокам.
-  const aim = click === undefined ? null : hexFromId(click, width);
-  const keep =
-    aim === null
-      ? undefined
-      : (hex: HexId): boolean => distance(hexFromId(hex, width), aim) <= strike.gap + WALL_SPREAD;
+// Линия наступления по оси удара на глубину strike.depth и старт; false — строить нечего.
+function startStrike(state: MatchState, army: Army, target: number, strike: Strike): boolean {
   const line = commanderLine(
     state.map,
     { hexes: state.hexes, cities: state.cities },
     strike.edges,
-    target,
+    blocOf(state, army.owner, target),
     strike.depth,
-    keep,
   );
   if (line.length === 0) return false;
   executePlanCommand(state, army.owner, { t: 'setOffensiveLine', armyId: army.id, edges: line });
@@ -287,21 +263,15 @@ function startStrike(
 }
 
 /**
- * Продолжает удар направления до гекса клика: когда очередное наступление кончилось, а клик ещё
- * не взят, строится новая линия от нового фронта. Взят клик или строить нечего — направление
- * переходит в «держать» (игрок) или в покой (ничья земля).
+ * Продолжает наступление направления: когда очередной удар кончился, ИИ заново оценивает
+ * обстановку, выбирает ось от нового фронта и бьёт снова. Строить нечего — направление
+ * переходит в «держать».
  */
 export function continueStrike(state: MatchState, army: Army): void {
   const dir = army.dir;
   if (!dir || dir.mode !== 'attack') return;
-  const aim: DirectionCommand | null =
-    dir.hex !== undefined && state.hexes.owner[dir.hex] !== army.owner
-      ? { target: dir.target, soldiers: army.wanted ?? 1, hex: dir.hex }
-      : null;
-  const strike = aim ? strikeFront(state, army.owner, aim) : null;
-  if (aim && strike && strike.edges.length > 0) {
-    if (startStrike(state, army, dir.target, strike, dir.hex)) return;
-  }
+  const strike = strikeFront(state, army.owner, { target: dir.target, soldiers: army.wanted ?? 1 });
+  if (strike.edges.length > 0 && startStrike(state, army, dir.target, strike)) return;
   army.dir = { target: dir.target, mode: 'hold' };
 }
 
@@ -321,5 +291,5 @@ export function executeLaunch(state: MatchState, playerId: number, cmd: Directio
   if (!ready) return;
   // Ничья земля занимается отрядами без линии наступления; игрок — наступлением по линии.
   if (cmd.target === NEUTRAL_TARGET) expandNeutral(state, ready.army);
-  else startStrike(state, ready.army, cmd.target, ready.strike, cmd.hex);
+  else startStrike(state, ready.army, cmd.target, ready.strike);
 }

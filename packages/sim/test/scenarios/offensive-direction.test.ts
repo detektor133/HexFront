@@ -81,13 +81,29 @@ interface Capture {
   readonly enclave: boolean;
 }
 
+// Ямки: чужой гекс, все соседи-суша которого свои. Эшелон оставляет такие позади, их берут
+// независимо от dt, как анклав.
+function pitsOf(state: S['state']): number[] {
+  const { width, height } = state.map;
+  const out: number[] = [];
+  for (let h = 0; h < state.hexes.owner.length; h += 1) {
+    if (state.hexes.owner[h] === 0 || state.map.terrain[h] === TERRAIN.water) continue;
+    const land = neighbors(hexFromId(h, width))
+      .filter((n) => inBounds(n, width, height))
+      .map((n) => hexId(n, width))
+      .filter((n) => state.map.terrain[n] !== TERRAIN.water);
+    if (land.length > 0 && land.every((n) => state.hexes.owner[n] === 0)) out.push(h);
+  }
+  return out;
+}
+
 // Прогон на ticks тиков с записью захватов: откуда (последний свой гекс отряда) и куда.
 function run(s: S, ticks: number): Capture[] {
   const out: Capture[] = [];
   const origin = new Map<number, number>();
   for (let t = 0; t < ticks; t += 1) {
     const owners = s.state.hexes.owner.slice();
-    const holes = new Set(enclosed(s.state, 0));
+    const holes = new Set([...enclosed(s.state, 0), ...pitsOf(s.state)]);
     for (const u of s.state.units) if (owners[u.hex] === 0) origin.set(u.id, u.hex);
     s.runTicks(1);
     for (const u of s.state.units) {
@@ -244,9 +260,11 @@ describe('наступление только к линии (04/T14b)', () => {
     if (plan?.kind !== 'front' || !plan.offensive) throw new Error('нет линии');
     const dt = lineDistance(s.state, plan.offensive.hexes);
     const facing = new Set(facingHexes(s.state, plan.edges, dt));
+    // Места по отрядам привязаны к линиям; стягивание сил на смотрящие грани видно в весах гексов.
     const onFacing = (active: boolean): number => {
       const p = { ...plan, offensive: { ...plan.offensive, active } } as typeof plan;
-      return [...allocate(s.state, p, 0).slots.values()].filter((h) => facing.has(h)).length;
+      const { weight } = allocate(s.state, p, 0);
+      return [...weight].filter(([h]) => facing.has(h)).reduce((sum, [, w]) => sum + w, 0);
     };
     expect(onFacing(true)).toBeGreaterThan(onFacing(false));
   });

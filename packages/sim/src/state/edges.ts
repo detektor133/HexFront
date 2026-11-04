@@ -173,11 +173,12 @@ export function landEdgePath(g: LineGround, points: readonly EdgeId[]): EdgeId[]
 export function borderSegmentEdges(
   g: LineGround,
   owner: number,
-  enemy: number,
+  enemy: number | ((who: number) => boolean),
   e: EdgeId,
 ): EdgeId[] {
   const s = ownSide(g, owner, e);
-  const facing = (x: EdgeId): boolean => g.hexes.owner[edgeOther(g, x)] === enemy;
+  const isEnemy = typeof enemy === 'number' ? (who: number): boolean => who === enemy : enemy;
+  const facing = (x: EdgeId): boolean => isEnemy(g.hexes.owner[edgeOther(g, x)] as number);
   if (s < 0 || !facing(s)) return [];
   const next = (x: EdgeId): EdgeId[] => borderNeighbors(g, owner, x).filter(facing);
   const comp = new Set<EdgeId>([s]);

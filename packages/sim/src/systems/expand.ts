@@ -1,6 +1,7 @@
 // Занятие ничьей земли направлением (07-controls.md, «Меню страны»): стоящие отряды армии идут
-// занимать пустые ничьи гексы вокруг клика — от границы наружу, по одному гексу на отряд, чтобы
-// земля росла сплошной, без червей; соседний ничей город с гарнизоном — штурмом, если прогноз
+// занимать пустые ничьи гексы волной — от границы наружу, по одному гексу на отряд, чтобы земля
+// росла сплошной, без червей. Приоритет волны выбирает ИИ: ничьи города, затем чужие столицы;
+// клик, если он есть, лишь переносит приоритет в свою точку; соседний ничей город с гарнизоном — штурмом, если прогноз
 // не «Поражение». Армия без плана: фронтом её отряды не управляет никто, кроме этой системы.
 import { EXPAND_RADIUS_BASE, EXPAND_RADIUS_MAX, EXPAND_SOLDIERS_PER_HEX } from '../balance.ts';
 import { releaseDirection } from '../commands/release.ts';
@@ -22,20 +23,30 @@ function around(state: MatchState, hex: HexId): HexId[] {
 }
 
 // Свободные для занятия гексы: ничья суша у клика, примыкающая к своей земле, без отряда на ней.
-function targets(state: MatchState, army: Army, click: HexId, radius: number): HexId[] {
+function targets(state: MatchState, army: Army, focus: HexId[], radius: number): HexId[] {
   const { width } = state.map;
-  const at = hexFromId(click, width);
+  const marks = focus.map((h) => hexFromId(h, width));
+  const away = (h: HexId): number =>
+    marks.length === 0 ? 0 : Math.min(...marks.map((m) => distance(m, hexFromId(h, width))));
   const busy = new Set(allUnits(state).map((u) => u.hex));
   const out: HexId[] = [];
   for (let h = 0; h < state.hexes.owner.length; h += 1) {
     if (state.hexes.owner[h] !== NEUTRAL || state.map.terrain[h] === TERRAIN.water) continue;
-    if (distance(at, hexFromId(h, width)) > radius || busy.has(h)) continue;
+    if (busy.has(h) || (Number.isFinite(radius) && away(h) > radius)) continue;
     if (!around(state, h).some((n) => state.hexes.owner[n] === army.owner)) continue;
     out.push(h);
   }
-  return out.sort(
-    (a, b) => distance(at, hexFromId(a, width)) - distance(at, hexFromId(b, width)) || a - b,
-  );
+  return out.sort((a, b) => away(a) - away(b) || a - b);
+}
+
+// Цели волны: ничьи города, а когда их нет — столицы других игроков.
+function objectives(state: MatchState, army: Army): HexId[] {
+  const free = state.cities.filter((c) => c.owner === NEUTRAL).map((c) => c.hex);
+  if (free.length > 0) return free;
+  return state.players
+    .filter((p) => p.id !== army.owner && p.status === 'alive')
+    .map((p) => state.cities.find((c) => c.id === p.capitalCityId)?.hex)
+    .filter((h): h is HexId => h !== undefined);
 }
 
 function send(state: MatchState, unit: Unit, hex: HexId): boolean {
@@ -55,11 +66,17 @@ function send(state: MatchState, unit: Unit, hex: HexId): boolean {
  */
 export function expandNeutral(state: MatchState, army: Army): void {
   const dir = army.dir;
-  if (!dir || dir.hex === undefined) return;
-  const radius = Math.min(
-    EXPAND_RADIUS_MAX,
-    EXPAND_RADIUS_BASE + intDiv(army.wanted ?? 0, EXPAND_SOLDIERS_PER_HEX),
-  );
+  if (!dir) return;
+  const click = dir.hex;
+  // Без клика ИИ идёт к ближайшей цели волны; с кликом — как раньше, в радиусе от него.
+  const radius =
+    click === undefined
+      ? Number.POSITIVE_INFINITY
+      : Math.min(
+          EXPAND_RADIUS_MAX,
+          EXPAND_RADIUS_BASE + intDiv(army.wanted ?? 0, EXPAND_SOLDIERS_PER_HEX),
+        );
+  const focus = click === undefined ? objectives(state, army) : [click];
   const free = allUnits(state)
     .filter(
       (u) =>
@@ -78,7 +95,7 @@ export function expandNeutral(state: MatchState, army: Army): void {
       .filter((u) => u.armyId === army.id && u.path.length > 0)
       .map((u) => u.path.at(-1) as HexId),
   );
-  const open = targets(state, army, dir.hex, radius).filter((h) => !claimed.has(h));
+  const open = targets(state, army, focus, radius).filter((h) => !claimed.has(h));
   for (const hex of open) {
     const at = hexFromId(hex, width);
     const unit = [...free2]
@@ -96,7 +113,10 @@ export function expandNeutral(state: MatchState, army: Army): void {
   for (const city of state.cities) {
     if (
       city.owner !== NEUTRAL ||
-      distance(hexFromId(city.hex, width), hexFromId(dir.hex, width)) > radius
+      (focus.length > 0 &&
+        Number.isFinite(radius) &&
+        Math.min(...focus.map((m) => distance(hexFromId(city.hex, width), hexFromId(m, width)))) >
+          radius)
     ) {
       continue;
     }
