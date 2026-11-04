@@ -228,6 +228,8 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let previousRoad: Uint8Array | null = null;
   let previousLink: Uint8Array | null = null;
   let previousCityHexes = '';
+  // Дерево рёбер дорог пересобирается только при смене дорог; толщина и пунктир — при каждом зуме.
+  let roadEdges: [number, number][] | null = null;
   const capturesByHex = new Map<number, { readonly started: number; readonly color: string }>();
   const cityFlashes = new Map<number, { readonly started: number; readonly color: string }>();
   let labelsKey = '';
@@ -332,7 +334,8 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     roads.clear();
     const width = (tokens.road.width[level - 1] ?? tokens.road.width[1]) / scale;
     const [dash, gap] = tokens.road.dash;
-    for (const [a, b] of roadTree(map, v)) {
+    roadEdges ??= roadTree(map, v);
+    for (const [a, b] of roadEdges) {
       const owner = roadEdgeOwner(v, a, b);
       dashed(roads, center(a), center(b), dash / scale, gap / scale);
       roads.stroke({
@@ -466,6 +469,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       previousRoad = v.hexes.road.slice();
       previousLink = v.hexes.link.slice();
       previousCityHexes = cityHexes;
+      roadEdges = null;
     }
     return changed;
   };
@@ -485,13 +489,12 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     top,
     territoryLabels,
     update(s, l) {
-      const levelChanged = level !== l;
       scale = s;
       level = l;
       unitLayer.setScale(s);
       territory.setScale(s);
       redraw();
-      if (levelChanged && view) drawRoads(view);
+      if (view) drawRoads(view);
     },
     setView(v, sel) {
       const roads = roadsChanged(v);
