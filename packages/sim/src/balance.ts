@@ -31,6 +31,8 @@ export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
 /** Период экономического решения easy-бота, тиков. */
 export const BOT_EASY_THINK_TICKS = 30;
+/** Первые 5 минут матча боты не объявляют войну: игрок успевает расти, а не отбиваться на старте. */
+export const BOT_WAR_GRACE_TICKS = 3000;
 
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
 

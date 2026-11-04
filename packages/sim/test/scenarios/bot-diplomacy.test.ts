@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { BOT_WAR_GRACE_TICKS } from '../../src/balance.ts';
 import { createBotTickContext } from '../../src/bots/context.ts';
 import { diplomacyCommands } from '../../src/bots/diplomacy.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
@@ -25,8 +26,17 @@ function setup(strong: number, weak: number) {
 }
 
 describe('дипломатия ботов', () => {
+  it('в льготный период бот не объявляет войну', () => {
+    const s = setup(2, 1);
+    expect(diplomacyCommands(s.state, 0, createBotTickContext(s.state))).not.toContainEqual({
+      t: 'declareWar',
+      target: 1,
+    });
+  });
+
   it('сильный сосед объявляет войну слабому, слабый предлагает ему пакт', () => {
     const s = setup(2, 1);
+    s.state.tick = BOT_WAR_GRACE_TICKS;
     const ctx = createBotTickContext(s.state);
     const strongCmds = diplomacyCommands(s.state, 0, ctx);
     expect(strongCmds).toContainEqual({ t: 'declareWar', target: 1 });

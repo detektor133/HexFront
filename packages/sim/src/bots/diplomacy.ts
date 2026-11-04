@@ -3,7 +3,7 @@
 // нет: сравниваются отношения сил в fixed-point (1,0 = равенство). Бот видит только то, что видел
 // бы игрок: соседей — по границе своих гексов.
 import type { BotTickContext } from './context.ts';
-import { BOT_EASY_THINK_TICKS } from '../balance.ts';
+import { BOT_EASY_THINK_TICKS, BOT_WAR_GRACE_TICKS } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import { hexFromId, hexId, inBounds, neighbors } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
@@ -81,7 +81,7 @@ export function diplomacyCommands(
 
   // Война: сильнейшая по соотношению сил цель, с которой я не в войне; разрыв договора дороже —
   // тем дороже, чем больше нарушений у меня уже есть.
-  if (atWarNow.length === 0) {
+  if (atWarNow.length === 0 && state.tick >= BOT_WAR_GRACE_TICKS) {
     const best = all
       .filter((r) => relationOf(state, me, r.id) !== 'war')
       .map((r) => {
