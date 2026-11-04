@@ -1,6 +1,6 @@
 import type { Graphics } from 'pixi.js';
 
-import { BUILDING } from '@hexfront/sim';
+import { BUILDING, depotLevel, isDepot } from '@hexfront/sim';
 
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -51,8 +51,15 @@ export function drawConstructions(
     const buildingAt = { x: glyph.at.x, y: glyph.at.y - hexRadius * 0.35 };
     if (glyph.building === BUILDING.fort) {
       drawFort(g, buildingAt, buildingRadius, glyph.color, scale);
-    } else if (glyph.building === BUILDING.depot) {
+    } else if (isDepot(glyph.building)) {
       drawDepot(g, buildingAt, buildingRadius, glyph.color, scale);
+      // Уровень склада — точки под знаком: две у второго уровня, три у третьего.
+      for (let i = 1; i < depotLevel(glyph.building); i += 1) {
+        const x = buildingAt.x + (i - (depotLevel(glyph.building) - 1) / 2) * buildingRadius * 0.7;
+        g.circle(x, buildingAt.y + buildingRadius * 0.95, buildingRadius * 0.16)
+          .fill(construction.fill)
+          .stroke({ color: glyph.color, width: construction.outline * scale });
+      }
     }
 
     if (glyph.improvement <= 0) continue;

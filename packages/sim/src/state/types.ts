@@ -9,7 +9,11 @@ import type { Fp } from '../math/int.ts';
 export const NEUTRAL = -1;
 
 /** Коды постройки гекса в hexes.building; 0 — нет постройки. */
-export const BUILDING = { none: 0, fort: 1, depot: 2 } as const;
+/**
+ * Постройки гекса. Склад — три уровня: код `depot` (1), `depot2` (2), `depot3` (3); уровень склада
+ * определяет `depotLevel`.
+ */
+export const BUILDING = { none: 0, fort: 1, depot: 2, depot2: 3, depot3: 4 } as const;
 
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
 export interface HexState {
@@ -97,7 +101,8 @@ export interface Recruitment {
   readonly armyId?: number;
 }
 
-export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
+export type ConstructionKind =
+  'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'upgradeDepot' | 'road';
 
 /** Стройка на гексе; одна на гекс. Прогресс — в тиках. */
 export interface Construction {

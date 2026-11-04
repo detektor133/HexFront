@@ -5,6 +5,7 @@ import {
   LOW_SUPPLY_SPEED_MULT,
   MAX_UNITS_PER_HEX,
   MOVE_TIME_S,
+  UNIT_SPEED_MULT,
   RIVER_MOVE_PENALTY_S,
   ROAD_MOVE_MULT,
   SPEED,
@@ -96,7 +97,7 @@ export interface Mover {
 
 /**
  * Время перехода между соседними гексами:
- * MOVE_TIME_S / SPEED × ROAD_MOVE_MULT (оба гекса дорожные) + RIVER_MOVE_PENALTY_S (река на ребре),
+ * MOVE_TIME_S / SPEED / UNIT_SPEED_MULT × ROAD_MOVE_MULT (оба гекса дорожные) + RIVER_MOVE_PENALTY_S (река на ребре),
  * × ZOC_MOVE_MULT (назначение рядом с врагом), ÷ LOW_SUPPLY_SPEED_MULT (снабжение < 50 %).
  * @returns тики, не меньше 1; null — гекс непроходим или не сосед
  */
@@ -104,7 +105,7 @@ export function stepTicks(state: MatchState, m: Mover, from: HexId, to: HexId): 
   const terrain = moveTerrain(state, to);
   const dir = directionTo(state, from, to);
   if (terrain === null || dir < 0) return null;
-  let t = fpDiv(MOVE_TIME_S[terrain], SPEED[m.type][terrain]);
+  let t = fpDiv(fpDiv(MOVE_TIME_S[terrain], SPEED[m.type][terrain]), UNIT_SPEED_MULT);
   const { road } = state.hexes;
   if (road[from] === 1 && road[to] === 1) t = fpMul(t, ROAD_MOVE_MULT);
   if (((state.map.rivers[from] ?? 0) >> dir) & 1) t = (t + RIVER_MOVE_PENALTY_S) as Fp;

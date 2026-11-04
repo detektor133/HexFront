@@ -1,13 +1,18 @@
 // Основная сеть снабжения игрока: узлы (свои гексы с дорогой или городом), связанные со столицей.
 // GDD: docs/gdd/04-roads-supply.md — «Сети снабжения». Кэш и изоляция — networkSystem (02/T7).
+import { isDepot } from './depot.ts';
 import { markNetworkClean, markSupplyDirty, networkNeedsRecompute } from './derived-cache.ts';
 import type { MatchState } from './types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 
-/** Является ли гекс узлом сети игрока: свой и с дорогой или городом. */
+/** Является ли гекс узлом сети игрока: свой и с дорогой, городом или складом. */
 export function isNetworkNode(state: MatchState, playerId: number, hex: HexId): boolean {
   if (state.hexes.owner[hex] !== playerId) return false;
-  return state.hexes.road[hex] === 1 || state.cities.some((c) => c.hex === hex);
+  return (
+    state.hexes.road[hex] === 1 ||
+    isDepot(state.hexes.building[hex] ?? 0) ||
+    state.cities.some((c) => c.hex === hex)
+  );
 }
 
 /**

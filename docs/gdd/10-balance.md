@@ -43,6 +43,9 @@
 | `RIVER_MOVE_PENALTY_S` | 1,0 |
 | `RIVER_ATTACK_MULT` | 0,7 |
 | `ROAD_MOVE_MULT` | 0,5 |
+| `DEPOT_SUPPLY` | 120 / 240 / 400 (уровни 1–3) `[ТЮНИНГ]` |
+| `DEPOT_UPGRADE_COST` / `_TIME_S` | 120 / 20 с (1→2); 220 / 30 с (2→3) `[ТЮНИНГ]` |
+| `UNIT_SPEED_MULT` | 1,5 `[ТЮНИНГ]` (время шага отряда делится на множитель) |
 | `ZOC_MOVE_MULT` | 2,0 |
 | `FERTILE_CAP_MULT` | 1,5 |
 | `MINE_GOLD_PER_S` | 1,0 |
@@ -193,6 +196,7 @@
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_MAX` | 10 `[ТЮНИНГ]` |
+| `EXPAND_MOUNTAIN_PENALTY` | 8 `[ТЮНИНГ]` |
 | `MERGE_SMALL_TINY` | 25 `[ТЮНИНГ]` |
 | `MERGE_SMALL_BELOW` | 150 `[ТЮНИНГ]` |
 | `CONSOLIDATE_CROWD` | 12 `[ТЮНИНГ]` |

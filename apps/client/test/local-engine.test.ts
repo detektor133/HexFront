@@ -157,14 +157,18 @@ describe('локальный режим', () => {
     expect(rejected.view.recruits).toHaveLength(1);
   });
 
-  it('у человека по умолчанию нет автокомандования: его армии ведёт только он сам', () => {
+  it('у человека нет автокомандования, но стартовые отряды сразу идут занимать ничью землю', () => {
     const e = engine();
     expect(e.state.players[HUMAN_ID]?.autoCommand).toBe(false);
     expect(e.state.armies.filter((a) => a.owner === HUMAN_ID).every((a) => !a.auto)).toBe(true);
     const owned = (): number => e.state.hexes.owner.filter((o) => o === HUMAN_ID).length;
     const before = owned();
+    e.tick();
+    // Стартовая армия получила приказ занимать ничью землю: приказ ведёт ИИ направления, не commander.
+    const army = e.state.armies.find((a) => a.owner === HUMAN_ID && a.dir?.target === -1);
+    expect(army?.dir?.mode).toBe('attack');
     for (let i = 0; i < 300; i += 1) e.tick();
-    expect(owned()).toBe(before);
+    expect(owned()).toBeGreaterThan(before);
   });
 
   it('армии с auto всех игроков ведёт commander; ручной приказ отряду auto не выключает (CR-006)', () => {

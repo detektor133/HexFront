@@ -22,7 +22,7 @@ describe('захват пустых гексов', () => {
     s.setPop(at(2, 1), 20);
     const id = s.unit('A', 'infantry', 1, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
-    s.runTicks(19);
+    s.runTicks(12);
     expect(s.owner(at(2, 1))).toBeNull();
     s.runTicks(1);
     expect(s.owner(at(2, 1))).toBe('A');

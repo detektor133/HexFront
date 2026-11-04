@@ -6,6 +6,7 @@ export * from './map/types.ts';
 export * from './map/codec.ts';
 export * from './map/load.ts';
 export * from './map/validate.ts';
+export * from './state/depot.ts';
 export * from './state/types.ts';
 export * from './state/pop-cap.ts';
 export * from './state/create-match.ts';

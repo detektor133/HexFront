@@ -44,7 +44,13 @@ function ActionButton(props: {
   const reasonId = useId();
   // Что даёт постройка — во всплывающей подсказке, не текстом в карточке (04/T16).
   const hint =
-    a.kind === 'fort' ? t('action.fortHint') : a.kind === 'depot' ? t('action.depotHint') : null;
+    a.kind === 'fort'
+      ? t('action.fortHint')
+      : a.kind === 'depot'
+        ? t('action.depotHint')
+        : a.kind === 'depotUpgrade'
+          ? t('action.depotUpgradeHint')
+          : null;
   const preview = a.kind === 'rebuild' ? a.previewPath : undefined;
   const label = t(`action.${a.kind}` as MessageKey);
   const compact = props.compact === true;
@@ -113,6 +119,7 @@ function ActionButton(props: {
 const ACTION_ICONS = {
   rebuild: IconRoute2,
   depot: IconPackage,
+  depotUpgrade: IconPackage,
   fort: IconShield,
   foundCity: IconBuildingCastle,
   upgrade: IconChevronsUp,

@@ -2,6 +2,7 @@
 // GDD: docs/gdd/03-cities-buildings.md
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
+import { depotBuilding, depotLevel } from '../state/depot.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
@@ -45,6 +46,14 @@ function complete(state: MatchState, c: Construction): void {
       return;
     case 'depot':
       hexes.building[c.hex] = BUILDING.depot;
+      state.supplyRevision += 1;
+      markSupplyDirty(state, c.owner);
+      markNetworkDirty(state, c.owner);
+      // Склад сам просит дорогу к основной сети, как город: иначе он изолирован.
+      queueAutoRoad(state, c.owner, c.hex, true);
+      return;
+    case 'upgradeDepot':
+      hexes.building[c.hex] = depotBuilding(depotLevel(hexes.building[c.hex] ?? 0) + 1);
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       return;

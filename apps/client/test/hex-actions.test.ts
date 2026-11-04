@@ -27,6 +27,7 @@ const plain = (checks: Partial<Selection> = {}): Selection => ({
   improve: ok(20_000),
   fort: noGold(60_000),
   depot: rule('depotTooClose'),
+  building: 0,
   rebuild: null,
   recruit: [],
   ...checks,

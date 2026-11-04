@@ -12,9 +12,10 @@ import {
   OFFENSIVE_FACING_WEIGHT,
 } from '../balance.ts';
 import { attachUnits, lineRuns } from './attach.ts';
+import { isDepot } from './depot.ts';
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
-import { BUILDING, type ArmyPlan, type MatchState, type Unit } from './types.ts';
+import { type ArmyPlan, type MatchState, type Unit } from './types.ts';
 import { allUnits } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -56,7 +57,7 @@ function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<
     let weight: number = FP + intDiv(enemy, THREAT_SOLDIERS);
     const city = state.cities.find((c) => c.hex === h);
     if (city) weight += city.id === capitalId ? FRONT_WEIGHT_CAPITAL : FRONT_WEIGHT_CITY;
-    if (state.hexes.building[h] === BUILDING.depot) weight += FRONT_WEIGHT_DEPOT;
+    if (isDepot(state.hexes.building[h] ?? 0)) weight += FRONT_WEIGHT_DEPOT;
     const hostileSides = near.filter((n) => {
       const o = state.hexes.owner[n] ?? -1;
       return o >= 0 && o !== owner && atWar(state, owner, o);

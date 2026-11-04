@@ -4,6 +4,9 @@
 // клик, если он есть, лишь переносит приоритет в свою точку; соседний ничей город с гарнизоном — штурмом, если прогноз
 // не «Поражение». Армия без плана: фронтом её отряды не управляет никто, кроме этой системы.
 import {
+  ASSAULT_MAX_UNITS,
+  ASSAULT_REACH,
+  EXPAND_MOUNTAIN_PENALTY,
   EXPAND_RADIUS_BASE,
   EXPAND_RADIUS_MAX,
   EXPAND_SOLDIERS_PER_HEX,
@@ -13,7 +16,7 @@ import {
   SWARM_SAFE,
 } from '../balance.ts';
 import { releaseDirection } from '../commands/release.ts';
-import { splitUnit } from '../commands/unit.ts';
+import { executeUnitCommand, splitUnit, validateUnitCommand } from '../commands/unit.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { intDiv, type Fp } from '../math/int.ts';
@@ -37,7 +40,9 @@ function targets(state: MatchState, army: Army, focus: HexId[], radius: number):
   const marks = focus.map((h) => hexFromId(h, width));
   const away = (h: HexId): number =>
     marks.length === 0 ? 0 : Math.min(...marks.map((m) => distance(m, hexFromId(h, width))));
-  const busy = new Set(allUnits(state).map((u) => u.hex));
+  // Гексы городов — не цель занятия: ничей город берёт только `storm`, когда сил хватает, иначе
+  // одиночка шла бы в город пешком и гибла у стен.
+  const busy = new Set([...allUnits(state).map((u) => u.hex), ...state.cities.map((c) => c.hex)]);
   const out: HexId[] = [];
   for (let h = 0; h < state.hexes.owner.length; h += 1) {
     if (state.hexes.owner[h] !== NEUTRAL || state.map.terrain[h] === TERRAIN.water) continue;
@@ -45,7 +50,10 @@ function targets(state: MatchState, army: Army, focus: HexId[], radius: number):
     if (!around(state, h).some((n) => state.hexes.owner[n] === army.owner)) continue;
     out.push(h);
   }
-  return out.sort((a, b) => away(a) - away(b) || a - b);
+  // Горы — в последнюю очередь: медленно, снабжение хуже, отряды там гибнут у стен городов.
+  const cost = (h: HexId): number =>
+    away(h) + (state.map.terrain[h] === TERRAIN.mountains ? EXPAND_MOUNTAIN_PENALTY : 0);
+  return out.sort((a, b) => cost(a) - cost(b) || a - b);
 }
 
 // Цели волны: ничьи города, а когда их нет — столицы других игроков.
@@ -111,6 +119,53 @@ function swarm(state: MatchState, army: Army, free: Unit[], open: readonly HexId
   }
 }
 
+// Штурм ничьих городов: только когда сил хватит — по прогнозу боя «победа» либо одним отрядом, либо
+// группой ближайших отрядов (до ASSAULT_MAX_UNITS). Отряд, которому город не по силам, не лезет в
+// него поодиночке (и не гибнет, например, в горах у стен), а продолжает занимать землю.
+function storm(
+  state: MatchState,
+  army: Army,
+  free: readonly Unit[],
+  idle: Set<number>,
+  focus: readonly HexId[],
+  radius: number,
+): void {
+  const { width } = state.map;
+  const at = (h: HexId) => hexFromId(h, width);
+  const underAssault = new Set(
+    allUnits(state)
+      .filter((u) => u.armyId === army.id)
+      .map((u) => (u.order === 'attack' ? u.target : (u.path.at(-1) ?? -1))),
+  );
+  for (const city of state.cities) {
+    if (city.owner !== NEUTRAL || underAssault.has(city.hex)) continue;
+    if (
+      focus.length > 0 &&
+      Number.isFinite(radius) &&
+      Math.min(...focus.map((m) => distance(at(city.hex), at(m)))) > radius
+    ) {
+      continue;
+    }
+    const pool = free
+      .filter((u) => idle.has(u.id) && distance(at(u.hex), at(city.hex)) <= ASSAULT_REACH)
+      .sort(
+        (a, b) =>
+          distance(at(a.hex), at(city.hex)) - distance(at(b.hex), at(city.hex)) || a.id - b.id,
+      );
+    const force: Unit[] = [];
+    for (const unit of pool.slice(0, ASSAULT_MAX_UNITS)) {
+      force.push(unit);
+      if (forecastInState(state, force, city.hex).outcome !== 'victory') continue;
+      const cmd = { t: 'attack', unitIds: force.map((u) => u.id), target: city.hex } as const;
+      if (validateUnitCommand(state, army.owner, cmd).ok) {
+        executeUnitCommand(state, army.owner, cmd);
+        for (const u of force) idle.delete(u.id);
+      }
+      break;
+    }
+  }
+}
+
 /**
  * Один шаг занятия: простаивающие отряды армии получают ближайшие к клику свободные гексы;
  * когда занимать больше нечего, направление уходит в покой.
@@ -156,6 +211,7 @@ export function expandNeutral(state: MatchState, army: Army): void {
   const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
   const claimed = claimedHexes();
   const open = targets(state, army, focus, radius).filter((h) => !claimed.has(h));
+  storm(state, army, free, free2, focus, radius);
   for (const hex of open) {
     const at = hexFromId(hex, width);
     const unit = [...free2]
@@ -168,27 +224,6 @@ export function expandNeutral(state: MatchState, army: Army): void {
       )[0];
     if (!unit) break;
     if (send(state, unit, hex)) free2.delete(unit.id);
-  }
-  // Ничей город у занятой земли берут штурмом, когда рядом стоит отряд и прогноз не «Поражение».
-  for (const city of state.cities) {
-    if (
-      city.owner !== NEUTRAL ||
-      (focus.length > 0 &&
-        Number.isFinite(radius) &&
-        Math.min(...focus.map((m) => distance(hexFromId(city.hex, width), hexFromId(m, width)))) >
-          radius)
-    ) {
-      continue;
-    }
-    const near = around(state, city.hex);
-    const unit = free
-      .filter((u) => free2.has(u.id) && near.includes(u.hex))
-      .find((u) => forecastInState(state, [u], city.hex).outcome !== 'defeat');
-    if (!unit) continue;
-    unit.order = 'attack';
-    unit.target = city.hex;
-    unit.slot = -1;
-    free2.delete(unit.id);
   }
   const finished = open.length === 0 && !moving && free2.size === free.length;
   // Занять больше нечего: армия расформировывается, отряды уходят в резерв — их возьмёт другое

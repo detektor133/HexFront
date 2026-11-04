@@ -44,18 +44,18 @@ function ticksToArrive(
 }
 
 describe('движение: время перехода', () => {
-  it('пехота по равнине — 2 с на гекс', () => {
+  it('пехота по равнине — 2 / 1,5 с на гекс (множитель скорости)', () => {
     const s = scenario(LINE, { legend });
     const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
-    expect(ticksToArrive(s, id, at(2, 1))).toBe(20);
+    expect(ticksToArrive(s, id, at(2, 1))).toBe(13);
   });
 
-  it('бронетехника по равнине — 2 / 1,6 = 1,25 с (12 тиков)', () => {
+  it('бронетехника по равнине — 2 / 1,6 = 1,25 с (8 тиков с множителем скорости 1,5)', () => {
     const s = scenario(LINE, { legend });
     const id = s.unit('A', 'armor', 100, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
-    expect(ticksToArrive(s, id, at(2, 1))).toBe(12);
+    expect(ticksToArrive(s, id, at(2, 1))).toBe(8);
   });
 
   it('пехота в лес — 3 / 0,7 ≈ 4,28 с (42 тика), в горы — 5 / 0,5 = 10 с', () => {
@@ -68,9 +68,9 @@ describe('движение: время перехода', () => {
     // Столица рядом — снабжение выше 50 %, скорость без штрафа.
     const id = s.unit('A', 'infantry', 100, at(1, 0));
     s.cmd('A', move([id], at(2, 0)));
-    expect(ticksToArrive(s, id, at(2, 0))).toBe(42);
+    expect(ticksToArrive(s, id, at(2, 0))).toBe(28);
     s.cmd('A', move([id], at(3, 0)));
-    expect(ticksToArrive(s, id, at(3, 0))).toBe(100);
+    expect(ticksToArrive(s, id, at(3, 0))).toBe(66);
   });
 
   it('дорога ×0,5, если оба гекса дорожные — по любым дорогам, и по чужим', () => {
@@ -82,9 +82,9 @@ describe('движение: время перехода', () => {
     );
     const id = s.unit('A', 'infantry', 100, at(1, 0));
     s.cmd('A', move([id], at(2, 0)));
-    expect(ticksToArrive(s, id, at(2, 0))).toBe(10);
+    expect(ticksToArrive(s, id, at(2, 0))).toBe(6);
     s.cmd('A', move([id], at(3, 0)));
-    expect(ticksToArrive(s, id, at(3, 0))).toBe(10);
+    expect(ticksToArrive(s, id, at(3, 0))).toBe(6);
   });
 
   it('переход через реку +1 с', () => {
@@ -93,7 +93,7 @@ describe('движение: время перехода', () => {
     // Направление 0 (SE) из (1,1) нечётного столбца ведёт в (2,1).
     s.river(at(1, 1), 0);
     s.cmd('A', move([id], at(2, 1)));
-    expect(ticksToArrive(s, id, at(2, 1))).toBe(30);
+    expect(ticksToArrive(s, id, at(2, 1))).toBe(23);
   });
 
   it('зона контроля: гекс-назначение рядом с вражеским отрядом — время ×2', () => {
@@ -101,7 +101,7 @@ describe('движение: время перехода', () => {
     const id = s.unit('A', 'infantry', 100, at(4, 1));
     s.unit('B', 'infantry', 100, at(6, 1));
     s.cmd('A', move([id], at(5, 1)));
-    expect(ticksToArrive(s, id, at(5, 1))).toBe(40);
+    expect(ticksToArrive(s, id, at(5, 1))).toBe(26);
   });
 
   it('снабжение ниже 50 % — скорость ×0,75 (2 / 0,75 ≈ 2,67 с)', () => {
@@ -109,7 +109,7 @@ describe('движение: время перехода', () => {
     // Столица даёт 500 на 2000 пехоты: R = 25 %, × 0,88 за гекс от города ≈ 22 %.
     const id = s.unit('A', 'infantry', 2000, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
-    expect(ticksToArrive(s, id, at(2, 1))).toBe(26);
+    expect(ticksToArrive(s, id, at(2, 1))).toBe(17);
   });
 
   it('несколько гексов подряд: путь идёт гекс за гексом, в конце приказ idle', () => {
@@ -119,9 +119,9 @@ describe('движение: время перехода', () => {
     s.runTicks(1);
     expect(s.unitById(id)?.order).toBe('move');
     // В пути отряд числится в старом гексе, пока переход не завершён.
-    s.runTicks(18);
+    s.runTicks(11);
     expect(s.unitById(id)?.hex).toBe(idOf(s, at(1, 1)));
-    expect(ticksToArrive(s, id, at(5, 1))).toBe(80 - 19);
+    expect(ticksToArrive(s, id, at(5, 1))).toBe(52 - 12);
     expect(s.unitById(id)?.order).toBe('idle');
     expect(s.unitById(id)?.path).toEqual([]);
   });

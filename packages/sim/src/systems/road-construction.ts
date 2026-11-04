@@ -4,9 +4,10 @@ import { ROAD_BUILD_S_PER_HEX, TICKS_PER_S } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 import { findRoadPath } from '../queries/road-path.ts';
+import { isDepot } from '../state/depot.ts';
 import { markNetworkDirty } from '../state/derived-cache.ts';
 import { mainNetworkMask } from '../state/network.ts';
-import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
+import { type Construction, type MatchState } from '../state/types.ts';
 
 /** Тиков на один гекс дороги. */
 export const ROAD_TICKS_PER_HEX = intDiv(ROAD_BUILD_S_PER_HEX * TICKS_PER_S, FP);
@@ -37,13 +38,21 @@ export function queueRoad(
  * Авто-дорога нового города: кратчайший путь по своей земле до ближайшего города основной сети.
  * Нет пути — город остаётся изолированным.
  */
-export function queueAutoRoad(state: MatchState, owner: number, cityHex: HexId): void {
+export function queueAutoRoad(
+  state: MatchState,
+  owner: number,
+  cityHex: HexId,
+  toAnyNode = false,
+): void {
   const mask = mainNetworkMask(state, owner);
   if (mask[cityHex] === 1) return;
   const mainCities = new Set(
     state.cities.filter((c) => c.owner === owner && mask[c.hex] === 1).map((c) => c.hex),
   );
-  const path = findRoadPath(state, owner, cityHex, (h) => mainCities.has(h));
+  // Склад тянется к любому узлу основной сети (город, дорога, другой склад), город — к городу.
+  const path = findRoadPath(state, owner, cityHex, (h) =>
+    toAnyNode ? mask[h] === 1 : mainCities.has(h),
+  );
   if (path) queueRoad(state, owner, cityHex, path);
 }
 
@@ -52,7 +61,7 @@ export function roadLost(state: MatchState, c: Construction): boolean {
   const built = intDiv(c.progressTicks, ROAD_TICKS_PER_HEX);
   const targetLost =
     !state.cities.some((city) => city.hex === c.hex && city.owner === c.owner) &&
-    !(state.hexes.building[c.hex] === BUILDING.depot && state.hexes.owner[c.hex] === c.owner);
+    !(isDepot(state.hexes.building[c.hex] ?? 0) && state.hexes.owner[c.hex] === c.owner);
   return targetLost || (c.path ?? []).slice(built).some((h) => state.hexes.owner[h] !== c.owner);
 }
 

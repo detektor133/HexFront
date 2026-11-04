@@ -4,6 +4,7 @@ import {
   BANKRUPT_SUPPLY_MULT,
   CAPITAL_SUPPLY_BONUS,
   CITY_SUPPLY_PER_LEVEL,
+  DEPOT_SUPPLY,
   DEPOT_LOSS_MULT,
   DEPOT_RADIUS,
   ISOLATED_SUPPLY_MULT,
@@ -11,9 +12,10 @@ import {
   SUPPLY_PER_SOLDIER,
 } from '../balance.ts';
 import { cityOutputMult } from './city-output.ts';
+import { depotLevel, isDepot } from './depot.ts';
 import { supplyRevision } from './derived-cache.ts';
 import { isCityIsolated } from './network.ts';
-import { BUILDING, type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
+import { type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
 import { allUnits } from './unit-index.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
@@ -58,7 +60,7 @@ function lossMap(state: MatchState, owner: number): Int32Array {
   const { width, height, terrain } = state.map;
   const nearDepot = new Uint8Array(width * height);
   state.hexes.building.forEach((b, id) => {
-    if (b !== BUILDING.depot || state.hexes.owner[id] !== owner) return;
+    if (!isDepot(b) || state.hexes.owner[id] !== owner) return;
     for (const h of spiral(hexFromId(id, width), DEPOT_RADIUS)) {
       if (inBounds(h, width, height)) nearDepot[hexId(h, width)] = 1;
     }
@@ -145,6 +147,15 @@ function ratios(
         produced += citySupply(state, c);
       }
     }
+    // Склады производят снабжение сами: чем больше складов у фронта, тем большая армия кормится;
+    // у изолированной сети — вдвое меньше, как у городов.
+    state.hexes.building.forEach((b, hex) => {
+      const level = depotLevel(b);
+      if (level === 0 || state.hexes.owner[hex] !== net.owner) return;
+      if (state.hexes.network[hex] !== net.id) return;
+      const own = DEPOT_SUPPLY[level - 1] ?? 0;
+      produced += net.isMain ? own : fpMul(own as Fp, ISOLATED_SUPPLY_MULT);
+    });
     const d = demand.get(net.id) ?? 0;
     result.set(net.id, (d === 0 ? FP : Math.min(FP, fpDiv(produced as Fp, d as Fp))) as Fp);
   }

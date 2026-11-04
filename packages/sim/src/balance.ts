@@ -159,6 +159,11 @@ export const DEPOT_RADIUS = 3;
 /** Минимальная дистанция до любого склада или города, гексов. */
 export const DEPOT_MIN_DISTANCE = 3;
 export const DEPOT_LOSS_MULT: Fp = fp(0.5);
+/** Снабжение, которое производит склад уровня 1–3 (единиц; 1 единица кормит солдата пехоты). */
+export const DEPOT_SUPPLY: readonly Fp[] = [fp(120), fp(240), fp(400)];
+/** Улучшение склада с уровня 1 и 2: цена, золото; время, секунды. */
+export const DEPOT_UPGRADE_COST: readonly Fp[] = [fp(120), fp(220)];
+export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30)];
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */
@@ -199,6 +204,8 @@ export const UPKEEP_GOLD_PER_UNIT_S: ByUnit<Fp> = {
 };
 export const ATK: ByUnit<Fp> = { infantry: fp(1.0), armor: fp(2.0), artillery: fp(0) };
 export const DEF: ByUnit<Fp> = { infantry: fp(1.2), armor: fp(0.9), artillery: fp(0.6) };
+/** Общий множитель скорости всех отрядов: время шага делится на него (игре нужны быстрые отряды). */
+export const UNIT_SPEED_MULT: Fp = fp(1.5);
 /** Скорость по местности; в таблице forest и hills — одна колонка. */
 export const SPEED: ByUnit<ByTerrain<Fp>> = {
   infantry: {
@@ -237,6 +244,8 @@ export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);
 export const EXPAND_RADIUS_BASE = 3;
 export const EXPAND_SOLDIERS_PER_HEX = 100;
 export const EXPAND_RADIUS_MAX = 10;
+/** Горный гекс при занятии «дальше» на столько гексов: сначала равнины, горы в последнюю очередь. */
+export const EXPAND_MOUNTAIN_PENALTY = 8;
 /** Слияние мелочи: отряд меньше порога стягивается к ближайшему своему в радиусе, раз в период. */
 export const MERGE_SMALL_TINY: Fp = fp(25);
 /** В «толпе» с излишком отрядов над гексами линии мелочью считается всё, что меньше этого. */

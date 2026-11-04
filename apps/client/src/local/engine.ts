@@ -11,13 +11,14 @@ import {
   RECRUIT_MIN,
   RECRUIT_STEP,
   fpDiv,
+  FP,
   recruitCapacity,
   cityPopCap,
   hexPopCap,
   botCommands,
   cityInfo,
   rebuildSupplyPlan,
-  BUILDING,
+  isDepot,
   commanderCommands,
   createMatch,
   createBotTickContext,
@@ -85,9 +86,10 @@ function selectionOf(state: MatchState, hex: number): Selection {
     improve: checkConstruction(state, HUMAN_ID, { t: 'improve', hex }),
     fort: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'fort' }),
     depot: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'depot' }),
+    building: state.hexes.building[hex] ?? 0,
     rebuild:
       info?.rebuild ??
-      (state.hexes.building[hex] === BUILDING.depot
+      (isDepot(state.hexes.building[hex] ?? 0)
         ? rebuildSupplyPlan(state, HUMAN_ID, { hex })
         : null),
     recruit: city?.owner === HUMAN_ID ? recruitOptions(state, city.id) : [],
@@ -124,6 +126,16 @@ export function createLocalEngine(
     for (const army of state.armies) if (army.owner === HUMAN_ID) army.auto = false;
   }
   let pending: Command[] = [];
+  // Стартовые отряды человека сразу в армии с приказом занимать ничью землю (ИИ раскидывает их роем),
+  // а не стоят без дела, пока игрок не откроет меню.
+  if (!bots.includes(HUMAN_ID)) {
+    const soldiers = state.units
+      .filter((u) => u.owner === HUMAN_ID)
+      .reduce((sum, u) => sum + u.soldiers, 0);
+    if (soldiers > 0) {
+      pending.push({ t: 'launchOffensive', target: -1, soldiers: Math.ceil(soldiers / FP) });
+    }
+  }
   let selected: number | null = null;
   let observerId: number | null = null;
   let pendingEvents: MatchState['events'] = [];

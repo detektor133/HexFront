@@ -10,6 +10,8 @@ import {
   CITY_UPGRADE_TIME_S,
   DEPOT_COST,
   DEPOT_MIN_DISTANCE,
+  DEPOT_UPGRADE_COST,
+  DEPOT_UPGRADE_TIME_S,
   DEPOT_TIME_S,
   FORT_COST,
   FORT_TIME_S,
@@ -20,6 +22,7 @@ import {
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import { distance, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { depotLevel, isDepot } from '../state/depot.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
 import { BUILDING, type ConstructionKind, type MatchState } from '../state/types.ts';
 
@@ -97,7 +100,7 @@ function tooCloseToDepot(state: MatchState, playerId: number, hex: HexId): boole
       if (!inBounds(near, width, height)) continue;
       const site = hexId(near, width);
       const own = state.hexes.owner[site] === playerId;
-      if (site !== hex && own && state.hexes.building[site] === BUILDING.depot) return true;
+      if (site !== hex && own && isDepot(state.hexes.building[site] ?? 0)) return true;
     }
   }
   return false;
@@ -149,6 +152,14 @@ function planBuild(
 ): PlanResult {
   const base = ownFreeHex(state, playerId, hex);
   if (base) return fail(base);
+  // Склад на гексе со складом — улучшение до следующего уровня.
+  const level = depotLevel(state.hexes.building[hex] ?? 0);
+  if (kind === 'depot' && level > 0) {
+    const cost = DEPOT_UPGRADE_COST[level - 1];
+    const timeS = DEPOT_UPGRADE_TIME_S[level - 1];
+    if (cost === undefined || timeS === undefined) return fail('maxLevel');
+    return plan({ kind: 'upgradeDepot', hex, cost, timeS });
+  }
   if (state.hexes.building[hex] !== BUILDING.none) return fail('buildingExists');
   if (kind === 'fort') {
     // У города своя оборона ×1,3, укрепление в нём не ставится.

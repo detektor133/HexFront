@@ -5,8 +5,9 @@ import { OK, rejected, type RejectReason, type Validation } from './types.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import { findRoadPath } from '../queries/road-path.ts';
+import { isDepot } from '../state/depot.ts';
 import { isCityIsolated, mainNetworkMask } from '../state/network.ts';
-import { BUILDING, type MatchState } from '../state/types.ts';
+import { type MatchState } from '../state/types.ts';
 import { queueRoad } from '../systems/road-construction.ts';
 
 /** План перестройки: путь от изолированного объекта до узла основной сети и цена. */
@@ -55,7 +56,7 @@ export function rebuildSupplyPlan(
       normalized.hex < 0 ||
       normalized.hex >= state.hexes.owner.length ||
       state.hexes.owner[normalized.hex] !== playerId ||
-      state.hexes.building[normalized.hex] !== BUILDING.depot
+      !isDepot(state.hexes.building[normalized.hex] ?? 0)
     ) {
       return fail('unknownDepot');
     }

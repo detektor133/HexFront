@@ -38,6 +38,8 @@ export interface Selection {
   readonly improve: ConstructionCheck;
   readonly fort: ConstructionCheck;
   readonly depot: ConstructionCheck;
+  /** Код постройки на гексе (`BUILDING`): склад любого уровня — улучшение вместо постройки. */
+  readonly building: number;
   /** План дороги для изолированного склада; для города используется `city.rebuild`. */
   readonly rebuild: RebuildPlan | null;
   /** Набор — только в своём городе; иначе пусто. */
