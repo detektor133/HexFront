@@ -11,3 +11,30 @@ body {
   font-family: var(--font-ui-family);
   font-size: var(--font-size-body);
 }
+
+/* Сенсорный экран: без выделения текста, подсветки нажатия, меню удержания и «обновить жестом». */
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+body {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+body :not(input, textarea, select) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Цель нажатия пальцем — не меньше 44 px (HIG и Material). */
+@media (pointer: coarse) {
+  button,
+  [role='button'] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

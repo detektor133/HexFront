@@ -131,12 +131,16 @@ export async function createMapView(
 ): Promise<MapView> {
   let opts = initial;
   const app = new Application();
+  // Телефон: разрешение не выше 2 и без MSAA — шейдеры карты сглаживают края сами, а лишние
+  // пиксели на слабом GPU дороже всего.
+  const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
   await app.init({
     background: tokens.map.water,
     resizeTo: host,
-    antialias: true,
+    antialias: !touch,
     autoDensity: true,
-    resolution: window.devicePixelRatio,
+    resolution: touch ? Math.min(2, window.devicePixelRatio) : window.devicePixelRatio,
+    powerPreference: 'high-performance',
   });
   host.appendChild(app.canvas);
   const selectionFrame = host.ownerDocument?.createElement('div');

@@ -9,6 +9,7 @@
   width: max-content;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - var(--dock-h, 0px) - var(--space-md) - var(--space-md));
+  max-height: calc(100dvh - var(--dock-h, 0px) - var(--space-md) - var(--space-md));
   overflow-y: auto;
   scrollbar-width: none;
   padding: var(--space-md);
