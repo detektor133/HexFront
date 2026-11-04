@@ -44,15 +44,40 @@ uniform vec2 uFog;
 uniform float uMode;
 
 const float SQRT3 = 1.7320508;
+const float GLOW_PX = 14.0;
+const float GLOW_MIX = 0.25;
+const float GLOW_ALPHA = 0.18;
+const float FEATHER_PX = 16.0;
+const float FOG_VEIL = 0.10;
+const ivec2 DIRS[6] = ivec2[6](ivec2(1, 0), ivec2(1, -1), ivec2(0, -1), ivec2(-1, 0), ivec2(-1, 1), ivec2(0, 1));
+
+ivec2 toOffset(ivec2 ax) {
+  return ivec2(ax.x, ax.y + (ax.x + (ax.x & 1)) / 2);
+}
+
+bool inMap(ivec2 o) {
+  return o.x >= 0 && o.y >= 0 && o.x < int(uMap.x) && o.y < int(uMap.y);
+}
 
 int ownerAt(ivec2 ax) {
-  ivec2 o = ivec2(ax.x, ax.y + (ax.x + (ax.x & 1)) / 2);
-  if (o.x < 0 || o.y < 0 || o.x >= int(uMap.x) || o.y >= int(uMap.y)) return 0;
+  ivec2 o = toOffset(ax);
+  if (!inMap(o)) return 0;
   return int(texelFetch(uData, o, 0).r * 255.0 + 0.5);
+}
+
+bool visibleAt(ivec2 ax) {
+  ivec2 o = toOffset(ax);
+  return inMap(o) && texelFetch(uData, o, 0).g > 0.5;
 }
 
 vec4 palette(int owner, float row) {
   return texelFetch(uPalette, ivec2(owner, int(row)), 0);
+}
+
+// Расстояние внутрь гекса от грани d: 0 на грани, апофема в центре.
+float edgeDist(vec2 p, int d, float apothem) {
+  float ang = radians(30.0 - 60.0 * float(d));
+  return apothem - dot(p, vec2(cos(ang), sin(ang)));
 }
 
 void main() {
@@ -68,40 +93,70 @@ void main() {
   if (dq > dr && dq > ds) rq = -rr - rs;
   else if (dr > ds) rr = -rq - rs;
   ivec2 ax = ivec2(int(rq), int(rr));
-  ivec2 off = ivec2(ax.x, ax.y + (ax.x + (ax.x & 1)) / 2);
-  if (off.x < 0 || off.y < 0 || off.x >= int(uMap.x) || off.y >= int(uMap.y)) discard;
+  ivec2 off = toOffset(ax);
+  if (!inMap(off)) discard;
   vec4 cell = texelFetch(uData, off, 0);
   int owner = int(cell.r * 255.0 + 0.5);
   vec2 p = vWorld - vec2(uR * 1.5 * rq, uR * SQRT3 * (rr + rq * 0.5));
+  float apothem = uR * SQRT3 * 0.5;
 
   if (uMode < 0.5) {
     if (owner == 0) discard;
+    float glowW = min(uPx * GLOW_PX, apothem);
+    float glow = 0.0;
+    float cover = 1.0;
+    float hexDist = 0.0;
+    for (int d = 0; d < 6; d++) {
+      float dist = edgeDist(p, d, apothem);
+      hexDist = max(hexDist, 1.0 - dist / apothem);
+      if (dist > glowW) continue;
+      int n = ownerAt(ax + DIRS[d]);
+      if (n == owner) continue;
+      float t = 1.0 - dist / glowW;
+      glow = max(glow, t * t);
+      if (n == 0) cover = min(cover, clamp(dist / uPx + 0.5, 0.0, 1.0));
+    }
     float a = float(owner) == uMe ? uAlpha.x : uAlpha.y;
     vec3 c = palette(owner, 0.0).rgb;
+    vec3 line = palette(owner, 1.0).rgb;
+    c = mix(c, line, glow * GLOW_MIX);
+    a = mix(a, min(1.0, a + GLOW_ALPHA), glow);
+    // Захват: цвет нового владельца заливает гекс от центра к краям, затухая (B — остаток эффекта).
+    float fade = cell.b;
+    if (fade > 0.0 && hexDist <= 1.0 - fade) {
+      c = mix(c, line, fade);
+      a = mix(a, 1.0, fade);
+    }
+    a *= cover;
     finalColor = vec4(c * a, a);
     return;
   }
 
   vec4 outColor = vec4(0.0);
   if (cell.g < 0.5) {
+    float veilK = 1.0;
+    for (int d = 0; d < 6; d++) {
+      float dist = edgeDist(p, d, apothem);
+      if (dist > uPx * FEATHER_PX) continue;
+      if (visibleAt(ax + DIRS[d])) veilK = min(veilK, dist / (uPx * FEATHER_PX));
+    }
+    float va = FOG_VEIL * veilK;
+    outColor = vec4(uFogColor.rgb * va, va);
     float hr = uR * 0.68;
     float u = p.y + 0.35 * p.x;
     if (abs(p.x) <= hr && abs(u) <= hr) {
       float sp = uFog.x * uPx;
       float f = abs(fract(u / sp + 0.5) - 0.5) * sp / sqrt(1.0 + 0.1225);
       float cov = clamp((uFog.y * uPx * 0.5 - f) / uPx + 0.5, 0.0, 1.0);
-      float a = uFogColor.a * cov;
-      outColor = vec4(uFogColor.rgb * a, a);
+      float ha = uFogColor.a * cov * veilK;
+      outColor = vec4(uFogColor.rgb * ha, ha) + outColor * (1.0 - ha);
     }
   }
   if (owner != 0) {
-    float apothem = uR * SQRT3 * 0.5;
     float bw = uBorder;
     float cover = 0.0;
-    const ivec2 DIRS[6] = ivec2[6](ivec2(1, 0), ivec2(1, -1), ivec2(0, -1), ivec2(-1, 0), ivec2(-1, 1), ivec2(0, 1));
     for (int d = 0; d < 6; d++) {
-      float ang = radians(30.0 - 60.0 * float(d));
-      float dist = apothem - dot(p, vec2(cos(ang), sin(ang)));
+      float dist = edgeDist(p, d, apothem);
       if (dist > bw + uPx) continue;
       if (ownerAt(ax + DIRS[d]) == owner) continue;
       float cv = clamp((bw - dist) / uPx + 0.5, 0.0, 1.0) * clamp(dist / uPx + 0.5, 0.0, 1.0);
@@ -126,6 +181,10 @@ export interface TerritoryGpu {
   /** Границы и штриховка тумана — над заливкой. */
   readonly over: Container;
   setView(view: PlayerView): void;
+  /** Остаток вспышки захвата гекса, 0..1 (0 — нет эффекта); загрузка в текстуру — `flush`. */
+  setCapture(hex: number, fade: number): void;
+  /** Загружает в GPU накопленные изменения вспышек захвата. */
+  flush(): void;
   /** Толщины линий — экранные px, шейдеру нужен масштаб камеры. */
   setScale(scale: number): void;
   destroy(): void;
@@ -159,6 +218,8 @@ function headlessTerritory(): TerritoryGpu {
     fill: new Container(),
     over: new Container(),
     setView: () => undefined,
+    setCapture: () => undefined,
+    flush: () => undefined,
     setScale: () => undefined,
     destroy: () => undefined,
   };
@@ -255,9 +316,21 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
     paletteSource.update();
   };
 
+  let captureDirty = false;
   return {
     fill,
     over,
+    setCapture(hex, fade) {
+      const value = fade <= 0 ? 0 : Math.max(1, Math.round(Math.min(1, fade) * 255));
+      if (data[hex * 4 + 2] === value) return;
+      data[hex * 4 + 2] = value;
+      captureDirty = true;
+    },
+    flush() {
+      if (!captureDirty) return;
+      captureDirty = false;
+      dataSource.update();
+    },
     setView(view) {
       if (packTerritory(view, data)) dataSource.update();
       // Порядок цветов задаёт клиент (setPlayerPalette) — сверяем палитру на каждом виде.

@@ -184,7 +184,6 @@ export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | 
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const territory = createTerritoryGpu(map, radius);
-  const captures = new Graphics();
   const constructionEffects = new Graphics();
   const cityEffects = new Graphics();
   const roads = new Graphics();
@@ -194,14 +193,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const labels = new Container();
 
   const container = new Container();
-  container.addChild(
-    territory.fill,
-    captures,
-    roads,
-    roadPreview,
-    constructionEffects,
-    cityEffects,
-  );
+  container.addChild(territory.fill, roads, roadPreview, constructionEffects, cityEffects);
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
@@ -267,18 +259,18 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     previousOwners = v.hexes.owner.slice();
   }
 
+  // Вспышка захвата рисуется шейдером: здесь лишь остаток эффекта каждого гекса уходит в текстуру.
   function drawCaptureEffects(): void {
-    captures.clear();
     for (const [id, effect] of capturesByHex) {
       const progress = captureProgress(frameMs - effect.started, reducedMotion);
       if (progress >= 1) {
         capturesByHex.delete(id);
+        territory.setCapture(id, 0);
         continue;
       }
-      const point = center(id);
-      const polygon = hexPolygon(point, radius * progress);
-      captures.poly(polygon).fill({ color: effect.color, alpha: 1 });
+      territory.setCapture(id, 1 - progress);
     }
+    territory.flush();
   }
 
   function drawConstructionEffects(v: PlayerView): void {
