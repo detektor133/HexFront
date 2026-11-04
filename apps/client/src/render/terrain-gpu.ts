@@ -103,20 +103,10 @@ float triDist(vec2 p, vec2 a, vec2 b, vec2 c) {
   return -sqrt(d.x) * sign(d.y);
 }
 
-// Лес: три кроны с мягкой тенью и бликом.
+// Лес: три плоские кроны.
 void forest(inout vec4 acc, vec2 q, vec3 ink) {
   vec2 centers[3] = vec2[3](vec2(0.0, -0.18), vec2(-0.24, 0.135), vec2(0.24, 0.135));
-  float r = 0.17;
-  for (int i = 0; i < 3; i++) {
-    vec2 rel = q - centers[i];
-    float shadow = cover(length(rel - vec2(0.035, 0.05)) - r);
-    over(acc, ink * 0.55, shadow * 0.22);
-    float d = length(rel) - r;
-    float lit = dot(normalize(rel + 1e-5), vec2(0.55, 0.83));
-    vec3 c = ink * (1.0 - 0.2 * smoothstep(0.1, 0.9, lit));
-    c = mix(c, vec3(1.0), 0.2 * smoothstep(0.35, 1.0, -lit));
-    over(acc, c, cover(d));
-  }
+  for (int i = 0; i < 3; i++) over(acc, ink, cover(length(q - centers[i]) - 0.17));
 }
 
 // Холмы: две дуги-«горба» с лёгкой заливкой под дугой.
@@ -190,27 +180,13 @@ void main() {
 
   if (uMode < 0.5) {
     vec3 col = fillOf(t);
-    col *= 1.0 + (hexNoise(ax, 3) - 0.5) * 0.05;
-    float shallow = 0.0;
-    float beach = 0.0;
     float gridCover = 0.0;
-    for (int d = 0; d < 6; d++) {
-      float dist = edgeDist(p, d, apothem);
-      if (uGrid > 0.5) gridCover = max(gridCover, clamp((uGridStyle.x - dist) / uPx + 0.5, 0.0, 1.0));
-      if (dist > apothem * 0.55) continue;
-      int nt = terrainAt(ax + DIRS[d]);
-      if (nt == t) continue;
-      if (t == 0) {
-        shallow = max(shallow, clamp(1.0 - dist / (apothem * 0.55), 0.0, 1.0));
-      } else if (nt == 0) {
-        beach = max(beach, clamp(1.0 - dist / (apothem * 0.3), 0.0, 1.0));
-      } else {
-        float k = 1.0 - clamp(dist / (apothem * 0.35), 0.0, 1.0);
-        col = mix(col, fillOf(nt), 0.5 * k * k);
+    if (uGrid > 0.5) {
+      for (int d = 0; d < 6; d++) {
+        float dist = edgeDist(p, d, apothem);
+        gridCover = max(gridCover, clamp((uGridStyle.x - dist) / uPx + 0.5, 0.0, 1.0));
       }
     }
-    col = mix(col, vec3(1.0), 0.3 * shallow * shallow);
-    col = mix(col, vec3(1.0), 0.32 * beach * beach);
     col = mix(col, vec3(1.0), uGridStyle.y * gridCover);
     finalColor = vec4(col, 1.0);
     return;
@@ -225,26 +201,15 @@ void main() {
   else if (t == 4) mountain(acc, pl, inkOf(4), hw);
   else if (t == 5) desert(acc, pl, inkOf(5), hw);
 
-  bool landNear = false;
   float coast = 0.0;
   for (int d = 0; d < 6; d++) {
     float dist = edgeDist(p, d, apothem);
     int nt = terrainAt(ax + DIRS[d]);
     if ((nt == 0) != (t == 0)) {
-      landNear = true;
       coast = max(coast, clamp((uPx * 0.5 - dist) / uPx + 0.5, 0.0, 1.0));
     }
   }
   if (coast > 0.0) over(acc, inkOf(0), coast);
-  // Рябь на глубокой воде: редкие короткие волны.
-  if (t == 0 && !landNear && hexNoise(ax, 4) > 0.5) {
-    vec2 w = p / uR - vec2((hexNoise(ax, 5) - 0.5) * 0.4, (hexNoise(ax, 6) - 0.5) * 0.9);
-    float lx = w.x;
-    if (abs(lx) < 0.22) {
-      float yy = 0.05 * sin(lx * 14.0);
-      over(acc, inkOf(0), 0.55 * cover(abs(w.y - yy) - hw));
-    }
-  }
   if (acc.a <= 0.0) discard;
   finalColor = acc;
 }`;

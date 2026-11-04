@@ -44,11 +44,6 @@ uniform vec2 uFog;
 uniform float uMode;
 
 const float SQRT3 = 1.7320508;
-const float GLOW_PX = 14.0;
-const float GLOW_MIX = 0.25;
-const float GLOW_ALPHA = 0.18;
-const float FEATHER_PX = 16.0;
-const float FOG_VEIL = 0.10;
 const ivec2 DIRS[6] = ivec2[6](ivec2(1, 0), ivec2(1, -1), ivec2(0, -1), ivec2(-1, 0), ivec2(-1, 1), ivec2(0, 1));
 
 ivec2 toOffset(ivec2 ax) {
@@ -63,11 +58,6 @@ int ownerAt(ivec2 ax) {
   ivec2 o = toOffset(ax);
   if (!inMap(o)) return 0;
   return int(texelFetch(uData, o, 0).r * 255.0 + 0.5);
-}
-
-bool visibleAt(ivec2 ax) {
-  ivec2 o = toOffset(ax);
-  return inMap(o) && texelFetch(uData, o, 0).g > 0.5;
 }
 
 vec4 palette(int owner, float row) {
@@ -102,25 +92,17 @@ void main() {
 
   if (uMode < 0.5) {
     if (owner == 0) discard;
-    float glowW = min(uPx * GLOW_PX, apothem);
-    float glow = 0.0;
     float cover = 1.0;
     float hexDist = 0.0;
     for (int d = 0; d < 6; d++) {
       float dist = edgeDist(p, d, apothem);
       hexDist = max(hexDist, 1.0 - dist / apothem);
-      if (dist > glowW) continue;
-      int n = ownerAt(ax + DIRS[d]);
-      if (n == owner) continue;
-      float t = 1.0 - dist / glowW;
-      glow = max(glow, t * t);
-      if (n == 0) cover = min(cover, clamp(dist / uPx + 0.5, 0.0, 1.0));
+      if (dist > uPx) continue;
+      if (ownerAt(ax + DIRS[d]) == 0) cover = min(cover, clamp(dist / uPx + 0.5, 0.0, 1.0));
     }
     float a = float(owner) == uMe ? uAlpha.x : uAlpha.y;
     vec3 c = palette(owner, 0.0).rgb;
     vec3 line = palette(owner, 1.0).rgb;
-    c = mix(c, line, glow * GLOW_MIX);
-    a = mix(a, min(1.0, a + GLOW_ALPHA), glow);
     // Захват: цвет нового владельца заливает гекс от центра к краям, затухая (B — остаток эффекта).
     float fade = cell.b;
     if (fade > 0.0 && hexDist <= 1.0 - fade) {
@@ -134,22 +116,14 @@ void main() {
 
   vec4 outColor = vec4(0.0);
   if (cell.g < 0.5) {
-    float veilK = 1.0;
-    for (int d = 0; d < 6; d++) {
-      float dist = edgeDist(p, d, apothem);
-      if (dist > uPx * FEATHER_PX) continue;
-      if (visibleAt(ax + DIRS[d])) veilK = min(veilK, dist / (uPx * FEATHER_PX));
-    }
-    float va = FOG_VEIL * veilK;
-    outColor = vec4(uFogColor.rgb * va, va);
     float hr = uR * 0.68;
     float u = p.y + 0.35 * p.x;
     if (abs(p.x) <= hr && abs(u) <= hr) {
       float sp = uFog.x * uPx;
       float f = abs(fract(u / sp + 0.5) - 0.5) * sp / sqrt(1.0 + 0.1225);
       float cov = clamp((uFog.y * uPx * 0.5 - f) / uPx + 0.5, 0.0, 1.0);
-      float ha = uFogColor.a * cov * veilK;
-      outColor = vec4(uFogColor.rgb * ha, ha) + outColor * (1.0 - ha);
+      float ha = uFogColor.a * cov;
+      outColor = vec4(uFogColor.rgb * ha, ha);
     }
   }
   if (owner != 0) {

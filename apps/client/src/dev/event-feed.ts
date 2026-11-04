@@ -8,7 +8,7 @@ export interface EventFeedItem {
   readonly expiresAt: number;
 }
 
-export const EVENT_TTL_MS = 6000;
+export const EVENT_TTL_MS = 20000;
 
 export function eventHex(event: GameEvent, view: PlayerView): number | null {
   if (event.t === 'unitDestroyed' || event.t === 'unitRetreated' || event.t === 'unitCapitulated') {
@@ -44,7 +44,7 @@ export function isImportantEvent(event: GameEvent): boolean {
 }
 
 function isVisibleEvent(event: GameEvent, localPlayerId: number): boolean {
-  if (event.t === 'unitDestroyed' || event.t === 'unitCapitulated' || event.t === 'unitRetreated') {
+  if (event.t === 'unitDestroyed' || event.t === 'unitCapitulated') {
     return event.playerId === localPlayerId;
   }
   if (

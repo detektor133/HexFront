@@ -131,7 +131,9 @@ export function EventFeed(props: {
           ) : (
             <IconLink size={18} aria-hidden />
           )}
-          <span className={styles.name}>{nameOf(offer.from)}</span>
+          <span className={styles.name}>
+            {`${t(offer.kind === 'pact' ? 'diplomacy.offerPact' : 'diplomacy.offerAlliance')}: ${nameOf(offer.from)}`}
+          </span>
           <IconButton
             className={styles.answer}
             label={t('diplomacy.accept')}
@@ -150,6 +152,9 @@ export function EventFeed(props: {
       ))}
       {items.map((item) =>
         (() => {
+          const other = diplomacyOther(item.event, me);
+          const text = label(item.event, me);
+          const full = other === null ? text : `${text}: ${nameOf(other)}`;
           const content = (
             <>
               <span
@@ -159,16 +164,13 @@ export function EventFeed(props: {
                 }}
               />
               <EventIcon event={item.event} localPlayerId={me} />
-              {diplomacyOther(item.event, me) !== null && (
-                <span className={styles.name}>{nameOf(diplomacyOther(item.event, me) ?? 0)}</span>
-              )}
+              <span className={styles.name}>{full}</span>
             </>
           );
           const className = `${styles.item} ${item.important ? styles.important : ''}`;
-          const text = label(item.event, props.localPlayerId ?? 0);
 
           return item.hex === null || item.hex === undefined ? (
-            <div className={className} key={item.id} title={text} aria-label={text} role="img">
+            <div className={className} key={item.id} title={full} aria-label={full} role="img">
               {content}
             </div>
           ) : (
@@ -176,8 +178,8 @@ export function EventFeed(props: {
               className={className}
               key={item.id}
               type="button"
-              title={text}
-              aria-label={text}
+              title={full}
+              aria-label={full}
               onClick={() => props.onFocus(item)}
             >
               {content}
