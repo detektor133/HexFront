@@ -2,6 +2,7 @@
 // размазано по армиям; перестановка — только при выигрыше покрытия больше порога. Если отрядов
 // меньше гексов линии, армия сама делится (CR-005).
 // GDD: docs/gdd/07-controls.md — «Планы армий», «Распределение».
+import { maintainDirections } from './direction.ts';
 import {
   FRONT_ALLOC_TICKS,
   FRONT_REALLOC_GAIN_MIN,
@@ -115,6 +116,7 @@ function runPlan(state: MatchState, armyId: number): void {
 /** Раз в FRONT_ALLOC_TICKS раздаёт места отрядам армии с планом; армии — в разные тики.
  * Армия без плана не трогается — слияние и расстановка её отрядов только вручную. */
 export function frontSystem(state: MatchState): void {
+  maintainDirections(state);
   for (const plan of state.plans) {
     if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan.armyId);
   }

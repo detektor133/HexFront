@@ -82,4 +82,50 @@ describe('наступление одной командой', () => {
     const plan = s.state.plans.find((p) => p.armyId === army?.id);
     expect(plan?.kind === 'front' && plan.offensive?.active).toBe(true);
   });
+
+  it('удар по ничьей земле — участок у клика, а не кольцо по всей границе; новый клик его переставляет', () => {
+    const wide = `
+      .  .  .  .  .  .  .  .  .  .  .
+      .  a  a  a  a  a  a  a  a  a  .
+      .  a  a  a  a  a  a  a  a  a  .
+      .  a  a  A1 a  a  a  a  a  a  .
+      .  a  a  a  a  a  a  a  a  a  .
+      .  a  a  a  a  a  a  a  a  a  .
+      .  .  .  .  .  .  .  .  .  .  B1
+    `;
+    const s = scenario(wide, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    for (const row of [1, 2, 3, 4, 5]) s.unit('A', 'infantry', 300, at(5, row));
+    const width = s.state.map.width;
+    const click = (col: number, row: number): number => at(col, row).col + at(col, row).row * width;
+    const cmd = { t: 'launchOffensive', target: -1, soldiers: 300, hex: click(10, 0) } as const;
+    applyCommands(s.state, [{ playerId: 0, cmd }]);
+
+    const army = s.state.armies.find((a) => a.owner === 0);
+    const first = s.state.plans.find((p) => p.armyId === army?.id);
+    const edges = first?.kind === 'front' ? [...first.edges] : [];
+    expect(edges.length).toBeGreaterThan(0);
+    // Вся своя граница с ничьей землёй заметно длиннее участка удара.
+    expect(edges.length).toBeLessThanOrEqual(2 * 12 + 1);
+    expect(edges.length).toBeLessThan(30);
+
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 300, hex: click(0, 6) } },
+    ]);
+    const second = s.state.plans.find((p) => p.armyId === army?.id);
+    const moved = second?.kind === 'front' ? [...second.edges] : [];
+    expect(moved.length).toBeGreaterThan(0);
+    expect(moved.some((e) => !edges.includes(e))).toBe(true);
+  });
+
+  it('0 солдат снимает направление: фронт убран, отряды в резерве, армия расформирована', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
+    expect(s.state.armies.some((a) => a.owner === 0)).toBe(true);
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 0 } }]);
+
+    expect(s.state.armies.some((a) => a.owner === 0)).toBe(false);
+    expect(s.state.plans).toHaveLength(0);
+    expect(s.state.units.filter((u) => u.owner === 0).every((u) => u.armyId === null)).toBe(true);
+  });
 });

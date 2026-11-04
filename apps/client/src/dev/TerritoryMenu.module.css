@@ -79,6 +79,13 @@
   cursor: pointer;
 }
 
+.hold:disabled,
+.go:disabled {
+  border-color: var(--ui-border);
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
 .go {
   display: grid;
   width: 40px;

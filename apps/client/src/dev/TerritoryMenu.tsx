@@ -1,4 +1,4 @@
-import { IconFlag, IconShield, IconSwords, IconX } from '@tabler/icons-react';
+import { IconFlag, IconShield, IconShieldOff, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { FP, type Command, type PlayerView } from '@hexfront/sim';
@@ -41,7 +41,11 @@ export function TerritoryMenu(props: {
 }): React.JSX.Element | null {
   const { view, other, hex, at, send, onClose } = props;
   const max = ownSoldiers(view);
-  const [soldiers, setSoldiers] = useState(() => Math.max(1, Math.floor(max / 2)));
+  // Уже поставленное направление: слайдер показывает его заказ, а не заново половину армии.
+  const existing = view.armies.find((a) => a.dir?.target === other);
+  const [soldiers, setSoldiers] = useState(() =>
+    Math.max(0, existing?.wanted ?? Math.max(1, Math.floor(max / 2))),
+  );
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -98,7 +102,7 @@ export function TerritoryMenu(props: {
         <input
           className={styles.slider}
           type="range"
-          min={1}
+          min={0}
           max={max}
           step={1}
           value={amount}
@@ -106,10 +110,20 @@ export function TerritoryMenu(props: {
           onChange={(event) => setSoldiers(Number(event.target.value))}
         />
         <span className={styles.count}>{amount}</span>
+        {existing && (
+          <IconButton
+            label={t('menu.release')}
+            className={styles.hold}
+            onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
+          >
+            <IconShieldOff size={20} aria-hidden="true" />
+          </IconButton>
+        )}
         {!neutral && (
           <IconButton
             label={t('menu.hold')}
             className={styles.hold}
+            disabled={amount < 1}
             onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount })}
           >
             <IconShield size={20} aria-hidden="true" />
@@ -119,6 +133,7 @@ export function TerritoryMenu(props: {
           <IconButton
             label={t(neutral ? 'menu.occupy' : 'menu.attack')}
             className={styles.go}
+            disabled={amount < 1}
             onClick={() => go({ t: 'launchOffensive', target: other, soldiers: amount, ...where })}
           >
             {neutral ? (

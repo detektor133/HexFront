@@ -382,9 +382,25 @@
 
 /* Число войск армии в заголовке справа от названия. */
 .troops {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
   margin-left: auto;
   font-size: var(--font-size-label);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
   color: var(--ui-ink);
+}
+
+/* Заказанная численность направления — под числом солдат, тусклее и мельче. */
+.wanted {
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  color: var(--ui-ink3);
+}
+
+.wanted::before {
+  content: '→ ';
 }

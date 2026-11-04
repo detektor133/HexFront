@@ -1,10 +1,11 @@
-// Закупка под заказ численности армии (07-controls.md, «Меню страны»): армия с `wanted` каждую
-// секунду ставит набор в ближайшем к своему фронту городе с пустой очередью; отряд приходит прямо
-// в армию и сам идёт на место по линии.
+// Закупка под заказ численности армии (07-controls.md, «Меню страны»): армия с `wanted` сначала
+// берёт свободный резерв, а недостающее раз в секунду заказывает набором в ближайшем к своему
+// фронту городе с пустой очередью; отряд приходит прямо в армию и сам идёт на место по линии.
 import { PROCURE_BATCH, RECRUIT_MIN, RECRUIT_STEP, TICKS_PER_S } from '../balance.ts';
 import { checkRecruit, startRecruit } from '../commands/recruit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
+import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import type { Army, City, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
@@ -28,17 +29,43 @@ function cityOrder(state: MatchState, army: Army): City[] {
     .sort((a, b) => away(a) - away(b) || a.id - b.id);
 }
 
-/** Закупает недостающих солдат для армий с заказанной численностью; раз в секунду. */
+const strength = (state: MatchState, army: Army): number =>
+  allUnits(state)
+    .filter((u) => u.armyId === army.id)
+    .reduce((sum, u) => sum + u.soldiers, 0) +
+  state.recruits.filter((r) => r.armyId === army.id).reduce((sum, r) => sum + r.soldiers, 0);
+
+// Резерв игрока — в армии с нехваткой, ближайшие к её фронту отряды раньше.
+function takeReserve(state: MatchState, army: Army): void {
+  const { width } = state.map;
+  const marks = anchors(state, army).map((h) => hexFromId(h, width));
+  const away = (hex: HexId): number =>
+    marks.length === 0 ? 0 : Math.min(...marks.map((m) => distance(m, hexFromId(hex, width))));
+  const reserve = allUnits(state)
+    .filter(
+      (u) =>
+        u.owner === army.owner &&
+        u.armyId === null &&
+        u.order === 'idle' &&
+        !u.inBattle &&
+        u.slot !== SLOT_DETACHED,
+    )
+    .sort((a, b) => away(a.hex) - away(b.hex) || a.id - b.id);
+  let have = strength(state, army);
+  for (const u of reserve) {
+    if (have >= (army.wanted ?? 0) * FP) return;
+    u.armyId = army.id;
+    have += u.soldiers;
+  }
+}
+
+/** Добирает резерв и закупает недостающих для армий с заказанной численностью; раз в секунду. */
 export function procure(state: MatchState): void {
   if (state.tick % TICKS_PER_S !== 0) return;
   for (const army of state.armies) {
     if (army.wanted === undefined) continue;
-    const have =
-      allUnits(state)
-        .filter((u) => u.armyId === army.id)
-        .reduce((sum, u) => sum + u.soldiers, 0) +
-      state.recruits.filter((r) => r.armyId === army.id).reduce((sum, r) => sum + r.soldiers, 0);
-    const deficit = army.wanted * FP - have;
+    takeReserve(state, army);
+    const deficit = army.wanted * FP - strength(state, army);
     if (deficit < RECRUIT_MIN) continue;
     const batch = intDiv(Math.min(deficit, PROCURE_BATCH), RECRUIT_STEP) * RECRUIT_STEP;
     let done = false;

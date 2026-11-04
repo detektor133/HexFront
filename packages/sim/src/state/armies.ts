@@ -2,6 +2,7 @@
 // GDD: docs/gdd/05-armies.md — «Набор».
 import { planHexes } from './front.ts';
 import type { MatchState } from './types.ts';
+import { FP } from '../math/int.ts';
 
 /**
  * Самая нуждающаяся армия игрока: сначала армии с планом — с наименьшим числом солдат на гекс
@@ -16,6 +17,8 @@ export function neediestArmy(state: MatchState, owner: number): number | null {
     if (army.owner !== owner) continue;
     let soldiers = 0;
     for (const u of state.units) if (u.armyId === army.id) soldiers += u.soldiers;
+    // Направление с заказом закупает и добирает себя само: полная армия резерв не берёт.
+    if (army.wanted !== undefined && soldiers >= army.wanted * FP) continue;
     const plan = state.plans.find((p) => p.armyId === army.id);
     const hexes = plan ? Math.max(1, planHexes(state, plan).length) : 0;
     // Сравнение «солдат на гекс» без деления: a/x < b/y ⇔ a·y < b·x (x, y > 0).

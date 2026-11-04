@@ -1,6 +1,7 @@
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
+  FP,
   ORG_MAX,
   OFFENSIVE_STOP_ORG,
   type ArmyView,
@@ -279,7 +280,9 @@ function ArmyCard(props: {
             )}
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
-              {props.wanted !== undefined && ` / ${props.wanted}`}
+              {props.wanted !== undefined && (
+                <span className={styles.wanted}>{formatSoldiers(props.wanted * FP)}</span>
+              )}
             </span>
             {stats.fighting && (
               <span title={t('army.fighting')}>

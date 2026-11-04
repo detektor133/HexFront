@@ -103,6 +103,10 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.auto ? 1 : 0);
     // Поле появилось позже: без него хэш прежних матчей не меняется.
     if (a.wanted !== undefined) int(s, a.wanted);
+    if (a.dir !== undefined) {
+      int(s, a.dir.target);
+      int(s, a.dir.mode === 'hold' ? 0 : 1);
+    }
   }
   int(s, state.plans.length);
   for (const p of state.plans) {
