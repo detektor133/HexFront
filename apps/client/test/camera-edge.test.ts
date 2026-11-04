@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { Graphics, type Container } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type MapStatic } from '@hexfront/sim';
@@ -92,11 +92,6 @@ const hostFor = (view: { readonly width: number; readonly height: number }): HTM
     appendChild: () => undefined,
   }) as unknown as HTMLElement;
 
-const sceneGraphics = (node: Container): Graphics[] => [
-  ...(node instanceof Graphics ? [node] : []),
-  ...node.children.flatMap((child) => sceneGraphics(child)),
-];
-
 describe('край карты и океан', () => {
   it('Критерий 1: центрирует каждый угловой гекс через MapView.centerOn', async () => {
     for (const map of maps) {
@@ -153,7 +148,7 @@ describe('край карты и океан', () => {
     });
   });
 
-  it('Критерий 3: Pixi получает фон воды и рисует берег цветом waterEdge', async () => {
+  it('Критерий 3: Pixi получает фон воды, берег рисует шейдер рельефа', async () => {
     const smallMap = maps[0];
     if (!smallMap) throw new Error('Карта small не загружена');
     const mapView = await createMapView(
@@ -163,16 +158,7 @@ describe('край карты и океан', () => {
       () => undefined,
     );
     const app = testApplication();
-    const graphics = sceneGraphics(app.stage);
-    const instructions = graphics.flatMap((graphic) => graphic.context.instructions);
-
     expect(app.options.background).toBe(tokens.map.water);
-    expect(
-      instructions.some((instruction) => {
-        const data = (instruction as { data: { style?: { color?: unknown } } }).data;
-        return data.style?.color === Number.parseInt(tokens.map.waterEdge.slice(1), 16);
-      }),
-    ).toBe(true);
     expect(tokens.map.water).not.toBe(tokens.map.background);
     mapView.destroy();
   });

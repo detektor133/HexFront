@@ -22,7 +22,6 @@ import { createGesture, type Gesture, type StrokePhase, type TapKind } from './g
 import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
-import { createTerrainRedrawGate } from './terrain-redraw.ts';
 import { tokens } from '../theme/tokens.ts';
 
 export interface MapViewState {
@@ -160,7 +159,7 @@ export async function createMapView(
   const world = new Container();
   app.stage.addChild(world);
 
-  let layer: TerrainLayer = createTerrainLayer(map, opts.radius, tokens.map.waterEdge);
+  let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
   const mount = (): void => {
     world.addChild(layer.base);
@@ -180,7 +179,6 @@ export async function createMapView(
   });
   let cam: Camera = fitCamera(cameraView(), bounds);
   let drawnScale = 0;
-  const terrainRedraw = createTerrainRedrawGate();
   let velocity: Velocity | null = null;
   let centerAnimation: { from: Camera; to: Camera; elapsedMs: number; durationMs: number } | null =
     null;
@@ -200,9 +198,7 @@ export async function createMapView(
     world.position.set(Math.round(cam.x), Math.round(cam.y));
     world.scale.set(cam.scale);
     const level = detailLevel(cam.scale);
-    if (terrainRedraw.shouldRedraw(cam.scale, level, performance.now())) {
-      layer.update(cam.scale, level);
-    }
+    layer.update(cam.scale, level);
     if (cam.scale !== drawnScale) {
       mid?.update(cam.scale, level);
       drawnScale = cam.scale;
@@ -318,7 +314,7 @@ export async function createMapView(
       layer.destroy();
       mid?.destroy();
       opts = next;
-      layer = createTerrainLayer(map, opts.radius, tokens.map.waterEdge);
+      layer = createTerrainLayer(map, opts.radius);
       mid = opts.midLayer?.(map, opts.radius) ?? null;
       mount();
       bounds = mapBounds(map.width, map.height, opts.radius);
@@ -335,7 +331,6 @@ export async function createMapView(
         bounds,
       );
       drawnScale = 0;
-      terrainRedraw.reset();
     },
     centerOn(hex, durationMs = 0) {
       const p = hexCenter(hex, opts.radius);

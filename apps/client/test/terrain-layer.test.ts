@@ -41,8 +41,9 @@ describe('слои рельефа карты', () => {
   it('разделяет базовые заливки и узоры слоем территории между ними', () => {
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
 
-    expect(layer.base.children).toHaveLength(3);
-    expect(layer.overlay.children).toHaveLength(3);
+    // Слой GPU-рельефа и реки под территорией, узоры над ней.
+    expect(layer.base.children).toHaveLength(2);
+    expect(layer.overlay.children).toHaveLength(1);
     const mapViewSource = readFileSync(
       new URL('../src/render/map-view.ts', import.meta.url),
       'utf8',
