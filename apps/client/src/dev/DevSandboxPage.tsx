@@ -583,6 +583,9 @@ export function SandboxSurface({
       <div ref={hostRef} className={styles.map} />
       <EventFeed
         items={sb.events}
+        offers={view?.diplomacy?.incoming ?? []}
+        nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+        send={sb.send}
         {...(view ? { localPlayerId: view.playerId } : {})}
         now={performance.now()}
         onFocus={sb.focusEvent}

@@ -197,7 +197,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const tutorialY = leftColumnTop;
   const tutorialVisible = input.tutorialVisible && tutorialY + 48 <= leftColumnBottom;
   const eventOverlayVisible =
-    !input.cardOpen && !input.popupOpen && !input.paused && (desktop || !input.leaderboardOpen);
+    !input.popupOpen && !input.paused && (desktop || (!input.cardOpen && !input.leaderboardOpen));
   const tutorialOverlayVisible = eventOverlayVisible && (desktop || !input.leaderboardOpen);
   const eventTop = Math.max(
     showLeaderboard ? leaderboardY + effectiveLeaderboardHeight + gap : leftColumnTop,

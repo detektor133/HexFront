@@ -36,3 +36,20 @@ div.item {
   flex: 0 0 auto;
   border-radius: 50%;
 }
+
+.offer {
+  border-left: 3px solid var(--ui-ink);
+  cursor: default;
+}
+
+.name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.answer {
+  flex: 0 0 auto;
+}

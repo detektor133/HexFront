@@ -7,7 +7,7 @@ import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
-import { EventFeed } from '../dev/EventFeed.tsx';
+import { EventFeed, feedRows } from '../dev/EventFeed.tsx';
 import { HexCard } from '../dev/HexCard.tsx';
 import { Hud } from '../dev/Hud.tsx';
 import { Leaderboard } from '../dev/Leaderboard.tsx';
@@ -110,7 +110,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
     bottomPanelHeight: dockH,
-    eventRows: Math.min(4, sb.events.length),
+    eventRows: feedRows(sb.events, view?.diplomacy?.incoming ?? []),
     tutorialVisible: showOnboarding && view !== null,
     leaderboardOpen,
     leaderboardRows: view?.ranking?.length ?? 0,
@@ -166,6 +166,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {styleFor('event-feed') && (
         <EventFeed
           items={sb.events}
+          offers={view?.diplomacy?.incoming ?? []}
+          nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+          send={sb.send}
           {...(view ? { localPlayerId: view.playerId } : {})}
           now={performance.now()}
           onFocus={sb.focusEvent}

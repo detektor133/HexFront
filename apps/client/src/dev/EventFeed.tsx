@@ -1,21 +1,25 @@
 import {
   IconArrowBackUp,
+  IconCheck,
   IconBuildingCastle,
   IconFlag,
   IconHeartHandshake,
+  IconLink,
   IconLinkOff,
   IconSkull,
   IconSwords,
+  IconX,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import type { GameEvent } from '@hexfront/sim';
+import type { Command, GameEvent, PlayerView } from '@hexfront/sim';
 
 import styles from './EventFeed.module.css';
 import type { EventFeedItem } from './event-feed.ts';
 import { visibleEvents } from './event-feed.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
+import { IconButton } from '../ui/icon-button.tsx';
 
 function assertNever(value: never): never {
   throw new Error(`Неизвестное событие: ${String(value)}`);
@@ -68,8 +72,33 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
   return null;
 }
 
+type Offer = NonNullable<PlayerView['diplomacy']>['incoming'][number];
+
+/** Записи ленты: события и входящие предложения дипломатии (последние висят, пока не отвечены). */
+export function feedRows(items: readonly EventFeedItem[], offers: readonly Offer[]): number {
+  return Math.min(
+    4,
+    items.filter((item) => item.event.t !== 'treatyOffered').length + offers.length,
+  );
+}
+
+function diplomacyOther(event: GameEvent, me: number): number | null {
+  if (
+    event.t === 'warDeclared' ||
+    event.t === 'treatyMade' ||
+    event.t === 'treatyBroken' ||
+    event.t === 'treatyOffered'
+  ) {
+    return event.playerId === me ? event.targetId : event.playerId;
+  }
+  return null;
+}
+
 export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
+  readonly offers?: readonly Offer[];
+  readonly nameOf?: (playerId: number) => string;
+  readonly send?: (cmd: Command) => void;
   readonly localPlayerId?: number;
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
@@ -83,10 +112,42 @@ export function EventFeed(props: {
     const timer = window.setInterval(() => setNow(performance.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
-  const items = visibleEvents(props.items, now);
-  if (items.length === 0) return null;
+  // Предложения показываются из состояния (с кнопками ответа), а не одноразовой записью.
+  const items = visibleEvents(props.items, now).filter((item) => item.event.t !== 'treatyOffered');
+  const offers = props.offers ?? [];
+  if (items.length === 0 && offers.length === 0) return null;
+  const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
+  const me = props.localPlayerId ?? 0;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
+      {offers.map((offer) => (
+        <div className={`${styles.item} ${styles.offer}`} key={`offer:${offer.from}`} role="status">
+          <span
+            className={styles.owner}
+            style={{ background: tokens.players.palette[offer.from]?.line ?? tokens.ui.ink }}
+          />
+          {offer.kind === 'pact' ? (
+            <IconHeartHandshake size={18} aria-hidden />
+          ) : (
+            <IconLink size={18} aria-hidden />
+          )}
+          <span className={styles.name}>{nameOf(offer.from)}</span>
+          <IconButton
+            className={styles.answer}
+            label={t('diplomacy.accept')}
+            onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: true })}
+          >
+            <IconCheck size={18} aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            className={styles.answer}
+            label={t('diplomacy.decline')}
+            onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: false })}
+          >
+            <IconX size={18} aria-hidden="true" />
+          </IconButton>
+        </div>
+      ))}
       {items.map((item) =>
         (() => {
           const content = (
@@ -97,7 +158,10 @@ export function EventFeed(props: {
                   background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
                 }}
               />
-              <EventIcon event={item.event} localPlayerId={props.localPlayerId ?? 0} />
+              <EventIcon event={item.event} localPlayerId={me} />
+              {diplomacyOther(item.event, me) !== null && (
+                <span className={styles.name}>{nameOf(diplomacyOther(item.event, me) ?? 0)}</span>
+              )}
             </>
           );
           const className = `${styles.item} ${item.important ? styles.important : ''}`;
