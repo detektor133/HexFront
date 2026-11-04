@@ -1,20 +1,12 @@
-import { Graphics, Text } from 'pixi.js';
+import { Text } from 'pixi.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadMap, type PlayerView } from '@hexfront/sim';
 
 import { installTextCanvasStub } from './text-canvas.ts';
-import {
-  borderMapChunks,
-  changedMapChunks,
-  createEconomyLayer,
-  fogHexes,
-  mapChunkKey,
-  territoryBorders,
-} from '../src/dev/economy-layer.ts';
+import { createEconomyLayer } from '../src/dev/economy-layer.ts';
 import { buildTerritoryLabels } from '../src/dev/territory-labels.ts';
-import { playerLine } from '../src/theme/colors.ts';
-import { tokens } from '../src/theme/tokens.ts';
+import { packTerritory } from '../src/render/territory-gpu.ts';
 
 const loaded = loadMap({
   version: 1,
@@ -101,63 +93,22 @@ const labelView = (owner: number[]): PlayerView =>
     ],
   }) as unknown as PlayerView;
 
-describe('слои границ и тумана', () => {
+describe('территория на GPU и подписи', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('инвалидирует только чанк изменившегося гекса', () => {
-    expect(mapChunkKey(17, 32)).toBe('1:0');
-    expect(changedMapChunks([0, 17, 17], 32)).toEqual(['0:0', '1:0']);
+  it('пакует владельца и видимость гексов в текстуру для шейдера', () => {
+    const data = new Uint8Array(2 * 4);
+
+    expect(packTerritory(view([1, 0]), data)).toBe(true);
+    expect(Array.from(data)).toEqual([1, 255, 0, 255, 2, 0, 0, 255]);
   });
 
-  it('инвалидирует соседний чанк для общей границы', () => {
-    expect(borderMapChunks([15], 32, 16)).toEqual(['0:0', '1:0']);
-  });
+  it('сообщает об изменении только когда данные текстуры поменялись', () => {
+    const data = new Uint8Array(2 * 4);
+    packTerritory(view([1, 1]), data);
 
-  it('рисует общую границу цветом каждого владельца с его стороны', () => {
-    const borders = territoryBorders(loaded.map, view([1, 1]));
-
-    expect(borders.filter((edge) => edge.neighborOwner >= 0)).toHaveLength(2);
-    expect(new Set(borders.map((edge) => edge.owner))).toEqual(new Set([0, 1]));
-  });
-
-  it('рисует границу толщиной 1,5 экранных px на каждом detail и сохраняет оба цвета соседей', () => {
-    vi.stubGlobal('window', { devicePixelRatio: 1, matchMedia: () => ({ matches: false }) });
-    const layer = createEconomyLayer(loaded.map, 10);
-    const strokes = vi.spyOn(Graphics.prototype, 'stroke');
-    const selection = { hex: null, units: [], target: null };
-    try {
-      for (const detail of [1, 2, 3] as const) {
-        strokes.mockClear();
-        layer.update(detail, detail);
-        layer.setView(view([1, 1]), selection);
-
-        const borderStrokes = strokes.mock.calls
-          .map(([style]) => style)
-          .filter(
-            (style): style is { width: number; color: string } =>
-              typeof style === 'object' &&
-              style !== null &&
-              'width' in style &&
-              typeof style.width === 'number' &&
-              'color' in style &&
-              typeof style.color === 'string' &&
-              style.width * detail === tokens.territory.borderWidth[0] &&
-              [playerLine(0), playerLine(1)].includes(style.color),
-          );
-        expect(borderStrokes.length).toBeGreaterThanOrEqual(2);
-        expect(new Set(borderStrokes.map((style) => style.color))).toEqual(
-          new Set([playerLine(0), playerLine(1)]),
-        );
-      }
-    } finally {
-      strokes.mockRestore();
-      layer.destroy();
-    }
-  });
-
-  it('штрихует только гексы вне зоны обзора', () => {
-    expect(fogHexes(view([1, 0]))).toEqual([1]);
-    expect(fogHexes(view([1, 1]))).toEqual([]);
+    expect(packTerritory(view([1, 1]), data)).toBe(false);
+    expect(packTerritory(view([1, 0]), data)).toBe(true);
   });
 
   it('показывает подписи на detail 1 и 2 и скрывает на detail 3 через setView', () => {

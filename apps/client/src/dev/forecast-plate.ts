@@ -105,7 +105,6 @@ export function drawForecastPlate(
       fill: tokens.ui.ink,
     },
   });
-  text.resolution = window.devicePixelRatio * 2;
   const w = PAD_X + ICON_PX + GAP + text.width + PAD_X;
   const g = new Graphics();
   g.context.batchMode = 'batch';

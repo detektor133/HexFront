@@ -97,7 +97,6 @@ function row(parent: Container, y: number, s: BattleSide, color: string): void {
       fill: tokens.ui.ink,
     },
   });
-  text.resolution = window.devicePixelRatio * 2;
   text.anchor.set(0, 0.5);
   text.position.set(PAD + 3 * (GLYPH + 2) + 2, y + ROW_H / 2);
   const barX = WIDTH - PAD - BAR_W;

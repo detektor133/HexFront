@@ -8,11 +8,9 @@ import {
   hexFromId,
   hexId,
   inBounds,
-  neighbor,
   neighbors,
   type MapStatic,
   type PlayerView,
-  type Direction,
 } from '@hexfront/sim';
 
 import { battleSides, drawBattlePanel, type MarkerAnchor } from './battle-panel.ts';
@@ -23,7 +21,7 @@ import type {
   UnitLayerCacheTelemetry,
 } from './cache-telemetry.ts';
 import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
-import { drawConstructions } from './construction-glyphs.ts';
+import { drawConstructions, type ConstructionGlyph } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
@@ -35,8 +33,9 @@ import {
 } from './territory-labels.ts';
 import { createUnitLayer, type UnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
-import { hexCenter, hexEdge, hexPolygon, type Point } from '../render/hex-geometry.ts';
-import { playerFill, playerLine } from '../theme/colors.ts';
+import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
+import { createTerritoryGpu } from '../render/territory-gpu.ts';
+import { playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Толщина выделения гекса и дуги стройки, экранные px (токена нет — отладочный вид). */
@@ -51,39 +50,6 @@ export interface SandboxSelection {
   readonly hex: number | null;
   readonly units: readonly number[];
   readonly target: number | null;
-}
-
-export const MAP_CHUNK_SIZE = 16;
-
-/** Возвращает ключ чанка гекса для адресной инвалидизации слоёв карты. */
-export function mapChunkKey(hex: number, width: number): string {
-  const x = hex % width;
-  const y = Math.floor(hex / width);
-  return `${Math.floor(x / MAP_CHUNK_SIZE)}:${Math.floor(y / MAP_CHUNK_SIZE)}`;
-}
-
-/** Возвращает чанки изменившихся гексов без дублирования ключей. */
-export function changedMapChunks(
-  changedHexes: readonly number[],
-  width: number,
-): readonly string[] {
-  return [...new Set(changedHexes.map((hex) => mapChunkKey(hex, width)))].sort();
-}
-
-/** Добавляет соседние чанки, которые затрагивает граница изменившегося гекса. */
-export function borderMapChunks(
-  changedHexes: readonly number[],
-  width: number,
-  height: number,
-): readonly string[] {
-  const chunks = new Set(changedMapChunks(changedHexes, width));
-  for (const hex of changedHexes) {
-    const point = hexFromId(hex, width);
-    for (const adjacent of neighbors(point)) {
-      if (inBounds(adjacent, width, height)) chunks.add(mapChunkKey(hexId(adjacent, width), width));
-    }
-  }
-  return [...chunks].sort();
 }
 
 const NOTHING: SandboxSelection = { hex: null, units: [], target: null };
@@ -215,56 +181,27 @@ export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | 
   return main ? owner : null;
 }
 
-export interface TerritoryBorder {
-  readonly hex: number;
-  readonly direction: number;
-  readonly owner: number;
-  readonly neighborOwner: number;
-}
-
-/** Возвращает кромки территории; общая граница выдаётся с обеих сторон. */
-export function territoryBorders(map: MapStatic, view: PlayerView): TerritoryBorder[] {
-  const borders: TerritoryBorder[] = [];
-  for (let id = 0; id < view.hexes.owner.length; id += 1) {
-    const owner = view.hexes.owner[id] ?? -1;
-    if (owner < 0) continue;
-    for (const direction of [0, 1, 2, 3, 4, 5] as const satisfies readonly Direction[]) {
-      const adjacent = neighbor(hexFromId(id, map.width), direction);
-      const neighborOwner = inBounds(adjacent, map.width, map.height)
-        ? (view.hexes.owner[hexId(adjacent, map.width)] ?? -1)
-        : -1;
-      if (neighborOwner !== owner) borders.push({ hex: id, direction, owner, neighborOwner });
-    }
-  }
-  return borders;
-}
-
-/** Возвращает гексы вне зоны обзора, где рисуется штриховка без затемнения. */
-export function fogHexes(view: PlayerView): number[] {
-  return Array.from(view.hexes.visible, (visible, id) => (visible === 0 ? id : -1)).filter(
-    (id) => id >= 0,
-  );
-}
-
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
-  const fill = new Container();
+  const territory = createTerritoryGpu(map, radius);
   const captures = new Graphics();
   const constructionEffects = new Graphics();
   const cityEffects = new Graphics();
   const roads = new Graphics();
   const roadPreview = new Graphics();
-  const borders = new Graphics();
-  const fog = new Graphics();
   const marks = new Graphics();
   marks.context.batchMode = 'batch';
   const labels = new Container();
-  const fillChunks = new Map<string, Graphics>();
-  const borderChunks = new Map<string, Graphics>();
-  const fogChunks = new Map<string, Graphics>();
 
   const container = new Container();
-  container.addChild(fill, captures, roads, roadPreview, constructionEffects, cityEffects);
+  container.addChild(
+    territory.fill,
+    captures,
+    roads,
+    roadPreview,
+    constructionEffects,
+    cityEffects,
+  );
   const top = new Container();
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
@@ -274,8 +211,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const territoryLabels = new Container();
   // Слои карты (art/style-guide.md): армии (10) ниже подписей городов и государств (12).
   top.addChild(
-    borders,
-    fog,
+    territory.over,
     planLayer.container,
     marks,
     unitLayer.container,
@@ -297,30 +233,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let frameMs = 0;
   let previousOwners: Int16Array | null = null;
-  let previousVisible: Uint8Array | null = null;
-  let previousRoadSignature = '';
+  let previousRoad: Uint8Array | null = null;
+  let previousLink: Uint8Array | null = null;
+  let previousCityHexes = '';
   const capturesByHex = new Map<number, { readonly started: number; readonly color: string }>();
   const cityFlashes = new Map<number, { readonly started: number; readonly color: string }>();
   let labelsKey = '';
   let territoryKey = '';
 
-  const chunkGraphics = (
-    layer: Map<string, Graphics>,
-    key: string,
-    parent: Container,
-  ): Graphics => {
-    const existing = layer.get(key);
-    if (existing) return existing;
-    const graphics = new Graphics();
-    layer.set(key, graphics);
-    parent.addChild(graphics);
-    return graphics;
-  };
-
-  const destroyChunkLayer = (layer: Map<string, Graphics>): void => {
-    for (const graphics of layer.values()) graphics.destroy({ context: true });
-    layer.clear();
-  };
+  const allHexIds: ReadonlySet<number> = new Set(
+    Array.from({ length: map.width * map.height }, (_, id) => id),
+  );
 
   function rememberEffects(v: PlayerView, nowMs: number): void {
     if (previousOwners) {
@@ -339,28 +262,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         cityFlashes.set(city.id, { started: nowMs, color: playerLine(city.owner) });
       }
     }
-    const hexIds = new Set(v.hexes.owner.keys());
     const cityIds = new Set(v.cities.map((city) => city.id));
-    pruneEconomyLayerCaches(capturesByHex, cityFlashes, hexIds, cityIds);
+    pruneEconomyLayerCaches(capturesByHex, cityFlashes, allHexIds, cityIds);
     previousOwners = v.hexes.owner.slice();
-  }
-
-  function allHexes(): readonly number[] {
-    return Array.from({ length: map.width * map.height }, (_, id) => id);
-  }
-
-  function drawFill(v: PlayerView, changed: readonly string[]): void {
-    for (const key of changed) {
-      const graphics = chunkGraphics(fillChunks, key, fill);
-      graphics.clear();
-      v.hexes.owner.forEach((owner, id) => {
-        if (owner < 0 || mapChunkKey(id, map.width) !== key) return;
-        graphics.poly(hexPolygon(center(id), radius)).fill({
-          color: playerFill(owner),
-          alpha: owner === v.playerId ? tokens.territory.alphaOwn : tokens.territory.alphaOther,
-        });
-      });
-    }
   }
 
   function drawCaptureEffects(): void {
@@ -466,42 +370,20 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     });
   }
 
-  function drawBorders(v: PlayerView, changed: readonly string[]): void {
-    for (const key of changed) chunkGraphics(borderChunks, key, borders).clear();
-    const width = tokens.territory.borderWidth[0] / scale;
-    for (const edge of territoryBorders(map, v)) {
-      const key = mapChunkKey(edge.hex, map.width);
-      if (!changed.includes(key)) continue;
-      const centerPoint = center(edge.hex);
-      const [a, b] = hexEdge(centerPoint, radius - width / 2, edge.direction);
-      chunkGraphics(borderChunks, key, borders)
-        .moveTo(a.x, a.y)
-        .lineTo(b.x, b.y)
-        .stroke({ color: playerLine(edge.owner), width, cap: 'round' });
-    }
-  }
-
-  function drawFog(v: PlayerView, changed: readonly string[]): void {
-    for (const key of changed) chunkGraphics(fogChunks, key, fog).clear();
-    const spacing = tokens.fog.hatchSpacing / scale;
-    const hatchRadius = radius * 0.68;
-    for (const id of fogHexes(v)) {
-      const key = mapChunkKey(id, map.width);
-      if (!changed.includes(key)) continue;
-      const point = center(id);
-      const graphics = chunkGraphics(fogChunks, key, fog);
-      for (let offset = -hatchRadius; offset <= hatchRadius; offset += spacing) {
-        graphics
-          .moveTo(point.x - hatchRadius, point.y + offset + hatchRadius * 0.35)
-          .lineTo(point.x + hatchRadius, point.y + offset - hatchRadius * 0.35);
-      }
-      graphics.stroke({
-        color: tokens.fog.hatch,
-        alpha: tokens.fog.hatchAlpha,
-        width: tokens.fog.hatchWidth / scale,
-        pixelLine: true,
+  // Знаки строений — только у гексов, где что-то построено, а не по объекту на каждый гекс карты.
+  function builtHexes(v: PlayerView): ConstructionGlyph[] {
+    const out: ConstructionGlyph[] = [];
+    v.hexes.building.forEach((building, hex) => {
+      const improvement = v.hexes.improvement[hex] ?? 0;
+      if (building === 0 && improvement <= 0) return;
+      out.push({
+        at: center(hex),
+        color: playerLine(v.hexes.owner[hex] ?? -1),
+        building,
+        improvement,
       });
-    }
+    });
+    return out;
   }
 
   function drawMarks(v: PlayerView): void {
@@ -515,17 +397,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isolated: c.isolated,
     }));
     drawCities(marks, glyphs, k, radius);
-    drawConstructions(
-      marks,
-      Array.from(v.hexes.building, (building, hex) => ({
-        at: center(hex),
-        color: playerLine(v.hexes.owner[hex] ?? -1),
-        building,
-        improvement: v.hexes.improvement[hex] ?? 0,
-      })),
-      k,
-      radius,
-    );
+    drawConstructions(marks, builtHexes(v), k, radius);
     const nextLabelsKey = cityLabelsKey(
       v.cities.map((c) => ({
         at: center(c.hex),
@@ -583,33 +455,31 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     }
   }
 
-  const roadSignature = (v: PlayerView): string =>
-    [
-      ...v.hexes.road,
-      ...v.hexes.link,
-      ...v.hexes.owner,
-      ...v.cities.flatMap((city) => [city.id, city.hex]),
-    ].join(',');
+  const sameArray = (a: ArrayLike<number> | null, b: ArrayLike<number>): boolean => {
+    if (a === b) return true;
+    if (!a || a.length !== b.length) return false;
+    for (let i = 0; i < b.length; i += 1) if (a[i] !== b[i]) return false;
+    return true;
+  };
 
-  const changedIds = (
-    before: Int16Array | Uint8Array | null,
-    after: Int16Array | Uint8Array,
-  ): number[] => {
-    if (!before) return Array.from({ length: after.length }, (_, id) => id);
-    const changed: number[] = [];
-    for (let id = 0; id < after.length; id += 1) {
-      if (before[id] !== after[id]) changed.push(id);
+  // Дороги пересобираются только при смене дорог, связей, владельцев или городов.
+  const roadsChanged = (v: PlayerView): boolean => {
+    const cityHexes = v.cities.map((city) => `${city.id}:${city.hex}`).join(',');
+    const changed =
+      !sameArray(previousRoad, v.hexes.road) ||
+      !sameArray(previousLink, v.hexes.link) ||
+      !sameArray(previousOwners, v.hexes.owner) ||
+      cityHexes !== previousCityHexes;
+    if (changed) {
+      previousRoad = v.hexes.road.slice();
+      previousLink = v.hexes.link.slice();
+      previousCityHexes = cityHexes;
     }
     return changed;
   };
 
-  const redraw = (changed: readonly number[] = allHexes(), drawStatic = true): void => {
+  const redraw = (): void => {
     if (!view) return;
-    if (drawStatic) {
-      drawFill(view, changedMapChunks(changed, map.width));
-      drawBorders(view, borderMapChunks(changed, map.width, map.height));
-      drawFog(view, changedMapChunks(changed, map.width));
-    }
     drawRoadPreview(view);
     drawMarks(view);
     drawConstructionEffects(view);
@@ -627,22 +497,18 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       scale = s;
       level = l;
       unitLayer.setScale(s);
-      redraw(levelChanged ? allHexes() : [], levelChanged);
+      territory.setScale(s);
+      redraw();
       if (levelChanged && view) drawRoads(view);
     },
     setView(v, sel) {
-      const ownerChanged = changedIds(previousOwners, v.hexes.owner);
-      const visibleChanged = changedIds(previousVisible, v.hexes.visible);
-      const nextRoadSignature = roadSignature(v);
+      const roads = roadsChanged(v);
       rememberEffects(v, performance.now());
       view = v;
       selected = sel;
-      redraw([...new Set([...ownerChanged, ...visibleChanged])], true);
-      if (nextRoadSignature !== previousRoadSignature) {
-        drawRoads(v);
-        previousRoadSignature = nextRoadSignature;
-      }
-      previousVisible = v.hexes.visible.slice();
+      territory.setView(v);
+      redraw();
+      if (roads) drawRoads(v);
       if (typeof document !== 'undefined') unitLayer.setView(v, sel, performance.now());
     },
     cacheTelemetry() {
@@ -707,9 +573,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       planLayer.frame(nowMs);
     },
     destroy() {
-      destroyChunkLayer(fillChunks);
-      destroyChunkLayer(borderChunks);
-      destroyChunkLayer(fogChunks);
+      territory.destroy();
       container.destroy({ children: true, context: true });
       top.destroy({ children: true, context: true });
     },

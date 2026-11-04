@@ -268,14 +268,11 @@ export function createChip(): Chip {
   } as const;
   const label = new BitmapText({ text: '', style: { ...font, fontSize: LABEL_PX } });
   label.anchor.set(0.5, 0.5);
-  const textResolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
-  label.resolution = textResolution;
   const count = new BitmapText({
     text: '',
     style: { ...font, fontSize: COUNT_PX, fill: tokens.ui.surface },
   });
   count.anchor.set(0.5, 0.5);
-  count.resolution = textResolution;
   content.addChild(g, label, count);
   const parts: Parts = { g, label, count };
   let width = 0;
@@ -295,11 +292,8 @@ export function createChip(): Chip {
       content.scale.set(1);
     },
     width: () => width,
-    setResolution(r) {
-      if (label.resolution === r) return;
-      label.resolution = r;
-      count.resolution = r;
-    },
+    // Разрешение BitmapText задаёт шрифт; Pixi не поддерживает его смену на лету и пишет предупреждение.
+    setResolution: () => undefined,
     destroy() {
       root.destroy({ children: true, context: true });
     },

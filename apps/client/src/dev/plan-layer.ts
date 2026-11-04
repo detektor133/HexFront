@@ -352,7 +352,6 @@ export function createPlanLayer(
         stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
       },
     });
-    tx.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
     tx.anchor.set(0.5, 1);
     tx.scale.set(k);
     tx.position.set(at.x, at.y - LABEL_LIFT * k);
