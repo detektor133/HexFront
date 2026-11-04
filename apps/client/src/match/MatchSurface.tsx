@@ -13,6 +13,7 @@ import { Hud } from '../dev/Hud.tsx';
 import { Leaderboard } from '../dev/Leaderboard.tsx';
 import { MatchEnd } from '../dev/MatchEnd.tsx';
 import { ObserverPanel } from '../dev/ObserverPanel.tsx';
+import { TerritoryMenu } from '../dev/TerritoryMenu.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
@@ -220,6 +221,15 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onOpenChange={setLeaderboardOpen}
           onSize={setLeaderboardSize}
           style={styleFor('leaderboard')}
+        />
+      )}
+      {view && sb.menu && (
+        <TerritoryMenu
+          view={view}
+          other={sb.menu.other}
+          at={sb.menu}
+          send={sb.send}
+          onClose={sb.closeMenu}
         />
       )}
       {view && (

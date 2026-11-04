@@ -1,0 +1,80 @@
+/* Меню чужой страны у места нажатия: дипломатия и наступление со слайдером. */
+.menu {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-ink2);
+  cursor: pointer;
+}
+
+.attack {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--ui-border);
+}
+
+.slider {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 36px;
+  accent-color: var(--status-danger);
+}
+
+.count {
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.go {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--status-danger);
+  cursor: pointer;
+}

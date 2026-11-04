@@ -31,6 +31,11 @@ export interface OrderDeps {
   /** Маркер боя под мировой точкой (null — мимо). */
   markerAt?(world: Point): MarkerAnchor | null;
   setBattlePanel?(m: MarkerAnchor | null): void;
+  /**
+   * Удержание без выбранных отрядов (палец): меню страны под пальцем или обычный выбор.
+   * screen — точка в координатах холста.
+   */
+  holdWithoutUnits?(world: Point, screen: Point): void;
 }
 
 /** Хуки карты для приказа удержанием и наведения. */
@@ -60,7 +65,8 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
     d.setTarget(hostileOnly && !t.badge ? null : t);
   };
   return {
-    canHold: () => !d.tool() && d.picked().units.length > 0,
+    // Без выбранных отрядов удержание открывает меню страны (ПКМ на ПК); с отрядами — приказ.
+    canHold: () => !d.tool() && (d.picked().units.length > 0 || d.holdWithoutUnits !== undefined),
     cancelZone(world) {
       const view = d.view();
       if (!view) return false;
@@ -69,7 +75,11 @@ export function createOrderHooks(d: OrderDeps): OrderHooks {
         return Math.hypot(world.x - c.x, world.y - c.y) <= d.radius * CHIP_HIT;
       });
     },
-    hold(world, phase) {
+    hold(world, phase, screen) {
+      if (d.picked().units.length === 0) {
+        if (phase === 'end' && screen) d.holdWithoutUnits?.(world, screen);
+        return;
+      }
       const hex = hexAt(world);
       if (phase === 'start' || phase === 'move') {
         d.setPlanHover?.(world);

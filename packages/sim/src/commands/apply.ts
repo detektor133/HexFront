@@ -3,6 +3,7 @@ import { executeArmyCommand, validateArmyCommand } from './army.ts';
 import { stillAuto, takeOver } from './auto.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { executeDiplomacy, validateDiplomacy } from './diplomacy.ts';
+import { executeLaunch, validateLaunch } from './launch.ts';
 import { executePlanCommand, validatePlanCommand } from './plan.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
 import { startRecruit, validateRecruit } from './recruit.ts';
@@ -70,6 +71,8 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'answerTreaty':
     case 'breakTreaty':
       return validateDiplomacy(state, playerId, cmd);
+    case 'launchOffensive':
+      return validateLaunch(state, playerId, cmd);
     case 'createArmy':
     case 'renameArmy':
     case 'disbandArmy':
@@ -128,6 +131,9 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'answerTreaty':
     case 'breakTreaty':
       executeDiplomacy(state, playerId, cmd);
+      return;
+    case 'launchOffensive':
+      executeLaunch(state, playerId, cmd);
       return;
     case 'createArmy':
     case 'renameArmy':

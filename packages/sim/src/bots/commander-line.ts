@@ -5,11 +5,16 @@ import { COMMANDER_LINE_DEPTH } from '../balance.ts';
 import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import type { PlayerView } from '../queries/player-view.ts';
 import { offensiveEdgePath } from '../state/edge-line.ts';
 import { edgeHex, edgeOf, edgeOther, isLandEdge, type EdgeId } from '../state/edges.ts';
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
+
+/** Что нужно линии от мира: владельцы гексов и города (снимок игрока или состояние матча). */
+export interface LineView {
+  readonly hexes: { readonly owner: Int16Array };
+  readonly cities: readonly { readonly hex: HexId; readonly owner: number }[];
+}
 
 function around(map: MapStatic, h: HexId): HexId[] {
   return neighbors(hexFromId(h, map.width))
@@ -48,7 +53,7 @@ function depthFromFront(g: Ground, front: readonly EdgeId[], enemy: number, limi
  */
 export function commanderLine(
   map: MapStatic,
-  view: PlayerView,
+  view: LineView,
   front: readonly EdgeId[],
   enemy: number,
   maxDepth: number = COMMANDER_LINE_DEPTH,

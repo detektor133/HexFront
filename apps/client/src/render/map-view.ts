@@ -65,7 +65,7 @@ export type HoldPhase = 'start' | 'move' | 'end' | 'cancel';
 export interface OrderHooks {
   canHold(): boolean;
   cancelZone(world: Point): boolean;
-  hold(world: Point, phase: HoldPhase): void;
+  hold(world: Point, phase: HoldPhase, screen?: Point): void;
   /** Сбрасывает прогноз приказа при нажатии Esc. */
   cancel(): void;
   /** Мышь над картой без нажатия (ПК: прогноз при наведении); null — ушла с карты. */
@@ -126,7 +126,7 @@ export async function createMapView(
   map: MapStatic,
   initial: MapViewOptions,
   onState: (s: MapViewState) => void,
-  onTap?: (hex: Hex, kind: TapKind, world: Point, shift: boolean) => void,
+  onTap?: (hex: Hex, kind: TapKind, world: Point, shift: boolean, screen: Point) => void,
   onDoubleTap?: (hex: Hex, world: Point) => void,
 ): Promise<MapView> {
   let opts = initial;
@@ -267,7 +267,7 @@ export async function createMapView(
         cam = zoomAt(cam, e.factor, e.at.x, e.at.y, cameraView(), bounds);
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
-        onTap?.(pixelToHex(world, opts.radius), e.kind, world, e.shift);
+        onTap?.(pixelToHex(world, opts.radius), e.kind, world, e.shift, e.at);
       } else if (e.t === 'selection') {
         const from = toWorld(e.at);
         const to = toWorld(e.to);
@@ -287,7 +287,7 @@ export async function createMapView(
         if (e.phase === 'end' || e.phase === 'cancel') grabbed = null;
       } else if (e.t === 'hold') {
         velocity = null;
-        hooks?.hold(toWorld(e.at), e.phase);
+        hooks?.hold(toWorld(e.at), e.phase, e.at);
       } else if (e.t === 'doubleTap') {
         const world = toWorld(e.at);
         onDoubleTap?.(pixelToHex(world, opts.radius), world);

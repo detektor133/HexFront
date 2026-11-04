@@ -64,6 +64,8 @@ export type Command =
   | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: 'pact' | 'alliance' }
   | { readonly t: 'answerTreaty'; readonly from: number; readonly accept: boolean }
   | { readonly t: 'breakTreaty'; readonly target: number }
+  /** Наступление на игрока с заказом числа солдат: армия, фронт, линия и старт одной командой. */
+  | { readonly t: 'launchOffensive'; readonly target: number; readonly soldiers: number }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {

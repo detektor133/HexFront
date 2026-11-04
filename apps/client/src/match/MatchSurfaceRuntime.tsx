@@ -44,7 +44,7 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import type { Point } from '../render/hex-geometry.ts';
+import { pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -175,10 +175,19 @@ function matchPlayerColors(selected: string): readonly PlayerColorId[] {
   return playerColorIds(selected) as readonly PlayerColorId[];
 }
 
+/** Меню чужой страны: игрок и точка нажатия в координатах страницы. */
+export interface TerritoryMenuState {
+  readonly other: number;
+  readonly x: number;
+  readonly y: number;
+}
+
 interface Sandbox {
   readonly msg: ViewMessage | null;
   readonly error: string | null;
   readonly picked: Picked;
+  readonly menu: TerritoryMenuState | null;
+  closeMenu(): void;
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   readonly army: number | null;
@@ -230,6 +239,7 @@ export function useSandbox(
   const [msg, setMsg] = useState<ViewMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
+  const [menu, setMenu] = useState<TerritoryMenuState | null>(null);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
   const [paused, setPausedState] = useState(
@@ -454,13 +464,32 @@ export function useSandbox(
     const initialSelect = params.get('select');
     if (initialSelect !== null) pick({ hex: Number(initialSelect), units: [], target: null });
     const initialScale = Number(params.get('scale'));
-    const onTap = (h: { q: number; r: number }, kind: TapKind, world: Point): void => {
+    // Меню чужой страны: ПКМ (удержание пальцем) без выбранных отрядов по земле другого игрока.
+    const openMenuAt = (hex: number, screen: Point | undefined): boolean => {
       const current = viewRef.current;
+      if (!current || !screen) return false;
+      const owner = current.hexes.owner[hex] ?? -1;
+      if (owner < 0 || owner === current.playerId) return false;
+      setMenu({ other: owner, x: screen.x, y: screen.y });
+      return true;
+    };
+    const onTap = (
+      h: { q: number; r: number },
+      kind: TapKind,
+      world: Point,
+      _shift?: boolean,
+      screen?: Point,
+    ): void => {
+      const current = viewRef.current;
+      setMenu(null);
       if (!current || !inBounds(h, map.width, map.height)) {
         return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
       if (input.tap(world, kind) || input.onHandle(world)) return;
+      if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {
+        return;
+      }
       if (kind === 'select') {
         const hit = layerRef.current?.unitsAt(world) ?? [];
         return pick(
@@ -497,6 +526,11 @@ export function useSandbox(
       order,
       markerAt: (world) => layerRef.current?.battleMarkerAt(world) ?? null,
       setBattlePanel: (m) => layerRef.current?.setBattlePanel(m),
+      holdWithoutUnits: (world, screen) => {
+        const h = pixelToHex(world, tokens.map.hexRadius);
+        if (!inBounds(h, map.width, map.height)) return;
+        if (!openMenuAt(hexId(h, map.width), screen)) onTap(h, 'select', world);
+      },
     });
     const options = {
       radius: tokens.map.hexRadius,
@@ -586,6 +620,8 @@ export function useSandbox(
     msg,
     error,
     picked,
+    menu,
+    closeMenu: () => setMenu(null),
     lastReject,
     tool,
     army,
