@@ -276,6 +276,13 @@ export const OFFENSIVE_STOP_ORG: Fp = fp(30);
 export const MAX_ACTIVE_ARROWS = 3;
 /** Вес гексов фронта с гранями, смотрящими на линию наступления, во время наступления. */
 export const OFFENSIVE_FACING_WEIGHT = 3;
+/**
+ * Эшелон: отряд смотрящей грани шагает раз в столько шагов армии; соседи чередуются, поэтому
+ * на каждом шаге половина отрядов — резерв, держит линию.
+ */
+export const OFFENSIVE_ECHELON_PERIOD = 2;
+/** Избыток отрядов на линии фронта, с которого лишний отряд переходит на другую линию армии. */
+export const FRONT_REBALANCE_SURPLUS = 2;
 /** Надбавки к весу гекса фронта при распределении отрядов (07-controls.md, «Распределение»). */
 export const FRONT_WEIGHT_CITY: Fp = fp(2);
 export const FRONT_WEIGHT_CAPITAL: Fp = fp(3);

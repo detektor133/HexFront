@@ -2,9 +2,16 @@
 // Наступают только отряды на гранях фронта, смотрящих на линию, и только шагом, после которого
 // они строго ближе к линии; за линию не идут.
 // GDD: docs/gdd/07-controls.md — «Линия наступления».
-import { MAX_UNITS_PER_HEX, OFFENSIVE_STEP_TICKS, OFFENSIVE_STOP_ORG } from '../balance.ts';
+import {
+  MAX_UNITS_PER_HEX,
+  OFFENSIVE_ECHELON_PERIOD,
+  OFFENSIVE_STEP_TICKS,
+  OFFENSIVE_STOP_ORG,
+} from '../balance.ts';
 import { setOffensive } from '../commands/plan.ts';
-import type { HexId } from '../math/hex.ts';
+import { TERRAIN } from '../map/types.ts';
+import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { intDiv } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
 import { edgeAt } from '../state/contour.ts';
@@ -26,6 +33,7 @@ import {
   stepsToward,
 } from '../state/offensive-steps.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 type FrontPlan = Extract<ArmyPlan, { kind: 'front' }>;
 
@@ -91,12 +99,35 @@ function touchesCorner(state: MatchState, e: EdgeId, c: Corner): boolean {
   return edgeCorners(e).some((x) => cornerKey(state, x) === key);
 }
 
+// Ямка: чужой или ничей гекс у взятой земли, все соседи которого (кроме воды и края карты) свои.
+// Эшелон мог оставить такой гекс позади — его берут независимо от dt, как анклав.
+function pits(state: MatchState, owner: number, around: readonly HexId[]): HexId[] {
+  const { width, height } = state.map;
+  const out = new Set<HexId>();
+  for (const h of around) {
+    for (const n of neighbors(hexFromId(h, width))) {
+      if (!inBounds(n, width, height)) continue;
+      const id = hexId(n, width);
+      if (state.hexes.owner[id] === owner || state.map.terrain[id] === TERRAIN.water) continue;
+      const land = neighbors(n)
+        .filter((x) => inBounds(x, width, height))
+        .map((x) => hexId(x, width))
+        .filter((x) => state.map.terrain[x] !== TERRAIN.water);
+      if (land.length > 0 && land.every((x) => state.hexes.owner[x] === owner)) out.add(id);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 function advance(state: MatchState, plan: FrontPlan): void {
   const off = plan.offensive;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (!off || owner === undefined) return;
   // Анклавы у взятой земли — тоже цель наступления, независимо от dt.
-  const enclaves = new Set(enclaveHexes(state, owner, off.taken));
+  const enclaves = new Set([
+    ...enclaveHexes(state, owner, off.taken),
+    ...pits(state, owner, [...off.taken, ...off.hexes]),
+  ]);
   if (enclaves.size === 0 && off.hexes.every((h) => state.hexes.owner[h] === owner)) {
     finish(state, plan, owner, off.edges);
     return;
@@ -105,10 +136,20 @@ function advance(state: MatchState, plan: FrontPlan): void {
   const facing = new Set(facingHexes(state, plan.edges, dist));
   const taken = new Set<HexId>();
   let progress = state.units.some((u) => u.armyId === plan.armyId && u.inBattle);
+  // Эшелон: соседние отряды смотрящих граней шагают по очереди — половина идёт, половина резерв
+  // держит линию и пойдёт на следующем шаге. Прорывов клином нет, пропусков тоже: очередь сдвигается.
+  const phase = intDiv(state.tick, OFFENSIVE_STEP_TICKS);
+  const goNow = new Set(
+    allUnits(state)
+      .filter((u) => advancing(u, plan.armyId, facing))
+      .filter((u) => (u.id + phase) % OFFENSIVE_ECHELON_PERIOD === 0)
+      .map((u) => u.id),
+  );
   for (const u of state.units) {
     const near = neighborsIn(state, u.hex, enclaves);
-    if (!advancing(u, plan.armyId, facing) && !(near.length > 0 && free(u, plan.armyId))) continue;
-    const toward = facing.has(u.hex) ? stepsToward(state, owner, u.hex, dist) : [];
+    const spearhead = goNow.has(u.id);
+    if (!spearhead && !(near.length > 0 && free(u, plan.armyId))) continue;
+    const toward = spearhead ? stepsToward(state, owner, u.hex, dist) : [];
     const steps = [...toward, ...near.filter((h) => !toward.includes(h))];
     const step = pickStep(state, u, steps, taken);
     if (step === null) continue;

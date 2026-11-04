@@ -11,6 +11,7 @@ import {
   MAX_UNITS_PER_HEX,
   OFFENSIVE_FACING_WEIGHT,
 } from '../balance.ts';
+import { attachUnits, lineRuns } from './attach.ts';
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
 import { BUILDING, type ArmyPlan, type MatchState, type Unit } from './types.ts';
@@ -213,7 +214,16 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
   const cap = (h: HexId): number =>
     MAX_UNITS_PER_HEX -
     allUnits(state).filter((u) => u.owner === owner && u.hex === h && !units.includes(u)).length;
-  const slots = new Map(assignLine(state, lineSlots(line, w, lineUnits.length, cap), lineUnits, w));
+  // Линий у армии может быть несколько: отряд закреплён за своей и расставляется внутри неё.
+  const runs = lineRuns(state, line);
+  const groups = attachUnits(state, runs, w, lineUnits);
+  const slots = new Map<number, HexId>();
+  runs.forEach((run, r) => {
+    const mine = groups[r] ?? [];
+    for (const [id, h] of assignLine(state, lineSlots(run, w, mine.length, cap), mine, w)) {
+      slots.set(id, h);
+    }
+  });
   const art = assignArtillery(state, owner, arty, line, w);
   for (const [id, h] of art.slots) slots.set(id, h);
   const occupied = new Set(slots.values());

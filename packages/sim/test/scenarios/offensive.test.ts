@@ -94,7 +94,7 @@ describe('линия наступления (CR-002, как в HoI4)', () => {
     s.cmd('A', startOffensive(army));
     s.runSeconds(80);
     for (const c of [3, 4, 5]) {
-      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r)).toBe('A');
+      for (let r = 0; r < 5; r += 1) expect(ownerOf(s, c, r), `гекс ${c},${r}`).toBe('A');
     }
     for (let r = 1; r < 5; r += 1) expect(ownerOf(s, 6, r)).toBe('B');
   });
