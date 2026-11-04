@@ -276,6 +276,12 @@ export const OFFENSIVE_STOP_ORG: Fp = fp(30);
 export const MAX_ACTIVE_ARROWS = 3;
 /** Вес гексов фронта с гранями, смотрящими на линию наступления, во время наступления. */
 export const OFFENSIVE_FACING_WEIGHT = 3;
+/** Надбавки к весу гекса фронта при распределении отрядов (07-controls.md, «Распределение»). */
+export const FRONT_WEIGHT_CITY: Fp = fp(2);
+export const FRONT_WEIGHT_CAPITAL: Fp = fp(3);
+export const FRONT_WEIGHT_DEPOT: Fp = fp(1);
+/** За каждую сторону света сверх первой, с которой гекс граничит с врагом (фланг). */
+export const FRONT_WEIGHT_FLANK: Fp = fp(1);
 /**
  * Смотрящие на линию наступления грани — не дальше стольких гексов от ближайшей к линии точки
  * фронта (07-controls.md, «Линия наступления»), гексов.

@@ -2,10 +2,18 @@
 // угрозе, броня на равнину, артиллерия позади линии. Состояние не меняет.
 // GDD: docs/gdd/07-controls.md — «Распределение».
 import { atWar } from './relations.ts';
-import { ARTY_RANGE, MAX_UNITS_PER_HEX, OFFENSIVE_FACING_WEIGHT } from '../balance.ts';
+import {
+  ARTY_RANGE,
+  FRONT_WEIGHT_CAPITAL,
+  FRONT_WEIGHT_CITY,
+  FRONT_WEIGHT_DEPOT,
+  FRONT_WEIGHT_FLANK,
+  MAX_UNITS_PER_HEX,
+  OFFENSIVE_FACING_WEIGHT,
+} from '../balance.ts';
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
-import type { ArmyPlan, MatchState, Unit } from './types.ts';
+import { BUILDING, type ArmyPlan, type MatchState, type Unit } from './types.ts';
 import { allUnits } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -30,15 +38,30 @@ function around(state: MatchState, hex: HexId): HexId[] {
     .map((n) => hexId(n, width));
 }
 
-/** Вес гекса линии: FP + вражеские солдаты на соседних гексах, в сотнях. */
+/**
+ * Вес гекса линии: FP + вражеские солдаты на соседних гексах, в сотнях; город, столица и склад
+ * на гексе; фланг — за каждую сторону с вражеской землёй сверх первой. Закрывать в первую очередь
+ * то, что дороже и опаснее.
+ */
 function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<HexId, number> {
   const out = new Map<HexId, number>();
+  const capitalId = state.players[owner]?.capitalCityId;
   for (const h of line) {
-    const near = new Set(around(state, h));
+    const near = around(state, h);
+    const nearSet = new Set(near);
     let enemy = 0;
     for (const u of state.units)
-      if (atWar(state, owner, u.owner) && near.has(u.hex)) enemy += u.soldiers;
-    out.set(h, FP + intDiv(enemy, THREAT_SOLDIERS));
+      if (atWar(state, owner, u.owner) && nearSet.has(u.hex)) enemy += u.soldiers;
+    let weight: number = FP + intDiv(enemy, THREAT_SOLDIERS);
+    const city = state.cities.find((c) => c.hex === h);
+    if (city) weight += city.id === capitalId ? FRONT_WEIGHT_CAPITAL : FRONT_WEIGHT_CITY;
+    if (state.hexes.building[h] === BUILDING.depot) weight += FRONT_WEIGHT_DEPOT;
+    const hostileSides = near.filter((n) => {
+      const o = state.hexes.owner[n] ?? -1;
+      return o >= 0 && o !== owner && atWar(state, owner, o);
+    }).length;
+    weight += Math.max(0, hostileSides - 1) * FRONT_WEIGHT_FLANK;
+    out.set(h, weight);
   }
   return out;
 }
