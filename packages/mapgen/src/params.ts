@@ -2,7 +2,7 @@
 export const MAPGEN_MAX_PLAYERS = 100;
 export const MAPGEN_NOISE_OCTAVES = 3;
 export const MAPGEN_EDGE_WATER = 2;
-export const MAPGEN_WATER_SHARE = 25;
+export const MAPGEN_WATER_SHARE = 15;
 export const MAPGEN_MIN_ISLAND = 30;
 export const MAPGEN_MOUNTAIN_SHARE = 8;
 export const MAPGEN_HILLS_SHARE = 14;

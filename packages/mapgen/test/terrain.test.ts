@@ -25,7 +25,7 @@ describe('процедурный рельеф', () => {
         result[code] = (result[code] ?? 0) + 1;
         return result;
       }, [] as number[]);
-      expect((counts[TERRAIN.water] ?? 0) / terrain.length).toBeCloseTo(0.25, 2);
+      expect((counts[TERRAIN.water] ?? 0) / terrain.length).toBeCloseTo(0.15, 2);
       const land = terrain.length - (counts[TERRAIN.water] ?? 0);
       expect((counts[TERRAIN.mountains] ?? 0) / land).toBeCloseTo(0.08, 2);
       expect((counts[TERRAIN.hills] ?? 0) / land).toBeCloseTo(0.14, 2);

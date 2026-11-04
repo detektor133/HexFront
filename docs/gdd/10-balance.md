@@ -59,7 +59,7 @@
 | `MAPGEN_MAX_PLAYERS` | 100 `[ТЮНИНГ]` |
 | MAPGEN_NOISE_OCTAVES | 3 `[ТЮНИНГ]` |
 | MAPGEN_EDGE_WATER | 2 гекса `[ТЮНИНГ]` |
-| MAPGEN_WATER_SHARE | 25 % `[ТЮНИНГ]` |
+| MAPGEN_WATER_SHARE | 15 % `[ТЮНИНГ]` |
 | MAPGEN_MIN_ISLAND | 30 гексов `[ТЮНИНГ]` |
 | MAPGEN_MOUNTAIN_SHARE | 8 % суши `[ТЮНИНГ]` |
 | MAPGEN_HILLS_SHARE | 14 % суши `[ТЮНИНГ]` |
