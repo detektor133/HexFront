@@ -1,4 +1,6 @@
 // Производные цвета из токенов (tokens.json): сами цвета не задаются, только вычисляются.
+import type { Relation } from '@hexfront/sim';
+
 import { tokens } from './tokens.ts';
 
 let playerPalette: Array<(typeof tokens.players.palette)[number]> = Array.from(
@@ -59,7 +61,12 @@ export function armyColor(armyNumber: number): string {
   return pool[index] ?? tokens.neutral.line;
 }
 
-/** Цвет фишки отряда по отношению к игроку me (CR-003): свои — зелёные, чужие — красные. */
-export function relationColor(owner: number, me: number): string {
-  return owner === me ? tokens.relation.own : tokens.relation.enemy;
+/**
+ * Цвет фишки отряда по отношению к игроку me (CR-003, CR-007): свои — зелёные, враги (война или
+ * дипломатия выключена) — красные, союзники — синие, остальные (мир, пакт) — серые.
+ */
+export function relationColor(owner: number, me: number, relation: Relation = 'war'): string {
+  if (owner === me) return tokens.relation.own;
+  if (relation === 'war') return tokens.relation.enemy;
+  return relation === 'alliance' ? tokens.relation.ally : tokens.neutral.line;
 }

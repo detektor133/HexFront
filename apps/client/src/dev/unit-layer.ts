@@ -264,7 +264,7 @@ export function createUnitLayer(
           })
         : -1;
     return {
-      color: relationColor(unit.owner, v.playerId),
+      color: relationColor(unit.owner, v.playerId, v.diplomacy?.relations[unit.owner]),
       army: army ? armyColor(army.number) : null,
       type: unit.type,
       soldiers: unit.soldiers,
