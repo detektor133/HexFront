@@ -37,12 +37,18 @@ export function rebuildSupplyPlan(
 ): RebuildPlan {
   const normalized: RebuildTarget = typeof target === 'number' ? { cityId: target } : target;
   let hex: HexId;
+  let capitalHex: HexId | null = null;
   if ('cityId' in normalized) {
     const city = state.cities.find((candidate) => candidate.id === normalized.cityId);
     if (!city) return fail('unknownCity');
     if (city.owner !== playerId) return fail('notOwnCity');
-    if (!isCityIsolated(state, city.id)) return fail('notIsolated');
     hex = city.hex;
+    // Связанный город тоже может проложить свою дорогу до столицы: цель — гекс столицы.
+    if (!isCityIsolated(state, city.id)) {
+      const capital = state.cities.find((c) => c.id === state.players[playerId]?.capitalCityId);
+      if (!capital || capital.id === city.id) return fail('notIsolated');
+      capitalHex = capital.hex;
+    }
   } else {
     if (
       !Number.isInteger(normalized.hex) ||
@@ -63,7 +69,9 @@ export function rebuildSupplyPlan(
   const mainIds = new Set(
     state.networks.filter((n) => n.owner === playerId && n.isMain).map((n) => n.id),
   );
-  const path = findRoadPath(state, playerId, hex, (h) => mainIds.has(state.hexes.network[h] ?? -1));
+  const path = findRoadPath(state, playerId, hex, (h) =>
+    capitalHex === null ? mainIds.has(state.hexes.network[h] ?? -1) : h === capitalHex,
+  );
   if (!path) return fail('noPath');
   const cityHexes = new Set(state.cities.map((c) => c.hex));
   const toBuild = path.filter((h) => state.hexes.road[h] !== 1 && !cityHexes.has(h));

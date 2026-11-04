@@ -74,6 +74,7 @@ export function cityInfo(state: MatchState, cityId: number): CityInfo | null {
   if (!city) return null;
   const isCapital = state.players[city.owner]?.capitalCityId === city.id;
   const isolated = isCityIsolated(state, city.id);
+  const rebuild = rebuildSupplyPlan(state, city.owner, city.id);
   const road = state.constructions.find((c) => c.kind === 'road' && c.hex === city.hex);
   const build = state.constructions.find((c) => c.kind !== 'road' && c.hex === city.hex);
   return {
@@ -96,6 +97,6 @@ export function cityInfo(state: MatchState, cityId: number): CityInfo | null {
       ? { kind: build.kind, progressTicks: build.progressTicks, totalTicks: build.totalTicks }
       : null,
     upgrade: checkConstruction(state, city.owner, { t: 'upgradeCity', cityId: city.id }),
-    rebuild: isolated ? rebuildSupplyPlan(state, city.owner, city.id) : null,
+    rebuild: rebuild.ok || isolated ? rebuild : null,
   };
 }
