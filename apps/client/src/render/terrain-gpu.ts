@@ -3,7 +3,7 @@
 // шейдере. Узоры — SDF с экранной толщиной линии: при зуме не нужна перетесселяция геометрии.
 import { BufferImageSource, Container, Mesh, MeshGeometry, Shader, Texture } from 'pixi.js';
 
-import type { MapStatic } from '@hexfront/sim';
+import { hexFromId, hexId, inBounds, neighbor, type Hex, type MapStatic } from '@hexfront/sim';
 
 import type { DetailLevel } from './camera.ts';
 import { mapBounds } from './hex-geometry.ts';
@@ -37,10 +37,13 @@ uniform float uR;
 uniform float uPx;
 uniform float uPattern;
 uniform float uGrid;
+uniform float uRiver;
+uniform vec3 uRiverColor;
 uniform vec2 uGridStyle;
 uniform float uMode;
 
 const float SQRT3 = 1.7320508;
+const ivec2 EDGE_CORNERS[6] = ivec2[6](ivec2(0, 1), ivec2(5, 0), ivec2(4, 5), ivec2(3, 4), ivec2(2, 3), ivec2(1, 2));
 const ivec2 DIRS[6] = ivec2[6](ivec2(1, 0), ivec2(1, -1), ivec2(0, -1), ivec2(-1, 0), ivec2(-1, 1), ivec2(0, 1));
 
 ivec2 toOffset(ivec2 ax) {
@@ -67,6 +70,11 @@ float hexNoise(ivec2 qr, int salt) {
   h = (h ^ (h >> 15)) * 0x85ebca6bu;
   h = (h ^ (h >> 13)) * 0xc2b2ae35u;
   return float(h ^ (h >> 16)) / 4294967296.0;
+}
+
+vec2 corner(int k) {
+  float a = radians(60.0 * float(k));
+  return uR * vec2(cos(a), sin(a));
 }
 
 float edgeDist(vec2 p, int d, float apothem) {
@@ -174,7 +182,8 @@ void main() {
   else if (dr > ds) rr = -rq - rs;
   ivec2 ax = ivec2(int(rq), int(rr));
   if (!inMap(toOffset(ax))) discard;
-  int t = terrainAt(ax);
+  vec4 cell = texelFetch(uData, toOffset(ax), 0);
+  int t = int(cell.r * 255.0 + 0.5);
   vec2 p = vWorld - vec2(uR * 1.5 * rq, uR * SQRT3 * (rr + rq * 0.5));
   float apothem = uR * SQRT3 * 0.5;
 
@@ -187,7 +196,19 @@ void main() {
         gridCover = max(gridCover, clamp((uGridStyle.x - dist) / uPx + 0.5, 0.0, 1.0));
       }
     }
+    // Реки: грани гекса (G) и «спицы» из его углов по граням соседей (B) — линия не рвётся в вершинах.
+    int edges = int(cell.g * 255.0 + 0.5);
+    int spokes = int(cell.b * 255.0 + 0.5);
+    float riverD = 1e9;
+    for (int d = 0; d < 6; d++) {
+      if (((edges >> d) & 1) == 1) riverD = min(riverD, segDist(p, corner(EDGE_CORNERS[d].x), corner(EDGE_CORNERS[d].y)));
+      if (((spokes >> d) & 1) == 1) {
+        vec2 a = corner(d);
+        riverD = min(riverD, segDist(p, a, a * 2.0));
+      }
+    }
     col = mix(col, vec3(1.0), uGridStyle.y * gridCover);
+    col = mix(col, uRiverColor, clamp((uRiver * 0.5 - riverD) / uPx + 0.5, 0.0, 1.0));
     finalColor = vec4(col, 1.0);
     return;
   }
@@ -237,11 +258,55 @@ function headlessTerrain(): TerrainGpu {
   };
 }
 
+const CORNER_EDGES: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [0, 5],
+  [5, 4],
+  [4, 3],
+  [3, 2],
+  [2, 1],
+];
+
+// Есть ли река на грани d гекса: бит хранится у гекса с направлением 0–2, иначе — у соседа.
+function riverOnEdge(map: MapStatic, hex: Hex, d: number): boolean {
+  if (!inBounds(hex, map.width, map.height)) return false;
+  if (d < 3) return ((map.rivers[hexId(hex, map.width)] ?? 0) & (1 << d)) !== 0;
+  const other = neighbor(hex, d as 0 | 1 | 2 | 3 | 4 | 5);
+  if (!inBounds(other, map.width, map.height)) return false;
+  return ((map.rivers[hexId(other, map.width)] ?? 0) & (1 << (d - 3))) !== 0;
+}
+
+/**
+ * Маски рек гекса: грани (бит d) и «спицы» из углов (бит k) — грани между двумя соседями,
+ * которые выходят из угла гекса наружу.
+ * @returns [маска граней, маска спиц]
+ */
+export function riverMasks(map: MapStatic, hex: Hex): readonly [number, number] {
+  let edges = 0;
+  let spokes = 0;
+  for (let d = 0; d < 6; d += 1) if (riverOnEdge(map, hex, d)) edges |= 1 << d;
+  CORNER_EDGES.forEach(([a, b], k) => {
+    const first = neighbor(hex, a as 0 | 1 | 2 | 3 | 4 | 5);
+    const second = neighbor(hex, b as 0 | 1 | 2 | 3 | 4 | 5);
+    for (let e = 0; e < 6; e += 1) {
+      const n = neighbor(first, e as 0 | 1 | 2 | 3 | 4 | 5);
+      if (n.q === second.q && n.r === second.r) {
+        if (riverOnEdge(map, first, e)) spokes |= 1 << k;
+        break;
+      }
+    }
+  });
+  return [edges, spokes];
+}
+
 export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
   if (typeof document === 'undefined') return headlessTerrain();
   const data = new Uint8Array(map.width * map.height * 4);
   map.terrain.forEach((code, id) => {
+    const [edges, spokes] = riverMasks(map, hexFromId(id, map.width));
     data[id * 4] = code;
+    data[id * 4 + 1] = edges;
+    data[id * 4 + 2] = spokes;
     data[id * 4 + 3] = 255;
   });
   const dataSource = new BufferImageSource({
@@ -297,6 +362,8 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
           uPx: { value: 1, type: 'f32' },
           uPattern: { value: M.patternWidth, type: 'f32' },
           uGrid: { value: 0, type: 'f32' },
+          uRiver: { value: 0, type: 'f32' },
+          uRiverColor: { value: rgb(M.river).map((c) => c / 255), type: 'vec3<f32>' },
           uGridStyle: { value: [0.5, M.hexGridAlpha], type: 'vec2<f32>' },
           uMode: { value: mode, type: 'f32' },
         },
@@ -319,6 +386,7 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
     setScale(scale, level) {
       setUniform('uPx', 1 / scale);
       setUniform('uGrid', level >= M.hexGridVisibleFromZoom ? 1 : 0);
+      setUniform('uRiver', (M.riverWidth[level - 1] ?? M.riverWidth[1] ?? 2.5) / scale);
     },
     destroy() {
       base.destroy();

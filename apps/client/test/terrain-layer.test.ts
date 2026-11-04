@@ -42,7 +42,7 @@ describe('слои рельефа карты', () => {
     const layer = createTerrainLayer(loaded.map, tokens.map.hexRadius);
 
     // Слой GPU-рельефа и реки под территорией, узоры над ней.
-    expect(layer.base.children).toHaveLength(2);
+    expect(layer.base.children).toHaveLength(1);
     expect(layer.overlay.children).toHaveLength(1);
     const mapViewSource = readFileSync(
       new URL('../src/render/map-view.ts', import.meta.url),
