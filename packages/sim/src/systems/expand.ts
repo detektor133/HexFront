@@ -3,6 +3,7 @@
 // земля росла сплошной, без червей; соседний ничей город с гарнизоном — штурмом, если прогноз
 // не «Поражение». Армия без плана: фронтом её отряды не управляет никто, кроме этой системы.
 import { EXPAND_RADIUS_BASE, EXPAND_RADIUS_MAX, EXPAND_SOLDIERS_PER_HEX } from '../balance.ts';
+import { releaseDirection } from '../commands/release.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
@@ -110,5 +111,7 @@ export function expandNeutral(state: MatchState, army: Army): void {
     free2.delete(unit.id);
   }
   const finished = open.length === 0 && !moving && free2.size === free.length;
-  if (finished) army.dir = { target: dir.target, mode: 'idle' };
+  // Занять больше нечего: армия расформировывается, отряды уходят в резерв — их возьмёт другое
+  // направление, а закупка не гонит новобранцев в армию, которой делать нечего.
+  if (finished) releaseDirection(state, army);
 }

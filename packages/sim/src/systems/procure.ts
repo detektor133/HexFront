@@ -62,7 +62,16 @@ function takeReserve(state: MatchState, army: Army): void {
 /** Добирает резерв и закупает недостающих для армий с заказанной численностью; раз в секунду. */
 export function procure(state: MatchState): void {
   if (state.tick % TICKS_PER_S !== 0) return;
-  for (const army of state.armies) {
+  // Справедливо: сначала армия с наименьшей долей заказа — иначе первая по id забирает резерв и
+  // очередь единственного города, а остальные направления стоят пустыми.
+  const wanting = state.armies
+    .filter((a) => a.wanted !== undefined && a.dir?.mode !== 'idle')
+    .sort((a, b) => {
+      const left = strength(state, a) * (b.wanted ?? 1);
+      const right = strength(state, b) * (a.wanted ?? 1);
+      return left - right || a.id - b.id;
+    });
+  for (const army of wanting) {
     if (army.wanted === undefined) continue;
     takeReserve(state, army);
     const deficit = army.wanted * FP - strength(state, army);

@@ -5,6 +5,7 @@
 // и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
 import { ARMY_NAME_MAX, executeArmyCommand } from './army.ts';
 import { executePlanCommand, removePlan, validatePlanCommand } from './plan.ts';
+import { releaseDirection } from './release.ts';
 import { OK, rejected, type Validation } from './types.ts';
 import { commanderLine } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
@@ -202,20 +203,7 @@ function candidates(
     );
 }
 
-/** Снимает направление: фронт и заказ убираются, отряды уходят в резерв, армия расформировывается. */
-export function releaseDirection(state: MatchState, army: Army): void {
-  removePlan(state, army.id);
-  for (const u of allUnits(state)) {
-    if (u.armyId === army.id) {
-      u.armyId = null;
-      u.slot = -1;
-    }
-  }
-  const rest = state.recruits.filter((r) => r.armyId !== army.id);
-  state.recruits.splice(0, state.recruits.length, ...rest);
-  const armies = state.armies.filter((a) => a.id !== army.id);
-  state.armies.splice(0, state.armies.length, ...armies);
-}
+export { releaseDirection };
 
 // Армия направления: создаётся при первом запуске, затем переиспользуется; фронт стоит на границе
 // с целью, отряды добраны под заказ, чего не хватает — закупит ИИ. Автокомандование выключено:
