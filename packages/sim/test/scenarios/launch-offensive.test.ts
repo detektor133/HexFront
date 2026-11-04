@@ -48,5 +48,38 @@ describe('наступление одной командой', () => {
     expect(units.length).toBeLessThan(4);
     const plan = s.state.plans.find((p) => p.armyId === army?.id);
     expect(plan?.kind === 'front' && plan.offensive?.active).toBe(true);
+    expect(army?.auto).toBe(false);
+  });
+
+  it('держать границу можно и в мире: фронт и заказ без наступления', () => {
+    const s = game();
+    const cmd = { t: 'holdBorder', target: 1, soldiers: 600 } as const;
+    expect(validate(s.state, 0, cmd).ok).toBe(true);
+    applyCommands(s.state, [{ playerId: 0, cmd }]);
+
+    const army = s.state.armies.find((a) => a.owner === 0);
+    expect(army?.wanted).toBe(600);
+    const plan = s.state.plans.find((p) => p.armyId === army?.id);
+    expect(plan?.kind).toBe('front');
+    expect(plan?.kind === 'front' && plan.offensive).toBeNull();
+  });
+
+  it('ничья земля тоже направление: фронт на границе у гекса клика и наступление без войны', () => {
+    const open = `
+      A1 a  a  .  .  .
+      a  a  a  .  .  .
+      a  a  a  .  .  B1
+    `;
+    const s = scenario(open, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    for (const row of [0, 1, 2]) s.unit('A', 'infantry', 300, at(2, row));
+    const hex = at(4, 1).col + at(4, 1).row * s.state.map.width;
+    const cmd = { t: 'launchOffensive', target: -1, soldiers: 300, hex } as const;
+    expect(validate(s.state, 0, cmd).ok).toBe(true);
+    applyCommands(s.state, [{ playerId: 0, cmd }]);
+
+    const army = s.state.armies.find((a) => a.owner === 0);
+    const plan = s.state.plans.find((p) => p.armyId === army?.id);
+    expect(plan?.kind === 'front' && plan.offensive?.active).toBe(true);
   });
 });

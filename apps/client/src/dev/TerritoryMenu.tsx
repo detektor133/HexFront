@@ -1,4 +1,4 @@
-import { IconSwords, IconX } from '@tabler/icons-react';
+import { IconFlag, IconShield, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { FP, type Command, type PlayerView } from '@hexfront/sim';
@@ -13,8 +13,8 @@ const MENU_WIDTH = 264;
 const EDGE = 8;
 
 /**
- * Предел слайдера наступления: солдаты в отрядах плюс половина населения — недостающих ИИ
- * закупит и подведёт (`wanted` армии).
+ * Предел слайдера: солдаты в отрядах плюс половина населения — недостающих ИИ закупит и подведёт
+ * (`wanted` армии).
  */
 function ownSoldiers(view: PlayerView): number {
   const total = view.units
@@ -24,18 +24,22 @@ function ownSoldiers(view: PlayerView): number {
 }
 
 /**
- * Меню чужой страны по ПКМ (удержанию пальцем) без выбранных отрядов: дипломатия и наступление со
- * слайдером «сколько войск». Дальше наступлением управляет движок фронта армии «→ имя».
+ * Меню земли по ПКМ (удержанию пальцем) без выбранных отрядов. Чужая страна: дипломатия, «держать
+ * границу» и, на войне, «наступать»; ничья земля: «занять». Слайдер — сколько солдат на этом
+ * направлении; дальше ИИ набирает, подводит и ведёт армию «Фронт: …».
  */
 export function TerritoryMenu(props: {
   readonly view: PlayerView;
+  /** Игрок, чья это земля, или -1 — ничья земля. */
   readonly other: number;
+  /** Гекс нажатия: у ничьей земли выбирает кусок границы. */
+  readonly hex: number;
   /** Точка нажатия в координатах страницы. */
   readonly at: { readonly x: number; readonly y: number };
   readonly send: (cmd: Command) => void;
   readonly onClose: () => void;
 }): React.JSX.Element | null {
-  const { view, other, at, send, onClose } = props;
+  const { view, other, hex, at, send, onClose } = props;
   const max = ownSoldiers(view);
   const [soldiers, setSoldiers] = useState(() => Math.max(1, Math.floor(max / 2)));
   const ref = useRef<HTMLDivElement | null>(null);
@@ -53,55 +57,78 @@ export function TerritoryMenu(props: {
       window.removeEventListener('pointerdown', onDown);
     };
   }, [onClose]);
-  const player = view.players[other];
-  if (!player || player.status !== 'alive') return null;
-  const atWar = (view.diplomacy?.relations[other] ?? 'war') === 'war';
+  const neutral = other < 0;
+  const player = neutral ? null : view.players[other];
+  if (!neutral && (!player || player.status !== 'alive')) return null;
+  const atWar = !neutral && (view.diplomacy?.relations[other] ?? 'war') === 'war';
+  const amount = Math.min(soldiers, max);
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - 220));
+  const name = neutral ? t('menu.neutral') : (player?.name ?? '');
+  // Ничья земля выбирает кусок границы по гексу клика; у игрока берётся вся граница с ним.
+  const where = neutral ? { hex } : {};
+  const go = (command: Command): void => {
+    send(command);
+    onClose();
+  };
   return (
     <div
       ref={ref}
       className={styles.menu}
       style={{ left, top, width: MENU_WIDTH }}
       role="dialog"
-      aria-label={player.name}
+      aria-label={name}
     >
       <div className={styles.header}>
         <span
           className={styles.dot}
-          style={{ background: tokens.players.palette[other]?.line ?? tokens.ui.ink }}
+          style={{
+            background: neutral
+              ? tokens.neutral.line
+              : (tokens.players.palette[other]?.line ?? tokens.ui.ink),
+          }}
         />
-        <span className={styles.name}>{player.name}</span>
+        <span className={styles.name}>{name}</span>
         <IconButton label={t('menu.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} aria-hidden="true" />
         </IconButton>
       </div>
-      <DiplomacyBlock view={view} other={other} send={send} />
-      {atWar && (
-        <div className={styles.attack}>
-          <input
-            className={styles.slider}
-            type="range"
-            min={1}
-            max={max}
-            step={1}
-            value={Math.min(soldiers, max)}
-            aria-label={t('menu.soldiers')}
-            onChange={(event) => setSoldiers(Number(event.target.value))}
-          />
-          <span className={styles.count}>{Math.min(soldiers, max)}</span>
+      {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
+      <div className={styles.attack}>
+        <input
+          className={styles.slider}
+          type="range"
+          min={1}
+          max={max}
+          step={1}
+          value={amount}
+          aria-label={t('menu.soldiers')}
+          onChange={(event) => setSoldiers(Number(event.target.value))}
+        />
+        <span className={styles.count}>{amount}</span>
+        {!neutral && (
           <IconButton
-            label={t('menu.attack')}
-            className={styles.go}
-            onClick={() => {
-              send({ t: 'launchOffensive', target: other, soldiers: Math.min(soldiers, max) });
-              onClose();
-            }}
+            label={t('menu.hold')}
+            className={styles.hold}
+            onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount })}
           >
-            <IconSwords size={20} aria-hidden="true" />
+            <IconShield size={20} aria-hidden="true" />
           </IconButton>
-        </div>
-      )}
+        )}
+        {(atWar || neutral) && (
+          <IconButton
+            label={t(neutral ? 'menu.occupy' : 'menu.attack')}
+            className={styles.go}
+            onClick={() => go({ t: 'launchOffensive', target: other, soldiers: amount, ...where })}
+          >
+            {neutral ? (
+              <IconFlag size={20} aria-hidden="true" />
+            ) : (
+              <IconSwords size={20} aria-hidden="true" />
+            )}
+          </IconButton>
+        )}
+      </div>
     </div>
   );
 }

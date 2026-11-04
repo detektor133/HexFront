@@ -1,4 +1,3 @@
-import { IconRobot } from '@tabler/icons-react';
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -198,24 +197,6 @@ function RunButton(props: {
   );
 }
 
-// Значок «А» — автокомандование армии (art/ui.md, «Панель армий»): вкл. — залитый круг.
-function AutoBadge(props: { on: boolean; onClick: () => void }): React.JSX.Element {
-  const label = t(props.on ? 'army.autoCommandOn' : 'army.autoCommandOff');
-  return (
-    <IconButton
-      type="button"
-      className={styles.autoBadge}
-      label={label}
-      aria-pressed={props.on}
-      onClick={props.onClick}
-    >
-      <span className={props.on ? styles.autoOn : styles.autoOff}>
-        <IconRobot size={16} aria-hidden="true" />
-      </span>
-    </IconButton>
-  );
-}
-
 function ArmyCard(props: {
   rawName: string;
   name: string;
@@ -233,9 +214,6 @@ function ArmyCard(props: {
   /** Подсказка приглушённой ▶ (у армии с auto без фронта). */
   runHint: string | null;
   onRun: (start: boolean) => void;
-  /** Автокомандование армии — значок «А» (CR-006). */
-  auto: boolean;
-  onAuto: () => void;
   onRename: (name: string) => void;
   onClick: () => void;
   /** ПКМ: если выбраны отряды — перевести их в эту армию, иначе выбрать армию. */
@@ -340,9 +318,8 @@ function ArmyCard(props: {
           />
         </span>
       </div>
-      {/* Колонка «А» и ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
+      {/* Колонка ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
       <span className={styles.side}>
-        <AutoBadge on={props.auto} onClick={props.onAuto} />
         <span className={styles.runs}>
           {run && (
             <>
@@ -502,8 +479,6 @@ export function ArmyBar(props: {
                   run={runOf(a)}
                   runHint={t('plan.needFront')}
                   onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
-                  auto={a.auto}
-                  onAuto={() => send({ t: 'setArmyAuto', armyId: a.id, on: !a.auto })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
                   onContextAction={() => {

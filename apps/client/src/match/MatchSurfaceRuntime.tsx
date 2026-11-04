@@ -6,6 +6,7 @@ import {
   inBounds,
   loadMap,
   neighbors,
+  TERRAIN,
   type Command,
   type MapStatic,
   type PlayerView,
@@ -169,15 +170,15 @@ type PlayerColorId = (typeof tokens.players.palette)[number]['id'];
 
 const NICKNAME_KEY = 'hexfront.nickname';
 const COLOR_KEY = 'hexfront.color';
-const AUTO_COMMAND_KEY = 'hexfront.auto-command';
 
 function matchPlayerColors(selected: string): readonly PlayerColorId[] {
   return playerColorIds(selected) as readonly PlayerColorId[];
 }
 
-/** Меню чужой страны: игрок и точка нажатия в координатах страницы. */
+/** Меню земли: владелец (-1 — ничья), гекс и точка нажатия в координатах страницы. */
 export interface TerritoryMenuState {
   readonly other: number;
+  readonly hex: number;
   readonly x: number;
   readonly y: number;
 }
@@ -451,7 +452,6 @@ export function useSandbox(
         playerColors: matchPlayerColors(
           setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
         ),
-        autoCommand: setup.autoCommand ?? localStorage.getItem(AUTO_COMMAND_KEY) === 'true',
       },
     );
     setPlayerPalette(
@@ -470,8 +470,10 @@ export function useSandbox(
       const current = viewRef.current;
       if (!current || !screen) return false;
       const owner = current.hexes.owner[hex] ?? -1;
-      if (owner < 0 || owner === current.playerId) return false;
-      setMenu({ other: owner, x: screen.x, y: screen.y });
+      if (owner === current.playerId) return false;
+      // Ничья суша — тоже направление («занять»); вода — нет.
+      if (owner < 0 && map.terrain[hex] === TERRAIN.water) return false;
+      setMenu({ other: owner, hex, x: screen.x, y: screen.y });
       return true;
     };
     const onTap = (

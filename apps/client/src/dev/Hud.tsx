@@ -91,7 +91,6 @@ function Settings(props: {
   onOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const on = props.view.me.autoCommand;
   return (
     <div className={styles.settingsWrap}>
       <IconButton
@@ -111,18 +110,6 @@ function Settings(props: {
       </IconButton>
       {open && (
         <div className={styles.settingsMenu} role="dialog" aria-label={t('settings.title')}>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            className={styles.switchRow}
-            onClick={() => props.send({ t: 'setAutoCommand', on: !on })}
-          >
-            <span>{t('settings.autoCommand')}</span>
-            <span className={on ? styles.switchOn : styles.switchOff}>
-              <span className={styles.knob} />
-            </span>
-          </button>
           {props.showFog && (
             <button
               type="button"

@@ -17,7 +17,6 @@ const HINT_TEXT: Record<
   OnboardingHintId,
   { title: Parameters<typeof t>[0]; text: Parameters<typeof t>[0] }
 > = {
-  autoCommand: { title: 'onboarding.auto.title', text: 'onboarding.auto.text' },
   tax: { title: 'onboarding.tax.title', text: 'onboarding.tax.text' },
   foundCity: { title: 'onboarding.city.title', text: 'onboarding.city.text' },
   front: { title: 'onboarding.front.title', text: 'onboarding.front.text' },

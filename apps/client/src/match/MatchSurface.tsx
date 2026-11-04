@@ -233,6 +233,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <TerritoryMenu
           view={view}
           other={sb.menu.other}
+          hex={sb.menu.hex}
           at={sb.menu}
           send={sb.send}
           onClose={sb.closeMenu}

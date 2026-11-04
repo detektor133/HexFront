@@ -17,17 +17,15 @@ const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
 const NICKNAME_KEY = 'hexfront.nickname';
 const COLOR_KEY = 'hexfront.color';
-const AUTO_COMMAND_KEY = 'hexfront.auto-command';
 
 function readStorage(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
 }
 
-function matchUrl(nickname: string, color: string, autoCommand: boolean): string {
+function matchUrl(nickname: string, color: string): string {
   const url = new URL(quickMatchUrl(), window.location.origin);
   if (nickname !== '') url.searchParams.set('name', nickname);
   url.searchParams.set('color', color);
-  url.searchParams.set('auto', autoCommand ? '1' : '0');
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
@@ -39,7 +37,6 @@ export function MainMenu(): React.JSX.Element {
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
-  const [autoCommand] = useState<boolean>(() => readStorage(AUTO_COMMAND_KEY, 'false') === 'true');
 
   useEffect(() => {
     let disposed = false;
@@ -115,7 +112,6 @@ export function MainMenu(): React.JSX.Element {
 
   const handlePlay = (): void => {
     localStorage.setItem(NICKNAME_KEY, nickname);
-    localStorage.setItem(AUTO_COMMAND_KEY, String(autoCommand));
   };
 
   return (
@@ -187,7 +183,7 @@ export function MainMenu(): React.JSX.Element {
         <a
           className={styles.play}
           role="button"
-          href={matchUrl(nickname, color, autoCommand)}
+          href={matchUrl(nickname, color)}
           onClick={handlePlay}
         >
           {t('menu.play')}

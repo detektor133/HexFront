@@ -66,6 +66,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+.hold {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
 .go {
   display: grid;
   width: 40px;

@@ -64,8 +64,23 @@ export type Command =
   | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: 'pact' | 'alliance' }
   | { readonly t: 'answerTreaty'; readonly from: number; readonly accept: boolean }
   | { readonly t: 'breakTreaty'; readonly target: number }
-  /** Наступление на игрока с заказом числа солдат: армия, фронт, линия и старт одной командой. */
-  | { readonly t: 'launchOffensive'; readonly target: number; readonly soldiers: number }
+  /**
+   * Наступление с заказом числа солдат: армия, фронт, линия и старт одной командой. Цель — id игрока
+   * (нужна война) или -1 (ничья земля у гекса hex).
+   */
+  | {
+      readonly t: 'launchOffensive';
+      readonly target: number;
+      readonly soldiers: number;
+      readonly hex?: number;
+    }
+  /** Держать границу: армия, фронт и заказ числа солдат без наступления; можно и в мире. */
+  | {
+      readonly t: 'holdBorder';
+      readonly target: number;
+      readonly soldiers: number;
+      readonly hex?: number;
+    }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   | {
