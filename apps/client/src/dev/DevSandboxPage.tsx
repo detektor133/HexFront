@@ -625,7 +625,7 @@ export function SandboxSurface({
       )}
       {view && <Leaderboard view={view} />}
       {view && <MatchEnd view={view} />}
-      {showOnboarding && view && <OnboardingHints view={view} />}
+      {showOnboarding && view && <OnboardingHints />}
       {view && (
         <ArmyBar
           view={view}

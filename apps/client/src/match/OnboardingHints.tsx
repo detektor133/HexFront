@@ -1,89 +1,97 @@
-import { useMemo, useState } from 'react';
-
-import type { PlayerView } from '@hexfront/sim';
+import { useState } from 'react';
 
 import styles from './OnboardingHints.module.css';
-import {
-  availableOnboardingHints,
-  onboardingState,
-  ONBOARDING_HINTS,
-  type OnboardingHintId,
-} from './onboarding.ts';
+import { nextStep, prevStep, TUTORIAL_STEPS, type TutorialButton } from './onboarding.ts';
 import { t } from '../i18n/dict.ts';
 
-const DISMISSED_KEY = 'hexfront.onboarding.dismissed';
+const DONE_KEY = 'hexfront.tutorial.done';
 
-const HINT_TEXT: Record<
-  OnboardingHintId,
-  { title: Parameters<typeof t>[0]; text: Parameters<typeof t>[0] }
-> = {
-  expand: { title: 'onboarding.expand.title', text: 'onboarding.expand.text' },
-  tax: { title: 'onboarding.tax.title', text: 'onboarding.tax.text' },
-  foundCity: { title: 'onboarding.city.title', text: 'onboarding.city.text' },
-  attack: { title: 'onboarding.attack.title', text: 'onboarding.attack.text' },
-  hold: { title: 'onboarding.hold.title', text: 'onboarding.hold.text' },
-  depot: { title: 'onboarding.depot.title', text: 'onboarding.depot.text' },
-};
-
-function readDismissed(): Set<OnboardingHintId> {
-  if (typeof localStorage === 'undefined') return new Set();
-  const raw = localStorage.getItem(DISMISSED_KEY);
-  if (!raw) return new Set();
+function readDone(): boolean {
   try {
-    const values: unknown = JSON.parse(raw);
-    if (!Array.isArray(values)) return new Set();
-    return new Set(
-      values.filter(
-        (value): value is OnboardingHintId =>
-          typeof value === 'string' && ONBOARDING_HINTS.includes(value as OnboardingHintId),
-      ),
-    );
+    return localStorage.getItem(DONE_KEY) === '1';
   } catch {
-    return new Set();
+    return false;
   }
 }
 
-function saveDismissed(dismissed: ReadonlySet<OnboardingHintId>): void {
-  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
+function saveDone(): void {
+  try {
+    localStorage.setItem(DONE_KEY, '1');
+  } catch {
+    // Без хранилища обучение просто покажется снова.
+  }
 }
 
-export function OnboardingHints({
-  view,
-  style,
-}: {
-  view: PlayerView;
-  style?: React.CSSProperties | undefined;
-}): React.JSX.Element | null {
-  const [dismissed, setDismissed] = useState<Set<OnboardingHintId>>(readDismissed);
-  const available = useMemo(
-    () => availableOnboardingHints(onboardingState(view), dismissed),
-    [dismissed, view],
-  );
-  const id = available[0];
-  if (!id) return null;
-  const hint = HINT_TEXT[id];
-  const dismiss = (all: boolean): void => {
-    const next = all
-      ? new Set(Object.keys(HINT_TEXT) as OnboardingHintId[])
-      : new Set(dismissed).add(id);
-    setDismissed(next);
-    saveDismissed(next);
-  };
+/** Мышь: подсвечена кнопка, о которой шаг (колесо — полоса, перетаскивание — стрелки). */
+function Mouse({ button }: { button: TutorialButton }): React.JSX.Element {
+  const on = 'var(--selection-color)';
+  const off = 'var(--ui-surface2)';
   return (
-    <aside className={styles.card} style={style} aria-live="polite">
-      <h2 className={styles.title}>{t(hint.title)}</h2>
-      <p className={styles.text}>{t(hint.text)}</p>
-      <div className={styles.actions}>
-        <button type="button" className={styles.button} onClick={() => dismiss(false)}>
-          {t('onboarding.next')}
-        </button>
-        <button
-          type="button"
-          className={`${styles.button} ${styles.secondary}`}
-          onClick={() => dismiss(true)}
-        >
-          {t('onboarding.disable')}
-        </button>
+    <svg className={styles.mouse} viewBox="0 0 48 72" aria-hidden="true">
+      <rect x="6" y="4" width="36" height="64" rx="18" fill={off} stroke="var(--ui-ink2)" />
+      <path d="M24 4v28M6 32h36" stroke="var(--ui-ink2)" strokeWidth="1.5" fill="none" />
+      {button === 'left' && <path d="M24 5.5V31H7.5C7.5 16 14 8 24 5.5Z" fill={on} />}
+      {button === 'right' && <path d="M24 5.5V31h16.5C40.5 16 34 8 24 5.5Z" fill={on} />}
+      {button === 'wheel' && <rect x="21.5" y="10" width="5" height="16" rx="2.5" fill={on} />}
+    </svg>
+  );
+}
+
+export function OnboardingHints(): React.JSX.Element | null {
+  const [done, setDone] = useState(readDone);
+  const [index, setIndex] = useState(0);
+  if (done) return null;
+  const step = TUTORIAL_STEPS[index];
+  if (!step) return null;
+  const finish = (): void => {
+    saveDone();
+    setDone(true);
+  };
+  const advance = (): void => {
+    const next = nextStep(index);
+    if (next === null) finish();
+    else setIndex(next);
+  };
+  const last = index === TUTORIAL_STEPS.length - 1;
+  return (
+    <aside
+      className={styles.card}
+      aria-live="polite"
+      aria-label={t('tutorial.label')}
+      data-testid="tutorial"
+    >
+      <div className={styles.body}>
+        <Mouse button={step.button} />
+        <div className={styles.copy}>
+          <h2 className={styles.title}>
+            {t(`tutorial.${step.id}.title` as Parameters<typeof t>[0])}
+          </h2>
+          <p className={styles.text}>{t(`tutorial.${step.id}.text` as Parameters<typeof t>[0])}</p>
+        </div>
+      </div>
+      <div className={styles.footer}>
+        <ol className={styles.dots} aria-label={`${index + 1} / ${TUTORIAL_STEPS.length}`}>
+          {TUTORIAL_STEPS.map((s, i) => (
+            <li key={s.id} className={i === index ? styles.dotActive : styles.dot} />
+          ))}
+        </ol>
+        <div className={styles.actions}>
+          <button type="button" className={styles.link} onClick={finish}>
+            {t('tutorial.skip')}
+          </button>
+          {index > 0 && (
+            <button
+              type="button"
+              className={`${styles.button} ${styles.secondary}`}
+              onClick={() => setIndex(prevStep(index))}
+            >
+              {t('tutorial.back')}
+            </button>
+          )}
+          <button type="button" className={styles.button} onClick={advance}>
+            {last ? t('tutorial.done') : t('tutorial.next')}
+          </button>
+        </div>
       </div>
     </aside>
   );

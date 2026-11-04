@@ -1,29 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { availableOnboardingHints, type OnboardingState } from '../src/match/onboarding.ts';
+import { nextStep, prevStep, TUTORIAL_STEPS } from '../src/match/onboarding.ts';
 
-const state: OnboardingState = {
-  canExpand: true,
-  canChangeTax: true,
-  canFoundCity: true,
-  canAttack: true,
-  canHold: true,
-  canBuildDepot: true,
-};
-
-describe('подсказки первого матча', () => {
-  it('возвращает только подсказки для доступных ситуаций в заданном порядке', () => {
-    expect(
-      availableOnboardingHints({ ...state, canFoundCity: false }, new Set(['expand', 'tax'])),
-    ).toEqual(['attack', 'hold', 'depot']);
+describe('обучение первого матча', () => {
+  it('шаги идут по порядку и заканчиваются на последнем', () => {
+    expect(nextStep(0)).toBe(1);
+    expect(nextStep(TUTORIAL_STEPS.length - 1)).toBeNull();
   });
 
-  it('не возвращает отключённые подсказки', () => {
-    expect(
-      availableOnboardingHints(
-        state,
-        new Set(['expand', 'tax', 'foundCity', 'attack', 'hold', 'depot']),
-      ),
-    ).toEqual([]);
+  it('назад с первого шага остаётся на первом', () => {
+    expect(prevStep(0)).toBe(0);
+    expect(prevStep(3)).toBe(2);
+  });
+
+  it('есть шаги про ПКМ по чужой и ничьей земле', () => {
+    const right = TUTORIAL_STEPS.filter((s) => s.button === 'right').map((s) => s.id);
+    expect(right).toEqual(expect.arrayContaining(['enemy', 'neutral', 'order']));
   });
 });

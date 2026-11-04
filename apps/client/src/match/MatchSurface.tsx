@@ -118,7 +118,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     hudHeight: hudH,
     bottomPanelHeight: dockH,
     eventRows: feedRows(sb.events, view?.diplomacy?.incoming ?? [], view?.me.graceLeftS),
-    tutorialVisible: showOnboarding && view !== null,
+    tutorialVisible: false,
     leaderboardOpen,
     leaderboardRows: view?.ranking?.length ?? 0,
     ...(leaderboardSize === undefined ? {} : { leaderboardSize }),
@@ -185,7 +185,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       )}
       {styleFor('left-column') && (
         <div className={styles.leftColumn} style={styleFor('left-column')}>
-          {showOnboarding && view && <OnboardingHints view={view} />}
+          {showOnboarding && view && <OnboardingHints />}
         </div>
       )}
       {view && (

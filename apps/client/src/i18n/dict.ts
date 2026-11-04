@@ -1,6 +1,32 @@
 // Словари интерфейса (CONVENTIONS.md §1: тексты UI — только через i18n).
 
 const ru = {
+  'tutorial.label': 'Обучение',
+  'tutorial.skip': 'Пропустить',
+  'tutorial.back': 'Назад',
+  'tutorial.next': 'Дальше',
+  'tutorial.done': 'Готово',
+  'tutorial.expand.title': 'Ничья земля',
+  'tutorial.expand.text':
+    'Стартовые отряды сами занимают ничью землю роем, от вашей границы наружу. Города берутся, только когда сил хватает.',
+  'tutorial.enemy.title': 'Чужая страна: ПКМ',
+  'tutorial.enemy.text':
+    'Правой кнопкой по чужой стране без выбранных отрядов откроется меню: слайдер «сколько солдат», «Наступать» (ИИ сам выберет оси удара и обновит их в бою), «Держать границу» и дипломатия. Из войны выход один — мир.',
+  'tutorial.neutral.title': 'Ничья земля: ПКМ',
+  'tutorial.neutral.text':
+    'ПКМ по ничьей земле открывает меню с кнопкой «Занять»: слайдер задаёт, сколько солдат отправить. Войска растят территорию сплошным пятном.',
+  'tutorial.select.title': 'Выбор отрядов: ЛКМ',
+  'tutorial.select.text':
+    'Левая кнопка по фишке выбирает отряд, рамкой по пустому месту — несколько, двойной клик — все отряды такого типа на экране. Esc снимает выбор.',
+  'tutorial.order.title': 'Приказ: ПКМ',
+  'tutorial.order.text':
+    'Когда отряды выбраны, ПКМ по гексу — идти, по врагу — атаковать, сразу и без подтверждения. Shift+ПКМ добавляет промежуточную точку маршрута.',
+  'tutorial.own.title': 'Свой гекс: ЛКМ',
+  'tutorial.own.text':
+    'ЛКМ по своему гексу открывает карточку: основать город, склад, форт, набор войск. Склад кормит армию, улучшается до 3 уровня и сам тянет дорогу.',
+  'tutorial.camera.title': 'Камера и клавиши',
+  'tutorial.camera.text':
+    'Колесо — масштаб, ПКМ-перетаскивание по пустому месту — двигать карту. Tab — следующая армия, Space — на последнее событие, Shift+1…9 — запомнить группу, 1…9 — выбрать её.',
   'menu.title': 'Быстрый матч',
   'menu.subtitle': 'Локальная игра против ботов',
   'menu.play': 'Играть',
@@ -16,26 +42,6 @@ const ru = {
   'menu.settings': 'Настройки',
   'menu.fullscreen': 'На весь экран',
   'menu.autoCommand': 'Автокомандование для новых армий',
-  'onboarding.auto.title': 'Автокомандование',
-  'onboarding.auto.text': 'Армия с «А» сама держит фронт и занимает ничью землю.',
-  'onboarding.tax.title': 'Налог',
-  'onboarding.tax.text': 'Низкий налог ускоряет рост людей, высокий приносит больше золота.',
-  'onboarding.city.title': 'Основать город',
-  'onboarding.city.text': 'Выберите свой гекс без города и нажмите «Основать город».',
-  'onboarding.expand.title': 'Ничья земля',
-  'onboarding.expand.text':
-    'Стартовые отряды сами занимают ничью землю роем, от своей границы наружу. Города берутся, только когда сил хватает.',
-  'onboarding.attack.title': 'Наступление',
-  'onboarding.attack.text':
-    'Нажмите на чужую страну и выберите «Наступать». ИИ сам выберет оси удара и обновит их в бою; число солдат задаёте вы. Из войны выход один — мир.',
-  'onboarding.hold.title': 'Оборона',
-  'onboarding.hold.text':
-    '«Держать границу» ставит войска на саму границу с выбранной страной: фронт — это граница, линии не рисуются.',
-  'onboarding.depot.title': 'Склады',
-  'onboarding.depot.text':
-    'Склад кормит большую армию, улучшается до 3 уровня и сам тянет дорогу к сети. Ставьте их у фронта.',
-  'onboarding.next': 'Понятно',
-  'onboarding.disable': 'Скрыть подсказки',
   'dev.map.title': 'Карта: отладка',
   'dev.map.scale': 'Масштаб',
   'dev.map.detail': 'Детализация',
@@ -354,6 +360,32 @@ const ru = {
 export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
+  'tutorial.label': 'Tutorial',
+  'tutorial.skip': 'Skip',
+  'tutorial.back': 'Back',
+  'tutorial.next': 'Next',
+  'tutorial.done': 'Done',
+  'tutorial.expand.title': 'Neutral land',
+  'tutorial.expand.text':
+    'Your starting units swarm out to take neutral land from your border outward. Cities are stormed only when you are strong enough.',
+  'tutorial.enemy.title': 'Foreign country: right click',
+  'tutorial.enemy.text':
+    'Right-click a foreign country with no units selected to open a menu: a “how many soldiers” slider, “Attack” (the AI picks the axes and refreshes them mid-battle), “Hold the border” and diplomacy. The only way out of a war is peace.',
+  'tutorial.neutral.title': 'Neutral land: right click',
+  'tutorial.neutral.text':
+    'Right-click neutral land to open a menu with “Occupy”: the slider sets how many soldiers go. Troops grow your territory as one solid area.',
+  'tutorial.select.title': 'Select units: left click',
+  'tutorial.select.text':
+    'Left-click a chip to select a unit, drag a box over empty ground for several, double-click for every unit of that type on screen. Esc clears the selection.',
+  'tutorial.order.title': 'Orders: right click',
+  'tutorial.order.text':
+    'With units selected, right-click a hex to move, an enemy to attack, with no confirmation. Shift+right-click adds a waypoint.',
+  'tutorial.own.title': 'Your hex: left click',
+  'tutorial.own.text':
+    'Left-click your own hex for its card: found a city, depot, fort, recruit. A depot feeds the army, upgrades to level 3 and lays its own road.',
+  'tutorial.camera.title': 'Camera and keys',
+  'tutorial.camera.text':
+    'Wheel zooms, right-drag on empty ground pans the map. Tab cycles armies, Space jumps to the last event, Shift+1…9 saves a group, 1…9 recalls it.',
   'menu.title': 'Quick match',
   'menu.subtitle': 'Local game against bots',
   'menu.play': 'Play',
@@ -369,26 +401,6 @@ const en: Record<MessageKey, string> = {
   'menu.settings': 'Settings',
   'menu.fullscreen': 'Fullscreen',
   'menu.autoCommand': 'Auto-command new armies',
-  'onboarding.auto.title': 'Auto command',
-  'onboarding.auto.text': 'An army with “A” holds the front and takes neutral land on its own.',
-  'onboarding.tax.title': 'Tax',
-  'onboarding.tax.text': 'Lower tax grows your population faster; higher tax brings more gold.',
-  'onboarding.city.title': 'Found a city',
-  'onboarding.city.text': 'Select your empty hex and press “Found city”.',
-  'onboarding.expand.title': 'Neutral land',
-  'onboarding.expand.text':
-    'Your starting units swarm out to take neutral land from your border outward. Cities are stormed only when you are strong enough.',
-  'onboarding.attack.title': 'Offensive',
-  'onboarding.attack.text':
-    'Click a foreign country and choose “Attack”. The AI picks the axes of attack and refreshes them mid-battle; you set the number of soldiers. The only way out of a war is peace.',
-  'onboarding.hold.title': 'Defense',
-  'onboarding.hold.text':
-    '“Hold the border” puts troops on the border with the chosen country itself: the front is the border, no lines to draw.',
-  'onboarding.depot.title': 'Depots',
-  'onboarding.depot.text':
-    'A depot feeds a bigger army, upgrades to level 3 and lays its own road to the network. Place them near the front.',
-  'onboarding.next': 'Got it',
-  'onboarding.disable': 'Hide hints',
   'dev.map.title': 'Map: debug',
   'dev.map.scale': 'Scale',
   'dev.map.detail': 'Detail',
