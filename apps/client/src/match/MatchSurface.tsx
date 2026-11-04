@@ -58,6 +58,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       }),
     [mapRequest.seed, sb.setPaused],
   );
+  // ПКМ в матче — приказ и меню страны: контекстное меню браузера не нужно нигде на странице.
+  useEffect(() => {
+    const noMenu = (event: MouseEvent): void => event.preventDefault();
+    document.addEventListener('contextmenu', noMenu);
+    return () => document.removeEventListener('contextmenu', noMenu);
+  }, []);
   useEffect(() => {
     const onVisibilityChange = (): void => {
       pauseController.handleVisibilityChange(document.visibilityState === 'hidden');

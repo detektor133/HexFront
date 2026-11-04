@@ -221,6 +221,8 @@ function ArmyCard(props: {
   name: string;
   color: string;
   stats: ArmyStats;
+  /** Заказанная численность армии (меню страны): рядом с числом солдат. */
+  wanted?: number | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
@@ -299,6 +301,7 @@ function ArmyCard(props: {
             )}
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
+              {props.wanted !== undefined && ` / ${props.wanted}`}
             </span>
             {stats.fighting && (
               <span title={t('army.fighting')}>
@@ -492,6 +495,7 @@ export function ArmyBar(props: {
                   rawName={a.name}
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
+                  wanted={a.wanted}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}

@@ -14,6 +14,13 @@ export interface LocalMatchSetup {
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
+// Золото в параметре — целое число монет; в состоянии оно fixed-point (×1000).
+function goldParam(value: string | null): number | null {
+  if (value === null || value === '') return null;
+  const coins = Number(value);
+  return Number.isInteger(coins) && coins >= 0 ? coins * 1000 : null;
+}
+
 export function readLocalMatchSetup(search: string): LocalMatchSetup {
   const params = new URLSearchParams(search);
   const map = readMapRequest(search);
@@ -34,6 +41,7 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     playerName: params.get('name'),
     playerColor: params.get('color'),
     autoCommand: auto === null ? null : auto === '1',
-    initialGold: params.get('initialGold') === '0' ? 0 : null,
+    // initialGold=N — стартовое золото игрока в золоте (для проверки закупки), 0 — без золота.
+    initialGold: goldParam(params.get('initialGold')),
   };
 }

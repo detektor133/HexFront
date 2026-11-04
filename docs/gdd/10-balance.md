@@ -189,6 +189,7 @@
 | `FRONT_WEIGHT_FLANK` | 1 `[ТЮНИНГ]` |
 | `FRONT_REBALANCE_SURPLUS` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_ECHELON_PERIOD` | 2 `[ТЮНИНГ]` |
+| `PROCURE_BATCH` | 300 `[ТЮНИНГ]` |
 | `OFFENSIVE_FACING_RANGE` | 3 |
 | `COMMANDER_LINE_DEPTH` | 3 |
 | `FRONT_SPLIT_MIN` | 50 |

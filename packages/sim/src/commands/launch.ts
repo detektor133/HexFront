@@ -91,6 +91,8 @@ export function executeLaunch(
   }
   if (!army) return;
   const front = frontToward(state, playerId, cmd.target);
+  // Заказанная численность: чего не хватает из готовых отрядов, ИИ закупит и подведёт.
+  army.wanted = cmd.soldiers;
   let have = allUnits(state)
     .filter((u) => u.armyId === army.id)
     .reduce((sum, u) => sum + u.soldiers, 0);

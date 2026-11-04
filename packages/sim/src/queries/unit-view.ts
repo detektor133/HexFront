@@ -53,6 +53,8 @@ export interface ArmyView {
   readonly name: string;
   /** Автокомандование (CR-006). */
   readonly auto: boolean;
+  /** Заказанная численность, солдат: ИИ закупает и подводит недостающих (меню страны). */
+  readonly wanted?: number;
 }
 
 /** Отряды для снимка игрока playerId. */
@@ -94,5 +96,11 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
 export function armyViews(state: MatchState, playerId: number): ArmyView[] {
   return state.armies
     .filter((a) => a.owner === playerId)
-    .map((a) => ({ id: a.id, number: a.number, name: a.name, auto: a.auto }));
+    .map((a) => ({
+      id: a.id,
+      number: a.number,
+      name: a.name,
+      auto: a.auto,
+      ...(a.wanted === undefined ? {} : { wanted: a.wanted }),
+    }));
 }

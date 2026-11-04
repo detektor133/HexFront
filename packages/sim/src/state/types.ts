@@ -93,6 +93,8 @@ export interface Recruitment {
   readonly soldiers: Fp;
   progressTicks: number;
   readonly totalTicks: number;
+  /** Армия, которая заказала набор (закупка под заказ численности): отряд приходит прямо в неё. */
+  readonly armyId?: number;
 }
 
 export type ConstructionKind = 'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'road';
@@ -207,6 +209,11 @@ export interface Army {
   name: string;
   /** Автокомандование: армией командует commander (CR-006). */
   auto: boolean;
+  /**
+   * Заказанная численность, солдат (целое): ИИ закупает недостающих в ближайших к фронту городах
+   * и подводит их. Нет поля — закупки нет (меню страны, `launchOffensive`).
+   */
+  wanted?: number;
 }
 
 /** События тика для интерфейса и логов; очищаются в начале каждого тика. */

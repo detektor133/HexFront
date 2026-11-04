@@ -101,6 +101,8 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.number);
     str(s, a.name);
     int(s, a.auto ? 1 : 0);
+    // Поле появилось позже: без него хэш прежних матчей не меняется.
+    if (a.wanted !== undefined) int(s, a.wanted);
   }
   int(s, state.plans.length);
   for (const p of state.plans) {
@@ -140,6 +142,7 @@ function hashConstructions(s: Hasher, state: MatchState): void {
     int(s, r.soldiers);
     int(s, r.progressTicks);
     int(s, r.totalTicks);
+    if (r.armyId !== undefined) int(s, r.armyId);
   }
 }
 

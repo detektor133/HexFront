@@ -1,5 +1,6 @@
 // Набор: очереди и появление отрядов.
 // GDD: docs/gdd/05-armies.md — «Набор»
+import { procure } from './procure.ts';
 import { MAX_UNITS_PER_HEX, ORG_MAX, TICKS_PER_S } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
@@ -48,8 +49,13 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     path: [],
     moveTicks: 0,
     moveTotal: 0,
-    // Резерв; с «Автопополнением» — самая нуждающаяся армия (CR-001).
-    armyId: state.players[r.owner]?.autoReinforce ? neediestArmy(state, r.owner) : null,
+    // Заказ армии — в неё; иначе резерв, с «Автопополнением» — самая нуждающаяся армия (CR-001).
+    armyId:
+      r.armyId !== undefined && state.armies.some((a) => a.id === r.armyId)
+        ? r.armyId
+        : state.players[r.owner]?.autoReinforce
+          ? neediestArmy(state, r.owner)
+          : null,
     lowSupplyTicks: 0,
     encircled: false,
     target: -1,
@@ -65,7 +71,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
 
 // При закрытой линии автопополнение доливает самый маленький однотипный отряд на линии.
 function reinforce(state: MatchState, r: Recruitment): boolean {
-  if (!state.players[r.owner]?.autoReinforce) return false;
+  if (r.armyId !== undefined || !state.players[r.owner]?.autoReinforce) return false;
   const armyId = neediestArmy(state, r.owner);
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (armyId === null || !plan) return false;
@@ -100,6 +106,7 @@ function distributeReserve(state: MatchState): void {
 
 export function recruitSystem(state: MatchState): void {
   distributeReserve(state);
+  procure(state);
   const remaining: Recruitment[] = [];
   for (const r of state.recruits) {
     const city = state.cities.find((c) => c.id === r.cityId);

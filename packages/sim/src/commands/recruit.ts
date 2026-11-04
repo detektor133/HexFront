@@ -183,6 +183,7 @@ export function startRecruit(
   cityId: number,
   type: UnitType,
   soldiers: Fp,
+  armyId?: number,
 ): void {
   const check = checkRecruit(state, playerId, cityId, type, soldiers);
   const player = state.players[playerId];
@@ -198,6 +199,7 @@ export function startRecruit(
     soldiers,
     progressTicks: 0,
     totalTicks: intDiv(check.timeS * TICKS_PER_S, FP),
+    ...(armyId === undefined ? {} : { armyId }),
   });
   state.nextId += 1;
 }

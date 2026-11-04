@@ -233,6 +233,8 @@ export const RECRUIT_PER_100_S: ByUnit<Fp> = {
 export const RECRUIT_MIN: Fp = fp(50);
 export const RECRUIT_STEP: Fp = fp(50);
 export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);
+/** Наибольший набор, который ИИ ставит за раз при закупке под заказ армии. */
+export const PROCURE_BATCH: Fp = fp(300);
 export const MAX_UNITS_PER_HEX = 3;
 export const UNIT_LIMIT_BASE = 4;
 export const UNIT_LIMIT_PER_CITY = 2;

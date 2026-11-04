@@ -12,12 +12,15 @@ import { IconButton } from '../ui/icon-button.tsx';
 const MENU_WIDTH = 264;
 const EDGE = 8;
 
-/** Солдат у игрока всего — предел слайдера наступления. */
+/**
+ * Предел слайдера наступления: солдаты в отрядах плюс половина населения — недостающих ИИ
+ * закупит и подведёт (`wanted` армии).
+ */
 function ownSoldiers(view: PlayerView): number {
   const total = view.units
     .filter((unit) => unit.owner === view.playerId)
     .reduce((sum, unit) => sum + unit.soldiers, 0);
-  return Math.max(1, Math.floor(total / FP));
+  return Math.max(1, Math.floor((total + view.me.popTotal / 2) / FP));
 }
 
 /**
