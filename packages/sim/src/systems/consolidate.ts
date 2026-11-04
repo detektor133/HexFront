@@ -40,7 +40,6 @@ export function consolidate(state: MatchState): void {
     );
   for (const u of allUnits(state)) {
     if (u.type === 'artillery' || u.slot === SLOT_DETACHED) continue;
-    if (u.armyId !== null && !planned.has(u.armyId)) continue;
     const key = `${u.owner}|${u.armyId}|${u.type}`;
     const list = groups.get(key);
     if (list) list.push(u);
@@ -63,7 +62,12 @@ export function consolidate(state: MatchState): void {
     const surplus = armyId === null || (perArmy.get(armyId) ?? 0) > (lineHexes.get(armyId) ?? 0);
     const crowded = surplus && (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
     const below = crowded ? MERGE_SMALL_BELOW : MERGE_SMALL_TINY;
-    const small = units.filter((u) => u.soldiers < below && free(u) && !nearFoe(u));
+    // Совсем крошечный отряд бесполезен где угодно; больший — только у армии с планом или в резерве и
+    // не рядом с врагом (роящаяся армия рассыпана намеренно, фронт у врага не трогаем).
+    const calm = (u: Unit): boolean => (u.armyId === null || planned.has(u.armyId)) && !nearFoe(u);
+    const small = units.filter(
+      (u) => free(u) && (u.soldiers < MERGE_SMALL_TINY || (u.soldiers < below && calm(u))),
+    );
     if (small.length === 0 || units.length < 2) continue;
     const taken = new Set<number>();
     for (const a of small) {
