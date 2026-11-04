@@ -68,6 +68,8 @@ export interface Chip {
   width(): number;
   /** Разрешение текста: при приближении его растеризуют заново, чтобы число было чётким. */
   setResolution(r: number): void;
+  /** Вдали фишка сворачивается в цветной щит с числом: без столбиков, значков и стрелок. */
+  setCompact(on: boolean): void;
   destroy(): void;
 }
 
@@ -223,6 +225,25 @@ function drawCount(p: Parts, s: ChipState, right: number, top: number): void {
     .stroke({ color: tokens.ui.surface, width: 1.5 });
 }
 
+// Свёрнутая фишка: квадрат цвета отношения с числом на нём, закладка армии слева.
+function drawCompact(p: Parts, s: ChipState): number {
+  const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX + TEXT_SLACK);
+  const w = (s.army ? TAB : 0) + text + PAD * 2;
+  const left = -w / 2;
+  const top = -H / 2;
+  const r = tokens.radius.chip;
+  const { g } = p;
+  const border = s.selected
+    ? { color: tokens.selection.color, width: tokens.selection.width }
+    : { color: tokens.ui.surface, width: OUTLINE };
+  g.roundRect(left, top, w, H, r).fill(s.color);
+  if (s.army) g.roundRect(left, top, TAB + r, H, r).fill(s.army);
+  g.roundRect(left, top, w, H, r).stroke(border);
+  p.label.position.set(left + (s.army ? TAB : 0) + (w - (s.army ? TAB : 0)) / 2, 0);
+  drawCount(p, s, left + w, top);
+  return w + Math.max(OUTLINE, tokens.selection.width, 2);
+}
+
 /** Белая диагональная штриховка отступления остаётся внутри корпуса фишки. */
 function drawRetreatHatch(g: Graphics, left: number, top: number, width: number): void {
   const step = 7;
@@ -276,20 +297,31 @@ export function createChip(): Chip {
   content.addChild(g, label, count);
   const parts: Parts = { g, label, count };
   let width = 0;
+  let compact = false;
+  let last: ChipState | null = null;
+  const render = (s: ChipState): void => {
+    label.text = formatSoldiers(s.soldiers);
+    label.style.fill = s.ghost ? s.color : compact ? tokens.ui.surface : tokens.ui.ink;
+    g.clear();
+    if (s.ghost) {
+      drawGhost(parts, s);
+      width = 0;
+    } else {
+      width = compact ? drawCompact(parts, s) : drawChip(parts, s);
+    }
+    content.alpha = s.retreating ? RETREAT_ALPHA : 1;
+    content.scale.set(1);
+  };
   return {
     root,
     draw(s) {
-      label.text = formatSoldiers(s.soldiers);
-      label.style.fill = s.ghost ? s.color : tokens.ui.ink;
-      g.clear();
-      if (s.ghost) {
-        drawGhost(parts, s);
-        width = 0;
-      } else {
-        width = drawChip(parts, s);
-      }
-      content.alpha = s.retreating ? RETREAT_ALPHA : 1;
-      content.scale.set(1);
+      last = s;
+      render(s);
+    },
+    setCompact(on) {
+      if (compact === on) return;
+      compact = on;
+      if (last) render(last);
     },
     width: () => width,
     // Разрешение BitmapText задаёт шрифт; Pixi не поддерживает его смену на лету и пишет предупреждение.

@@ -51,7 +51,7 @@ export function chipGroups(v: PlayerView, expanded: ReadonlySet<number> = new Se
         key: `u${unit.id}`,
         units: stack,
         moving: inTransit(unit),
-        stackOffset: (index - middle) * CHIP_STACK_STEP,
+        stackOffset: (index - middle) * 2 * chipHalf(),
       });
     }
   }

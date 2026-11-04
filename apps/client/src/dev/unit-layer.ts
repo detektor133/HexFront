@@ -17,7 +17,15 @@ import {
 import { markerAt, type MarkerAnchor } from './battle-panel.ts';
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
-import { CHIP_WORLD, attackShift, chipHalf, cityChipShift } from './chip-place.ts';
+import {
+  COMPACT_BELOW,
+  attackShift,
+  chipHalf,
+  chipWorld,
+  chipWorldAt,
+  cityChipShift,
+  setChipWorld,
+} from './chip-place.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { createChip, type Chip, type ChipState } from './unit-chips.ts';
 import { chipGroups } from './unit-groups.ts';
@@ -159,6 +167,7 @@ export function createUnitLayer(
   let picked: Picked = { hex: null, units: [], target: null };
   let snapAt = 0;
   let k = 1;
+  let compact = false;
   let textRes = globalThis.window?.devicePixelRatio ?? 1;
   let lastFrame = 0;
   const reducedMotion =
@@ -225,7 +234,7 @@ export function createUnitLayer(
     }
     markerAnchors.set(key, { sourceHex: u.hex, targetHex: u.target, at: edgeCenter });
     current?.container?.position.set(edgeCenter.x, edgeCenter.y);
-    current?.container?.scale.set(CHIP_WORLD * pulse);
+    current?.container?.scale.set(chipWorld() * pulse);
   }
 
   const base = (hex: number): Point => {
@@ -450,6 +459,7 @@ export function createUnitLayer(
         if (from) drawnAt.set(e.key, from);
       }
       chip.setResolution(textRes);
+      chip.setCompact(compact);
       chip.draw(e.state);
     }
   }
@@ -457,7 +467,7 @@ export function createUnitLayer(
   const layer: UnitLayer = {
     container,
     battleMarkerAt(world) {
-      return markerAt(markerAnchors.values(), world, MARKER_HIT_PX * CHIP_WORLD);
+      return markerAt(markerAnchors.values(), world, MARKER_HIT_PX * chipWorld());
     },
     battleMarkerState(sourceHex, targetHex) {
       return battleMarkers.get(`${sourceHex}->${targetHex}`)?.object?.state ?? null;
@@ -481,7 +491,7 @@ export function createUnitLayer(
       const at = drawnAt.get(entry.key) ?? entry.at(1);
       const width = chips.get(entry.key)?.width();
       if (width === undefined || width <= 0) return null;
-      const halfWidth = (width * CHIP_WORLD) / 2;
+      const halfWidth = (width * chipWorld()) / 2;
       const halfHeight = chipHalf();
       return {
         left: at.x - halfWidth,
@@ -496,7 +506,7 @@ export function createUnitLayer(
       for (const entry of entries) {
         if (entry.units.length === 0) continue;
         const at = drawnAt.get(entry.key) ?? entry.at(1);
-        const halfWidth = ((chips.get(entry.key)?.width() ?? 0) * CHIP_WORLD) / 2;
+        const halfWidth = ((chips.get(entry.key)?.width() ?? 0) * chipWorld()) / 2;
         if (Math.abs(world.x - at.x) > halfWidth || Math.abs(world.y - at.y) > halfHeight) continue;
         const ids = entry.units;
         const dx = world.x - at.x;
@@ -508,9 +518,21 @@ export function createUnitLayer(
     },
     setScale(scale) {
       k = 1 / scale;
-      const res = Math.ceil((window.devicePixelRatio * scale * CHIP_WORLD) / RES_STEP) * RES_STEP;
+      const next = chipWorldAt(scale);
+      const resized = Math.abs(next - chipWorld()) > 1e-6;
+      setChipWorld(next);
+      compact = next * scale < COMPACT_BELOW;
+      const res = Math.ceil((window.devicePixelRatio * scale * next) / RES_STEP) * RES_STEP;
       textRes = Math.max(1, res * 2);
-      for (const chip of chips.values()) chip.setResolution(textRes);
+      for (const chip of chips.values()) {
+        chip.setResolution(textRes);
+        chip.setCompact(compact);
+      }
+      // Размер фишки изменился — сдвиги стопок и над городами пересчитываем.
+      if (resized && view) {
+        entries = build(view);
+        syncChips();
+      }
     },
     cacheTelemetry() {
       return unitLayerCacheTelemetry(shown, drawnAt, chips, encircledSince);
@@ -532,7 +554,7 @@ export function createUnitLayer(
         drawnAt.set(e.key, at);
         for (const id of e.units) shown.set(id, at);
         chip.root.position.set(at.x, at.y);
-        chip.root.scale.set(CHIP_WORLD);
+        chip.root.scale.set(chipWorld());
       }
       drawGround(view, frac, nowMs);
     },
