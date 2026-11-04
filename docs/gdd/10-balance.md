@@ -143,13 +143,13 @@
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |
 | `SUPPLY_PER_SOLDIER` | 1,0 | 2,5 | 1,5 |
-| `RECRUIT_BASE_S` / `_PER_100_S` | 8 / 1 | 15 / 2 | 12 / 1,5 |
+| `RECRUIT_BASE_S` / `_PER_100_S` | 4 / 0,5 | 8 / 1 | 6 / 0,75 |
 
 | Константа | Значение |
 | --- | --- |
 | `RECRUIT_MIN` / `RECRUIT_STEP` | 50 / 50 |
 | `RECRUIT_MIN_HEX_POP_RATIO` | 0,1 |
-| `MAX_UNITS_PER_HEX` | 3 |
+| `MAX_UNITS_PER_HEX` | 1000 (предела нет) |
 | `START_UNITS` | 2 × 100 пехоты |
 | `START_GOLD` | 200 |
 | `START_POP_CAPITAL` / `START_POP_HEX` | 200 / 40 |
@@ -214,9 +214,7 @@
 | `OFFENSIVE_FACING_RANGE` | 3 |
 | `COMMANDER_LINE_DEPTH` | 3 |
 | `FRONT_SPLIT_MIN` | 50 |
-| `FRONT_FULL_COVER` | 12 `[ТЮНИНГ]` |
-| `FRONT_SPLIT_LONG` | 150 `[ТЮНИНГ]` |
-| `FRONT_COVER_STRIDE` | 6 `[ТЮНИНГ]` |
+| `FRONT_HOLD_DENOM` | 2 `[ТЮНИНГ]` |
 | `FRONT_THREAT_RANGE` | 3 `[ТЮНИНГ]` |
 | `FRONT_REALLOC_GAIN_MIN` | 0,15 |
 

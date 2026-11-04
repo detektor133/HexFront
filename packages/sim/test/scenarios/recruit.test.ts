@@ -63,11 +63,11 @@ describe('набор отрядов', () => {
     expect(s.lastEvent('unitRecruited')).toBeDefined();
   });
 
-  it('время: бронетехника 200 — 15 + 2 × 2 = 19 с', () => {
+  it('время: бронетехника 200 — 8 + 1 × 2 = 10 с', () => {
     const s = setup();
     s.player('A').gold = (1000 * FP) as Fp;
     s.cmd('A', recruit(at(1, 1), 'armor', 200));
-    s.runTicks(189);
+    s.runTicks(99);
     expect(s.unitsOf('A')).toHaveLength(0);
     s.runTicks(1);
     expect(s.unitsOf('A')).toHaveLength(1);
@@ -149,19 +149,17 @@ describe('набор отрядов', () => {
     expect(s.rejections()).toEqual(['notEnoughGold']);
   });
 
-  it('в городе 3 отряда — новый появляется в ближайшем своём свободном гексе', () => {
+  it('в городе много отрядов — новый появляется в самом городе: предела нет', () => {
     const s = setup();
     for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(1, 1));
     s.cmd('A', recruit(at(1, 1), 'infantry', 50));
     s.runSeconds(9);
     const fresh = s.unitsOf('A')[3];
     expect(fresh).toBeDefined();
-    // Соседи города — кольцо 1; при равенстве дистанции — наименьший HexId. Столбец 1 нечётный
-    // и сдвинут вверх (even-q), поэтому (0,0) — сосед (1,1), его HexId 0.
-    expect(fresh?.hex).toBe(0);
+    expect(fresh?.hex).toBe(1 + 1 * 6);
   });
 
-  it('заполненный гекс не принимает четвёртый отряд при наборе', () => {
+  it('в гексе города сколько угодно своих отрядов: набор не отклоняется', () => {
     const s = setup();
     for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(1, 1));
     for (const [c, r] of [
@@ -179,7 +177,7 @@ describe('набор отрядов', () => {
     s.runSeconds(9);
     expect(s.rejections()).toEqual([]);
     expect(s.unitsOf('A')).toHaveLength(12);
-    expect(s.unitsOf('A').filter((unit) => unit.hex === 1 + 1 * 6)).toHaveLength(3);
+    expect(s.unitsOf('A').filter((unit) => unit.hex === 1 + 1 * 6)).toHaveLength(4);
   });
 
   it('потеря города отменяет набор без возврата золота', () => {

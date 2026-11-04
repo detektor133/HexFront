@@ -75,7 +75,7 @@ describe('отступление', () => {
     expect(s.lastEvent('unitCapitulated')).toBeDefined();
   });
 
-  it('соседи переполнены (3 отряда) — капитуляция', () => {
+  it('на гексе соседа свои отряды сколько угодно — отряд отступает, а не сдаётся', () => {
     const s = scenario(
       `
       ~  ~  ~  ~  ~
@@ -89,7 +89,7 @@ describe('отступление', () => {
     for (let i = 0; i < 3; i += 1) s.unit('B', 'infantry', 30, at(3, 1));
     s.cmd('A', attack([att], at(2, 1)));
     untilBroken(s, def);
-    expect(s.unitById(def)).toBeUndefined();
+    expect(s.unitById(def)).toBeDefined();
   });
 
   it('приоритет: гекс не рядом с атакующими, затем меньший HexId', () => {

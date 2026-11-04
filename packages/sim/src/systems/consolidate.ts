@@ -16,6 +16,7 @@ import { mergeUnits } from '../commands/unit.ts';
 import { distance, hexFromId } from '../math/hex.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
+import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
@@ -48,9 +49,19 @@ export function consolidate(state: MatchState): void {
   // Размер войска игрока: в толпе (больше CONSOLIDATE_CROWD отрядов) мелочь — всё меньше MERGE_SMALL_BELOW,
   // иначе только совсем крошечные отряды.
   const crowd = new Map<number, number>();
-  for (const u of allUnits(state)) crowd.set(u.owner, (crowd.get(u.owner) ?? 0) + 1);
+  const perArmy = new Map<number | null, number>();
+  for (const u of allUnits(state)) {
+    crowd.set(u.owner, (crowd.get(u.owner) ?? 0) + 1);
+    if (u.type !== 'artillery') perArmy.set(u.armyId, (perArmy.get(u.armyId) ?? 0) + 1);
+  }
+  // Гексов линии у армии с планом: пока отрядов не больше, армия делится, а не сливается.
+  const lineHexes = new Map(
+    state.plans.map((p) => [p.armyId, planHexes(state, p).length] as const),
+  );
   for (const units of groups.values()) {
-    const crowded = (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
+    const armyId = units[0]?.armyId ?? null;
+    const surplus = armyId === null || (perArmy.get(armyId) ?? 0) > (lineHexes.get(armyId) ?? 0);
+    const crowded = surplus && (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
     const below = crowded ? MERGE_SMALL_BELOW : MERGE_SMALL_TINY;
     const small = units.filter((u) => u.soldiers < below && free(u) && !nearFoe(u));
     if (small.length === 0 || units.length < 2) continue;

@@ -31,7 +31,8 @@ function runChecked(s: ReturnType<typeof make>, ticks: number): void {
     s.runTicks(1);
     const perHex = new Map<number, number>();
     for (const u of s.state.units) perHex.set(u.hex, (perHex.get(u.hex) ?? 0) + 1);
-    expect(Math.max(...perHex.values())).toBeLessThanOrEqual(3);
+    // Предела отрядов в гексе нет (решение владельца 2026-11-04): проверяем лишь, что учёт сходится.
+    expect([...perHex.values()].reduce((a, b) => a + b, 0)).toBe(s.state.units.length);
   }
 }
 
@@ -51,7 +52,7 @@ describe('сбор отрядов', () => {
     expect(left[0]?.soldiers).toBe(200 * 1000);
   });
 
-  it('разные типы и резерв не сливаются: четыре отряда занимают два гекса, ≤3 на тике', () => {
+  it('разные типы и резерв не сливаются: четыре отряда остаются четырьмя отрядами', () => {
     const s = make();
     const ids = [
       s.unit('A', 'infantry', 100, at(1, 0)),
@@ -64,7 +65,6 @@ describe('сбор отрядов', () => {
 
     const mine = s.unitsOf('A');
     expect(mine).toHaveLength(4);
-    expect(new Set(mine.map((u) => u.hex)).size).toBe(2);
     expect(mine.every((u) => u.gather === -1 && u.order === 'idle')).toBe(true);
   });
 

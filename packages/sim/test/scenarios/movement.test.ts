@@ -178,16 +178,16 @@ describe('движение: путь', () => {
     expect(ticksToArrive(s, id, at(6, 1))).toBeGreaterThan(0);
   });
 
-  it('цель — полный гекс (3 своих отряда) — отказ hexFull', () => {
+  it('цель — гекс с тремя своими отрядами — приказ принимается: предела нет', () => {
     const s = scenario(LINE, { legend });
     for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(3, 1));
     const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', move([id], at(3, 1)));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['hexFull']);
+    expect(s.rejections()).toEqual([]);
   });
 
-  it('путь обходит полные гексы', () => {
+  it('путь идёт и через гексы со своими отрядами', () => {
     const s = scenario(
       `
       a  a  a
@@ -199,10 +199,10 @@ describe('движение: путь', () => {
     for (let i = 0; i < 3; i += 1) s.unit('A', 'infantry', 50, at(1, 1));
     const path = findPath(s.state, idOf(s, at(0, 1)), idOf(s, at(2, 1)), 'infantry', 0);
     expect(path).not.toBeNull();
-    expect(path).not.toContain(idOf(s, at(1, 1)));
+    expect(path).toContain(idOf(s, at(1, 1)));
   });
 
-  it('гекс на пути заполнился — отряд ждёт перед ним, потом идёт дальше', () => {
+  it('гекс на пути со своими отрядами отряд не задерживает', () => {
     const s = scenario(
       `
       ~  ~  ~  ~
@@ -215,9 +215,7 @@ describe('движение: путь', () => {
     s.cmd('A', move([id], at(3, 1)));
     s.runTicks(1);
     const blockers = [0, 1, 2].map(() => s.unit('A', 'infantry', 50, at(1, 1)));
-    s.runSeconds(10);
-    expect(s.unitById(id)?.hex).toBe(idOf(s, at(0, 1)));
-    s.cmd('A', move([blockers[0] ?? -1], at(2, 1)));
+    expect(blockers).toHaveLength(3);
     expect(ticksToArrive(s, id, at(3, 1))).toBeGreaterThan(0);
   });
 
@@ -267,7 +265,7 @@ describe('чужие отряды, разделение, слияние', () => 
     expect(mine[1]?.org).toBe(70_400);
   });
 
-  it('разделение: 0, всё войско, нет места в гексе — отказ', () => {
+  it('разделение: 0 и всё войско — отказ; в гексе с другими отрядами делится', () => {
     const s = scenario(LINE, { legend });
     const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', split(id, 0));
@@ -277,7 +275,7 @@ describe('чужие отряды, разделение, слияние', () => 
     s.unit('A', 'infantry', 50, at(1, 1));
     s.cmd('A', split(id, 50));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['invalidAmount', 'invalidAmount', 'hexFull']);
+    expect(s.rejections()).toEqual(['invalidAmount', 'invalidAmount']);
   });
 
   it('разделение не ограничено глобальным числом отрядов', () => {

@@ -71,14 +71,17 @@ function tooCloseToCity(state: MatchState, hex: HexId): boolean {
   return sites.some((site) => distance(hexFromId(site, state.map.width), h) < CITY_MIN_DISTANCE);
 }
 
-// Склады ищем в кольце радиуса DEPOT_MIN_DISTANCE − 1 вокруг гекса, а не по всей карте: бот
-// перебирает сотни гексов-кандидатов, и обход всей карты на каждый давал O(карта²).
-function tooCloseToDepot(state: MatchState, hex: HexId): boolean {
+// Склад не ближе DEPOT_MIN_DISTANCE к СВОЕМУ складу или городу: чужой город или склад на границе
+// строить не мешает (склад у врага — не повод оставлять свою армию без снабжения). Склады ищем в
+// кольце радиуса DEPOT_MIN_DISTANCE − 1 вокруг гекса, а не по всей карте.
+function tooCloseToDepot(state: MatchState, playerId: number, hex: HexId): boolean {
   const { width, height } = state.map;
   const candidate = hexFromId(hex, width);
   const sites = [
-    ...state.cities.map((c) => c.hex),
-    ...state.constructions.filter((c) => c.kind === 'foundCity').map((c) => c.hex),
+    ...state.cities.filter((c) => c.owner === playerId).map((c) => c.hex),
+    ...state.constructions
+      .filter((c) => c.kind === 'foundCity' && c.owner === playerId)
+      .map((c) => c.hex),
   ];
   if (
     sites.some(
@@ -93,7 +96,8 @@ function tooCloseToDepot(state: MatchState, hex: HexId): boolean {
       const near = { q: candidate.q + dq, r: candidate.r + dr };
       if (!inBounds(near, width, height)) continue;
       const site = hexId(near, width);
-      if (site !== hex && state.hexes.building[site] === BUILDING.depot) return true;
+      const own = state.hexes.owner[site] === playerId;
+      if (site !== hex && own && state.hexes.building[site] === BUILDING.depot) return true;
     }
   }
   return false;
@@ -151,7 +155,7 @@ function planBuild(
     if (cityAt(state, hex)) return fail('fortInCity');
     return plan({ kind, hex, cost: FORT_COST, timeS: FORT_TIME_S });
   }
-  if (tooCloseToDepot(state, hex)) return fail('depotTooClose');
+  if (tooCloseToDepot(state, playerId, hex)) return fail('depotTooClose');
   return plan({ kind, hex, cost: DEPOT_COST, timeS: DEPOT_TIME_S });
 }
 

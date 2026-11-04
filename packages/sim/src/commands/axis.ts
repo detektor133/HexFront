@@ -79,7 +79,9 @@ export function pickAxes(
     if (mine.some((c) => distance(p, at(c.hex)) <= SUPPLY_RADIUS)) total += SUPPLY_BONUS;
     return total;
   };
-  const count = Math.min(want, AXIS_MAX, Math.max(1, intDiv(soldiers, AXIS_SOLDIERS)));
+  // Новых осей не нужно (want ≤ 0) — делить заказ на ноль осей нельзя.
+  if (want <= 0) return { edges: [], windows: [], axes: 0, depth: DEPTH };
+  const count = Math.max(1, Math.min(want, AXIS_MAX, intDiv(soldiers, AXIS_SOLDIERS)));
   const half = Math.min(
     WINDOW_MAX,
     Math.max(WINDOW_MIN, intDiv(intDiv(soldiers, count), SOLDIERS_PER_EDGE)),

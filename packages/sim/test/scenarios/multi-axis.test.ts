@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
+import { pickAxes } from '../../src/commands/axis.ts';
 import { borderPieces } from '../../src/commands/launch.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { lineRuns } from '../../src/systems/offensive.ts';
@@ -149,5 +150,16 @@ describe('фронт направления — сама граница', () => 
     expect(exact).toBeGreaterThan(100);
     // Один захват двигает несколько граней, но не весь фронт (в нём больше 80 граней).
     expect(biggestJump).toBeLessThan(60);
+  });
+});
+
+describe('оси удара: граничные случаи', () => {
+  it('новых осей не нужно (want = 0): пустой удар, а не деление на ноль', () => {
+    const s = war();
+    const pieces = borderPieces(s.state, 0, 1);
+    const enemy = (who: number): boolean => who === 1;
+    expect(() => pickAxes(s.state, 0, enemy, pieces, 1200, [], 0)).not.toThrow();
+    expect(pickAxes(s.state, 0, enemy, pieces, 1200, [], 0).axes).toBe(0);
+    expect(pickAxes(s.state, 0, enemy, pieces, 1200, [], -2).axes).toBe(0);
   });
 });

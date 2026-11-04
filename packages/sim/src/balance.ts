@@ -222,12 +222,12 @@ export const SUPPLY_PER_SOLDIER: ByUnit<Fp> = {
   armor: fp(2.5),
   artillery: fp(1.5),
 };
-export const RECRUIT_BASE_S: ByUnit<Fp> = { infantry: fp(8), armor: fp(15), artillery: fp(12) };
+export const RECRUIT_BASE_S: ByUnit<Fp> = { infantry: fp(4), armor: fp(8), artillery: fp(6) };
 /** В таблице — `_PER_100_S` рядом с `RECRUIT_BASE_S`: секунд на каждые 100 солдат. */
 export const RECRUIT_PER_100_S: ByUnit<Fp> = {
-  infantry: fp(1),
-  armor: fp(2),
-  artillery: fp(1.5),
+  infantry: fp(0.5),
+  armor: fp(1),
+  artillery: fp(0.75),
 };
 
 export const RECRUIT_MIN: Fp = fp(50);
@@ -239,7 +239,7 @@ export const EXPAND_SOLDIERS_PER_HEX = 100;
 export const EXPAND_RADIUS_MAX = 10;
 /** Слияние мелочи: отряд меньше порога стягивается к ближайшему своему в радиусе, раз в период. */
 export const MERGE_SMALL_TINY: Fp = fp(25);
-/** В «толпе» (отрядов в армии больше CONSOLIDATE_CROWD) мелочью считается всё, что меньше этого. */
+/** В «толпе» с излишком отрядов над гексами линии мелочью считается всё, что меньше этого. */
 export const MERGE_SMALL_BELOW: Fp = fp(150);
 export const CONSOLIDATE_CROWD = 12;
 export const MERGE_SMALL_RADIUS = 4;
@@ -269,7 +269,11 @@ export const ASSAULT_MAX_UNITS = 8;
 export const ASSAULT_PERIOD_S = 2;
 /** Наибольший набор, который ИИ ставит за раз при закупке под заказ армии. */
 export const PROCURE_BATCH: Fp = fp(300);
-export const MAX_UNITS_PER_HEX = 3;
+/**
+ * Предела отрядов одного игрока в гексе нет (решение владельца 2026-11-04); константа — лишь защита от
+ * мусорных значений в проверках, до неё в игре не доходят.
+ */
+export const MAX_UNITS_PER_HEX = 1000;
 export const UNIT_LIMIT_BASE = 4;
 export const UNIT_LIMIT_PER_CITY = 2;
 /** `START_UNITS` = 2 × 100 пехоты: количество и размер отдельно. */
@@ -334,16 +338,10 @@ export const OFFENSIVE_FACING_RANGE = 3;
 export const COMMANDER_LINE_DEPTH = 3;
 /** Автоделение на линии плана: часть не меньше шага набора (05-armies.md, CR-005). */
 export const FRONT_SPLIT_MIN: Fp = fp(50);
-/**
- * Автоделение закрывает все гексы короткой линии (до FRONT_FULL_COVER гексов); у длинной — угрожаемые
- * гексы, а остальным хватает одного отряда на FRONT_COVER_STRIDE гексов.
- */
-export const FRONT_FULL_COVER = 12;
-/** Длинную линию (больше FRONT_FULL_COVER гексов) армия делит не мельче чем на такие части. */
-export const FRONT_SPLIT_LONG: Fp = fp(150);
-export const FRONT_COVER_STRIDE = 6;
 /** Гекс линии угрожаем, если чужой отряд ближе стольких гексов. */
 export const FRONT_THREAT_RANGE = 3;
+/** Часть отряда у врага не меньше 1/FRONT_HOLD_DENOM силы врага рядом: автоделение не дробит силы. */
+export const FRONT_HOLD_DENOM = 2;
 export const FRONT_REALLOC_GAIN_MIN: Fp = fp(0.15);
 
 // Обзор и победа

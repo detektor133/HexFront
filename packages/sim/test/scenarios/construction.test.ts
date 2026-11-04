@@ -238,7 +238,7 @@ describe('постройки', () => {
     ['чужой город', 'city', 1],
     ['нейтральный город', 'city', -1],
   ] as const)(
-    'склад отклоняется ближе минимальной дистанции от %s и разрешён на границе',
+    'склад ближе минимальной дистанции от %s: свои мешают, чужие и нейтральные — нет',
     (_name, kind, owner) => {
       const s = fresh();
       const candidate = cellAt(s, 5);
@@ -269,7 +269,8 @@ describe('постройки', () => {
       place(s, near);
       s.cmd('A', build(candidate, 'depot'));
       s.runTicks(1);
-      expect(s.rejections()).toEqual(['depotTooClose']);
+      // Мешают только свои склад и город: чужой на границе строить склад не запрещает.
+      expect(s.rejections()).toEqual(owner === 0 ? ['depotTooClose'] : []);
       const boundary = fresh();
       place(boundary, edge);
       boundary.cmd('A', build(candidate, 'depot'));

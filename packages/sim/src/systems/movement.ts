@@ -1,20 +1,14 @@
 // Переходы отрядов гекс за гексом, захват пустых гексов, атака врага на пути, отсчёт отступления. Путь не пересчитывается (05-armies.md, «Движение»).
 // GDD: docs/gdd/05-armies.md — «Движение», «Захват», «Приказы»
-import {
-  CONSOLIDATE_CROWD,
-  CONSOLIDATE_MAX,
-  MAX_UNITS_PER_HEX,
-  ORG_AFTER_RETREAT,
-} from '../balance.ts';
+import { MAX_UNITS_PER_HEX, ORG_AFTER_RETREAT } from '../balance.ts';
 import { gatherSystem } from './gather.ts';
 import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
-import { intDiv } from '../math/int.ts';
 import { isHostileHex, ownUnitsAt, peaceBlocked, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
 import { isAllied } from '../state/relations.ts';
 import type { Unit, MatchState } from '../state/types.ts';
-import { allUnits, moveUnit, removeUnits } from '../state/unit-index.ts';
+import { moveUnit } from '../state/unit-index.ts';
 
 // Сбрасывает путь; отряд с приказом move встаёт.
 function stop(unit: Unit): void {
@@ -43,40 +37,8 @@ function meetEnemy(state: MatchState, unit: Unit, next: HexId): boolean {
   return true;
 }
 
-// Полный гекс впереди: если там стоит свой стоящий отряд той же армии и типа, колонна вливается в
-// него (затор из мелких отрядов иначе стоит вечно), иначе отряд ждёт места. true — отряд влит.
-function joinStack(state: MatchState, unit: Unit, hex: HexId): boolean {
-  const blocker = allUnits(state).find(
-    (u) =>
-      u.hex === hex &&
-      u.owner === unit.owner &&
-      u.type === unit.type &&
-      u.armyId === unit.armyId &&
-      u.order === 'idle' &&
-      !u.inBattle &&
-      u.soldiers + unit.soldiers <= CONSOLIDATE_MAX,
-  );
-  if (!blocker) return false;
-  // Вливаются только в толпе: в малой армии мелочи нет, и стоящий отряд — это сознательный строй.
-  const mine = allUnits(state).filter((u) => u.owner === unit.owner).length;
-  if (mine <= CONSOLIDATE_CROWD) return false;
-  const total = blocker.soldiers + unit.soldiers;
-  blocker.org = intDiv(
-    blocker.org * blocker.soldiers + unit.org * unit.soldiers,
-    total,
-  ) as typeof blocker.org;
-  blocker.soldiers = total as typeof blocker.soldiers;
-  removeUnits(state, [unit]);
-  return true;
-}
-
-// Гекс полон: колонна, подошедшая к своему стоящему отряду, вливается в него (и исчезает), иначе
-// отряд ждёт места. В обоих случаях дальше идти нельзя.
-const isFull = (state: MatchState, unit: Unit, hex: HexId): boolean => {
-  if (ownUnitsAt(state, unit.owner, hex) < MAX_UNITS_PER_HEX) return false;
-  joinStack(state, unit, hex);
-  return true;
-};
+const isFull = (state: MatchState, unit: Unit, hex: HexId): boolean =>
+  ownUnitsAt(state, unit.owner, hex) >= MAX_UNITS_PER_HEX;
 
 function startStep(state: MatchState, unit: Unit, next: HexId): boolean {
   if (blocked(state, unit, next)) {
@@ -132,8 +94,7 @@ function retreatTick(unit: Unit): void {
 
 /** Двигает отряды с приказом move на тик; отряды — по возрастанию id. */
 export function movementSystem(state: MatchState): void {
-  // Копия: влитый в затор отряд исчезает из state.units прямо во время обхода.
-  for (const unit of [...state.units]) {
+  for (const unit of state.units) {
     if (unit.order === 'move') advance(state, unit);
     else if (unit.order === 'retreat') retreatTick(unit);
   }

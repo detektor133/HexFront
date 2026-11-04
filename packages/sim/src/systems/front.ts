@@ -6,18 +6,15 @@ import { consolidate } from './consolidate.ts';
 import { maintainDirections } from './direction.ts';
 import {
   FRONT_ALLOC_TICKS,
-  FRONT_COVER_STRIDE,
-  FRONT_FULL_COVER,
+  FRONT_HOLD_DENOM,
   FRONT_REALLOC_GAIN_MIN,
-  FRONT_SPLIT_LONG,
   FRONT_SPLIT_MIN,
   FRONT_THREAT_RANGE,
-  MAX_UNITS_PER_HEX,
 } from '../balance.ts';
 import { mergeUnits, splitUnit } from '../commands/unit.ts';
 import { distance, hexFromId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
-import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
+import { findPath } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
@@ -49,21 +46,17 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
   u.order = 'move';
 }
 
-// Сколько отрядов нужно линии: угрожаемые гексы (чужой отряд рядом) закрываем все, остальные —
-// по одному отряду на FRONT_COVER_STRIDE гексов. Закрывать каждый гекс 100-гексового фронта значило
-// раздробить армию на мелочь, которую враг бьёт крупными отрядами.
-function coverNeed(state: MatchState, plan: ArmyPlan, owner: number): number {
-  const line = planHexes(state, plan);
-  if (line.length <= FRONT_FULL_COVER) return line.length;
-  const { width } = state.map;
-  const foes = allUnits(state).filter((u) => u.owner !== owner && atWar(state, owner, u.owner));
-  const threatened = line.filter((h) =>
-    foes.some((u) => distance(hexFromId(u.hex, width), hexFromId(h, width)) <= FRONT_THREAT_RANGE),
-  ).length;
-  return Math.min(
-    line.length,
-    Math.max(threatened, intDiv(line.length + FRONT_COVER_STRIDE - 1, FRONT_COVER_STRIDE)),
-  );
+// Сколько отрядов нужно линии: по отряду на каждый гекс — пробелов нет ни на каких участках.
+const coverNeed = (state: MatchState, plan: ArmyPlan): number => planHexes(state, plan).length;
+
+// Сила врага рядом с гексом (в солдатах): чужие отряды в пределах FRONT_THREAT_RANGE гексов.
+function enemyNear(hex: number, width: number, foes: readonly Unit[]): number {
+  let strength = 0;
+  const at = hexFromId(hex, width);
+  for (const u of foes) {
+    if (distance(at, hexFromId(u.hex, width)) <= FRONT_THREAT_RANGE) strength += u.soldiers;
+  }
+  return strength;
 }
 
 /**
@@ -74,17 +67,22 @@ function coverNeed(state: MatchState, plan: ArmyPlan, owner: number): number {
 function coverLine(state: MatchState, armyId: number, owner: number): void {
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
-  const need = coverNeed(state, plan, owner);
-  const splitMin =
-    planHexes(state, plan).length > FRONT_FULL_COVER ? FRONT_SPLIT_LONG : FRONT_SPLIT_MIN;
+  const need = coverNeed(state, plan);
+  const { width } = state.map;
   for (;;) {
     const units = allUnits(state).filter((u) => planControls(u, armyId) && u.type !== 'artillery');
-    // Глобального лимита отрядов нет (DECISIONS 2026-10-02): ограничивают только гекс и минимум деления.
+    // Глобального лимита отрядов нет (DECISIONS 2026-10-02): ограничивает только минимум деления.
     if (units.length >= need) return;
+    const foes = allUnits(state).filter((u) => u.owner !== owner && atWar(state, owner, u.owner));
     let best: Unit | null = null;
     for (const u of units) {
-      if (u.soldiers < 2 * splitMin || ownUnitsAt(state, owner, u.hex) >= MAX_UNITS_PER_HEX)
-        continue;
+      // Адаптивно: у сильного врага отряд делится не мельче, чем держит долю его силы (каждая часть
+      // — не меньше 1/FRONT_HOLD_DENOM силы врага рядом), у тихого участка — до FRONT_SPLIT_MIN.
+      const hold = Math.max(
+        FRONT_SPLIT_MIN,
+        intDiv(enemyNear(u.hex, width, foes), FRONT_HOLD_DENOM),
+      );
+      if (u.soldiers < 2 * hold) continue;
       if (!best || u.soldiers > best.soldiers) best = u;
     }
     if (!best) return;
@@ -97,8 +95,8 @@ const bySize = (a: Unit, b: Unit): number => a.soldiers - b.soldiers || a.id - b
 // Одно слияние за распределение: пара должна быть однотипной, в одном гексе и не в бою.
 // Только для армии с планом (фронт/наступление/оборона) — её расстановку ведёт commander
 // (решение владельца 2026-11-02); армия без плана не сливается сама, только вручную.
-function autoMerge(state: MatchState, plan: ArmyPlan, owner: number): void {
-  const need = coverNeed(state, plan, owner);
+function autoMerge(state: MatchState, plan: ArmyPlan): void {
+  const need = coverNeed(state, plan);
   const armyUnits = allUnits(state).filter(
     (u) => planControls(u, plan.armyId) && u.type !== 'artillery',
   );
@@ -121,7 +119,7 @@ function runPlan(state: MatchState, armyId: number): void {
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
-  autoMerge(state, plan, owner);
+  autoMerge(state, plan);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
