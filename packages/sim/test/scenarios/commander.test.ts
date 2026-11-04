@@ -106,7 +106,7 @@ describe('commander: ничья земля (04/T21, CR-006)', () => {
     const s = scenario(OPEN, { legend });
     const army = autoArmy(s, 2);
     const before = ownedBy(s, 0);
-    s.runAuto(300);
+    s.runAuto(150);
     expect(ownedBy(s, 0)).toBeGreaterThan(before + 2);
     expect(planOf(s, army)).toBeUndefined();
   });

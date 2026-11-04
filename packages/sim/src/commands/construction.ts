@@ -18,7 +18,7 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
-import { distance, hexFromId, type HexId } from '../math/hex.ts';
+import { distance, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
 import { BUILDING, type ConstructionKind, type MatchState } from '../state/types.ts';
@@ -71,19 +71,32 @@ function tooCloseToCity(state: MatchState, hex: HexId): boolean {
   return sites.some((site) => distance(hexFromId(site, state.map.width), h) < CITY_MIN_DISTANCE);
 }
 
+// Склады ищем в кольце радиуса DEPOT_MIN_DISTANCE − 1 вокруг гекса, а не по всей карте: бот
+// перебирает сотни гексов-кандидатов, и обход всей карты на каждый давал O(карта²).
 function tooCloseToDepot(state: MatchState, hex: HexId): boolean {
-  const candidate = hexFromId(hex, state.map.width);
+  const { width, height } = state.map;
+  const candidate = hexFromId(hex, width);
   const sites = [
     ...state.cities.map((c) => c.hex),
     ...state.constructions.filter((c) => c.kind === 'foundCity').map((c) => c.hex),
   ];
-  state.hexes.building.forEach((building, site) => {
-    if (building === BUILDING.depot) sites.push(site);
-  });
-  return sites.some(
-    (site) =>
-      site !== hex && distance(hexFromId(site, state.map.width), candidate) < DEPOT_MIN_DISTANCE,
-  );
+  if (
+    sites.some(
+      (site) => site !== hex && distance(hexFromId(site, width), candidate) < DEPOT_MIN_DISTANCE,
+    )
+  ) {
+    return true;
+  }
+  const reach = DEPOT_MIN_DISTANCE - 1;
+  for (let dq = -reach; dq <= reach; dq += 1) {
+    for (let dr = Math.max(-reach, -dq - reach); dr <= Math.min(reach, -dq + reach); dr += 1) {
+      const near = { q: candidate.q + dq, r: candidate.r + dr };
+      if (!inBounds(near, width, height)) continue;
+      const site = hexId(near, width);
+      if (site !== hex && state.hexes.building[site] === BUILDING.depot) return true;
+    }
+  }
+  return false;
 }
 
 function planFoundCity(state: MatchState, playerId: number, hex: HexId): PlanResult {

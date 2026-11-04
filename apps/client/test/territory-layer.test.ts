@@ -86,6 +86,7 @@ const labelView = (owner: number[]): PlayerView =>
     constructions: [],
     plans: [],
     units: [],
+    armies: [],
     recruits: [],
     players: [
       { id: 0, name: 'Север' },

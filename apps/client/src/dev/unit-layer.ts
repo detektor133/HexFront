@@ -164,7 +164,6 @@ export function createUnitLayer(
   const chips = new Map<string, Chip>();
   let entries: Entry[] = [];
   let view: PlayerView | null = null;
-  let picked: Picked = { hex: null, units: [], target: null };
   let snapAt = 0;
   let k = 1;
   let compact = false;
@@ -181,16 +180,33 @@ export function createUnitLayer(
   const battleMarkers = new Map<string, BattleMarker<BattleMarkerObject>>();
   const battleMarkerColors = new Map<string, string>();
   const markerAnchors = new Map<string, MarkerAnchor>();
+  // Индексы снимка: поиск по списку отрядов на каждый отряд даёт O(n²) в большой войне.
+  let pickedSet: ReadonlySet<number> = new Set();
+  const armyById = new Map<number, PlayerView['armies'][number]>();
+  const attackersByTarget = new Map<number, UnitView[]>();
+  const unitsByHex = new Map<number, UnitView[]>();
+  const push = (map: Map<number, UnitView[]>, key: number, u: UnitView): void => {
+    const list = map.get(key);
+    if (list) list.push(u);
+    else map.set(key, [u]);
+  };
+  function index(v: PlayerView, p: Picked): void {
+    pickedSet = new Set(p.units);
+    armyById.clear();
+    for (const a of v.armies) armyById.set(a.id, a);
+    attackersByTarget.clear();
+    unitsByHex.clear();
+    for (const u of v.units) {
+      push(unitsByHex, u.hex, u);
+      if (u.order === 'attack') push(attackersByTarget, u.target, u);
+    }
+  }
 
   function battleAdvantage(u: UnitView, v: PlayerView): number | null {
     if (u.attackState !== null && u.attackState !== undefined) return u.attackState.advantage;
     if (u.owner !== v.playerId) return null;
-    const attackers = v.units.filter(
-      (candidate) => candidate.order === 'attack' && candidate.target === u.target,
-    );
-    const defenders = v.units.filter(
-      (candidate) => candidate.hex === u.target && candidate.owner !== u.owner,
-    );
+    const attackers = attackersByTarget.get(u.target) ?? [];
+    const defenders = (unitsByHex.get(u.target) ?? []).filter((c) => c.owner !== u.owner);
     const attackerOrg = attackers.reduce((sum, candidate) => sum + candidate.org, 0);
     const defenderOrg = defenders.reduce((sum, candidate) => sum + candidate.org, 0);
     const total = attackerOrg + defenderOrg;
@@ -253,7 +269,7 @@ export function createUnitLayer(
   };
 
   function stateOf(unit: UnitView, v: PlayerView): ChipState {
-    const army = v.armies.find((a) => a.id === unit.armyId);
+    const army = armyById.get(unit.armyId ?? -1);
     const mine = unit.owner === v.playerId;
     const attack = mine && unit.order === 'attack' && unit.target >= 0 ? unit : undefined;
     const attackDirection =
@@ -271,7 +287,7 @@ export function createUnitLayer(
       org: unit.org / ORG_MAX,
       supply: mine ? (unit.supplyLevel ?? FULL) / FULL : null,
       starving: unit.starving === true,
-      selected: picked.units.includes(unit.id),
+      selected: pickedSet.has(unit.id),
       retreating: unit.order === 'retreat',
       encircled: mine && unit.encircled === true,
       ghost: false,
@@ -299,13 +315,13 @@ export function createUnitLayer(
       soldiers,
       org,
       count: units.length,
-      selected: units.some((u) => picked.units.includes(u.id)),
+      selected: units.some((u) => pickedSet.has(u.id)),
     };
   }
 
   function build(v: PlayerView): Entry[] {
     const out: Entry[] = [];
-    for (const g of chipGroups(v, new Set(picked.units))) {
+    for (const g of chipGroups(v, pickedSet)) {
       const unit = g.units[0] as UnitView;
       out.push({
         key: g.key,
@@ -354,7 +370,7 @@ export function createUnitLayer(
     ground.clear();
     const mine = v.units.filter((u) => u.owner === v.playerId);
     // Зона огня выбранной артиллерии: контур области гексов в радиусе ARTY_RANGE.
-    const arty = mine.filter((u) => u.type === 'artillery' && picked.units.includes(u.id));
+    const arty = mine.filter((u) => u.type === 'artillery' && pickedSet.has(u.id));
     if (arty.length > 0) {
       const inside = new Set<number>();
       v.hexes.owner.forEach((_, id) => {
@@ -376,7 +392,7 @@ export function createUnitLayer(
     const phase = ((nowMs / 1000) * PATH_SPEED) % (PATH_DASH + PATH_GAP);
     for (const u of mine) {
       if (u.path.length === 0) continue;
-      if (!picked.units.includes(u.id)) continue;
+      if (!pickedSet.has(u.id)) continue;
       const pts = [shown.get(u.id) ?? unitAt(u, frac), ...u.path.map(base)];
       dashedPath(ground, pts, PATH_DASH * k, PATH_GAP * k, phase * k);
       ground.stroke({
@@ -474,7 +490,7 @@ export function createUnitLayer(
     },
     setView(v, p, nowMs) {
       view = v;
-      picked = p;
+      index(v, p);
       snapAt = nowMs;
       cities.clear();
       for (const c of v.cities) cities.set(c.hex, c.level);

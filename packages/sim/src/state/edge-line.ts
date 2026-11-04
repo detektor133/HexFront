@@ -64,7 +64,9 @@ export function normalizeLine(g: LineGround, edges: readonly EdgeId[]): EdgeId[]
 /**
  * Линия наступления по точкам-граням: точки приводятся к одному EdgeId, между ними — кратчайший
  * путь по граням суши (в одном EdgeId), затем повторы и петли убираются (`normalizeLine`).
- * @returns грани по порядку или null, если точки не на суше, их не соединить или линия пуста
+ * Точки, которые не соединить одной цепочкой, дают несколько линий: каждая связная группа точек —
+ * своя линия (направления наступления, 07-controls.md).
+ * @returns грани по порядку (линии подряд) или null, если точки не на суше или линия пуста
  */
 export function offensiveEdgePath(g: LineGround, points: readonly EdgeId[]): EdgeId[] | null {
   if (points.length === 0 || points.some((e) => !isLandEdge(g, e))) return null;
@@ -76,12 +78,25 @@ export function offensiveEdgePath(g: LineGround, points: readonly EdgeId[]): Edg
     const out = around.filter((x) => isLandEdge(g, x)).map((x) => canonicalEdge(g, x));
     return [...new Set(out)].sort((a, b) => a - b);
   };
-  const path = edgeChain(
-    points.map((e) => canonicalEdge(g, e)),
-    next,
-    limitOf(g),
-    true,
-  );
-  const line = path ? normalizeLine(g, path) : [];
+  const chain = (pts: readonly EdgeId[], strict: boolean): EdgeId[] | null =>
+    edgeChain(
+      pts.map((e) => canonicalEdge(g, e)),
+      next,
+      limitOf(g),
+      strict,
+    );
+  const whole = chain(points, true);
+  if (whole) {
+    const line = normalizeLine(g, whole);
+    return line.length > 0 ? line : null;
+  }
+  const groups: EdgeId[][] = [];
+  for (const p of points) {
+    const last = groups.at(-1);
+    if (last && chain([...last, p], true)) last.push(p);
+    else groups.push([p]);
+  }
+  const runs = groups.map((group) => normalizeLine(g, chain(group, true) ?? group));
+  const line = runs.flat();
   return line.length > 0 ? line : null;
 }

@@ -6,12 +6,20 @@
 import { commanderLine } from './commander-line.ts';
 import { strike } from './commander-strike.ts';
 import { warWith } from './war.ts';
-import { MAX_UNITS_PER_HEX } from '../balance.ts';
+import {
+  AXIS_DONE_PERCENT,
+  AXIS_MAX,
+  BOT_AXIS_EDGES,
+  SWARM_PART,
+  MAX_UNITS_PER_HEX,
+  SWARM_PARTS_PER_TICK,
+  SWARM_SAFE,
+} from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import { fp, type Fp } from '../math/int.ts';
+import { fp, intDiv, type Fp } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
@@ -299,6 +307,20 @@ function expand(
   const borderGap = (h: HexId): number =>
     Math.min(...mine.map((m) => distance(hexOf(map, m), hexOf(map, h))), Number.MAX_SAFE_INTEGER);
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
+  // Расстояние до своей земли считается один раз на город, а не на каждый отряд.
+  const bordering = cities.filter((h) => borderGap(h) <= 1);
+  const foes = view.units.filter((x) => x.owner !== view.playerId);
+  // Свободные места в гексе для отделяемых частей: общие на все отряды гекса.
+  const room = new Map<HexId, number>();
+  const roomAt = (hex: HexId): number => {
+    const known = room.get(hex);
+    if (known !== undefined) return known;
+    const free =
+      MAX_UNITS_PER_HEX -
+      view.units.filter((x) => x.owner === view.playerId && x.hex === hex).length;
+    room.set(hex, free);
+    return free;
+  };
   const out: Command[] = [];
   for (const u of units.filter(idle)) {
     const at = hexOf(map, u.hex);
@@ -320,13 +342,34 @@ function expand(
     const fromCore = (h: HexId): number => core(h) * LAND_KEY + fromUnit(h);
     // Нейтральный город — только у своей границы: за далёким городом отряд тянул бы червяка
     // через ничью землю вместо целостного государства.
-    const winnable = cities.filter(
-      (h) => borderGap(h) <= 1 && forecastBattle(map, view, [u.id], h).outcome === 'victory',
+    const winnable = bordering.filter(
+      (h) => forecastBattle(map, view, [u.id], h).outcome === 'victory',
     );
     const target = nearest(winnable, fromUnit) ?? nearest(empty, fromCore);
     if (target === null) continue;
     claimed.add(target);
     out.push({ t: 'move', unitIds: [u.id], to: target });
+    // Рой: крупный отряд отделяет части на соседние свободные гексы, чтобы ничья земля бралась
+    // широко и сразу, а не по гексу за отряд.
+    let rest: number = u.soldiers;
+    for (
+      let n = 0;
+      n < SWARM_PARTS_PER_TICK && rest >= 2 * SWARM_PART && roomAt(u.hex) > 0;
+      n += 1
+    ) {
+      // Рой — только вдали от врага: мелкая часть рядом с ним гибнет в бою.
+      const next = nearest(
+        empty.filter((h) =>
+          foes.every((e) => distance(hexOf(map, e.hex), hexOf(map, h)) > SWARM_SAFE),
+        ),
+        fromUnit,
+      );
+      if (next === null) break;
+      claimed.add(next);
+      rest -= SWARM_PART;
+      room.set(u.hex, roomAt(u.hex) - 1);
+      out.push({ t: 'split', unitId: u.id, soldiers: SWARM_PART, to: next });
+    }
   }
   return out;
 }
@@ -381,10 +424,17 @@ export function decide(
         units.filter((u) => !striking.has(u.id)),
       ),
     );
-    if (plan.startWanted && !plan.offensive) {
-      const line = commanderLine(map, view, plan.edges, piece.enemy, lineDepth);
-      if (line.length > 0) {
-        out.push({ t: 'setOffensiveLine', armyId, edges: line }, { t: 'startOffensive', armyId });
+    // Линию строим, когда её нет, и обновляем, когда идущая почти взята: наступление не встаёт.
+    const finished =
+      plan.offensive?.active === true &&
+      ownedShare(view, plan.offensive.hexes) >= AXIS_DONE_PERCENT;
+    if ((plan.startWanted && !plan.offensive) || finished) {
+      const lines = strikeAxes(map, view, plan.edges, piece.enemy, lineDepth);
+      if (lines.length > 0) {
+        out.push(
+          { t: 'setOffensiveLine', armyId, edges: lines.flat(), lines },
+          { t: 'startOffensive', armyId },
+        );
       }
     }
     return out;
@@ -399,6 +449,34 @@ export function decide(
     ),
   );
   return out;
+}
+
+// Доля гексов линии, уже взятых игроком, процентов.
+function ownedShare(view: PlayerView, hexes: readonly HexId[]): number {
+  if (hexes.length === 0) return 100;
+  const own = hexes.filter((h) => view.hexes.owner[h] === view.playerId).length;
+  return intDiv(own * 100, hexes.length);
+}
+
+// Широкий фронт бьёт несколькими осями: средние части равных кусков фронта, между ними — разрывы.
+function strikeAxes(
+  map: MapStatic,
+  view: PlayerView,
+  front: readonly EdgeId[],
+  enemy: number,
+  depth: number | undefined,
+): EdgeId[][] {
+  const count = Math.min(AXIS_MAX, intDiv(front.length, BOT_AXIS_EDGES));
+  if (count < 2) return [commanderLine(map, view, front, enemy, depth)].filter((l) => l.length > 0);
+  const size = intDiv(front.length, count);
+  const margin = intDiv(size, 5);
+  const lines: EdgeId[][] = [];
+  for (let i = 0; i < count; i += 1) {
+    const part = front.slice(i * size + margin, (i + 1) * size - margin);
+    const line = commanderLine(map, view, part, enemy, depth);
+    if (line.length > 0) lines.push(line);
+  }
+  return lines;
 }
 
 /**

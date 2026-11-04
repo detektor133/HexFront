@@ -237,6 +237,25 @@ export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);
 export const EXPAND_RADIUS_BASE = 3;
 export const EXPAND_SOLDIERS_PER_HEX = 100;
 export const EXPAND_RADIUS_MAX = 10;
+/** Слияние мелочи: отряд меньше порога стягивается к ближайшему своему в радиусе, раз в период. */
+export const MERGE_SMALL_BELOW: Fp = fp(25);
+export const MERGE_SMALL_RADIUS = 3;
+export const CONSOLIDATE_PERIOD_S = 2;
+/** Рой на ничьей земле: сколько частей отряд отделяет за тик (ИИ-командир бота). */
+export const SWARM_PARTS_PER_TICK = 2;
+/** Рой не занимает гексы ближе этого числа гексов к чужим отрядам. */
+export const SWARM_SAFE = 6;
+/** Размер части, которую рой отделяет от отряда. */
+export const SWARM_PART: Fp = fp(100);
+/** Оси удара направления: одна на каждые AXIS_SOLDIERS солдат заказа, не больше AXIS_MAX. */
+export const AXIS_SOLDIERS = 300;
+export const AXIS_MAX = 4;
+/** Как часто ИИ обновляет линии идущего наступления, секунд. */
+export const AXIS_REFRESH_S = 5;
+/** Линия считается выполненной, когда взято не меньше этой доли её гексов, процентов. */
+export const AXIS_DONE_PERCENT = 70;
+/** Бот: одна ось на каждые столько граней фронта (широкий фронт — несколько осей). */
+export const BOT_AXIS_EDGES = 14;
 /** Наибольший набор, который ИИ ставит за раз при закупке под заказ армии. */
 export const PROCURE_BATCH: Fp = fp(300);
 export const MAX_UNITS_PER_HEX = 3;

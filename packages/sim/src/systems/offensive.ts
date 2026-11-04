@@ -14,7 +14,7 @@ import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.t
 import { intDiv } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { isHostileHex, ownUnitsAt } from '../queries/unit-path.ts';
-import { edgeAt } from '../state/contour.ts';
+import { edgeAt, touches } from '../state/contour.ts';
 import {
   cornerKey,
   edgeCorners,
@@ -70,19 +70,31 @@ const advancing = (u: Unit, armyId: number, facing: ReadonlySet<HexId>): boolean
 // Вся линия своя и анклавов нет — как в HoI4: фронт армии — дуга своей границы от угла начала
 // линии до угла конца (контур, как в «Линии фронта»), линия и стрелки исчезают. Дуги нет — фронт
 // прежний.
+// Линии, из которых сложено наступление: подряд идущие грани, сходящиеся в углу, — одна линия.
+export function lineRuns(state: MatchState, line: readonly EdgeId[]): EdgeId[][] {
+  const runs: EdgeId[][] = [];
+  for (const e of line) {
+    const run = runs.at(-1);
+    const prev = run?.at(-1);
+    if (run && prev !== undefined && touches(state, prev, e)) run.push(e);
+    else runs.push([e]);
+  }
+  return runs;
+}
+
 function finish(state: MatchState, plan: FrontPlan, owner: number, line: readonly EdgeId[]): void {
-  const first = line[0];
-  const last = line.at(-1);
   const marks = line.map((e) => (isBorderEdge(state, owner, e) ? e : flipEdge(state, e)));
-  // Грани границы у внешних углов концов линии: дуга идёт от угла до угла.
-  for (const [e, next] of [
-    [first, line[1]],
-    [last, line.at(-2)],
-  ] as const) {
-    if (e === undefined) continue;
-    for (const c of edgeCorners(e)) {
-      if (next !== undefined && touchesCorner(state, next, c)) continue;
-      marks.push(edgeAt(state, owner, c, 0), edgeAt(state, owner, c, 1));
+  // Грани границы у внешних углов концов каждой линии: дуга идёт от угла до угла.
+  for (const run of lineRuns(state, line)) {
+    for (const [e, next] of [
+      [run[0], run[1]],
+      [run.at(-1), run.at(-2)],
+    ] as const) {
+      if (e === undefined) continue;
+      for (const c of edgeCorners(e)) {
+        if (next !== undefined && touchesCorner(state, next, c)) continue;
+        marks.push(edgeAt(state, owner, c, 0), edgeAt(state, owner, c, 1));
+      }
     }
   }
   const arc = borderArc(state, owner, marks);

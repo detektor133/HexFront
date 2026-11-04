@@ -4,19 +4,27 @@
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
 import { ARMY_NAME_MAX, executeArmyCommand } from './army.ts';
-import { pickAxis, type Strike } from './axis.ts';
+import { pickAxes, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
 import { OK, rejected, type Validation } from './types.ts';
+import { AXIS_DONE_PERCENT, AXIS_MAX, AXIS_SOLDIERS } from '../balance.ts';
 import { commanderLine } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { FP } from '../math/int.ts';
+import { FP, intDiv } from '../math/int.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
-import { borderEdges, borderSegmentEdges, edgeHex, type EdgeId } from '../state/edges.ts';
+import {
+  borderEdges,
+  borderSegmentEdges,
+  edgeHex,
+  edgeOther,
+  type EdgeId,
+} from '../state/edges.ts';
 import { atWar, isAllied } from '../state/relations.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { expandNeutral } from '../systems/expand.ts';
+import { lineRuns } from '../systems/offensive.ts';
 
 /** Предел заказа солдат в одной команде: защита от мусорных значений. */
 const SOLDIERS_MAX = 1_000_000;
@@ -66,13 +74,21 @@ export function borderPieces(state: MatchState, playerId: number, target: number
 }
 
 // Участок удара выбирает ИИ: клик игрока в выборе оси не участвует.
-function strikeFront(state: MatchState, playerId: number, cmd: DirectionCommand): Strike {
-  return pickAxis(
+function strikeFront(
+  state: MatchState,
+  playerId: number,
+  cmd: DirectionCommand,
+  skip: readonly EdgeId[] = [],
+  want?: number,
+): Strike {
+  return pickAxes(
     state,
     playerId,
     blocOf(state, playerId, cmd.target),
     borderPieces(state, playerId, cmd.target),
     cmd.soldiers,
+    skip,
+    want,
   );
 }
 
@@ -216,7 +232,9 @@ function prepare(
   // Фронт — вся граница с блоком цели, чтобы нигде на ней не было дыр и не было лишнего.
   const neutral = cmd.target === NEUTRAL_TARGET;
   const front = neutral ? [] : frontOf(state, playerId, cmd.target);
-  const strike: Strike = neutral ? { edges: [], depth: 0 } : strikeFront(state, playerId, cmd);
+  const strike: Strike = neutral
+    ? { edges: [], windows: [], axes: 0, depth: 0 }
+    : strikeFront(state, playerId, cmd);
   const anchors =
     neutral && cmd.hex !== undefined
       ? [cmd.hex]
@@ -244,23 +262,89 @@ function prepare(
   return plan?.kind === 'front' ? { army, strike } : null;
 }
 
+// Линии наступления: у каждой оси свой участок границы и своя линия впереди него.
+function strikeLines(state: MatchState, army: Army, target: number, strike: Strike): EdgeId[][] {
+  const enemy = blocOf(state, army.owner, target);
+  return strike.windows
+    .map((w) =>
+      commanderLine(
+        state.map,
+        { hexes: state.hexes, cities: state.cities },
+        w,
+        enemy,
+        strike.depth,
+      ),
+    )
+    .filter((line) => line.length > 0);
+}
+
+function setLines(state: MatchState, army: Army, lines: readonly (readonly EdgeId[])[]): void {
+  executePlanCommand(state, army.owner, {
+    t: 'setOffensiveLine',
+    armyId: army.id,
+    edges: lines.flat(),
+    lines,
+  });
+}
+
 // Линия наступления по оси удара на глубину strike.depth и старт; false — строить нечего.
 function startStrike(state: MatchState, army: Army, target: number, strike: Strike): boolean {
-  const line = commanderLine(
-    state.map,
-    { hexes: state.hexes, cities: state.cities },
-    strike.edges,
-    blocOf(state, army.owner, target),
-    strike.depth,
-  );
-  if (line.length === 0) return false;
-  executePlanCommand(state, army.owner, { t: 'setOffensiveLine', armyId: army.id, edges: line });
+  const lines = strikeLines(state, army, target, strike);
+  if (lines.length === 0) return false;
+  setLines(state, army, lines);
   const start = { t: 'startOffensive', armyId: army.id } as const;
   if (validatePlanCommand(state, army.owner, start).ok) {
     executePlanCommand(state, army.owner, start);
   }
   return true;
 }
+
+/** Доля взятых гексов линии, процентов: гексы линии — те, что у граней и входят в `hexes`. */
+function takenShare(
+  state: MatchState,
+  owner: number,
+  run: readonly EdgeId[],
+  hexes: ReadonlySet<number>,
+): number {
+  const own = new Set<number>();
+  const all = new Set<number>();
+  for (const e of run) {
+    for (const h of [edgeHex(e), edgeOther(state, e)]) {
+      if (h < 0 || !hexes.has(h)) continue;
+      all.add(h);
+      if (state.hexes.owner[h] === owner) own.add(h);
+    }
+  }
+  return all.size === 0 ? 100 : intDiv(own.size * 100, all.size);
+}
+
+/**
+ * ИИ обновляет линии идущего наступления: выполненные (взято AXIS_DONE_PERCENT гексов) снимаются,
+ * вместо них строятся новые оси по свежей обстановке; невыполненные остаются. Число осей держится
+ * по заказу солдат.
+ */
+export function refreshStrike(state: MatchState, army: Army): void {
+  const dir = army.dir;
+  const plan = state.plans.find((p) => p.armyId === army.id);
+  if (!dir || dir.mode !== 'attack' || plan?.kind !== 'front' || !plan.offensive?.active) return;
+  const off = plan.offensive;
+  const hexes = new Set(off.hexes);
+  const runs = lineRuns(state, off.edges);
+  const kept = runs.filter((r) => takenShare(state, army.owner, r, hexes) < AXIS_DONE_PERCENT);
+  if (kept.length === runs.length && kept.length >= strikeAxes(army)) return;
+  const cmd = { target: dir.target, soldiers: army.wanted ?? 1 };
+  const strike = strikeFront(state, army.owner, cmd, kept.flat(), strikeAxes(army) - kept.length);
+  const fresh = strikeLines(state, army, dir.target, strike);
+  const lines = [...kept, ...fresh];
+  if (lines.length === 0 || (fresh.length === 0 && kept.length === runs.length)) return;
+  setLines(state, army, lines);
+  const start = { t: 'startOffensive', armyId: army.id } as const;
+  if (validatePlanCommand(state, army.owner, start).ok)
+    executePlanCommand(state, army.owner, start);
+}
+
+const strikeAxes = (army: Army): number =>
+  Math.min(AXIS_MAX, Math.max(1, intDiv(army.wanted ?? 0, AXIS_SOLDIERS)));
 
 /**
  * Продолжает наступление направления: когда очередной удар кончился, ИИ заново оценивает

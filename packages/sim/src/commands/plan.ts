@@ -73,10 +73,13 @@ function validateOffensive(
 ): Validation {
   const plan = state.plans.find((p) => p.armyId === cmd.armyId);
   if (plan?.kind !== 'front') return rejected('noFront');
-  if (cmd.edges.length === 0 || cmd.edges.some((e) => !inMap(state, e) || !isLandEdge(state, e))) {
-    return rejected('badHex');
+  for (const group of cmd.lines ?? [cmd.edges]) {
+    if (group.length === 0 || group.some((e) => !inMap(state, e) || !isLandEdge(state, e))) {
+      return rejected('badHex');
+    }
+    if (!offensiveEdgePath(state, group)) return rejected('noPath');
   }
-  return offensiveEdgePath(state, cmd.edges) ? OK : rejected('noPath');
+  return OK;
 }
 
 // «Начать наступление»: есть нарисованная линия; идущих наступлений у игрока не больше
@@ -213,8 +216,9 @@ export function executePlanCommand(state: MatchState, playerId: number, cmd: Pla
   if (cmd.t === 'setOffensiveLine') {
     const plan = state.plans.find((p) => p.armyId === cmd.armyId);
     // Одна грань — один EdgeId, петли вырезаются молча (07-controls.md, «Линия наступления»).
-    const edges = offensiveEdgePath(state, cmd.edges);
-    if (!plan || !edges) return;
+    // Каждая линия строится отдельно: иначе кратчайший путь по суше слил бы их в одну.
+    const edges = (cmd.lines ?? [cmd.edges]).flatMap((g) => offensiveEdgePath(state, g) ?? []);
+    if (!plan || edges.length === 0) return;
     return setOffensive(state, cmd.armyId, offensiveLine(state, plan, edges));
   }
   if (cmd.t === 'assignFront') {

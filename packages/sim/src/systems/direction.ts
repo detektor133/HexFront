@@ -3,8 +3,13 @@
 // какой другой; кончившийся удар ИИ повторяет по новой обстановке, выбывший игрок снимает
 // направление; ничья земля занимается отрядами.
 import { expandNeutral } from './expand.ts';
-import { TICKS_PER_S } from '../balance.ts';
-import { borderPieces, continueStrike, releaseDirection } from '../commands/launch.ts';
+import { AXIS_REFRESH_S, TICKS_PER_S } from '../balance.ts';
+import {
+  borderPieces,
+  continueStrike,
+  refreshStrike,
+  releaseDirection,
+} from '../commands/launch.ts';
 import { placeFront } from '../commands/plan.ts';
 import type { MatchState } from '../state/types.ts';
 
@@ -31,6 +36,10 @@ export function maintainDirections(state: MatchState): void {
       !first.startWanted
     ) {
       continueStrike(state, army);
+    }
+    // Идущее наступление ИИ обновляет: выполненные линии снимает, вместо них строит новые оси.
+    if (dir.mode === 'attack' && state.tick % (AXIS_REFRESH_S * TICKS_PER_S) === 0) {
+      refreshStrike(state, army);
     }
     const edges = borderPieces(state, army.owner, dir.target).flat();
     if (edges.length === 0) continue;

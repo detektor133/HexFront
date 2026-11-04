@@ -22,7 +22,13 @@ export type Command =
     }
   | { readonly t: 'setDefenseLine'; readonly armyId: number; readonly points: readonly HexId[] }
   | { readonly t: 'clearPlan'; readonly armyId: number; readonly edges?: readonly number[] }
-  | { readonly t: 'setOffensiveLine'; readonly armyId: number; readonly edges: readonly number[] }
+  | {
+      readonly t: 'setOffensiveLine';
+      readonly armyId: number;
+      readonly edges: readonly number[];
+      /** Несколько отдельных линий наступления; нет — `edges` одна линия. */
+      readonly lines?: readonly (readonly number[])[];
+    }
   | { readonly t: 'startOffensive'; readonly armyId: number }
   | { readonly t: 'stopOffensive'; readonly armyId: number }
   | { readonly t: 'clearOffensive'; readonly armyId: number }

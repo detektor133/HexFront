@@ -193,6 +193,17 @@
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_MAX` | 10 `[ТЮНИНГ]` |
+| `MERGE_SMALL_BELOW` | 25 `[ТЮНИНГ]` |
+| `MERGE_SMALL_RADIUS` | 3 `[ТЮНИНГ]` |
+| `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
+| `SWARM_PARTS_PER_TICK` | 2 `[ТЮНИНГ]` |
+| `SWARM_SAFE` | 6 `[ТЮНИНГ]` |
+| `SWARM_PART` | 100 `[ТЮНИНГ]` |
+| `AXIS_SOLDIERS` | 300 `[ТЮНИНГ]` |
+| `AXIS_MAX` | 4 `[ТЮНИНГ]` |
+| `AXIS_REFRESH_S` | 5 `[ТЮНИНГ]` |
+| `AXIS_DONE_PERCENT` | 70 `[ТЮНИНГ]` |
+| `BOT_AXIS_EDGES` | 14 `[ТЮНИНГ]` |
 | `OFFENSIVE_FACING_RANGE` | 3 |
 | `COMMANDER_LINE_DEPTH` | 3 |
 | `FRONT_SPLIT_MIN` | 50 |

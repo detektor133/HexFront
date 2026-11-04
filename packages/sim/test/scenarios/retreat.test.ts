@@ -86,7 +86,7 @@ describe('отступление', () => {
     );
     const att = s.unit('A', 'infantry', 900, at(1, 1));
     const def = s.unit('B', 'infantry', 100, at(2, 1));
-    for (let i = 0; i < 3; i += 1) s.unit('B', 'infantry', 10, at(3, 1));
+    for (let i = 0; i < 3; i += 1) s.unit('B', 'infantry', 30, at(3, 1));
     s.cmd('A', attack([att], at(2, 1)));
     untilBroken(s, def);
     expect(s.unitById(def)).toBeUndefined();

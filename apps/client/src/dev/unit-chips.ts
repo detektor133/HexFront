@@ -275,6 +275,25 @@ function drawGhost(p: Parts, s: ChipState): void {
   p.label.position.set(left + SQUARE + PAD + text / 2, 0);
 }
 
+// Одинаково ли состояние фишки: все поля плоские, сравнение поле за полем.
+function sameState(a: ChipState, b: ChipState): boolean {
+  return (
+    a.color === b.color &&
+    a.army === b.army &&
+    a.type === b.type &&
+    a.soldiers === b.soldiers &&
+    a.org === b.org &&
+    a.supply === b.supply &&
+    a.starving === b.starving &&
+    a.selected === b.selected &&
+    a.retreating === b.retreating &&
+    a.encircled === b.encircled &&
+    a.ghost === b.ghost &&
+    (a.attackDirection ?? null) === (b.attackDirection ?? null) &&
+    (a.count ?? 1) === (b.count ?? 1)
+  );
+}
+
 /** Создаёт фишку; перерисовка — только при смене состояния (раз в снимок), не каждый кадр. */
 export function createChip(): Chip {
   const root = new Container();
@@ -315,6 +334,9 @@ export function createChip(): Chip {
   return {
     root,
     draw(s) {
+      // Снимок приходит часто, а фишка чаще всего не меняется: пересборка Graphics и текста
+      // у сотен фишек каждый снимок — главная трата кадра в большой войне.
+      if (last && sameState(last, s)) return;
       last = s;
       render(s);
     },
