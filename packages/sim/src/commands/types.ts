@@ -86,6 +86,8 @@ export type Command =
       readonly target: number;
       readonly soldiers: number;
       readonly hex?: number;
+      /** Откуда брать солдат: id своих армий, −1 — резерв. Нет поля — ИИ берёт свободных сам. */
+      readonly from?: readonly number[];
     }
   /** Держать границу: армия, фронт и заказ числа солдат без наступления; можно и в мире. */
   | {
@@ -93,9 +95,12 @@ export type Command =
       readonly target: number;
       readonly soldiers: number;
       readonly hex?: number;
+      readonly from?: readonly number[];
     }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
+  /** Делит армию на две примерно равные по числу солдат; вторая половина — новая армия. */
+  | { readonly t: 'splitArmy'; readonly armyId: number }
   | {
       readonly t: 'assignUnits';
       readonly unitIds: readonly number[];
@@ -122,6 +127,7 @@ export const REJECT_REASONS = [
   'buildingExists',
   'fortInCity',
   'depotTooClose',
+  'tooFewUnits',
   'unknownDepot',
   'notIsolated',
   'noPath',

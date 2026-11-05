@@ -37,6 +37,8 @@ export interface DirectionCommand {
   readonly target: number;
   readonly soldiers: number;
   readonly hex?: number;
+  /** Откуда брать солдат: id своих армий, −1 — резерв; нет поля — ИИ берёт свободных сам. */
+  readonly from?: readonly number[];
 }
 
 /**
@@ -116,6 +118,11 @@ function validateDirection(
   ) {
     return rejected('invalidAmount');
   }
+  if (cmd.from !== undefined) {
+    const own = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.id));
+    const ok = Array.isArray(cmd.from) && cmd.from.every((id) => id === -1 || own.has(id));
+    if (!ok) return rejected('unknownArmy');
+  }
   const badHex =
     cmd.hex !== undefined &&
     !(Number.isInteger(cmd.hex) && cmd.hex >= 0 && cmd.hex < state.hexes.owner.length);
@@ -172,12 +179,15 @@ function candidates(
   playerId: number,
   armyId: number,
   anchors: readonly HexId[],
+  from?: readonly number[],
 ): Unit[] {
   const { width } = state.map;
   const hexes = anchors.map((h) => hexFromId(h, width));
   const away = (u: Unit): number =>
     Math.min(...hexes.map((h) => distance(hexFromId(u.hex, width), h)));
   const spare = (u: Unit): boolean => {
+    // Источники выбрал игрок: берём из них любые стоящие отряды, а не только свободные.
+    if (from !== undefined) return from.includes(u.armyId ?? -1);
     if (u.armyId === null) return true;
     const owner = state.armies.find((a) => a.id === u.armyId);
     return (
@@ -243,7 +253,7 @@ function prepare(
     .filter((u) => u.armyId === army.id)
     .reduce((sum, u) => sum + u.soldiers, 0);
   const picked: number[] = [];
-  for (const u of candidates(state, playerId, army.id, anchors)) {
+  for (const u of candidates(state, playerId, army.id, anchors, cmd.from)) {
     if (have >= cmd.soldiers * FP) break;
     picked.push(u.id);
     have += u.soldiers;
@@ -254,7 +264,20 @@ function prepare(
     for (const u of allUnits(state)) {
       if (picked.includes(u.id) && u.armyId !== null) sources.add(u.armyId);
     }
+    const taken = new Map<number, number>();
+    for (const u of allUnits(state)) {
+      if (picked.includes(u.id) && u.armyId !== null) {
+        taken.set(u.armyId, (taken.get(u.armyId) ?? 0) + u.soldiers);
+      }
+    }
     executeArmyCommand(state, playerId, { t: 'assignUnits', unitIds: picked, armyId: army.id });
+    // Донор с направлением не добирает забранное: его лимит уменьшается на отданных солдат.
+    for (const [id, soldiers] of taken) {
+      const donor = state.armies.find((a) => a.id === id);
+      if (donor?.wanted !== undefined) {
+        donor.wanted = Math.max(0, donor.wanted - intDiv(soldiers, FP));
+      }
+    }
     dropEmptyArmies(state, sources);
   }
   // Занятие ничьей земли ведёт `expandNeutral` без плана: фронта у такой армии нет.

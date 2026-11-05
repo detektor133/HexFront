@@ -5,6 +5,7 @@ import { OK, rejected, type Command, type RejectReason, type Validation } from '
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { trimAutoFront } from '../state/front.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 export type ArmyCommand = Extract<
   Command,
@@ -13,6 +14,7 @@ export type ArmyCommand = Extract<
       | 'createArmy'
       | 'renameArmy'
       | 'disbandArmy'
+      | 'splitArmy'
       | 'assignUnits'
       | 'setAutoReinforce'
       | 'setArmyAuto'
@@ -74,6 +76,9 @@ export function validateArmyCommand(
   const army = ownArmy(state, playerId, cmd.armyId);
   if (!army.ok) return rejected(army.reason);
   if (cmd.t === 'renameArmy' && !validName(cmd.name)) return rejected('badName');
+  if (cmd.t === 'splitArmy' && allUnits(state).filter((u) => u.armyId === cmd.armyId).length < 2) {
+    return rejected('tooFewUnits');
+  }
   return OK;
 }
 
@@ -121,6 +126,36 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       for (const u of state.units) if (u.armyId === cmd.armyId) u.armyId = null;
       const rest = state.armies.filter((a) => a.id !== cmd.armyId);
       state.armies.splice(0, state.armies.length, ...rest);
+      return;
+    }
+    case 'splitArmy': {
+      const source = state.armies.find((a) => a.id === cmd.armyId);
+      const player = state.players[playerId];
+      if (!source || !player) return;
+      // Крупные отряды по очереди уходят в более лёгкую половину: суммы почти равны.
+      const units = allUnits(state)
+        .filter((u) => u.armyId === cmd.armyId)
+        .sort((x, y) => y.soldiers - x.soldiers || x.id - y.id);
+      player.armiesCreated += 1;
+      const half = {
+        id: state.nextId,
+        owner: playerId,
+        number: player.armiesCreated,
+        name: '',
+        auto: source.auto,
+      };
+      state.nextId += 1;
+      state.armies.push(half);
+      let kept = 0;
+      let moved = 0;
+      for (const u of units) {
+        if (kept <= moved) kept += u.soldiers;
+        else {
+          moved += u.soldiers;
+          u.armyId = half.id;
+          u.slot = -1;
+        }
+      }
       return;
     }
     case 'assignUnits':

@@ -105,3 +105,39 @@
   justify-content: flex-end;
   gap: var(--space-sm);
 }
+
+/* Откуда брать солдат: чипы-переключатели армий и резерва. */
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.source,
+.sourceOn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.sourceOn {
+  border-color: var(--selection-color);
+  background: var(--ui-surface2);
+}
+
+.sourceName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

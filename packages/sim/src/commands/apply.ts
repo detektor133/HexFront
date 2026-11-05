@@ -78,6 +78,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'createArmy':
     case 'renameArmy':
     case 'disbandArmy':
+    case 'splitArmy':
     case 'assignUnits':
     case 'setAutoReinforce':
     case 'setArmyAuto':
@@ -143,6 +144,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'createArmy':
     case 'renameArmy':
     case 'disbandArmy':
+    case 'splitArmy':
     case 'assignUnits':
     case 'setAutoReinforce':
     case 'setArmyAuto':

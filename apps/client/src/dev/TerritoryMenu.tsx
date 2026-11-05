@@ -1,12 +1,13 @@
 import { IconFlag, IconShield, IconShieldOff, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
-import type { Command, PlayerView } from '@hexfront/sim';
+import { FP, type Command, type PlayerView } from '@hexfront/sim';
 
 import { LimitEditor } from './ArmyLimit.tsx';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import styles from './TerritoryMenu.module.css';
 import { maxArmySoldiers } from './army-limit.ts';
+import { armyName } from './army-name.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -37,6 +38,8 @@ export function TerritoryMenu(props: {
   const [soldiers, setSoldiers] = useState(() =>
     Math.max(0, existing?.wanted ?? Math.max(1, Math.floor(max / 2))),
   );
+  // Откуда брать солдат: id армий и −1 — резерв; пусто — ИИ берёт свободных сам.
+  const [from, setFrom] = useState<readonly number[]>([]);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -59,9 +62,18 @@ export function TerritoryMenu(props: {
   const amount = Math.min(soldiers, max);
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - 220));
+  const mine = view.units.filter((u) => u.owner === view.playerId);
+  const soldiersOf = (armyId: number | null): number =>
+    Math.floor(
+      mine.filter((u) => u.armyId === armyId).reduce((sum, u) => sum + u.soldiers, 0) / FP,
+    );
+  const sources = [
+    { id: -1, name: t('army.reserve'), soldiers: soldiersOf(null) },
+    ...view.armies.map((a) => ({ id: a.id, name: armyName(a), soldiers: soldiersOf(a.id) })),
+  ].filter((source) => source.soldiers > 0);
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
   // Клик не выбирает место удара: ось наступления и приоритет занятия определяет ИИ.
-  const where = {};
+  const where = from.length > 0 ? { from } : {};
   const go = (command: Command): void => {
     send(command);
     onClose();
@@ -91,6 +103,26 @@ export function TerritoryMenu(props: {
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
       <div className={styles.attack}>
         <LimitEditor value={amount} max={max} onChange={setSoldiers} />
+        <div className={styles.sources} role="group" aria-label={t('menu.sources')}>
+          {sources.map((source) => (
+            <button
+              key={source.id}
+              type="button"
+              className={from.includes(source.id) ? styles.sourceOn : styles.source}
+              aria-pressed={from.includes(source.id)}
+              onClick={() =>
+                setFrom((now) =>
+                  now.includes(source.id)
+                    ? now.filter((id) => id !== source.id)
+                    : [...now, source.id],
+                )
+              }
+            >
+              <span className={styles.sourceName}>{source.name}</span>
+              <span>{source.soldiers}</span>
+            </button>
+          ))}
+        </div>
         <div className={styles.actions}>
           {existing && (
             <IconButton
@@ -106,7 +138,7 @@ export function TerritoryMenu(props: {
               label={t('menu.hold')}
               className={styles.hold}
               disabled={amount < 1}
-              onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount })}
+              onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount, ...where })}
             >
               <IconShield size={20} aria-hidden="true" />
             </IconButton>

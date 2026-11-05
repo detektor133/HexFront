@@ -123,6 +123,12 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   auto: <path d="M4 10 A6 6 0 0 1 15 6 M15 2 V6 H11 M16 10 A6 6 0 0 1 5 14 M5 18 V14 H9" />,
+  split: (
+    <>
+      <line x1="10" y1="3" x2="10" y2="9" />
+      <polyline points="4,17 4,12 10,9 16,12 16,17" />
+    </>
+  ),
   edit: <path d="M4 16 L5 12 L14 3 L17 6 L8 15 Z M12 5 L15 8" />,
   add: (
     <>
@@ -479,6 +485,14 @@ export function ArmyBar(props: {
               onClick={() => use('erase')}
               active={active('erase')}
               disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
+            />
+            <Tool
+              icon="split"
+              label="army.split"
+              onClick={() => send({ t: 'splitArmy', armyId: army.id })}
+              disabled={
+                mine.filter((u) => u.armyId === army.id).length < 2 ? t('army.splitNeedTwo') : null
+              }
             />
             <Tool
               icon="disband"

@@ -63,6 +63,59 @@ describe('наступление одной командой', () => {
     expect(s.state.armies.some((a) => a.owner === 0 && a.dir !== undefined)).toBe(true);
   });
 
+  it('делит армию надвое по числу солдат, вторая половина — новая армия без направления', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Главная' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Главная');
+    if (!army) throw new Error('нет армии');
+    for (const u of s.state.units) if (u.owner === 0) u.armyId = army.id;
+    expect(validate(s.state, 0, { t: 'splitArmy', armyId: army.id })).toEqual({ ok: true });
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'splitArmy', armyId: army.id } }]);
+    const armies = s.state.armies.filter((a) => a.owner === 0);
+    expect(armies).toHaveLength(2);
+    const sums = armies.map((a) =>
+      s.state.units.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0),
+    );
+    expect(sums[0]).toBe(sums[1]);
+    expect(armies.every((a) => a.dir === undefined)).toBe(true);
+  });
+
+  it('армия с одним отрядом не делится', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Одна' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Одна');
+    const unit = s.state.units.find((u) => u.owner === 0);
+    if (!army || !unit) throw new Error('нет армии или отряда');
+    unit.armyId = army.id;
+    expect(validate(s.state, 0, { t: 'splitArmy', armyId: army.id })).toEqual({
+      ok: false,
+      reason: 'tooFewUnits',
+    });
+  });
+
+  it('солдат берут только из выбранных армий, лимит донора уменьшается', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Донор' } }]);
+    const donor = s.state.armies.find((a) => a.owner === 0 && a.name === 'Донор');
+    if (!donor) throw new Error('нет донора');
+    donor.wanted = 600;
+    const [first, second] = s.state.units.filter((u) => u.owner === 0);
+    if (!first || !second) throw new Error('нет отрядов');
+    first.armyId = donor.id;
+    const cmd = { t: 'holdBorder', target: 1, soldiers: 300, from: [donor.id] } as const;
+    expect(validate(s.state, 0, cmd).ok).toBe(true);
+    applyCommands(s.state, [{ playerId: 0, cmd }]);
+    const dir = s.state.armies.find((a) => a.dir?.target === 1);
+    expect(s.state.units.find((u) => u.id === first.id)?.armyId).toBe(dir?.id);
+    // Вторая — резерв, не выбранный источник: осталась на месте.
+    expect(s.state.units.find((u) => u.id === second.id)?.armyId).not.toBe(dir?.id);
+    expect(s.state.armies.find((a) => a.id === donor.id)?.wanted).toBe(300);
+    expect(validate(s.state, 0, { ...cmd, from: [999] })).toEqual({
+      ok: false,
+      reason: 'unknownArmy',
+    });
+  });
+
   it('держать границу можно и в мире: фронт и заказ без наступления', () => {
     const s = game();
     const cmd = { t: 'holdBorder', target: 1, soldiers: 600 } as const;

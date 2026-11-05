@@ -2,6 +2,10 @@
 
 const ru = {
   'army.limit': 'Лимит армии',
+  'army.split': 'Разделить армию надвое',
+  'army.splitNeedTwo': 'Нужно хотя бы два отряда',
+  'menu.sources': 'Откуда брать солдат',
+  'reason.tooFewUnits': 'Слишком мало отрядов',
   'army.limitApply': 'Применить',
   'buildings.title': 'Постройки',
   'buildings.cities': 'Города',
@@ -386,6 +390,10 @@ export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
   'army.limit': 'Army limit',
+  'army.split': 'Split army in two',
+  'army.splitNeedTwo': 'Needs at least two units',
+  'menu.sources': 'Take soldiers from',
+  'reason.tooFewUnits': 'Too few units',
   'army.limitApply': 'Apply',
   'buildings.title': 'Buildings',
   'buildings.cities': 'Cities',
