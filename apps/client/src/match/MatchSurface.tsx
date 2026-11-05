@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { BuildingsPanel } from './BuildingsPanel.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { OnboardingHints } from './OnboardingHints.tsx';
@@ -37,6 +38,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const [popupOpen, setPopupOpen] = useState(false);
+  const [buildingsOpen, setBuildingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(
     () => window.innerWidth > 600 && window.innerHeight > 500,
   );
@@ -284,6 +286,17 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setMapMode={sb.mapModes.setMapMode}
           setBuild={sb.mapModes.setBuild}
           bottom={dockH + 12}
+          buildingsOpen={buildingsOpen}
+          onToggleBuildings={() => setBuildingsOpen((open) => !open)}
+        />
+      )}
+      {view && !debug && buildingsOpen && (
+        <BuildingsPanel
+          view={view}
+          send={sb.send}
+          onFocus={sb.focusHex}
+          onClose={() => setBuildingsOpen(false)}
+          top={hudH}
         />
       )}
       {(loaded === 'error' || sb.error) && (

@@ -3,7 +3,7 @@
 // с ними, или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
-import { ARMY_NAME_MAX, executeArmyCommand } from './army.ts';
+import { ARMY_NAME_MAX, dropEmptyArmies, executeArmyCommand } from './army.ts';
 import { pickAxes, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
@@ -249,7 +249,13 @@ function prepare(
     have += u.soldiers;
   }
   if (picked.length > 0) {
+    // Откуда забрали отряды: опустевшая безымянная армия (стартовая «1-я») больше не нужна.
+    const sources = new Set<number>();
+    for (const u of allUnits(state)) {
+      if (picked.includes(u.id) && u.armyId !== null) sources.add(u.armyId);
+    }
     executeArmyCommand(state, playerId, { t: 'assignUnits', unitIds: picked, armyId: army.id });
+    dropEmptyArmies(state, sources);
   }
   // Занятие ничьей земли ведёт `expandNeutral` без плана: фронта у такой армии нет.
   if (neutral) {

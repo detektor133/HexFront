@@ -2,6 +2,7 @@ import {
   IconBuildingCommunity,
   IconChevronsUp,
   IconHammer,
+  IconListDetails,
   IconMap2,
   IconPackage,
   IconShield,
@@ -30,6 +31,8 @@ interface Props {
   readonly setBuild: (tool: BuildTool | null) => void;
   /** Отступ от низа страницы, px: над панелью армий. */
   readonly bottom: number;
+  readonly buildingsOpen: boolean;
+  readonly onToggleBuildings: () => void;
 }
 
 /** Правый нижний угол: молоточек (режим строительства) и режимы карты — обычная и снабжение. */
@@ -39,6 +42,8 @@ export function MapTools({
   setMapMode,
   setBuild,
   bottom,
+  buildingsOpen,
+  onToggleBuildings,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
   return (
@@ -59,6 +64,14 @@ export function MapTools({
         </div>
       )}
       <div className={styles.column}>
+        <IconButton
+          label={t('buildings.title')}
+          className={buildingsOpen ? styles.active : styles.button}
+          aria-pressed={buildingsOpen}
+          onClick={onToggleBuildings}
+        >
+          <IconListDetails size={22} stroke={1.75} />
+        </IconButton>
         <IconButton
           label={t('mapTools.build')}
           className={hammerOn ? styles.active : styles.button}

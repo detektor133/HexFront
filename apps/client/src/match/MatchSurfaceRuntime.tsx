@@ -204,6 +204,8 @@ interface Sandbox {
   snapshotTelemetry(): SnapshotTelemetryCounts;
   cacheTelemetry(): CacheTelemetry;
   focusEvent(item: EventFeedItem): void;
+  /** Центрирует камеру на гексе и открывает его карточку. */
+  focusHex(hex: number): void;
   send(cmd: Command): void;
   setFog(on: boolean): void;
   setPaused(on: boolean): void;
@@ -692,6 +694,12 @@ export function useSandbox(
       if (item.hex !== null && typeof loaded !== 'string') {
         mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
       }
+    },
+    focusHex(hex) {
+      if (typeof loaded !== 'string') {
+        mapViewRef.current?.centerOn(hexFromId(hex, loaded.map.width), tokens.motion.map);
+      }
+      pick({ hex, units: [], target: null });
     },
     setFog,
     setPaused,

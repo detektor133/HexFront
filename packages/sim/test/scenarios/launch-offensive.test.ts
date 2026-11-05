@@ -52,6 +52,17 @@ describe('наступление одной командой', () => {
     expect(army?.auto).toBe(false);
   });
 
+  it('опустевшая безымянная армия, откуда забрали отряды, исчезает', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: '' } }]);
+    const home = s.state.armies.find((a) => a.owner === 0);
+    if (!home) throw new Error('нет стартовой армии');
+    for (const u of s.state.units) if (u.owner === 0) u.armyId = home.id;
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 1200 } }]);
+    expect(s.state.armies.some((a) => a.id === home.id)).toBe(false);
+    expect(s.state.armies.some((a) => a.owner === 0 && a.dir !== undefined)).toBe(true);
+  });
+
   it('держать границу можно и в мире: фронт и заказ без наступления', () => {
     const s = game();
     const cmd = { t: 'holdBorder', target: 1, soldiers: 600 } as const;

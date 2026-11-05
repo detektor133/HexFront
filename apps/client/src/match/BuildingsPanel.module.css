@@ -1,0 +1,180 @@
+/* Окно «Постройки»: плавающее, двигается за заголовок. Цвета и отступы — только токены. */
+.panel {
+  position: fixed;
+  z-index: 25;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  max-height: min(60vh, 460px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  font-variant-numeric: tabular-nums;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.header:active {
+  cursor: grabbing;
+}
+
+.title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ui-ink);
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.close,
+.tab,
+.tabOn,
+.upgrade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+}
+
+.close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.tab,
+.tabOn {
+  flex: 1;
+  height: 36px;
+}
+
+.tabOn {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+.count {
+  font-size: var(--font-size-caption);
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 0 var(--space-sm) var(--space-sm);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.focus {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--space-xs);
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.level {
+  min-width: 20px;
+  padding: 0 var(--space-xs);
+  color: var(--ui-ink2);
+  text-align: center;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+}
+
+.meta {
+  color: var(--ui-ink3);
+  font-size: var(--font-size-caption);
+}
+
+.warn {
+  color: var(--status-danger);
+  font-size: var(--font-size-caption);
+}
+
+.upgrade {
+  height: 36px;
+}
+
+.upgrade:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cost,
+.poor {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--font-size-caption);
+}
+
+.poor {
+  color: var(--status-danger);
+}
+
+.max,
+.empty {
+  color: var(--ui-ink3);
+  font-size: var(--font-size-caption);
+}
+
+.empty {
+  padding: var(--space-sm) 0;
+}

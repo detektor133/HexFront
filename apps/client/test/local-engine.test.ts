@@ -17,6 +17,13 @@ function engine(fog = false) {
   return e;
 }
 
+/** Человек под мозгом бота: нет автозапуска «занять ничью землю», стартовая армия остаётся. */
+function botEngine() {
+  const e = createLocalEngine(small, 42, 2, [HUMAN_ID, 1]);
+  if ('errors' in e) throw new Error(e.errors.join(', '));
+  return e;
+}
+
 function asView(msg: FromWorker): Extract<FromWorker, { t: 'view' }> {
   if (msg.t !== 'view') throw new Error('ожидался снимок');
   return msg;
@@ -139,6 +146,8 @@ describe('локальный режим', () => {
 
   it('один снимок синхронно отражает переименование, набор и отказ повторного набора', () => {
     const e = engine();
+    // Первый тик: стартовые отряды уходят в армию «Ничья земля», опустевшая 1-я армия исчезает.
+    e.tick();
     const capital = e.state.cities.find((c) => c.owner === HUMAN_ID);
     const army = e.state.armies.find((a) => a.owner === HUMAN_ID);
     if (!capital || !army) throw new Error('стартовые объекты не найдены');
@@ -172,7 +181,7 @@ describe('локальный режим', () => {
   });
 
   it('армии с auto всех игроков ведёт commander; ручной приказ отряду auto не выключает (CR-006)', () => {
-    const e = engine();
+    const e = botEngine();
     for (const a of e.state.armies) if (a.owner === HUMAN_ID) a.auto = true;
     const owned = (p: number): number => e.state.hexes.owner.filter((o) => o === p).length;
     const before = [owned(0), owned(1)];
@@ -188,7 +197,7 @@ describe('локальный режим', () => {
 
   it('ручной приказ или деление отряду: auto остаётся, ручное побеждает решение commander (04/T22a)', () => {
     for (const manual of ['split', 'move'] as const) {
-      const e = engine();
+      const e = botEngine();
       for (const a of e.state.armies) if (a.owner === HUMAN_ID) a.auto = true;
       const [unit] = e.state.units.filter((u) => u.owner === HUMAN_ID);
       if (!unit) throw new Error('нет стартового отряда');

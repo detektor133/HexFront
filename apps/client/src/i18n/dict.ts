@@ -1,6 +1,19 @@
 // Словари интерфейса (CONVENTIONS.md §1: тексты UI — только через i18n).
 
 const ru = {
+  'buildings.title': 'Постройки',
+  'buildings.cities': 'Города',
+  'buildings.depots': 'Склады',
+  'buildings.forts': 'Укрепления',
+  'buildings.building': 'Идёт стройка',
+  'buildings.upgrade': 'Улучшить',
+  'buildings.max': 'Макс.',
+  'buildings.close': 'Закрыть',
+  'buildings.empty': 'Пока ничего нет',
+  'buildings.city': 'Город',
+  'buildings.isolated': 'Без связи',
+  'buildings.depot': 'Склад',
+  'buildings.fort': 'Укрепление',
   'mapTools.build': 'Строительство',
   'mapTools.city': 'Основать город',
   'mapTools.depot': 'Склад',
@@ -370,6 +383,19 @@ const ru = {
 export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
+  'buildings.title': 'Buildings',
+  'buildings.cities': 'Cities',
+  'buildings.depots': 'Depots',
+  'buildings.forts': 'Fortifications',
+  'buildings.building': 'Under construction',
+  'buildings.upgrade': 'Upgrade',
+  'buildings.max': 'Max',
+  'buildings.close': 'Close',
+  'buildings.empty': 'Nothing yet',
+  'buildings.city': 'City',
+  'buildings.isolated': 'Isolated',
+  'buildings.depot': 'Depot',
+  'buildings.fort': 'Fort',
   'mapTools.build': 'Build',
   'mapTools.city': 'Found a city',
   'mapTools.depot': 'Depot',

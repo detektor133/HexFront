@@ -40,6 +40,7 @@ const sandbox = {
     frontTween: { byArmy: 0 },
   }),
   focusEvent: vi.fn(),
+  focusHex: vi.fn(),
   send: vi.fn(),
   setFog: vi.fn(),
   setPaused: vi.fn(),

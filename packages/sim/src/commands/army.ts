@@ -77,6 +77,22 @@ export function validateArmyCommand(
   return OK;
 }
 
+/**
+ * Армия без отрядов, без направления и без заказа набора никому не нужна (стартовая «1-я армия»
+ * после того, как её отряды ушли на направление): убирается вместе с планом.
+ */
+export function dropEmptyArmies(state: MatchState, armyIds: ReadonlySet<number>): void {
+  for (const id of armyIds) {
+    const army = state.armies.find((a) => a.id === id);
+    if (!army || army.dir !== undefined || army.wanted !== undefined) continue;
+    if (state.units.some((u) => u.armyId === id)) continue;
+    if (state.recruits.some((r) => r.armyId === id)) continue;
+    removePlan(state, id);
+    const rest = state.armies.filter((a) => a.id !== id);
+    state.armies.splice(0, state.armies.length, ...rest);
+  }
+}
+
 /** Применяет команду армии. Вызывается только после успешной проверки. */
 export function executeArmyCommand(state: MatchState, playerId: number, cmd: ArmyCommand): void {
   switch (cmd.t) {
