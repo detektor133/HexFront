@@ -33,9 +33,11 @@ function Slot(props: {
   fullRate?: string;
   negative?: boolean;
   tone?: 'success' | 'warning' | 'danger';
+  /** Метка для обучения (`data-tutorial`). */
+  tutorial?: string;
 }): React.JSX.Element {
   return (
-    <div className={styles.slot}>
+    <div className={styles.slot} data-tutorial={props.tutorial}>
       <MetricIcon
         name={props.icon}
         className={`${styles.metricIcon} ${props.icon === 'gold' ? styles.goldIcon : ''}`}
@@ -253,6 +255,7 @@ export function Hud(props: {
   return (
     <header ref={hudRef} className={styles.hud} style={props.style}>
       <Slot
+        tutorial="pop"
         icon="people"
         value={formatCompact(s.popTotal)}
         fullValue={formatFp(s.popTotal)}
@@ -261,6 +264,7 @@ export function Hud(props: {
         negative={s.popGrowthPerS < 0}
       />
       <Slot
+        tutorial="gold"
         icon="gold"
         value={formatCompact(me.gold)}
         fullValue={formatFp(me.gold)}
@@ -272,6 +276,7 @@ export function Hud(props: {
         <IconButton
           type="button"
           buttonRef={taxButtonRef}
+          data-tutorial="tax"
           className={`${styles.taxButton} ${styles.hudInteractive}`}
           label={t('hud.tax')}
           aria-expanded={taxOpen}
@@ -317,6 +322,7 @@ export function Hud(props: {
         )}
       </div>
       <Slot
+        tutorial="supply"
         icon="supply"
         value={formatPercent(s.supplyLevel)}
         {...(supplyTone ? { tone: supplyTone } : {})}

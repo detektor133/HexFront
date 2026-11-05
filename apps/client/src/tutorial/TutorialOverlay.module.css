@@ -1,0 +1,139 @@
+/* Подсказки обучения: рамка у цели и карточка с текстом шага. Клики проходят сквозь рамку. */
+.ring,
+.ringRound {
+  position: fixed;
+  z-index: 40;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 3px solid var(--selection-color);
+  animation: tutorial-pulse 1100ms ease-in-out infinite;
+}
+
+.ring {
+  border-radius: var(--radius-card);
+}
+
+.ringRound {
+  border-radius: 50%;
+}
+
+.card {
+  position: fixed;
+  left: 50%;
+  z-index: 41;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: min(380px, calc(100vw - 24px));
+  padding: var(--space-md);
+  color: var(--ui-ink);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  transform: translateX(-50%);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.text,
+.hint {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hint {
+  padding-top: var(--space-xs);
+  font-weight: 600;
+  border-top: 1px solid var(--ui-border);
+}
+
+.bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--ui-surface2);
+  border-radius: 4px;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--ui-ink);
+  transition: width 400ms linear;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+.button,
+.secondary {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-button);
+}
+
+.button {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border: 1px solid var(--ui-button-primary-bg);
+}
+
+.secondary {
+  color: var(--ui-ink);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+}
+
+.link {
+  padding: 0;
+  color: var(--ui-ink2);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+@keyframes tutorial-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .ringRound {
+    animation: none;
+  }
+}

@@ -155,10 +155,12 @@ function Tool(props: {
   onClick: () => void;
   disabled?: string | null;
   active?: boolean;
+  tutorial?: string;
 }): React.JSX.Element {
   const label = props.disabled ?? t(props.label);
   return (
     <IconButton
+      data-tutorial={props.tutorial}
       type="button"
       className={styles.tool}
       label={label}
@@ -283,7 +285,7 @@ function ArmyCard(props: {
     props.onContextAction();
   };
   return (
-    <div className={`${styles.card} ${frame}`}>
+    <div className={`${styles.card} ${frame}`} data-tutorial="army-card">
       <div
         role="button"
         tabIndex={0}
@@ -332,6 +334,7 @@ function ArmyCard(props: {
               <button
                 type="button"
                 className={styles.limit}
+                data-tutorial="army-limit"
                 title={t('army.limit')}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -518,6 +521,7 @@ export function ArmyBar(props: {
             />
             <Tool
               icon="split"
+              tutorial="army-split"
               label="army.split"
               onClick={() => send({ t: 'splitArmy', armyId: army.id })}
               disabled={

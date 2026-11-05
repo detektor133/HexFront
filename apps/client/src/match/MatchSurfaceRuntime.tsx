@@ -47,7 +47,7 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import { pixelToHex, type Point } from '../render/hex-geometry.ts';
+import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -206,6 +206,10 @@ interface Sandbox {
   focusEvent(item: EventFeedItem): void;
   /** Центрирует камеру на гексе и открывает его карточку. */
   focusHex(hex: number): void;
+  /** Видимая область карты в мировых координатах (обучение следит за камерой и ставит метки). */
+  cameraRect(): { readonly from: Point; readonly to: Point } | null;
+  /** Центр гекса в мировых координатах. */
+  hexWorld(hex: number): Point | null;
   send(cmd: Command): void;
   setFog(on: boolean): void;
   setPaused(on: boolean): void;
@@ -469,6 +473,7 @@ export function useSandbox(
       {
         telemetry: debug,
         initialGold: setup.initialGold,
+        tutorial: setup.tutorial !== null,
         playerName:
           setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
         playerColors: matchPlayerColors(
@@ -694,6 +699,11 @@ export function useSandbox(
       if (item.hex !== null && typeof loaded !== 'string') {
         mapViewRef.current?.centerOn(hexFromId(item.hex, loaded.map.width));
       }
+    },
+    cameraRect: () => mapViewRef.current?.visibleWorldRect?.() ?? null,
+    hexWorld(hex) {
+      if (typeof loaded === 'string') return null;
+      return hexCenter(hexFromId(hex, loaded.map.width), tokens.map.hexRadius);
     },
     focusHex(hex) {
       if (typeof loaded !== 'string') {

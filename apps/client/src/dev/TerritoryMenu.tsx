@@ -174,6 +174,7 @@ export function TerritoryMenu(props: {
             <button
               type="button"
               className={styles.act}
+              data-tutorial="hold"
               disabled={amount < 1}
               onClick={() => go({ t: 'holdBorder', target: other, ...where })}
             >
@@ -185,6 +186,7 @@ export function TerritoryMenu(props: {
             <button
               type="button"
               className={styles.actGo}
+              data-tutorial={neutral ? 'occupy' : 'attack'}
               disabled={amount < 1}
               onClick={() => go({ t: 'launchOffensive', target: other, ...where })}
             >

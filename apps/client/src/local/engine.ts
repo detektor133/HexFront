@@ -43,6 +43,20 @@ import type { MapMaskMode, RecruitOption, Selection, ViewPayload } from './messa
  */
 export const HUMAN_ID = 0;
 
+/** В уроке люди на землях игрока растут быстрее: город можно основать за минуты, а не за полчаса. */
+const TUTORIAL_GROWTH_TICKS = 1200;
+
+function boostPeople(state: MatchState): void {
+  const owner = state.hexes.owner;
+  for (let h = 0; h < owner.length; h += 1) {
+    if (owner[h] !== HUMAN_ID) continue;
+    const cap = hexPopCap(state, h);
+    const pop = state.hexes.pop[h] ?? 0;
+    if (cap > 0 && pop < cap)
+      state.hexes.pop[h] = Math.min(cap, pop + Math.ceil(cap / TUTORIAL_GROWTH_TICKS));
+  }
+}
+
 export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
@@ -116,6 +130,7 @@ export function createLocalEngine(
   fog = false,
   playerName = '',
   diplomacy = false,
+  tutorial = false,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
@@ -133,7 +148,8 @@ export function createLocalEngine(
   let pending: Command[] = [];
   // Стартовые отряды человека сразу в армии с приказом занимать ничью землю (ИИ раскидывает их роем),
   // а не стоят без дела, пока игрок не откроет меню.
-  if (!bots.includes(HUMAN_ID)) {
+  // В уроке игрок сам учится занимать землю: автоприказ не отдаётся.
+  if (!bots.includes(HUMAN_ID) && !tutorial) {
     const soldiers = state.units
       .filter((u) => u.owner === HUMAN_ID)
       .reduce((sum, u) => sum + u.soldiers, 0);
@@ -152,6 +168,7 @@ export function createLocalEngine(
       ...botCommands(state, bots, botContext),
     ]);
     pending = [];
+    if (tutorial) boostPeople(state);
     pendingEvents = [...pendingEvents, ...state.events];
   };
   const snapshot = (): ViewPayload => {

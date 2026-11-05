@@ -70,6 +70,7 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     msg.fog,
     msg.playerName ?? '',
     true,
+    msg.tutorial === true,
   );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });

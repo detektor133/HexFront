@@ -57,7 +57,6 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import { OnboardingHints } from '../match/OnboardingHints.tsx';
 import type { Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -496,10 +495,7 @@ function useSandbox(
 }
 
 /** /dev/sandbox?map=small[&select=HexId&scale] — песочница: экономика, отряды, бой (03/T12). */
-export function SandboxSurface({
-  showOnboarding = false,
-  debug = false,
-}: { showOnboarding?: boolean; debug?: boolean } = {}): React.JSX.Element {
+export function SandboxSurface({ debug = false }: { debug?: boolean } = {}): React.JSX.Element {
   const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -625,7 +621,6 @@ export function SandboxSurface({
       )}
       {view && <Leaderboard view={view} />}
       {view && <MatchEnd view={view} />}
-      {showOnboarding && view && <OnboardingHints />}
       {view && (
         <ArmyBar
           view={view}
@@ -679,5 +674,5 @@ export function SandboxSurface({
 
 /** Отладочная песочница с панелью наблюдателя и телеметрией. */
 export function DevSandboxPage(): React.JSX.Element {
-  return <SandboxSurface debug showOnboarding={false} />;
+  return <SandboxSurface debug />;
 }

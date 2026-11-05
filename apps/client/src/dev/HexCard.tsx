@@ -82,6 +82,7 @@ function ActionButton(props: {
       <button
         type="button"
         className={`${styles.button}${a.affordable ? ` ${styles.accent}` : ''}`}
+        data-tutorial={a.kind === 'foundCity' ? 'found-city' : undefined}
         disabled={!a.affordable}
         aria-label={compact ? label : undefined}
         {...(!a.affordable ? { 'aria-describedby': reasonId } : {})}
@@ -249,6 +250,7 @@ function RecruitButton(props: {
         </span>
         <button
           type="button"
+          data-tutorial="recruit"
           className={`${styles.button} ${styles.recruitAction}${check?.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
           disabled={!check?.ok}
           aria-label={t('recruit.queue')}

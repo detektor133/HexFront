@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
-import { OnboardingHints } from './OnboardingHints.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
@@ -22,10 +21,14 @@ import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
 import { t } from '../i18n/dict.ts';
+import { tokens } from '../theme/tokens.ts';
+import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
+import type { ChapterId, TutorialCtx } from '../tutorial/script.ts';
 
 /** Экран локального матча игрока с отдельной отладочной панелью. */
 interface MatchSurfaceProps {
-  readonly showOnboarding?: boolean;
+  /** Глава обучения: матч-урок с подсказками поверх интерфейса. */
+  readonly tutorial?: ChapterId | null;
   readonly debug?: boolean;
 }
 
@@ -33,7 +36,7 @@ interface MatchSurfaceProps {
 const ARMY_TOOLS_H = 64;
 
 export const MatchSurface: React.FC<MatchSurfaceProps> = ({
-  showOnboarding = false,
+  tutorial = null,
   debug = false,
 }: MatchSurfaceProps = {}) => {
   const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
@@ -158,6 +161,41 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     [],
   );
   const map = typeof loaded === 'string' ? null : loaded.map;
+  // Обучение читает матч так же, как игрок видит его: снимок, выбор и открытые окна.
+  const sbRef = useRef(sb);
+  sbRef.current = sb;
+  const tutorialCtx = useMemo<Omit<TutorialCtx, 'pans' | 'zooms'> | null>(
+    () =>
+      tutorial && view && map
+        ? {
+            view,
+            map,
+            picked: sb.picked,
+            menuOther: sb.menu?.other ?? null,
+            army: sb.army,
+            build: sb.mapModes.build,
+            mapMode: sb.mapModes.mapMode,
+            buildingsOpen,
+          }
+        : null,
+    [
+      tutorial,
+      view,
+      map,
+      sb.picked,
+      sb.menu,
+      sb.army,
+      sb.mapModes.build,
+      sb.mapModes.mapMode,
+      buildingsOpen,
+    ],
+  );
+  const tutorialCamera = useCallback(() => {
+    const rect = sbRef.current.cameraRect();
+    const host = hostRef.current;
+    return rect && host ? { ...rect, screen: host.getBoundingClientRect() } : null;
+  }, []);
+  const tutorialHexWorld = useCallback((hex: number) => sbRef.current.hexWorld(hex), []);
   const styleFor = (id: string): React.CSSProperties | undefined => {
     const element = layout.elements.find((item) => item.id === id);
     if (!element) return undefined;
@@ -192,11 +230,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         now={performance.now()}
         onFocus={sb.focusEvent}
       />
-      {styleFor('left-column') && (
-        <div className={styles.leftColumn} style={styleFor('left-column')}>
-          {showOnboarding && view && <OnboardingHints />}
-        </div>
-      )}
       {view && (
         <Hud
           view={view}
@@ -338,6 +371,15 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             style={styleFor('card')}
           />
         )}
+      {tutorial && (
+        <TutorialOverlay
+          chapter={tutorial}
+          ctx={tutorialCtx}
+          camera={tutorialCamera}
+          hexWorld={tutorialHexWorld}
+          hexRadius={tokens.map.hexRadius}
+        />
+      )}
       {debug && sb.lastReject && (
         <p className={styles.reject}>
           {t('dev.economy.lastRejection')}: {sb.lastReject}

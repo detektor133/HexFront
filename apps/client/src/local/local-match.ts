@@ -38,6 +38,7 @@ export function startLocalMatch(
     readonly playerColors?: readonly string[];
     readonly autoCommand?: boolean;
     readonly initialGold?: number | null;
+    readonly tutorial?: boolean;
   } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
@@ -55,6 +56,7 @@ export function startLocalMatch(
     ...(options.telemetry ? { telemetry: true } : {}),
     ...(options.playerName ? { playerName: options.playerName } : {}),
     ...(options.playerColors ? { playerColors: options.playerColors } : {}),
+    ...(options.tutorial ? { tutorial: true } : {}),
     ...(options.initialGold !== undefined && options.initialGold !== null
       ? { initialGold: options.initialGold }
       : {}),

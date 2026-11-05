@@ -11,6 +11,8 @@ export interface LocalMatchSetup {
   readonly playerColor: string | null;
   readonly autoCommand: boolean | null;
   readonly initialGold: number | null;
+  /** Глава обучения (`tutorial=core`): матч-урок, соперник пассивен, автозанятие не включается. */
+  readonly tutorial: string | null;
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
@@ -25,9 +27,14 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
   const params = new URLSearchParams(search);
   const map = readMapRequest(search);
   const watch = params.get('watch') === '1';
-  const bots = Array.from({ length: map.players }, (_, playerId) => playerId).filter(
-    (playerId) => watch || playerId !== 0,
-  );
+  const tutorial = params.get('tutorial');
+  // Урок: соперник не думает (без бота), поэтому он стоит и ждёт, пока игрок дойдёт до него.
+  const bots =
+    tutorial !== null
+      ? []
+      : Array.from({ length: map.players }, (_, playerId) => playerId).filter(
+          (playerId) => watch || playerId !== 0,
+        );
   const speed =
     params.get('freezeTime') === '1'
       ? 0
@@ -43,5 +50,6 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     autoCommand: auto === null ? null : auto === '1',
     // initialGold=N — стартовое золото игрока в золоте (для проверки закупки), 0 — без золота.
     initialGold: goldParam(params.get('initialGold')),
+    tutorial,
   };
 }

@@ -68,6 +68,7 @@ export function MapTools({
           {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => (
             <IconButton
               key={tool}
+              data-tutorial={`build-${tool}`}
               label={t(label)}
               className={tool === build ? styles.active : styles.button}
               aria-pressed={tool === build}
@@ -86,6 +87,7 @@ export function MapTools({
       )}
       <div className={styles.column}>
         <IconButton
+          data-tutorial="buildings"
           label={t('buildings.title')}
           className={buildingsOpen ? styles.active : styles.button}
           aria-pressed={buildingsOpen}
@@ -94,6 +96,7 @@ export function MapTools({
           <IconListDetails size={22} stroke={1.75} />
         </IconButton>
         <IconButton
+          data-tutorial="hammer"
           label={t('mapTools.build')}
           className={hammerOn ? styles.active : styles.button}
           aria-pressed={hammerOn}
@@ -110,6 +113,7 @@ export function MapTools({
           <IconMap2 size={22} stroke={1.75} />
         </IconButton>
         <IconButton
+          data-tutorial="supply-mode"
           label={t('mapTools.supply')}
           className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
           aria-pressed={mapMode === 'supply'}

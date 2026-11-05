@@ -64,6 +64,8 @@ export type ToWorker =
       readonly playerName?: string;
       readonly playerColors?: readonly string[];
       readonly initialGold?: number;
+      /** Матч-урок: стартовые отряды не получают автозанятие земли. */
+      readonly tutorial?: boolean;
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }
