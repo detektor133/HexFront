@@ -21,6 +21,9 @@ import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 
+/** Дальность упреждающей угрозы, гексов: вес врага падает с расстоянием от полного (1 гекс) до 1/3. */
+const THREAT_REACH = 3;
+
 /** Вес угрозы считается в сотнях вражеских солдат (07-controls.md). */
 const THREAT_SOLDIERS = 100;
 
@@ -50,10 +53,16 @@ function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<
   const capitalId = state.players[owner]?.capitalCityId;
   for (const h of line) {
     const near = around(state, h);
-    const nearSet = new Set(near);
+    const here = hexFromId(h, state.map.width);
+    // Угроза с упреждением: враг рядом давит в полную силу, дальше — слабее (до THREAT_REACH гексов),
+    // поэтому резерв подтягивается к участку, к которому враг идёт, до первого удара.
     let enemy = 0;
-    for (const u of state.units)
-      if (atWar(state, owner, u.owner) && nearSet.has(u.hex)) enemy += u.soldiers;
+    for (const u of state.units) {
+      if (!atWar(state, owner, u.owner)) continue;
+      const d = distance(here, hexFromId(u.hex, state.map.width));
+      if (d <= THREAT_REACH)
+        enemy += intDiv(u.soldiers * (THREAT_REACH + 1 - Math.max(1, d)), THREAT_REACH);
+    }
     let weight: number = FP + intDiv(enemy, THREAT_SOLDIERS);
     const city = state.cities.find((c) => c.hex === h);
     if (city) weight += city.id === capitalId ? FRONT_WEIGHT_CAPITAL : FRONT_WEIGHT_CITY;
