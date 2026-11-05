@@ -1,80 +1,28 @@
-import { IconCheck, IconMinus, IconPlus } from '@tabler/icons-react';
+import { IconCheck } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import styles from './ArmyLimit.module.css';
-import { LIMIT_STEP, clampLimit, presetAmount } from './army-limit.ts';
+import { ForceEditor } from './ForceEditor.tsx';
+import type { Counts } from './direction-order.ts';
+import { countsFromShares, type Shares } from './force-share.ts';
 import { t } from '../i18n/dict.ts';
-import { IconButton } from '../ui/icon-button.tsx';
 
-const PRESETS: readonly { readonly label: string; readonly share: number }[] = [
-  { label: '25%', share: 0.25 },
-  { label: '50%', share: 0.5 },
-  { label: '75%', share: 0.75 },
-  { label: '100%', share: 1 },
-];
-const WIDTH = 224;
+const WIDTH = 248;
 const EDGE = 8;
 
-/** Число солдат: большое поле, −/+ и доли предела; общий для карточки армии и окна соседа. */
-export function LimitEditor(props: {
-  readonly value: number;
-  readonly max: number;
-  readonly onChange: (soldiers: number) => void;
-  readonly onEnter?: () => void;
-}): React.JSX.Element {
-  const { value, max, onChange, onEnter } = props;
-  const change = (next: number): void => onChange(clampLimit(next, max));
-  return (
-    <>
-      <div className={styles.value}>
-        <IconButton label="−" className={styles.step} onClick={() => change(value - LIMIT_STEP)}>
-          <IconMinus size={18} aria-hidden="true" />
-        </IconButton>
-        <input
-          className={styles.input}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={max}
-          value={value}
-          aria-label={t('army.limit')}
-          onChange={(event) => change(Number(event.target.value))}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onEnter?.();
-          }}
-        />
-        <IconButton label="+" className={styles.step} onClick={() => change(value + LIMIT_STEP)}>
-          <IconPlus size={18} aria-hidden="true" />
-        </IconButton>
-      </div>
-      <div className={styles.presets}>
-        {PRESETS.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            className={value === presetAmount(max, p.share) ? styles.presetOn : styles.preset}
-            onClick={() => change(presetAmount(max, p.share))}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** Мини-поповер лимита армии над карточкой: число, −/+ и доли предела; применяется кнопкой ✓. */
+/** Поповер армии над карточкой: сколько войск и из чего (ползунки); применяется кнопкой ✓. */
 export function ArmyLimit(props: {
   /** Прямоугольник кнопки лимита на карточке, px страницы. */
   readonly anchor: DOMRect;
   readonly value: number;
+  readonly shares: Shares;
   readonly max: number;
-  readonly onApply: (soldiers: number) => void;
+  readonly onApply: (soldiers: number, counts: Counts) => void;
   readonly onClose: () => void;
 }): React.JSX.Element {
   const { anchor, max, onApply, onClose } = props;
-  const [value, setValue] = useState(props.value);
+  const [force, setForce] = useState({ total: props.value, shares: props.shares });
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -91,9 +39,8 @@ export function ArmyLimit(props: {
     };
   }, [onClose]);
   const left = Math.max(EDGE, Math.min(anchor.left, window.innerWidth - WIDTH - EDGE));
-  const set = (next: number): void => setValue(clampLimit(next, max));
   const apply = (): void => {
-    onApply(value);
+    onApply(force.total, countsFromShares(force.total, force.shares));
     onClose();
   };
   return createPortal(
@@ -104,7 +51,12 @@ export function ArmyLimit(props: {
       role="dialog"
       aria-label={t('army.limit')}
     >
-      <LimitEditor value={value} max={max} onChange={set} onEnter={apply} />
+      <ForceEditor
+        total={force.total}
+        max={max}
+        shares={force.shares}
+        onChange={(total, shares) => setForce({ total, shares })}
+      />
       <button type="button" className={styles.okWide} onClick={apply}>
         <IconCheck size={18} aria-hidden="true" />
         {t('army.limitApply')}

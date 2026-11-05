@@ -1,3 +1,4 @@
+import { IconFlag, IconShield, IconSwords } from '@tabler/icons-react';
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -14,6 +15,8 @@ import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
 import { limitCommand, maxArmySoldiers } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
+import { armyCounts, type Counts } from './direction-order.ts';
+import { sharesFromCounts } from './force-share.ts';
 import { offensiveButtons } from './offensive-buttons.ts';
 import type { Tool as PlanTool } from './plan-draft.ts';
 import type { ToolState } from './plan-tools.ts';
@@ -207,6 +210,26 @@ function RunButton(props: {
   );
 }
 
+/** Значок приказа армии: щит — держит границу, мечи — наступает, флаг — занимает; точка — цвет цели. */
+function OrderBadge(props: {
+  readonly dir: ArmyView['dir'] | undefined;
+}): React.JSX.Element | null {
+  const dir = props.dir;
+  if (!dir || dir.mode === 'idle') return null;
+  const neutral = dir.target < 0;
+  const Glyph = dir.mode === 'hold' ? IconShield : neutral ? IconFlag : IconSwords;
+  const color = neutral
+    ? tokens.neutral.line
+    : (tokens.players.palette[dir.target]?.line ?? tokens.ui.ink);
+  const label = t(dir.mode === 'hold' ? 'menu.hold' : neutral ? 'menu.occupy' : 'menu.attack');
+  return (
+    <span className={styles.order} title={label}>
+      <Glyph size={14} aria-hidden="true" />
+      <span className={styles.orderDot} style={{ background: color }} />
+    </span>
+  );
+}
+
 function ArmyCard(props: {
   rawName: string;
   name: string;
@@ -215,7 +238,14 @@ function ArmyCard(props: {
   /** Заказанная численность армии (меню страны): рядом с числом солдат. */
   wanted?: number | undefined;
   /** Лимит любой армии: предел числа и применение; `wanted` пуст — лимита нет («∞»). */
-  limit: { readonly max: number; readonly onApply: (soldiers: number) => void };
+  limit: {
+    readonly max: number;
+    /** Текущий состав армии: заказ или то, что стоит в отрядах. */
+    readonly counts: Counts;
+    readonly onApply: (soldiers: number, counts: Counts) => void;
+  };
+  /** Приказ армии: режим и цель (id игрока или −1); нет — приказа нет. */
+  dir?: ArmyView['dir'] | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
@@ -296,6 +326,7 @@ function ArmyCard(props: {
                 <Icon name="edit" className={styles.editIcon} />
               </button>
             )}
+            <OrderBadge dir={props.dir} />
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
               <button
@@ -351,6 +382,7 @@ function ArmyCard(props: {
         <ArmyLimit
           anchor={limitAnchor}
           value={props.wanted ?? Math.min(props.limit.max, Math.floor(stats.soldiers / FP))}
+          shares={sharesFromCounts(props.limit.counts)}
           max={props.limit.max}
           onApply={props.limit.onApply}
           onClose={() => setLimitAnchor(null)}
@@ -521,9 +553,20 @@ export function ArmyBar(props: {
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
                   wanted={a.wanted}
+                  dir={a.dir}
                   limit={{
                     max: maxArmySoldiers(view),
-                    onApply: (soldiers) => send(limitCommand(a, soldiers)),
+                    counts: armyCounts(view, a),
+                    onApply: (soldiers, counts) => {
+                      const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
+                      send(
+                        limitCommand(
+                          a,
+                          soldiers,
+                          mix && { armor: mix.armor, artillery: mix.artillery },
+                        ),
+                      );
+                    },
                   }}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}

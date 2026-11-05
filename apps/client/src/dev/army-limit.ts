@@ -27,6 +27,10 @@ export function clampLimit(value: number, max: number): number {
 }
 
 /** Команда нового лимита любой армии: направление и режим не трогаются, ИИ добирает до числа. */
-export function limitCommand(army: ArmyView, soldiers: number): Command {
-  return { t: 'setArmyLimit', armyId: army.id, soldiers };
+export function limitCommand(
+  army: ArmyView,
+  soldiers: number,
+  mix?: { readonly armor: number; readonly artillery: number },
+): Command {
+  return { t: 'setArmyLimit', armyId: army.id, soldiers, ...(mix ? { mix } : {}) };
 }

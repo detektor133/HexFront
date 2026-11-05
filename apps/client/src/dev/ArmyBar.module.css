@@ -34,6 +34,7 @@
 }
 
 .content {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -68,9 +69,14 @@
 /* Приказы — прямо над карточками армий, слева. */
 .tools {
   flex-wrap: wrap;
+  /* Над карточками, вне потока: выбор армии не растит нижнюю панель и ничего не сдвигает. */
+  position: absolute;
+  bottom: 100%;
+  left: 0;
   align-self: flex-start;
   gap: 2px;
   max-width: 100%;
+  margin-bottom: var(--space-sm);
   padding: var(--space-xs);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
@@ -433,4 +439,19 @@
 
 .limit::before {
   content: '→ ';
+}
+
+/* Значок приказа армии: режим и цвет цели. */
+.order {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  color: var(--ui-ink2);
+}
+
+.orderDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }

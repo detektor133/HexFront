@@ -28,6 +28,9 @@ interface MatchSurfaceProps {
   readonly debug?: boolean;
 }
 
+/** Высота тулбара приказов армии с отступом, px: карточки гекса и отряда встают выше него. */
+const ARMY_TOOLS_H = 64;
+
 export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   showOnboarding = false,
   debug = false,
@@ -116,10 +119,16 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     groupedCardFixture && fixtureSourceUnit
       ? { hex: null, units: [2_147_483_646, 2_147_483_647], target: null }
       : sb.picked;
+  // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
+  const partial = view ? armySelection(view, sb.picked.units).partial : [];
+  // Тулбар приказов стоит над нижней панелью вне её высоты; карточкам над ней нужен запас под него.
+  const toolsShown =
+    (view?.armies.some((a) => a.id === army) ?? false) ||
+    partial.filter((a) => a !== army).length === 1;
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
-    bottomPanelHeight: dockH,
+    bottomPanelHeight: dockH + (toolsShown ? ARMY_TOOLS_H : 0),
     eventRows: feedRows(sb.events, view?.diplomacy?.incoming ?? [], view?.me.graceLeftS),
     tutorialVisible: false,
     leaderboardOpen,
@@ -168,8 +177,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     }
     return style;
   };
-  // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
-  const partial = view ? armySelection(view, sb.picked.units).partial : [];
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />

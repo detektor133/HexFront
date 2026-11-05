@@ -8,14 +8,15 @@ import {
 } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { FP, type Command, type PlayerView } from '@hexfront/sim';
+import { FP, type ArmyView, type Command, type PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
-import { MixEditor } from './MixEditor.tsx';
+import { ForceEditor } from './ForceEditor.tsx';
 import styles from './TerritoryMenu.module.css';
 import { maxArmySoldiers } from './army-limit.ts';
 import { armyName } from './army-name.ts';
-import { NEW_ARMY, armyCounts, orderFields, totalOf, type Counts } from './direction-order.ts';
+import { NEW_ARMY, armyCounts, orderFields, totalOf } from './direction-order.ts';
+import { countsFromShares, defaultShares, sharesFromCounts, type Shares } from './force-share.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -44,19 +45,20 @@ export function TerritoryMenu(props: {
   // Армия приказа: уже стоящая на эту цель выбрана сразу и показывает свой состав; «Новая» — с нуля.
   const existing = view.armies.find((a) => a.dir?.target === other);
   const [armyId, setArmyId] = useState<number>(existing?.id ?? NEW_ARMY);
-  const [counts, setCounts] = useState<Counts>(() =>
-    existing
-      ? armyCounts(view, existing)
-      : { infantry: Math.max(1, Math.floor(max / 2)), armor: 0, artillery: 0 },
-  );
+  // Состав приказа: общее число и доли по типам; у существующей армии — её собственные.
+  const fresh = (): { total: number; shares: Shares } => {
+    const total = Math.max(1, Math.floor(max / 2));
+    return { total, shares: defaultShares(view, total) };
+  };
+  const fromArmy = (army: ArmyView): { total: number; shares: Shares } => {
+    const counts = armyCounts(view, army);
+    return { total: Math.min(max, totalOf(counts)), shares: sharesFromCounts(counts) };
+  };
+  const [force, setForce] = useState(() => (existing ? fromArmy(existing) : fresh()));
   const pickArmy = (id: number): void => {
     setArmyId(id);
     const army = view.armies.find((a) => a.id === id);
-    setCounts(
-      army
-        ? armyCounts(view, army)
-        : { infantry: Math.max(1, Math.floor(max / 2)), armor: 0, artillery: 0 },
-    );
+    setForce(army ? fromArmy(army) : fresh());
   };
   // Откуда брать солдат: id армий и −1 — резерв; пусто — ИИ берёт свободных сам.
   const [from, setFrom] = useState<readonly number[]>([]);
@@ -90,7 +92,8 @@ export function TerritoryMenu(props: {
   const player = neutral ? null : view.players[other];
   if (!neutral && (!player || player.status !== 'alive')) return null;
   const atWar = !neutral && (view.diplomacy?.relations[other] ?? 'war') === 'war';
-  const amount = totalOf(counts);
+  const counts = countsFromShares(force.total, force.shares);
+  const amount = force.total;
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - height - EDGE));
   const mine = view.units.filter((u) => u.owner === view.playerId);
@@ -161,7 +164,12 @@ export function TerritoryMenu(props: {
             </button>
           ))}
         </div>
-        <MixEditor counts={counts} max={max} onChange={setCounts} />
+        <ForceEditor
+          total={force.total}
+          max={max}
+          shares={force.shares}
+          onChange={(total, shares) => setForce({ total, shares })}
+        />
         {armyId === NEW_ARMY && sources.length > 0 && (
           <div className={styles.sources} role="group" aria-label={t('menu.sources')}>
             {sources.map((source) => (

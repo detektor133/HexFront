@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ArmyView } from '@hexfront/sim';
 
-import { clampLimit, limitCommand, presetAmount } from '../src/dev/army-limit.ts';
+import { clampLimit, limitCommand } from '../src/dev/army-limit.ts';
 
 const army = (dir?: ArmyView['dir']): ArmyView => ({
   id: 7,
@@ -21,11 +21,9 @@ describe('лимит армии', () => {
     expect(limitCommand(army(), 150)).toEqual(expected);
   });
 
-  it('значение зажато в 0..предел, доли предела — целые и не меньше 1', () => {
+  it('значение зажато в 0..предел, ', () => {
     expect(clampLimit(-5, 300)).toBe(0);
     expect(clampLimit(999, 300)).toBe(300);
     expect(clampLimit(Number.NaN, 300)).toBe(0);
-    expect(presetAmount(300, 0.25)).toBe(75);
-    expect(presetAmount(1, 0.25)).toBe(1);
   });
 });
