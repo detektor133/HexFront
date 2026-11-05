@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCommands } from '../../src/commands/apply.ts';
+import { applyCommands, validate } from '../../src/commands/apply.ts';
 import { createDiplomacy } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
@@ -103,5 +103,37 @@ describe('закупка под заказ численности', () => {
       .reduce((sum, u) => sum + u.soldiers, 0);
     expect(inArmy).toBe(400_000);
     expect(reserve).toBe(500_000);
+  });
+
+  it('набор в армию: новобранцы приходят в выбранную армию, чужая армия отклоняется', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const player = s.state.players[0];
+    if (player) player.gold = 100_000_000 as never;
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Новая' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Новая');
+    const cityId = s.state.cities.find((c) => c.owner === 0)?.id ?? -1;
+    applyCommands(s.state, [
+      {
+        playerId: 0,
+        cmd: {
+          t: 'recruit',
+          cityId,
+          type: 'infantry',
+          soldiers: 50_000 as never,
+          armyId: army?.id ?? -1,
+        },
+      },
+    ]);
+    s.runSeconds(30);
+    expect(s.state.units.filter((u) => u.armyId === army?.id).length).toBeGreaterThan(0);
+    const bad = validate(s.state, 0, {
+      t: 'recruit',
+      cityId,
+      type: 'infantry',
+      soldiers: 50_000 as never,
+      armyId: 9999,
+    });
+    expect(bad).toEqual({ ok: false, reason: 'unknownArmy' });
   });
 });

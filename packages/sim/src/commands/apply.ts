@@ -56,8 +56,12 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
         playerId,
         'cityId' in cmd ? { cityId: cmd.cityId } : { hex: cmd.hex },
       );
-    case 'recruit':
+    case 'recruit': {
+      const army = cmd.armyId === undefined ? null : state.armies.find((a) => a.id === cmd.armyId);
+      if (army === undefined) return rejected('unknownArmy');
+      if (army && army.owner !== playerId) return rejected('notOwnArmy');
       return validateRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
+    }
     case 'move':
     case 'attack':
     case 'stop':
@@ -119,7 +123,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       );
       return;
     case 'recruit':
-      startRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers);
+      startRecruit(state, playerId, cmd.cityId, cmd.type, cmd.soldiers, cmd.armyId);
       return;
     case 'move':
     case 'attack':

@@ -13,6 +13,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   TERRAIN_NAMES,
   TICKS_PER_S,
+  type ArmyView,
   type Command,
   type MapStatic,
   type PlayerView,
@@ -23,6 +24,7 @@ import {
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import styles from './HexCard.module.css';
+import { armyName } from './army-name.ts';
 import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
 import { UnitGlyph } from './unit-glyph.tsx';
@@ -155,6 +157,8 @@ function Price(props: { value: string; ok: boolean }): React.JSX.Element {
 
 function RecruitButton(props: {
   options: readonly RecruitOption[];
+  /** Свои армии: новобранцы идут в выбранную или в резерв. */
+  armies: readonly ArmyView[];
   send: (cmd: Command) => void;
   cityId: number;
 }): React.JSX.Element | null {
@@ -165,6 +169,8 @@ function RecruitButton(props: {
       : (props.options[0]?.type ?? 'infantry'),
   );
   const [soldiers, setSoldiers] = useState(RECRUIT_MIN);
+  // Куда придут новобранцы: null — в резерв.
+  const [armyId, setArmyId] = useState<number | null>(null);
   const o = props.options.find((option) => option.type === type);
   if (!o) return null;
   const amount: RecruitAmount | undefined = o.amounts.find((x) => x.soldiers === soldiers);
@@ -220,6 +226,27 @@ function RecruitButton(props: {
             );
           })}
         </div>
+        {props.armies.length > 0 && (
+          <label className={styles.recruitTarget}>
+            <span>{t('recruit.to')}</span>
+            <select
+              value={armyId ?? ''}
+              aria-label={t('recruit.to')}
+              onChange={(event) =>
+                setArmyId(
+                  event.currentTarget.value === '' ? null : Number(event.currentTarget.value),
+                )
+              }
+            >
+              <option value="">{t('army.reserve')}</option>
+              {props.armies.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {armyName(a)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className={styles.recruitRange}>
           <span>{label}</span>
           <input
@@ -257,7 +284,13 @@ function RecruitButton(props: {
           {...(reason ? { 'aria-describedby': reasonId } : {})}
           title={t('recruit.queue')}
           onClick={() =>
-            props.send({ t: 'recruit', cityId: props.cityId, type, soldiers: selectedSoldiers })
+            props.send({
+              t: 'recruit',
+              cityId: props.cityId,
+              type,
+              soldiers: selectedSoldiers,
+              ...(armyId !== null && props.armies.some((a) => a.id === armyId) ? { armyId } : {}),
+            })
           }
         >
           <IconUserPlus size={16} aria-hidden="true" />
@@ -409,7 +442,9 @@ export function HexCard(props: {
             {t('card.seconds')}
           </p>
         )}
-        {c && !recruiting && <RecruitButton options={s.recruit} send={send} cityId={c.id} />}
+        {c && !recruiting && (
+          <RecruitButton options={s.recruit} send={send} cityId={c.id} armies={view.armies} />
+        )}
       </div>
     </section>
   );

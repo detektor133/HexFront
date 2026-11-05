@@ -59,6 +59,8 @@ export type Command =
       readonly type: UnitType;
       /** fixed-point солдат, кратно RECRUIT_STEP. */
       readonly soldiers: Fp;
+      /** Армия, в которую придёт новобранец; нет поля — в резерв. */
+      readonly armyId?: number;
     }
   | { readonly t: 'foundCity'; readonly hex: HexId }
   | { readonly t: 'upgradeCity'; readonly cityId: number }

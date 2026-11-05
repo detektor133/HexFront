@@ -386,6 +386,7 @@ const ru = {
   'army.fighting': 'В бою',
   'army.encircled': 'В окружении',
   'recruit.queue': 'Набор',
+  'recruit.to': 'Куда',
   'recruit.type': 'Тип войск',
   'recruit.amount': 'Число солдат',
 } as const;
@@ -778,6 +779,7 @@ const en: Record<MessageKey, string> = {
   'army.fighting': 'In battle',
   'army.encircled': 'Encircled',
   'recruit.queue': 'Recruiting',
+  'recruit.to': 'To',
   'recruit.type': 'Unit type',
   'recruit.amount': 'Soldier count',
 };

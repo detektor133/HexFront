@@ -602,7 +602,9 @@ export function ArmyBar(props: {
                 }
               >
                 <Icon name="reserve" />
-                <span className={styles.num}>{reserve.length}</span>
+                <span className={styles.num}>
+                  {formatSoldiers(reserve.reduce((sum, u) => sum + u.soldiers, 0))}
+                </span>
               </IconButton>
               <IconButton
                 type="button"

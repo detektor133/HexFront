@@ -362,6 +362,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
     'types info action'
+    'target target target'
     'range range range';
   align-items: center;
   gap: var(--space-xs) var(--space-sm);
@@ -374,6 +375,28 @@
 
 .recruitControl .recruitRange {
   grid-area: range;
+}
+
+.recruitControl .recruitTarget {
+  grid-area: target;
+}
+
+/* Куда придут новобранцы: резерв или выбранная армия. */
+.recruitTarget {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.recruitTarget select {
+  min-width: 0;
+  height: 32px;
+  color: var(--ui-ink);
+  font: inherit;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
 }
 
 .recruitInfo {
