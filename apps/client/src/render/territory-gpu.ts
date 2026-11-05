@@ -1,5 +1,5 @@
 // Территория на GPU: владелец и видимость гекса лежат в текстуре карты (1 тексель = 1 гекс),
-// заливка, границы и штриховка тумана считаются во фрагментном шейдере. На процессоре нет ни
+// заливка, границы и тёмный туман считаются во фрагментном шейдере. На процессоре нет ни
 // тесселяции, ни вершинных буферов: смена владельцев — это загрузка нескольких килобайт текстуры.
 import { BufferImageSource, Container, Mesh, MeshGeometry, Shader, Texture } from 'pixi.js';
 
@@ -92,17 +92,32 @@ void main() {
 
   if (uMode < 0.5) {
     if (owner == 0) discard;
+    // Плавный край: к ничьей земле заливка тает, к чужому владельцу цвет перетекает (на грани — поровну).
+    float soft = apothem * 0.35;
     float cover = 1.0;
     float hexDist = 0.0;
-    for (int d = 0; d < 6; d++) {
-      float dist = edgeDist(p, d, apothem);
-      hexDist = max(hexDist, 1.0 - dist / apothem);
-      if (dist > uPx) continue;
-      if (ownerAt(ax + DIRS[d]) == 0) cover = min(cover, clamp(dist / uPx + 0.5, 0.0, 1.0));
-    }
     float a = float(owner) == uMe ? uAlpha.x : uAlpha.y;
     vec3 c = palette(owner, 0.0).rgb;
     vec3 line = palette(owner, 1.0).rgb;
+    vec3 mixC = c;
+    float mixA = a;
+    for (int d = 0; d < 6; d++) {
+      float dist = edgeDist(p, d, apothem);
+      hexDist = max(hexDist, 1.0 - dist / apothem);
+      if (dist >= soft) continue;
+      int no = ownerAt(ax + DIRS[d]);
+      if (no == owner) continue;
+      float t = smoothstep(0.0, soft, max(dist, 0.0));
+      if (no == 0) {
+        cover = min(cover, 0.3 + 0.7 * t);
+      } else {
+        float k = 0.5 * (1.0 - t);
+        mixC = mix(mixC, palette(no, 0.0).rgb, k);
+        mixA = mix(mixA, float(no) == uMe ? uAlpha.x : uAlpha.y, k);
+      }
+    }
+    c = mixC;
+    a = mixA;
     // Захват: цвет нового владельца заливает гекс от центра к краям, затухая (B — остаток эффекта).
     float fade = cell.b;
     if (fade > 0.0 && hexDist <= 1.0 - fade) {
@@ -115,32 +130,35 @@ void main() {
   }
 
   vec4 outColor = vec4(0.0);
-  if (cell.g < 0.5) {
-    float hr = uR * 0.68;
-    float u = p.y + 0.35 * p.x;
-    if (abs(p.x) <= hr && abs(u) <= hr) {
-      float sp = uFog.x * uPx;
-      float f = abs(fract(u / sp + 0.5) - 0.5) * sp / sqrt(1.0 + 0.1225);
-      float cov = clamp((uFog.y * uPx * 0.5 - f) / uPx + 0.5, 0.0, 1.0);
-      float ha = uFogColor.a * cov;
-      outColor = vec4(uFogColor.rgb * ha, ha);
-    }
-  }
   if (owner != 0) {
     float bw = uBorder;
+    float feather = uPx * 1.5;
     float cover = 0.0;
     for (int d = 0; d < 6; d++) {
       float dist = edgeDist(p, d, apothem);
-      if (dist > bw + uPx) continue;
+      if (dist > bw + feather) continue;
       if (ownerAt(ax + DIRS[d]) == owner) continue;
-      float cv = clamp((bw - dist) / uPx + 0.5, 0.0, 1.0) * clamp(dist / uPx + 0.5, 0.0, 1.0);
+      float cv = (1.0 - smoothstep(bw * 0.5, bw + feather, dist)) * clamp(dist / uPx + 0.5, 0.0, 1.0);
       cover = max(cover, cv);
     }
-    if (cover > 0.0) {
-      vec3 line = palette(owner, 1.0).rgb;
-      outColor = vec4(line * cover + outColor.rgb * (1.0 - cover), cover + outColor.a * (1.0 - cover));
-    }
+    if (cover > 0.0) outColor = vec4(palette(owner, 1.0).rgb * cover, cover);
   }
+  // Туман: тёмная пелена на невидимом; на границе видимого и скрытого затемнение плавно меняется.
+  float hid = cell.g < 0.5 ? 1.0 : 0.0;
+  float fogV = hid;
+  float fsoft = apothem * uFog.x;
+  for (int d = 0; d < 6; d++) {
+    float dist = edgeDist(p, d, apothem);
+    if (dist >= fsoft) continue;
+    ivec2 o = toOffset(ax + DIRS[d]);
+    if (!inMap(o)) continue;
+    float nh = texelFetch(uData, o, 0).g < 0.5 ? 1.0 : 0.0;
+    if (nh == hid) continue;
+    float k = 0.5 * (1.0 - smoothstep(0.0, fsoft, max(dist, 0.0)));
+    fogV = mix(fogV, nh, k);
+  }
+  float fa = uFogColor.a * fogV;
+  if (fa > 0.0) outColor = vec4(uFogColor.rgb * fa + outColor.rgb * (1.0 - fa), fa + outColor.a * (1.0 - fa));
   if (outColor.a <= 0.0) discard;
   finalColor = outColor;
 }`;
@@ -152,7 +170,7 @@ function rgb(hex: string): [number, number, number] {
 export interface TerritoryGpu {
   /** Заливка территории — под дорогами и фишками. */
   readonly fill: Container;
-  /** Границы и штриховка тумана — над заливкой. */
+  /** Границы и тёмный туман — над заливкой. */
   readonly over: Container;
   setView(view: PlayerView): void;
   /** Остаток вспышки захвата гекса, 0..1 (0 — нет эффекта); загрузка в текстуру — `flush`. */
@@ -238,7 +256,7 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
     indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
   });
 
-  const fog = rgb(tokens.fog.hatch);
+  const fog = rgb(tokens.fog.dark);
   const makeShader = (mode: number): Shader =>
     Shader.from({
       gl: { vertex: VERTEX, fragment: FRAGMENT },
@@ -256,11 +274,11 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
             type: 'vec2<f32>',
           },
           uFogColor: {
-            value: [fog[0] / 255, fog[1] / 255, fog[2] / 255, tokens.fog.hatchAlpha],
+            value: [fog[0] / 255, fog[1] / 255, fog[2] / 255, tokens.fog.darkAlpha],
             type: 'vec4<f32>',
           },
           uFog: {
-            value: [tokens.fog.hatchSpacing, tokens.fog.hatchWidth],
+            value: [tokens.fog.soft, 0],
             type: 'vec2<f32>',
           },
           uMode: { value: mode, type: 'f32' },

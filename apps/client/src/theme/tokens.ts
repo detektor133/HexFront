@@ -10,25 +10,26 @@ export const tokens = {
         1.5
       ]
     },
-    "background": "#BFD8EA",
-    "water": "#8BD0EF",
-    "waterEdge": "#9CC3E0",
-    "river": "#8FBCE0",
+    "background": "#4F86A8",
+    "water": "#5B94B8",
+    "waterEdge": "#4A7FA3",
+    "river": "#4A7FA3",
     "riverWidth": [
       1.5,
       2.5,
       3.5
     ],
     "terrain": {
-      "plains": "#F8F6EF",
-      "forest": "#B3E0B1",
-      "forestInk": "#6BA36B",
-      "hills": "#DFE3B5",
-      "hillInk": "#959A6B",
-      "mountains": "#C3CAD0",
-      "mountainInk": "#6B7983",
-      "desert": "#FFE49F",
-      "desertInk": "#D0A45C"
+      "plains": "#A9CB78",
+      "plainsInk": "#6F9A47",
+      "forest": "#59B35F",
+      "forestInk": "#23592E",
+      "hills": "#BDB276",
+      "hillInk": "#7A7442",
+      "mountains": "#A0A8AE",
+      "mountainInk": "#515F69",
+      "desert": "#E2C47A",
+      "desertInk": "#A98239"
     },
     "patternWidth": 1.25,
     "hexGrid": "#FFFFFF",
@@ -36,7 +37,7 @@ export const tokens = {
     "hexGridVisibleFromZoom": 2
   },
   "territory": {
-    "fillMix": 0.62,
+    "fillMix": 0.3,
     "alphaOwn": 0.5,
     "alphaOther": 0.85,
     "borderWidth": [
@@ -262,7 +263,10 @@ export const tokens = {
     "hatchAlpha": 0.08,
     "hatchSpacing": 6,
     "hatchWidth": 1,
-    "memoryAlpha": 0.5
+    "memoryAlpha": 0.5,
+    "dark": "#080D14",
+    "darkAlpha": 0.74,
+    "soft": 0.5
   },
   "ui": {
     "ink": "#22211E",

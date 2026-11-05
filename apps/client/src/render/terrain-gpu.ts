@@ -72,6 +72,14 @@ float hexNoise(ivec2 qr, int salt) {
   return float(h ^ (h >> 16)) / 4294967296.0;
 }
 
+float vnoise(vec2 x) {
+  ivec2 i = ivec2(floor(x));
+  vec2 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hexNoise(i, 7), hexNoise(i + ivec2(1, 0), 7), f.x),
+             mix(hexNoise(i + ivec2(0, 1), 7), hexNoise(i + ivec2(1, 1), 7), f.x), f.y);
+}
+
 vec2 corner(int k) {
   float a = radians(60.0 * float(k));
   return uR * vec2(cos(a), sin(a));
@@ -111,10 +119,29 @@ float triDist(vec2 p, vec2 a, vec2 b, vec2 c) {
   return -sqrt(d.x) * sign(d.y);
 }
 
-// Лес: три плоские кроны.
-void forest(inout vec4 acc, vec2 q, vec3 ink) {
-  vec2 centers[3] = vec2[3](vec2(0.0, -0.18), vec2(-0.24, 0.135), vec2(0.24, 0.135));
-  for (int i = 0; i < 3; i++) over(acc, ink, cover(length(q - centers[i]) - 0.17));
+// Лес: семь двухъярусных елей; порядок сверху вниз, нижние перекрывают верхние, оттенок у каждой свой.
+const vec2 TREES[7] = vec2[7](vec2(-0.12, -0.38), vec2(0.32, -0.3), vec2(-0.46, -0.06), vec2(0.06, -0.02), vec2(0.46, 0.08), vec2(-0.26, 0.36), vec2(0.24, 0.4));
+void forest(inout vec4 acc, vec2 q, vec3 ink, ivec2 ax) {
+  for (int i = 0; i < 7; i++) {
+    vec2 c = TREES[i] + (vec2(hexNoise(ax, 10 + i), hexNoise(ax, 20 + i)) - 0.5) * 0.1;
+    vec3 shade = ink * (0.85 + 0.35 * hexNoise(ax, 30 + i));
+    over(acc, shade, cover(triDist(q, c + vec2(0.0, -0.12), c + vec2(-0.2, 0.12), c + vec2(0.2, 0.12))));
+    over(acc, shade * 1.18 + 0.04, cover(triDist(q, c + vec2(0.0, -0.3), c + vec2(-0.15, -0.01), c + vec2(0.15, -0.01))));
+    over(acc, vec3(1.0), 0.14 * cover(triDist(q, c + vec2(0.0, -0.3), c + vec2(-0.15, -0.01), c + vec2(0.0, -0.01))));
+    over(acc, ink * 0.55, cover(segDist(q, c + vec2(0.0, 0.12), c + vec2(0.0, 0.2)) - 0.02));
+  }
+}
+
+// Равнина: пучки травы — три коротких штриха из одной точки.
+const vec2 TUFTS[6] = vec2[6](vec2(-0.45, -0.25), vec2(0.1, -0.45), vec2(0.5, -0.15), vec2(-0.2, 0.1), vec2(0.35, 0.3), vec2(-0.5, 0.4));
+void grass(inout vec4 acc, vec2 q, vec3 ink, float hw, ivec2 ax) {
+  for (int i = 0; i < 6; i++) {
+    vec2 c = TUFTS[i] + (vec2(hexNoise(ax, 40 + i), hexNoise(ax, 50 + i)) - 0.5) * 0.14;
+    float d = segDist(q, c, c + vec2(-0.06, -0.11));
+    d = min(d, segDist(q, c, c + vec2(0.0, -0.14)));
+    d = min(d, segDist(q, c, c + vec2(0.06, -0.11)));
+    over(acc, ink, 0.85 * cover(d - hw));
+  }
 }
 
 // Холмы: две дуги-«горба» с лёгкой заливкой под дугой.
@@ -189,6 +216,19 @@ void main() {
 
   if (uMode < 0.5) {
     vec3 col = fillOf(t);
+    // Плавные границы: цвет соседней суши подмешивается к грани (ровно половина на самой грани).
+    if (t != 0) {
+      float soft = apothem * 0.6;
+      for (int d = 0; d < 6; d++) {
+        float dist = edgeDist(p, d, apothem);
+        if (dist >= soft) continue;
+        int nt = terrainAt(ax + DIRS[d]);
+        if (nt == t || nt == 0) continue;
+        float k = 0.5 * (1.0 - smoothstep(0.0, soft, max(dist, 0.0)));
+        col = mix(col, fillOf(nt), k);
+      }
+      col *= 0.92 + 0.16 * vnoise(vWorld / (uR * 0.5));
+    }
     float gridCover = 0.0;
     if (uGrid > 0.5) {
       for (int d = 0; d < 6; d++) {
@@ -217,7 +257,8 @@ void main() {
   float hw = uPattern * uPx / uR * 0.5;
   vec2 j = vec2(hexNoise(ax, 1) - 0.5, hexNoise(ax, 2) - 0.5) * 0.24;
   vec2 pl = p / uR - j;
-  if (t == 2) forest(acc, pl, inkOf(2));
+  if (t == 1) grass(acc, pl, inkOf(1), hw, ax);
+  else if (t == 2) forest(acc, pl, inkOf(2), ax);
   else if (t == 3) hills(acc, pl, inkOf(3), hw);
   else if (t == 4) mountain(acc, pl, inkOf(4), hw);
   else if (t == 5) desert(acc, pl, inkOf(5), hw);
@@ -319,7 +360,7 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
   });
   const T = M.terrain;
   const fills = [M.water, T.plains, T.forest, T.hills, T.mountains, T.desert];
-  const inks = [M.waterEdge, T.plains, T.forestInk, T.hillInk, T.mountainInk, T.desertInk];
+  const inks = [M.waterEdge, T.plainsInk, T.forestInk, T.hillInk, T.mountainInk, T.desertInk];
   const colors = new Uint8Array(8 * 2 * 4);
   [fills, inks].forEach((row, y) => {
     row.forEach((hex, x) => colors.set([...rgb(hex), 255], (y * 8 + x) * 4));
