@@ -208,7 +208,9 @@
 | `MERGE_SMALL_BELOW` | 150 `[ТЮНИНГ]` |
 | `CONSOLIDATE_CROWD` | 12 `[ТЮНИНГ]` |
 | `MERGE_SMALL_RADIUS` | 4 `[ТЮНИНГ]` |
-| `CONSOLIDATE_MAX` | 400 `[ТЮНИНГ]` |
+| `CONSOLIDATE_MAX` | 300 `[ТЮНИНГ]` |
+| `CONSOLIDATE_UNITS_TARGET` | 25 `[ТЮНИНГ]` |
+| `CONSOLIDATE_MAX_CEIL` | 1500 `[ТЮНИНГ]` |
 | `CONSOLIDATE_SAFE` | 3 `[ТЮНИНГ]` |
 | `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
 | `SWARM_SAFE` | 6 `[ТЮНИНГ]` |

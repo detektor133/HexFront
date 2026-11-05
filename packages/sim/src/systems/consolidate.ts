@@ -4,6 +4,8 @@
 import {
   CONSOLIDATE_CROWD,
   CONSOLIDATE_MAX,
+  CONSOLIDATE_MAX_CEIL,
+  CONSOLIDATE_UNITS_TARGET,
   CONSOLIDATE_PERIOD_S,
   CONSOLIDATE_SAFE,
   MAX_UNITS_PER_HEX,
@@ -14,12 +16,24 @@ import {
 } from '../balance.ts';
 import { mergeUnits } from '../commands/unit.ts';
 import { distance, hexFromId } from '../math/hex.ts';
+import { intDiv } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
+
+/**
+ * Предел отряда при слиянии, fixed-point: CONSOLIDATE_MAX для небольшого войска, а у большого —
+ * войско / CONSOLIDATE_UNITS_TARGET, но не больше CONSOLIDATE_MAX_CEIL.
+ */
+export function unitCap(totalSoldiers: number): number {
+  return Math.min(
+    CONSOLIDATE_MAX_CEIL,
+    Math.max(CONSOLIDATE_MAX, intDiv(totalSoldiers, CONSOLIDATE_UNITS_TARGET)),
+  );
+}
 
 const free = (u: Unit): boolean => !u.inBattle && u.order !== 'retreat' && u.order !== 'attack';
 
@@ -50,8 +64,13 @@ export function consolidate(state: MatchState): void {
   // гексами линии разрешает слияние.
   const crowd = new Map<number, number>();
   const perArmy = new Map<number | null, number>();
+  // Предел отряда командир выбирает по размеру войска: чем больше войско, тем крупнее отряды, чтобы
+  // массовая армия не рассыпалась на сотни мелких (а сотни фишек не тормозили игру).
+  const soldiersOf = new Map<number, number>();
   for (const u of allUnits(state)) {
     crowd.set(u.owner, (crowd.get(u.owner) ?? 0) + 1);
+    if (u.type !== 'artillery')
+      soldiersOf.set(u.owner, (soldiersOf.get(u.owner) ?? 0) + u.soldiers);
     if (u.type !== 'artillery') perArmy.set(u.armyId, (perArmy.get(u.armyId) ?? 0) + 1);
   }
   // Гексов линии у армии с планом: пока отрядов не больше, армия делится, а не сливается.
@@ -73,11 +92,13 @@ export function consolidate(state: MatchState): void {
       (isPlanned && (perArmy.get(armyId) ?? 0) > (lineHexes.get(armyId) ?? 0));
     // Совсем крошечный отряд бесполезен где угодно; больший — только в спокойном месте (не рядом с
     // врагом: фронт у врага не трогаем).
+    const total = soldiersOf.get(units[0]?.owner ?? -1) ?? 0;
+    const cap = unitCap(total);
+    const below = Math.max(MERGE_SMALL_BELOW, intDiv(cap, 2));
     const crowded = surplus && (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
     const calm = (u: Unit): boolean => crowded && !nearFoe(u);
     const small = units.filter(
-      (u) =>
-        free(u) && (u.soldiers < MERGE_SMALL_TINY || (u.soldiers < MERGE_SMALL_BELOW && calm(u))),
+      (u) => free(u) && (u.soldiers < MERGE_SMALL_TINY || (u.soldiers < below && calm(u))),
     );
     if (small.length === 0 || units.length < 2) continue;
     const smallIds = new Set(small.map((u) => u.id));
@@ -93,7 +114,7 @@ export function consolidate(state: MatchState): void {
         if (b.id === a.id || taken.has(b.id) || !free(b)) continue;
         // Мелкий идёт к крупному; из двух мелких — к меньшему id: пара не расходится.
         if (b.soldiers < a.soldiers || (b.soldiers === a.soldiers && b.id > a.id)) continue;
-        if (a.soldiers + b.soldiers + (incoming.get(b.id) ?? 0) > CONSOLIDATE_MAX) continue;
+        if (a.soldiers + b.soldiers + (incoming.get(b.id) ?? 0) > cap) continue;
         const d = distance(at, hexFromId(b.hex, width));
         if (d <= MERGE_SMALL_RADIUS && d < bestD) {
           best = b;

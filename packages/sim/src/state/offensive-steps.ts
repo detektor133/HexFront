@@ -248,9 +248,10 @@ export function neighborsIn(g: LineGround, hex: HexId, set: ReadonlySet<HexId>):
 }
 
 /**
- * Котлы в своей земле: связные куски не своих гексов (вода входит в кусок), которые не касаются
- * края карты и в которых не больше `maxLand` проходимых гексов. Чужой отряд или целый чужой
- * островок посреди своей страны — котёл, его надо закрыть, а не обходить стороной.
+ * Котлы: связные куски чужой и ничьей суши (вода — преграда, край карты — тоже), в которых не
+ * больше `maxLand` проходимых гексов. Остаток врага посреди своей страны, в углу карты или у
+ * кромки воды — котёл: его надо закрыть, а не держать рядом войска. Большая земля врага (кусок
+ * больше `maxLand`) котлом не считается.
  * @returns куски — проходимые гексы по возрастанию HexId, куски по первому гексу
  */
 export function holeComponents(g: LineGround, owner: number, maxLand: number): HexId[][] {
@@ -258,23 +259,19 @@ export function holeComponents(g: LineGround, owner: number, maxLand: number): H
   const seen = new Uint8Array(g.hexes.owner.length);
   const out: HexId[][] = [];
   for (let start = 0; start < g.hexes.owner.length; start += 1) {
-    if (seen[start] || g.hexes.owner[start] === owner) continue;
+    if (seen[start] || g.hexes.owner[start] === owner || !passable(g, start)) continue;
     const comp: HexId[] = [start];
     seen[start] = 1;
-    let open = false;
     for (let i = 0; i < comp.length; i += 1) {
       const h = comp[i] as HexId;
       for (let k = 0; k < SIDES; k += 1) {
         const n = table[h * SIDES + k] as number;
-        if (n < 0) open = true;
-        if (n < 0 || seen[n] || g.hexes.owner[n] === owner) continue;
+        if (n < 0 || seen[n] || g.hexes.owner[n] === owner || !passable(g, n)) continue;
         seen[n] = 1;
         comp.push(n);
       }
     }
-    if (open) continue;
-    const land = comp.filter((h) => passable(g, h)).sort((a, b) => a - b);
-    if (land.length > 0 && land.length <= maxLand) out.push(land);
+    if (comp.length <= maxLand) out.push(comp.sort((x, y) => x - y));
   }
   return out;
 }

@@ -94,7 +94,10 @@ function releaseSurplus(state: MatchState, army: Army): void {
     army.wanted * FP;
   if (surplus < FP) return;
   const idle = allUnits(state)
-    .filter((u) => u.armyId === army.id && u.order === 'idle' && !u.inBattle)
+    // Артиллерия в резерв не уходит: она нужна армии за линией, а не в запас.
+    .filter(
+      (u) => u.armyId === army.id && u.order === 'idle' && !u.inBattle && u.type !== 'artillery',
+    )
     .sort((a, b) => a.soldiers - b.soldiers || a.id - b.id);
   for (const unit of idle) {
     if (surplus < FP) return;

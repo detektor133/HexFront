@@ -269,7 +269,10 @@ export const MERGE_SMALL_BELOW: Fp = fp(150);
 export const MERGE_SMALL_RADIUS = 4;
 /** Предел отряда при слиянии мелочи и при вливании колонны в затор, солдат. */
 export const CONSOLIDATE_CROWD = 12;
-export const CONSOLIDATE_MAX: Fp = fp(400);
+/** Предел отряда при слиянии для небольшого войска; у большого растёт: войско / CONSOLIDATE_UNITS_TARGET. */
+export const CONSOLIDATE_MAX: Fp = fp(300);
+export const CONSOLIDATE_UNITS_TARGET = 25;
+export const CONSOLIDATE_MAX_CEIL: Fp = fp(1500);
 /** Мелочь не стягивается, пока враг ближе стольких гексов: фронт у врага не трогаем. */
 export const CONSOLIDATE_SAFE = 3;
 export const CONSOLIDATE_PERIOD_S = 2;

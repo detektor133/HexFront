@@ -136,4 +136,19 @@ describe('закупка под заказ численности', () => {
     });
     expect(bad).toEqual({ ok: false, reason: 'unknownArmy' });
   });
+
+  it('артиллерия при снижении лимита остаётся в армии, в резерв уходит пехота', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const inf = [1, 2].map((row) => s.unit('A', 'infantry', 200, at(2, row)));
+    const art = s.unit('A', 'artillery', 100, at(2, 3));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Строй' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Строй');
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'assignUnits', unitIds: [...inf, art], armyId: army?.id ?? -1 } },
+      { playerId: 0, cmd: { t: 'setArmyLimit', armyId: army?.id ?? -1, soldiers: 150 } },
+    ]);
+    s.runSeconds(3);
+    expect(s.state.units.find((u) => u.id === art)?.armyId).toBe(army?.id);
+  });
 });

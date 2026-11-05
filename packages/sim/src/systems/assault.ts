@@ -103,6 +103,10 @@ function assault(state: MatchState, army: Army): void {
 
 /** Самый большой котёл (проходимых гексов), который закрывают отдельно от линии наступления. */
 const POCKET_MAX_LAND = 60;
+/** Группа на котёл с врагом крупнее штурмовой: котёл надо закрыть, а не держать рядом войска. */
+const POCKET_MAX_UNITS = 16;
+/** Котёл прилегает к своей земле, червя не будет: отряды берутся и издалека. */
+const POCKET_REACH = 20;
 /** Сколько гексов котла ставится в работу за одно решение. */
 const POCKET_BATCH = 8;
 
@@ -136,11 +140,11 @@ function closePockets(state: MatchState, owner: number, armies: readonly Army[])
   const used = new Set<number>();
   for (const hex of targets.slice(0, POCKET_BATCH)) {
     const pool = free
-      .filter((u) => !used.has(u.id) && distance(at(u.hex), at(hex)) <= ASSAULT_REACH)
+      .filter((u) => !used.has(u.id) && distance(at(u.hex), at(hex)) <= POCKET_REACH)
       .sort((a, b) => distance(at(a.hex), at(hex)) - distance(at(b.hex), at(hex)) || a.id - b.id);
     const hostile = isHostileHex(state, owner, hex);
     const force: Unit[] = [];
-    for (const unit of pool.slice(0, hostile ? ASSAULT_MAX_UNITS : 1)) {
+    for (const unit of pool.slice(0, hostile ? POCKET_MAX_UNITS : 1)) {
       force.push(unit);
       if (hostile && forecastInState(state, force, hex).outcome !== 'victory') continue;
       const cmd = hostile

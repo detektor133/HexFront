@@ -1,6 +1,6 @@
 // Pixi-сцена карты: слои рельефа и камера с перетаскиванием, колесом, щипком и инерцией.
 // ADR-0005: карта рисуется Pixi императивно, React только управляет параметрами.
-import { Application, Container, CullerPlugin, extensions, Graphics } from 'pixi.js';
+import { Application, BigPool, Container, CullerPlugin, extensions, Graphics } from 'pixi.js';
 
 import type { Hex, MapStatic } from '@hexfront/sim';
 
@@ -124,6 +124,9 @@ export interface MapView {
 const VELOCITY_SMOOTHING = 0.8;
 /** Если палец замер дольше этого перед отпусканием, инерции нет. */
 const INERTIA_MAX_PAUSE_MS = 80;
+
+/** Как часто отпускаются свободные элементы пула Pixi, мс. */
+const POOL_CLEAR_MS = 15_000;
 
 /** Плагин отсечения подключается один раз на страницу, а не на каждую карту. */
 let cullerAdded = false;
@@ -349,6 +352,10 @@ export async function createMapView(
   });
   // Удержание засчитывается и без движения пальца — проверка каждый кадр.
   app.ticker.add(() => gesture.tick(performance.now()));
+  // Пул Pixi хранит отработавшие пакеты графики вместе с их буферами и сам не худеет: после тяжёлой
+  // сцены в нём оставались десятки тысяч пакетов и сотни мегабайт (снимок кучи). Свободные
+  // элементы пула отпускаем раз в POOL_CLEAR_MS; занятые не затрагиваются.
+  const poolTimer = setInterval(() => BigPool?.clear(), POOL_CLEAR_MS);
 
   return {
     configure(next) {
@@ -460,6 +467,7 @@ export async function createMapView(
       apply();
     },
     destroy() {
+      clearInterval(poolTimer);
       detach();
       selectionFrame?.remove();
       app.destroy({ removeView: true }, { children: true, context: true });
