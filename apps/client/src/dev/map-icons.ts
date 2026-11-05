@@ -83,8 +83,8 @@ function buildAtlas(): Uint8Array {
     ctx.clearRect(0, 0, RASTER, RASTER);
     ctx.save();
     ctx.scale(RASTER / 24, RASTER / 24);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = 'white';
+    ctx.fillStyle = 'white';
     ctx.lineWidth = STROKE;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -145,7 +145,7 @@ void main() {
 const FLOATS_PER_VERTEX = 8;
 const FLOATS_PER_QUAD = FLOATS_PER_VERTEX * 4;
 
-function rgb(hex: string): [number, number, number] {
+function channels(hex: string): [number, number, number] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255) as [
     number,
     number,
@@ -222,7 +222,7 @@ export function createMapIconLayer(): MapIconLayer {
 
   const writeQuad = (slot: number, icon: MapIcon, cell: number, outline: boolean): void => {
     const half = icon.size / 2;
-    const [r, g, b] = outline ? [1, 1, 1] : rgb(icon.color);
+    const [r, g, b] = outline ? [1, 1, 1] : channels(icon.color);
     const a = outline ? 0 : 1;
     // Полпикселя внутрь клетки: соседние клетки атласа не просачиваются при линейной выборке.
     const pad = 0.5 / atlasWidth;

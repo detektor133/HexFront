@@ -163,7 +163,7 @@ void main() {
   finalColor = outColor;
 }`;
 
-function rgb(hex: string): [number, number, number] {
+function channels(hex: string): [number, number, number] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
 }
 
@@ -256,7 +256,7 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
     indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
   });
 
-  const fog = rgb(tokens.fog.dark);
+  const fog = channels(tokens.fog.dark);
   const makeShader = (mode: number): Shader =>
     Shader.from({
       gl: { vertex: VERTEX, fragment: FRAGMENT },
@@ -300,8 +300,8 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
   const writePalette = (): void => {
     const next = new Uint8Array(paletteData.length);
     for (let i = 1; i < PALETTE_SIZE; i += 1) {
-      next.set([...rgb(playerFill(i - 1)), 255], i * 4);
-      next.set([...rgb(playerLine(i - 1)), 255], (PALETTE_SIZE + i) * 4);
+      next.set([...channels(playerFill(i - 1)), 255], i * 4);
+      next.set([...channels(playerLine(i - 1)), 255], (PALETTE_SIZE + i) * 4);
     }
     if (next.every((value, index) => value === paletteData[index])) return;
     paletteData.set(next);

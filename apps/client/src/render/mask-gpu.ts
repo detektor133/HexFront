@@ -121,7 +121,7 @@ void main() {
   }
 }`;
 
-function rgb(hex: string): [number, number, number] {
+function channels(hex: string): [number, number, number] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255) as [
     number,
     number,
@@ -183,11 +183,11 @@ export function createMaskGpu(map: MapStatic, radius: number): MaskGpu {
         uR: { value: radius, type: 'f32' },
         uPx: { value: 1, type: 'f32' },
         uKind: { value: 0, type: 'f32' },
-        uBad: { value: rgb(tokens.status.danger), type: 'vec3<f32>' },
-        uMid: { value: rgb(tokens.status.lowSupply), type: 'vec3<f32>' },
-        uGood: { value: rgb(tokens.status.success), type: 'vec3<f32>' },
-        uAccent: { value: rgb(tokens.selection.color), type: 'vec3<f32>' },
-        uDim: { value: rgb(tokens.ui.ink), type: 'vec3<f32>' },
+        uBad: { value: channels(tokens.status.danger), type: 'vec3<f32>' },
+        uMid: { value: channels(tokens.status.lowSupply), type: 'vec3<f32>' },
+        uGood: { value: channels(tokens.status.success), type: 'vec3<f32>' },
+        uAccent: { value: channels(tokens.selection.color), type: 'vec3<f32>' },
+        uDim: { value: channels(tokens.ui.ink), type: 'vec3<f32>' },
       },
     },
   });

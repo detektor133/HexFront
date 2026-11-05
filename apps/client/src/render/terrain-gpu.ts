@@ -266,7 +266,7 @@ void main() {
   finalColor = acc;
 }`;
 
-function rgb(hex: string): [number, number, number] {
+function channels(hex: string): [number, number, number] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
 }
 
@@ -353,7 +353,7 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
   const inks = [M.waterEdge, T.plainsInk, T.forestInk, T.hillInk, T.mountainInk, T.desertInk];
   const colors = new Uint8Array(8 * 2 * 4);
   [fills, inks].forEach((row, y) => {
-    row.forEach((hex, x) => colors.set([...rgb(hex), 255], (y * 8 + x) * 4));
+    row.forEach((hex, x) => colors.set([...channels(hex), 255], (y * 8 + x) * 4));
   });
   const colorSource = new BufferImageSource({
     resource: colors,
@@ -393,7 +393,7 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
           uPx: { value: 1, type: 'f32' },
           uPattern: { value: M.patternWidth, type: 'f32' },
           uRiver: { value: 0, type: 'f32' },
-          uRiverColor: { value: rgb(M.river).map((c) => c / 255), type: 'vec3<f32>' },
+          uRiverColor: { value: channels(M.river).map((c) => c / 255), type: 'vec3<f32>' },
           uMode: { value: mode, type: 'f32' },
         },
       },
