@@ -77,4 +77,57 @@ describe('целостное наступление', () => {
       if (stillWanted) expect(now).toBe(was);
     }
   });
+
+  it('резерв из глубокого тыла подтягивается к границе, а не стоит без дела', () => {
+    const wide = [
+      'A1 a  a  a  a  a  a  a  a  a  b  b  b  B1',
+      ...Array.from({ length: 4 }, () => 'a  a  a  a  a  a  a  a  a  a  b  b  b  b'),
+    ].join('\n');
+    const s = scenario(wide, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    s.unit('A', 'infantry', 200, at(8, 1));
+
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: 1 } }]);
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 100 } }]);
+    // Резерв появляется после приказа: армия его не взяла, он стоит в глубоком тылу.
+    const reserve = s.unit('A', 'infantry', 200, at(0, 3));
+    const w = s.state.map.width;
+    // Резерв сливается и делится, поэтому смотрим на все отряды без армии, а не на один id.
+    const gaps = (): number[] =>
+      s.state.units
+        .filter((u) => u.owner === 0 && u.armyId === null)
+        .map((u) => {
+          let best = 99;
+          s.state.hexes.owner.forEach((o, h) => {
+            if (o === 1) best = Math.min(best, distance(hexFromId(h, w), hexFromId(u.hex, w)));
+          });
+          return best;
+        });
+    expect(Math.max(...gaps())).toBeGreaterThan(5);
+    expect(reserve).toBeGreaterThan(0);
+    s.runSeconds(60);
+    const after = gaps();
+    expect(after.length).toBeGreaterThan(0);
+    expect(Math.max(...after)).toBeLessThanOrEqual(5);
+  });
+
+  it('наступление упёрлось надолго: командир снимает его, армия во временной обороне и потом пробует снова', () => {
+    const s = war();
+    for (let row = 0; row < 7; row += 1) s.unit('B', 'infantry', 4000, at(4, row));
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 800 } },
+    ]);
+    const army = (): ReturnType<typeof s.state.armies.find> =>
+      s.state.armies.find((a) => a.owner === 0 && a.dir?.target === 1);
+    expect(army()?.dir?.mode).toBe('attack');
+    s.runSeconds(60);
+    const dir = army()?.dir;
+    // Бить нечем — армия не стоит в «наступлении» без дела, а держит границу и ждёт срока.
+    expect(dir?.mode === 'hold' || dir?.mode === 'attack').toBe(true);
+    const held = s.state.armies.some((a) => a.dir?.mode === 'hold' && a.dir.resume !== undefined);
+    const resumed = army()?.dir?.mode === 'attack';
+    expect(held || resumed).toBe(true);
+    s.runSeconds(60);
+    expect(army()?.dir?.target).toBe(1);
+  });
 });

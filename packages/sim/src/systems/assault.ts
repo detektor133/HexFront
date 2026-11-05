@@ -14,10 +14,11 @@ import { blocOf } from '../commands/launch.ts';
 import { executeUnitCommand, validateUnitCommand } from '../commands/unit.ts';
 import { distance, hexFromId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
-import { isHostileHex } from '../queries/unit-path.ts';
+import { findPath, isHostileHex } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { adjacentHexes, holeComponents } from '../state/offensive-steps.ts';
+import { atWar } from '../state/relations.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -154,6 +155,64 @@ function closePockets(state: MatchState, owner: number, armies: readonly Army[])
   }
 }
 
+/** Резерв ближе этого числа гексов к фронту стоит где стоит; дальше — подтягивается. */
+const STAGE_RANGE = 3;
+/** Сколько отрядов резерва командир подтягивает за раз. */
+const STAGE_BATCH = 6;
+
+/**
+ * Резерв — у фронта, а не в тылу: стоящие отряды без армии, далёкие от границы с врагом, идут к
+ * ближайшему своему гексу у неё и ждут там: оттуда они вливаются в армии и затыкают прорывы
+ * вместо того, чтобы тратить минуты на дорогу из глубины страны.
+ */
+function stageReserve(state: MatchState, owner: number): void {
+  const { width } = state.map;
+  const at = (hex: number) => hexFromId(hex, width);
+  const front: number[] = [];
+  state.hexes.owner.forEach((o, h) => {
+    if (o !== owner) return;
+    const touches = adjacentHexes(state, h).some((n) => {
+      const other = state.hexes.owner[n] ?? -1;
+      return other >= 0 && other !== owner && atWar(state, owner, other);
+    });
+    if (touches) front.push(h);
+  });
+  if (front.length === 0) return;
+  const reserve = allUnits(state).filter(
+    (u) =>
+      u.owner === owner &&
+      u.armyId === null &&
+      u.type !== 'artillery' &&
+      u.order === 'idle' &&
+      !u.inBattle &&
+      u.slot !== SLOT_DETACHED,
+  );
+  let sent = 0;
+  for (const u of reserve) {
+    if (sent >= STAGE_BATCH) return;
+    let best = front[0] as number;
+    let bestD = Number.MAX_SAFE_INTEGER;
+    for (const h of front) {
+      const d = distance(at(u.hex), at(h));
+      if (d < bestD) {
+        best = h;
+        bestD = d;
+      }
+    }
+    if (bestD <= STAGE_RANGE) continue;
+    const path =
+      findPath(state, u.hex, best, u.type, owner, true) ??
+      findPath(state, u.hex, best, u.type, owner, 'safe');
+    if (!path || path.length === 0) continue;
+    u.path = path;
+    u.moveTicks = 0;
+    u.moveTotal = 0;
+    u.slot = -1;
+    u.order = 'move';
+    sent += 1;
+  }
+}
+
 // Свободный резерв игрока вливается в ближайшую к нему наступающую армию: заказ — минимум,
 // а отряды в тылу без дела — потеря силы.
 function deployReserve(state: MatchState, owner: number, attackers: readonly Army[]): void {
@@ -194,4 +253,12 @@ export function commandAssaults(state: MatchState): void {
     for (const army of armies) assault(state, army);
     closePockets(state, owner, armies);
   }
+  // Резерв подтягивается к фронту у игроков с приказами направлений (раз в четыре решения).
+  if (state.tick % (ASSAULT_PERIOD_S * TICKS_PER_S * 4) !== 0) return;
+  const owners = new Set(
+    state.armies
+      .filter((a) => a.dir && a.dir.mode !== 'idle' && a.dir.target >= 0)
+      .map((a) => a.owner),
+  );
+  for (const owner of [...owners].sort((a, b) => a - b)) stageReserve(state, owner);
 }

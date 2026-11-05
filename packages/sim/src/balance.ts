@@ -23,6 +23,10 @@ export const FRONT_ALLOC_TICKS = 50;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;
+/** Наступление без шага и боя дольше этого, тиков, командир меняет: оси — на другой участок, нечем бить — оборона. */
+export const OFFENSIVE_STALL_TICKS = 300;
+/** Через сколько тиков армия во временной обороне пробует наступать снова. */
+export const OFFENSIVE_RETRY_TICKS = 200;
 /**
  * Период вызова commander для игрока (все его армии с автокомандованием — в один тик; игроки
  * распределены по тикам по id), тиков (07-controls.md, CR-006).
@@ -260,12 +264,12 @@ export const EXPAND_STORM_GAP = 2;
 export const EXPAND_COMPACT_WEIGHT = 3;
 /** Слияние мелочи: отряд меньше порога стягивается к ближайшему своему в радиусе, раз в период. */
 export const MERGE_SMALL_TINY: Fp = fp(25);
-/** В «толпе» с излишком отрядов над гексами линии мелочью считается всё, что меньше этого. */
+/** Мелочью в спокойном месте у армии без плана, у резерва и у армии с избытком отрядов считается всё, что меньше этого. */
 export const MERGE_SMALL_BELOW: Fp = fp(150);
-export const CONSOLIDATE_CROWD = 12;
 export const MERGE_SMALL_RADIUS = 4;
 /** Предел отряда при слиянии мелочи и при вливании колонны в затор, солдат. */
-export const CONSOLIDATE_MAX: Fp = fp(300);
+export const CONSOLIDATE_CROWD = 12;
+export const CONSOLIDATE_MAX: Fp = fp(400);
 /** Мелочь не стягивается, пока враг ближе стольких гексов: фронт у врага не трогаем. */
 export const CONSOLIDATE_SAFE = 3;
 export const CONSOLIDATE_PERIOD_S = 2;

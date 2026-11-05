@@ -46,7 +46,8 @@ export function consolidate(state: MatchState): void {
     else groups.set(key, [u]);
   }
   // Размер войска игрока: в толпе (больше CONSOLIDATE_CROWD отрядов) мелочь — всё меньше MERGE_SMALL_BELOW,
-  // иначе только совсем крошечные отряды.
+  // иначе только совсем крошечные отряды. Отрядов в каждой армии (резерв — null): излишек над
+  // гексами линии разрешает слияние.
   const crowd = new Map<number, number>();
   const perArmy = new Map<number | null, number>();
   for (const u of allUnits(state)) {
@@ -57,19 +58,32 @@ export function consolidate(state: MatchState): void {
   const lineHexes = new Map(
     state.plans.map((p) => [p.armyId, planHexes(state, p).length] as const),
   );
+
+  const armyById = new Map(state.armies.map((x) => [x.id, x] as const));
   for (const units of groups.values()) {
     const armyId = units[0]?.armyId ?? null;
-    const surplus = armyId === null || (perArmy.get(armyId) ?? 0) > (lineHexes.get(armyId) ?? 0);
+    const army = armyId === null ? undefined : armyById.get(armyId);
+    // Мелочь стягивается сама у резерва, у армии с законченным направлением (`idle`) и у армии с
+    // планом при избытке отрядов над гексами линии (иначе в линии появились бы дыры). Армии,
+    // которыми игрок управляет вручную, и рой на ничьей земле остаются как расставлены.
+    const isPlanned = armyId !== null && planned.has(armyId);
+    const surplus =
+      armyId === null ||
+      army?.dir?.mode === 'idle' ||
+      (isPlanned && (perArmy.get(armyId) ?? 0) > (lineHexes.get(armyId) ?? 0));
+    // Совсем крошечный отряд бесполезен где угодно; больший — только в спокойном месте (не рядом с
+    // врагом: фронт у врага не трогаем).
     const crowded = surplus && (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
-    const below = crowded ? MERGE_SMALL_BELOW : MERGE_SMALL_TINY;
-    // Совсем крошечный отряд бесполезен где угодно; больший — только у армии с планом или в резерве и
-    // не рядом с врагом (роящаяся армия рассыпана намеренно, фронт у врага не трогаем).
-    const calm = (u: Unit): boolean => (u.armyId === null || planned.has(u.armyId)) && !nearFoe(u);
+    const calm = (u: Unit): boolean => crowded && !nearFoe(u);
     const small = units.filter(
-      (u) => free(u) && (u.soldiers < MERGE_SMALL_TINY || (u.soldiers < below && calm(u))),
+      (u) =>
+        free(u) && (u.soldiers < MERGE_SMALL_TINY || (u.soldiers < MERGE_SMALL_BELOW && calm(u))),
     );
     if (small.length === 0 || units.length < 2) continue;
+    const smallIds = new Set(small.map((u) => u.id));
     const taken = new Set<number>();
+    // Крупный отряд, к которому идут мелкие, принимает несколько за раз, пока не наберёт предел.
+    const incoming = new Map<number, number>();
     for (const a of small) {
       if (taken.has(a.id)) continue;
       const at = hexFromId(a.hex, width);
@@ -79,7 +93,7 @@ export function consolidate(state: MatchState): void {
         if (b.id === a.id || taken.has(b.id) || !free(b)) continue;
         // Мелкий идёт к крупному; из двух мелких — к меньшему id: пара не расходится.
         if (b.soldiers < a.soldiers || (b.soldiers === a.soldiers && b.id > a.id)) continue;
-        if (a.soldiers + b.soldiers > CONSOLIDATE_MAX) continue;
+        if (a.soldiers + b.soldiers + (incoming.get(b.id) ?? 0) > CONSOLIDATE_MAX) continue;
         const d = distance(at, hexFromId(b.hex, width));
         if (d <= MERGE_SMALL_RADIUS && d < bestD) {
           best = b;
@@ -88,7 +102,8 @@ export function consolidate(state: MatchState): void {
       }
       if (!best) continue;
       taken.add(a.id);
-      taken.add(best.id);
+      if (smallIds.has(best.id)) taken.add(best.id);
+      else incoming.set(best.id, (incoming.get(best.id) ?? 0) + a.soldiers);
       if (best.hex === a.hex) {
         mergeUnits(state, [a, best]);
         continue;

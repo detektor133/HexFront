@@ -8,7 +8,7 @@ import { pickAxes, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
 import { OK, rejected, type Validation } from './types.ts';
-import { AXIS_DONE_PERCENT, AXIS_MAX, AXIS_SOLDIERS } from '../balance.ts';
+import { AXIS_DONE_PERCENT, AXIS_MAX, AXIS_SOLDIERS, OFFENSIVE_RETRY_TICKS } from '../balance.ts';
 import { commanderLine } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
@@ -415,7 +415,33 @@ export function continueStrike(state: MatchState, army: Army): void {
   if (!dir || dir.mode !== 'attack') return;
   const strike = strikeFront(state, army.owner, { target: dir.target, soldiers: army.wanted ?? 1 });
   if (strike.edges.length > 0 && startStrike(state, army, dir.target, strike)) return;
-  army.dir = { target: dir.target, mode: 'hold' };
+  // Бить пока нечем: временная оборона, через OFFENSIVE_RETRY_TICKS армия попробует снова.
+  army.dir = { target: dir.target, mode: 'hold', resume: state.tick + OFFENSIVE_RETRY_TICKS };
+}
+
+/**
+ * Наступление встало (нет шага и боя OFFENSIVE_STALL_TICKS): командир отменяет стоящие оси и ищет
+ * новые на другом участке; если ударить некуда — армия уходит во временную оборону и вернётся к
+ * наступлению позже, а не стоит без дела.
+ */
+export function reshuffleStrike(state: MatchState, army: Army): void {
+  const dir = army.dir;
+  const plan = state.plans.find((p) => p.armyId === army.id);
+  if (!dir || dir.mode !== 'attack' || plan?.kind !== 'front' || !plan.offensive) return;
+  const stalled = plan.offensive.edges;
+  const cmd = { target: dir.target, soldiers: army.wanted ?? 1 };
+  const strike = strikeFront(state, army.owner, cmd, stalled, strikeAxes(army));
+  const fresh = strikeLines(state, army, dir.target, strike);
+  if (fresh.length > 0) {
+    setLines(state, army, fresh);
+    const start = { t: 'startOffensive', armyId: army.id } as const;
+    if (validatePlanCommand(state, army.owner, start).ok) {
+      executePlanCommand(state, army.owner, start);
+    }
+    return;
+  }
+  executePlanCommand(state, army.owner, { t: 'clearOffensive', armyId: army.id });
+  army.dir = { target: dir.target, mode: 'hold', resume: state.tick + OFFENSIVE_RETRY_TICKS };
 }
 
 /** Применяет команду holdBorder. Вызывается только после успешной проверки. */

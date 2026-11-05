@@ -4,15 +4,17 @@
 // направление; ничья земля занимается отрядами.
 import { commandAssaults } from './assault.ts';
 import { expandNeutral } from './expand.ts';
-import { AXIS_REFRESH_S, TICKS_PER_S } from '../balance.ts';
+import { AXIS_REFRESH_S, OFFENSIVE_STALL_TICKS, TICKS_PER_S } from '../balance.ts';
 import {
   borderPieces,
   continueStrike,
   refreshStrike,
+  reshuffleStrike,
   releaseDirection,
 } from '../commands/launch.ts';
 import { placeFront } from '../commands/plan.ts';
 import type { MatchState } from '../state/types.ts';
+import { allUnits } from '../state/unit-index.ts';
 
 // Фронт направления — не «едущая» линия, а сама граница с блоком цели: любая смена владельца гекса
 // пересчитывает его целиком и точно. Лишних граней, которые потом надо было бы исправлять, нет.
@@ -48,7 +50,24 @@ export function maintainDirections(state: MatchState): void {
       releaseDirection(state, army);
       continue;
     }
+    // Временная оборона после застоя: время пришло — снова наступаем.
+    if (dir.mode === 'hold' && dir.resume !== undefined && state.tick >= dir.resume) {
+      army.dir = { target: dir.target, mode: 'attack' };
+      continueStrike(state, army);
+      continue;
+    }
     const first = state.plans.find((p) => p.armyId === army.id);
+    // Наступление встало надолго — командир меняет оси или уходит во временную оборону.
+    if (
+      dir.mode === 'attack' &&
+      first?.kind === 'front' &&
+      first.offensive?.active &&
+      state.tick - first.offensive.progressTick > OFFENSIVE_STALL_TICKS &&
+      !allUnits(state).some((u) => u.armyId === army.id && u.inBattle)
+    ) {
+      reshuffleStrike(state, army);
+      continue;
+    }
     // Наступление кончилось — продолжаем до клика или переходим в «держать».
     if (
       dir.mode === 'attack' &&

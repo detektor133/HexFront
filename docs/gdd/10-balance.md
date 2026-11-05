@@ -14,6 +14,8 @@
 | `FRONT_ALLOC_TICKS` | 50 |
 | `OFFENSIVE_STEP_TICKS` | 20 |
 | `OFFENSIVE_STUCK_TICKS` | 100 |
+| `OFFENSIVE_STALL_TICKS` | 300 `[ТЮНИНГ]` |
+| `OFFENSIVE_RETRY_TICKS` | 200 `[ТЮНИНГ]` |
 | `COMMANDER_TICKS` | 5 |
 | `BOT_THINK_TICKS` | 10 |
 | `PREP_TIME_S` | 5 |
@@ -206,7 +208,7 @@
 | `MERGE_SMALL_BELOW` | 150 `[ТЮНИНГ]` |
 | `CONSOLIDATE_CROWD` | 12 `[ТЮНИНГ]` |
 | `MERGE_SMALL_RADIUS` | 4 `[ТЮНИНГ]` |
-| `CONSOLIDATE_MAX` | 300 `[ТЮНИНГ]` |
+| `CONSOLIDATE_MAX` | 400 `[ТЮНИНГ]` |
 | `CONSOLIDATE_SAFE` | 3 `[ТЮНИНГ]` |
 | `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
 | `SWARM_SAFE` | 6 `[ТЮНИНГ]` |
