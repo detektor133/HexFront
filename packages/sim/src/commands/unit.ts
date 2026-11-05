@@ -81,13 +81,18 @@ function validateMove(
 }
 
 // Атака = путь до вражеского гекса; последний шаг движение превращает в атаку.
-function validateAttack(state: MatchState, units: readonly Unit[], target: HexId): Validation {
+function validateAttack(
+  state: MatchState,
+  units: readonly Unit[],
+  target: HexId,
+  via: readonly HexId[] = [],
+): Validation {
   if (!Number.isInteger(target) || target < 0 || target >= state.hexes.owner.length) {
     return rejected('badHex');
   }
   if (units.some((u) => u.type === 'artillery')) return rejected('badOrder');
   if (units.some((u) => !isHostileHex(state, u.owner, target))) return rejected('notEnemy');
-  return validateMove(state, units, target);
+  return validateMove(state, units, target, via);
 }
 
 // Фокус огня: только артиллерия, цель — существующий чужой отряд (или null — автоцель).
@@ -140,7 +145,7 @@ export function validateUnitCommand(
     case 'move':
       return validateMove(state, owned.units, cmd.to, cmd.via);
     case 'attack':
-      return validateAttack(state, owned.units, cmd.target);
+      return validateAttack(state, owned.units, cmd.target, cmd.via);
     case 'bombard':
       return validateBombard(state, owned.units[0], cmd.targetUnitId);
     case 'split':
@@ -232,7 +237,7 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
         const path =
           (cmd.t === 'move'
             ? routePath(state, a, cmd.via ?? [], cmd.to)
-            : findPath(state, a.hex, cmd.target, a.type, a.owner)) ?? [];
+            : routePath(state, a, cmd.via ?? [], cmd.target)) ?? [];
         // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
         const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
         if (!sameStep) stop(a);

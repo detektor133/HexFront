@@ -244,3 +244,27 @@ export function hexSupplyEff(state: MatchState, owner: number, hex: number): Fp 
   }
   return best as Fp;
 }
+
+/**
+ * Уровень снабжения каждого своего гекса: лучшая сеть игрока, доля её производства (R) на потери
+ * пути до гекса. Для карты снабжения: чужие гексы — 0.
+ * @returns байт на гекс: 0 — не свой, иначе 1 + процент снабжения (1..101)
+ */
+export function supplyLevels(state: MatchState, owner: number): Uint8Array {
+  const out = new Uint8Array(state.hexes.owner.length);
+  state.hexes.owner.forEach((o, id) => {
+    if (o === owner) out[id] = 1;
+  });
+  const loss = lossMap(state, owner);
+  for (const net of state.networks) {
+    if (net.owner !== owner) continue;
+    const dist = lossFrom(state, owner, net.id, loss);
+    const ratio = state.supplyRatios.get(net.id) ?? (FP as Fp);
+    dist.forEach((d, id) => {
+      if (d === UNREACHED || state.hexes.owner[id] !== owner) return;
+      const level = fpMul(ratio, Math.max(0, FP - d) as Fp);
+      out[id] = Math.max(out[id] ?? 0, 1 + intDiv(level * 100, FP));
+    });
+  }
+  return out;
+}

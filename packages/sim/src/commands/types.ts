@@ -14,7 +14,13 @@ export type Command =
       /** Промежуточные точки маршрута по порядку, не больше MAX_VIA_POINTS (CR-012). */
       readonly via?: readonly HexId[];
     }
-  | { readonly t: 'attack'; readonly unitIds: readonly number[]; readonly target: HexId }
+  | {
+      readonly t: 'attack';
+      readonly unitIds: readonly number[];
+      readonly target: HexId;
+      /** Промежуточные точки перед атакой — цепочка приказов Shift+ПКМ, не больше MAX_VIA_POINTS. */
+      readonly via?: readonly HexId[];
+    }
   | {
       readonly t: 'assignFront';
       readonly armyId: number;

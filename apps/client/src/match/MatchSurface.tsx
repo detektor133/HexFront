@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { OnboardingHints } from './OnboardingHints.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
@@ -274,6 +275,15 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           tool={sb.tool}
           onTool={sb.setTool}
           style={styleFor('bottom-panel')}
+        />
+      )}
+      {view && !debug && (
+        <MapTools
+          mapMode={sb.mapModes.mapMode}
+          build={sb.mapModes.build}
+          setMapMode={sb.mapModes.setMapMode}
+          setBuild={sb.mapModes.setBuild}
+          bottom={dockH + 12}
         />
       )}
       {(loaded === 'error' || sb.error) && (

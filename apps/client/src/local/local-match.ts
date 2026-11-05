@@ -1,7 +1,7 @@
 // Страница ↔ Web Worker: запуск локального матча и отправка команд.
 import type { Command } from '@hexfront/sim';
 
-import type { FromWorker, ToWorker } from './messages.ts';
+import type { FromWorker, MapMaskMode, ToWorker } from './messages.ts';
 
 export interface LocalMatch {
   send(cmd: Command): void;
@@ -19,6 +19,8 @@ export interface LocalMatch {
     to: number,
     via: readonly number[],
   ): void;
+  /** Ответ придёт в onMessage сообщением mapMask с тем же requestId. */
+  requestMask?(requestId: number, mode: MapMaskMode): void;
   ack(seq: number): void;
   dispose(): void;
 }
@@ -70,6 +72,7 @@ export function startLocalMatch(
     select: (hex) => post({ t: 'select', hex }),
     previewPath: (requestId, unitIds, to, via) =>
       post({ t: 'previewPath', requestId, unitIds, to, via }),
+    requestMask: (requestId, mode) => post({ t: 'mapMask', requestId, mode }),
     ack: (seq) => post({ t: 'ack', seq }),
     dispose: () => worker.terminate(),
   };

@@ -4,6 +4,9 @@ import type { SnapshotMessage } from '@hexfront/protocol';
 import {
   canFoundCity,
   previewPath,
+  buildMask,
+  supplyLevels,
+  type BuildMaskKind,
   type PathPreview,
   checkConstruction,
   checkRecruit,
@@ -32,7 +35,7 @@ import {
   type RejectReason,
 } from '@hexfront/sim';
 
-import type { RecruitOption, Selection, ViewPayload } from './messages.ts';
+import type { MapMaskMode, RecruitOption, Selection, ViewPayload } from './messages.ts';
 
 /**
  * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
@@ -48,6 +51,8 @@ export interface LocalEngine {
   /** Путь и время для выбранных отрядов игрока; состояние не меняется. */
   previewPath(unitIds: readonly number[], to: number, via: readonly number[]): PathPreview | null;
   setView(playerId: number | null, fog: boolean): void;
+  /** Маска режима карты: снабжение или «где можно строить»; состояние не меняется. */
+  mapMask(mode: MapMaskMode): Uint8Array;
   select(hex: number | null): void;
   /** Один тик симуляции; возвращает снимок для страницы. */
   tick(): ViewPayload;
@@ -188,6 +193,12 @@ export function createLocalEngine(
     },
     select(hex) {
       selected = hex;
+    },
+    mapMask(mode) {
+      const me = observerId ?? HUMAN_ID;
+      if (mode === 'supply') return supplyLevels(state, me);
+      const kind = mode.slice('build:'.length) as BuildMaskKind;
+      return buildMask(state, me, kind);
     },
     previewPath(unitIds, to, via) {
       return previewPath(state, observerId ?? 0, unitIds, to, via);

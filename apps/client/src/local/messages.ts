@@ -46,6 +46,9 @@ export interface Selection {
   readonly recruit: readonly RecruitOption[];
 }
 
+/** Режим карты: снабжение или стройка (build:city, build:fort, build:depot, build:improve). */
+export type MapMaskMode = 'supply' | 'build:city' | 'build:fort' | 'build:depot' | 'build:improve';
+
 export type ToWorker =
   | {
       readonly t: 'start';
@@ -77,6 +80,7 @@ export type ToWorker =
       readonly to: number;
       readonly via: readonly number[];
     }
+  | { readonly t: 'mapMask'; readonly requestId: number; readonly mode: MapMaskMode }
   | { readonly t: 'ack'; readonly seq: number };
 
 export interface ViewPayload {
@@ -112,8 +116,16 @@ export interface PathPreviewReply {
   readonly preview: PathPreview | null;
 }
 
+export interface MapMaskReply {
+  readonly t: 'mapMask';
+  readonly requestId: number;
+  readonly mode: MapMaskMode;
+  readonly mask: Uint8Array;
+}
+
 export type FromWorker =
   | ViewPayload
+  | MapMaskReply
   | DeltaViewPayload
   | PathPreviewReply
   | { readonly t: 'error'; readonly errors: readonly string[] };

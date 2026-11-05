@@ -1,7 +1,7 @@
 // Слой песочницы /dev/sandbox (02/T10–T11, 03/T12): территории, дороги пунктиром, города, стройки,
 // отряды и бои, выбранный гекс. Дороги лежат под узорами рельефа, города, стройки и отряды — над ними
 // (style-guide, слои).
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Text } from 'pixi.js';
 
 import {
   LINK,
@@ -35,6 +35,7 @@ import {
 import { createUnitLayer, type UnitLayer } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
+import { createMaskGpu, type MaskKind } from '../render/mask-gpu.ts';
 import { createTerritoryGpu } from '../render/territory-gpu.ts';
 import { playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -72,6 +73,10 @@ export interface EconomyLayer {
   setPlanHover(world: Point | null): void;
   /** Подсветка пути перестройки снабжения из карточки города. */
   setRoadPreview(path: readonly number[] | null): void;
+  /** Режим карты: маска по гексам (снабжение или стройка) или null — обычная карта. */
+  setMapMask(kind: MaskKind | null, mask: Uint8Array | null): void;
+  /** Номера точек цепочки приказов Shift+ПКМ на карте (пусто — убрать). */
+  setQueueMarks(hexes: readonly number[]): void;
   /** Кольцо «сколько взять» при вытягивании части из фишки. */
   setSplit(o: SplitOverlay | null): void;
   /**
@@ -185,6 +190,7 @@ export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | 
 /** Создаёт слой; данные приходят снимками playerView 10 раз в секунду. */
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const territory = createTerritoryGpu(map, radius);
+  const maskGpu = createMaskGpu(map, radius);
   const constructionEffects = new Graphics();
   const cityEffects = new Graphics();
   const roads = new Graphics();
@@ -193,6 +199,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   marks.context.batchMode = 'batch';
   const labels = new Container();
   const mapIcons = createMapIconLayer();
+  const queueMarks = new Container();
 
   const container = new Container();
   container.addChild(territory.fill, roads, roadPreview, constructionEffects, cityEffects);
@@ -205,10 +212,12 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const territoryLabels = new Container();
   // Слои карты (art/style-guide.md): армии (10) ниже подписей городов и государств (12).
   top.addChild(
+    maskGpu.container,
     territory.over,
     planLayer.container,
     marks,
     mapIcons.container,
+    queueMarks,
     unitLayer.container,
     labels,
     territoryLabels,
@@ -501,6 +510,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       level = l;
       unitLayer.setScale(s);
       territory.setScale(s);
+      maskGpu.setScale(s);
       redraw();
       if (view) drawRoads(view);
     },
@@ -554,6 +564,34 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     setPlanHover(world) {
       planLayer.setHover(world);
     },
+    setQueueMarks(hexes) {
+      queueMarks
+        .removeChildren()
+        .forEach((child) => child.destroy({ children: true, context: true }));
+      hexes.forEach((hex, i) => {
+        const at = center(hex);
+        const badge = new Graphics()
+          .circle(at.x, at.y, radius * 0.34)
+          .fill(tokens.ui.surface)
+          .stroke({ color: tokens.selection.color, width: 1.5 });
+        const label = new Text({
+          text: String(i + 1),
+          style: {
+            fontFamily: tokens.font.ui.family,
+            fontWeight: '500',
+            fontSize: radius * 0.5,
+            fill: tokens.ui.ink,
+          },
+        });
+        label.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
+        label.anchor.set(0.5);
+        label.position.set(at.x, at.y);
+        queueMarks.addChild(badge, label);
+      });
+    },
+    setMapMask(kind, mask) {
+      maskGpu.setMask(kind, mask);
+    },
     setRoadPreview(path) {
       roadPreviewPath = path;
       redraw();
@@ -577,6 +615,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     destroy() {
       territory.destroy();
+      maskGpu.destroy();
       container.destroy({ children: true, context: true });
       top.destroy({ children: true, context: true });
     },

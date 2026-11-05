@@ -17,6 +17,8 @@ export { applyCommands, validate } from './commands/apply.ts';
 export { MAX_VIA_POINTS } from './commands/unit.ts';
 export * from './step.ts';
 export * from './queries/city.ts';
+export * from './queries/map-masks.ts';
+export { supplyLevels } from './state/supply.ts';
 export * from './queries/path-preview.ts';
 export * from './queries/road-path.ts';
 export * from './state/network.ts';

@@ -12,11 +12,13 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { applyHudPreview, readHudPreview } from '../dev/hud-preview.ts';
 import { createOrderHooks } from '../dev/order-hooks.ts';
+import { EMPTY_QUEUE, queueOrder, remainingPoints, type OrderQueue } from '../dev/order-queue.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
@@ -189,6 +191,7 @@ interface Sandbox {
   readonly picked: Picked;
   readonly menu: TerritoryMenuState | null;
   closeMenu(): void;
+  readonly mapModes: MapModes;
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   readonly army: number | null;
@@ -262,18 +265,33 @@ export function useSandbox(
     snapshotTelemetryRef.current = createSnapshotTelemetry();
   }
 
-  const pick = useCallback((p: Picked) => {
-    if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
-    pickedRef.current = p;
-    setPicked(p);
-    // Подсвечивается что-то одно: выбраны все отряды армии — армия выбрана сама; выбран гекс —
-    // армия не выбрана (07-controls.md, «Что выбрано»).
+  const mapModes = useMapModes(matchRef, layerRef);
+  const mapModesRef = useRef(mapModes);
+  mapModesRef.current = mapModes;
+
+  const queueRef = useRef<OrderQueue>(EMPTY_QUEUE);
+  const syncQueueMarks = useCallback(() => {
     const v = viewRef.current;
-    if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
-    else if (p.hex !== null) setArmyRef.current(null);
-    layerRef.current?.setRoadPreview(null);
-    if (v) layerRef.current?.setView(v, p);
+    const points = v ? remainingPoints(v, pickedRef.current, queueRef.current) : [];
+    layerRef.current?.setQueueMarks(points);
   }, []);
+
+  const pick = useCallback(
+    (p: Picked) => {
+      if (p.hex !== pickedRef.current.hex) matchRef.current?.select(p.hex);
+      pickedRef.current = p;
+      setPicked(p);
+      // Подсвечивается что-то одно: выбраны все отряды армии — армия выбрана сама; выбран гекс —
+      // армия не выбрана (07-controls.md, «Что выбрано»).
+      const v = viewRef.current;
+      if (v && p.units.length > 0) setArmyRef.current(armySelection(v, p.units).whole);
+      else if (p.hex !== null) setArmyRef.current(null);
+      layerRef.current?.setRoadPreview(null);
+      if (v) layerRef.current?.setView(v, p);
+      syncQueueMarks();
+    },
+    [syncQueueMarks],
+  );
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
   const setFog = useCallback((on: boolean) => {
     matchRef.current?.setView(observerIdRef.current, on);
@@ -403,6 +421,7 @@ export function useSandbox(
       applyStartCameraToView(view);
       workerTelemetryRef.current = m.telemetry ?? null;
       layerRef.current?.setView(view, pickedRef.current);
+      syncQueueMarks();
       setMsg(applied);
       const nextEvents = appendEvents(
         eventsRef.current,
@@ -442,6 +461,7 @@ export function useSandbox(
         if (m.t === 'error') return setError(m.errors.join('; '));
         // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
         if (m.t === 'pathPreview') return;
+        if (m.t === 'mapMask') return mapModesRef.current.handleReply(m);
         scheduleMessage(m);
       },
       {
@@ -480,7 +500,7 @@ export function useSandbox(
       h: { q: number; r: number },
       kind: TapKind,
       world: Point,
-      _shift?: boolean,
+      shift?: boolean,
       screen?: Point,
     ): void => {
       const current = viewRef.current;
@@ -489,6 +509,26 @@ export function useSandbox(
         return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
+      // Shift+ПКМ: цепочка приказов — точка добавляется после предыдущих, отряды идут сразу.
+      if (
+        kind === 'order' &&
+        shift &&
+        pickedRef.current.units.length > 0 &&
+        mapModesRef.current.build === null
+      ) {
+        const next = queueOrder(current, pickedRef.current, hex, queueRef.current);
+        if (next) {
+          queueRef.current = next.queue;
+          match.send(next.cmd);
+          syncQueueMarks();
+        }
+        return;
+      }
+      // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
+      if (mapModesRef.current.build !== null) {
+        if (kind === 'order') return mapModesRef.current.setBuild(null);
+        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd))) return;
+      }
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {
         return;
@@ -515,12 +555,18 @@ export function useSandbox(
       centerOn: (hex, durationMs) => mapViewRef.current?.centerOn(hex, durationMs),
     });
     // Приказ (ПКМ, отпущенное удержание): «идти» или «атаковать» сразу, без подтверждения.
-    const order = createOrderHandler({
+    const plainOrder = createOrderHandler({
       getView: () => viewRef.current,
       getPicked: () => pickedRef.current,
       send: (command) => match.send(command),
       pick,
     });
+    // Обычный приказ заменяет цепочку Shift+ПКМ.
+    const order = (hex: number): void => {
+      queueRef.current = EMPTY_QUEUE;
+      plainOrder(hex);
+      syncQueueMarks();
+    };
     const hooks = createOrderHooks({
       map,
       radius: tokens.map.hexRadius,
@@ -629,6 +675,7 @@ export function useSandbox(
     picked,
     menu,
     closeMenu: () => setMenu(null),
+    mapModes,
     lastReject,
     tool,
     army,

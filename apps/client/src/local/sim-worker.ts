@@ -165,6 +165,14 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
         preview: engine?.previewPath(msg.unitIds, msg.to, msg.via) ?? null,
       });
       return;
+    case 'mapMask':
+      post({
+        t: 'mapMask',
+        requestId: msg.requestId,
+        mode: msg.mode,
+        mask: engine?.mapMask(msg.mode) ?? new Uint8Array(0),
+      });
+      return;
     case 'ack':
       if (msg.seq !== snapshotSeq) return;
       lastAckMs = performance.now() - lastSnapshotAt;

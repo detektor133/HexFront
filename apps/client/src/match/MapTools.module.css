@@ -1,0 +1,47 @@
+/* Правый нижний угол: режимы карты и молоточек. Кнопки — тот же квадрат, что у остальных иконок HUD. */
+.root {
+  position: fixed;
+  right: var(--space-lg);
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  pointer-events: none;
+}
+
+.column,
+.row {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  pointer-events: auto;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.column {
+  flex-direction: column;
+}
+
+.button,
+.active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-card);
+}
+
+.active {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}

@@ -50,6 +50,14 @@ const sandbox = {
   setTool: vi.fn(),
   setArmy: vi.fn(),
   setRoadPreview: vi.fn(),
+  mapModes: {
+    mapMode: 'normal' as const,
+    build: null,
+    setMapMode: vi.fn(),
+    setBuild: vi.fn(),
+    handleReply: vi.fn(),
+    clickHex: vi.fn(),
+  },
   setDockHeight: vi.fn(),
   pixiTelemetry: () => ({
     objects: 0,

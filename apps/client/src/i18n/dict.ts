@@ -1,6 +1,13 @@
 // Словари интерфейса (CONVENTIONS.md §1: тексты UI — только через i18n).
 
 const ru = {
+  'mapTools.build': 'Строительство',
+  'mapTools.city': 'Основать город',
+  'mapTools.depot': 'Склад',
+  'mapTools.fort': 'Укрепление',
+  'mapTools.improve': 'Благоустройство',
+  'mapTools.normal': 'Обычная карта',
+  'mapTools.supply': 'Карта снабжения',
   'tutorial.label': 'Обучение',
   'tutorial.skip': 'Пропустить',
   'tutorial.back': 'Назад',
@@ -360,6 +367,13 @@ const ru = {
 export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
+  'mapTools.build': 'Build',
+  'mapTools.city': 'Found a city',
+  'mapTools.depot': 'Depot',
+  'mapTools.fort': 'Fortification',
+  'mapTools.improve': 'Improvement',
+  'mapTools.normal': 'Normal map',
+  'mapTools.supply': 'Supply map',
   'tutorial.label': 'Tutorial',
   'tutorial.skip': 'Skip',
   'tutorial.back': 'Back',
