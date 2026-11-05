@@ -14,6 +14,8 @@ export interface CityGlyph {
   readonly color: string;
   readonly isCapital: boolean;
   readonly isolated: boolean;
+  /** На гексе города есть здание: знак сдвигается, чтобы не перекрывать его. */
+  readonly shared: boolean;
 }
 
 export interface CityLabel {
@@ -50,16 +52,6 @@ export function citySize(hexRadius: number, level: number): number {
   return hexRadius * share;
 }
 
-function star(g: Graphics, c: Point, outer: number, inner: number): void {
-  const pts: number[] = [];
-  for (let i = 0; i < 10; i += 1) {
-    const r = i % 2 === 0 ? outer : inner;
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
-    pts.push(c.x + r * Math.cos(a), c.y + r * Math.sin(a));
-  }
-  g.poly(pts).fill(city.fill);
-}
-
 // Пометка разрыва у изолированного города: два коротких штриха status.danger справа сверху.
 function drawBreak(g: Graphics, c: CityGlyph, r: number, k: number): void {
   const b = r * BREAK_SHARE;
@@ -71,8 +63,8 @@ function drawBreak(g: Graphics, c: CityGlyph, r: number, k: number): void {
 }
 
 /**
- * Рисует диски городов; k = 1 / масштаб камеры — только для экранной толщины обводки.
- * @returns иконки замка, которые нужно поставить поверх дисков
+ * Рисует пометки разрыва у изолированных городов; k = 1 / масштаб камеры — для экранной толщины.
+ * @returns иконки городов (замок, у столицы — звезда) цвета владельца
  */
 export function drawCities(
   g: Graphics,
@@ -83,16 +75,16 @@ export function drawCities(
   const icons: MapIcon[] = [];
   for (const c of cities) {
     const r = citySize(hexRadius, c.level);
-    g.circle(c.at.x, c.at.y, r)
-      .fill(c.color)
-      .stroke({ color: city.fill, width: city.outline * k });
-    icons.push({ kind: 'city', at: c.at, size: r * ICON_FIT });
-    // Столица — звезда-значок на углу диска.
-    if (c.isCapital) {
-      const badge = { x: c.at.x + r * 0.8, y: c.at.y - r * 0.8 };
-      star(g, badge, r * city.capitalStarOuter * 0.9, r * city.capitalStarInner * 0.9);
-    }
-    if (c.isolated) drawBreak(g, c, r, k);
+    // Рядом со зданием на том же гексе город сдвинут влево-вниз и чуть меньше.
+    const scale = c.shared ? 0.85 : 1;
+    const at = c.shared ? { x: c.at.x - hexRadius * 0.2, y: c.at.y + hexRadius * 0.12 } : c.at;
+    icons.push({
+      kind: c.isCapital ? 'capital' : 'city',
+      at,
+      color: c.color,
+      size: r * ICON_FIT * scale,
+    });
+    if (c.isolated) drawBreak(g, { ...c, at }, r * scale, k);
   }
   return icons;
 }

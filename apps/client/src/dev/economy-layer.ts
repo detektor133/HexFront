@@ -371,6 +371,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   // Знаки строений — только у гексов, где что-то построено, а не по объекту на каждый гекс карты.
   function builtHexes(v: PlayerView): ConstructionGlyph[] {
     const out: ConstructionGlyph[] = [];
+    const cityHexes = new Set(v.cities.map((c) => c.hex));
     v.hexes.building.forEach((building, hex) => {
       const improvement = v.hexes.improvement[hex] ?? 0;
       if (building === 0 && improvement <= 0) return;
@@ -379,6 +380,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         color: playerLine(v.hexes.owner[hex] ?? -1),
         building,
         improvement,
+        city: cityHexes.has(hex),
       });
     });
     return out;
@@ -393,6 +395,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       color: c.owner < 0 ? tokens.neutral.line : playerLine(c.owner),
       isCapital: c.isCapital,
       isolated: c.isolated,
+      shared: (v.hexes.building[c.hex] ?? 0) !== 0 || (v.hexes.improvement[c.hex] ?? 0) > 0,
     }));
     mapIcons.sync([
       ...drawCities(marks, glyphs, k, radius),

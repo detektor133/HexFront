@@ -68,9 +68,12 @@ function targets(
   const marks = focus.map((h) => hexFromId(h, width));
   const away = (h: HexId): number =>
     marks.length === 0 ? 0 : Math.min(...marks.map((m) => distance(m, hexFromId(h, width))));
-  // Гексы городов — не цель занятия: ничей город берёт только `storm`, когда сил хватает, иначе
-  // одиночка шла бы в город пешком и гибла у стен.
-  const busy = new Set([...allUnits(state).map((u) => u.hex), ...state.cities.map((c) => c.hex)]);
+  // Город с гарнизоном — не цель занятия: его берёт только `storm`, когда сил хватает, иначе
+  // одиночка шла бы в город пешком и гибла у стен. Город без гарнизона занимается как обычный гекс.
+  const busy = new Set([
+    ...allUnits(state).map((u) => u.hex),
+    ...state.cities.filter((c) => c.defenders > 0).map((c) => c.hex),
+  ]);
   const out: HexId[] = [];
   for (let h = 0; h < state.hexes.owner.length; h += 1) {
     if (state.hexes.owner[h] !== NEUTRAL || state.map.terrain[h] === TERRAIN.water) continue;
@@ -175,7 +178,7 @@ function storm(
       .map((u) => (u.order === 'attack' ? u.target : (u.path.at(-1) ?? -1))),
   );
   for (const city of state.cities) {
-    if (city.owner !== NEUTRAL || underAssault.has(city.hex)) continue;
+    if (city.owner !== NEUTRAL || city.defenders <= 0 || underAssault.has(city.hex)) continue;
     // Город далеко от своей земли стал бы анклавом: сначала земля дорастает до него.
     if (!nearOwn(state, city.hex, army.owner, EXPAND_STORM_GAP)) continue;
     if (

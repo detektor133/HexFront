@@ -43,7 +43,8 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     owner: NEUTRAL,
     level: c.level,
     name: c.name,
-    defenders: (c.garrison * FP) as Fp,
+    // Ничьи города без гарнизона: ценность города в уровне и экономике, а не в обороне (решение владельца).
+    defenders: 0 as Fp,
     defenseOrg: ORG_MAX,
     inBattle: false,
     captureTicks: 0,

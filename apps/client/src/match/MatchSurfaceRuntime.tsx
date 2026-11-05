@@ -465,7 +465,7 @@ export function useSandbox(
     const initialSelect = params.get('select');
     if (initialSelect !== null) pick({ hex: Number(initialSelect), units: [], target: null });
     const initialScale = Number(params.get('scale'));
-    // Меню чужой страны: ПКМ (удержание пальцем) без выбранных отрядов по земле другого игрока.
+    // Меню чужой страны: ЛКМ или ПКМ (удержание пальцем) без выбранных отрядов по земле другого игрока.
     const openMenuAt = (hex: number, screen: Point | undefined): boolean => {
       const current = viewRef.current;
       if (!current || !screen) return false;
@@ -495,9 +495,13 @@ export function useSandbox(
       }
       if (kind === 'select') {
         const hit = layerRef.current?.unitsAt(world) ?? [];
-        return pick(
-          hit.length > 0 ? selectUnits(current, pickedRef.current, hit) : selectHexOnly(hex),
-        );
+        if (hit.length > 0) return pick(selectUnits(current, pickedRef.current, hit));
+        // ЛКМ по чужой или ничьей земле — то же меню, что по ПКМ; карточка чужого гекса не открывается.
+        if ((current.hexes.owner[hex] ?? -1) !== current.playerId) {
+          if (pickedRef.current.units.length === 0) openMenuAt(hex, screen);
+          return pick(NOTHING_PICKED);
+        }
+        return pick(selectHexOnly(hex));
       }
       order(hex);
     };

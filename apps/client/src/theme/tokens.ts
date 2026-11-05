@@ -53,96 +53,120 @@ export const tokens = {
         "line": "#0E7C6B"
       },
       {
-        "id": "brick",
-        "line": "#B4432A"
+        "id": "berry",
+        "line": "#7E2256"
+      },
+      {
+        "id": "bronze",
+        "line": "#814E11"
       },
       {
         "id": "cobalt",
-        "line": "#2757B8"
-      },
-      {
-        "id": "mustard",
-        "line": "#946A08"
-      },
-      {
-        "id": "plum",
-        "line": "#7B3F8C"
-      },
-      {
-        "id": "forest",
-        "line": "#3F7D2C"
-      },
-      {
-        "id": "crimson",
-        "line": "#B3263E"
-      },
-      {
-        "id": "ocean",
-        "line": "#1D7697"
-      },
-      {
-        "id": "olive",
-        "line": "#636A1C"
-      },
-      {
-        "id": "rose",
-        "line": "#AE4274"
-      },
-      {
-        "id": "indigo",
-        "line": "#3D4A9E"
-      },
-      {
-        "id": "rust",
-        "line": "#94561B"
-      },
-      {
-        "id": "slate",
-        "line": "#4F6475"
-      },
-      {
-        "id": "magenta",
-        "line": "#9E2C8C"
-      },
-      {
-        "id": "pine",
-        "line": "#1E6B4A"
-      },
-      {
-        "id": "amber",
-        "line": "#A9580A"
-      },
-      {
-        "id": "navy",
-        "line": "#243B6B"
-      },
-      {
-        "id": "wine",
-        "line": "#7E2A3E"
-      },
-      {
-        "id": "moss",
-        "line": "#557526"
-      },
-      {
-        "id": "cyan",
-        "line": "#0B7F8E"
-      },
-      {
-        "id": "orchid",
-        "line": "#7F4DAD"
-      },
-      {
-        "id": "cocoa",
-        "line": "#6B4A3A"
-      },
-      {
-        "id": "steel",
-        "line": "#3B6A8A"
+        "line": "#1B6BCF"
       },
       {
         "id": "scarlet",
-        "line": "#B8381F"
+        "line": "#D1282E"
+      },
+      {
+        "id": "fern",
+        "line": "#2E4F00"
+      },
+      {
+        "id": "violet",
+        "line": "#9748C5"
+      },
+      {
+        "id": "indigo",
+        "line": "#3A3F86"
+      },
+      {
+        "id": "olive",
+        "line": "#756F1C"
+      },
+      {
+        "id": "brick",
+        "line": "#7D2C1B"
+      },
+      {
+        "id": "fuchsia",
+        "line": "#D40078"
+      },
+      {
+        "id": "grass",
+        "line": "#407B0E"
+      },
+      {
+        "id": "purple",
+        "line": "#741193"
+      },
+      {
+        "id": "garnet",
+        "line": "#9B3648"
+      },
+      {
+        "id": "copper",
+        "line": "#B2501B"
+      },
+      {
+        "id": "lavender",
+        "line": "#6D63AE"
+      },
+      {
+        "id": "emerald",
+        "line": "#0D6731"
+      },
+      {
+        "id": "mauve",
+        "line": "#A1518C"
+      },
+      {
+        "id": "grape",
+        "line": "#74478C"
+      },
+      {
+        "id": "raspberry",
+        "line": "#D8074F"
+      },
+      {
+        "id": "azure",
+        "line": "#2D4DC9"
+      },
+      {
+        "id": "ochre",
+        "line": "#8C671E"
+      },
+      {
+        "id": "magenta",
+        "line": "#A20E94"
+      },
+      {
+        "id": "crimson",
+        "line": "#B11909"
+      },
+      {
+        "id": "amethyst",
+        "line": "#693FBB"
+      },
+      {
+        "id": "rose",
+        "line": "#B14A69"
+      },
+      {
+        "id": "mustard",
+        "line": "#6D5703"
+      },
+      {
+        "id": "rust",
+        "line": "#8D4520"
+      },
+      {
+        "id": "moss",
+        "line": "#52600B"
+      },
+      {
+        "id": "coral",
+        "line": "#B04E4C"
       }
     ],
     "minContrastOnWhite": 4.5

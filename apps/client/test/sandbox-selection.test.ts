@@ -88,9 +88,9 @@ describe('песочница: выбор и приказы как в HoI4', () =
     expect(orderHex(view, NOTHING_PICKED, home).cmd).toBeNull();
   });
 
-  it('нейтральный город с гарнизоном — враждебный гекс', () => {
+  it('нейтральный город без гарнизона — не враждебный гекс', () => {
     const neutral = view.cities.find((c) => c.owner < 0);
-    expect(neutral && isHostile(view, neutral.hex)).toBe(true);
+    expect(neutral && isHostile(view, neutral.hex)).toBe(false);
   });
 
   it('рамка выбирает видимую часть собственной фишки, исключая нулевое пересечение', () => {

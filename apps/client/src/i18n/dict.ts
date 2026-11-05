@@ -9,12 +9,12 @@ const ru = {
   'tutorial.expand.title': 'Ничья земля',
   'tutorial.expand.text':
     'Стартовые отряды сами занимают ничью землю роем, от вашей границы наружу. Города берутся, только когда сил хватает.',
-  'tutorial.enemy.title': 'Чужая страна: ПКМ',
+  'tutorial.enemy.title': 'Чужая страна: клик',
   'tutorial.enemy.text':
-    'Правой кнопкой по чужой стране без выбранных отрядов откроется меню: слайдер «сколько солдат», «Наступать» (ИИ сам выберет оси удара и обновит их в бою), «Держать границу» и дипломатия. Из войны выход один — мир.',
-  'tutorial.neutral.title': 'Ничья земля: ПКМ',
+    'Клик (ЛКМ или ПКМ) по чужой стране без выбранных отрядов откроет меню: слайдер «сколько солдат», «Наступать» (ИИ сам выберет оси удара и обновит их в бою), «Держать границу» и дипломатия. Из войны выход один — мир.',
+  'tutorial.neutral.title': 'Ничья земля: клик',
   'tutorial.neutral.text':
-    'ПКМ по ничьей земле открывает меню с кнопкой «Занять»: слайдер задаёт, сколько солдат отправить. Войска растят территорию сплошным пятном.',
+    'Клик (ЛКМ или ПКМ) по ничьей земле открывает меню с кнопкой «Занять»: слайдер задаёт, сколько солдат отправить. Войска растят территорию сплошным пятном.',
   'tutorial.select.title': 'Выбор отрядов: ЛКМ',
   'tutorial.select.text':
     'Левая кнопка по фишке выбирает отряд, рамкой по пустому месту — несколько, двойной клик — все отряды такого типа на экране. Esc снимает выбор.',
@@ -368,10 +368,10 @@ const en: Record<MessageKey, string> = {
   'tutorial.expand.title': 'Neutral land',
   'tutorial.expand.text':
     'Your starting units swarm out to take neutral land from your border outward. Cities are stormed only when you are strong enough.',
-  'tutorial.enemy.title': 'Foreign country: right click',
+  'tutorial.enemy.title': 'Foreign country: click',
   'tutorial.enemy.text':
     'Right-click a foreign country with no units selected to open a menu: a “how many soldiers” slider, “Attack” (the AI picks the axes and refreshes them mid-battle), “Hold the border” and diplomacy. The only way out of a war is peace.',
-  'tutorial.neutral.title': 'Neutral land: right click',
+  'tutorial.neutral.title': 'Neutral land: click',
   'tutorial.neutral.text':
     'Right-click neutral land to open a menu with “Occupy”: the slider sets how many soldiers go. Troops grow your territory as one solid area.',
   'tutorial.select.title': 'Select units: left click',
