@@ -212,7 +212,7 @@
 | `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
 | `SWARM_SAFE` | 6 `[ТЮНИНГ]` |
 | `AXIS_SOLDIERS` | 300 `[ТЮНИНГ]` |
-| `AXIS_MAX` | 4 `[ТЮНИНГ]` |
+| `AXIS_MAX` | 8 `[ТЮНИНГ]` |
 | `AXIS_REFRESH_S` | 5 `[ТЮНИНГ]` |
 | `AXIS_DONE_PERCENT` | 70 `[ТЮНИНГ]` |
 | `BOT_AXIS_EDGES` | 14 `[ТЮНИНГ]` |

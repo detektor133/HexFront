@@ -13,8 +13,10 @@ import { blocOf } from '../commands/launch.ts';
 import { executeUnitCommand, validateUnitCommand } from '../commands/unit.ts';
 import { distance, hexFromId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
+import { isHostileHex } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
+import { adjacentHexes, holeComponents } from '../state/offensive-steps.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -77,6 +79,60 @@ function assault(state: MatchState, army: Army): void {
   }
 }
 
+/** Самый большой котёл (проходимых гексов), который закрывают отдельно от линии наступления. */
+const POCKET_MAX_LAND = 60;
+/** Сколько гексов котла ставится в работу за одно решение. */
+const POCKET_BATCH = 8;
+
+/**
+ * Закрытие котлов: чужие и ничьи куски внутри своей земли берутся независимо от линии наступления.
+ * Заходят гексы котла, прилегающие к своей земле: пустой гекс — одним отрядом, гекс с врагом —
+ * минимальной группой, которой прогноз боя обещает победу. Котёл съедается слоями, как анклав.
+ */
+function closePockets(state: MatchState, owner: number, armies: readonly Army[]): void {
+  const ids = new Set(armies.map((a) => a.id));
+  const free = allUnits(state).filter(
+    (u) => u.owner === owner && u.armyId !== null && ids.has(u.armyId) && ready(u),
+  );
+  if (free.length === 0) return;
+  const { width } = state.map;
+  const at = (hex: number) => hexFromId(hex, width);
+  const heading = new Set(
+    allUnits(state)
+      .filter((u) => u.owner === owner)
+      .map((u) => (u.order === 'attack' ? u.target : (u.path.at(-1) ?? -1))),
+  );
+  const own = (h: number): boolean => state.hexes.owner[h] === owner;
+  const targets: number[] = [];
+  for (const hole of holeComponents(state, owner, POCKET_MAX_LAND)) {
+    for (const h of hole) {
+      if (heading.has(h)) continue;
+      const touches = adjacentHexes(state, h).some(own);
+      if (touches) targets.push(h);
+    }
+  }
+  const used = new Set<number>();
+  for (const hex of targets.slice(0, POCKET_BATCH)) {
+    const pool = free
+      .filter((u) => !used.has(u.id))
+      .sort((a, b) => distance(at(a.hex), at(hex)) - distance(at(b.hex), at(hex)) || a.id - b.id);
+    const hostile = isHostileHex(state, owner, hex);
+    const force: Unit[] = [];
+    for (const unit of pool.slice(0, hostile ? ASSAULT_MAX_UNITS : 1)) {
+      force.push(unit);
+      if (hostile && forecastInState(state, force, hex).outcome !== 'victory') continue;
+      const cmd = hostile
+        ? ({ t: 'attack', unitIds: force.map((u) => u.id), target: hex } as const)
+        : ({ t: 'move', unitIds: [unit.id], to: hex } as const);
+      if (validateUnitCommand(state, owner, cmd).ok) {
+        executeUnitCommand(state, owner, cmd);
+        for (const u of force) used.add(u.id);
+      }
+      break;
+    }
+  }
+}
+
 // Свободный резерв игрока вливается в ближайшую к нему наступающую армию: заказ — минимум,
 // а отряды в тылу без дела — потеря силы.
 function deployReserve(state: MatchState, owner: number, attackers: readonly Army[]): void {
@@ -115,5 +171,6 @@ export function commandAssaults(state: MatchState): void {
   for (const [owner, armies] of byOwner) {
     deployReserve(state, owner, armies);
     for (const army of armies) assault(state, army);
+    closePockets(state, owner, armies);
   }
 }

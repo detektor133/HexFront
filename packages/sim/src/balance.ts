@@ -274,7 +274,7 @@ export const CONSOLIDATE_PERIOD_S = 2;
 export const SWARM_SAFE = 6;
 /** Оси удара направления: одна на каждые AXIS_SOLDIERS солдат заказа, не больше AXIS_MAX. */
 export const AXIS_SOLDIERS = 300;
-export const AXIS_MAX = 4;
+export const AXIS_MAX = 8;
 /** Как часто ИИ обновляет линии идущего наступления, секунд. */
 export const AXIS_REFRESH_S = 5;
 /** Линия считается выполненной, когда взято не меньше этой доли её гексов, процентов. */

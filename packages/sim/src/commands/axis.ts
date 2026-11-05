@@ -23,7 +23,7 @@ export interface Strike {
 /** Сколько солдат приходится на одну грань половины ширины удара: больше войск — шире удар. */
 const SOLDIERS_PER_EDGE = 100;
 const WINDOW_MIN = 2;
-const WINDOW_MAX = 12;
+const WINDOW_MAX = 20;
 const DEPTH = 4;
 /** Запас между осями вдоль границы, граней: две глубины шага, иначе их линии сомкнутся. */
 const AXIS_GAP_EDGES = 4 * DEPTH;

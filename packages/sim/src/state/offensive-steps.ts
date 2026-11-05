@@ -246,3 +246,40 @@ export function neighborsIn(g: LineGround, hex: HexId, set: ReadonlySet<HexId>):
     .filter((n) => set.has(n))
     .sort((a, b) => a - b);
 }
+
+/**
+ * Котлы в своей земле: связные куски не своих гексов (вода входит в кусок), которые не касаются
+ * края карты и в которых не больше `maxLand` проходимых гексов. Чужой отряд или целый чужой
+ * островок посреди своей страны — котёл, его надо закрыть, а не обходить стороной.
+ * @returns куски — проходимые гексы по возрастанию HexId, куски по первому гексу
+ */
+export function holeComponents(g: LineGround, owner: number, maxLand: number): HexId[][] {
+  const table = neighborTable(g);
+  const seen = new Uint8Array(g.hexes.owner.length);
+  const out: HexId[][] = [];
+  for (let start = 0; start < g.hexes.owner.length; start += 1) {
+    if (seen[start] || g.hexes.owner[start] === owner) continue;
+    const comp: HexId[] = [start];
+    seen[start] = 1;
+    let open = false;
+    for (let i = 0; i < comp.length; i += 1) {
+      const h = comp[i] as HexId;
+      for (let k = 0; k < SIDES; k += 1) {
+        const n = table[h * SIDES + k] as number;
+        if (n < 0) open = true;
+        if (n < 0 || seen[n] || g.hexes.owner[n] === owner) continue;
+        seen[n] = 1;
+        comp.push(n);
+      }
+    }
+    if (open) continue;
+    const land = comp.filter((h) => passable(g, h)).sort((a, b) => a - b);
+    if (land.length > 0 && land.length <= maxLand) out.push(land);
+  }
+  return out;
+}
+
+/** Соседние гексы внутри карты. */
+export function adjacentHexes(g: LineGround, hex: HexId): HexId[] {
+  return adjacent(g, hex);
+}
