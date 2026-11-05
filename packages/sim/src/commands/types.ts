@@ -3,7 +3,7 @@
 import type { UnitType } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
-import type { TreatyKind } from '../state/types.ts';
+import type { ArmyMix, TreatyKind } from '../state/types.ts';
 
 export type Command =
   | { readonly t: 'setTax'; readonly rate: Fp }
@@ -88,6 +88,10 @@ export type Command =
       readonly hex?: number;
       /** Откуда брать солдат: id своих армий, −1 — резерв. Нет поля — ИИ берёт свободных сам. */
       readonly from?: readonly number[];
+      /** Армия приказа; −1 — всегда новая; нет поля — армия направления на цель, а если её нет — новая. */
+      readonly armyId?: number;
+      /** Состав заказа по типам; нет поля — любой. */
+      readonly mix?: ArmyMix;
     }
   /** Держать границу: армия, фронт и заказ числа солдат без наступления; можно и в мире. */
   | {
@@ -96,12 +100,19 @@ export type Command =
       readonly soldiers: number;
       readonly hex?: number;
       readonly from?: readonly number[];
+      readonly armyId?: number;
+      readonly mix?: ArmyMix;
     }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   /** Делит армию на две примерно равные по числу солдат; вторая половина — новая армия. */
   | { readonly t: 'splitArmy'; readonly armyId: number }
-  | { readonly t: 'setArmyLimit'; readonly armyId: number; readonly soldiers: number }
+  | {
+      readonly t: 'setArmyLimit';
+      readonly armyId: number;
+      readonly soldiers: number;
+      readonly mix?: ArmyMix;
+    }
   | {
       readonly t: 'assignUnits';
       readonly unitIds: readonly number[];

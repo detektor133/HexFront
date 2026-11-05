@@ -41,4 +41,25 @@ describe('закупка под заказ численности', () => {
     expect(soldiers + queued).toBeGreaterThan(100_000);
     expect(s.state.units.filter((u) => u.armyId === army?.id).length).toBeGreaterThan(1);
   });
+
+  it('с заданным составом ИИ закупает недостающую технику, а не одну пехоту', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const player = s.state.players[0];
+    if (player) player.gold = 100_000_000 as never;
+    s.unit('A', 'infantry', 300, at(2, 1));
+    applyCommands(s.state, [
+      {
+        playerId: 0,
+        cmd: { t: 'holdBorder', target: 1, soldiers: 400, mix: { armor: 100, artillery: 0 } },
+      },
+    ]);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    s.runSeconds(40);
+    const armor = [
+      ...s.state.units.filter((u) => u.armyId === army?.id && u.type === 'armor'),
+      ...s.state.recruits.filter((r) => r.armyId === army?.id && r.type === 'armor'),
+    ];
+    expect(armor.length).toBeGreaterThan(0);
+  });
 });

@@ -4,7 +4,7 @@ import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { trimAutoFront } from '../state/front.ts';
-import type { Army, MatchState, Unit } from '../state/types.ts';
+import type { Army, ArmyMix, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
 export type ArmyCommand = Extract<
@@ -50,6 +50,19 @@ function ownUnitList(state: MatchState, playerId: number, ids: readonly number[]
   return { ok: true, value: units };
 }
 
+/** Состав допустим, если его нет или танки и артиллерия — целые неотрицательные в пределах лимита. */
+export function validMix(mix: ArmyMix | undefined, soldiers: number): boolean {
+  if (mix === undefined) return true;
+  const { armor, artillery } = mix;
+  return (
+    Number.isInteger(armor) &&
+    Number.isInteger(artillery) &&
+    armor >= 0 &&
+    artillery >= 0 &&
+    armor + artillery <= soldiers
+  );
+}
+
 const validName = (name: unknown): boolean =>
   typeof name === 'string' && name.length <= ARMY_NAME_MAX;
 
@@ -77,8 +90,9 @@ export function validateArmyCommand(
   const army = ownArmy(state, playerId, cmd.armyId);
   if (!army.ok) return rejected(army.reason);
   if (cmd.t === 'renameArmy' && !validName(cmd.name)) return rejected('badName');
-  if (cmd.t === 'setArmyLimit' && !(Number.isInteger(cmd.soldiers) && cmd.soldiers >= 0)) {
-    return rejected('badValue');
+  if (cmd.t === 'setArmyLimit') {
+    if (!(Number.isInteger(cmd.soldiers) && cmd.soldiers >= 0)) return rejected('badValue');
+    if (!validMix(cmd.mix, cmd.soldiers)) return rejected('badValue');
   }
   if (cmd.t === 'splitArmy' && allUnits(state).filter((u) => u.armyId === cmd.armyId).length < 2) {
     return rejected('tooFewUnits');
@@ -131,6 +145,8 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       if (!army) return;
       if (cmd.soldiers === 0) delete army.wanted;
       else army.wanted = cmd.soldiers;
+      if (cmd.mix === undefined || cmd.soldiers === 0) delete army.mix;
+      else army.mix = cmd.mix;
       return;
     }
     case 'disbandArmy': {

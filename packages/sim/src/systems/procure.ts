@@ -1,12 +1,19 @@
 // Закупка под заказ численности армии (07-controls.md, «Меню страны»): армия с `wanted` сначала
 // берёт свободный резерв, а недостающее раз в секунду заказывает набором в ближайшем к своему
 // фронту городе с пустой очередью; отряд приходит прямо в армию и сам идёт на место по линии.
-import { PROCURE_BATCH, RECRUIT_MIN, RECRUIT_STEP, TICKS_PER_S } from '../balance.ts';
+import {
+  PROCURE_BATCH,
+  RECRUIT_MIN,
+  RECRUIT_STEP,
+  TICKS_PER_S,
+  type UnitType,
+} from '../balance.ts';
 import { checkRecruit, startRecruit } from '../commands/recruit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
+import { mixNeed } from '../state/mix.ts';
 import type { Army, City, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -35,6 +42,17 @@ const strength = (state: MatchState, army: Army): number =>
     .reduce((sum, u) => sum + u.soldiers, 0) +
   state.recruits.filter((r) => r.armyId === army.id).reduce((sum, r) => sum + r.soldiers, 0);
 
+const TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
+
+// Солдаты армии определённого типа: в отрядах и в очереди набора.
+const strengthOf = (state: MatchState, army: Army, type: UnitType): number =>
+  allUnits(state)
+    .filter((u) => u.armyId === army.id && u.type === type)
+    .reduce((sum, u) => sum + u.soldiers, 0) +
+  state.recruits
+    .filter((r) => r.armyId === army.id && r.type === type)
+    .reduce((sum, r) => sum + r.soldiers, 0);
+
 // Резерв игрока — в армии с нехваткой, ближайшие к её фронту отряды раньше.
 function takeReserve(state: MatchState, army: Army): void {
   const { width } = state.map;
@@ -51,9 +69,12 @@ function takeReserve(state: MatchState, army: Army): void {
         u.slot !== SLOT_DETACHED,
     )
     .sort((a, b) => away(a.hex) - away(b.hex) || a.id - b.id);
+  const need = mixNeed(army.wanted ?? 0, army.mix);
   let have = strength(state, army);
   for (const u of reserve) {
     if (have >= (army.wanted ?? 0) * FP) return;
+    // Состав задан: берём из резерва только тот тип, которого армии не хватает.
+    if (need !== undefined && strengthOf(state, army, u.type) >= need[u.type] * FP) continue;
     u.armyId = army.id;
     have += u.soldiers;
   }
@@ -74,17 +95,27 @@ export function procure(state: MatchState): void {
   for (const army of wanting) {
     if (army.wanted === undefined) continue;
     takeReserve(state, army);
-    const deficit = army.wanted * FP - strength(state, army);
+    orderOne(state, army);
+  }
+}
+
+// Одна закупка армии за секунду: нехватка по типу состава (без состава — пехота) в ближайшем городе.
+function orderOne(state: MatchState, army: Army): void {
+  const need = mixNeed(army.wanted ?? 0, army.mix);
+  for (const type of TYPES) {
+    const deficit =
+      need === undefined
+        ? (army.wanted ?? 0) * FP - strength(state, army)
+        : need[type] * FP - strengthOf(state, army, type);
+    if (need === undefined && type !== 'infantry') return;
     if (deficit < RECRUIT_MIN) continue;
     const batch = intDiv(Math.min(deficit, PROCURE_BATCH), RECRUIT_STEP) * RECRUIT_STEP;
-    let done = false;
     for (const city of cityOrder(state, army)) {
-      for (let amount = batch; amount >= RECRUIT_MIN && !done; amount -= RECRUIT_STEP) {
-        if (!checkRecruit(state, army.owner, city.id, 'infantry', amount as Fp).ok) continue;
-        startRecruit(state, army.owner, city.id, 'infantry', amount as Fp, army.id);
-        done = true;
+      for (let amount = batch; amount >= RECRUIT_MIN; amount -= RECRUIT_STEP) {
+        if (!checkRecruit(state, army.owner, city.id, type, amount as Fp).ok) continue;
+        startRecruit(state, army.owner, city.id, type, amount as Fp, army.id);
+        return;
       }
-      if (done) break;
     }
   }
 }

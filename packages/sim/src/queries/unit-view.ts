@@ -55,6 +55,8 @@ export interface ArmyView {
   readonly auto: boolean;
   /** Заказанная численность, солдат: ИИ закупает и подводит недостающих (меню страны). */
   readonly wanted?: number;
+  /** Состав заказа: танки и артиллерия (остальное — пехота); нет поля — тип не важен. */
+  readonly mix?: { readonly armor: number; readonly artillery: number };
   /** Направление армии: цель (id игрока или -1 — ничья земля) и режим. */
   readonly dir?: { readonly target: number; readonly mode: 'hold' | 'attack' | 'idle' };
 }
@@ -104,6 +106,7 @@ export function armyViews(state: MatchState, playerId: number): ArmyView[] {
       name: a.name,
       auto: a.auto,
       ...(a.wanted === undefined ? {} : { wanted: a.wanted }),
+      ...(a.mix === undefined ? {} : { mix: a.mix }),
       ...(a.dir === undefined ? {} : { dir: a.dir }),
     }));
 }

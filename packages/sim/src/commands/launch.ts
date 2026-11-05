@@ -3,7 +3,7 @@
 // с ними, или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
-import { ARMY_NAME_MAX, dropEmptyArmies, executeArmyCommand } from './army.ts';
+import { ARMY_NAME_MAX, dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
 import { pickAxes, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
@@ -20,14 +20,18 @@ import {
   edgeOther,
   type EdgeId,
 } from '../state/edges.ts';
+import { mixNeed } from '../state/mix.ts';
 import { atWar, isAllied } from '../state/relations.ts';
-import type { Army, MatchState, Unit } from '../state/types.ts';
+import type { Army, ArmyMix, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { expandNeutral } from '../systems/expand.ts';
 import { lineRuns } from '../systems/offensive.ts';
 
 /** Предел заказа солдат в одной команде: защита от мусорных значений. */
 const SOLDIERS_MAX = 1_000_000;
+
+/** `armyId` направления: всегда создать новую армию, а не взять армию направления на цель. */
+export const NEW_ARMY = -1;
 
 /** Ничья земля как цель направления. */
 export const NEUTRAL_TARGET = -1;
@@ -39,6 +43,10 @@ export interface DirectionCommand {
   readonly hex?: number;
   /** Откуда брать солдат: id своих армий, −1 — резерв; нет поля — ИИ берёт свободных сам. */
   readonly from?: readonly number[];
+  /** Армия, которой отдан приказ; нет поля — армия направления на цель или новая. */
+  readonly armyId?: number;
+  /** Состав заказа по типам; нет поля — любой. */
+  readonly mix?: ArmyMix;
 }
 
 /**
@@ -118,6 +126,12 @@ function validateDirection(
   ) {
     return rejected('invalidAmount');
   }
+  if (cmd.armyId !== undefined && cmd.armyId !== NEW_ARMY) {
+    const army = state.armies.find((a) => a.id === cmd.armyId);
+    if (!army) return rejected('unknownArmy');
+    if (army.owner !== playerId) return rejected('notOwnArmy');
+  }
+  if (!validMix(cmd.mix, cmd.soldiers)) return rejected('badValue');
   if (cmd.from !== undefined) {
     const own = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.id));
     const ok = Array.isArray(cmd.from) && cmd.from.every((id) => id === -1 || own.has(id));
@@ -223,7 +237,12 @@ function prepare(
   cmd: DirectionCommand,
   mode: 'hold' | 'attack',
 ): { readonly army: Army; readonly strike: Strike } | null {
-  let army = directionArmy(state, playerId, cmd.target);
+  let army =
+    cmd.armyId === undefined
+      ? directionArmy(state, playerId, cmd.target)
+      : cmd.armyId === NEW_ARMY
+        ? undefined
+        : state.armies.find((a) => a.id === cmd.armyId);
   if (!army) {
     executeArmyCommand(state, playerId, { t: 'createArmy', name: armyName(state, cmd.target) });
     army = state.armies.at(-1);
@@ -231,6 +250,8 @@ function prepare(
   if (!army) return null;
   army.auto = false;
   army.wanted = cmd.soldiers;
+  if (cmd.mix === undefined) delete army.mix;
+  else army.mix = cmd.mix;
   army.dir = {
     target: cmd.target,
     mode,
@@ -249,13 +270,21 @@ function prepare(
     neutral && cmd.hex !== undefined
       ? [cmd.hex]
       : (neutral ? borderPieces(state, playerId, cmd.target).flat() : front).map((e) => edgeHex(e));
-  let have = allUnits(state)
-    .filter((u) => u.armyId === army.id)
-    .reduce((sum, u) => sum + u.soldiers, 0);
+  const need = mixNeed(cmd.soldiers, cmd.mix);
+  const haveBy = { infantry: 0, armor: 0, artillery: 0 };
+  let have = 0;
+  for (const u of allUnits(state)) {
+    if (u.armyId !== army.id) continue;
+    haveBy[u.type] += u.soldiers;
+    have += u.soldiers;
+  }
   const picked: number[] = [];
   for (const u of candidates(state, playerId, army.id, anchors, cmd.from)) {
     if (have >= cmd.soldiers * FP) break;
+    // Состав задан: берём только тот тип, которого армии ещё не хватает.
+    if (need !== undefined && haveBy[u.type] >= need[u.type] * FP) continue;
     picked.push(u.id);
+    haveBy[u.type] += u.soldiers;
     have += u.soldiers;
   }
   if (picked.length > 0) {

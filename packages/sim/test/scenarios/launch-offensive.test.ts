@@ -283,4 +283,51 @@ describe('наступление одной командой', () => {
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'setArmyLimit', armyId: id, soldiers: 0 } }]);
     expect(s.state.armies.find((a) => a.id === id)?.wanted).toBeUndefined();
   });
+
+  it('состав по типам: хранится в армии, из свободных берётся только нужный тип', () => {
+    const s = game();
+    s.unit('A', 'armor', 300, at(1, 0));
+    const cmd = {
+      t: 'holdBorder',
+      target: 1,
+      soldiers: 800,
+      mix: { armor: 300, artillery: 0 },
+    } as const;
+    expect(validate(s.state, 0, cmd).ok).toBe(true);
+    applyCommands(s.state, [{ playerId: 0, cmd }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.dir !== undefined);
+    expect(army?.mix).toEqual({ armor: 300, artillery: 0 });
+    const types = s.state.units.filter((u) => u.armyId === army?.id).map((u) => u.type);
+    expect(types.filter((x) => x === 'armor')).toHaveLength(1);
+    expect(types.filter((x) => x === 'infantry').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('состав больше лимита отклоняется', () => {
+    const s = game();
+    const cmd = {
+      t: 'holdBorder',
+      target: 1,
+      soldiers: 100,
+      mix: { armor: 80, artillery: 40 },
+    } as const;
+    expect(validate(s.state, 0, cmd)).toEqual({ ok: false, reason: 'badValue' });
+  });
+
+  it('armyId выбирает армию приказа: −1 заводит новую, а не берёт армию направления', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 300 } }]);
+    const first = s.state.armies.filter((a) => a.owner === 0);
+    expect(first).toHaveLength(1);
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 300, armyId: -1 } },
+    ]);
+    expect(s.state.armies.filter((a) => a.owner === 0)).toHaveLength(2);
+    const id = first[0]?.id ?? 0;
+    expect(validate(s.state, 0, { t: 'holdBorder', target: 1, soldiers: 300, armyId: id }).ok).toBe(
+      true,
+    );
+    expect(
+      validate(s.state, 0, { t: 'holdBorder', target: 1, soldiers: 300, armyId: 999 }),
+    ).toEqual({ ok: false, reason: 'unknownArmy' });
+  });
 });

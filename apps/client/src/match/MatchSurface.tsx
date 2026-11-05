@@ -229,7 +229,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('leaderboard')}
         />
       )}
-      {view && sb.menu && (
+      {view && sb.menu && !pauseState.menuOpen && (
         <TerritoryMenu
           view={view}
           other={sb.menu.other}

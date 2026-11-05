@@ -228,6 +228,12 @@ export type ArmyPlan =
       readonly hexes: readonly HexId[];
     };
 
+/** Состав лимита армии: сколько солдат из лимита — танки и артиллерия; остальное — пехота. */
+export interface ArmyMix {
+  readonly armor: number;
+  readonly artillery: number;
+}
+
 /** Армия — группа отрядов игрока с названием (05-armies.md, «Модель», CR-001). */
 export interface Army {
   readonly id: number;
@@ -243,6 +249,8 @@ export interface Army {
    * и подводит их. Нет поля — закупки нет (меню страны, `launchOffensive`).
    */
   wanted?: number;
+  /** Состав заказа по типам; нет поля — тип не важен, закупается пехота. */
+  mix?: ArmyMix;
   /**
    * Направление армии: цель (id игрока или -1 — ничья земля) и режим. «hold» держит всю границу с
    * игроком (фронт обновляется по мере появления новых кусков), «attack» ведёт наступление.
