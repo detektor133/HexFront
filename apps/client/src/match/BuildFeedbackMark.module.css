@@ -1,0 +1,126 @@
+/* Отметка клика строительства: кольцо и подпись у курсора. */
+.ok,
+.fail {
+  position: fixed;
+  z-index: 25;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.ring {
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 3px solid var(--ui-ink);
+  border-radius: 50%;
+  animation: build-ring 700ms ease-out both;
+}
+
+.fail .ring {
+  border-color: var(--status-danger);
+  animation: build-ring-fail 400ms ease-out both;
+}
+
+.badge {
+  position: absolute;
+  left: 0;
+  bottom: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px var(--space-sm);
+  color: var(--ui-ink);
+  font-size: 13px;
+  white-space: nowrap;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  transform: translateX(-50%);
+  animation: build-badge 1100ms ease-out both;
+}
+
+.fail .badge {
+  color: var(--status-danger);
+  border-color: var(--status-danger);
+  animation: build-shake 1100ms ease-out both;
+}
+
+@keyframes build-ring {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@keyframes build-ring-fail {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes build-badge {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  20%,
+  75% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@keyframes build-shake {
+  0% {
+    opacity: 0;
+  }
+
+  10%,
+  75% {
+    opacity: 1;
+  }
+
+  15%,
+  45% {
+    transform: translateX(calc(-50% - 6px));
+  }
+
+  30%,
+  60% {
+    transform: translateX(calc(-50% + 6px));
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .badge {
+    animation-duration: 1ms;
+  }
+}

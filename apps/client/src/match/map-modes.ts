@@ -34,7 +34,18 @@ function modeOf(mapMode: MapMode, build: BuildTool | null): MapMaskMode | null {
   return mapMode === 'supply' ? 'supply' : null;
 }
 
+/** Итог клика по гексу в режиме строительства: стройка пошла, не хватает золота или нельзя. */
+export interface BuildFeedback {
+  readonly id: number;
+  readonly kind: 'ok' | 'gold' | 'blocked';
+  /** Точка клика, px страницы. */
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface MapModes {
+  /** Последний клик строительства для анимации; гаснет сам. */
+  readonly feedback: BuildFeedback | null;
   readonly mapMode: MapMode;
   readonly build: BuildTool | null;
   setMapMode(mode: MapMode): void;
@@ -45,7 +56,11 @@ export interface MapModes {
    * Клик по гексу в режиме строительства.
    * @returns true, если режим включён и клик израсходован (строится, если гекс подсвечен)
    */
-  clickHex(hex: number, send: (cmd: Command) => void): boolean;
+  clickHex(
+    hex: number,
+    send: (cmd: Command) => void,
+    at?: { readonly x: number; readonly y: number },
+  ): boolean;
 }
 
 export function useMapModes(
@@ -59,6 +74,8 @@ export function useMapModes(
   const maskRef = useRef<Uint8Array>(new Uint8Array(0));
   const requestId = useRef(0);
   const refreshTimer = useRef<number | null>(null);
+  const [feedback, setFeedback] = useState<BuildFeedback | null>(null);
+  const feedbackId = useRef(0);
 
   const request = useCallback(() => {
     const mode = modeRef.current;
@@ -109,11 +126,21 @@ export function useMapModes(
   );
 
   const clickHex = useCallback(
-    (hex: number, send: (cmd: Command) => void): boolean => {
+    (
+      hex: number,
+      send: (cmd: Command) => void,
+      at?: { readonly x: number; readonly y: number },
+    ): boolean => {
       const tool = buildRef.current;
       if (tool === null) return false;
-      // 1 — можно построить; 2 — не хватает золота, 0 — нельзя: клик ничего не делает.
-      if (maskRef.current[hex] === 1) {
+      // 1 — можно построить; 2 — не хватает золота, 0 — нельзя: клик объясняет отказ.
+      const mask = maskRef.current[hex];
+      if (at) {
+        feedbackId.current += 1;
+        const kind = mask === 1 ? 'ok' : mask === 2 ? 'gold' : 'blocked';
+        setFeedback({ id: feedbackId.current, kind, x: at.x, y: at.y });
+      }
+      if (mask === 1) {
         send(buildCommand(tool, hex));
         if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
         refreshTimer.current = window.setTimeout(request, AFTER_COMMAND_MS);
@@ -124,6 +151,7 @@ export function useMapModes(
   );
 
   return {
+    feedback,
     mapMode,
     build,
     setMapMode: (mode) => {

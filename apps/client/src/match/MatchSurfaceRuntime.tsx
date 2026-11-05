@@ -529,7 +529,7 @@ export function useSandbox(
       // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
       if (mapModesRef.current.build !== null) {
         if (kind === 'order') return mapModesRef.current.setBuild(null);
-        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd))) return;
+        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen)) return;
       }
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {

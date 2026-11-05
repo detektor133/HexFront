@@ -45,3 +45,21 @@
   background: var(--ui-button-primary-bg);
   border-color: var(--ui-button-primary-bg);
 }
+
+/* Цена выбранной стройки и золото: красным, когда не хватает. */
+.price,
+.priceBad {
+  align-self: center;
+  padding: 0 var(--space-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.price {
+  color: var(--ui-ink);
+}
+
+.priceBad {
+  color: var(--status-danger);
+  font-weight: 600;
+}

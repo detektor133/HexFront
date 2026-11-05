@@ -96,9 +96,14 @@ function ActionButton(props: {
         onMouseLeave={clearPreview}
         onFocus={() => preview && props.onRoadPreview?.(preview)}
         onBlur={clearPreview}
-        onClick={() => {
+        onClick={(event) => {
           props.send(a.cmd);
           clearPreview();
+          // Отклик на нажатие: плитка «вдавливается» и возвращается — видно, что команда принята.
+          event.currentTarget.animate?.(
+            [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
+            { duration: 280, easing: 'ease-out' },
+          );
         }}
       >
         {compact ? compactActionIcon(a.kind) : <span>{label}</span>}

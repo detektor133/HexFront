@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
@@ -284,6 +285,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('bottom-panel')}
         />
       )}
+      <BuildFeedbackMark feedback={sb.mapModes.feedback} />
       {view && !debug && (
         <MapTools
           mapMode={sb.mapModes.mapMode}
@@ -291,6 +293,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setMapMode={sb.mapModes.setMapMode}
           setBuild={sb.mapModes.setBuild}
           bottom={dockH + 12}
+          gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           buildingsOpen={buildingsOpen}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
         />
