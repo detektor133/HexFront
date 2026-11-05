@@ -2,7 +2,7 @@
 // укрепление — щит, город — замок, благоустройство — шевроны; столица — звезда. Без дисков:
 // иконка цвета владельца с белой обводкой. Контуры рисуются в canvas один раз на вид и становятся
 // белыми текстурами; цвет даёт тинт спрайта.
-import { Container, Sprite, Texture } from 'pixi.js';
+import { CanvasSource, Container, Sprite, Texture } from 'pixi.js';
 
 import type { Point } from '../render/hex-geometry.ts';
 
@@ -38,8 +38,9 @@ const ICON_PATHS: Readonly<Record<MapIconKind, readonly string[]>> = {
   improvement: ['M7 11l5 -5l5 5', 'M7 17l5 -5l5 5'],
 };
 
-const TEXTURE_PX = 96;
-const STROKE = 3;
+// Крупная текстура + мипмапы: при любом зуме иконка уменьшается честным фильтром, а не «мылится».
+const TEXTURE_PX = 256;
+const STROKE = 3.2;
 const OUTLINE = 3.4;
 const cache = new Map<string, Texture>();
 
@@ -65,7 +66,9 @@ function iconTexture(kind: MapIconKind, outline: boolean): Texture {
       ctx.stroke(path);
     }
   }
-  const texture = Texture.from(canvas);
+  const texture = new Texture({
+    source: new CanvasSource({ resource: canvas, autoGenerateMipmaps: true, scaleMode: 'linear' }),
+  });
   cache.set(key, texture);
   return texture;
 }
