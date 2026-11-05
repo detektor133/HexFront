@@ -36,10 +36,8 @@ uniform vec2 uMap;
 uniform float uR;
 uniform float uPx;
 uniform float uPattern;
-uniform float uGrid;
 uniform float uRiver;
 uniform vec3 uRiverColor;
-uniform vec2 uGridStyle;
 uniform float uMode;
 
 const float SQRT3 = 1.7320508;
@@ -218,7 +216,7 @@ void main() {
     vec3 col = fillOf(t);
     // Плавные границы: цвет соседней суши подмешивается к грани (ровно половина на самой грани).
     if (t != 0) {
-      float soft = apothem * 0.6;
+      float soft = apothem * 0.95;
       for (int d = 0; d < 6; d++) {
         float dist = edgeDist(p, d, apothem);
         if (dist >= soft) continue;
@@ -228,13 +226,6 @@ void main() {
         col = mix(col, fillOf(nt), k);
       }
       col *= 0.92 + 0.16 * vnoise(vWorld / (uR * 0.5));
-    }
-    float gridCover = 0.0;
-    if (uGrid > 0.5) {
-      for (int d = 0; d < 6; d++) {
-        float dist = edgeDist(p, d, apothem);
-        gridCover = max(gridCover, clamp((uGridStyle.x - dist) / uPx + 0.5, 0.0, 1.0));
-      }
     }
     // Реки: грани гекса (G) и «спицы» из его углов по граням соседей (B) — линия не рвётся в вершинах.
     int edges = int(cell.g * 255.0 + 0.5);
@@ -247,7 +238,6 @@ void main() {
         riverD = min(riverD, segDist(p, a, a * 2.0));
       }
     }
-    col = mix(col, vec3(1.0), uGridStyle.y * gridCover);
     col = mix(col, uRiverColor, clamp((uRiver * 0.5 - riverD) / uPx + 0.5, 0.0, 1.0));
     finalColor = vec4(col, 1.0);
     return;
@@ -285,7 +275,7 @@ export interface TerrainGpu {
   readonly base: Container;
   /** Узоры и береговая линия — над территорией. */
   readonly over: Container;
-  /** Толщины линий — экранные px; сетка видна с уровня M.hexGridVisibleFromZoom. */
+  /** Толщины линий — экранные px; белой сетки гексов нет, переходы между биомами — градиент. */
   setScale(scale: number, level: DetailLevel): void;
   destroy(): void;
 }
@@ -402,10 +392,8 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
           uR: { value: radius, type: 'f32' },
           uPx: { value: 1, type: 'f32' },
           uPattern: { value: M.patternWidth, type: 'f32' },
-          uGrid: { value: 0, type: 'f32' },
           uRiver: { value: 0, type: 'f32' },
           uRiverColor: { value: rgb(M.river).map((c) => c / 255), type: 'vec3<f32>' },
-          uGridStyle: { value: [0.5, M.hexGridAlpha], type: 'vec2<f32>' },
           uMode: { value: mode, type: 'f32' },
         },
       },
@@ -426,7 +414,6 @@ export function createTerrainGpu(map: MapStatic, radius: number): TerrainGpu {
     over,
     setScale(scale, level) {
       setUniform('uPx', 1 / scale);
-      setUniform('uGrid', level >= M.hexGridVisibleFromZoom ? 1 : 0);
       setUniform('uRiver', (M.riverWidth[level - 1] ?? M.riverWidth[1] ?? 2.5) / scale);
     },
     destroy() {

@@ -194,8 +194,8 @@ export const tokens = {
     "labelHalo": 3
   },
   "construction": {
-    "size": 0.3,
-    "improvementSize": 0.15,
+    "size": 0.36,
+    "improvementSize": 0.22,
     "outline": 1.5,
     "fill": "#FFFFFF"
   },

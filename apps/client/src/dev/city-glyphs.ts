@@ -2,6 +2,7 @@
 // владельца; размер — доля радиуса гекса по уровню (масштабируется с картой), у столицы — звезда.
 import { Text, type Container, type Graphics } from 'pixi.js';
 
+import { ICON_FIT, type MapIcon } from './map-icons.ts';
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -69,21 +70,31 @@ function drawBreak(g: Graphics, c: CityGlyph, r: number, k: number): void {
   g.stroke({ color: tokens.status.danger, width: city.outline * 1.5 * k, cap: 'round' });
 }
 
-/** Рисует знаки городов; k = 1 / масштаб камеры — только для экранной толщины обводки. */
+/**
+ * Рисует диски городов; k = 1 / масштаб камеры — только для экранной толщины обводки.
+ * @returns иконки замка, которые нужно поставить поверх дисков
+ */
 export function drawCities(
   g: Graphics,
   cities: readonly CityGlyph[],
   k: number,
   hexRadius: number,
-): void {
+): MapIcon[] {
+  const icons: MapIcon[] = [];
   for (const c of cities) {
     const r = citySize(hexRadius, c.level);
     g.circle(c.at.x, c.at.y, r)
       .fill(c.color)
       .stroke({ color: city.fill, width: city.outline * k });
-    if (c.isCapital) star(g, c.at, r * city.capitalStarOuter, r * city.capitalStarInner);
+    icons.push({ kind: 'city', at: c.at, size: r * ICON_FIT });
+    // Столица — звезда-значок на углу диска.
+    if (c.isCapital) {
+      const badge = { x: c.at.x + r * 0.8, y: c.at.y - r * 0.8 };
+      star(g, badge, r * city.capitalStarOuter * 0.9, r * city.capitalStarInner * 0.9);
+    }
     if (c.isolated) drawBreak(g, c, r, k);
   }
+  return icons;
 }
 
 /** Рисует подписи городов с жёстким ореолом цвета поверхности карты. */

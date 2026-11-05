@@ -2,6 +2,7 @@ import type { Graphics } from 'pixi.js';
 
 import { BUILDING, depotLevel, isDepot } from '@hexfront/sim';
 
+import { ICON_FIT, type MapIcon } from './map-icons.ts';
 import type { Point } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -14,49 +15,38 @@ export interface ConstructionGlyph {
   readonly improvement: number;
 }
 
-function polygonCenter(at: Point, radius: number, angle: number): number[] {
-  return [at.x + Math.cos(angle) * radius, at.y + Math.sin(angle) * radius];
-}
-
-function drawFort(g: Graphics, at: Point, radius: number, color: string, scale: number): void {
-  g.poly([
-    ...polygonCenter(at, radius, -Math.PI / 2),
-    ...polygonCenter(at, radius, 0),
-    ...polygonCenter(at, radius, Math.PI / 2),
-    ...polygonCenter(at, radius, Math.PI),
-  ])
+/** Диск под иконкой: цвет владельца, белая обводка. */
+function disc(g: Graphics, at: Point, radius: number, color: string, scale: number): void {
+  g.circle(at.x, at.y, radius)
     .fill(color)
     .stroke({ color: construction.fill, width: construction.outline * scale });
 }
 
-function drawDepot(g: Graphics, at: Point, radius: number, color: string, scale: number): void {
-  g.poly([
-    ...polygonCenter(at, radius, -Math.PI / 2),
-    ...polygonCenter(at, radius, Math.PI / 6),
-    ...polygonCenter(at, radius, (5 * Math.PI) / 6),
-  ])
-    .fill(color)
-    .stroke({ color: construction.fill, width: construction.outline * scale });
-}
-
-/** Рисует процедурные знаки укрепления, склада и благоустройства. */
+/**
+ * Рисует диски укрепления, склада и благоустройства; сами иконки — в слое map-icons.
+ * @returns иконки, которые нужно поставить поверх дисков
+ */
 export function drawConstructions(
   g: Graphics,
   glyphs: readonly ConstructionGlyph[],
   scale: number,
   hexRadius: number,
-): void {
+): MapIcon[] {
+  const icons: MapIcon[] = [];
   for (const glyph of glyphs) {
     const buildingRadius = hexRadius * construction.size;
     const buildingAt = { x: glyph.at.x, y: glyph.at.y - hexRadius * 0.35 };
-    if (glyph.building === BUILDING.fort) {
-      drawFort(g, buildingAt, buildingRadius, glyph.color, scale);
-    } else if (isDepot(glyph.building)) {
-      drawDepot(g, buildingAt, buildingRadius, glyph.color, scale);
+    const kind =
+      glyph.building === BUILDING.fort ? 'fort' : isDepot(glyph.building) ? 'depot' : null;
+    if (kind) {
+      disc(g, buildingAt, buildingRadius, glyph.color, scale);
+      icons.push({ kind, at: buildingAt, size: buildingRadius * ICON_FIT });
+    }
+    if (kind === 'depot') {
       // Уровень склада — точки под знаком: две у второго уровня, три у третьего.
       for (let i = 1; i < depotLevel(glyph.building); i += 1) {
         const x = buildingAt.x + (i - (depotLevel(glyph.building) - 1) / 2) * buildingRadius * 0.7;
-        g.circle(x, buildingAt.y + buildingRadius * 0.95, buildingRadius * 0.16)
+        g.circle(x, buildingAt.y + buildingRadius * 1.25, buildingRadius * 0.16)
           .fill(construction.fill)
           .stroke({ color: glyph.color, width: construction.outline * scale });
       }
@@ -67,8 +57,9 @@ export function drawConstructions(
       glyph.building === BUILDING.none
         ? glyph.at
         : { x: glyph.at.x + hexRadius * 0.5, y: glyph.at.y - hexRadius * 0.5 };
-    g.circle(improvementAt.x, improvementAt.y, hexRadius * construction.improvementSize)
-      .fill(glyph.color)
-      .stroke({ color: construction.fill, width: construction.outline * scale });
+    const radius = hexRadius * construction.improvementSize;
+    disc(g, improvementAt, radius, glyph.color, scale);
+    icons.push({ kind: 'improvement', at: improvementAt, size: radius * ICON_FIT });
   }
+  return icons;
 }

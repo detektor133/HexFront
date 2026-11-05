@@ -16,12 +16,6 @@ const small = JSON.parse(
 const loaded = loadMap(small);
 if (!loaded.ok) throw new Error(loaded.errors.join('; '));
 
-function pointCoordinate(points: number[], index: number): number {
-  const value = points[index];
-  if (value === undefined) throw new Error('У знака отсутствует вершина');
-  return value;
-}
-
 function constructionView(): PlayerView {
   const engine = createLocalEngine(small, 42, 2);
   if ('errors' in engine) throw new Error(engine.errors.join('; '));
@@ -100,26 +94,9 @@ describe('знаки построек', () => {
     layer.setView(view, { hex: null, units: [], target: null });
 
     expect(captured.colors.filter((color) => color === playerLine(0))).toHaveLength(3);
-    expect(captured.polygons.some((points) => points.length === 8)).toBe(true);
-    expect(captured.polygons.some((points) => points.length === 6)).toBe(true);
+    // Знаки — диски цвета владельца (иконки Tabler ставит слой map-icons): fort и depot одного размера.
     const buildingRadius = tokens.map.hexRadius * tokens.construction.size;
-    const fort = captured.polygons.find((points) => points.length === 8) as number[];
-    const depot = captured.polygons.find((points) => points.length === 6) as number[];
-    expect(fort).toBeDefined();
-    expect(depot).toBeDefined();
-    if (!fort || !depot) throw new Error('Знаки fort и depot не перехвачены');
-    expect(
-      Math.hypot(
-        pointCoordinate(fort, 0) - pointCoordinate(fort, 2),
-        pointCoordinate(fort, 1) - pointCoordinate(fort, 3),
-      ) / Math.SQRT2,
-    ).toBeCloseTo(buildingRadius);
-    expect(
-      Math.hypot(
-        pointCoordinate(depot, 0) - pointCoordinate(depot, 2),
-        pointCoordinate(depot, 1) - pointCoordinate(depot, 3),
-      ),
-    ).toBeCloseTo(buildingRadius * Math.sqrt(3));
+    expect(captured.circles.filter((args) => args[2] === buildingRadius)).toHaveLength(2);
     expect(
       captured.circles.some(
         (args) => args[2] === tokens.map.hexRadius * tokens.construction.improvementSize,

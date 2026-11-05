@@ -23,6 +23,7 @@ import type {
 import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyphs.ts';
 import { drawConstructions, type ConstructionGlyph } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
+import { createMapIconLayer } from './map-icons.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
 import type { SplitOverlay } from './split-drag.ts';
@@ -191,6 +192,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const marks = new Graphics();
   marks.context.batchMode = 'batch';
   const labels = new Container();
+  const mapIcons = createMapIconLayer();
 
   const container = new Container();
   container.addChild(territory.fill, roads, roadPreview, constructionEffects, cityEffects);
@@ -206,6 +208,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     territory.over,
     planLayer.container,
     marks,
+    mapIcons.container,
     unitLayer.container,
     labels,
     territoryLabels,
@@ -391,8 +394,10 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       isCapital: c.isCapital,
       isolated: c.isolated,
     }));
-    drawCities(marks, glyphs, k, radius);
-    drawConstructions(marks, builtHexes(v), k, radius);
+    mapIcons.sync([
+      ...drawCities(marks, glyphs, k, radius),
+      ...drawConstructions(marks, builtHexes(v), k, radius),
+    ]);
     const nextLabelsKey = cityLabelsKey(
       v.cities.map((c) => ({
         at: center(c.hex),
