@@ -214,8 +214,8 @@ function ArmyCard(props: {
   stats: ArmyStats;
   /** Заказанная численность армии (меню страны): рядом с числом солдат. */
   wanted?: number | undefined;
-  /** Лимит армии с направлением: предел слайдера и применение; undefined — лимита нет. */
-  limit?: { readonly max: number; readonly onApply: (soldiers: number) => void } | undefined;
+  /** Лимит любой армии: предел числа и применение; `wanted` пуст — лимита нет («∞»). */
+  limit: { readonly max: number; readonly onApply: (soldiers: number) => void };
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
@@ -298,19 +298,17 @@ function ArmyCard(props: {
             )}
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
-              {props.wanted !== undefined && props.limit && (
-                <button
-                  type="button"
-                  className={styles.limit}
-                  title={t('army.limit')}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setLimitAnchor(event.currentTarget.getBoundingClientRect());
-                  }}
-                >
-                  {formatSoldiers(props.wanted * FP)}
-                </button>
-              )}
+              <button
+                type="button"
+                className={styles.limit}
+                title={t('army.limit')}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setLimitAnchor(event.currentTarget.getBoundingClientRect());
+                }}
+              >
+                {props.wanted === undefined ? '∞' : formatSoldiers(props.wanted * FP)}
+              </button>
             </span>
             {stats.fighting && (
               <span title={t('army.fighting')}>
@@ -349,10 +347,10 @@ function ArmyCard(props: {
           />
         </span>
       </div>
-      {limitAnchor && props.limit && props.wanted !== undefined && (
+      {limitAnchor && (
         <ArmyLimit
           anchor={limitAnchor}
-          value={props.wanted}
+          value={props.wanted ?? Math.min(props.limit.max, Math.floor(stats.soldiers / FP))}
           max={props.limit.max}
           onApply={props.limit.onApply}
           onClose={() => setLimitAnchor(null)}
@@ -523,17 +521,10 @@ export function ArmyBar(props: {
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
                   wanted={a.wanted}
-                  limit={
-                    a.dir
-                      ? {
-                          max: maxArmySoldiers(view),
-                          onApply: (soldiers) => {
-                            const command = limitCommand(a, soldiers);
-                            if (command) send(command);
-                          },
-                        }
-                      : undefined
-                  }
+                  limit={{
+                    max: maxArmySoldiers(view),
+                    onApply: (soldiers) => send(limitCommand(a, soldiers)),
+                  }}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}

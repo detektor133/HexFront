@@ -1,5 +1,8 @@
-/* Полоса событий у левого края: свёрнутая метка — цвет игрока и значок, по наведению раскрывается
-   в текст. Новое событие выезжает и мигает цветом; предложение договора качается, пока без ответа. */
+/* Полоса событий у левого края: свёрнутая метка — квадрат с иконкой и цветной кромкой игрока, по
+   наведению раскрывается в текст. Новое событие выезжает и мигает цветом; предложение договора
+   качается, пока без ответа. Выезд и наведение живут на внешней обёртке, качание — на внутренней
+   метке: у обёртки размер и положение не прыгают, поэтому наведение не мерцает и анимации не
+   перезапускаются. */
 .feed {
   position: fixed;
   left: 0;
@@ -13,14 +16,21 @@
   pointer-events: none;
 }
 
+.slot {
+  display: flex;
+  pointer-events: auto;
+  animation: feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
 .item {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   box-sizing: border-box;
+  min-width: 40px;
   min-height: 40px;
-  max-width: 48px;
-  padding: 4px 12px 4px 10px;
+  max-width: 40px;
+  padding: 4px 12px 4px 11px;
   overflow: hidden;
   color: var(--ui-ink);
   font: inherit;
@@ -31,17 +41,15 @@
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);
   border-left: 0;
+  border-right: 4px solid var(--ui-ink);
   border-radius: 0 var(--radius-card) var(--radius-card) 0;
   box-shadow: var(--shadow-hard);
-  pointer-events: auto;
   transition: max-width 180ms ease-out;
-  animation:
-    feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
-    feed-flash 1100ms ease-out both;
+  animation: feed-flash 1100ms ease-out both;
 }
 
-.item:hover,
-.item:focus-visible {
+.slot:hover .item,
+.slot:focus-within .item {
   max-width: 360px;
 }
 
@@ -49,32 +57,27 @@ div.item {
   cursor: default;
 }
 
-/* Важное: широкая полоса цвета опасности с внутренней стороны метки. */
+/* Важное: кромка цвета опасности вместо цвета игрока. */
 .important {
-  border-right: 4px solid var(--status-danger);
+  border-right-color: var(--status-danger);
 }
 
-.owner {
+.icon {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
 }
 
 /* Предложение договора всегда раскрыто, с кнопками ответа, и качается, пока на него не ответили. */
 .offer {
   max-width: 360px;
-  border-right: 4px solid var(--ui-ink);
   cursor: default;
   animation:
-    feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
     feed-flash 1100ms ease-out both,
     feed-wiggle 1400ms ease-in-out 1.2s infinite;
 }
 
-.offer:hover,
-.offer:focus-within {
-  animation: none;
+.slot:hover .offer,
+.slot:focus-within .offer {
+  animation: feed-flash 1100ms ease-out both;
 }
 
 .name {
@@ -130,6 +133,7 @@ div.item {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .slot,
   .item,
   .offer {
     animation: none;

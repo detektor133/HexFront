@@ -257,14 +257,30 @@ describe('наступление одной командой', () => {
     expect(count()).toBeGreaterThan(before);
   });
 
-  it('0 солдат снимает направление: фронт убран, отряды в резерве, армия расформирована', () => {
+  it('0 солдат снимает направление: фронт убран, армия остаётся со своими отрядами без дела', () => {
     const s = game();
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
-    expect(s.state.armies.some((a) => a.owner === 0)).toBe(true);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    expect(army).toBeDefined();
+    const mine = s.state.units.filter((u) => u.armyId === army?.id).length;
+    expect(mine).toBeGreaterThan(0);
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 0 } }]);
 
-    expect(s.state.armies.some((a) => a.owner === 0)).toBe(false);
+    const kept = s.state.armies.find((a) => a.id === army?.id);
+    expect(kept?.dir?.mode).toBe('idle');
     expect(s.state.plans).toHaveLength(0);
-    expect(s.state.units.filter((u) => u.owner === 0).every((u) => u.armyId === null)).toBe(true);
+    expect(s.state.units.filter((u) => u.armyId === army?.id)).toHaveLength(mine);
+  });
+
+  it('лимит ставится любой армии без направления; 0 лимит снимает', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Запас' } }]);
+    const id = s.state.armies.filter((a) => a.owner === 0).at(-1)?.id ?? -1;
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'setArmyLimit', armyId: id, soldiers: 120 } },
+    ]);
+    expect(s.state.armies.find((a) => a.id === id)?.wanted).toBe(120);
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'setArmyLimit', armyId: id, soldiers: 0 } }]);
+    expect(s.state.armies.find((a) => a.id === id)?.wanted).toBeUndefined();
   });
 });

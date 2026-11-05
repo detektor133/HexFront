@@ -101,6 +101,7 @@ export type Command =
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   /** Делит армию на две примерно равные по числу солдат; вторая половина — новая армия. */
   | { readonly t: 'splitArmy'; readonly armyId: number }
+  | { readonly t: 'setArmyLimit'; readonly armyId: number; readonly soldiers: number }
   | {
       readonly t: 'assignUnits';
       readonly unitIds: readonly number[];

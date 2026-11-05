@@ -3,11 +3,14 @@ import {
   IconCheck,
   IconBuildingCastle,
   IconFlag,
+  IconHammer,
   IconHeartHandshake,
+  IconInfoCircle,
   IconLink,
   IconLinkOff,
   IconSkull,
   IconSwords,
+  IconTrophy,
   IconX,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -70,8 +73,13 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
     return <IconHeartHandshake size={18} aria-hidden />;
   }
   if (event.t === 'treatyBroken') return <IconLinkOff size={18} aria-hidden />;
-  return null;
+  if (event.t === 'constructionDone') return <IconHammer size={18} aria-hidden />;
+  if (event.t === 'matchWon') return <IconTrophy size={18} aria-hidden />;
+  return <IconInfoCircle size={18} aria-hidden />;
 }
+
+const ownerColor = (playerId: number): string =>
+  tokens.players.palette[playerId]?.line ?? tokens.ui.ink;
 
 type Offer = NonNullable<PlayerView['diplomacy']>['incoming'][number];
 
@@ -130,39 +138,45 @@ export function EventFeed(props: {
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
       {grace !== undefined && (
-        <div className={`${styles.item} ${styles.important}`} role="alert">
-          <IconBuildingCastle size={18} aria-hidden />
-          <span
-            className={styles.name}
-          >{`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}</span>
+        <div className={styles.slot}>
+          <div className={`${styles.item} ${styles.important}`} role="alert">
+            <IconBuildingCastle size={18} aria-hidden className={styles.icon} />
+            <span
+              className={styles.name}
+            >{`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}</span>
+          </div>
         </div>
       )}
       {offers.map((offer) => (
-        <div className={`${styles.item} ${styles.offer}`} key={`offer:${offer.from}`} role="status">
-          <span
-            className={styles.owner}
-            style={{ background: tokens.players.palette[offer.from]?.line ?? tokens.ui.ink }}
-          />
-          {offer.kind === 'pact' ? (
-            <IconHeartHandshake size={18} aria-hidden />
-          ) : (
-            <IconLink size={18} aria-hidden />
-          )}
-          <span className={styles.name}>{`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}</span>
-          <IconButton
-            className={styles.answer}
-            label={t('diplomacy.accept')}
-            onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: true })}
+        <div className={styles.slot} key={`offer:${offer.from}`}>
+          <div
+            className={`${styles.item} ${styles.offer}`}
+            style={{ borderRightColor: ownerColor(offer.from) }}
+            role="status"
           >
-            <IconCheck size={18} aria-hidden="true" />
-          </IconButton>
-          <IconButton
-            className={styles.answer}
-            label={t('diplomacy.decline')}
-            onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: false })}
-          >
-            <IconX size={18} aria-hidden="true" />
-          </IconButton>
+            {offer.kind === 'pact' ? (
+              <IconHeartHandshake size={18} aria-hidden className={styles.icon} />
+            ) : (
+              <IconLink size={18} aria-hidden className={styles.icon} />
+            )}
+            <span
+              className={styles.name}
+            >{`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}</span>
+            <IconButton
+              className={styles.answer}
+              label={t('diplomacy.accept')}
+              onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: true })}
+            >
+              <IconCheck size={18} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className={styles.answer}
+              label={t('diplomacy.decline')}
+              onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: false })}
+            >
+              <IconX size={18} aria-hidden="true" />
+            </IconButton>
+          </div>
         </div>
       ))}
       {items.map((item) =>
@@ -172,33 +186,38 @@ export function EventFeed(props: {
           const full = other === null ? text : `${text}: ${nameOf(other)}`;
           const content = (
             <>
-              <span
-                className={styles.owner}
-                style={{
-                  background: tokens.players.palette[item.event.playerId]?.line ?? tokens.ui.ink,
-                }}
-              />
-              <EventIcon event={item.event} localPlayerId={me} />
+              <span className={styles.icon}>
+                <EventIcon event={item.event} localPlayerId={me} />
+              </span>
               <span className={styles.name}>{full}</span>
             </>
           );
           const className = `${styles.item} ${item.important ? styles.important : ''}`;
+          const style = { borderRightColor: ownerColor(item.event.playerId) };
 
-          return item.hex === null || item.hex === undefined ? (
-            <div className={className} key={item.id} title={full} aria-label={full} role="img">
-              {content}
+          return (
+            <div className={styles.slot} key={item.id}>
+              {item.hex === null || item.hex === undefined ? (
+                <div
+                  className={className}
+                  style={item.important ? undefined : style}
+                  aria-label={full}
+                  role="img"
+                >
+                  {content}
+                </div>
+              ) : (
+                <button
+                  className={className}
+                  style={item.important ? undefined : style}
+                  type="button"
+                  aria-label={full}
+                  onClick={() => props.onFocus(item)}
+                >
+                  {content}
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              className={className}
-              key={item.id}
-              type="button"
-              title={full}
-              aria-label={full}
-              onClick={() => props.onFocus(item)}
-            >
-              {content}
-            </button>
           );
         })(),
       )}

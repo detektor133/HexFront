@@ -14,21 +14,11 @@ const army = (dir?: ArmyView['dir']): ArmyView => ({
 });
 
 describe('лимит армии', () => {
-  it('держащая граница армия меняет лимит командой holdBorder, наступающая — launchOffensive', () => {
-    expect(limitCommand(army({ target: 3, mode: 'hold' }), 150)).toEqual({
-      t: 'holdBorder',
-      target: 3,
-      soldiers: 150,
-    });
-    expect(limitCommand(army({ target: -1, mode: 'attack' }), 80)).toEqual({
-      t: 'launchOffensive',
-      target: -1,
-      soldiers: 80,
-    });
-  });
-
-  it('у армии без направления лимита нет', () => {
-    expect(limitCommand(army(), 100)).toBeNull();
+  it('лимит любой армии, с направлением или без, меняет одна команда setArmyLimit', () => {
+    const expected = { t: 'setArmyLimit', armyId: 7, soldiers: 150 };
+    expect(limitCommand(army({ target: 3, mode: 'hold' }), 150)).toEqual(expected);
+    expect(limitCommand(army({ target: -1, mode: 'attack' }), 150)).toEqual(expected);
+    expect(limitCommand(army(), 150)).toEqual(expected);
   });
 
   it('значение зажато в 0..предел, доли предела — целые и не меньше 1', () => {

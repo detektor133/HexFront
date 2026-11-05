@@ -26,14 +26,7 @@ export function clampLimit(value: number, max: number): number {
   return Math.max(0, Math.min(max, Math.round(Number.isFinite(value) ? value : 0)));
 }
 
-/**
- * Команда нового лимита для армии с направлением: режим (держать или наступать) сохраняется.
- * @returns null — у армии нет направления, лимита нет
- */
-export function limitCommand(army: ArmyView, soldiers: number): Command | null {
-  const dir = army.dir;
-  if (!dir) return null;
-  return dir.mode === 'attack'
-    ? { t: 'launchOffensive', target: dir.target, soldiers }
-    : { t: 'holdBorder', target: dir.target, soldiers };
+/** Команда нового лимита любой армии: направление и режим не трогаются, ИИ добирает до числа. */
+export function limitCommand(army: ArmyView, soldiers: number): Command {
+  return { t: 'setArmyLimit', armyId: army.id, soldiers };
 }

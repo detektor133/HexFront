@@ -15,6 +15,7 @@ export type ArmyCommand = Extract<
       | 'renameArmy'
       | 'disbandArmy'
       | 'splitArmy'
+      | 'setArmyLimit'
       | 'assignUnits'
       | 'setAutoReinforce'
       | 'setArmyAuto'
@@ -76,6 +77,9 @@ export function validateArmyCommand(
   const army = ownArmy(state, playerId, cmd.armyId);
   if (!army.ok) return rejected(army.reason);
   if (cmd.t === 'renameArmy' && !validName(cmd.name)) return rejected('badName');
+  if (cmd.t === 'setArmyLimit' && !(Number.isInteger(cmd.soldiers) && cmd.soldiers >= 0)) {
+    return rejected('badValue');
+  }
   if (cmd.t === 'splitArmy' && allUnits(state).filter((u) => u.armyId === cmd.armyId).length < 2) {
     return rejected('tooFewUnits');
   }
@@ -119,6 +123,14 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
     case 'renameArmy': {
       const army = state.armies.find((a) => a.id === cmd.armyId);
       if (army) army.name = cmd.name;
+      return;
+    }
+    case 'setArmyLimit': {
+      // Лимит есть у любой армии: ИИ добирает её до числа из резерва и закупкой; 0 — лимит снят.
+      const army = state.armies.find((a) => a.id === cmd.armyId);
+      if (!army) return;
+      if (cmd.soldiers === 0) delete army.wanted;
+      else army.wanted = cmd.soldiers;
       return;
     }
     case 'disbandArmy': {

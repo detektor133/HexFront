@@ -39,7 +39,7 @@ export function maintainDirections(state: MatchState): void {
   if (state.tick % TICKS_PER_S !== 0) return;
   for (const army of [...state.armies]) {
     const dir = army.dir;
-    if (!dir) continue;
+    if (!dir || dir.mode === 'idle') continue;
     if (dir.target < 0) {
       if (dir.mode === 'attack') expandNeutral(state, army);
       continue;
