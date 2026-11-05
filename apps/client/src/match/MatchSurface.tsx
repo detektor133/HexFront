@@ -128,7 +128,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const layout = computeMatchLayout({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     hudHeight: hudH,
-    bottomPanelHeight: dockH + (toolsShown ? ARMY_TOOLS_H : 0),
+    bottomPanelHeight: dockH,
+    cardReserve: toolsShown ? ARMY_TOOLS_H : 0,
     eventRows: feedRows(sb.events, view?.diplomacy?.incoming ?? [], view?.me.graceLeftS),
     tutorialVisible: false,
     leaderboardOpen,

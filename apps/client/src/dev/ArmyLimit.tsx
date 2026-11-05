@@ -1,4 +1,3 @@
-import { IconCheck } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -11,7 +10,7 @@ import { t } from '../i18n/dict.ts';
 const WIDTH = 248;
 const EDGE = 8;
 
-/** Поповер армии над карточкой: сколько войск и из чего (ползунки); применяется кнопкой ✓. */
+/** Поповер армии над карточкой: сколько войск и из чего (ползунки); применяется сразу, как отпустил ползунок. */
 export function ArmyLimit(props: {
   /** Прямоугольник кнопки лимита на карточке, px страницы. */
   readonly anchor: DOMRect;
@@ -39,10 +38,6 @@ export function ArmyLimit(props: {
     };
   }, [onClose]);
   const left = Math.max(EDGE, Math.min(anchor.left, window.innerWidth - WIDTH - EDGE));
-  const apply = (): void => {
-    onApply(force.total, countsFromShares(force.total, force.shares));
-    onClose();
-  };
   return createPortal(
     <div
       ref={ref}
@@ -56,11 +51,8 @@ export function ArmyLimit(props: {
         max={max}
         shares={force.shares}
         onChange={(total, shares) => setForce({ total, shares })}
+        onCommit={(total, shares) => onApply(total, countsFromShares(total, shares))}
       />
-      <button type="button" className={styles.okWide} onClick={apply}>
-        <IconCheck size={18} aria-hidden="true" />
-        {t('army.limitApply')}
-      </button>
     </div>,
     document.body,
   );

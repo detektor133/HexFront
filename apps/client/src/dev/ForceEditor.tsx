@@ -18,8 +18,11 @@ export function ForceEditor(props: {
   readonly max: number;
   readonly shares: Shares;
   readonly onChange: (total: number, shares: Shares) => void;
+  /** Игрок отпустил ползунок: значение окончательное — можно применять приказом. */
+  readonly onCommit?: (total: number, shares: Shares) => void;
 }): React.JSX.Element {
-  const { total, max, shares, onChange } = props;
+  const { total, max, shares, onChange, onCommit } = props;
+  const commit = (): void => onCommit?.(total, shares);
   const [open, setOpen] = useState(false);
   const counts = countsFromShares(total, shares);
   const Chevron = open ? IconChevronUp : IconChevronDown;
@@ -37,6 +40,8 @@ export function ForceEditor(props: {
           value={Math.min(total, max)}
           aria-label={t('menu.total')}
           onChange={(event) => onChange(Number(event.target.value), shares)}
+          onPointerUp={commit}
+          onKeyUp={commit}
         />
       </label>
       <button
@@ -56,6 +61,7 @@ export function ForceEditor(props: {
             percent={shares[type]}
             soldiers={counts[type]}
             onChange={(value) => onChange(total, setShare(shares, type, value))}
+            onRelease={commit}
           />
         ))}
     </div>
@@ -67,6 +73,7 @@ function Share(props: {
   readonly percent: number;
   readonly soldiers: number;
   readonly onChange: (percent: number) => void;
+  readonly onRelease: () => void;
 }): React.JSX.Element {
   const label = t(`unit.${props.type}` as MessageKey);
   return (
@@ -85,6 +92,8 @@ function Share(props: {
         value={props.percent}
         aria-label={label}
         onChange={(event) => props.onChange(Number(event.target.value))}
+        onPointerUp={props.onRelease}
+        onKeyUp={props.onRelease}
       />
     </label>
   );

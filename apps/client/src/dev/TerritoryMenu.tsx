@@ -13,7 +13,7 @@ import { FP, type ArmyView, type Command, type PlayerView } from '@hexfront/sim'
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import { ForceEditor } from './ForceEditor.tsx';
 import styles from './TerritoryMenu.module.css';
-import { maxArmySoldiers } from './army-limit.ts';
+import { limitCommand, maxArmySoldiers } from './army-limit.ts';
 import { armyName } from './army-name.ts';
 import { NEW_ARMY, armyCounts, orderFields, totalOf } from './direction-order.ts';
 import { countsFromShares, defaultShares, sharesFromCounts, type Shares } from './force-share.ts';
@@ -60,8 +60,6 @@ export function TerritoryMenu(props: {
     const army = view.armies.find((a) => a.id === id);
     setForce(army ? fromArmy(army) : fresh());
   };
-  // Откуда брать солдат: id армий и −1 — резерв; пусто — ИИ берёт свободных сам.
-  const [from, setFrom] = useState<readonly number[]>([]);
   const ref = useRef<HTMLDivElement | null>(null);
   // Реальная высота окна: оно растёт от числа источников, и фиксированная оценка уводила его за край.
   const [height, setHeight] = useState(220);
@@ -101,16 +99,16 @@ export function TerritoryMenu(props: {
     Math.floor(
       mine.filter((u) => u.armyId === armyId).reduce((sum, u) => sum + u.soldiers, 0) / FP,
     );
-  const sources = [
-    { id: -1, name: t('army.reserve'), soldiers: soldiersOf(null) },
-    ...view.armies.map((a) => ({ id: a.id, name: armyName(a), soldiers: soldiersOf(a.id) })),
-  ].filter((source) => source.soldiers > 0);
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
   // Клик не выбирает место удара: ось наступления и приоритет занятия определяет ИИ.
-  // Источники нужны только новой армии: у выбранной армии состав задан ею самой.
-  const where = {
-    ...orderFields(counts, armyId),
-    ...(armyId === NEW_ARMY && from.length > 0 ? { from } : {}),
+  const where = orderFields(counts, armyId);
+  // Армия уже стоит на эту цель: ползунки применяются сразу, как отпустил, без кнопок приказа.
+  const live = armyId !== NEW_ARMY && armyId === existing?.id;
+  const commit = (total: number, shares: Shares): void => {
+    if (!live || !existing) return;
+    const c = countsFromShares(total, shares);
+    const mix = c.armor + c.artillery > 0 ? { armor: c.armor, artillery: c.artillery } : undefined;
+    send(limitCommand(existing, total, mix));
   };
   const go = (command: Command): void => {
     send(command);
@@ -169,53 +167,24 @@ export function TerritoryMenu(props: {
           max={max}
           shares={force.shares}
           onChange={(total, shares) => setForce({ total, shares })}
+          onCommit={commit}
         />
-        {armyId === NEW_ARMY && sources.length > 0 && (
-          <div className={styles.sources} role="group" aria-label={t('menu.sources')}>
-            {sources.map((source) => (
-              <button
-                key={source.id}
-                type="button"
-                className={from.includes(source.id) ? styles.sourceOn : styles.source}
-                aria-pressed={from.includes(source.id)}
-                onClick={() =>
-                  setFrom((now) =>
-                    now.includes(source.id)
-                      ? now.filter((id) => id !== source.id)
-                      : [...now, source.id],
-                  )
-                }
-              >
-                <span className={styles.sourceName}>{source.name}</span>
-                <span>{source.soldiers}</span>
-              </button>
-            ))}
-          </div>
-        )}
         <div className={styles.actions}>
-          {existing && (
-            <IconButton
-              label={t('menu.release')}
-              className={styles.hold}
-              onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
-            >
-              <IconShieldOff size={20} aria-hidden="true" />
-            </IconButton>
-          )}
           {!neutral && (
-            <IconButton
-              label={t('menu.hold')}
-              className={styles.hold}
+            <button
+              type="button"
+              className={styles.act}
               disabled={amount < 1}
               onClick={() => go({ t: 'holdBorder', target: other, ...where })}
             >
               <IconShield size={20} aria-hidden="true" />
-            </IconButton>
+              {t('menu.holdShort')}
+            </button>
           )}
           {(atWar || neutral) && (
-            <IconButton
-              label={t(neutral ? 'menu.occupy' : 'menu.attack')}
-              className={styles.go}
+            <button
+              type="button"
+              className={styles.actGo}
               disabled={amount < 1}
               onClick={() => go({ t: 'launchOffensive', target: other, ...where })}
             >
@@ -224,9 +193,20 @@ export function TerritoryMenu(props: {
               ) : (
                 <IconSwords size={20} aria-hidden="true" />
               )}
-            </IconButton>
+              {t(neutral ? 'menu.occupy' : 'menu.attack')}
+            </button>
           )}
         </div>
+        {existing && (
+          <button
+            type="button"
+            className={styles.release}
+            onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
+          >
+            <IconShieldOff size={16} aria-hidden="true" />
+            {t('menu.release')}
+          </button>
+        )}
       </div>
     </div>
   );

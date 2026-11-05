@@ -58,6 +58,8 @@ export interface MatchLayoutInput {
   readonly popupAnchorY?: number;
   readonly popupSize?: { readonly width: number; readonly height: number };
   readonly paused: boolean;
+  /** Запас под плавающий тулбар приказов над нижней панелью, px: карточка встаёт выше него. */
+  readonly cardReserve?: number;
 }
 
 export function matchLayoutElementStyle(element: MatchLayoutElement): CSSProperties {
@@ -221,7 +223,8 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   if (tutorialVisible && tutorialOverlayVisible) {
     elements.push(layoutElement('left-column', 'left-column', edge, leftColumnTop, leftWidth, 48));
   }
-  const cardAvailableHeight = bottomY - input.hudHeight - gap * 2;
+  const cardReserve = input.cardReserve ?? 0;
+  const cardAvailableHeight = bottomY - cardReserve - input.hudHeight - gap * 2;
   if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {
     const cardHeight = Math.min(Math.max(44, input.cardHeight), cardAvailableHeight);
     const cardWidth = phoneViewport ? width - edge * 2 : 320;
@@ -230,7 +233,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
         'card',
         'card',
         edge,
-        Math.max(input.hudHeight + gap, bottomY - gap - cardHeight),
+        Math.max(input.hudHeight + gap, bottomY - cardReserve - gap - cardHeight),
         cardWidth,
         cardHeight,
       ),
