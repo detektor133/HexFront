@@ -37,6 +37,8 @@ export interface MatchEndScreenProps {
   readonly eliminated: boolean;
   readonly fog: boolean;
   readonly reason?: WinReason;
+  /** Союзники победителя при победе коалиции. */
+  readonly allies?: readonly number[];
   readonly victoryHold?: VictoryHoldView | null;
   readonly rows?: readonly EndRow[];
   readonly stats?: EndStats;
@@ -46,8 +48,9 @@ export interface MatchEndScreenProps {
 
 function victoryReason(reason: WinReason | undefined): string {
   if (reason === 'cities') return t('match.reason.cities');
-  if (reason === 'lastStanding') return t('match.reason.lastStanding');
-  return t('match.reason.score');
+  if (reason === 'allCities') return t('match.reason.allCities');
+  if (reason === 'coalition') return t('match.reason.coalition');
+  return t('match.reason.lastStanding');
 }
 
 function holdClock(seconds: number): string {
@@ -66,7 +69,7 @@ function heading(props: MatchEndScreenProps): React.JSX.Element[] {
       </p>,
     ];
   }
-  const won = props.winner === props.playerId;
+  const won = props.winner === props.playerId || (props.allies?.includes(props.playerId) ?? false);
   const who = props.winnerName ?? `${t('observer.player')} ${props.winner + 1}`;
   const text = won
     ? victoryReason(props.reason)

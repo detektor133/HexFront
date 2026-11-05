@@ -288,8 +288,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onWatch={(message) => sb.setFog(message.enabled)}
           onMenu={pauseController.goToMenu}
           {...(() => {
-            const reason = sb.msg?.events.find((event) => event.t === 'matchWon')?.reason;
-            return reason ? { reason } : {};
+            const won = sb.msg?.events.find((event) => event.t === 'matchWon');
+            if (won?.t !== 'matchWon') return {};
+            return { reason: won.reason, ...(won.allies ? { allies: won.allies } : {}) };
           })()}
         />
       )}

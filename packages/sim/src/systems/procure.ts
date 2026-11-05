@@ -9,6 +9,7 @@ import {
   type UnitType,
 } from '../balance.ts';
 import { checkRecruit, startRecruit } from '../commands/recruit.ts';
+import { splitUnit } from '../commands/unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
@@ -80,6 +81,38 @@ function takeReserve(state: MatchState, army: Army): void {
   }
 }
 
+/**
+ * Лимит уменьшен — лишние солдаты уходят в резерв: целые отряды, которые не нужны армии, а если
+ * лишнее меньше отряда — отделённая часть. Идут только стоящие отряды вне боя.
+ */
+function releaseSurplus(state: MatchState, army: Army): void {
+  if (army.wanted === undefined) return;
+  let surplus =
+    allUnits(state)
+      .filter((u) => u.armyId === army.id)
+      .reduce((sum, u) => sum + u.soldiers, 0) -
+    army.wanted * FP;
+  if (surplus < FP) return;
+  const idle = allUnits(state)
+    .filter((u) => u.armyId === army.id && u.order === 'idle' && !u.inBattle)
+    .sort((a, b) => a.soldiers - b.soldiers || a.id - b.id);
+  for (const unit of idle) {
+    if (surplus < FP) return;
+    if (unit.soldiers <= surplus) {
+      surplus -= unit.soldiers;
+      unit.armyId = null;
+      unit.slot = -1;
+      continue;
+    }
+    const part = intDiv(surplus, FP) * FP;
+    if (part < FP || unit.soldiers - part < FP) continue;
+    const piece = splitUnit(state, unit, part as Fp);
+    piece.armyId = null;
+    piece.slot = -1;
+    surplus -= part;
+  }
+}
+
 /** Добирает резерв и закупает недостающих для армий с заказанной численностью; раз в секунду. */
 export function procure(state: MatchState): void {
   if (state.tick % TICKS_PER_S !== 0) return;
@@ -94,6 +127,7 @@ export function procure(state: MatchState): void {
     });
   for (const army of wanting) {
     if (army.wanted === undefined) continue;
+    releaseSurplus(state, army);
     takeReserve(state, army);
     orderOne(state, army);
   }

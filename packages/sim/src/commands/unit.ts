@@ -236,21 +236,16 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'attack':
       for (const a of owned.units) {
         const dest = cmd.t === 'move' ? cmd.to : cmd.target;
-        // Идущий отряд не бросает начатый переход: новый маршрут строится от гекса, в который он
-        // уже вступает, прогресс шага сохраняется — приказ «на ходу» не откатывает фишку назад.
-        const entering = a.order === 'move' && a.moveTotal > 0 ? a.path[0] : undefined;
-        const fromEntering =
-          entering === undefined ? null : routePath(state, a, cmd.via ?? [], dest, entering);
-        if (entering !== undefined && fromEntering) {
-          a.path = [entering, ...fromEntering];
-        } else {
-          stop(a);
-          a.path = routePath(state, a, cmd.via ?? [], dest) ?? [];
-        }
+        const path = routePath(state, a, cmd.via ?? [], dest) ?? [];
+        // Приказ игрока выполняется сразу: начатый шаг прерывается. Исключение — тот же ближайший
+        // шаг: переход продолжается с накопленным прогрессом (05-armies.md).
+        const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
+        if (!sameStep) stop(a);
         // Ручной приказ снимает отряд с места в плане армии; освободившись, он вернётся в план.
         a.slot = -1;
         a.gather = -1;
-        a.order = a.path.length > 0 ? 'move' : 'idle';
+        a.path = path;
+        a.order = path.length > 0 ? 'move' : 'idle';
       }
       return;
     case 'split':

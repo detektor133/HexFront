@@ -1,14 +1,12 @@
 // Склады: код постройки → уровень склада (1–5), 0 — не склад. Уровень задаёт снабжение склада и
 // цену улучшения (docs/gdd/03-cities-buildings.md, «Склад»).
+import { FORT_SPAN } from './building.ts';
 import { BUILDING } from './types.ts';
+import { intDiv } from '../math/int.ts';
 
-/** Уровень склада по коду постройки: 1–3 или 0, если это не склад. */
+/** Уровень склада по коду постройки (4 × уровень + уровень укрепления): 1–5 или 0, если склада нет. */
 export function depotLevel(building: number): number {
-  if (building === BUILDING.depot) return 1;
-  if (building === BUILDING.depot2) return 2;
-  if (building === BUILDING.depot3) return 3;
-  if (building === BUILDING.depot4) return 4;
-  return building === BUILDING.depot5 ? 5 : 0;
+  return Math.min(DEPOT_MAX_LEVEL, intDiv(building, FORT_SPAN));
 }
 
 /** Склад ли это (любого уровня). */

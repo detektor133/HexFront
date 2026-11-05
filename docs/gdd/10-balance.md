@@ -16,7 +16,6 @@
 | `OFFENSIVE_STUCK_TICKS` | 100 |
 | `COMMANDER_TICKS` | 5 |
 | `BOT_THINK_TICKS` | 10 |
-| `MATCH_TIME_LIMIT_S` | 1500 |
 | `PREP_TIME_S` | 5 |
 
 ## Боты

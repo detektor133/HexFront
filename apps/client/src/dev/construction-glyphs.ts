@@ -27,16 +27,23 @@ export function drawConstructions(
   const icons: MapIcon[] = [];
   const R = hexRadius;
   for (const glyph of glyphs) {
-    const kind = isFort(glyph.building) ? 'fort' : isDepot(glyph.building) ? 'depot' : null;
-    const size = R * (glyph.city ? 0.62 : 0.8);
+    // На гексе могут стоять и укрепление, и склад: два знака рядом.
+    const kinds = [
+      ...(isFort(glyph.building) ? (['fort'] as const) : []),
+      ...(isDepot(glyph.building) ? (['depot'] as const) : []),
+    ];
+    const kind = kinds[0] ?? null;
+    const size = R * (glyph.city ? 0.62 : kinds.length > 1 ? 0.6 : 0.8);
     // На гексе города здание — в верхнем правом углу, город сдвинут влево-вниз.
-    const at = glyph.city
+    const base = glyph.city
       ? { x: glyph.at.x + R * 0.42, y: glyph.at.y - R * 0.34 }
       : { x: glyph.at.x, y: glyph.at.y - R * 0.08 };
-    if (kind) {
-      icons.push({ kind, at, color: glyph.color, size });
+    kinds.forEach((one, index) => {
+      const at =
+        kinds.length > 1 ? { x: base.x + (index === 0 ? -0.55 : 0.55) * size, y: base.y } : base;
+      icons.push({ kind: one, at, color: glyph.color, size });
       // Уровень — точки под знаком: на одну меньше уровня (первый уровень без точек).
-      const level = kind === 'fort' ? fortLevel(glyph.building) : depotLevel(glyph.building);
+      const level = one === 'fort' ? fortLevel(glyph.building) : depotLevel(glyph.building);
       for (let i = 1; i < level; i += 1) {
         const x = at.x + (i - level / 2) * size * 0.3;
         icons.push({
@@ -46,7 +53,7 @@ export function drawConstructions(
           size: size * 0.38,
         });
       }
-    }
+    });
 
     if (glyph.improvement <= 0) continue;
     const shared = kind !== null || glyph.city;

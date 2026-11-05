@@ -4,6 +4,8 @@ import { DEPOT_MIN_DISTANCE, TICKS_PER_S } from '../../src/balance.ts';
 import { distance, offsetToAxial } from '../../src/math/hex.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { canFoundCity } from '../../src/queries/city.ts';
+import { depotLevel } from '../../src/state/depot.ts';
+import { fortLevel } from '../../src/state/fort.ts';
 import { hashState } from '../../src/state/hash.ts';
 import { BUILDING } from '../../src/state/types.ts';
 import {
@@ -241,6 +243,24 @@ describe('постройки', () => {
     expect(s.rejections()).toEqual(['maxLevel']);
   });
 
+  it('укрепление и склад стоят на одном гексе, улучшаются независимо', () => {
+    const s = fresh();
+    s.player('A').gold = 5_000_000 as never;
+    const hex = cellAt(s, 4);
+    const id = hex.col + hex.row * s.state.map.width;
+    s.cmd('A', build(hex, 'fort'));
+    s.runSeconds(10);
+    s.cmd('A', build(hex, 'depot'));
+    s.runSeconds(15);
+    expect(s.rejections()).toEqual([]);
+    expect(fortLevel(s.state.hexes.building[id] ?? 0)).toBe(1);
+    expect(depotLevel(s.state.hexes.building[id] ?? 0)).toBe(1);
+    s.cmd('A', build(hex, 'fort'));
+    s.runSeconds(16);
+    expect(fortLevel(s.state.hexes.building[id] ?? 0)).toBe(2);
+    expect(depotLevel(s.state.hexes.building[id] ?? 0)).toBe(1);
+  });
+
   it('склад строится на своём гексе без дороги', () => {
     const s = fresh();
     const hex = cellAt(s, 4);
@@ -299,17 +319,18 @@ describe('постройки', () => {
     },
   );
 
-  it('одна постройка на гекс, благоустройство с ней совместимо', () => {
+  it('укрепление не мешает складу и благоустройству: склад отказывает только по расстоянию', () => {
     const s = fresh();
     const hex = cellAt(s, 2);
     s.cmd('A', build(hex, 'fort'));
     s.runSeconds(10);
     s.cmd('A', build(hex, 'depot'));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['buildingExists']);
+    // Склад у города нельзя по расстоянию, а не потому, что на гексе стоит укрепление.
+    expect(s.rejections()).toEqual(['depotTooClose']);
     s.cmd('A', improve(hex));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['buildingExists']);
+    expect(s.rejections()).toEqual(['depotTooClose']);
   });
 });
 

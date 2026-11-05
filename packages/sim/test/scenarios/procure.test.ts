@@ -83,4 +83,25 @@ describe('закупка под заказ численности', () => {
       .reduce((sum, r) => sum + r.soldiers, 0);
     expect(soldiers + queued).toBeGreaterThanOrEqual(250_000);
   });
+
+  it('лимит уменьшен — лишние солдаты уходят в резерв: целыми отрядами и отделённой частью', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const ids = [1, 2, 3].map((row) => s.unit('A', 'infantry', 300, at(2, row)));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Строй' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Строй');
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'assignUnits', unitIds: ids, armyId: army?.id ?? -1 } },
+      { playerId: 0, cmd: { t: 'setArmyLimit', armyId: army?.id ?? -1, soldiers: 400 } },
+    ]);
+    s.runSeconds(3);
+    const inArmy = s.state.units
+      .filter((u) => u.armyId === army?.id)
+      .reduce((sum, u) => sum + u.soldiers, 0);
+    const reserve = s.state.units
+      .filter((u) => u.owner === 0 && u.armyId === null)
+      .reduce((sum, u) => sum + u.soldiers, 0);
+    expect(inArmy).toBe(400_000);
+    expect(reserve).toBe(500_000);
+  });
 });

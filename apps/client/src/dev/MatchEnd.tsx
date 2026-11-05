@@ -10,6 +10,8 @@ export function MatchEnd(props: {
   readonly onMenu?: (path: string) => void;
   readonly replay?: readonly PlayerView[];
   readonly reason?: WinReason;
+  /** Победившая коалиция: победа засчитывается и союзникам. */
+  readonly allies?: readonly number[];
 }): React.JSX.Element | null {
   const player = props.view.players[props.view.playerId];
   const eliminated = player?.status !== 'alive';
@@ -36,6 +38,7 @@ export function MatchEnd(props: {
     eliminated,
     fog: props.fog ?? true,
     ...(props.reason ? { reason: props.reason } : {}),
+    ...(props.allies ? { allies: props.allies } : {}),
     victoryHold: props.view.victoryHold ?? null,
     onWatch: props.onWatch ?? (() => undefined),
     onMenu: props.onMenu ?? (() => undefined),

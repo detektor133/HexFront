@@ -16,13 +16,13 @@ export const NEUTRAL = -1;
 export const BUILDING = {
   none: 0,
   fort: 1,
-  depot: 2,
-  depot2: 3,
-  depot3: 4,
-  depot4: 5,
-  depot5: 6,
-  fort2: 7,
-  fort3: 8,
+  fort2: 2,
+  fort3: 3,
+  depot: 4,
+  depot2: 8,
+  depot3: 12,
+  depot4: 16,
+  depot5: 20,
 } as const;
 
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
@@ -306,7 +306,13 @@ export type GameEvent =
     }
   | { readonly t: 'playerEliminated'; readonly playerId: number }
   | { readonly t: 'offensiveDone'; readonly playerId: number; readonly armyId: number }
-  | { readonly t: 'matchWon'; readonly playerId: number; readonly reason: WinReason }
+  | {
+      readonly t: 'matchWon';
+      readonly playerId: number;
+      readonly reason: WinReason;
+      /** Победившая коалиция (с playerId во главе); нет поля — победил один игрок. */
+      readonly allies?: readonly number[];
+    }
   | {
       readonly t: 'constructionDone' | 'constructionCancelled';
       readonly playerId: number;
@@ -315,7 +321,7 @@ export type GameEvent =
     };
 
 /** Как выиграна партия (08-match.md, «Победа»). */
-export type WinReason = 'cities' | 'lastStanding' | 'score';
+export type WinReason = 'cities' | 'allCities' | 'lastStanding' | 'coalition';
 
 /** Отношение пары игроков (дипломатия, CR-007). */
 export type Relation = 'peace' | 'war' | 'pact' | 'alliance';

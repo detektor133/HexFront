@@ -192,17 +192,73 @@ describe('победа', () => {
     expect(s.lastEvent('matchWon')).toMatchObject({ reason: 'lastStanding' });
   });
 
-  it('таймер 25:00 — победа по очкам', () => {
+  it('таймера матча нет: через час без победителя игра продолжается', () => {
     const s = scenario(
       `
       A1 a  a  N1 ~  N1 ~  B1 ~  N1
     `,
       { legend },
     );
-    s.setTick(1500 * 10 - 1);
-    s.runTicks(1);
+    s.setTick(60 * 60 * 10);
+    s.runTicks(20);
+    expect(s.state.winner).toBe(-1);
+  });
+
+  it('все города карты у одного игрока — победа сразу, без отсчёта 60 с', () => {
+    const s = scenario(
+      `
+      A1 r  A2 ~  B1 b
+    `,
+      { legend },
+    );
+    s.unit('B', 'infantry', 50, at(4, 0));
+    s.setOwner(at(4, 0), 'A');
+    s.runTicks(2);
     expect(s.state.winner).toBe(0);
-    expect(s.lastEvent('matchWon')).toMatchObject({ reason: 'score' });
+    expect(s.lastEvent('matchWon')).toMatchObject({ playerId: 0, reason: 'allCities' });
+  });
+
+  it('коалиция: все живые — союзники, побеждают вместе', () => {
+    const s = scenario(
+      `
+      A1 a  a  ~  B1 b  b
+    `,
+      { legend },
+    );
+    const n = s.state.players.length;
+    s.state.diplomacy = {
+      relation: Array.from({ length: n * n }, () => 'peace' as const),
+      violations: Array.from({ length: n }, () => 0),
+      offers: [],
+    };
+    s.state.diplomacy.relation[0 * n + 1] = 'alliance';
+    s.state.diplomacy.relation[1 * n + 0] = 'alliance';
+    s.runTicks(2);
+    expect(s.state.winner).toBe(0);
+    expect(s.lastEvent('matchWon')).toMatchObject({ reason: 'coalition', allies: [0, 1] });
+  });
+
+  it('города коалиции считаются вместе: все города у союзников — победа', () => {
+    const s = scenario(
+      `
+      A1 a  a  ~  B1 b  b  ~  N1
+    `,
+      { legend },
+    );
+    s.unit('B', 'infantry', 50, at(4, 0));
+    const n = s.state.players.length;
+    s.state.diplomacy = {
+      relation: Array.from({ length: n * n }, () => 'peace' as const),
+      violations: Array.from({ length: n }, () => 0),
+      offers: [],
+    };
+    s.setOwner(at(8, 0), 'A');
+    s.runTicks(2);
+    expect(s.state.winner).toBe(-1);
+    s.state.diplomacy.relation[0 * n + 1] = 'alliance';
+    s.state.diplomacy.relation[1 * n + 0] = 'alliance';
+    s.runTicks(2);
+    expect(s.state.winner).toBeGreaterThanOrEqual(0);
   });
 });
 

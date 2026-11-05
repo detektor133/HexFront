@@ -2,10 +2,11 @@
 // GDD: docs/gdd/03-cities-buildings.md
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
-import { depotBuilding, depotLevel } from '../state/depot.ts';
+import { withDepot, withFort } from '../state/building.ts';
+import { depotLevel } from '../state/depot.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
-import { fortBuilding, fortLevel } from '../state/fort.ts';
-import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
+import { fortLevel } from '../state/fort.ts';
+import { type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
 
 function complete(state: MatchState, c: Construction): void {
@@ -41,15 +42,18 @@ function complete(state: MatchState, c: Construction): void {
       hexes.improvement[c.hex] = (hexes.improvement[c.hex] ?? 0) + 1;
       return;
     case 'fort':
-      hexes.building[c.hex] = BUILDING.fort;
+      hexes.building[c.hex] = withFort(hexes.building[c.hex] ?? 0, 1);
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       return;
     case 'upgradeFort':
-      hexes.building[c.hex] = fortBuilding(fortLevel(hexes.building[c.hex] ?? 0) + 1);
+      hexes.building[c.hex] = withFort(
+        hexes.building[c.hex] ?? 0,
+        fortLevel(hexes.building[c.hex] ?? 0) + 1,
+      );
       return;
     case 'depot':
-      hexes.building[c.hex] = BUILDING.depot;
+      hexes.building[c.hex] = withDepot(hexes.building[c.hex] ?? 0, 1);
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       markNetworkDirty(state, c.owner);
@@ -57,7 +61,10 @@ function complete(state: MatchState, c: Construction): void {
       queueAutoRoad(state, c.owner, c.hex, true);
       return;
     case 'upgradeDepot':
-      hexes.building[c.hex] = depotBuilding(depotLevel(hexes.building[c.hex] ?? 0) + 1);
+      hexes.building[c.hex] = withDepot(
+        hexes.building[c.hex] ?? 0,
+        depotLevel(hexes.building[c.hex] ?? 0) + 1,
+      );
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       return;

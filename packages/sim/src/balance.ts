@@ -39,7 +39,6 @@ export const BOT_WAR_GRACE_TICKS = 3000;
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;
 
-export const MATCH_TIME_LIMIT_S: Fp = fp(1500);
 export const PREP_TIME_S: Fp = fp(5);
 
 // Местность

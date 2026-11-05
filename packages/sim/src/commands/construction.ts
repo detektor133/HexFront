@@ -27,7 +27,7 @@ import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { depotLevel, isDepot } from '../state/depot.ts';
 import { fortLevel } from '../state/fort.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
-import { BUILDING, type ConstructionKind, type MatchState } from '../state/types.ts';
+import { type ConstructionKind, type MatchState } from '../state/types.ts';
 
 type BuildCommand = Extract<Command, { t: 'foundCity' | 'upgradeCity' | 'improve' | 'build' }>;
 
@@ -172,7 +172,7 @@ function planBuild(
     if (cost === undefined || timeS === undefined) return fail('maxLevel');
     return plan({ kind: 'upgradeFort', hex, cost, timeS });
   }
-  if (state.hexes.building[hex] !== BUILDING.none) return fail('buildingExists');
+  // Укрепление и склад на одном гексе ставятся вместе: своё здание уже улучшается выше, чужого не ждём.
   if (kind === 'fort') {
     // У города своя оборона ×1,3, укрепление в нём не ставится.
     if (cityAt(state, hex)) return fail('fortInCity');
