@@ -3,6 +3,7 @@
 import { VISION_CITY, VISION_RECALC_TICKS, VISION_TERRITORY, VISION_UNIT } from '../balance.ts';
 import { hexFromId, hexId, spiral, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
+import { isAllied } from '../state/relations.ts';
 import type { MatchState, VisionSource, VisionState } from '../state/types.ts';
 
 export function createVisionState(players: number, size: number): VisionState {
@@ -20,6 +21,7 @@ export function createVisionState(players: number, size: number): VisionState {
     unitSources: new Map(),
     citySources: new Map(),
     dirty: Array.from({ length: players }, () => new Set<number>()),
+    allianceKey: '',
     initialized: false,
   };
 }
@@ -47,6 +49,26 @@ function markDirty(vision: VisionState, player: number, id: number): void {
   vision.dirty[player]?.add(id);
 }
 
+/** Союзники игрока: общий обзор (08-match.md, «Дипломатия»). */
+function alliesOf(state: MatchState, player: number): number[] {
+  const out: number[] = [];
+  for (let other = 0; other < state.players.length; other += 1) {
+    if (isAllied(state, player, other)) out.push(other);
+  }
+  return out;
+}
+
+/** Меняется, когда заключается или рвётся союз: тогда обзор всех пересчитывается целиком. */
+function allianceKey(state: MatchState): string {
+  const pairs: string[] = [];
+  for (let a = 0; a < state.players.length; a += 1) {
+    for (let b = a + 1; b < state.players.length; b += 1) {
+      if (isAllied(state, a, b)) pairs.push(`${a}-${b}`);
+    }
+  }
+  return pairs.join(',');
+}
+
 function updateSource(
   state: MatchState,
   vision: VisionState,
@@ -57,9 +79,11 @@ function updateSource(
   if (source.owner < 0) return;
   const coverage = vision.coverage[source.owner];
   if (!coverage) return;
+  // Изменение покрытия владельца видят он сам и его союзники.
+  const watchers = [source.owner, ...alliesOf(state, source.owner)];
   forEachAround(state, source.hex, sourceRadius(kind), (id) => {
     coverage[id] = Math.max(0, (coverage[id] ?? 0) + delta);
-    markDirty(vision, source.owner, id);
+    for (const watcher of watchers) markDirty(vision, watcher, id);
   });
 }
 
@@ -87,8 +111,9 @@ function flushDirty(state: MatchState, vision: VisionState): void {
     const improvements = vision.improvement[player];
     const buildings = vision.building[player];
     if (!dirty || !visible || !explored || !roads || !improvements || !buildings) continue;
+    const group = [player, ...alliesOf(state, player)];
     for (const id of dirty) {
-      const isVisible = vision.coverage[player]?.[id] !== 0;
+      const isVisible = group.some((member) => vision.coverage[member]?.[id] !== 0);
       visible[id] = isVisible ? 1 : 0;
       if (!isVisible) continue;
       explored[id] = 1;
@@ -119,6 +144,7 @@ function initializeIncremental(state: MatchState, vision: VisionState): void {
     updateSource(state, vision, source, 1, 'city');
   }
   vision.initialized = true;
+  vision.allianceKey = allianceKey(state);
   flushDirty(state, vision);
 }
 
@@ -191,6 +217,19 @@ export function recalculateVision(state: MatchState, vision: VisionState): void 
           visible[id] = 1;
         });
     }
+  }
+  // Союзники делят обзор: к собственному обзору добавляется собственный обзор каждого союзника
+  // (не слитый — иначе союз цепочкой A–B–C открыл бы A карту C).
+  const own = vision.visible.map((v) => v.slice());
+  for (let player = 0; player < state.players.length; player += 1) {
+    const visible = vision.visible[player];
+    const explored = vision.explored[player];
+    if (!visible || !explored) continue;
+    for (const ally of alliesOf(state, player)) {
+      const theirs = own[ally];
+      if (!theirs) continue;
+      for (let id = 0; id < theirs.length; id += 1) if (theirs[id] === 1) visible[id] = 1;
+    }
     for (let id = 0; id < state.hexes.owner.length; id += 1) {
       if (visible[id] !== 1) continue;
       explored[id] = 1;
@@ -212,6 +251,14 @@ export function visionSystem(state: MatchState): void {
     return;
   }
   if (state.tick % VISION_RECALC_TICKS !== 0) return;
+  const key = allianceKey(state);
+  if (key !== state.vision.allianceKey) {
+    // Союз заключён или разорван: у каждого игрока пересчитывается весь обзор.
+    state.vision.allianceKey = key;
+    for (let player = 0; player < state.players.length; player += 1) {
+      for (let id = 0; id < state.hexes.owner.length; id += 1) markDirty(state.vision, player, id);
+    }
+  }
   syncHexes(state, state.vision);
   syncSources(state, state.vision, 'unit');
   syncSources(state, state.vision, 'city');

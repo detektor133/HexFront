@@ -3,6 +3,7 @@ import type { BotTickContext } from './context.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import { neighbors, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { fpDiv, fpMul, type Fp } from '../math/int.ts';
+import { atWar } from '../state/relations.ts';
 import type { MatchState } from '../state/types.ts';
 import { playerIncomePerSecond, playerUpkeepPerSecond } from '../systems/economy.ts';
 
@@ -39,7 +40,8 @@ function contactHexes(
       if (!inBounds(neighbor, state.map.width, state.map.height)) continue;
       const hex = hexId(neighbor, state.map.width);
       const enemy = state.hexes.owner[hex] ?? -1;
-      if (enemy < 0 || enemy === playerId) continue;
+      // Союзник, пакт и мир — не угроза: иначе бот рядом с союзником всё время «обороняется».
+      if (enemy < 0 || enemy === playerId || !atWar(state, playerId, enemy)) continue;
       const theirs = contacts.get(enemy) ?? new Set<HexId>();
       theirs.add(hex);
       contacts.set(enemy, theirs);

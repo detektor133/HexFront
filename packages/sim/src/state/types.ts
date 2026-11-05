@@ -10,10 +10,18 @@ export const NEUTRAL = -1;
 
 /** Коды постройки гекса в hexes.building; 0 — нет постройки. */
 /**
- * Постройки гекса. Склад — три уровня: код `depot` (1), `depot2` (2), `depot3` (3); уровень склада
+ * Постройки гекса. Склад — пять уровней: коды `depot` (1) … `depot5` (5); уровень склада
  * определяет `depotLevel`.
  */
-export const BUILDING = { none: 0, fort: 1, depot: 2, depot2: 3, depot3: 4 } as const;
+export const BUILDING = {
+  none: 0,
+  fort: 1,
+  depot: 2,
+  depot2: 3,
+  depot3: 4,
+  depot4: 5,
+  depot5: 6,
+} as const;
 
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
 export interface HexState {
@@ -367,6 +375,8 @@ export interface VisionState {
   readonly unitSources: Map<number, VisionSource>;
   readonly citySources: Map<number, VisionSource>;
   readonly dirty: Set<number>[];
+  /** Какие пары в союзе на момент последнего пересчёта: смена требует полного пересчёта обзора. */
+  allianceKey: string;
   initialized: boolean;
 }
 

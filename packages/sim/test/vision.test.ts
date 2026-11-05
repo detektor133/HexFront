@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TICKS_PER_S, VISION_RECALC_TICKS } from '../src/balance.ts';
 import { move, own, city, scenario, at } from './scenario/dsl.ts';
+import { createDiplomacy, setRelation } from '../src/state/relations.ts';
 import { createVisionState, recalculateVision } from '../src/systems/vision.ts';
 
 function visionSnapshot(vision: ReturnType<typeof createVisionState>): unknown {
@@ -13,6 +14,34 @@ function visionSnapshot(vision: ReturnType<typeof createVisionState>): unknown {
     building: vision.building.map((values) => [...values]),
   };
 }
+
+describe('общий обзор союзников', () => {
+  const legend = {
+    A: own('A'),
+    A1: city('A', 1, { capital: true }),
+    B1: city('B', 1, { capital: true }),
+    b: own('B'),
+  };
+  const MAP = `
+    A1 A  A  .  .  .  .  .  .  .  .  .  .  .  .  b  b  B1
+  `;
+
+  it('союзник видит то, что видит союзник, и перестаёт при разрыве союза', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    s.runTicks(VISION_RECALC_TICKS + 1);
+    const far = at(16, 0).col;
+    const visible = (player: number): number => s.state.vision?.visible[player]?.[far] ?? 0;
+    expect(visible(0)).toBe(0);
+    expect(visible(1)).toBe(1);
+    setRelation(s.state, 0, 1, 'alliance');
+    s.runTicks(VISION_RECALC_TICKS * 2);
+    expect(visible(0)).toBe(1);
+    setRelation(s.state, 0, 1, 'peace');
+    s.runTicks(VISION_RECALC_TICKS * 2);
+    expect(visible(0)).toBe(0);
+  });
+});
 
 describe('инкрементальный обзор', () => {
   it('совпадает с полным пересчётом после изменений источников обзора', () => {

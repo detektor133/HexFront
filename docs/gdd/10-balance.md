@@ -44,8 +44,8 @@
 | `RIVER_MOVE_PENALTY_S` | 1,0 |
 | `RIVER_ATTACK_MULT` | 0,7 |
 | `ROAD_MOVE_MULT` | 0,5 |
-| `DEPOT_SUPPLY` | 120 / 240 / 400 (уровни 1–3) `[ТЮНИНГ]` |
-| `DEPOT_UPGRADE_COST` / `_TIME_S` | 120 / 20 с (1→2); 220 / 30 с (2→3) `[ТЮНИНГ]` |
+| `DEPOT_SUPPLY` | 120 / 240 / 400 / 600 / 850 (уровни 1–5) `[ТЮНИНГ]` |
+| `DEPOT_UPGRADE_COST` / `_TIME_S` | 120 / 20 с (1→2); 220 / 30 с (2→3); 350 / 40 с (3→4); 520 / 50 с (4→5) `[ТЮНИНГ]` |
 | `UNIT_SPEED_MULT` | 1,5 `[ТЮНИНГ]` (время шага отряда делится на множитель) |
 | `ZOC_MOVE_MULT` | 2,0 |
 | `FERTILE_CAP_MULT` | 1,5 |
@@ -146,7 +146,7 @@
 | `ATK` | 1,0 | 2,0 | 0 |
 | `DEF` | 1,2 | 0,9 | 0,6 |
 | `SPEED` plains / forest,hills / mountains / desert | 1,0 / 0,7 / 0,5 / 0,9 | 1,6 / 0,8 / 0,5 / 1,4 | 0,7 / 0,5 / 0,4 / 0,7 |
-| `SUPPLY_PER_SOLDIER` | 1,0 | 2,5 | 1,5 |
+| `SUPPLY_PER_SOLDIER` | 0,5 | 1,25 | 0,75 |
 | `RECRUIT_BASE_S` / `_PER_100_S` | 4 / 0,5 | 8 / 1 | 6 / 0,75 |
 
 | Константа | Значение |

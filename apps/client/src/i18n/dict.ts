@@ -30,7 +30,7 @@ const ru = {
     'Когда отряды выбраны, ПКМ по гексу — идти, по врагу — атаковать, сразу и без подтверждения. Shift+ПКМ добавляет промежуточную точку маршрута.',
   'tutorial.own.title': 'Свой гекс: ЛКМ',
   'tutorial.own.text':
-    'ЛКМ по своему гексу открывает карточку: основать город, склад, форт, набор войск. Склад кормит армию, улучшается до 3 уровня и сам тянет дорогу.',
+    'ЛКМ по своему гексу открывает карточку: основать город, склад, форт, набор войск. Склад кормит армию, улучшается до 5 уровня и сам тянет дорогу.',
   'tutorial.camera.title': 'Камера и клавиши',
   'tutorial.camera.text':
     'Колесо — масштаб, ПКМ-перетаскивание по пустому месту — двигать карту. Tab — следующая армия, Space — на последнее событие, Shift+1…9 — запомнить группу, 1…9 — выбрать её.',
@@ -396,7 +396,7 @@ const en: Record<MessageKey, string> = {
     'With units selected, right-click a hex to move, an enemy to attack, with no confirmation. Shift+right-click adds a waypoint.',
   'tutorial.own.title': 'Your hex: left click',
   'tutorial.own.text':
-    'Left-click your own hex for its card: found a city, depot, fort, recruit. A depot feeds the army, upgrades to level 3 and lays its own road.',
+    'Left-click your own hex for its card: found a city, depot, fort, recruit. A depot feeds the army, upgrades to level 5 and lays its own road.',
   'tutorial.camera.title': 'Camera and keys',
   'tutorial.camera.text':
     'Wheel zooms, right-drag on empty ground pans the map. Tab cycles armies, Space jumps to the last event, Shift+1…9 saves a group, 1…9 recalls it.',

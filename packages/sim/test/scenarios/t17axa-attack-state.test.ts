@@ -61,12 +61,12 @@ describe('07/T17axa: состояние атаки и локальная оце�
     s.runTicks(1);
 
     // При двух атакующих по 600 солдат и защитнике в 200 солдат времена до слома
-    // дают преимущество атакующего 92; для защитника стороны инвертируются: 100 − 92 = 8.
+    // дают преимущество атакующего 94; для защитника стороны инвертируются: 100 − 94 = 6.
     const attackerState = attackState(playerView(s.state, 0), attacker);
     const defenderState = attackState(playerView(s.state, 1), attacker);
 
-    expect(attackerState).toMatchObject({ target: targetHex, advantage: 92, status: 'success' });
-    expect(defenderState).toMatchObject({ target: targetHex, advantage: 8, status: 'danger' });
+    expect(attackerState).toMatchObject({ target: targetHex, advantage: 94, status: 'success' });
+    expect(defenderState).toMatchObject({ target: targetHex, advantage: 6, status: 'danger' });
   });
 
   it('использует цвета success, warning и danger из исхода прогноза', () => {
@@ -80,7 +80,7 @@ describe('07/T17axa: состояние атаки и локальная оце�
     };
 
     expect(run(900, 200)?.status).toBe('success');
-    expect(run(800, 500)?.status).toBe('warning');
+    expect(run(650, 500)?.status).toBe('warning');
     expect(run(100, 900)?.status).toBe('danger');
   });
 

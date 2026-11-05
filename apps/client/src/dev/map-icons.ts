@@ -1,8 +1,7 @@
 // Знаки на карте — те же иконки Tabler, что на кнопках строительства (HexCard): склад — коробка,
 // укрепление — щит, город — замок, благоустройство — шевроны; столица — звезда. Без дисков:
-// иконка цвета владельца с белой обводкой. Контуры рисуются в canvas один раз на вид и становятся
-// белыми текстурами; цвет даёт тинт спрайта.
-import { CanvasSource, Container, Sprite, Texture } from 'pixi.js';
+// иконка цвета владельца с белой обводкой.
+import { Container, Graphics, GraphicsContext, GraphicsPath } from 'pixi.js';
 
 import type { Point } from '../render/hex-geometry.ts';
 
@@ -38,78 +37,64 @@ const ICON_PATHS: Readonly<Record<MapIconKind, readonly string[]>> = {
   improvement: ['M7 11l5 -5l5 5', 'M7 17l5 -5l5 5'],
 };
 
-// Крупная текстура + мипмапы: при любом зуме иконка уменьшается честным фильтром, а не «мылится».
-const TEXTURE_PX = 256;
-const STROKE = 3.2;
-const OUTLINE = 3.4;
-const cache = new Map<string, Texture>();
+// Иконки — векторные: контуры Tabler рисуются Graphics в мировых единицах и перетесселируются
+// видеокартой с MSAA, поэтому края острые при любом зуме (растровая текстура всегда «мылилась»).
+const STROKE = 2.6;
+const OUTLINE = 2.8;
+/** Контекст на (вид, цвет, обводка) общий для всех иконок: геометрия строится один раз. */
+const contexts = new Map<string, GraphicsContext>();
 
-// Две белые текстуры одной иконки: обводка (толще, звезда с заливкой) идёт под цветной иконкой.
-function iconTexture(kind: MapIconKind, outline: boolean): Texture {
-  const key = kind + (outline ? ':outline' : ':fill');
-  const cached = cache.get(key);
+function iconContext(kind: MapIconKind, color: string, outline: boolean): GraphicsContext {
+  const key = `${kind}:${color}:${outline ? 'o' : 'f'}`;
+  const cached = contexts.get(key);
   if (cached) return cached;
-  const canvas = document.createElement('canvas');
-  canvas.width = TEXTURE_PX;
-  canvas.height = TEXTURE_PX;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.scale(TEXTURE_PX / 24, TEXTURE_PX / 24);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.lineWidth = outline ? STROKE + OUTLINE : STROKE;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    for (const d of ICON_PATHS[kind]) {
-      const path = new Path2D(d);
-      if (kind === 'capital') ctx.fill(path);
-      ctx.stroke(path);
-    }
+  const context = new GraphicsContext();
+  const width = outline ? STROKE + OUTLINE : STROKE;
+  for (const d of ICON_PATHS[kind]) {
+    const path = new GraphicsPath(d);
+    // Звезда столицы закрашена: сплошной силуэт читается мельче линейных значков.
+    if (kind === 'capital') context.path(path).fill({ color });
+    context.path(path).stroke({ color, width, cap: 'round', join: 'round' });
   }
-  const texture = new Texture({
-    source: new CanvasSource({ resource: canvas, autoGenerateMipmaps: true, scaleMode: 'linear' }),
-  });
-  cache.set(key, texture);
-  return texture;
+  contexts.set(key, context);
+  return context;
 }
 
 export interface MapIconLayer {
   readonly container: Container;
-  /** Расставляет иконки: лишние спрайты прячутся, недостающие создаются. */
+  /** Расставляет иконки: лишние графики прячутся, недостающие создаются. */
   sync(icons: readonly MapIcon[]): void;
 }
 
-/** Без DOM (юнит-тесты в node) текстуры не строятся — слой пустой. */
+const WHITE = '#FFFFFF';
+
 export function createMapIconLayer(): MapIconLayer {
   const container = new Container();
-  const pool: Sprite[] = [];
-  const place = (index: number, texture: Texture, icon: MapIcon, tint: string): void => {
-    let sprite = pool[index];
-    if (!sprite) {
-      sprite = new Sprite();
-      sprite.anchor.set(0.5);
-      pool.push(sprite);
-      container.addChild(sprite);
+  const pool: Graphics[] = [];
+  const place = (index: number, context: GraphicsContext, icon: MapIcon): void => {
+    let g = pool[index];
+    if (!g) {
+      g = new Graphics();
+      g.pivot.set(12, 12);
+      pool.push(g);
+      container.addChild(g);
     }
-    sprite.visible = true;
-    sprite.texture = texture;
-    sprite.tint = tint;
-    sprite.position.set(icon.at.x, icon.at.y);
-    sprite.width = icon.size;
-    sprite.height = icon.size;
+    g.visible = true;
+    g.context = context;
+    g.position.set(icon.at.x, icon.at.y);
+    g.scale.set(icon.size / 24);
   };
   return {
     container,
     sync(icons) {
-      if (typeof document === 'undefined') return;
       // Сначала все обводки, затем все цветные иконки: соседние знаки не затирают друг друга.
-      icons.forEach((icon, i) => place(i, iconTexture(icon.kind, true), icon, '#FFFFFF'));
+      icons.forEach((icon, i) => place(i, iconContext(icon.kind, WHITE, true), icon));
       icons.forEach((icon, i) =>
-        place(icons.length + i, iconTexture(icon.kind, false), icon, icon.color),
+        place(icons.length + i, iconContext(icon.kind, icon.color, false), icon),
       );
       for (let i = icons.length * 2; i < pool.length; i += 1) {
-        const sprite = pool[i];
-        if (sprite) sprite.visible = false;
+        const g = pool[i];
+        if (g) g.visible = false;
       }
     },
   };

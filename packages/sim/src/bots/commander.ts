@@ -309,7 +309,7 @@ function expand(
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   // Расстояние до своей земли считается один раз на город, а не на каждый отряд.
   const bordering = cities.filter((h) => borderGap(h) <= 1);
-  const foes = view.units.filter((x) => x.owner !== view.playerId);
+  const foes = view.units.filter((x) => warWith(view, x.owner));
   // Свободные места в гексе для отделяемых частей: общие на все отряды гекса.
   const room = new Map<HexId, number>();
   const roomAt = (hex: HexId): number => {

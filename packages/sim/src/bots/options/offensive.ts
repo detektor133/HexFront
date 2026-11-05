@@ -1,6 +1,7 @@
 import { validatePlanCommand } from '../../commands/plan.ts';
 import { fpDiv, fp, type Fp } from '../../math/int.ts';
 import { edgeOther } from '../../state/edges.ts';
+import { atWar } from '../../state/relations.ts';
 import type { MatchState } from '../../state/types.ts';
 import type { BotTickContext } from '../context.ts';
 import { hasOptionState, option } from './helpers.ts';
@@ -25,7 +26,7 @@ function offensiveOptions(
     const enemyOwners = new Set(
       [...frontHexes]
         .map((hex) => state.hexes.owner[hex] ?? -1)
-        .filter((owner) => owner >= 0 && owner !== playerId),
+        .filter((owner) => owner >= 0 && owner !== playerId && atWar(state, playerId, owner)),
     );
     const mine = (context.unitsByPlayer[playerId] ?? [])
       .filter((unit) => unit.armyId === army.id)

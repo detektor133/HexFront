@@ -161,11 +161,11 @@ export const DEPOT_RADIUS = 3;
 /** Минимальная дистанция до любого склада или города, гексов. */
 export const DEPOT_MIN_DISTANCE = 3;
 export const DEPOT_LOSS_MULT: Fp = fp(0.5);
-/** Снабжение, которое производит склад уровня 1–3 (единиц; 1 единица кормит солдата пехоты). */
-export const DEPOT_SUPPLY: readonly Fp[] = [fp(120), fp(240), fp(400)];
-/** Улучшение склада с уровня 1 и 2: цена, золото; время, секунды. */
-export const DEPOT_UPGRADE_COST: readonly Fp[] = [fp(120), fp(220)];
-export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30)];
+/** Снабжение, которое производит склад уровня 1–5 (единиц; 1 единица кормит 2 солдат пехоты). */
+export const DEPOT_SUPPLY: readonly Fp[] = [fp(120), fp(240), fp(400), fp(600), fp(850)];
+/** Улучшение склада с уровня 1..4: цена, золото; время, секунды. */
+export const DEPOT_UPGRADE_COST: readonly Fp[] = [fp(120), fp(220), fp(350), fp(520)];
+export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30), fp(40), fp(50)];
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */
@@ -227,9 +227,9 @@ export const SPEED: ByUnit<ByTerrain<Fp>> = {
   },
 };
 export const SUPPLY_PER_SOLDIER: ByUnit<Fp> = {
-  infantry: fp(1.0),
-  armor: fp(2.5),
-  artillery: fp(1.5),
+  infantry: fp(0.5),
+  armor: fp(1.25),
+  artillery: fp(0.75),
 };
 export const RECRUIT_BASE_S: ByUnit<Fp> = { infantry: fp(4), armor: fp(8), artillery: fp(6) };
 /** В таблице — `_PER_100_S` рядом с `RECRUIT_BASE_S`: секунд на каждые 100 солдат. */

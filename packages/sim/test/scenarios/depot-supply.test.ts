@@ -45,18 +45,32 @@ describe('склад — узел снабжения', () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  it('склад улучшается до третьего уровня и производит больше снабжения', () => {
+  it('склад улучшается до пятого уровня и производит больше снабжения', () => {
     const s = game();
     s.cmd('A', build(at(6, 0), 'depot'));
     s.runSeconds(15);
-    s.cmd('A', build(at(6, 0), 'depot'));
-    s.runSeconds(21);
-    expect(s.state.hexes.building[idOf(s, 6)]).toBe(BUILDING.depot2);
-    s.cmd('A', build(at(6, 0), 'depot'));
-    s.runSeconds(31);
-    expect(s.state.hexes.building[idOf(s, 6)]).toBe(BUILDING.depot3);
+    const levels = [
+      [21, BUILDING.depot2],
+      [31, BUILDING.depot3],
+      [41, BUILDING.depot4],
+      [51, BUILDING.depot5],
+    ] as const;
+    for (const [seconds, code] of levels) {
+      s.cmd('A', build(at(6, 0), 'depot'));
+      s.runSeconds(seconds);
+      expect(s.state.hexes.building[idOf(s, 6)]).toBe(code);
+    }
     s.cmd('A', build(at(6, 0), 'depot'));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['maxLevel']);
+  });
+
+  it('второй склад рядом со строящимся первым заложить нельзя', () => {
+    const s = game();
+    s.cmd('A', build(at(6, 0), 'depot'));
+    s.runTicks(2);
+    s.cmd('A', build(at(4, 0), 'depot'));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['depotTooClose']);
   });
 });

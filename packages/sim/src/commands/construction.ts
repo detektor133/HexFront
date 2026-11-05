@@ -76,14 +76,15 @@ function tooCloseToCity(state: MatchState, hex: HexId): boolean {
 
 // Склад не ближе DEPOT_MIN_DISTANCE к СВОЕМУ складу или городу: чужой город или склад на границе
 // строить не мешает (склад у врага — не повод оставлять свою армию без снабжения). Склады ищем в
-// кольце радиуса DEPOT_MIN_DISTANCE − 1 вокруг гекса, а не по всей карте.
+// кольце радиуса DEPOT_MIN_DISTANCE − 1 вокруг гекса, а не по всей карте. Строящиеся склады и города
+// считаются так же, как готовые: иначе рядом со стройкой можно заложить второй склад.
 function tooCloseToDepot(state: MatchState, playerId: number, hex: HexId): boolean {
   const { width, height } = state.map;
   const candidate = hexFromId(hex, width);
   const sites = [
     ...state.cities.filter((c) => c.owner === playerId).map((c) => c.hex),
     ...state.constructions
-      .filter((c) => c.kind === 'foundCity' && c.owner === playerId)
+      .filter((c) => (c.kind === 'foundCity' || c.kind === 'depot') && c.owner === playerId)
       .map((c) => c.hex),
   ];
   if (

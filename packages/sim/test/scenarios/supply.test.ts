@@ -89,19 +89,19 @@ describe('снабжённость отрядов', () => {
     `,
       { legend },
     );
-    const id = s.unit('A', 'infantry', 1000, at(0, 0));
+    const id = s.unit('A', 'infantry', 2000, at(0, 0));
     expect(supplyAfterRecalc(s, id)).toBe(50);
   });
 
-  it('бронетехника потребляет 2,5 на солдата', () => {
+  it('бронетехника потребляет 1,25 на солдата', () => {
     const s = scenario(
       `
       A1 a
     `,
       { legend },
     );
-    // 500 / (400 × 2,5) = 50 %.
-    const id = s.unit('A', 'armor', 400, at(0, 0));
+    // 500 / (800 × 1,25) = 50 %.
+    const id = s.unit('A', 'armor', 800, at(0, 0));
     expect(supplyAfterRecalc(s, id)).toBe(50);
   });
 
@@ -112,8 +112,8 @@ describe('снабжённость отрядов', () => {
     `,
       { legend },
     );
-    // Город ур. 1 изолирован: 250 × 0,5 = 125 на 250 пехоты → 50 %; от столицы — 1 − 8 × 0,08 = 36 %.
-    const id = s.unit('A', 'infantry', 250, at(8, 0));
+    // Город ур. 1 изолирован: 250 × 0,5 = 125 на 500 пехоты → 50 %; от столицы — 1 − 8 × 0,08 = 36 %.
+    const id = s.unit('A', 'infantry', 500, at(8, 0));
     expect(supplyAfterRecalc(s, id)).toBe(50);
   });
 
@@ -136,9 +136,9 @@ describe('снабжённость отрядов', () => {
     `,
       { legend },
     );
-    const id = s.unit('A', 'infantry', 100, at(1, 0));
+    const id = s.unit('A', 'infantry', 200, at(1, 0));
     s.player('A').gold = 0 as Fp;
-    s.unit('A', 'armor', 1000, at(0, 0));
+    s.unit('A', 'armor', 2000, at(0, 0));
     s.runTicks(1);
     expect(s.player('A').bankrupt).toBe(true);
     // Спрос 100 + 2500 при производстве 500, затем ×0,5 за банкротство.
@@ -197,16 +197,16 @@ describe('котёл и истощение', () => {
     `,
       { legend },
     );
-    // Столица 500 при спросе 1250 → 40 %.
-    const id = s.unit('A', 'infantry', 1250, at(0, 0));
+    // Столица 500 при спросе 2500 → 40 %.
+    const id = s.unit('A', 'infantry', 2500, at(0, 0));
     // 200 тиков льготы — без потерь.
     s.runTicks(200);
-    expect(s.unitById(id)?.soldiers).toBe(1250 * FP);
-    // Следующая секунда при s = 40 %: 0,4 %/с × 1250 ≈ 5 солдат (сложный процент — чуть меньше).
+    expect(s.unitById(id)?.soldiers).toBe(2500 * FP);
+    // Следующая секунда при s = 40 %: 0,4 %/с × 2500 ≈ 10 солдат (сложный процент — чуть меньше).
     s.runTicks(10);
-    const lost = 1250 * FP - (s.unitById(id)?.soldiers ?? 0);
-    expect(lost / FP).toBeGreaterThan(4.9);
-    expect(lost / FP).toBeLessThanOrEqual(5);
+    const lost = 2500 * FP - (s.unitById(id)?.soldiers ?? 0);
+    expect(lost / FP).toBeGreaterThan(9.8);
+    expect(lost / FP).toBeLessThanOrEqual(10);
   });
 
   it('снабжение 50 % и выше — истощения нет', () => {

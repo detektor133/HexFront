@@ -55,9 +55,12 @@ export function ownUnitsAt(view: PlayerView, hex: number): UnitView[] {
 
 /** Гекс занят врагом: чужие отряды или чужой город с обороной (как isHostileHex в sim). */
 export function isHostile(view: PlayerView, hex: number): boolean {
-  if (view.units.some((u) => u.hex === hex && u.owner !== view.playerId)) return true;
+  // Союзник, пакт и мир — не враг: приказ на их гекс — обычное движение (союзник пропускает).
+  const foe = (owner: number): boolean =>
+    owner !== view.playerId && (owner < 0 || (view.diplomacy?.relations[owner] ?? 'war') === 'war');
+  if (view.units.some((u) => u.hex === hex && foe(u.owner))) return true;
   const city = view.cities.find((c) => c.hex === hex);
-  return city !== undefined && city.owner !== view.playerId && city.defenders > 0;
+  return city !== undefined && foe(city.owner) && city.defenders > 0;
 }
 
 function pickedUnits(view: PlayerView, picked: Picked): UnitView[] {

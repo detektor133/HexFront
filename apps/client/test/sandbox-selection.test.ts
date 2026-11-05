@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import type { PlayerView } from '@hexfront/sim';
+import type { PlayerView, Relation } from '@hexfront/sim';
 
 import {
   isHostile,
@@ -86,6 +86,20 @@ describe('песочница: выбор и приказы как в HoI4', () =
 
   it('приказ без выбранных отрядов работает как выбор', () => {
     expect(orderHex(view, NOTHING_PICKED, home).cmd).toBeNull();
+  });
+
+  it('отряд союзника — не враждебный гекс: приказ на него — обычное движение', () => {
+    const ally = view.units.find((u) => u.owner !== view.playerId);
+    if (!ally) throw new Error('нет чужого отряда');
+    expect(isHostile(view, ally.hex)).toBe(true);
+    const relations: Relation[] = Array.from({ length: 8 }, () => 'war');
+    relations[view.playerId] = 'peace';
+    relations[ally.owner] = 'alliance';
+    const allied: PlayerView = {
+      ...view,
+      diplomacy: { relations, violations: [], incoming: [], outgoing: [] },
+    };
+    expect(isHostile(allied, ally.hex)).toBe(false);
   });
 
   it('нейтральный город без гарнизона — не враждебный гекс', () => {
