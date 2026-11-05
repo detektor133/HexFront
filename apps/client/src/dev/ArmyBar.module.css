@@ -404,3 +404,33 @@
 .wanted::before {
   content: '→ ';
 }
+
+/* Имя правится кликом: карандаш рядом с названием. */
+.editIcon {
+  width: 12px;
+  height: 12px;
+  margin-left: var(--space-xs);
+  fill: none;
+  stroke: var(--ui-ink3);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -1px;
+}
+
+/* Лимит армии: «→ N» открывает поповер; пунктир — признак, что число можно менять. */
+.limit {
+  padding: 0;
+  color: var(--ui-ink3);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed var(--ui-border-strong);
+  cursor: pointer;
+}
+
+.limit::before {
+  content: '→ ';
+}

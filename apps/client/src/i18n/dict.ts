@@ -1,6 +1,8 @@
 // Словари интерфейса (CONVENTIONS.md §1: тексты UI — только через i18n).
 
 const ru = {
+  'army.limit': 'Лимит армии',
+  'army.limitApply': 'Применить',
   'buildings.title': 'Постройки',
   'buildings.cities': 'Города',
   'buildings.depots': 'Склады',
@@ -383,6 +385,8 @@ const ru = {
 export type MessageKey = keyof typeof ru;
 
 const en: Record<MessageKey, string> = {
+  'army.limit': 'Army limit',
+  'army.limitApply': 'Apply',
   'buildings.title': 'Buildings',
   'buildings.cities': 'Cities',
   'buildings.depots': 'Depots',

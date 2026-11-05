@@ -1,27 +1,18 @@
 import { IconFlag, IconShield, IconShieldOff, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { FP, type Command, type PlayerView } from '@hexfront/sim';
+import type { Command, PlayerView } from '@hexfront/sim';
 
+import { LimitEditor } from './ArmyLimit.tsx';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import styles from './TerritoryMenu.module.css';
+import { maxArmySoldiers } from './army-limit.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const MENU_WIDTH = 264;
 const EDGE = 8;
-
-/**
- * Предел слайдера: солдаты в отрядах плюс половина населения — недостающих ИИ закупит и подведёт
- * (`wanted` армии).
- */
-function ownSoldiers(view: PlayerView): number {
-  const total = view.units
-    .filter((unit) => unit.owner === view.playerId)
-    .reduce((sum, unit) => sum + unit.soldiers, 0);
-  return Math.max(1, Math.floor((total + view.me.popTotal / 2) / FP));
-}
 
 /**
  * Меню земли по ПКМ (удержанию пальцем) без выбранных отрядов. Чужая страна: дипломатия, «держать
@@ -40,7 +31,7 @@ export function TerritoryMenu(props: {
   readonly onClose: () => void;
 }): React.JSX.Element | null {
   const { view, other, at, send, onClose } = props;
-  const max = ownSoldiers(view);
+  const max = maxArmySoldiers(view);
   // Уже поставленное направление: слайдер показывает его заказ, а не заново половину армии.
   const existing = view.armies.find((a) => a.dir?.target === other);
   const [soldiers, setSoldiers] = useState(() =>
@@ -99,50 +90,44 @@ export function TerritoryMenu(props: {
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
       <div className={styles.attack}>
-        <input
-          className={styles.slider}
-          type="range"
-          min={0}
-          max={max}
-          step={1}
-          value={amount}
-          aria-label={t('menu.soldiers')}
-          onChange={(event) => setSoldiers(Number(event.target.value))}
-        />
-        <span className={styles.count}>{amount}</span>
-        {existing && (
-          <IconButton
-            label={t('menu.release')}
-            className={styles.hold}
-            onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
-          >
-            <IconShieldOff size={20} aria-hidden="true" />
-          </IconButton>
-        )}
-        {!neutral && (
-          <IconButton
-            label={t('menu.hold')}
-            className={styles.hold}
-            disabled={amount < 1}
-            onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount })}
-          >
-            <IconShield size={20} aria-hidden="true" />
-          </IconButton>
-        )}
-        {(atWar || neutral) && (
-          <IconButton
-            label={t(neutral ? 'menu.occupy' : 'menu.attack')}
-            className={styles.go}
-            disabled={amount < 1}
-            onClick={() => go({ t: 'launchOffensive', target: other, soldiers: amount, ...where })}
-          >
-            {neutral ? (
-              <IconFlag size={20} aria-hidden="true" />
-            ) : (
-              <IconSwords size={20} aria-hidden="true" />
-            )}
-          </IconButton>
-        )}
+        <LimitEditor value={amount} max={max} onChange={setSoldiers} />
+        <div className={styles.actions}>
+          {existing && (
+            <IconButton
+              label={t('menu.release')}
+              className={styles.hold}
+              onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
+            >
+              <IconShieldOff size={20} aria-hidden="true" />
+            </IconButton>
+          )}
+          {!neutral && (
+            <IconButton
+              label={t('menu.hold')}
+              className={styles.hold}
+              disabled={amount < 1}
+              onClick={() => go({ t: 'holdBorder', target: other, soldiers: amount })}
+            >
+              <IconShield size={20} aria-hidden="true" />
+            </IconButton>
+          )}
+          {(atWar || neutral) && (
+            <IconButton
+              label={t(neutral ? 'menu.occupy' : 'menu.attack')}
+              className={styles.go}
+              disabled={amount < 1}
+              onClick={() =>
+                go({ t: 'launchOffensive', target: other, soldiers: amount, ...where })
+              }
+            >
+              {neutral ? (
+                <IconFlag size={20} aria-hidden="true" />
+              ) : (
+                <IconSwords size={20} aria-hidden="true" />
+              )}
+            </IconButton>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,8 @@ import {
 } from '@hexfront/sim';
 
 import styles from './ArmyBar.module.css';
+import { ArmyLimit } from './ArmyLimit.tsx';
+import { limitCommand, maxArmySoldiers } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { offensiveButtons } from './offensive-buttons.ts';
 import type { Tool as PlanTool } from './plan-draft.ts';
@@ -121,6 +123,7 @@ const ICONS: Record<string, React.JSX.Element> = {
     </>
   ),
   auto: <path d="M4 10 A6 6 0 0 1 15 6 M15 2 V6 H11 M16 10 A6 6 0 0 1 5 14 M5 18 V14 H9" />,
+  edit: <path d="M4 16 L5 12 L14 3 L17 6 L8 15 Z M12 5 L15 8" />,
   add: (
     <>
       <line x1="10" y1="4" x2="10" y2="16" />
@@ -205,6 +208,8 @@ function ArmyCard(props: {
   stats: ArmyStats;
   /** Заказанная численность армии (меню страны): рядом с числом солдат. */
   wanted?: number | undefined;
+  /** Лимит армии с направлением: предел слайдера и применение; undefined — лимита нет. */
+  limit?: { readonly max: number; readonly onApply: (soldiers: number) => void } | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
@@ -224,6 +229,7 @@ function ArmyCard(props: {
   const { stats, run } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
+  const [limitAnchor, setLimitAnchor] = useState<DOMRect | null>(null);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -274,14 +280,30 @@ function ArmyCard(props: {
                 }}
               />
             ) : (
-              <button type="button" className={styles.nameButton} onClick={beginEditing}>
+              <button
+                type="button"
+                className={styles.nameButton}
+                title={t('army.rename')}
+                onClick={beginEditing}
+              >
                 {props.name}
+                <Icon name="edit" className={styles.editIcon} />
               </button>
             )}
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
-              {props.wanted !== undefined && (
-                <span className={styles.wanted}>{formatSoldiers(props.wanted * FP)}</span>
+              {props.wanted !== undefined && props.limit && (
+                <button
+                  type="button"
+                  className={styles.limit}
+                  title={t('army.limit')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setLimitAnchor(event.currentTarget.getBoundingClientRect());
+                  }}
+                >
+                  {formatSoldiers(props.wanted * FP)}
+                </button>
               )}
             </span>
             {stats.fighting && (
@@ -321,29 +343,40 @@ function ArmyCard(props: {
           />
         </span>
       </div>
-      {/* Колонка ▶ ■ — всегда: карточка не меняет ширину, когда появляется линия. */}
-      <span className={styles.side}>
-        <span className={styles.runs}>
-          {run && (
-            <>
-              <RunButton
-                icon="start"
-                label="plan.start"
-                hint={run.start ? null : props.runHint}
-                enabled={run.start}
-                onClick={() => props.onRun(true)}
-              />
-              <RunButton
-                icon="stop"
-                label="plan.stop"
-                hint={null}
-                enabled={run.stop}
-                onClick={() => props.onRun(false)}
-              />
-            </>
-          )}
+      {limitAnchor && props.limit && props.wanted !== undefined && (
+        <ArmyLimit
+          anchor={limitAnchor}
+          value={props.wanted}
+          max={props.limit.max}
+          onApply={props.limit.onApply}
+          onClose={() => setLimitAnchor(null)}
+        />
+      )}
+      {/* Колонка ▶ ■ только у армии с линией наступления. */}
+      {run && (
+        <span className={styles.side}>
+          <span className={styles.runs}>
+            {
+              <>
+                <RunButton
+                  icon="start"
+                  label="plan.start"
+                  hint={run.start ? null : props.runHint}
+                  enabled={run.start}
+                  onClick={() => props.onRun(true)}
+                />
+                <RunButton
+                  icon="stop"
+                  label="plan.stop"
+                  hint={null}
+                  enabled={run.stop}
+                  onClick={() => props.onRun(false)}
+                />
+              </>
+            }
+          </span>
         </span>
-      </span>
+      )}
     </div>
   );
 }
@@ -476,6 +509,17 @@ export function ArmyBar(props: {
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
                   wanted={a.wanted}
+                  limit={
+                    a.dir
+                      ? {
+                          max: maxArmySoldiers(view),
+                          onApply: (soldiers) => {
+                            const command = limitCommand(a, soldiers);
+                            if (command) send(command);
+                          },
+                        }
+                      : undefined
+                  }
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}

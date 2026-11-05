@@ -47,7 +47,7 @@
 
 .attack {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-sm);
   padding-top: var(--space-xs);
   border-top: 1px solid var(--ui-border);
@@ -97,4 +97,11 @@
   background: var(--ui-surface);
   color: var(--status-danger);
   cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
 }

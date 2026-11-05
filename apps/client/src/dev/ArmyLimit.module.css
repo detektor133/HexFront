@@ -1,0 +1,104 @@
+/* Мини-поповер лимита армии: поверх карты, над карточкой. */
+.pop {
+  position: fixed;
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  color: var(--ui-ink);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  appearance: textfield;
+}
+
+.input::-webkit-inner-spin-button,
+.input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.step,
+.ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.ok {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+.presets {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.preset,
+.presetOn {
+  flex: 1;
+  height: 36px;
+  padding: 0;
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.presetOn {
+  border-color: var(--selection-color);
+  background: var(--ui-surface2);
+}
+
+.okWide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: 40px;
+  color: var(--ui-button-primary-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-button-primary-bg);
+  border: 0;
+  border-radius: var(--radius-button);
+}
