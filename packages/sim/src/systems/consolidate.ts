@@ -94,11 +94,18 @@ export function consolidate(state: MatchState): void {
         continue;
       }
       if (ownUnitsAt(state, a.owner, best.hex) >= MAX_UNITS_PER_HEX) continue;
-      const path = findPath(state, a.hex, best.hex, a.type, a.owner, true);
-      if (!path || path.length === 0) continue;
-      a.path = path;
-      a.moveTicks = 0;
-      a.moveTotal = 0;
+      // Идущий отряд не бросает начатый шаг: путь строится от гекса, в который он уже вступает.
+      const entering = a.order === 'move' && a.moveTotal > 0 ? a.path[0] : undefined;
+      const path = findPath(state, entering ?? a.hex, best.hex, a.type, a.owner, true);
+      if (!path) continue;
+      if (entering === undefined) {
+        if (path.length === 0) continue;
+        a.path = path;
+        a.moveTicks = 0;
+        a.moveTotal = 0;
+      } else {
+        a.path = [entering, ...path];
+      }
       a.slot = -1;
       a.order = 'move';
     }

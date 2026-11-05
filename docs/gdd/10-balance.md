@@ -210,9 +210,7 @@
 | `CONSOLIDATE_MAX` | 300 `[ТЮНИНГ]` |
 | `CONSOLIDATE_SAFE` | 3 `[ТЮНИНГ]` |
 | `CONSOLIDATE_PERIOD_S` | 2 `[ТЮНИНГ]` |
-| `SWARM_PARTS_PER_TICK` | 2 `[ТЮНИНГ]` |
 | `SWARM_SAFE` | 6 `[ТЮНИНГ]` |
-| `SWARM_PART` | 150 `[ТЮНИНГ]` |
 | `AXIS_SOLDIERS` | 300 `[ТЮНИНГ]` |
 | `AXIS_MAX` | 4 `[ТЮНИНГ]` |
 | `AXIS_REFRESH_S` | 5 `[ТЮНИНГ]` |

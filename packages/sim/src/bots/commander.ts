@@ -10,9 +10,9 @@ import {
   AXIS_DONE_PERCENT,
   AXIS_MAX,
   BOT_AXIS_EDGES,
-  SWARM_PART,
+  EXPAND_COMPACT_WEIGHT,
+  FRONT_SPLIT_MIN,
   MAX_UNITS_PER_HEX,
-  SWARM_PARTS_PER_TICK,
   SWARM_SAFE,
 } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
@@ -32,6 +32,7 @@ import {
   isBorderEdge,
   type EdgeId,
 } from '../state/edges.ts';
+import { planExpansion } from '../state/expansion.ts';
 
 type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
@@ -49,9 +50,6 @@ function piecesOf(
   return result;
 }
 
-/** Множитель ключа цели экспансии: больше любого расстояния на карте в гексах. */
-const LAND_KEY = 1 << 16;
-
 /** Непрерывный кусок своей границы с врагом. */
 interface Piece {
   readonly enemy: number;
@@ -64,6 +62,9 @@ export interface CommanderContext {
   /** Распределение кусков по армиям для одного снимка; ключ — резервная армия или -1. */
   readonly assigned: Map<number, Map<number, Piece>>;
 }
+
+/** Вес кольца вокруг столицы при выборе гекса: ядро растёт ровно, а не вытягивается за отрядом. */
+const RING_WEIGHT = 5;
 
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
 
@@ -310,66 +311,51 @@ function expand(
   // Расстояние до своей земли считается один раз на город, а не на каждый отряд.
   const bordering = cities.filter((h) => borderGap(h) <= 1);
   const foes = view.units.filter((x) => warWith(view, x.owner));
-  // Свободные места в гексе для отделяемых частей: общие на все отряды гекса.
-  const room = new Map<HexId, number>();
-  const roomAt = (hex: HexId): number => {
-    const known = room.get(hex);
-    if (known !== undefined) return known;
-    const free =
-      MAX_UNITS_PER_HEX -
-      view.units.filter((x) => x.owner === view.playerId && x.hex === hex).length;
-    room.set(hex, free);
-    return free;
-  };
   const out: Command[] = [];
+  const dist = (a: HexId, b: HexId): number => distance(hexOf(map, a), hexOf(map, b));
+  const rest: UnitView[] = [];
   for (const u of units.filter(idle)) {
-    const at = hexOf(map, u.hex);
-    // Лучшая цель по ключу (меньше — лучше), при равенстве — меньший HexId.
-    const nearest = (hexes: readonly HexId[], key: (h: HexId) => number): HexId | null => {
-      let best: HexId | null = null;
-      let bestK = Number.MAX_SAFE_INTEGER;
-      for (const h of hexes) {
-        const k = key(h);
-        if (!claimed.has(h) && (k < bestK || (k === bestK && best !== null && h < best))) {
-          best = h;
-          bestK = k;
-        }
-      }
-      return best;
-    };
-    const fromUnit = (h: HexId): number => distance(at, hexOf(map, h));
-    // Расстояния на карте меньше LAND_KEY, поэтому ключ — «сначала к столице, потом к отряду».
-    const fromCore = (h: HexId): number => core(h) * LAND_KEY + fromUnit(h);
     // Нейтральный город — только у своей границы: за далёким городом отряд тянул бы червяка
     // через ничью землю вместо целостного государства.
-    const winnable = bordering.filter(
-      (h) => forecastBattle(map, view, [u.id], h).outcome === 'victory',
-    );
-    const target = nearest(winnable, fromUnit) ?? nearest(empty, fromCore);
-    if (target === null) continue;
-    claimed.add(target);
-    out.push({ t: 'move', unitIds: [u.id], to: target });
-    // Рой: крупный отряд отделяет части на соседние свободные гексы, чтобы ничья земля бралась
-    // широко и сразу, а не по гексу за отряд.
-    let rest: number = u.soldiers;
-    for (
-      let n = 0;
-      n < SWARM_PARTS_PER_TICK && rest >= 2 * SWARM_PART && roomAt(u.hex) > 0;
-      n += 1
-    ) {
-      // Рой — только вдали от врага: мелкая часть рядом с ним гибнет в бою.
-      const next = nearest(
-        empty.filter((h) =>
-          foes.every((e) => distance(hexOf(map, e.hex), hexOf(map, h)) > SWARM_SAFE),
-        ),
-        fromUnit,
-      );
-      if (next === null) break;
-      claimed.add(next);
-      rest -= SWARM_PART;
-      room.set(u.hex, roomAt(u.hex) - 1);
-      out.push({ t: 'split', unitId: u.id, soldiers: SWARM_PART, to: next });
+    let city: HexId | null = null;
+    for (const h of bordering) {
+      if (claimed.has(h) || forecastBattle(map, view, [u.id], h).outcome !== 'victory') continue;
+      if (city === null || dist(u.hex, h) < dist(u.hex, city)) city = h;
     }
+    if (city === null) {
+      rest.push(u);
+      continue;
+    }
+    claimed.add(city);
+    out.push({ t: 'move', unitIds: [u.id], to: city });
+  }
+  // Ничья земля — ближайшему отряду (кольцом у ядра), отряд крупнее двух частей делится поровну
+  // на соседние свободные гексы; вблизи врага не делится.
+  const ownNeighbors = (h: HexId): number =>
+    neighbors(hexOf(map, h)).filter(
+      (n) =>
+        inBounds(n, map.width, map.height) &&
+        view.hexes.owner[hexId(n, map.width)] === view.playerId,
+    ).length;
+  const cells = empty
+    .filter((h) => !claimed.has(h))
+    .map((h) => ({
+      hex: h,
+      // Кольцо у ядра и плотность: гексы с большим числом своих соседей занимаются раньше.
+      cost: core(h) * RING_WEIGHT + (6 - ownNeighbors(h)) * EXPAND_COMPACT_WEIGHT,
+      safe: foes.every((e) => dist(e.hex, h) > SWARM_SAFE),
+    }));
+  const orders = planExpansion(
+    rest.map((u) => ({ id: u.id, hex: u.hex, soldiers: u.soldiers })),
+    cells,
+    dist,
+    FRONT_SPLIT_MIN,
+  );
+  for (const order of orders) {
+    for (const part of order.parts) {
+      out.push({ t: 'split', unitId: order.unitId, soldiers: part.soldiers as Fp, to: part.hex });
+    }
+    if (order.main !== null) out.push({ t: 'move', unitIds: [order.unitId], to: order.main });
   }
   return out;
 }

@@ -62,4 +62,25 @@ describe('закупка под заказ численности', () => {
     ];
     expect(armor.length).toBeGreaterThan(0);
   });
+
+  it('армия без приказа и без отрядов набирает до лимита, который задан командой', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const player = s.state.players[0];
+    if (player) player.gold = 100_000_000 as never;
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Запас' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    expect(army?.dir).toBeUndefined();
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'setArmyLimit', armyId: army?.id ?? -1, soldiers: 300 } },
+    ]);
+    s.runSeconds(40);
+    const soldiers = s.state.units
+      .filter((u) => u.armyId === army?.id)
+      .reduce((sum, u) => sum + u.soldiers, 0);
+    const queued = s.state.recruits
+      .filter((r) => r.armyId === army?.id)
+      .reduce((sum, r) => sum + r.soldiers, 0);
+    expect(soldiers + queued).toBeGreaterThanOrEqual(250_000);
+  });
 });

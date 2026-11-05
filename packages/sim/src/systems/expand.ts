@@ -14,8 +14,7 @@ import {
   EXPAND_SOLDIERS_PER_HEX,
   EXPAND_STORM_GAP,
   MAX_UNITS_PER_HEX,
-  SWARM_PART,
-  SWARM_PARTS_PER_TICK,
+  FRONT_SPLIT_MIN,
   SWARM_SAFE,
 } from '../balance.ts';
 import { releaseDirection } from '../commands/release.ts';
@@ -25,6 +24,7 @@ import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../
 import { intDiv, type Fp } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
+import { planExpansion, type ExpansionCell } from '../state/expansion.ts';
 import type { Army, MatchState, Unit } from '../state/types.ts';
 import { allUnits, removeUnits } from '../state/unit-index.ts';
 
@@ -63,7 +63,7 @@ function targets(
   focus: HexId[],
   radius: number,
   pull: boolean,
-): HexId[] {
+): ExpansionCell[] {
   const { width } = state.map;
   const marks = focus.map((h) => hexFromId(h, width));
   const away = (h: HexId): number =>
@@ -93,7 +93,12 @@ function targets(
       (state.map.terrain[h] === TERRAIN.mountains ? EXPAND_MOUNTAIN_PENALTY : 0)
     );
   };
-  return out.sort((a, b) => cost(a) - cost(b) || a - b);
+  const foes = allUnits(state).filter((u) => u.owner !== army.owner);
+  const safe = (h: HexId): boolean =>
+    foes.every((e) => distance(hexFromId(e.hex, width), hexFromId(h, width)) > SWARM_SAFE);
+  return out
+    .sort((a, b) => cost(a) - cost(b) || a - b)
+    .map((hex) => ({ hex, cost: cost(hex), safe: safe(hex) }));
 }
 
 // Цели волны: ничьи города, а когда их нет — столицы других игроков.
@@ -115,48 +120,6 @@ function send(state: MatchState, unit: Unit, hex: HexId): boolean {
   unit.slot = -1;
   unit.order = 'move';
   return true;
-}
-
-// Рой: гексов для занятия больше, чем свободных отрядов, — крупные отряды отделяют части и
-// отправляют их на свободные гексы, а не занимают землю по гексу за отряд. Вдали от чужих отрядов:
-// мелкая часть рядом с врагом гибнет.
-function swarm(state: MatchState, army: Army, free: Unit[], open: readonly HexId[]): void {
-  const { width } = state.map;
-  const foes = allUnits(state).filter((u) => u.owner !== army.owner);
-  const safe = open.filter((h) =>
-    foes.every((e) => distance(hexFromId(e.hex, width), hexFromId(h, width)) > SWARM_SAFE),
-  );
-  let missing = safe.length - free.length;
-  const taken = new Set<HexId>();
-  for (const unit of [...free].sort((a, b) => b.soldiers - a.soldiers || a.id - b.id)) {
-    for (
-      let n = 0;
-      n < SWARM_PARTS_PER_TICK &&
-      missing > 0 &&
-      unit.soldiers >= 2 * SWARM_PART &&
-      ownUnitsAt(state, unit.owner, unit.hex) < MAX_UNITS_PER_HEX;
-      n += 1
-    ) {
-      const here = hexFromId(unit.hex, width);
-      const hex = safe
-        .filter((h) => !taken.has(h))
-        .sort(
-          (a, b) =>
-            distance(here, hexFromId(a, width)) - distance(here, hexFromId(b, width)) || a - b,
-        )[0];
-      if (hex === undefined) return;
-      const part = splitUnit(state, unit, SWARM_PART);
-      if (send(state, part, hex)) {
-        taken.add(hex);
-        missing -= 1;
-      } else {
-        // Части некуда идти — она возвращается в отряд, а не остаётся лишней мелочью.
-        unit.soldiers = (unit.soldiers + part.soldiers) as Fp;
-        removeUnits(state, [part]);
-        return;
-      }
-    }
-  }
 }
 
 // Штурм ничьих городов: только когда сил хватит — по прогнозу боя «победа» либо одним отрядом, либо
@@ -243,34 +206,37 @@ export function expandNeutral(state: MatchState, army: Army): void {
         .filter((u) => u.armyId === army.id && u.path.length > 0)
         .map((u) => u.path.at(-1) as HexId),
     );
-  const before = claimedHexes();
-  swarm(
-    state,
-    army,
-    free,
-    targets(state, army, focus, radius, click === undefined).filter((h) => !before.has(h)),
-  );
-  const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
   const claimed = claimedHexes();
+  const moving = allUnits(state).some((u) => u.armyId === army.id && u.order !== 'idle');
   const open = targets(state, army, focus, radius, click === undefined).filter(
-    (h) => !claimed.has(h),
+    (cell) => !claimed.has(cell.hex),
   );
   storm(state, army, free, free2, focus, radius);
-  for (const hex of open) {
-    const at = hexFromId(hex, width);
-    const unit = [...free2]
-      .map((id) => free.find((u) => u.id === id))
-      .filter((u): u is Unit => u !== undefined)
-      .sort(
-        (a, b) =>
-          distance(hexFromId(a.hex, width), at) - distance(hexFromId(b.hex, width), at) ||
-          a.id - b.id,
-      )[0];
-    if (!unit) break;
-    if (send(state, unit, hex)) free2.delete(unit.id);
+  // Гекс — ближайшему отряду, а не отряд — самому нужному гексу; когда гексов больше, отряды делятся.
+  const ready = free.filter((u) => free2.has(u.id));
+  const dist = (a: HexId, b: HexId): number => distance(hexFromId(a, width), hexFromId(b, width));
+  const orders = planExpansion(
+    ready.map((u) => ({ id: u.id, hex: u.hex, soldiers: u.soldiers })),
+    open,
+    dist,
+    FRONT_SPLIT_MIN,
+  );
+  for (const order of orders) {
+    const unit = ready.find((u) => u.id === order.unitId);
+    if (!unit) continue;
+    for (const part of order.parts) {
+      if (ownUnitsAt(state, unit.owner, unit.hex) >= MAX_UNITS_PER_HEX) break;
+      const piece = splitUnit(state, unit, part.soldiers as Fp);
+      if (!send(state, piece, part.hex)) {
+        // Части некуда идти — она возвращается в отряд, а не остаётся лишней мелочью.
+        unit.soldiers = (unit.soldiers + piece.soldiers) as Fp;
+        removeUnits(state, [piece]);
+      }
+    }
+    if (order.main !== null && send(state, unit, order.main)) free2.delete(unit.id);
   }
   const finished = open.length === 0 && !moving && free2.size === free.length;
-  // Занять больше нечего: армия расформировывается, отряды уходят в резерв — их возьмёт другое
-  // направление, а закупка не гонит новобранцев в армию, которой делать нечего.
+  // Занять больше нечего: направление уходит в покой, армия остаётся, а закупка не гонит
+  // новобранцев в армию, которой делать нечего.
   if (finished) releaseDirection(state, army);
 }

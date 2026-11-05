@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TAX_MAX,
@@ -81,6 +81,36 @@ function SettingsIcon(): React.JSX.Element {
   );
 }
 
+/**
+ * Закрывает открытое окно по клику вне его (и вне кнопки-открывашки) и по Esc: окно не должно
+ * держать экран, пока не попадёшь именно в кнопку.
+ */
+function useDismiss(
+  open: boolean,
+  inside: readonly React.RefObject<HTMLElement | null>[],
+  close: () => void,
+): void {
+  const insideRef = useRef(inside);
+  insideRef.current = inside;
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: PointerEvent): void => {
+      const target = event.target as Node;
+      if (insideRef.current.some((ref) => ref.current?.contains(target))) return;
+      close();
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, close]);
+}
+
 // Меню настроек: пока одна настройка — «Автокомандование» для новых армий (art/ui.md, CR-006).
 function Settings(props: {
   view: PlayerView;
@@ -91,8 +121,18 @@ function Settings(props: {
   onOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const { onOpenChange } = props;
+  useDismiss(
+    open,
+    [wrapRef],
+    useCallback(() => {
+      setOpen(false);
+      onOpenChange?.(false);
+    }, [onOpenChange]),
+  );
   return (
-    <div className={styles.settingsWrap}>
+    <div ref={wrapRef} className={styles.settingsWrap}>
       <IconButton
         type="button"
         className={`${styles.settingsButton} ${styles.hudInteractive}`}
@@ -188,6 +228,15 @@ export function Hud(props: {
     observer.observe(taxButton);
     return () => observer.disconnect();
   }, [props.onTaxAnchor]);
+  const { onPopupChange } = props;
+  useDismiss(
+    taxOpen,
+    [taxPopupRef, taxButtonRef],
+    useCallback(() => {
+      setTaxOpen(false);
+      onPopupChange?.(false);
+    }, [onPopupChange]),
+  );
   useLayoutEffect(() => {
     const popup = taxPopupRef.current;
     const onTaxSize = props.onTaxSize;

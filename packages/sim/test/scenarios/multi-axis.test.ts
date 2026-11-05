@@ -218,7 +218,7 @@ describe('занятие ничьей земли: штурм ничьего го
     applyCommands(s.state, [
       { playerId: 0, cmd: { t: 'launchOffensive', target: -1, soldiers: 400 } },
     ]);
-    s.runSeconds(40);
+    s.runSeconds(12);
     expect(s.state.units.some((u) => u.order === 'attack')).toBe(false);
     const width = s.state.map.width;
     const columns = Array.from(

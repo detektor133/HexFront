@@ -379,14 +379,18 @@ describe('новый приказ посреди перехода', () => {
     expect(s.unitById(id)?.moveTicks).toBe(ticks + 1);
   });
 
-  it('путь в другую сторону — отряд остаётся в своём гексе, переход начинается заново', () => {
+  it('приказ в другую сторону на ходу: начатый шаг доводится, фишка не откатывается назад', () => {
     const s = scenario(CROSS, { legend });
     const id = s.unit('A', 'infantry', 100, at(1, 1));
     s.cmd('A', move([id], at(3, 1)));
     s.runTicks(10);
+    const progress = s.unitById(id)?.moveTicks ?? 0;
     s.cmd('A', move([id], at(0, 1)));
     s.runTicks(1);
+    // Отряд всё ещё в своём гексе, но шаг продолжается с накопленным прогрессом, а не с нуля.
     expect(s.unitById(id)?.hex).toBe(1 + 1 * 4);
-    expect(s.unitById(id)?.moveTicks).toBe(1);
+    expect(s.unitById(id)?.moveTicks).toBe(progress + 1);
+    s.runTicks(200);
+    expect(s.unitById(id)?.hex).toBe(0 + 1 * 4);
   });
 });

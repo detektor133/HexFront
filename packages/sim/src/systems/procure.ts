@@ -86,7 +86,7 @@ export function procure(state: MatchState): void {
   // Справедливо: сначала армия с наименьшей долей заказа — иначе первая по id забирает резерв и
   // очередь единственного города, а остальные направления стоят пустыми.
   const wanting = state.armies
-    .filter((a) => a.wanted !== undefined && a.dir?.mode !== 'idle')
+    .filter((a) => a.wanted !== undefined)
     .sort((a, b) => {
       const left = strength(state, a) * (b.wanted ?? 1);
       const right = strength(state, b) * (a.wanted ?? 1);

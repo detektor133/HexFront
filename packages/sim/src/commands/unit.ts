@@ -46,12 +46,13 @@ export function routePath(
   unit: Unit,
   via: readonly HexId[],
   to: HexId,
+  start: HexId = unit.hex,
 ): HexId[] | null {
   // Слабый враг (победа по прогнозу) не преграда: отряд дойдёт и атакует его сам (meetEnemy).
   const weakEnemy = (hex: HexId): boolean =>
     unit.type !== 'artillery' && forecastInState(state, [unit], hex).outcome === 'victory';
   const path: HexId[] = [];
-  let from = unit.hex;
+  let from = start;
   for (const point of [...via, to]) {
     const leg = findPath(state, from, point, unit.type, unit.owner, false, weakEnemy);
     if (!leg) return null;
@@ -234,18 +235,22 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'move':
     case 'attack':
       for (const a of owned.units) {
-        const path =
-          (cmd.t === 'move'
-            ? routePath(state, a, cmd.via ?? [], cmd.to)
-            : routePath(state, a, cmd.via ?? [], cmd.target)) ?? [];
-        // Тот же ближайший шаг — переход продолжается с накопленным прогрессом (05-armies.md).
-        const sameStep = a.moveTotal > 0 && path[0] !== undefined && path[0] === a.path[0];
-        if (!sameStep) stop(a);
+        const dest = cmd.t === 'move' ? cmd.to : cmd.target;
+        // Идущий отряд не бросает начатый переход: новый маршрут строится от гекса, в который он
+        // уже вступает, прогресс шага сохраняется — приказ «на ходу» не откатывает фишку назад.
+        const entering = a.order === 'move' && a.moveTotal > 0 ? a.path[0] : undefined;
+        const fromEntering =
+          entering === undefined ? null : routePath(state, a, cmd.via ?? [], dest, entering);
+        if (entering !== undefined && fromEntering) {
+          a.path = [entering, ...fromEntering];
+        } else {
+          stop(a);
+          a.path = routePath(state, a, cmd.via ?? [], dest) ?? [];
+        }
         // Ручной приказ снимает отряд с места в плане армии; освободившись, он вернётся в план.
         a.slot = -1;
         a.gather = -1;
-        a.path = path;
-        a.order = path.length > 0 ? 'move' : 'idle';
+        a.order = a.path.length > 0 ? 'move' : 'idle';
       }
       return;
     case 'split':

@@ -270,12 +270,8 @@ export const CONSOLIDATE_MAX: Fp = fp(300);
 /** Мелочь не стягивается, пока враг ближе стольких гексов: фронт у врага не трогаем. */
 export const CONSOLIDATE_SAFE = 3;
 export const CONSOLIDATE_PERIOD_S = 2;
-/** Рой на ничьей земле: сколько частей отряд отделяет за тик (ИИ-командир бота). */
-export const SWARM_PARTS_PER_TICK = 2;
 /** Рой не занимает гексы ближе этого числа гексов к чужим отрядам. */
 export const SWARM_SAFE = 6;
-/** Размер части, которую рой отделяет от отряда. */
-export const SWARM_PART: Fp = fp(150);
 /** Оси удара направления: одна на каждые AXIS_SOLDIERS солдат заказа, не больше AXIS_MAX. */
 export const AXIS_SOLDIERS = 300;
 export const AXIS_MAX = 4;

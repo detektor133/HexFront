@@ -63,7 +63,8 @@ describe('фишки отрядов (07/T17bt)', () => {
     e.queue({ t: 'split', unitId: a.id, soldiers: (50 * FP) as Fp });
     let v = view();
     const mine = v.units.filter((u) => u.owner === v.playerId && u.hex === a.hex);
-    expect(mine).toHaveLength(3);
+    // Два стартовых отряда и отделённая часть; рой занятия может добавить ещё части в тот же тик.
+    expect(mine.length).toBeGreaterThanOrEqual(3);
     const ids = mine.map((u) => u.id);
     const to = farPlain(v, a.hex);
     e.queue({ t: 'move', unitIds: ids, to });

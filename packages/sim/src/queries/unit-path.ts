@@ -186,7 +186,7 @@ function search(
   mover: Mover,
   isGoal: (hex: HexId) => boolean,
   h: (hex: HexId) => number,
-  ownLand = false,
+  ownLand: LandRule = false,
 ): HexId[] | null {
   const { width, height } = state.map;
   const buffers = buffersFor(state);
@@ -207,7 +207,9 @@ function search(
       if (!inBounds(n, width, height)) continue;
       const id = hexId(n, width);
       if (!canEnter(state, mover, id, isGoal(id))) continue;
-      if (ownLand && state.hexes.owner[id] !== mover.owner) continue;
+      const land = state.hexes.owner[id] ?? -1;
+      if (ownLand === true && land !== mover.owner) continue;
+      if (ownLand === 'safe' && land !== mover.owner && land >= 0) continue;
       const cost = stepTicks(state, mover, hex, id);
       if (cost === null || gh + cost >= distanceAt(buffers, id)) continue;
       buffers.generation[id] = buffers.currentGeneration;
@@ -222,10 +224,13 @@ function search(
   return path.reverse();
 }
 
+/** Правило земли для пути: любая, только своя (`true`) или своя и ничья (`'safe'`). */
+export type LandRule = boolean | 'safe';
+
 /**
  * Путь отряда (A* по времени хода, ничьи — по меньшему HexId). Снабжённость считается полной:
  * она меняет все шаги одинаково и на выбор пути не влияет. ownLand — только по своей земле (путь
- * к месту на линии плана).
+ * к месту на линии плана); 'safe' — по своей и ничьей, но не по чужой.
  * @returns гексы после from до to включительно; [] при from === to; null — пути нет
  */
 export function findPath(
@@ -234,7 +239,7 @@ export function findPath(
   to: HexId,
   type: UnitType,
   owner: number,
-  ownLand = false,
+  ownLand: LandRule = false,
   passHostile?: (hex: HexId) => boolean,
 ): HexId[] | null {
   if (from === to) return [];

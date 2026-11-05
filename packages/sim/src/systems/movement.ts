@@ -74,6 +74,8 @@ function advance(state: MatchState, unit: Unit): void {
   const next = unit.path[0];
   if (next === undefined) return stop(unit);
   if (unit.moveTotal === 0 && !startStep(state, unit, next)) return;
+  // Шаг стал запрещён (мир, чужая земля для артиллерии): встаём сразу, а не после полного перехода.
+  if (blocked(state, unit, next)) return stop(unit);
   if (unit.moveTicks < unit.moveTotal) unit.moveTicks += 1;
   if (unit.moveTicks < unit.moveTotal) return;
   if (blocked(state, unit, next)) return stop(unit);

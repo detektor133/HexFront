@@ -204,9 +204,10 @@ function candidates(
     if (from !== undefined) return from.includes(u.armyId ?? -1);
     if (u.armyId === null) return true;
     const owner = state.armies.find((a) => a.id === u.armyId);
+    // Армия без дела — без заказа или с законченным направлением (`idle`) — отдаёт стоящие отряды.
     return (
       owner !== undefined &&
-      owner.wanted === undefined &&
+      (owner.wanted === undefined || owner.dir?.mode === 'idle') &&
       !state.plans.some((p) => p.armyId === u.armyId)
     );
   };

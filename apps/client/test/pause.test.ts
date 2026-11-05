@@ -60,6 +60,7 @@ function mockReactHooks(): void {
       useEffect: (effect: () => void) => effect(),
       useLayoutEffect: (effect: () => void) => effect(),
       useMemo: <T>(factory: () => T) => factory(),
+      useCallback: <T>(callback: T) => callback,
       useRef: <T>(value: T) => ({ current: value }),
       useState: <T>(value: T) => {
         const index = cursor;

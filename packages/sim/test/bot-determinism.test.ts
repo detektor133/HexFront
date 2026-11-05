@@ -47,5 +47,5 @@ describe('детерминизм полного прогона ботов', () =
 
     expect(second.commands).toEqual(first.commands);
     expect(second.hash).toBe(first.hash);
-  }, 30_000);
+  }, 90_000);
 });

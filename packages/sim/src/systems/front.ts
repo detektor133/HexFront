@@ -12,7 +12,7 @@ import {
   FRONT_THREAT_RANGE,
 } from '../balance.ts';
 import { mergeUnits, splitUnit } from '../commands/unit.ts';
-import { distance, hexFromId } from '../math/hex.ts';
+import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath } from '../queries/unit-path.ts';
 import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
@@ -21,10 +21,48 @@ import { atWar } from '../state/relations.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
-// Отряд идёт на своё место или встаёт на нём в оборону.
-function goTo(state: MatchState, u: Unit, slot: number): void {
+// Путь к месту по своей земле, чтобы не брать чужие гексы по дороге (04/T14b); своя земля бывает
+// разорвана — тогда через ничью, но не через чужую.
+const safePath = (state: MatchState, u: Unit, from: HexId, to: number): HexId[] | null =>
+  findPath(state, from, to, u.type, u.owner, true) ??
+  findPath(state, from, to, u.type, u.owner, 'safe');
+
+// Маршрут отряда к месту. Нет безопасного пути — ближайший достижимый гекс линии: отряд не стоит
+// без дела из-за разорванной земли. Линии не достать вообще — идёт напрямую, беря чужое по дороге.
+function routeTo(
+  state: MatchState,
+  u: Unit,
+  from: HexId,
+  slot: number,
+  line: readonly HexId[],
+): { readonly slot: number; readonly path: HexId[] } | null {
+  const direct = safePath(state, u, from, slot);
+  if (direct && direct.length > 0) return { slot, path: direct };
+  const { width } = state.map;
+  const at = hexFromId(from, width);
+  const near = line
+    .filter((h) => h !== slot)
+    .sort((x, y) => distance(at, hexFromId(x, width)) - distance(at, hexFromId(y, width)) || x - y)
+    .slice(0, ROUTE_ALTERNATIVES);
+  for (const h of near) {
+    const path = safePath(state, u, from, h);
+    if (path && path.length > 0) return { slot: h, path };
+  }
+  const forced = findPath(state, from, slot, u.type, u.owner);
+  return forced && forced.length > 0 ? { slot, path: forced } : null;
+}
+
+// Отряд идёт на своё место или встаёт на нём в оборону. Идущий отряд не бросает начатый переход:
+// новый маршрут строится от гекса, в который он уже вступает, а прогресс шага сохраняется. Иначе
+// пересмотр мест чаще времени перехода гонял бы отряд «почти дошёл — откат — снова» без конца.
+function goTo(state: MatchState, u: Unit, slot: number, line: readonly HexId[]): void {
   u.slot = slot;
   if (u.hex === slot) {
+    // Место — гекс, из которого отряд уже выходит: начатый шаг доводится, откатывать фишку нельзя.
+    if (u.order === 'move' && u.moveTotal > 0 && u.path.length > 0) {
+      u.path = [u.path[0] as HexId];
+      return;
+    }
     if (u.order === 'move') {
       u.path = [];
       u.moveTicks = 0;
@@ -34,17 +72,31 @@ function goTo(state: MatchState, u: Unit, slot: number): void {
     return;
   }
   if (u.order === 'move' && u.path.at(-1) === slot) return;
-  // К месту — только по своей земле: иначе отряд берёт чужие гексы по дороге (04/T14b).
-  const path = findPath(state, u.hex, slot, u.type, u.owner, true);
-  if (!path || path.length === 0) {
-    u.slot = -1;
+  const entering = u.order === 'move' && u.moveTotal > 0 ? u.path[0] : undefined;
+  if (entering === slot) {
+    u.path = [slot];
     return;
   }
-  u.path = path;
-  u.moveTicks = 0;
-  u.moveTotal = 0;
+  const route = routeTo(state, u, entering ?? u.hex, slot, line);
+  if (!route) {
+    u.slot = -1;
+    // Нет пути дальше — отряд заканчивает начатый шаг и встаёт, а не откатывается.
+    if (entering !== undefined) u.path = [entering];
+    return;
+  }
+  u.slot = route.slot;
+  if (entering === undefined) {
+    u.path = route.path;
+    u.moveTicks = 0;
+    u.moveTotal = 0;
+  } else {
+    u.path = [entering, ...route.path];
+  }
   u.order = 'move';
 }
+
+/** Сколько других гексов линии пробуем, когда путь к назначенному месту закрыт. */
+const ROUTE_ALTERNATIVES = 6;
 
 // Сколько отрядов нужно линии: по отряду на каждый гекс — пробелов нет ни на каких участках.
 const coverNeed = (state: MatchState, plan: ArmyPlan): number => planHexes(state, plan).length;
@@ -133,7 +185,7 @@ function runPlan(state: MatchState, armyId: number): void {
   for (const u of units) {
     const slot = keep ? u.slot : next.slots.get(u.id);
     if (slot === undefined) u.slot = -1;
-    else goTo(state, u, slot);
+    else goTo(state, u, slot, next.line);
   }
 }
 
