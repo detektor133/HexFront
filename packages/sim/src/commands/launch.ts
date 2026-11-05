@@ -251,6 +251,7 @@ function prepare(
   if (!army) return null;
   army.auto = false;
   army.wanted = cmd.soldiers;
+  army.trim = true;
   if (cmd.mix === undefined) delete army.mix;
   else army.mix = cmd.mix;
   army.dir = {

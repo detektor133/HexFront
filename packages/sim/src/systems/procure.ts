@@ -86,21 +86,30 @@ function takeReserve(state: MatchState, army: Army): void {
  * лишнее меньше отряда — отделённая часть. Идут только стоящие отряды вне боя.
  */
 function releaseSurplus(state: MatchState, army: Army): void {
-  if (army.wanted === undefined) return;
+  // Только после команды игрока с новым лимитом: избыток от добора (отряд крупнее нехватки) не
+  // отпускается, иначе добор и сброс шли бы по кругу и лишним уходил бы самый мелкий отряд.
+  if (army.wanted === undefined || !army.trim) return;
   let surplus =
     allUnits(state)
       .filter((u) => u.armyId === army.id)
       .reduce((sum, u) => sum + u.soldiers, 0) -
     army.wanted * FP;
-  if (surplus < FP) return;
+  if (surplus < FP) {
+    delete army.trim;
+    return;
+  }
   const idle = allUnits(state)
     // Артиллерия в резерв не уходит: она нужна армии за линией, а не в запас.
     .filter(
       (u) => u.armyId === army.id && u.order === 'idle' && !u.inBattle && u.type !== 'artillery',
     )
     .sort((a, b) => a.soldiers - b.soldiers || a.id - b.id);
+  if (idle.length === 0) {
+    delete army.trim;
+    return;
+  }
   for (const unit of idle) {
-    if (surplus < FP) return;
+    if (surplus < FP) break;
     if (unit.soldiers <= surplus) {
       surplus -= unit.soldiers;
       unit.armyId = null;
@@ -114,6 +123,8 @@ function releaseSurplus(state: MatchState, army: Army): void {
     piece.slot = -1;
     surplus -= part;
   }
+  // Всё лишнее отпущено (или остальное в движении — дойдёт позже): сброс разовый.
+  if (surplus < FP) delete army.trim;
 }
 
 /** Добирает резерв и закупает недостающих для армий с заказанной численностью; раз в секунду. */

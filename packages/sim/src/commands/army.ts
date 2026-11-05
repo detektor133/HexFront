@@ -145,6 +145,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       if (!army) return;
       if (cmd.soldiers === 0) delete army.wanted;
       else army.wanted = cmd.soldiers;
+      army.trim = cmd.soldiers > 0;
       if (cmd.mix === undefined || cmd.soldiers === 0) delete army.mix;
       else army.mix = cmd.mix;
       return;

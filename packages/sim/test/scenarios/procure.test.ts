@@ -151,4 +151,25 @@ describe('закупка под заказ численности', () => {
     s.runSeconds(3);
     expect(s.state.units.find((u) => u.id === art)?.armyId).toBe(army?.id);
   });
+
+  it('избыток от добора из резерва не сбрасывается обратно: лимит не трогали — состав армии стоит', () => {
+    const s = scenario(MAP, { legend });
+    s.state.diplomacy = createDiplomacy(s.state.players.length);
+    const inf = s.unit('A', 'infantry', 150, at(2, 1));
+    const art = s.unit('A', 'artillery', 50, at(2, 2));
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Строй' } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.name === 'Строй');
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'assignUnits', unitIds: [inf, art], armyId: army?.id ?? -1 } },
+      { playerId: 0, cmd: { t: 'setArmyLimit', armyId: army?.id ?? -1, soldiers: 300 } },
+    ]);
+    s.runSeconds(2);
+    // Нехватка 100, а в резерве отряд 500: добор берёт его целиком — армия выше лимита.
+    s.unit('A', 'infantry', 500, at(2, 3));
+    s.runSeconds(20);
+    const mine = s.state.units.filter((u) => u.armyId === army?.id);
+    expect(mine.some((u) => u.type === 'artillery')).toBe(true);
+    expect(mine.reduce((sum, u) => sum + u.soldiers, 0)).toBeGreaterThanOrEqual(600_000);
+    expect(s.state.units.filter((u) => u.owner === 0 && u.armyId === null)).toHaveLength(0);
+  });
 });
