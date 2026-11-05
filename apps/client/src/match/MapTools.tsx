@@ -1,5 +1,5 @@
 import {
-  IconBuildingCastle,
+  IconBuildingCommunity,
   IconChevronsUp,
   IconHammer,
   IconMap2,
@@ -17,7 +17,7 @@ const BUILD_TOOLS: readonly {
   readonly icon: typeof IconShield;
   readonly label: MessageKey;
 }[] = [
-  { tool: 'city', icon: IconBuildingCastle, label: 'mapTools.city' },
+  { tool: 'city', icon: IconBuildingCommunity, label: 'mapTools.city' },
   { tool: 'depot', icon: IconPackage, label: 'mapTools.depot' },
   { tool: 'fort', icon: IconShield, label: 'mapTools.fort' },
   { tool: 'improve', icon: IconChevronsUp, label: 'mapTools.improve' },

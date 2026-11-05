@@ -221,6 +221,26 @@ describe('постройки', () => {
     expect(s.state.hexes.building[id]).toBe(BUILDING.fort);
   });
 
+  it('укрепление улучшается до укрепрайона и усиливает оборону', () => {
+    const s = fresh();
+    s.player('A').gold = 5_000_000 as never;
+    const hex = cellAt(s, 4);
+    const id = hex.col + hex.row * s.state.map.width;
+    s.cmd('A', build(hex, 'fort'));
+    s.runSeconds(10);
+    for (const [seconds, code] of [
+      [16, BUILDING.fort2],
+      [21, BUILDING.fort3],
+    ] as const) {
+      s.cmd('A', build(hex, 'fort'));
+      s.runSeconds(seconds);
+      expect(s.state.hexes.building[id]).toBe(code);
+    }
+    s.cmd('A', build(hex, 'fort'));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual(['maxLevel']);
+  });
+
   it('склад строится на своём гексе без дороги', () => {
     const s = fresh();
     const hex = cellAt(s, 4);
@@ -284,7 +304,7 @@ describe('постройки', () => {
     const hex = cellAt(s, 2);
     s.cmd('A', build(hex, 'fort'));
     s.runSeconds(10);
-    s.cmd('A', build(hex, 'fort'));
+    s.cmd('A', build(hex, 'depot'));
     s.runTicks(1);
     expect(s.rejections()).toEqual(['buildingExists']);
     s.cmd('A', improve(hex));

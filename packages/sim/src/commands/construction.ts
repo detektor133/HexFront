@@ -15,6 +15,8 @@ import {
   DEPOT_TIME_S,
   FORT_COST,
   FORT_TIME_S,
+  FORT_UPGRADE_COST,
+  FORT_UPGRADE_TIME_S,
   IMPROVEMENT_COST,
   IMPROVEMENT_TIME_S,
   TICKS_PER_S,
@@ -23,6 +25,7 @@ import { OK, rejected, type Command, type RejectReason, type Validation } from '
 import { distance, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { depotLevel, isDepot } from '../state/depot.ts';
+import { fortLevel } from '../state/fort.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
 import { BUILDING, type ConstructionKind, type MatchState } from '../state/types.ts';
 
@@ -160,6 +163,14 @@ function planBuild(
     const timeS = DEPOT_UPGRADE_TIME_S[level - 1];
     if (cost === undefined || timeS === undefined) return fail('maxLevel');
     return plan({ kind: 'upgradeDepot', hex, cost, timeS });
+  }
+  // Укрепление на гексе с укреплением — улучшение до следующего уровня (до укрепрайона).
+  const fort = fortLevel(state.hexes.building[hex] ?? 0);
+  if (kind === 'fort' && fort > 0) {
+    const cost = FORT_UPGRADE_COST[fort - 1];
+    const timeS = FORT_UPGRADE_TIME_S[fort - 1];
+    if (cost === undefined || timeS === undefined) return fail('maxLevel');
+    return plan({ kind: 'upgradeFort', hex, cost, timeS });
   }
   if (state.hexes.building[hex] !== BUILDING.none) return fail('buildingExists');
   if (kind === 'fort') {

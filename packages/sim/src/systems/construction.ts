@@ -4,6 +4,7 @@ import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
 import { depotBuilding, depotLevel } from '../state/depot.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
+import { fortBuilding, fortLevel } from '../state/fort.ts';
 import { BUILDING, type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
 
@@ -43,6 +44,9 @@ function complete(state: MatchState, c: Construction): void {
       hexes.building[c.hex] = BUILDING.fort;
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
+      return;
+    case 'upgradeFort':
+      hexes.building[c.hex] = fortBuilding(fortLevel(hexes.building[c.hex] ?? 0) + 1);
       return;
     case 'depot':
       hexes.building[c.hex] = BUILDING.depot;

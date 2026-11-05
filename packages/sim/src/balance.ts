@@ -154,7 +154,12 @@ export const IMPROVEMENT_CAP_STEP: Fp = fp(0.5);
 export const IMPROVEMENT_GROWTH_STEP: Fp = fp(0.3);
 export const FORT_COST: Fp = fp(60);
 export const FORT_TIME_S: Fp = fp(10);
+/** Множитель обороны укрепления уровней 1–3 (3 — укрепрайон). */
+export const FORT_DEF_MULTS: readonly Fp[] = [fp(1.4), fp(1.8), fp(2.4)];
 export const FORT_DEF_MULT: Fp = fp(1.4);
+/** Улучшение укрепления с уровня 1 и 2: цена, золото; время, секунды. */
+export const FORT_UPGRADE_COST: readonly Fp[] = [fp(100), fp(200)];
+export const FORT_UPGRADE_TIME_S: readonly Fp[] = [fp(15), fp(20)];
 export const DEPOT_COST: Fp = fp(80);
 export const DEPOT_TIME_S: Fp = fp(15);
 export const DEPOT_RADIUS = 3;

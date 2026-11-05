@@ -4,6 +4,7 @@
 import {
   DEPOT_COST,
   isDepot,
+  isFort,
   type Command,
   type ConstructionCheck,
   type RejectReason,
@@ -12,7 +13,14 @@ import {
 import type { Selection } from '../local/messages.ts';
 
 export type ActionKind =
-  'upgrade' | 'rebuild' | 'foundCity' | 'improve' | 'fort' | 'depot' | 'depotUpgrade';
+  | 'upgrade'
+  | 'rebuild'
+  | 'foundCity'
+  | 'improve'
+  | 'fort'
+  | 'fortUpgrade'
+  | 'depot'
+  | 'depotUpgrade';
 
 export interface HexAction {
   readonly kind: ActionKind;
@@ -92,7 +100,9 @@ export function visibleActions(
   } else {
     out.push(foundCityAction(s.foundCity, hex, foundCityCost));
     out.push(fromCheck('improve', s.improve, { t: 'improve', hex }, improveBlockedCost));
-    out.push(fromCheck('fort', s.fort, { t: 'build', hex, kind: 'fort' }));
+    // Укрепление на гексе с укреплением — улучшение до следующего уровня (укрепрайон).
+    const fortKind = isFort(s.building) ? 'fortUpgrade' : 'fort';
+    out.push(fromCheck(fortKind, s.fort, { t: 'build', hex, kind: 'fort' }));
     if (s.rebuild) out.push(rebuildAction(s.rebuild, { t: 'rebuildSupply', hex }));
   }
   // Склад на гексе со складом — улучшение до следующего уровня.

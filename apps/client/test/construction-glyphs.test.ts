@@ -32,6 +32,16 @@ describe('знаки построек', () => {
     expect(icons.every((i) => i.color === '#0E7C6B')).toBe(true);
   });
 
+  it('уровень укрепления и склада — точки под знаком, на одну меньше уровня', () => {
+    const dots = (building: number): number =>
+      drawConstructions(new Graphics(), [glyph({ building })], 1, R).filter((i) => i.kind === 'dot')
+        .length;
+    expect(dots(BUILDING.fort)).toBe(0);
+    expect(dots(BUILDING.fort2)).toBe(1);
+    expect(dots(BUILDING.fort3)).toBe(2);
+    expect(dots(BUILDING.depot5)).toBe(4);
+  });
+
   it('пустой гекс ничего не рисует', () => {
     expect(drawConstructions(new Graphics(), [glyph({})], 1, R)).toEqual([]);
   });

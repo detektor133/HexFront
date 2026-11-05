@@ -616,6 +616,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     destroy() {
       territory.destroy();
       maskGpu.destroy();
+      mapIcons.destroy();
       container.destroy({ children: true, context: true });
       top.destroy({ children: true, context: true });
     },

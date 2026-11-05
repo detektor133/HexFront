@@ -11,6 +11,7 @@ import {
   FLANK_MAX,
   FLANK_STEP,
   FORT_DEF_MULT,
+  FORT_DEF_MULTS,
   ORG_LOSS_K,
   ORG_LOSS_MAX,
   ORG_LOSS_MIN,
@@ -21,7 +22,8 @@ import {
 import { TERRAIN_NAMES, type MapStatic } from '../map/types.ts';
 import { distance, hexFromId, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
-import { BUILDING, type UnitOrder } from '../state/types.ts';
+import { fortLevel } from '../state/fort.ts';
+import type { UnitOrder } from '../state/types.ts';
 
 /** Боец для формул: отряд из состояния или из снимка игрока. */
 export interface Fighter {
@@ -129,7 +131,8 @@ export function defensePower(
   }
   const name = TERRAIN_NAMES[ground.map.terrain[hex] ?? 0];
   let mult = (name === undefined || name === 'water' ? FP : DEF_MULT[name]) as Fp;
-  if (ground.building[hex] === BUILDING.fort) mult = fpMul(mult, FORT_DEF_MULT);
+  const fort = fortLevel(ground.building[hex] ?? 0);
+  if (fort > 0) mult = fpMul(mult, FORT_DEF_MULTS[fort - 1] ?? FORT_DEF_MULT);
   if (ground.hasCity(hex)) mult = fpMul(mult, CITY_DEF_MULT);
   return fpMul(raw as Fp, mult);
 }

@@ -1,6 +1,6 @@
 import {
   IconArrowUp,
-  IconBuildingCastle,
+  IconBuildingCommunity,
   IconChevronsUp,
   IconPackage,
   IconRoute2,
@@ -46,11 +46,13 @@ function ActionButton(props: {
   const hint =
     a.kind === 'fort'
       ? t('action.fortHint')
-      : a.kind === 'depot'
-        ? t('action.depotHint')
-        : a.kind === 'depotUpgrade'
-          ? t('action.depotUpgradeHint')
-          : null;
+      : a.kind === 'fortUpgrade'
+        ? t('action.fortUpgradeHint')
+        : a.kind === 'depot'
+          ? t('action.depotHint')
+          : a.kind === 'depotUpgrade'
+            ? t('action.depotUpgradeHint')
+            : null;
   const preview = a.kind === 'rebuild' ? a.previewPath : undefined;
   const label = t(`action.${a.kind}` as MessageKey);
   const compact = props.compact === true;
@@ -121,7 +123,8 @@ const ACTION_ICONS = {
   depot: IconPackage,
   depotUpgrade: IconPackage,
   fort: IconShield,
-  foundCity: IconBuildingCastle,
+  fortUpgrade: IconShield,
+  foundCity: IconBuildingCommunity,
   upgrade: IconChevronsUp,
   improve: IconArrowUp,
 } as const;

@@ -21,6 +21,8 @@ export const BUILDING = {
   depot3: 4,
   depot4: 5,
   depot5: 6,
+  fort2: 7,
+  fort3: 8,
 } as const;
 
 /** Изменяемые данные гексов — структура массивов по HexId (ADR-0006). */
@@ -110,7 +112,14 @@ export interface Recruitment {
 }
 
 export type ConstructionKind =
-  'foundCity' | 'upgradeCity' | 'improve' | 'fort' | 'depot' | 'upgradeDepot' | 'road';
+  | 'foundCity'
+  | 'upgradeCity'
+  | 'improve'
+  | 'fort'
+  | 'upgradeFort'
+  | 'depot'
+  | 'upgradeDepot'
+  | 'road';
 
 /** Стройка на гексе; одна на гекс. Прогресс — в тиках. */
 export interface Construction {

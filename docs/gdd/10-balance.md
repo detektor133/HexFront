@@ -130,6 +130,8 @@
 | `IMPROVEMENT_CAP_STEP` | 0,5 |
 | `IMPROVEMENT_GROWTH_STEP` | 0,3 |
 | `FORT_COST` / `FORT_TIME_S` / `FORT_DEF_MULT` | 60 / 10 / 1,4 |
+| `FORT_DEF_MULTS` | 1,4 / 1,8 / 2,4 (уровни 1–3) `[ТЮНИНГ]` |
+| `FORT_UPGRADE_COST` / `_TIME_S` | 100 / 15 с (1→2); 200 / 20 с (2→3) `[ТЮНИНГ]` |
 | `DEPOT_COST` / `DEPOT_TIME_S` / `DEPOT_RADIUS` / `DEPOT_MIN_DISTANCE` / `DEPOT_LOSS_MULT` | 80 / 15 / 3 / 3 / 0,5 |
 | `ROAD_BUILD_S_PER_HEX` | 1,5 |
 | `SUPPLY_REBUILD_COST_PER_HEX` | 15 |

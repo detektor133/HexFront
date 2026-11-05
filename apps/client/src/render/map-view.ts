@@ -93,6 +93,11 @@ export interface MapView {
   /** Ставит гекс в центр экрана (в пределах границ карты). */
   centerOn(hex: Hex, durationMs?: number): void;
   /**
+   * Ставит гекс в центр и держит его там, пока игрок не сдвинет камеру сам: панели HUD и размер
+   * окна приходят после первого кадра и сдвигают середину видимой области.
+   */
+  pinCenter(hex: Hex): void;
+  /**
    * Режим рисования: один палец или ЛКМ с зажатием ведут линию, два пальца, колесо и
    * перетаскивание правой/средней кнопкой двигают карту; null — обычный режим.
    */
@@ -195,6 +200,8 @@ export async function createMapView(
   let centerAnimation: { from: Camera; to: Camera; elapsedMs: number; durationMs: number } | null =
     null;
   let pressed = 0;
+  let pinned: Hex | null = null;
+  let seenSize = '';
   let stroking = false;
   let hooks: OrderHooks | null = null;
   let stroke: StrokeHandler | null = null;
@@ -218,8 +225,29 @@ export async function createMapView(
     onState({ scale: cam.scale, level, fps: app.ticker.FPS });
   };
 
+  const centerTo = (hex: Hex, durationMs = 0): void => {
+    const p = hexCenter(hex, opts.radius);
+    const v = cameraView();
+    const target = clampCamera(
+      {
+        scale: cam.scale,
+        x: v.width / 2 - p.x * cam.scale,
+        y: (v.top ?? 0) + v.height / 2 - p.y * cam.scale,
+      },
+      cameraView(),
+      bounds,
+    );
+    centerAnimation = durationMs > 0 ? { from: cam, to: target, elapsedMs: 0, durationMs } : null;
+    if (durationMs <= 0) cam = target;
+  };
+
   app.ticker.add((ticker) => {
     mid?.frame?.(performance.now());
+    const size = `${view().width}x${view().height}`;
+    if (size !== seenSize) {
+      seenSize = size;
+      if (pinned) centerTo(pinned);
+    }
     if (centerAnimation) {
       centerAnimation.elapsedMs += ticker.deltaMS;
       const progress = Math.min(1, centerAnimation.elapsedMs / centerAnimation.durationMs);
@@ -263,6 +291,7 @@ export async function createMapView(
     },
     (e) => {
       if (e.t === 'pan') {
+        pinned = null;
         cam = panBy(cam, e.dx, e.dy, cameraView(), bounds);
         const now = performance.now();
         const dt = Math.max(1, now - lastPanMs);
@@ -272,6 +301,7 @@ export async function createMapView(
         velocity = { vx: v.vx * (1 - k) + inst.vx * k, vy: v.vy * (1 - k) + inst.vy * k };
         lastPanMs = now;
       } else if (e.t === 'zoom') {
+        pinned = null;
         cam = zoomAt(cam, e.factor, e.at.x, e.at.y, cameraView(), bounds);
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
@@ -305,7 +335,10 @@ export async function createMapView(
     },
   );
   const detach = attachInput(app.canvas, gesture, {
-    zoom: (factor, at) => (cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds)),
+    zoom: (factor, at) => {
+      pinned = null;
+      cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds);
+    },
     pressed: (n) => {
       pressed = n;
       if (n > 0) velocity = null;
@@ -345,19 +378,12 @@ export async function createMapView(
       drawnScale = 0;
     },
     centerOn(hex, durationMs = 0) {
-      const p = hexCenter(hex, opts.radius);
-      const v = cameraView();
-      const target = clampCamera(
-        {
-          scale: cam.scale,
-          x: v.width / 2 - p.x * cam.scale,
-          y: (v.top ?? 0) + v.height / 2 - p.y * cam.scale,
-        },
-        cameraView(),
-        bounds,
-      );
-      centerAnimation = durationMs > 0 ? { from: cam, to: target, elapsedMs: 0, durationMs } : null;
-      if (durationMs <= 0) cam = target;
+      pinned = null;
+      centerTo(hex, durationMs);
+    },
+    pinCenter(hex) {
+      pinned = hex;
+      centerTo(hex);
     },
     setGrab(fn) {
       grab = fn;
@@ -422,12 +448,14 @@ export async function createMapView(
     },
     setBottomInset(px) {
       bottomInset = Math.max(0, px);
+      if (pinned) centerTo(pinned);
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
     setTopInset(px, right = rightInset) {
       topInset = Math.max(0, px);
       rightInset = Math.max(0, right);
+      if (pinned) centerTo(pinned);
       cam = clampCamera(cam, cameraView(), bounds);
       apply();
     },
