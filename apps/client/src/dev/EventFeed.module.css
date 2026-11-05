@@ -1,54 +1,138 @@
+/* Полоса событий у левого края: свёрнутая метка — цвет игрока и значок, по наведению раскрывается
+   в текст. Новое событие выезжает и мигает цветом; предложение договора качается, пока без ответа. */
 .feed {
-  position: absolute;
-  z-index: 3;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  z-index: 18;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .item {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-height: 30px;
-  padding: 4px 8px;
-  border: 0;
-  border-left: 0 solid var(--status-danger);
-  background: var(--ui-surface);
+  box-sizing: border-box;
+  min-height: 40px;
+  max-width: 48px;
+  padding: 4px 12px 4px 10px;
+  overflow: hidden;
   color: var(--ui-ink);
   font: inherit;
   font-size: 13px;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-left: 0;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  box-shadow: var(--shadow-hard);
+  pointer-events: auto;
+  transition: max-width 180ms ease-out;
+  animation:
+    feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    feed-flash 1100ms ease-out both;
+}
+
+.item:hover,
+.item:focus-visible {
+  max-width: 360px;
 }
 
 div.item {
   cursor: default;
 }
 
+/* Важное: широкая полоса цвета опасности с внутренней стороны метки. */
 .important {
-  border-left-width: 3px;
+  border-right: 4px solid var(--status-danger);
 }
 
 .owner {
-  width: var(--space-sm);
-  height: 8px;
   flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
 
+/* Предложение договора всегда раскрыто, с кнопками ответа, и качается, пока на него не ответили. */
 .offer {
-  border-left: 3px solid var(--ui-ink);
+  max-width: 360px;
+  border-right: 4px solid var(--ui-ink);
   cursor: default;
+  animation:
+    feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    feed-flash 1100ms ease-out both,
+    feed-wiggle 1400ms ease-in-out 1.2s infinite;
+}
+
+.offer:hover,
+.offer:focus-within {
+  animation: none;
 }
 
 .name {
   min-width: 0;
   flex: 1 1 auto;
-  overflow-wrap: anywhere;
-  white-space: normal;
 }
 
 .answer {
   flex: 0 0 auto;
+}
+
+@keyframes feed-enter {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes feed-flash {
+  0%,
+  35% {
+    background: var(--status-danger);
+  }
+
+  100% {
+    background: var(--ui-surface);
+  }
+}
+
+@keyframes feed-wiggle {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30% {
+    transform: translateX(-6px);
+  }
+
+  20%,
+  40% {
+    transform: translateX(6px);
+  }
+
+  50% {
+    transform: translateX(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .offer {
+    animation: none;
+    transition: none;
+  }
 }

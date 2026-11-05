@@ -173,19 +173,16 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
-      {styleFor('event-feed') && (
-        <EventFeed
-          items={sb.events}
-          offers={view?.diplomacy?.incoming ?? []}
-          nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
-          send={sb.send}
-          graceLeftS={view?.me.graceLeftS}
-          {...(view ? { localPlayerId: view.playerId } : {})}
-          now={performance.now()}
-          onFocus={sb.focusEvent}
-          style={styleFor('event-feed')}
-        />
-      )}
+      <EventFeed
+        items={sb.events}
+        offers={view?.diplomacy?.incoming ?? []}
+        nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+        send={sb.send}
+        graceLeftS={view?.me.graceLeftS}
+        {...(view ? { localPlayerId: view.playerId } : {})}
+        now={performance.now()}
+        onFocus={sb.focusEvent}
+      />
       {styleFor('left-column') && (
         <div className={styles.leftColumn} style={styleFor('left-column')}>
           {showOnboarding && view && <OnboardingHints />}
