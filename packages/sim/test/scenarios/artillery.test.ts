@@ -160,4 +160,18 @@ describe('регрессии', () => {
     expect(() => s.runTicks(5)).not.toThrow();
     expect(s.unitById(att)).toBeUndefined();
   });
+
+  it('выделенная вместе с пехотой артиллерия подходит в упор к вражеской клетке и встаёт на своей', () => {
+    const s = scenario(LINE, { legend });
+    const inf = s.unit('A', 'infantry', 100, at(1, 1));
+    const art = s.unit('A', 'artillery', 100, at(1, 1));
+    s.unit('B', 'infantry', 100, at(4, 1));
+    s.cmd('A', attack([inf, art], at(4, 1)));
+    s.runTicks(1);
+    expect(s.rejections()).toEqual([]);
+    s.runSeconds(40);
+    // Артиллерия остановилась на последнем своём гексе у цели и сама на чужую землю не вошла.
+    expect(s.unitById(art)?.hex).toBe(hexOf(s, at(3, 1)));
+    expect(s.unitById(art)?.order).toBe('idle');
+  });
 });

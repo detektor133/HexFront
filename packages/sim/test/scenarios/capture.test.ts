@@ -51,12 +51,12 @@ describe('захват пустых гексов', () => {
     expect(s.owner(at(3, 1))).toBe('A');
   });
 
-  it('артиллерия не захватывает: на чужой гекс её не пускает путь', () => {
+  it('артиллерия не захватывает: на чужой гекс не входит, встаёт в упор на своём', () => {
     const s = scenario(MAP, { legend });
     const id = s.unit('A', 'artillery', 100, at(1, 1));
     s.cmd('A', move([id], at(2, 1)));
     s.runSeconds(3);
     expect(s.owner(at(2, 1))).toBeNull();
-    expect(s.rejections()).toEqual(['noPath']);
+    expect(s.rejections()).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@
 // GDD: docs/gdd/05-armies.md — «Движение», «Разделение и слияние», «Приказы».
 import { MAX_UNITS_PER_HEX } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
-import type { HexId } from '../math/hex.ts';
+import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { planGather } from '../queries/gather.ts';
@@ -62,6 +62,28 @@ export function routePath(
   return path;
 }
 
+/** Сколько ближайших своих гексов пробует артиллерия, ища место «в упор» к цели. */
+const ARTY_STAND_CANDIDATES = 12;
+
+/**
+ * Куда идёт отряд по приказу на гекс. Артиллерия не входит на чужую землю: она встаёт на своём
+ * гексе, ближайшем к цели (в упор к клетке) и ждёт — огонь ведётся сам; остальные идут на цель.
+ */
+export function orderDestination(state: MatchState, unit: Unit, to: HexId): HexId {
+  if (unit.type !== 'artillery' || state.hexes.owner[to] === unit.owner) return to;
+  const { width } = state.map;
+  const target = hexFromId(to, width);
+  const own: { readonly hex: HexId; readonly d: number }[] = [];
+  state.hexes.owner.forEach((o, h) => {
+    if (o === unit.owner) own.push({ hex: h, d: distance(hexFromId(h, width), target) });
+  });
+  own.sort((a, b) => a.d - b.d || a.hex - b.hex);
+  for (const { hex } of own.slice(0, ARTY_STAND_CANDIDATES)) {
+    if (hex === unit.hex || findPath(state, unit.hex, hex, unit.type, unit.owner)) return hex;
+  }
+  return to;
+}
+
 function validateMove(
   state: MatchState,
   units: readonly Unit[],
@@ -73,10 +95,11 @@ function validateMove(
   }
   if (via.length > MAX_VIA_POINTS) return rejected('badOrder');
   for (const a of units) {
-    if (a.hex === to && via.length === 0) continue;
-    if (ownUnitsAt(state, a.owner, to) >= MAX_UNITS_PER_HEX && a.hex !== to)
+    const dest = orderDestination(state, a, to);
+    if (a.hex === dest && via.length === 0) continue;
+    if (ownUnitsAt(state, a.owner, dest) >= MAX_UNITS_PER_HEX && a.hex !== dest)
       return rejected('hexFull');
-    if (!routePath(state, a, via, to)) return rejected('noPath');
+    if (!routePath(state, a, via, dest)) return rejected('noPath');
   }
   return OK;
 }
@@ -91,8 +114,9 @@ function validateAttack(
   if (!Number.isInteger(target) || target < 0 || target >= state.hexes.owner.length) {
     return rejected('badHex');
   }
-  if (units.some((u) => u.type === 'artillery')) return rejected('badOrder');
-  if (units.some((u) => !isHostileHex(state, u.owner, target))) return rejected('notEnemy');
+  // Артиллерия в атаку не идёт, но выбранная вместе с пехотой подходит в упор и встаёт.
+  const strikers = units.filter((u) => u.type !== 'artillery');
+  if (strikers.some((u) => !isHostileHex(state, u.owner, target))) return rejected('notEnemy');
   return validateMove(state, units, target, via);
 }
 
@@ -235,7 +259,7 @@ export function executeUnitCommand(state: MatchState, playerId: number, cmd: Uni
     case 'move':
     case 'attack':
       for (const a of owned.units) {
-        const dest = cmd.t === 'move' ? cmd.to : cmd.target;
+        const dest = orderDestination(state, a, cmd.t === 'move' ? cmd.to : cmd.target);
         const path = routePath(state, a, cmd.via ?? [], dest) ?? [];
         // Приказ игрока выполняется сразу: начатый шаг прерывается. Исключение — тот же ближайший
         // шаг: переход продолжается с накопленным прогрессом (05-armies.md).

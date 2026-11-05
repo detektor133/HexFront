@@ -3,7 +3,6 @@ import type { PlayerView } from '@hexfront/sim';
 import { NOTHING_PICKED, selectUnits, type Picked } from './sandbox-selection.ts';
 import type { UnitLayer } from './unit-layer.ts';
 import type { Point } from '../render/hex-geometry.ts';
-import type { StrokeHandler } from '../render/map-view.ts';
 
 export interface PickedState {
   current: Picked;
@@ -32,13 +31,6 @@ export function createSandboxPicker(
     commitPickedState(state, picked, notify);
     afterPick(picked, previous);
   };
-}
-
-export function createSandboxGrab(
-  inputGrab: (world: Point) => StrokeHandler | null,
-  splitGrab: (world: Point) => StrokeHandler | null,
-): (world: Point) => StrokeHandler | null {
-  return (world) => inputGrab(world) ?? splitGrab(world);
 }
 
 /** Обрабатывает попадание в фишку и обновляет состояние выбора владельца карты. */

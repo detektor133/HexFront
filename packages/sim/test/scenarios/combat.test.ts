@@ -167,7 +167,7 @@ describe('ход боя', () => {
     expect(s.owner(at(3, 1))).toBe('A');
   });
 
-  it('attack: цель не враг — отказ notEnemy; артиллерия — badOrder', () => {
+  it('attack: цель не враг — отказ notEnemy; артиллерия приказ принимает и подходит в упор', () => {
     const s = scenario(FIELD, { legend });
     const inf = s.unit('A', 'infantry', 100, at(1, 1));
     const art = s.unit('A', 'artillery', 100, at(2, 1));
@@ -175,7 +175,7 @@ describe('ход боя', () => {
     s.cmd('A', attack([inf], at(2, 1)));
     s.cmd('A', attack([art], at(3, 1)));
     s.runTicks(1);
-    expect(s.rejections()).toEqual(['notEnemy', 'badOrder']);
+    expect(s.rejections()).toEqual(['notEnemy']);
   });
 
   it('отряд без солдат уничтожается', () => {

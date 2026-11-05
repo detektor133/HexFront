@@ -165,7 +165,7 @@ describe('видимость линии фронта', () => {
       return this;
     });
     try {
-      layer.setView(view, null, selected.id, null, 1, 2);
+      layer.setView(view, null, selected.id, 1, 2);
       const selectedStroke = strokes.find(({ color }) => color === armyColor(selected.number));
       const otherStroke = strokes.find(({ color }) => color === armyColor(other.number));
       const selectedTicks = strokes.filter(
@@ -257,7 +257,7 @@ describe('видимость линии фронта', () => {
       }
 
       strokes.length = 0;
-      layer.setView(view, null, null, null, 1, 2);
+      layer.setView(view, null, null, 1, 2);
       const plainStrokes = strokes.filter(
         ({ color, width }) =>
           (color === armyColor(selected.number) || color === armyColor(other.number)) &&
@@ -313,10 +313,10 @@ describe('видимость линии фронта', () => {
     const tails = (): Array<{ readonly color?: string; readonly alpha?: number }> =>
       fills.filter(({ color }) => color === tokens.arrow.color);
     try {
-      layer.setView(view, null, army.id, null, 1, 2);
+      layer.setView(view, null, army.id, 1, 2);
       const selected = [...tails()];
       fills.length = 0;
-      layer.setView(view, null, null, null, 1, 2);
+      layer.setView(view, null, null, 1, 2);
       const unselected = [...tails()];
 
       expect(selected.length).toBeGreaterThan(0);

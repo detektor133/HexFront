@@ -32,6 +32,7 @@ import {
   MAPGEN_RIVERS_PER_PLAYER_NUMERATOR,
   MAPGEN_WATER_SHARE,
 } from './params.ts';
+import { riverFromHexPath } from './rivers.ts';
 
 export interface TerrainOptions {
   readonly width: number;
@@ -284,22 +285,12 @@ function riverEdges(
       terrain[hexId(last, options.width)] !== TERRAIN.water
     )
       continue;
-    for (let i = 1; i < path.length; i += 1) {
-      const from = path[i - 1];
-      const to = path[i];
-      if (!from || !to) continue;
-      const dir =
-        [0, 1, 2, 3, 4, 5].find((candidate) => {
-          const n = neighbor(from, candidate as Direction);
-          return n.q === to.q && n.r === to.r;
-        }) ?? 0;
-      const start = dir < 3 ? from : to;
-      const canonical = dir < 3 ? dir : dir - 3;
-      const key = `${start.q},${start.r},${canonical}`;
-      if (!used.has(key)) {
-        used.add(key);
-        result.push([start.q, start.r, canonical]);
-      }
+    // Путь по гексам превращается в непрерывную цепочку граней: стык в общих углах, не обрывки.
+    for (const edge of riverFromHexPath(path, (h) => inBounds(h, options.width, options.height))) {
+      const id = `${edge[0]},${edge[1]},${edge[2]}`;
+      if (used.has(id)) continue;
+      used.add(id);
+      result.push(edge);
     }
     if (result.length >= target * MAPGEN_RIVER_MIN_EDGES) break;
   }

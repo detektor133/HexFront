@@ -34,7 +34,6 @@ import {
   selectUnitsInRect,
   type Picked,
 } from './sandbox-selection.ts';
-import { createSplitGrab } from './split-drag.ts';
 import { useTelemetry } from './telemetry-client.ts';
 import {
   createSnapshotTelemetry,
@@ -44,12 +43,7 @@ import {
   type SnapshotTelemetryCounts,
   type WorkerTelemetry,
 } from './telemetry.ts';
-import {
-  createPickedState,
-  createSandboxPicker,
-  createSandboxGrab,
-  tapUnit,
-} from './unit-selection.ts';
+import { createPickedState, createSandboxPicker, tapUnit } from './unit-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
 import { ControlGroups } from '../input/control-groups.ts';
 import { createHotkeyHandler } from '../input/hotkeys.ts';
@@ -203,20 +197,6 @@ function useSandbox(
   }, []);
   const setArmyRef = useRef(setArmy);
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
-  const splitGrab = useMemo(
-    () =>
-      createSplitGrab({
-        context: (): DraftContext | null => {
-          const v = viewRef.current;
-          if (!v || typeof loaded === 'string') return null;
-          return { map: loaded.map, view: v, radius: tokens.map.hexRadius };
-        },
-        chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
-        send: (cmd) => matchRef.current?.send(cmd),
-        setOverlay: (o) => layerRef.current?.setSplit(o),
-      }),
-    [loaded],
-  );
   const setToolRef = useRef<(t: ToolState | null) => void>(() => undefined);
   // Инструменты планов: рисование пальцем по граням, тапы, ручки фронта (CR-004).
   const input = useMemo(
@@ -368,7 +348,7 @@ function useSandbox(
       v.setBottomInset(dockHeightRef.current);
       v.setTopInset(hudHeightRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
-      v.setGrab(createSandboxGrab(input.grab, splitGrab));
+      v.setGrab(input.grab);
       v.setOrderHooks(hooks);
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
@@ -422,7 +402,7 @@ function useSandbox(
       mapViewRef.current = null;
       eventsRef.current = [];
     };
-  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
+  }, [hostRef, loaded, mapRequest, pick, input, setTool, debug]);
 
   return {
     msg,

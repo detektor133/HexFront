@@ -163,12 +163,14 @@ describe('движение: путь', () => {
     expect(s.rejections()).toEqual(['noPath']);
   });
 
-  it('артиллерия ходит только по своим гексам', () => {
+  it('артиллерия ходит только по своим гексам: приказ на чужой гекс — встать в упор на своём', () => {
     const s = scenario(LINE, { legend });
     const id = s.unit('A', 'artillery', 100, at(5, 1));
     s.cmd('A', move([id], at(6, 1)));
-    s.runTicks(1);
-    expect(s.rejections()).toEqual(['noPath']);
+    s.runSeconds(3);
+    expect(s.rejections()).toEqual([]);
+    expect(s.unitById(id)?.hex).toBe(5 + 1 * s.state.map.width);
+    expect(s.owner(at(6, 1))).not.toBe('A');
   });
 
   it('пехота может идти на нейтральный гекс', () => {

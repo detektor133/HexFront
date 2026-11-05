@@ -31,7 +31,6 @@ import {
   selectUnitsInRect,
   type Picked,
 } from '../dev/sandbox-selection.ts';
-import { createSplitGrab } from '../dev/split-drag.ts';
 import {
   createSnapshotTelemetry,
   type CacheTelemetry,
@@ -343,20 +342,6 @@ export function useSandbox(
   }, []);
   const setArmyRef = useRef(setArmy);
   // setTool зависит от input, а input вызывает setTool — связь через ссылку.
-  const splitGrab = useMemo(
-    () =>
-      createSplitGrab({
-        context: (): DraftContext | null => {
-          const v = viewRef.current;
-          if (!v || typeof loaded === 'string') return null;
-          return { map: loaded.map, view: v, radius: tokens.map.hexRadius };
-        },
-        chipAt: (hex) => layerRef.current?.chipAt(hex) ?? { x: 0, y: 0 },
-        send: (cmd) => matchRef.current?.send(cmd),
-        setOverlay: (o) => layerRef.current?.setSplit(o),
-      }),
-    [loaded],
-  );
   const setToolRef = useRef<(t: ToolState | null) => void>(() => undefined);
   // Инструменты планов: рисование пальцем по граням, тапы, ручки фронта (CR-004).
   const input = useMemo(
@@ -612,7 +597,7 @@ export function useSandbox(
       v.setTopInset(hudHeightRef.current);
       v.setTopInset(hudHeightRef.current, rightInsetRef.current);
       // Сначала ручки фронта выбранной армии, потом — вытягивание части из своей фишки.
-      v.setGrab((world) => (toolRef.current ? null : (input.grab(world) ?? splitGrab(world))));
+      v.setGrab((world) => (toolRef.current ? null : input.grab(world)));
       v.setOrderHooks(hooks);
       v.setSelection((from, to, phase) => {
         if (phase !== 'end') return;
@@ -668,7 +653,7 @@ export function useSandbox(
       mapViewRef.current = null;
       eventsRef.current = [];
     };
-  }, [hostRef, loaded, mapRequest, pick, input, setTool, splitGrab, debug]);
+  }, [hostRef, loaded, mapRequest, pick, input, setTool, debug]);
 
   // groupTick меняется при записи группы; состав отрядов берётся из последнего вида.
   const groupDigits = useMemo(

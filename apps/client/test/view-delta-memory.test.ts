@@ -143,11 +143,11 @@ describe('дельты вида и текст карты (07/T15)', () => {
       } as never,
       null,
       null,
-      { center: { x: 0, y: 0 }, ring: 1, share: 0.5, amount: 100, target: null },
       1,
       2,
     );
-    expect(bitmapTexts(plan.container)).toHaveLength(1);
+    // Слой планов без прогноза текста не создаёт; если создаёт, то только BitmapText.
+    expect(bitmapTexts(plan.container)).toHaveLength(0);
     plan.destroy();
 
     const deltaSource = readFileSync(join(SOURCE_ROOT, 'local/view-delta.ts'), 'utf8');

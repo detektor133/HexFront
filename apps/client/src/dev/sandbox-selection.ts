@@ -163,9 +163,8 @@ export function orderHex(
   if (mine.length === 0) return { picked: selectHex(view, picked, hex), cmd: null };
   const done = { ...picked, target: null };
   if (isHostile(view, hex)) {
-    const attackers = mine.filter((u) => u.type !== 'artillery');
-    if (attackers.length === 0) return { picked: done, cmd: null };
-    return { picked: done, cmd: { t: 'attack', unitIds: attackers.map((u) => u.id), target: hex } };
+    // Артиллерия идёт вместе: она подойдёт в упор к клетке и встанет, огонь — сам.
+    return { picked: done, cmd: { t: 'attack', unitIds: mine.map((u) => u.id), target: hex } };
   }
   // Приказ на гекс, где отряды уже стоят: наступающие и идущие останавливаются (как в HoI4).
   if (via.length === 0 && mine.every((u) => u.hex === hex)) {

@@ -2,7 +2,7 @@
 // цвета армии по граням на белой подложке, у выбранной армии — ручки на концах; линия
 // наступления — пунктир `arrow.color` гладкой кривой по граням и широкие полупрозрачные стрелки
 // к ней; линия обороны — через центры гексов с зубцами к врагу; прогноз у линии; черновик.
-import { BitmapText, Container, Graphics } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 
 import {
   edgeHex,
@@ -36,7 +36,6 @@ import {
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
 import { edgeRuns } from './plan-edges.ts';
 import { isHostile } from './sandbox-selection.ts';
-import type { SplitOverlay } from './split-drag.ts';
 import { dashedPath } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import type { Point } from '../render/hex-geometry.ts';
@@ -45,9 +44,6 @@ import { tokens } from '../theme/tokens.ts';
 
 /** Черновик: подсветка линии — доля непрозрачности. */
 const DRAFT_ALPHA = 0.6;
-/** Прогноз у линии: кегль и подъём над точкой, px экрана. */
-const LABEL_PX = 13;
-const LABEL_LIFT = 14;
 const RANK: Record<ForecastOutcome, number> = { defeat: 0, stalemate: 1, victory: 2 };
 
 export interface PlanLayer {
@@ -56,7 +52,6 @@ export interface PlanLayer {
     view: PlayerView,
     draft: Draft | null,
     selectedArmy: number | null,
-    split: SplitOverlay | null,
     scale: number,
     level: DetailLevel,
   ): void;
@@ -341,23 +336,6 @@ export function createPlanLayer(
     return worst;
   }
 
-  function label(text: string, color: string, at: Point): void {
-    const tx = new BitmapText({
-      text,
-      style: {
-        fontFamily: tokens.font.ui.family,
-        fontWeight: '500',
-        fontSize: LABEL_PX,
-        fill: color,
-        stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
-      },
-    });
-    tx.anchor.set(0.5, 1);
-    tx.scale.set(k);
-    tx.position.set(at.x, at.y - LABEL_LIFT * k);
-    labels.addChild(tx);
-  }
-
   function drawOffensive(v: PlayerView, p: FrontPlan, showForecastCard: boolean): void {
     if (!p.offensive) return;
     const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
@@ -368,35 +346,6 @@ export function createPlanLayer(
     if (badge && end) {
       drawForecastPresentation(labels, badge, end, k, showForecastCard);
     }
-  }
-
-  // Кольцо деления: подложка, дуга «сколько взять» от верха по часовой, ручка, число; путь в гекс.
-  function drawSplit(o: SplitOverlay): void {
-    const { center: c, ring } = o;
-    if (o.target !== null) {
-      const t = center(o.target);
-      dashedPath(g, [c, t], 6 * k, 5 * k, 0);
-      g.stroke({ color: tokens.relation.own, width: 2.5 * k, cap: 'round' });
-      g.circle(t.x, t.y, 6 * k)
-        .fill(tokens.ui.surface)
-        .stroke({ color: tokens.relation.own, width: 2.5 * k });
-    }
-    g.circle(c.x, c.y, ring).stroke({ color: tokens.ui.surface, width: 8 * k, alpha: 0.95 });
-    const start = -Math.PI / 2;
-    const end = start + Math.PI * 2 * o.share;
-    g.moveTo(c.x, c.y - ring)
-      .arc(c.x, c.y, ring, start, end)
-      .stroke({
-        color: tokens.relation.own,
-        width: 5 * k,
-        cap: 'round',
-      });
-    const kx = c.x + Math.cos(end) * ring;
-    const ky = c.y + Math.sin(end) * ring;
-    g.circle(kx, ky, 6 * k)
-      .fill(tokens.ui.surface)
-      .stroke({ color: tokens.relation.own, width: 2.5 * k });
-    label(String(o.amount), tokens.ui.ink, { x: c.x, y: c.y - ring - 4 * k });
   }
 
   function drawDraft(v: PlayerView, d: Draft, color: string): void {
@@ -428,8 +377,8 @@ export function createPlanLayer(
 
   return {
     container,
-    setView(v, draft, selectedArmy, split, scale, lvl) {
-      last = [v, draft, selectedArmy, split, scale, lvl];
+    setView(v, draft, selectedArmy, scale, lvl) {
+      last = [v, draft, selectedArmy, scale, lvl];
       const now = performance.now();
       k = 1 / scale;
       level = lvl;
@@ -462,7 +411,6 @@ export function createPlanLayer(
       animating = tweens.active(now);
       const dc = draft ? colorOf(draft.armyId) : null;
       if (draft && dc) drawDraft(v, draft, dc);
-      if (split) drawSplit(split);
     },
     setHover(world) {
       const before = hoverNearForecast();

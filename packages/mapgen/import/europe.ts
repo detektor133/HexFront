@@ -19,6 +19,7 @@ import {
 } from '@hexfront/sim';
 
 import { CITY_NAMES, chooseCities, largestRoadableLand } from '../src/map.ts';
+import { riverFromHexPath } from '../src/rivers.ts';
 import { generateRoads } from '../src/roads.ts';
 
 const SOURCES = {
@@ -232,26 +233,30 @@ function directionBetween(from: Hex, to: Hex): Direction | null {
 function riverEdges(shapes: readonly Shape[], grid: Grid): [number, number, number][] {
   const edges: [number, number, number][] = [];
   const seen = new Set<string>();
+  const flush = (path: Hex[]): void => {
+    // Путь по соседним гексам → непрерывная цепочка граней (стык в общих углах, не обрывки).
+    for (const edge of riverFromHexPath(path, (h) => inBounds(h, grid.width, grid.height))) {
+      const key = edge.join(',');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push(edge);
+    }
+  };
   for (const shape of shapes)
-    for (const part of shape.parts)
-      for (let index = 1; index < part.length; index += 1) {
-        const previous = part[index - 1];
-        const current = part[index];
-        if (!previous || !current) continue;
-        const a = pointHex(grid, previous);
-        const b = pointHex(grid, current);
-        const direction = directionBetween(a, b);
-        if (direction === null) continue;
-        // Грань хранится от меньшей к большей из трёх «прямых» сторон (0–2), как в формате карты.
-        const [from, side] =
-          direction <= 2
-            ? ([a, direction] as const)
-            : ([b, ((direction + 3) % 6) as Direction] as const);
-        const key = `${from.q},${from.r},${side}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        edges.push([from.q, from.r, side]);
+    for (const part of shape.parts) {
+      let path: Hex[] = [];
+      for (const point of part) {
+        const hex = pointHex(grid, point);
+        const last = path[path.length - 1];
+        if (last && last.q === hex.q && last.r === hex.r) continue;
+        if (last && directionBetween(last, hex) === null) {
+          flush(path);
+          path = [];
+        }
+        path.push(hex);
       }
+      flush(path);
+    }
   return edges;
 }
 

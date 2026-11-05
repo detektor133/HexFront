@@ -26,7 +26,6 @@ import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import { createMapIconLayer } from './map-icons.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
-import type { SplitOverlay } from './split-drag.ts';
 import {
   buildTerritoryLabels,
   drawTerritoryLabels,
@@ -77,8 +76,6 @@ export interface EconomyLayer {
   setMapMask(kind: MaskKind | null, mask: Uint8Array | null): void;
   /** Номера точек цепочки приказов Shift+ПКМ на карте (пусто — убрать). */
   setQueueMarks(hexes: readonly number[]): void;
-  /** Кольцо «сколько взять» при вытягивании части из фишки. */
-  setSplit(o: SplitOverlay | null): void;
   /**
    * Цель приказа, пока палец держит (или мышь наводит): подсветка гекса и плашка прогноза над
    * ним, если там враг; null — убрать.
@@ -228,7 +225,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let draft: Draft | null = null;
   let selectedArmy: number | null = null;
   let roadPreviewPath: readonly number[] | null = null;
-  let split: SplitOverlay | null = null;
   let orderTarget: OrderTarget | null = null;
   let battlePanel: MarkerAnchor | null = null;
   let scale = 1;
@@ -498,7 +494,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     drawConstructionEffects(view);
     drawCaptureEffects();
     drawCityFlashEffects(view);
-    planLayer.setView(view, draft, selectedArmy, split, scale, level);
+    planLayer.setView(view, draft, selectedArmy, scale, level);
   };
 
   return {
@@ -530,10 +526,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         economy: economyLayerCacheTelemetry(capturesByHex, cityFlashes),
         frontTween: planLayer.cacheTelemetry(),
       };
-    },
-    setSplit(o) {
-      split = o;
-      redraw();
     },
     setOrderTarget(t) {
       orderTarget = t;
