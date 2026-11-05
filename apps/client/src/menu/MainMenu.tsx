@@ -157,126 +157,128 @@ export function MainMenu(): React.JSX.Element {
       <div ref={backgroundHostRef} className={styles.background} aria-hidden="true" />
       <section className={styles.card} aria-labelledby="main-menu-title">
         <p className={styles.wordmark}>Hexfront</p>
-        <h1 id="main-menu-title" className={styles.title}>
-          {t('menu.title')}
-        </h1>
-        <p className={styles.subtitle}>{t('menu.subtitle')}</p>
-        <div className={styles.field}>
-          <span className={styles.label}>{t('menu.map')}</span>
-          <div className={styles.segmented} role="radiogroup" aria-label={t('menu.map')}>
-            {MAPS.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                role="radio"
-                aria-checked={m.id === map}
-                className={`${styles.segment} ${m.id === map ? styles.chosen : ''}`}
-                onClick={() => setMap(m.id)}
-              >
-                <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
-                <small>{m.size}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-        {chooser?.choosePlayers && (
-          <label className={styles.field}>
-            <span className={styles.label}>{`${t('menu.players')}: ${players}`}</span>
-            <input
-              type="range"
-              min={PLAYERS_MIN}
-              max={PLAYERS_MAX}
-              value={players}
-              onChange={(event) => setPlayers(Number(event.target.value))}
-            />
-          </label>
-        )}
-        <div className={styles.identityRow}>
-          <div ref={colorsRef} className={styles.colorPicker}>
-            {!isColorPickerOpen &&
-              tokens.players.palette
-                .filter((playerColor) => playerColor.id === color)
-                .map((playerColor) => (
+        {askOpen ? (
+          <TutorialAsk
+            name={nickname}
+            color={color}
+            onNo={() => {
+              markAsked();
+              setAskOpen(false);
+            }}
+          />
+        ) : chaptersOpen ? (
+          <TutorialChapters name={nickname} color={color} onClose={() => setChaptersOpen(false)} />
+        ) : (
+          <>
+            <h1 id="main-menu-title" className={styles.title}>
+              {t('menu.title')}
+            </h1>
+            <p className={styles.subtitle}>{t('menu.subtitle')}</p>
+            <div className={styles.field}>
+              <span className={styles.label}>{t('menu.map')}</span>
+              <div className={styles.segmented} role="radiogroup" aria-label={t('menu.map')}>
+                {MAPS.map((m) => (
                   <button
-                    key={playerColor.id}
+                    key={m.id}
                     type="button"
-                    className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
-                    aria-label={`${t('menu.color')} ${playerColor.id}`}
-                    aria-expanded={isColorPickerOpen}
-                    aria-haspopup="listbox"
-                    style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
-                    onClick={() => {
-                      if (!isColorPickerOpen) {
-                        setIsColorPickerOpen(true);
-                        return;
-                      }
-                      handleColor(playerColor.id);
-                      setIsColorPickerOpen(false);
-                    }}
-                  />
-                ))}
-            {isColorPickerOpen && (
-              <div
-                className={styles.palette}
-                role="listbox"
-                aria-label={t('menu.color')}
-                style={{ gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }}
-              >
-                {tokens.players.palette.map((playerColor) => (
-                  <button
-                    key={playerColor.id}
-                    type="button"
-                    aria-label={`${t('menu.color')} ${playerColor.id}`}
-                    aria-selected={playerColor.id === color}
-                    className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
-                    style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
-                    onClick={() => {
-                      handleColor(playerColor.id);
-                      setIsColorPickerOpen(false);
-                    }}
-                  />
+                    role="radio"
+                    aria-checked={m.id === map}
+                    className={`${styles.segment} ${m.id === map ? styles.chosen : ''}`}
+                    onClick={() => setMap(m.id)}
+                  >
+                    <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
+                    <small>{m.size}</small>
+                  </button>
                 ))}
               </div>
+            </div>
+            {chooser?.choosePlayers && (
+              <label className={styles.field}>
+                <span className={styles.label}>{`${t('menu.players')}: ${players}`}</span>
+                <input
+                  type="range"
+                  min={PLAYERS_MIN}
+                  max={PLAYERS_MAX}
+                  value={players}
+                  onChange={(event) => setPlayers(Number(event.target.value))}
+                />
+              </label>
             )}
-          </div>
-          <label className={styles.nickname}>
-            <span>{t('menu.nickname')}</span>
-            <input
-              value={nickname}
-              maxLength={16}
-              onChange={(event) => setNickname(event.target.value.slice(0, 16))}
-            />
-          </label>
-        </div>
-        <a
-          className={styles.play}
-          role="button"
-          href={matchUrl(nickname, color, map, players)}
-          onClick={handlePlay}
-        >
-          {t('menu.play')}
-        </a>
-        <button
-          type="button"
-          className={styles.tutorialButton}
-          onClick={() => setChaptersOpen(true)}
-        >
-          {t('tutorial.menuButton')}
-        </button>
+            <div className={styles.identityRow}>
+              <div ref={colorsRef} className={styles.colorPicker}>
+                {!isColorPickerOpen &&
+                  tokens.players.palette
+                    .filter((playerColor) => playerColor.id === color)
+                    .map((playerColor) => (
+                      <button
+                        key={playerColor.id}
+                        type="button"
+                        className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
+                        aria-label={`${t('menu.color')} ${playerColor.id}`}
+                        aria-expanded={isColorPickerOpen}
+                        aria-haspopup="listbox"
+                        style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                        onClick={() => {
+                          if (!isColorPickerOpen) {
+                            setIsColorPickerOpen(true);
+                            return;
+                          }
+                          handleColor(playerColor.id);
+                          setIsColorPickerOpen(false);
+                        }}
+                      />
+                    ))}
+                {isColorPickerOpen && (
+                  <div
+                    className={styles.palette}
+                    role="listbox"
+                    aria-label={t('menu.color')}
+                    style={{ gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }}
+                  >
+                    {tokens.players.palette.map((playerColor) => (
+                      <button
+                        key={playerColor.id}
+                        type="button"
+                        aria-label={`${t('menu.color')} ${playerColor.id}`}
+                        aria-selected={playerColor.id === color}
+                        className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
+                        style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                        onClick={() => {
+                          handleColor(playerColor.id);
+                          setIsColorPickerOpen(false);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <label className={styles.nickname}>
+                <span>{t('menu.nickname')}</span>
+                <input
+                  value={nickname}
+                  maxLength={16}
+                  onChange={(event) => setNickname(event.target.value.slice(0, 16))}
+                />
+              </label>
+            </div>
+            <a
+              className={styles.play}
+              role="button"
+              href={matchUrl(nickname, color, map, players)}
+              onClick={handlePlay}
+            >
+              {t('menu.play')}
+            </a>
+            <button
+              type="button"
+              className={styles.tutorialButton}
+              onClick={() => setChaptersOpen(true)}
+            >
+              {t('tutorial.menuButton')}
+            </button>
+          </>
+        )}
       </section>
-      {askOpen && (
-        <TutorialAsk
-          name={nickname}
-          color={color}
-          onNo={() => {
-            markAsked();
-            setAskOpen(false);
-          }}
-        />
-      )}
-      {chaptersOpen && (
-        <TutorialChapters name={nickname} color={color} onClose={() => setChaptersOpen(false)} />
-      )}
     </main>
   );
 }

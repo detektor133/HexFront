@@ -50,6 +50,7 @@ export function TutorialOverlay(props: {
   const [mark, setMark] = useState<Mark | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [finished, setFinished] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const ctx = useMemo<TutorialCtx | null>(
     () => (props.ctx ? { ...props.ctx, pans, zooms } : null),
     [props.ctx, pans, zooms],
@@ -141,6 +142,7 @@ export function TutorialOverlay(props: {
   }, [step, ctx, camera, hexWorld, hexRadius]);
 
   const exit = (): void => window.location.assign('/');
+  if (dismissed) return null;
   if (finished) {
     return (
       <aside
@@ -155,7 +157,7 @@ export function TutorialOverlay(props: {
           <button type="button" className={styles.button} onClick={exit}>
             {t('tutorial.toMenu')}
           </button>
-          <button type="button" className={styles.secondary} onClick={() => setFinished(false)}>
+          <button type="button" className={styles.secondary} onClick={() => setDismissed(true)}>
             {t('tutorial.keepPlaying')}
           </button>
         </div>

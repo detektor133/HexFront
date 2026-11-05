@@ -217,3 +217,30 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-button);
 }
+
+.chapters {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.chapter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.chapter small {
+  color: var(--ui-ink2);
+  font-weight: 400;
+}

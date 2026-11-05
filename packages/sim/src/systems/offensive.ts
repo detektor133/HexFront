@@ -100,7 +100,13 @@ function finish(state: MatchState, plan: FrontPlan, owner: number, line: readonl
   const arc = borderArc(state, owner, marks);
   const edges = arc.length > 0 ? arc : [...plan.edges];
   const i = state.plans.findIndex((p) => p.armyId === plan.armyId);
-  state.plans[i] = { ...plan, edges, offensive: null };
+  // Фронт направления выводится из границы с целью: сбрасываем версию, чтобы ближайший тик пересчитал его.
+  state.plans[i] = {
+    ...plan,
+    edges,
+    offensive: null,
+    ...(plan.derived === undefined ? {} : { rev: -1 }),
+  };
   trimAutoFront(state, plan.armyId);
   state.events.push({ t: 'offensiveDone', playerId: owner, armyId: plan.armyId });
 }

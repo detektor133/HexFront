@@ -4,6 +4,7 @@
 // армию, а не стоит в тылу. Только армии с направлением `attack`; людям автоматика не включается.
 import {
   ASSAULT_MAX_UNITS,
+  ASSAULT_GAP,
   ASSAULT_REACH,
   OFFENSIVE_STOP_ORG,
   TICKS_PER_S,
@@ -26,6 +27,26 @@ const CAPITAL_VALUE_MULT = 2;
 const ready = (u: Unit): boolean =>
   u.order === 'idle' && !u.inBattle && u.type !== 'artillery' && u.org >= OFFENSIVE_STOP_ORG;
 
+// Есть ли свой гекс не дальше ASSAULT_GAP гексов от города: далёкий город не штурмуют — иначе отряд
+// тянул бы червя по чужой земле, а не наступал сплошным фронтом.
+function nearOwn(state: MatchState, hex: number, owner: number): boolean {
+  let ring: number[] = [hex];
+  const seen = new Set<number>(ring);
+  for (let step = 0; step < ASSAULT_GAP; step += 1) {
+    const nextRing: number[] = [];
+    for (const h of ring) {
+      for (const n of adjacentHexes(state, h)) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        if (state.hexes.owner[n] === owner) return true;
+        nextRing.push(n);
+      }
+    }
+    ring = nextRing;
+  }
+  return false;
+}
+
 /**
  * Группы штурма: по каждому вражескому городу блока цели (по пользе: ценность / расстояние)
  * ближайшие готовые отряды армии, минимальный набор которых по прогнозу побеждает.
@@ -45,7 +66,7 @@ function assault(state: MatchState, army: Army): void {
   const free = mine.filter(ready);
   const used = new Set<number>();
   const ranked = state.cities
-    .filter((c) => enemy(c.owner) && !busy.has(c.hex))
+    .filter((c) => enemy(c.owner) && !busy.has(c.hex) && nearOwn(state, c.hex, army.owner))
     .map((c) => ({
       city: c,
       value: c.level * (c.id === state.players[c.owner]?.capitalCityId ? CAPITAL_VALUE_MULT : 1),
@@ -114,7 +135,7 @@ function closePockets(state: MatchState, owner: number, armies: readonly Army[])
   const used = new Set<number>();
   for (const hex of targets.slice(0, POCKET_BATCH)) {
     const pool = free
-      .filter((u) => !used.has(u.id))
+      .filter((u) => !used.has(u.id) && distance(at(u.hex), at(hex)) <= ASSAULT_REACH)
       .sort((a, b) => distance(at(a.hex), at(hex)) - distance(at(b.hex), at(hex)) || a.id - b.id);
     const hostile = isHostileHex(state, owner, hex);
     const force: Unit[] = [];

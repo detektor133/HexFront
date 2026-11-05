@@ -120,7 +120,13 @@ function lineSlots(
   return out;
 }
 
-// Место — ближайшему подходящему отряду: на равнину — броне, на прочую местность — пехоте.
+/** Штраф к расстоянию, когда род войск не тот, что нужен на местности (броня — равнина, пехота — прочее). */
+const TYPE_PENALTY = 2;
+
+// Места — отрядам с наименьшим общим переходом. Сначала отряд остаётся там, где уже стоит или куда
+// уже идёт, если это место нужно и теперь: пересмотр линии не меняет отряды местами и не гоняет их
+// навстречу друг другу. Остальные пары берутся по возрастанию расстояния (с поправкой на род
+// войск), а не «место по важности — ближайшему отряду»: слабому месту не достаётся дальний отряд.
 function assignLine(
   state: MatchState,
   slots: HexId[],
@@ -128,23 +134,40 @@ function assignLine(
   w: Map<HexId, number>,
 ): Map<number, HexId> {
   const { width } = state.map;
-  const free = [...units];
   const out = new Map<number, HexId>();
-  const sorted = [...slots].sort((a, b) => (w.get(b) ?? 0) - (w.get(a) ?? 0) || a - b);
-  for (const h of sorted) {
+  const open = [...slots];
+  const free: Unit[] = [];
+  for (const u of units) {
+    const keep = [u.slot, u.hex].find((h) => h >= 0 && open.includes(h));
+    if (keep === undefined) {
+      free.push(u);
+      continue;
+    }
+    out.set(u.id, keep);
+    open.splice(open.indexOf(keep), 1);
+  }
+  const pairs: { readonly u: Unit; readonly s: number; readonly cost: number }[] = [];
+  open.forEach((h, s) => {
     const plains = state.map.terrain[h] === TERRAIN.plains;
     const wanted = plains ? 'armor' : 'infantry';
-    const pool = free.some((u) => u.type === wanted) ? free.filter((u) => u.type === wanted) : free;
     const at = hexFromId(h, width);
-    pool.sort(
-      (a, b) =>
-        distance(hexFromId(a.hex, width), at) - distance(hexFromId(b.hex, width), at) ||
-        a.id - b.id,
-    );
-    const pick = pool[0];
-    if (!pick) break;
-    out.set(pick.id, h);
-    free.splice(free.indexOf(pick), 1);
+    for (const u of free) {
+      const cost = distance(hexFromId(u.hex, width), at) + (u.type === wanted ? 0 : TYPE_PENALTY);
+      pairs.push({ u, s, cost });
+    }
+  });
+  pairs.sort(
+    (x, y) =>
+      x.cost - y.cost ||
+      (w.get(open[y.s] as HexId) ?? 0) - (w.get(open[x.s] as HexId) ?? 0) ||
+      x.u.id - y.u.id ||
+      x.s - y.s,
+  );
+  const usedSlot = new Set<number>();
+  for (const p of pairs) {
+    if (out.has(p.u.id) || usedSlot.has(p.s)) continue;
+    out.set(p.u.id, open[p.s] as HexId);
+    usedSlot.add(p.s);
   }
   return out;
 }

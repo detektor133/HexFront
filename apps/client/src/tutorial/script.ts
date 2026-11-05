@@ -150,7 +150,7 @@ const CORE: readonly Step[] = [
   { id: 'menu', target: { hex: neutralNear }, done: (c) => c.menuOther === -1 },
   {
     id: 'occupy',
-    target: { ui: 'occupy' },
+    target: { ui: 'occupy', fallbackHex: neutralNear },
     done: (c) => c.view.armies.some((a) => a.dir?.target === -1 && a.dir.mode === 'attack'),
   },
   { id: 'people', manual: true, target: { ui: 'pop' } },
@@ -176,13 +176,36 @@ const CORE: readonly Step[] = [
     done: (c, b) => c.view.recruits.length > b,
   },
   {
+    id: 'hammer',
+    target: { ui: 'hammer' },
+    done: (c) => c.build !== null,
+  },
+  {
+    id: 'improveTool',
+    target: { ui: 'build-improve' },
+    done: (c) => c.build === 'improve',
+  },
+  {
+    id: 'improve',
+    base: (c) => builtOwn(c, 'improve'),
+    done: (c, b) => builtOwn(c, 'improve') > b,
+  },
+  {
     id: 'enemy',
     target: { hex: (c) => enemyCity(c)?.hex ?? null },
     done: (c) => c.menuOther !== null && c.menuOther === (enemyCity(c)?.owner ?? -99),
   },
   {
+    id: 'war',
+    target: { ui: 'declare-war', fallbackHex: (c) => enemyCity(c)?.hex ?? null },
+    done: (c) => {
+      const foe = enemyCity(c)?.owner;
+      return foe !== undefined && c.view.diplomacy?.relations[foe] === 'war';
+    },
+  },
+  {
     id: 'attack',
-    target: { ui: 'attack' },
+    target: { ui: 'attack', fallbackHex: (c) => enemyCity(c)?.hex ?? null },
     done: (c) =>
       c.view.armies.some(
         (a) => a.dir?.target === (enemyCity(c)?.owner ?? -99) && a.dir.mode === 'attack',

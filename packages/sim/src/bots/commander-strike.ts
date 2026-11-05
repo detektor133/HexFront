@@ -3,6 +3,7 @@
 // / расстояние), а не по ближайшей границе; сила — минимальный набор ближайших отрядов, которому
 // прогноз обещает победу, остальные остаются на месте. Только армии ботов: люди командуют сами.
 import { warWith } from './war.ts';
+import { ASSAULT_GAP, ASSAULT_REACH } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
@@ -18,9 +19,16 @@ interface Target {
   readonly value: number;
 }
 
-function targets(view: PlayerView): Target[] {
+// Только города у своей земли: далёкая столица — не цель, а повод тянуть червя через вражескую страну.
+function targets(map: MapStatic, view: PlayerView): Target[] {
+  const mine: HexId[] = [];
+  view.hexes.owner.forEach((o, h) => {
+    if (o === view.playerId) mine.push(h);
+  });
+  const at = (hex: HexId) => hexFromId(hex, map.width);
   return view.cities
     .filter((c) => warWith(view, c.owner))
+    .filter((c) => mine.some((h) => distance(at(h), at(c.hex)) <= ASSAULT_GAP))
     .map((c) => ({ hex: c.hex, value: c.level * (c.isCapital ? CAPITAL_VALUE_MULT : 1) }));
 }
 
@@ -34,7 +42,7 @@ export function strike(map: MapStatic, view: PlayerView, free: readonly UnitView
   const out: Command[] = [];
   const used = new Set<number>();
   const at = (hex: HexId) => hexFromId(hex, map.width);
-  const ranked = targets(view)
+  const ranked = targets(map, view)
     .map((t) => {
       const nearest = Math.min(
         ...free.map((u) => distance(at(u.hex), at(t.hex))),
@@ -47,7 +55,7 @@ export function strike(map: MapStatic, view: PlayerView, free: readonly UnitView
     .sort((a, b) => b.value * (a.nearest + 1) - a.value * (b.nearest + 1) || a.hex - b.hex);
   for (const target of ranked) {
     const pool = free
-      .filter((u) => !used.has(u.id))
+      .filter((u) => !used.has(u.id) && distance(at(u.hex), at(target.hex)) <= ASSAULT_REACH)
       .sort(
         (a, b) =>
           distance(at(a.hex), at(target.hex)) - distance(at(b.hex), at(target.hex)) || a.id - b.id,

@@ -132,3 +132,25 @@ describe('матч-урок', () => {
     expect(setup.initialGold).toBe(600_000);
   });
 });
+
+describe('война и строительство в обучении', () => {
+  it('в уроке мир: «Наступать» недоступно, пока игрок сам не объявит войну', () => {
+    const s = start();
+    const war = STEPS.core.find((x) => x.id === 'war');
+    expect(war?.done?.(ctxOf(s.view()), 0)).toBe(false);
+    s.queue({ t: 'declareWar', target: 1 } as never);
+    s.tick(3);
+    expect(war?.done?.(ctxOf(s.view()), 0)).toBe(true);
+  });
+
+  it('молоточек учит строить: шаги идут по режиму строительства и самой стройке', () => {
+    const ids = STEPS.core.map((x) => x.id);
+    expect(ids.indexOf('hammer')).toBeGreaterThan(ids.indexOf('recruit'));
+    expect(ids.indexOf('improve')).toBeLessThan(ids.indexOf('enemy'));
+    expect(ids.indexOf('war')).toBeLessThan(ids.indexOf('attack'));
+    const s = start();
+    const hammer = STEPS.core.find((x) => x.id === 'hammer');
+    expect(hammer?.done?.(ctxOf(s.view()), 0)).toBe(false);
+    expect(hammer?.done?.(ctxOf(s.view(), { build: 'improve' }), 0)).toBe(true);
+  });
+});

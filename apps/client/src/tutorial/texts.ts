@@ -175,6 +175,58 @@ const TEXTS: Readonly<Record<string, Both>> = {
       mouse: 'Left-click your city and the recruit icon.',
     },
   },
+  'core.hammer': {
+    ru: {
+      title: 'Молоточек: строительство',
+      text: 'Всё, что строится на карте, — через молоточек справа внизу: он включает режим строительства и подсвечивает гексы, где можно строить прямо сейчас.',
+      touch: 'Коснись молоточка.',
+      mouse: 'Нажми на молоточек.',
+    },
+    en: {
+      title: 'Hammer: building',
+      text: 'Everything built on the map goes through the hammer at the bottom right: it turns on build mode and highlights hexes where you can build right now.',
+      touch: 'Tap the hammer.',
+      mouse: 'Click the hammer.',
+    },
+  },
+  'core.improveTool': {
+    ru: {
+      title: 'Что строить',
+      text: 'В ряду над молоточком — город, склад, укрепление и благоустройство. Выбери благоустройство: оно дёшево и поднимает предел людей на гексе. В панели видно цену и твоё золото.',
+    },
+    en: {
+      title: 'What to build',
+      text: 'The row above the hammer has city, depot, fort and improvement. Pick improvement: it is cheap and raises a hex population limit. The bar shows the price and your gold.',
+    },
+  },
+  'core.improve': {
+    ru: {
+      title: 'Построй',
+      text: 'Нажми на подсвеченный гекс: золото спишется сразу, стройка пойдёт, режим останется включённым. Если гекс бледнее — золота мало, клик объяснит. Выйти из режима — Esc, правая кнопка или молоточек.',
+      touch: 'Коснись подсвеченного гекса.',
+      mouse: 'Нажми левую кнопку мыши на подсвеченном гексе.',
+    },
+    en: {
+      title: 'Build',
+      text: 'Press a highlighted hex: gold is spent at once, construction starts and the mode stays on. A paler hex means gold is short and the click explains. Leave the mode with Esc, right click or the hammer.',
+      touch: 'Tap a highlighted hex.',
+      mouse: 'Left-click a highlighted hex.',
+    },
+  },
+  'core.war': {
+    ru: {
+      title: 'Объяви войну',
+      text: 'Пока вы в мире, наступать нельзя. Нажми значок мечей в меню соперника: война объявлена, и появится кнопка «Наступать». Из войны выход один — мир.',
+      touch: 'Коснись значка мечей в меню.',
+      mouse: 'Нажми на значок мечей в меню.',
+    },
+    en: {
+      title: 'Declare war',
+      text: 'You cannot attack while at peace. Press the swords icon in the rival menu: war is declared and the Attack button appears. The only way out of war is peace.',
+      touch: 'Tap the swords icon in the menu.',
+      mouse: 'Click the swords icon in the menu.',
+    },
+  },
   'core.enemy': {
     ru: {
       title: 'Соперник',
@@ -192,11 +244,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.attack': {
     ru: {
       title: 'Наступление',
-      text: 'Война уже идёт. Нажми «Наступать»: ИИ сам выберет, где бить, построит линии и поведёт армию. «Держать» вместо этого просто прикроет границу.',
+      text: 'Война объявлена. Нажми «Наступать»: ИИ сам выберет, где бить, построит линии и поведёт армию. «Держать» вместо этого просто прикроет границу.',
     },
     en: {
       title: 'Offensive',
-      text: 'You are at war. Press Attack: the AI picks where to strike, draws the lines and leads the army. Hold just covers the border instead.',
+      text: 'War is declared. Press Attack: the AI picks where to strike, draws the lines and leads the army. Hold just covers the border instead.',
     },
   },
   'core.finish': {

@@ -84,6 +84,7 @@ export function DiplomacyBlock(props: {
       <div className={styles.actions}>
         {relation !== 'war' && (
           <IconButton
+            data-tutorial="declare-war"
             className={styles.action}
             label={t('diplomacy.war')}
             onClick={() => send({ t: 'declareWar', target: other })}
