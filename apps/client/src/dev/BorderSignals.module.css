@@ -1,0 +1,52 @@
+/* Сигналы границы: стопка плашек под верхней панелью. */
+.stack {
+  position: absolute;
+  top: calc(var(--hud-h, 0px) + var(--space-sm));
+  left: var(--space-md);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: calc(100vw - var(--space-md) * 2);
+}
+
+.signal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  background: var(--ui-panel-image) var(--ui-surface);
+  color: var(--ui-ink);
+  box-shadow: var(--shadow-hard);
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.name {
+  min-width: 0;
+  max-width: 140px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-ink2);
+  cursor: pointer;
+}

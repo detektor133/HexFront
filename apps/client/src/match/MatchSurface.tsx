@@ -8,6 +8,7 @@ import { PauseMenu } from './PauseMenu.tsx';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
+import { BorderSignals } from '../dev/BorderSignals.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
 import { EventFeed, feedRows } from '../dev/EventFeed.tsx';
 import { HexCard } from '../dev/HexCard.tsx';
@@ -270,6 +271,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onSize={setLeaderboardSize}
           style={styleFor('leaderboard')}
         />
+      )}
+      {view && map && !debug && !tutorial && !pauseState.menuOpen && (
+        <BorderSignals view={view} map={map} send={sb.send} />
       )}
       {view && map && sb.menu && !pauseState.menuOpen && (
         <TerritoryMenu
