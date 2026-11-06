@@ -5,8 +5,8 @@
   width: max-content;
   max-width: calc(100vw - 16px);
   padding: 6px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   box-shadow: var(--shadow-hard);
   font-variant-numeric: tabular-nums;
 }
@@ -17,8 +17,8 @@
   box-sizing: border-box;
   padding: 0 var(--space-sm);
   overflow: hidden;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;

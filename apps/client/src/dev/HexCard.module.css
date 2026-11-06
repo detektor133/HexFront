@@ -13,8 +13,8 @@
   overflow-y: auto;
   scrollbar-width: none;
   padding: var(--space-md);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
 }
@@ -135,7 +135,7 @@
   width: 100%;
   padding: 0 var(--space-sm);
   border: 0;
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   font: inherit;
   text-align: left;
@@ -185,7 +185,7 @@
   width: auto;
   min-height: var(--touch-target-min);
   padding: 0 var(--space-sm);
-  border: 1px solid var(--ui-border);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-chip);
   background: var(--ui-surface2);
   font-size: var(--font-size-caption);
@@ -262,9 +262,9 @@
   align-items: center;
   min-height: var(--touch-target-min);
   padding: 0 var(--space-md);
-  border: 1px solid var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
@@ -394,8 +394,8 @@
   height: 32px;
   color: var(--ui-ink);
   font: inherit;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
 }
 
@@ -409,7 +409,7 @@
 
 .recruitBlock {
   padding-top: var(--space-sm);
-  border-top: 1px solid var(--ui-border);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .recruitControl .recruitAction {
@@ -432,7 +432,7 @@
   width: calc(var(--touch-target-min) + var(--space-sm));
   height: calc(var(--touch-target-min) + var(--space-sm));
   padding: 0;
-  border: 1px solid var(--ui-border);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-chip);
   background: var(--ui-surface2);
   color: var(--ui-ink);
@@ -523,9 +523,9 @@
   min-height: var(--touch-target-min);
   padding: 0 var(--space-sm) 0 0;
   overflow: hidden;
-  border: 1px solid var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;

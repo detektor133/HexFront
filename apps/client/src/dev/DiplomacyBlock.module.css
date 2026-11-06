@@ -4,7 +4,7 @@
   flex-direction: column;
   gap: var(--space-xs);
   padding-top: var(--space-xs);
-  border-top: 1px solid var(--ui-border);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .row {
@@ -61,9 +61,9 @@
   height: 36px;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   cursor: pointer;
 }

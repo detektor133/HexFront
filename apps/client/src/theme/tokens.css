@@ -149,6 +149,11 @@
   --ui-border-strong: #B9B7AE;
   --ui-button-primary-bg: #22211E;
   --ui-button-primary-ink: #FFFFFF;
+  --ui-border-width: 1px;
+  --ui-border-style: solid;
+  --ui-panel-image: none;
+  --ui-display-transform: none;
+  --ui-display-spacing: 0em;
   --status-success: #2E7D4F;
   --status-success-bg: #E3F1E8;
   --status-warning: #A8680F;

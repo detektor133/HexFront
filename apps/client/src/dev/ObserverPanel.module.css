@@ -7,8 +7,8 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   box-shadow: var(--shadow-hard);
 }
 
@@ -16,9 +16,9 @@
 .panel select {
   min-height: var(--touch-target-min);
   padding: 0 var(--space-sm);
-  border: 1px solid var(--ui-border);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   font: inherit;
 }

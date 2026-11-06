@@ -58,12 +58,10 @@ describe('токены', () => {
       'glass',
       'glassLight',
       'mint',
-      'peach',
-      'lavender',
-      'sky',
-      'graphite',
-      'forest',
-      'ink',
+      'toy',
+      'steel',
+      'scroll',
+      'blueprint',
     ]);
   });
 

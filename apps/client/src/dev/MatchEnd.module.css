@@ -9,8 +9,8 @@
   box-sizing: border-box;
   padding: var(--space-lg);
   transform: translate(-50%, -50%);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   color: var(--ui-ink);
@@ -20,6 +20,8 @@
 .title {
   margin: 0 0 var(--space-sm);
   font-family: var(--font-display-family);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
   font-weight: var(--font-display-weight);
   font-size: var(--font-size-hud-value);
 }
@@ -77,7 +79,7 @@
 
 .hex {
   aspect-ratio: 1;
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
 }
 
 .hex[data-owner='0'] {

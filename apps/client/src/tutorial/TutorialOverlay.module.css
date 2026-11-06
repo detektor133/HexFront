@@ -28,8 +28,8 @@
   width: min(380px, calc(100vw - 24px));
   padding: var(--space-md);
   color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   transform: translateX(-50%);
@@ -62,7 +62,7 @@
 .hint {
   padding-top: var(--space-xs);
   font-weight: 600;
-  border-top: 1px solid var(--ui-border);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .bar {
@@ -103,8 +103,8 @@
 
 .secondary {
   color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
 }
 
 .link {

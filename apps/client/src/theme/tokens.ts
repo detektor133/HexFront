@@ -301,7 +301,12 @@ export const tokens = {
     "border": "#D9D7CF",
     "borderStrong": "#B9B7AE",
     "buttonPrimaryBg": "#22211E",
-    "buttonPrimaryInk": "#FFFFFF"
+    "buttonPrimaryInk": "#FFFFFF",
+    "borderWidth": 1,
+    "borderStyle": "solid",
+    "panelImage": "none",
+    "displayTransform": "none",
+    "displaySpacing": "0em"
   },
   "status": {
     "success": "#2E7D4F",

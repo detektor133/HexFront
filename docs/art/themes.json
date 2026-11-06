@@ -1,6 +1,6 @@
 {
   "$schema": "hexfront-themes-v1",
-  "$comment": "Темы интерфейса (HUD, карточки, меню). Переопределяют только группы tokens.json: ui, status, radius, shadow. Карта (рельеф, территории, фишки) от темы не зависит. Базовые значения tokens.json — запасной вариант без data-theme. Решение владельца 2026-11-06: градиенты, тени, размытие, тёмные панели и скругления больше токенов разрешены, если их задаёт тема; backdrop-filter не используется — под панелями живой WebGL-холст.",
+  "$comment": "Темы интерфейса (HUD, карточки, меню). Переопределяют только группы tokens.json: ui (цвета и форма: рамка, узор панелей, регистр заголовков), status, radius, shadow, space, font. Карта (рельеф, территории, фишки) от темы не зависит. Базовые значения tokens.json — запасной вариант без data-theme. Решение владельца 2026-11-06: градиенты, тени, размытие, тёмные панели и скругления больше токенов разрешены, если их задаёт тема; backdrop-filter не используется — под панелями живой WebGL-холст. Узор панели (ui.panelImage) — один слой CSS-фона без цвета: цвет берётся из ui.surface.",
   "default": "soft",
   "themes": [
     {
@@ -78,170 +78,154 @@
     {
       "id": "mint",
       "ui": {
-        "ink": "#173026",
-        "ink2": "#4C6B5D",
-        "ink3": "#7F9A8D",
-        "surface": "#F6FBF8",
-        "surface2": "#E2F2E9",
-        "border": "#CFE5D8",
-        "borderStrong": "#9FC8B0",
-        "buttonPrimaryBg": "#1E9468",
-        "buttonPrimaryInk": "#FFFFFF"
+        "ink": "#0F2E20",
+        "ink2": "#2F5E47",
+        "ink3": "#5E8A74",
+        "surface": "#E3F5EB",
+        "surface2": "#C4E8D3",
+        "border": "#86C6A2",
+        "borderStrong": "#3F9E70",
+        "buttonPrimaryBg": "#11884F",
+        "buttonPrimaryInk": "#FFFFFF",
+        "borderWidth": 1.5
       },
       "status": {
-        "success": "#1E7A4A",
-        "successBg": "#D6F0E0",
-        "warning": "#9A6200",
-        "warningBg": "#FBEFD2",
-        "danger": "#C23B22",
-        "dangerBg": "#FBE3DD"
+        "success": "#0E7A44",
+        "successBg": "#BDEACF",
+        "warning": "#935B00",
+        "warningBg": "#F9E7B8",
+        "danger": "#BD3520",
+        "dangerBg": "#F8D6CE"
       },
       "radius": { "chip": 12, "button": 16, "card": 22, "input": 16 },
-      "shadow": { "hard": "0 8px 22px rgba(20, 70, 50, 0.18), 0 1px 3px rgba(20, 70, 50, 0.16)" }
+      "shadow": { "hard": "0 8px 22px rgba(10, 70, 40, 0.3), 0 1px 3px rgba(10, 70, 40, 0.22)" }
     },
     {
-      "id": "peach",
+      "id": "toy",
       "ui": {
-        "ink": "#35210F",
-        "ink2": "#7A5B43",
-        "ink3": "#A88B73",
-        "surface": "#FFF9F3",
-        "surface2": "#FFE8D6",
-        "border": "#F3D5BC",
-        "borderStrong": "#E2B48F",
-        "buttonPrimaryBg": "#D9582B",
-        "buttonPrimaryInk": "#FFFFFF"
+        "ink": "#2B1B4A",
+        "ink2": "#5B4A7A",
+        "ink3": "#8A7BA6",
+        "surface": "#FFF1D0",
+        "surface2": "#FFD166",
+        "border": "#2B1B4A",
+        "borderStrong": "#2B1B4A",
+        "buttonPrimaryBg": "#EF476F",
+        "buttonPrimaryInk": "#FFFFFF",
+        "borderWidth": 3,
+        "panelImage": "radial-gradient(rgba(43, 27, 74, 0.1) 1.5px, transparent 1.6px) 0 0 / 14px 14px"
       },
       "status": {
-        "success": "#2F7D4F",
-        "successBg": "#DDF1E4",
-        "warning": "#9A5A00",
-        "warningBg": "#FFE6B8",
-        "danger": "#B8301B",
-        "dangerBg": "#FFD9D0"
+        "success": "#058A66",
+        "successBg": "#C2F0E0",
+        "warning": "#9A5F00",
+        "warningBg": "#FFE08A",
+        "danger": "#D01E30",
+        "dangerBg": "#FFC4CB"
       },
-      "radius": { "chip": 10, "button": 18, "card": 24, "input": 18 },
-      "shadow": { "hard": "0 8px 22px rgba(120, 60, 20, 0.2), 0 1px 3px rgba(120, 60, 20, 0.16)" }
+      "radius": { "chip": 12, "button": 18, "card": 26, "input": 16 },
+      "shadow": { "hard": "0 5px 0 #2B1B4A" },
+      "space": { "xs": 5, "sm": 10, "md": 14, "lg": 18, "xl": 26 },
+      "font": {
+        "display": { "family": "Rubik" },
+        "ui": { "family": "Rubik" },
+        "size": { "body": 15, "label": 14 }
+      }
     },
     {
-      "id": "lavender",
+      "id": "steel",
       "ui": {
-        "ink": "#241A3D",
-        "ink2": "#5F5380",
-        "ink3": "#9188AD",
-        "surface": "#FBF9FF",
-        "surface2": "#ECE6FA",
-        "border": "#DDD4F2",
-        "borderStrong": "#B9AADF",
-        "buttonPrimaryBg": "#6A4CC4",
-        "buttonPrimaryInk": "#FFFFFF"
+        "ink": "#E6E8D2",
+        "ink2": "#B3B79A",
+        "ink3": "#82866A",
+        "surface": "#2A3024",
+        "surface2": "#384030",
+        "border": "#566045",
+        "borderStrong": "#A3A56B",
+        "buttonPrimaryBg": "#D9A21B",
+        "buttonPrimaryInk": "#1E1A08",
+        "borderWidth": 2,
+        "panelImage": "repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 6px, transparent 6px 12px)",
+        "displayTransform": "uppercase",
+        "displaySpacing": "0.06em"
       },
       "status": {
-        "success": "#2A7C52",
-        "successBg": "#DBF0E4",
-        "warning": "#97600A",
-        "warningBg": "#FBEBCB",
-        "danger": "#BC3350",
-        "dangerBg": "#FBDDE4"
+        "success": "#8ED8A0",
+        "successBg": "#243C28",
+        "warning": "#F0BE4E",
+        "warningBg": "#443816",
+        "danger": "#FF9580",
+        "dangerBg": "#4A2620"
       },
-      "radius": { "chip": 10, "button": 14, "card": 18, "input": 14 },
-      "shadow": { "hard": "0 8px 24px rgba(60, 40, 120, 0.2), 0 1px 3px rgba(60, 40, 120, 0.16)" }
+      "radius": { "chip": 2, "button": 2, "card": 3, "input": 2 },
+      "shadow": { "hard": "0 0 0 1px #12150F, 0 6px 14px rgba(0, 0, 0, 0.45)" },
+      "space": { "xs": 3, "sm": 6, "md": 10, "lg": 14, "xl": 20 },
+      "font": { "display": { "family": "Russo One" } }
     },
     {
-      "id": "sky",
+      "id": "scroll",
       "ui": {
-        "ink": "#10253A",
-        "ink2": "#46607A",
-        "ink3": "#7C93AA",
-        "surface": "#F3F9FE",
-        "surface2": "#DCEBF8",
-        "border": "#C6DCEF",
-        "borderStrong": "#94BADD",
-        "buttonPrimaryBg": "#1C74D9",
-        "buttonPrimaryInk": "#FFFFFF"
+        "ink": "#3A2A14",
+        "ink2": "#6B5230",
+        "ink3": "#9A7F55",
+        "surface": "#F2E4C3",
+        "surface2": "#E6D3A6",
+        "border": "#8C6B3E",
+        "borderStrong": "#5E4524",
+        "buttonPrimaryBg": "#7A2E1C",
+        "buttonPrimaryInk": "#F8ECD0",
+        "borderWidth": 2,
+        "panelImage": "linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(120, 80, 20, 0.1))"
       },
       "status": {
-        "success": "#1F7A4A",
-        "successBg": "#D8F0E2",
-        "warning": "#955A00",
-        "warningBg": "#FBEBC8",
-        "danger": "#BE3320",
-        "dangerBg": "#FBDDD6"
+        "success": "#2F6B3A",
+        "successBg": "#D3E3B8",
+        "warning": "#8A5200",
+        "warningBg": "#F3D894",
+        "danger": "#A32A18",
+        "dangerBg": "#EFC3B2"
       },
-      "radius": { "chip": 6, "button": 8, "card": 10, "input": 8 },
-      "shadow": { "hard": "0 6px 18px rgba(20, 70, 130, 0.22), 0 1px 2px rgba(20, 70, 130, 0.18)" }
+      "radius": { "chip": 6, "button": 6, "card": 8, "input": 6 },
+      "shadow": { "hard": "0 0 0 3px #F2E4C3, 0 0 0 4px #8C6B3E, 0 8px 16px rgba(60, 40, 10, 0.35)" },
+      "font": {
+        "display": { "family": "Lora" },
+        "ui": { "family": "Lora" },
+        "size": { "body": 15, "label": 14 }
+      }
     },
     {
-      "id": "graphite",
+      "id": "blueprint",
       "ui": {
-        "ink": "#ECEFF1",
-        "ink2": "#AEB6BD",
-        "ink3": "#7C858D",
-        "surface": "#1E2227",
-        "surface2": "#2A3037",
-        "border": "#3A424B",
-        "borderStrong": "#58626D",
-        "buttonPrimaryBg": "#FF8A3D",
-        "buttonPrimaryInk": "#1E1409"
+        "ink": "#EAF4FF",
+        "ink2": "#A9C8E8",
+        "ink3": "#7FA3CC",
+        "surface": "#12406F",
+        "surface2": "#1A528C",
+        "border": "#5C8FC4",
+        "borderStrong": "#CFE6FF",
+        "buttonPrimaryBg": "#FFD84A",
+        "buttonPrimaryInk": "#0B2A4A",
+        "borderStyle": "dashed",
+        "panelImage": "conic-gradient(from 90deg at 1px 1px, transparent 90deg, rgba(255, 255, 255, 0.1) 0) 0 0 / 16px 16px",
+        "displayTransform": "uppercase",
+        "displaySpacing": "0.08em"
       },
       "status": {
-        "success": "#7BD3A0",
-        "successBg": "#1B3A2B",
-        "warning": "#F0BA55",
-        "warningBg": "#3B3016",
-        "danger": "#FF8F7A",
-        "dangerBg": "#43211C"
+        "success": "#8EE6B0",
+        "successBg": "#16507A",
+        "warning": "#FFD84A",
+        "warningBg": "#4A4A2A",
+        "danger": "#FF9C88",
+        "dangerBg": "#5A3040"
       },
-      "radius": { "chip": 4, "button": 6, "card": 8, "input": 6 },
-      "shadow": { "hard": "0 8px 20px rgba(0, 0, 0, 0.45)" }
-    },
-    {
-      "id": "forest",
-      "ui": {
-        "ink": "#E8F1E4",
-        "ink2": "#AFC4AA",
-        "ink3": "#7F967B",
-        "surface": "#14261D",
-        "surface2": "#1F3A2B",
-        "border": "#2F5440",
-        "borderStrong": "#4F7F63",
-        "buttonPrimaryBg": "#8BC34A",
-        "buttonPrimaryInk": "#10200F"
-      },
-      "status": {
-        "success": "#8EE0A8",
-        "successBg": "#1B4030",
-        "warning": "#EEC25F",
-        "warningBg": "#3E3416",
-        "danger": "#FF9A86",
-        "dangerBg": "#47241E"
-      },
-      "radius": { "chip": 8, "button": 10, "card": 14, "input": 10 },
-      "shadow": { "hard": "0 8px 20px rgba(0, 10, 4, 0.45)" }
-    },
-    {
-      "id": "ink",
-      "ui": {
-        "ink": "#F2F2F2",
-        "ink2": "#B4B4BC",
-        "ink3": "#80808A",
-        "surface": "#14141A",
-        "surface2": "#1F1F28",
-        "border": "#33333F",
-        "borderStrong": "#5A5A6B",
-        "buttonPrimaryBg": "#F2F2F2",
-        "buttonPrimaryInk": "#14141A"
-      },
-      "status": {
-        "success": "#7BD3A0",
-        "successBg": "#16342A",
-        "warning": "#F0BA55",
-        "warningBg": "#3A2F15",
-        "danger": "#FF8F7A",
-        "dangerBg": "#40201C"
-      },
-      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
-      "shadow": { "hard": "0 6px 18px rgba(0, 0, 0, 0.5)" }
+      "radius": { "chip": 0, "button": 0, "card": 0, "input": 0 },
+      "shadow": { "hard": "0 6px 14px rgba(0, 20, 50, 0.5)" },
+      "space": { "xs": 3, "sm": 6, "md": 10, "lg": 14, "xl": 20 },
+      "font": {
+        "display": { "family": "IBM Plex Mono" },
+        "ui": { "family": "IBM Plex Mono" },
+        "size": { "caption": 11, "body": 13, "label": 12 }
+      }
     }
   ]
 }

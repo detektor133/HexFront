@@ -8,14 +8,16 @@
 .title {
   margin: 0 0 var(--space-md);
   font-family: var(--font-display-family);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
   font-size: var(--font-size-title);
   font-weight: var(--font-display-weight);
 }
 
 .canvas {
   height: 580px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
 }
 
 .stackCanvas {

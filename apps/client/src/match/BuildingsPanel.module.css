@@ -7,8 +7,8 @@
   max-height: min(60vh, 460px);
   display: flex;
   flex-direction: column;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   font-variant-numeric: tabular-nums;
@@ -22,7 +22,7 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .header:active {
@@ -56,8 +56,8 @@
   padding: 0 var(--space-sm);
   color: var(--ui-ink);
   cursor: pointer;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
 }
 
@@ -102,7 +102,7 @@
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-xs) 0;
-  border-top: 1px solid var(--ui-border);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .focus {
@@ -134,7 +134,7 @@
   padding: 0 var(--space-xs);
   color: var(--ui-ink2);
   text-align: center;
-  border: 1px solid var(--ui-border);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
 }
 

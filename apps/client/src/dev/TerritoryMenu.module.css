@@ -6,9 +6,9 @@
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   box-sizing: border-box;
 }
@@ -50,7 +50,7 @@
   flex-direction: column;
   gap: var(--space-sm);
   padding-top: var(--space-xs);
-  border-top: 1px solid var(--ui-border);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .slider {
@@ -72,9 +72,9 @@
   height: 40px;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--ui-ink);
   cursor: pointer;
 }
@@ -94,7 +94,7 @@
   padding: 0;
   border: 1px solid var(--status-danger);
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: var(--ui-surface) var(--ui-panel-image);
   color: var(--status-danger);
   cursor: pointer;
 }
@@ -123,8 +123,8 @@
 
 .act {
   color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
 }
 
 .actGo {
@@ -175,8 +175,8 @@
   font: inherit;
   font-size: var(--font-size-caption);
   cursor: pointer;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
 }
 

@@ -36,8 +36,8 @@
   color: var(--ui-ink);
   font-size: 13px;
   white-space: nowrap;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
   transform: translateX(-50%);

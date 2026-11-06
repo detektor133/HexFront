@@ -6,7 +6,7 @@ export type TokenValue = string | number | TokenValue[] | { [key: string]: Token
 const HEADER = 'Сгенерировано tools/tokens из docs/art/tokens.json — не редактировать вручную.';
 
 // Эти группы — CSS-размеры в px; остальные числа (альфа, толщины на карте, веса) — без единиц.
-const PX_PATHS = ['radius', 'space', 'font-size', 'touch-target-min'];
+const PX_PATHS = ['radius', 'space', 'font-size', 'touch-target-min', 'ui-border-width'];
 
 function strip(value: TokenValue): TokenValue {
   if (Array.isArray(value)) return value.map(strip);

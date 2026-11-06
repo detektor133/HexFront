@@ -38,8 +38,8 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface) var(--ui-panel-image);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-left: 0;
   border-right: 4px solid var(--ui-ink);
   border-radius: 0 var(--radius-card) var(--radius-card) 0;
@@ -106,7 +106,7 @@ div.item {
   }
 
   100% {
-    background: var(--ui-surface);
+    background: var(--ui-surface) var(--ui-panel-image);
   }
 }
 
