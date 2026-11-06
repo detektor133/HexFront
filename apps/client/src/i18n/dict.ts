@@ -3,6 +3,7 @@
 const ru = {
   'army.limit': 'Лимит армии',
   'army.split': 'Разделить армию надвое',
+  'army.stars': 'Опыт армии: звёзды растут от боёв',
   'army.stronger': 'Усилить армию',
   'army.weaker': 'Уменьшить армию',
   'army.strongest': 'Выше корпуса уровня нет',
@@ -407,6 +408,7 @@ export type MessageKey = keyof typeof ru;
 const en: Record<MessageKey, string> = {
   'army.limit': 'Army limit',
   'army.split': 'Split army in two',
+  'army.stars': 'Army experience: stars grow in battle',
   'army.stronger': 'Strengthen army',
   'army.weaker': 'Reduce army',
   'army.strongest': 'No level above corps',

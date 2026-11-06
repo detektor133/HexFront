@@ -444,6 +444,13 @@
   content: '→ ';
 }
 
+/* Звёзды опыта армии на карточке. */
+.stars {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--selection-color);
+}
+
 /* Значок приказа армии: режим и цвет цели. */
 .order {
   display: inline-flex;

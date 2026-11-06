@@ -1,4 +1,11 @@
-import { IconFlag, IconMinus, IconPlus, IconShield, IconSwords } from '@tabler/icons-react';
+import {
+  IconFlag,
+  IconMinus,
+  IconPlus,
+  IconShield,
+  IconStarFilled,
+  IconSwords,
+} from '@tabler/icons-react';
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -226,6 +233,8 @@ function ArmyCard(props: {
   wanted?: number | undefined;
   /** Название уровня размера армии на карточке. */
   levelLabel: string;
+  /** Звёзды опыта армии 0..3. */
+  stars: number;
   /** Лимит любой армии: предел числа и применение; `wanted` пуст — лимита нет («∞»). */
   limit: {
     readonly max: number;
@@ -311,6 +320,13 @@ function ArmyCard(props: {
               </button>
             )}
             <OrderBadge dir={props.dir} />
+            {props.stars > 0 && (
+              <span className={styles.stars} title={t('army.stars')}>
+                {Array.from({ length: props.stars }, (_, i) => (
+                  <IconStarFilled key={i} size={12} aria-hidden="true" />
+                ))}
+              </span>
+            )}
             <span className={styles.troops} title={t('unit.soldiers')}>
               {formatSoldiers(stats.soldiers)}
               <button
@@ -549,6 +565,7 @@ export function ArmyBar(props: {
                   stats={armyStats(units)}
                   wanted={a.wanted}
                   levelLabel={levelLabelOf(a, units)}
+                  stars={a.stars ?? 0}
                   dir={a.dir}
                   limit={{
                     max: maxArmySoldiers(view),

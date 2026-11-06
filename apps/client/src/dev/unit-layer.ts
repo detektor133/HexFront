@@ -282,6 +282,7 @@ export function createUnitLayer(
     return {
       color: relationColor(unit.owner, v.playerId, v.diplomacy?.relations[unit.owner]),
       army: army ? armyColor(army.number) : null,
+      stars: unit.stars ?? 0,
       type: unit.type,
       soldiers: unit.soldiers,
       org: unit.org / ORG_MAX,
@@ -314,6 +315,7 @@ export function createUnitLayer(
       ...state,
       soldiers,
       org,
+      stars: Math.max(...units.map((u) => u.stars ?? 0)),
       count: units.length,
       selected: units.some((u) => pickedSet.has(u.id)),
     };

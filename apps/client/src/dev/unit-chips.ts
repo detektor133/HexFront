@@ -13,6 +13,10 @@ import { tokens } from '../theme/tokens.ts';
 
 const H = 26;
 const TAB = 6;
+/** Закладка со звёздами опыта: шире обычной, звёзды стоят столбиком. */
+const TAB_STARS = 12;
+const STAR_R = 3.4;
+const STAR_STEP = 7.5;
 const SQUARE = 24;
 const PAD = 5;
 const MIN_TEXT = 22;
@@ -60,6 +64,31 @@ export interface ChipState {
   readonly attackDirection?: number | null;
   /** Число одинаковых отрядов в стопке; нет или 1 — один отряд. */
   readonly count?: number;
+  /** Звёзды опыта армии 0..3: столбик на закладке, видны и у чужих отрядов. */
+  readonly stars?: number;
+}
+
+/** Ширина закладки слева: цвет армии, а со звёздами — шире; чужой отряд со звёздами тоже с закладкой. */
+function tabWidth(s: ChipState): number {
+  if ((s.stars ?? 0) > 0) return TAB_STARS;
+  return s.army ? TAB : 0;
+}
+
+// Звёзды опыта: белые пятиконечные, столбиком по центру закладки.
+function drawStars(g: Graphics, s: ChipState, left: number): void {
+  const n = s.stars ?? 0;
+  if (n <= 0) return;
+  const cx = left + TAB_STARS / 2;
+  for (let i = 0; i < n; i += 1) {
+    const cy = (i - (n - 1) / 2) * STAR_STEP;
+    const points: number[] = [];
+    for (let k = 0; k < 10; k += 1) {
+      const radius = k % 2 === 0 ? STAR_R : STAR_R * 0.45;
+      const angle = -Math.PI / 2 + (k * Math.PI) / 5;
+      points.push(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+    }
+    g.poly(points).fill(tokens.ui.surface);
+  }
 }
 
 export interface Chip {
@@ -161,16 +190,17 @@ function body(g: Graphics, s: ChipState, left: number, w: number): number {
       : { color: s.color, width: OUTLINE };
   g.roundRect(left, top, w, H, r).fill(tokens.ui.surface);
   // Закладка цвета армии — левый край фишки; без армии квадрат начинается от края.
-  const tab = s.army ? TAB : 0;
+  const tab = tabWidth(s);
   const sq = left + tab;
-  if (s.army) {
-    g.roundRect(left, top, TAB + r, H, r).fill(s.army);
+  if (tab > 0) {
+    g.roundRect(left, top, tab + r, H, r).fill(s.army ?? s.color);
     g.rect(sq, top, SQUARE, H).fill(s.color);
   } else {
     g.roundRect(sq, top, SQUARE, H, r).fill(s.color);
     g.rect(sq + r, top, SQUARE - r, H).fill(s.color);
   }
   g.roundRect(left, top, w, H, r).stroke(border);
+  drawStars(g, s, left);
   drawTypeGlyph(g, s.type, sq + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, tokens.ui.surface);
   return sq;
 }
@@ -193,7 +223,7 @@ function drawChip(p: Parts, s: ChipState): number {
   const text = Math.max(MIN_TEXT, p.label.text.length * LABEL_PX + TEXT_SLACK);
   const attackSlot =
     s.attackDirection === null || s.attackDirection === undefined ? 0 : ATTACK_SLOT;
-  const w = (s.army ? TAB : 0) + SQUARE + PAD + attackSlot + text + PAD + barsWidth(s);
+  const w = tabWidth(s) + SQUARE + PAD + attackSlot + text + PAD + barsWidth(s);
   const left = -w / 2;
   const { g } = p;
   const sq = body(g, s, left, w);
@@ -280,6 +310,7 @@ function sameState(a: ChipState, b: ChipState): boolean {
   return (
     a.color === b.color &&
     a.army === b.army &&
+    (a.stars ?? 0) === (b.stars ?? 0) &&
     a.type === b.type &&
     a.soldiers === b.soldiers &&
     a.org === b.org &&
