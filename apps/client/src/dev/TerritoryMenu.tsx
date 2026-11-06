@@ -11,9 +11,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FP, type ArmyView, type Command, type PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
-import { ForceEditor } from './ForceEditor.tsx';
 import styles from './TerritoryMenu.module.css';
-import { limitCommand, maxArmySoldiers } from './army-limit.ts';
+import { maxArmySoldiers } from './army-limit.ts';
 import { armyName } from './army-name.ts';
 import { NEW_ARMY, armyCounts, orderFields, totalOf } from './direction-order.ts';
 import { countsFromShares, defaultShares, sharesFromCounts, type Shares } from './force-share.ts';
@@ -54,6 +53,7 @@ export function TerritoryMenu(props: {
     const counts = armyCounts(view, army);
     return { total: Math.min(max, totalOf(counts)), shares: sharesFromCounts(counts) };
   };
+  // Размер и состав меняются только на карточке самой армии; приказ берёт армию как есть.
   const [force, setForce] = useState(() => (existing ? fromArmy(existing) : fresh()));
   const pickArmy = (id: number): void => {
     setArmyId(id);
@@ -102,14 +102,6 @@ export function TerritoryMenu(props: {
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
   // Клик не выбирает место удара: ось наступления и приоритет занятия определяет ИИ.
   const where = orderFields(counts, armyId);
-  // Армия уже стоит на эту цель: ползунки применяются сразу, как отпустил, без кнопок приказа.
-  const live = armyId !== NEW_ARMY && armyId === existing?.id;
-  const commit = (total: number, shares: Shares): void => {
-    if (!live || !existing) return;
-    const c = countsFromShares(total, shares);
-    const mix = c.armor + c.artillery > 0 ? { armor: c.armor, artillery: c.artillery } : undefined;
-    send(limitCommand(existing, total, mix));
-  };
   const go = (command: Command): void => {
     send(command);
     onClose();
@@ -162,13 +154,6 @@ export function TerritoryMenu(props: {
             </button>
           ))}
         </div>
-        <ForceEditor
-          total={force.total}
-          max={max}
-          shares={force.shares}
-          onChange={(total, shares) => setForce({ total, shares })}
-          onCommit={commit}
-        />
         <div className={styles.actions}>
           {!neutral && (
             <button
