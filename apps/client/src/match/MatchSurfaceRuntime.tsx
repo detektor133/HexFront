@@ -253,6 +253,18 @@ export function useSandbox(
   const setHoldPick = useCallback((armyId: number | null) => {
     holdPickRef.current = armyId;
     setHoldPickState(armyId);
+    // Подсветка стран, против которых можно держать фронт: маска стройки (светлое — можно).
+    const v = viewRef.current;
+    if (armyId === null || !v) {
+      layerRef.current?.setMapMask(null, null);
+      return;
+    }
+    const mask = new Uint8Array(v.hexes.owner.length);
+    for (let i = 0; i < mask.length; i += 1) {
+      const owner = v.hexes.owner[i] ?? -1;
+      if (owner >= 0 && owner !== v.playerId && v.players[owner]?.status === 'alive') mask[i] = 1;
+    }
+    layerRef.current?.setMapMask('build', mask);
   }, []);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
