@@ -217,44 +217,6 @@
   stroke-linejoin: round;
 }
 
-.themeGroup {
-  display: grid;
-  gap: var(--space-xs);
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.themeLabel {
-  padding: 0;
-  color: var(--ui-ink2);
-  font-size: var(--font-size-caption);
-}
-
-.themeButtons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-xs);
-}
-
-.themeButton,
-.themeActive {
-  min-height: 44px;
-  padding: 0 var(--space-md);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-button);
-  background: var(--ui-surface2);
-  color: var(--ui-ink);
-  font: inherit;
-  cursor: pointer;
-}
-
-.themeActive {
-  border-color: var(--ui-button-primary-bg);
-  background: var(--ui-button-primary-bg);
-  color: var(--ui-button-primary-ink);
-}
-
 .settingsMenu {
   position: absolute;
   top: calc(100% + var(--space-sm));

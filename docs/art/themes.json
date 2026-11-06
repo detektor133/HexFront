@@ -1,6 +1,6 @@
 {
   "$schema": "hexfront-themes-v1",
-  "$comment": "Темы интерфейса (HUD, карточки, меню). Переопределяют только группы tokens.json: ui (цвета и форма: рамка, форма углов, узор панелей, регистр заголовков), status, radius, shadow, space, font. Карта (рельеф, территории, фишки) от темы не зависит. Базовые значения tokens.json — запасной вариант без data-theme. Решение владельца 2026-11-06: градиенты, тени, размытие, тёмные панели и скругления больше токенов разрешены, если их задаёт тема; backdrop-filter не используется — под панелями живой WebGL-холст. Узор панели (ui.panelImage) — слои CSS-фона без цвета (последний слой получает цвет из ui.surface). Игровые стили — по образцам, выбранным владельцем: HoI4, Civilization, Total War / Crusader Kings.",
+  "$comment": "Темы интерфейса (HUD, карточки, меню). Переопределяют только группы tokens.json: ui (цвета и форма: рамка, форма углов, узор панелей, регистр заголовков), status, radius, shadow, space, font. Карта (рельеф, территории, фишки) от темы не зависит. Базовые значения tokens.json — запасной вариант без data-theme. Решение владельца 2026-11-06: градиенты, тени, размытие, тёмные панели и скругления больше токенов разрешены, если их задаёт тема; backdrop-filter не используется — под панелями живой WebGL-холст. Узор панели (ui.panelImage) — слои CSS-фона без цвета (последний слой получает цвет из ui.surface). Остальные темы (Мягкий, стёкла, Игрушка, Сталь, Свиток, Чертёж, Штаб, Империя, Королевство) отвергнуты владельцем 2026-11-06: оставлена одна «Мята», выбор стиля в игре убран.",
   "default": "mint",
   "themes": [
     {
@@ -27,104 +27,6 @@
       },
       "radius": { "chip": 12, "button": 16, "card": 22, "input": 16 },
       "shadow": { "hard": "0 8px 22px rgba(10, 70, 40, 0.3), 0 1px 3px rgba(10, 70, 40, 0.22)" }
-    },
-    {
-      "id": "hoi",
-      "ui": {
-        "ink": "#E9E7DA",
-        "ink2": "#B5B8A4",
-        "ink3": "#80856F",
-        "surface": "#1F2420",
-        "surface2": "#2B332C",
-        "border": "#4A5446",
-        "borderStrong": "#8B9272",
-        "buttonPrimaryBg": "#B8923A",
-        "buttonPrimaryInk": "#1B1608",
-        "borderWidth": 2,
-        "corner": "bevel",
-        "panelImage": "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 4px), linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%)",
-        "displayTransform": "uppercase",
-        "displaySpacing": "0.05em"
-      },
-      "status": {
-        "success": "#8ED8A0",
-        "successBg": "#243C28",
-        "warning": "#F0BE4E",
-        "warningBg": "#443816",
-        "danger": "#FF9580",
-        "dangerBg": "#4A2620"
-      },
-      "radius": { "chip": 3, "button": 4, "card": 8, "input": 3 },
-      "shadow": {
-        "hard": "inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 0 1px #0D100D, 0 8px 18px rgba(0, 0, 0, 0.5)"
-      },
-      "space": { "xs": 3, "sm": 6, "md": 10, "lg": 14, "xl": 20 },
-      "font": { "display": { "family": "Oswald" } }
-    },
-    {
-      "id": "civ",
-      "ui": {
-        "ink": "#2B2417",
-        "ink2": "#5E4E2F",
-        "ink3": "#8D7A52",
-        "surface": "#F4EBD3",
-        "surface2": "#E8D9B3",
-        "border": "#B28A33",
-        "borderStrong": "#7C5F1E",
-        "buttonPrimaryBg": "#1F4E5F",
-        "buttonPrimaryInk": "#F6EBCB",
-        "borderWidth": 2,
-        "panelImage": "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.1 0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\"), linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(150, 105, 30, 0.12))",
-        "displayTransform": "uppercase",
-        "displaySpacing": "0.06em"
-      },
-      "status": {
-        "success": "#2F6B3A",
-        "successBg": "#D3E3B8",
-        "warning": "#8A5200",
-        "warningBg": "#F3D894",
-        "danger": "#A32A18",
-        "dangerBg": "#EFC3B2"
-      },
-      "radius": { "chip": 4, "button": 6, "card": 8, "input": 5 },
-      "shadow": {
-        "hard": "0 0 0 1px #F4EBD3, 0 0 0 3px #B28A33, 0 10px 20px rgba(60, 40, 10, 0.35)"
-      },
-      "font": { "display": { "family": "Forum" } }
-    },
-    {
-      "id": "kingdom",
-      "ui": {
-        "ink": "#EFE2C8",
-        "ink2": "#C4B190",
-        "ink3": "#8F7D5E",
-        "surface": "#2A1D16",
-        "surface2": "#3A2A20",
-        "border": "#6B4A2C",
-        "borderStrong": "#C9A25A",
-        "buttonPrimaryBg": "#8E2B22",
-        "buttonPrimaryInk": "#F7E9C8",
-        "borderWidth": 2,
-        "corner": "scoop",
-        "panelImage": "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\"), radial-gradient(ellipse at top, rgba(255, 220, 150, 0.08), transparent 70%)"
-      },
-      "status": {
-        "success": "#9AD9A5",
-        "successBg": "#233A2A",
-        "warning": "#EEC25F",
-        "warningBg": "#463816",
-        "danger": "#FF9A86",
-        "dangerBg": "#4E2620"
-      },
-      "radius": { "chip": 4, "button": 6, "card": 10, "input": 5 },
-      "shadow": {
-        "hard": "0 0 0 1px #120B07, inset 0 0 0 1px rgba(201, 162, 90, 0.35), 0 10px 22px rgba(0, 0, 0, 0.55)"
-      },
-      "font": {
-        "display": { "family": "Alegreya SC" },
-        "ui": { "family": "Alegreya" },
-        "size": { "caption": 13, "body": 15, "label": 14 }
-      }
     }
   ]
 }

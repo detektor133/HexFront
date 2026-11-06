@@ -1,40 +1,18 @@
-// Выбор темы интерфейса: хранится в localStorage, применяется атрибутом data-theme на <html>.
-// Тема меняет только токены ui/status/radius/shadow (docs/art/themes.json), карту не трогает.
-import { defaultTheme, themeIds, type ThemeId } from './themes.ts';
+// Тема интерфейса «Мята» (docs/art/themes.json): применяется атрибутом data-theme на <html>.
+// Выбор стиля игроку не показывается: остальные темы отвергнуты владельцем 2026-11-06.
+import { defaultTheme, type ThemeId } from './themes.ts';
 
-export { themeIds, type ThemeId };
+export type { ThemeId };
 
-const KEY = 'hexfront.theme';
-
-function isThemeId(value: string | null): value is ThemeId {
-  return themeIds.some((id) => id === value);
-}
-
-/** Сохранённая тема игрока или тема по умолчанию. */
+/** Тема интерфейса: единственная, «Мята». */
 export function currentTheme(): ThemeId {
-  try {
-    const saved = localStorage.getItem(KEY);
-    return isThemeId(saved) ? saved : defaultTheme;
-  } catch {
-    // Хранилище закрыто (приватный режим): остаётся тема по умолчанию.
-    return defaultTheme;
-  }
+  return defaultTheme;
 }
 
-/** Применяет тему к документу; вызывается при старте и при выборе в настройках. */
+/** Применяет тему к документу при старте. */
 export function applyTheme(
   id: ThemeId,
   root: HTMLElement | undefined = document.documentElement,
 ): void {
   if (root) root.dataset.theme = id;
-}
-
-/** Запоминает выбор игрока и применяет тему сразу. */
-export function chooseTheme(id: ThemeId): void {
-  try {
-    localStorage.setItem(KEY, id);
-  } catch {
-    // Выбор действует до перезагрузки страницы.
-  }
-  applyTheme(id);
 }

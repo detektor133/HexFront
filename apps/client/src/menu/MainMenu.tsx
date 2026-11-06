@@ -12,7 +12,6 @@ import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
 import { TutorialAsk, TutorialChapters } from './TutorialMenu.tsx';
 import { playerColorIds } from '../theme/colors.ts';
-import { chooseTheme, currentTheme, themeIds, type ThemeId } from '../theme/theme.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
 
@@ -59,7 +58,6 @@ export function MainMenu(): React.JSX.Element {
   const backgroundRef = useRef<LocalMatch | null>(null);
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
-  const [theme, setTheme] = useState<ThemeId>(currentTheme);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
   const [map, setMap] = useState<MenuMap>(() => {
     const saved = readStorage(MAP_KEY, 'europe');
@@ -190,26 +188,6 @@ export function MainMenu(): React.JSX.Element {
                   >
                     <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
                     <small>{m.size}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={styles.field}>
-              <span className={styles.label}>{t('settings.theme')}</span>
-              <div className={styles.segmented} role="radiogroup" aria-label={t('settings.theme')}>
-                {themeIds.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={id === theme}
-                    className={`${styles.segment} ${id === theme ? styles.chosen : ''}`}
-                    onClick={() => {
-                      chooseTheme(id);
-                      setTheme(id);
-                    }}
-                  >
-                    <span>{t(`theme.${id}`)}</span>
                   </button>
                 ))}
               </div>
