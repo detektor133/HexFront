@@ -212,6 +212,8 @@ interface Sandbox {
   focusHex(hex: number): void;
   /** Видимая область карты в мировых координатах (обучение следит за камерой и ставит метки). */
   cameraRect(): { readonly from: Point; readonly to: Point } | null;
+  /** Подписка на сдвиг камеры (плашки на карте); возвращает отписку. */
+  subscribeCamera(listener: () => void): () => void;
   /** Центр гекса в мировых координатах. */
   hexWorld(hex: number): Point | null;
   send(cmd: Command): void;
@@ -249,6 +251,7 @@ export function useSandbox(
   useEffect(() => groups.subscribe(bumpGroups), [groups]);
   const armyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
+  const cameraListenersRef = useRef(new Set<() => void>());
   const holdPickRef = useRef<number | null>(null);
   const [holdPick, setHoldPickState] = useState<number | null>(null);
   const setHoldPick = useCallback((armyId: number | null) => {
@@ -637,6 +640,9 @@ export function useSandbox(
       if (cancelled) return v.destroy();
       view = v;
       mapViewRef.current = v;
+      v.onCamera(() => {
+        for (const listener of cameraListenersRef.current) listener();
+      });
       const currentTool = toolRef.current;
       v.setStroke(currentTool && currentTool.tool !== 'erase' ? input.stroke : null);
       if (viewRef.current) applyStartCameraToView(viewRef.current);
@@ -736,6 +742,10 @@ export function useSandbox(
       }
     },
     cameraRect: () => mapViewRef.current?.visibleWorldRect?.() ?? null,
+    subscribeCamera(listener) {
+      cameraListenersRef.current.add(listener);
+      return () => cameraListenersRef.current.delete(listener);
+    },
     hexWorld(hex) {
       if (typeof loaded === 'string') return null;
       return hexCenter(hexFromId(hex, loaded.map.width), tokens.map.hexRadius);

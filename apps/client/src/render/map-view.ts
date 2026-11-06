@@ -113,6 +113,8 @@ export interface MapView {
   setOrderHooks(hooks: OrderHooks | null): void;
   /** Видимая область карты в мировых координатах. */
   visibleWorldRect?(): { readonly from: Point; readonly to: Point };
+  /** Подписка на сдвиг и масштаб камеры: плашки на карте идут за ней без опроса; возвращает отписку. */
+  onCamera(listener: () => void): () => void;
   /** Отменяет текущий жест и его прогноз. */
   cancel(): void;
   /** Счётчики Pixi для dev-телеметрии; не участвуют в отрисовке и симуляции. */
@@ -216,9 +218,11 @@ export async function createMapView(
     y: (at.y - cam.y) / cam.scale,
   });
 
+  const cameraListeners = new Set<() => void>();
   const apply = (): void => {
     world.position.set(Math.round(cam.x), Math.round(cam.y));
     world.scale.set(cam.scale);
+    for (const listener of cameraListeners) listener();
     const level = detailLevel(cam.scale);
     layer.update(cam.scale, level);
     if (cam.scale !== drawnScale) {
@@ -405,6 +409,10 @@ export async function createMapView(
       stroking = false;
       hooks?.cancel();
       clearSelectionFrame();
+    },
+    onCamera(listener) {
+      cameraListeners.add(listener);
+      return () => cameraListeners.delete(listener);
     },
     visibleWorldRect() {
       const size = view();

@@ -196,6 +196,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     const host = hostRef.current;
     return rect && host ? { ...rect, screen: host.getBoundingClientRect() } : null;
   }, []);
+  const subscribeCamera = useCallback(
+    (listener: () => void) => sbRef.current.subscribeCamera(listener),
+    [],
+  );
   const tutorialHexWorld = useCallback((hex: number) => sbRef.current.hexWorld(hex), []);
   const styleFor = (id: string): React.CSSProperties | undefined => {
     const element = layout.elements.find((item) => item.id === id);
@@ -278,6 +282,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           map={map}
           send={sb.send}
           camera={tutorialCamera}
+          subscribeCamera={subscribeCamera}
           hexWorld={tutorialHexWorld}
         />
       )}

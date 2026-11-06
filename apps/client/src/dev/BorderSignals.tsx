@@ -1,5 +1,5 @@
 import { IconShield, IconX } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Command, MapStatic, PlayerView } from '@hexfront/sim';
 
@@ -17,31 +17,33 @@ export interface SignalCamera {
   readonly screen: { readonly left: number; readonly top: number; readonly width: number };
 }
 
-/** Как часто плашка пересчитывает положение вслед за камерой, мс. */
-const FOLLOW_MS = 33;
-
-interface Placed {
-  readonly other: number;
-  readonly x: number;
-  readonly y: number;
-}
-
 /**
- * Сигнал границы: маленькая плашка прямо на границе с соседом, с которым появилась общая граница
- * и у которого нет приказа ни одной армии. Следует за картой, пока игрок не закроет её крестиком
- * или не нажмёт «Держать ▾». Один сигнал на соседа.
+ * Сигнал границы: значок щита цвета соседа прямо на границе, где появилась общая граница и ни одна
+ * армия не стоит на соседа. Тап раскрывает «Держать ▾» и крестик; без нажатия сигнал остаётся.
+ * Положение меняется только по событиям камеры и прямо в DOM, без опроса и без перерисовки React.
  */
 export function BorderSignals(props: {
   readonly view: PlayerView;
   readonly map: MapStatic;
   readonly send: (cmd: Command) => void;
   readonly camera: () => SignalCamera | null;
+  readonly subscribeCamera: (listener: () => void) => () => void;
   readonly hexWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
 }): React.JSX.Element | null {
-  const { view, map, send, camera, hexWorld } = props;
+  const { view, map, send, camera, subscribeCamera, hexWorld } = props;
   const [closed, setClosed] = useState<ReadonlySet<number>>(new Set());
-  const [placed, setPlaced] = useState<readonly Placed[]>([]);
-  const neighbours = useMemo(() => contacts(view, map), [view, map]);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  // Якорь сигнала не прыгает: гекс границы запоминается, пока он остаётся своим.
+  const anchors = useRef(new Map<number, number>());
+  const neighbours = useMemo(() => {
+    const found = contacts(view, map);
+    for (const [other, hex] of found) {
+      const kept = anchors.current.get(other);
+      if (kept !== undefined && view.hexes.owner[kept] === view.playerId) found.set(other, kept);
+      else anchors.current.set(other, hex);
+    }
+    return found;
+  }, [view, map]);
   const open = useMemo(
     () =>
       [...neighbours]
@@ -51,61 +53,88 @@ export function BorderSignals(props: {
         .sort((a, b) => a[0] - b[0]),
     [neighbours, closed, view.armies],
   );
-  useEffect(() => {
-    const place = (): void => {
+  const nodes = useRef(new Map<number, HTMLElement>());
+  const place = useMemo(
+    () => (): void => {
       const cam = camera();
-      const next: Placed[] = [];
-      if (cam) {
-        const scale = cam.screen.width / (cam.to.x - cam.from.x);
-        for (const [other, hex] of open) {
-          const world = hexWorld(hex);
-          if (!world) continue;
-          next.push({
-            other,
-            x: Math.round(cam.screen.left + (world.x - cam.from.x) * scale),
-            y: Math.round(cam.screen.top + (world.y - cam.from.y) * scale),
-          });
-        }
+      if (!cam) return;
+      const scale = cam.screen.width / (cam.to.x - cam.from.x);
+      for (const [other, hex] of open) {
+        const node = nodes.current.get(other);
+        const world = hexWorld(hex);
+        if (!node || !world) continue;
+        const x = cam.screen.left + (world.x - cam.from.x) * scale;
+        const y = cam.screen.top + (world.y - cam.from.y) * scale;
+        node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
       }
-      setPlaced((now) =>
-        now.length === next.length && now.every((p, i) => p.x === next[i]?.x && p.y === next[i]?.y)
-          ? now
-          : next,
-      );
-    };
+    },
+    [open, camera, hexWorld],
+  );
+  useLayoutEffect(() => {
     place();
-    const timer = window.setInterval(place, FOLLOW_MS);
-    return () => window.clearInterval(timer);
-  }, [open, camera, hexWorld]);
-  const hexOf = new Map(open);
+    return subscribeCamera(place);
+  }, [place, subscribeCamera]);
+  useEffect(() => {
+    if (expanded === null) return;
+    const onDown = (event: PointerEvent): void => {
+      const node = nodes.current.get(expanded);
+      if (node && !node.contains(event.target as Node)) setExpanded(null);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [expanded]);
+  if (open.length === 0) return null;
   return (
     <>
-      {placed.map(({ other, x, y }) => {
-        const hex = hexOf.get(other) ?? 0;
+      {open.map(([other, hex]) => {
+        const color = tokens.players.palette[other]?.line ?? tokens.ui.ink;
+        const name = view.players[other]?.name ?? String(other + 1);
         return (
-          <div key={other} className={styles.signal} style={{ left: x, top: y }}>
-            <span
-              className={styles.dot}
-              style={{ background: tokens.players.palette[other]?.line ?? tokens.ui.ink }}
-              title={view.players[other]?.name ?? String(other + 1)}
-            />
-            <OrderSplit
-              compact
-              icon={<IconShield size={16} aria-hidden="true" />}
-              label="menu.holdShort"
-              tutorial="signal-hold"
-              disabled={null}
-              armies={view.armies}
-              onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
-              onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
-            />
-            <IconButton
-              label={t('menu.close')}
-              className={styles.close}
-              onClick={() => setClosed((now) => new Set(now).add(other))}
-            >
-              <IconX size={14} aria-hidden="true" />
-            </IconButton>
+          <div
+            key={other}
+            className={styles.anchor}
+            ref={(node) => {
+              if (node) nodes.current.set(other, node);
+              else nodes.current.delete(other);
+            }}
+          >
+            <div className={styles.signal}>
+              <button
+                type="button"
+                className={styles.badge}
+                style={{ borderColor: color, color }}
+                title={name}
+                aria-label={name}
+                aria-expanded={expanded === other}
+                onClick={() => setExpanded((now) => (now === other ? null : other))}
+              >
+                <IconShield size={18} aria-hidden="true" />
+              </button>
+              {expanded === other && (
+                <div className={styles.actions}>
+                  <OrderSplit
+                    compact
+                    icon={<IconShield size={16} aria-hidden="true" />}
+                    label="menu.holdShort"
+                    tutorial="signal-hold"
+                    disabled={null}
+                    armies={view.armies}
+                    onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
+                    onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
+                  />
+                  <IconButton
+                    label={t('menu.close')}
+                    className={styles.close}
+                    onClick={() => {
+                      setClosed((now) => new Set(now).add(other));
+                      setExpanded(null);
+                    }}
+                  >
+                    <IconX size={14} aria-hidden="true" />
+                  </IconButton>
+                </div>
+              )}
+            </div>
           </div>
         );
       })}

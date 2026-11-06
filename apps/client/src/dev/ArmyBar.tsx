@@ -30,7 +30,7 @@ import {
   stepLevel,
 } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
-import { armyCounts, orderFields, type Counts } from './direction-order.ts';
+import { armyCounts, orderFields } from './direction-order.ts';
 import { countsFromShares, sharesFromCounts } from './force-share.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
@@ -187,16 +187,10 @@ function Tool(props: {
   );
 }
 
-function Meter(props: {
-  icon: string;
-  label: MessageKey;
-  share: number;
-  color: string;
-}): React.JSX.Element {
+function Meter(props: { label: MessageKey; share: number; color: string }): React.JSX.Element {
   const pct = Math.round(Math.max(0, Math.min(1, props.share)) * 100);
   return (
     <span className={styles.row} title={`${t(props.label)}: ${pct}%`}>
-      <Icon name={props.icon} className={styles.meterIcon} />
       <span className={styles.meter}>
         <span style={{ width: `${pct}%`, background: props.color }} />
       </span>
@@ -229,19 +223,8 @@ function ArmyCard(props: {
   name: string;
   color: string;
   stats: ArmyStats;
-  /** Заказанная численность армии (меню страны): рядом с числом солдат. */
-  wanted?: number | undefined;
-  /** Название уровня размера армии на карточке. */
-  levelLabel: string;
   /** Звёзды опыта армии 0..3. */
   stars: number;
-  /** Лимит любой армии: предел числа и применение; `wanted` пуст — лимита нет («∞»). */
-  limit: {
-    readonly max: number;
-    /** Текущий состав армии: заказ или то, что стоит в отрядах. */
-    readonly counts: Counts;
-    readonly onApply: (soldiers: number, counts: Counts) => void;
-  };
   /** Приказ армии: режим и цель (id игрока или −1); нет — приказа нет. */
   dir?: ArmyView['dir'] | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
@@ -258,8 +241,8 @@ function ArmyCard(props: {
   const { stats } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
-  const [limitAnchor, setLimitAnchor] = useState<DOMRect | null>(null);
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
+  // Переименование — двойным кликом по названию; двойной клик по остальной карточке — к армии.
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
     setDraft(props.rawName);
@@ -282,6 +265,7 @@ function ArmyCard(props: {
         tabIndex={0}
         className={styles.pick}
         aria-pressed={props.selected}
+        title={`${formatSoldiers(stats.soldiers)} ${t('unit.soldiers')}`}
         onClick={select}
         onDoubleClick={props.onDoubleClick}
         onContextMenu={selectFromContextMenu}
@@ -302,6 +286,7 @@ function ArmyCard(props: {
                 onChange={(event) => setDraft(event.target.value)}
                 onBlur={save}
                 onClick={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
                   event.stopPropagation();
                   if (event.key === 'Enter') save();
@@ -309,15 +294,9 @@ function ArmyCard(props: {
                 }}
               />
             ) : (
-              <button
-                type="button"
-                className={styles.nameButton}
-                title={t('army.rename')}
-                onClick={beginEditing}
-              >
+              <span className={styles.nameText} onDoubleClick={beginEditing}>
                 {props.name}
-                <Icon name="edit" className={styles.editIcon} />
-              </button>
+              </span>
             )}
             <OrderBadge dir={props.dir} />
             {props.stars > 0 && (
@@ -327,21 +306,6 @@ function ArmyCard(props: {
                 ))}
               </span>
             )}
-            <span className={styles.troops} title={t('unit.soldiers')}>
-              {formatSoldiers(stats.soldiers)}
-              <button
-                type="button"
-                className={styles.limit}
-                data-tutorial="army-limit"
-                title={t('army.limit')}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setLimitAnchor(event.currentTarget.getBoundingClientRect());
-                }}
-              >
-                {props.levelLabel}
-              </button>
-            </span>
             {stats.fighting && (
               <span title={t('army.fighting')}>
                 <Icon name="fighting" className={styles.fightingIcon} />
@@ -364,7 +328,6 @@ function ArmyCard(props: {
             )}
           </span>
           <Meter
-            icon="org"
             label="army.org"
             share={stats.org}
             color={
@@ -372,22 +335,12 @@ function ArmyCard(props: {
             }
           />
           <Meter
-            icon="supply"
             label="army.supply"
             share={stats.supply}
             color={supplyColor(stats.supply, stats.starving > 0)}
           />
         </span>
       </div>
-      {limitAnchor && (
-        <ArmyLimit
-          anchor={limitAnchor}
-          value={props.wanted ?? Math.min(props.limit.max, Math.floor(stats.soldiers / FP))}
-          shares={sharesFromCounts(props.limit.counts)}
-          onApply={props.limit.onApply}
-          onClose={() => setLimitAnchor(null)}
-        />
-      )}
     </div>
   );
 }
@@ -418,6 +371,7 @@ export function ArmyBar(props: {
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [compAnchor, setCompAnchor] = useState<DOMRect | null>(null);
   const { onHeight } = props;
   useLayoutEffect(() => {
     const el = contentRef.current;
@@ -461,7 +415,7 @@ export function ArmyBar(props: {
   const soldiersOf = (a: ArmyView): number =>
     Math.floor(mine.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0) / FP);
   const sizeOf = (a: ArmyView): number => armySize(a, soldiersOf(a));
-  const levelLabelOf = (a: ArmyView, _units: readonly UnitView[]): string => {
+  const levelLabelOf = (a: ArmyView): string => {
     const index = levelIndex(levels, sizeOf(a));
     const name = LEVEL_NAMES[index];
     return t(name === undefined ? 'army.level.none' : name);
@@ -513,17 +467,27 @@ export function ArmyBar(props: {
               disabled={attackBlocked(army)}
             />
             <Tool
+              glyph={<IconMinus size={18} aria-hidden="true" />}
+              label="army.weaker"
+              onClick={() => resize(army, -1)}
+              disabled={resizeBlocked(army, -1)}
+            />
+            <button
+              type="button"
+              className={styles.level}
+              data-tutorial="army-limit"
+              title={t('army.composition')}
+              aria-expanded={compAnchor !== null}
+              onClick={(event) => setCompAnchor(event.currentTarget.getBoundingClientRect())}
+            >
+              {levelLabelOf(army)}
+            </button>
+            <Tool
               glyph={<IconPlus size={18} aria-hidden="true" />}
               tutorial="army-stronger"
               label="army.stronger"
               onClick={() => resize(army, 1)}
               disabled={resizeBlocked(army, 1)}
-            />
-            <Tool
-              glyph={<IconMinus size={18} aria-hidden="true" />}
-              label="army.weaker"
-              onClick={() => resize(army, -1)}
-              disabled={resizeBlocked(army, -1)}
             />
             <Tool
               icon="split"
@@ -551,6 +515,20 @@ export function ArmyBar(props: {
             ))}
           </ul>
         )}
+        {army && compAnchor && (
+          <ArmyLimit
+            anchor={compAnchor}
+            value={sizeOf(army)}
+            shares={sharesFromCounts(armyCounts(view, army))}
+            onApply={(soldiers, counts) => {
+              const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
+              send(
+                limitCommand(army, soldiers, mix && { armor: mix.armor, artillery: mix.artillery }),
+              );
+            }}
+            onClose={() => setCompAnchor(null)}
+          />
+        )}
         <div className={styles.strip} onWheel={onStripWheel}>
           <div className={styles.stripContent}>
             {view.armies.map((a) => {
@@ -562,24 +540,8 @@ export function ArmyBar(props: {
                   rawName={a.name}
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
-                  wanted={a.wanted}
-                  levelLabel={levelLabelOf(a, units)}
                   stars={a.stars ?? 0}
                   dir={a.dir}
-                  limit={{
-                    max: maxArmySoldiers(view),
-                    counts: armyCounts(view, a),
-                    onApply: (soldiers, counts) => {
-                      const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
-                      send(
-                        limitCommand(
-                          a,
-                          soldiers,
-                          mix && { armor: mix.armor, artillery: mix.artillery },
-                        ),
-                      );
-                    },
-                  }}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}

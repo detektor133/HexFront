@@ -299,6 +299,32 @@
   text-overflow: ellipsis;
 }
 
+/* Название армии: без карандаша, переименование двойным кликом. */
+.nameText {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Уровень размера армии между «−» и «+»: ширина фиксирована, подпись не двигает соседей. */
+.level {
+  min-width: 6.5em;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-button);
+  background: var(--ui-panel-image) var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-label);
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .num {
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
