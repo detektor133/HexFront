@@ -28,54 +28,6 @@
       "shadow": { "hard": "0 8px 24px rgba(60, 45, 25, 0.2), 0 1px 3px rgba(60, 45, 25, 0.18)" }
     },
     {
-      "id": "deco",
-      "ui": {
-        "ink": "#F2EAD3",
-        "ink2": "#BFC3D6",
-        "ink3": "#8189A6",
-        "surface": "#0F1B33",
-        "surface2": "#1A2A4A",
-        "border": "#6F5E2E",
-        "borderStrong": "#D4AF5A",
-        "buttonPrimaryBg": "#D4AF5A",
-        "buttonPrimaryInk": "#0F1B33"
-      },
-      "status": {
-        "success": "#7BD3A0",
-        "successBg": "#16382E",
-        "warning": "#EDBF5C",
-        "warningBg": "#3A3014",
-        "danger": "#FF8F7A",
-        "dangerBg": "#40201D"
-      },
-      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
-      "shadow": { "hard": "0 0 0 3px #0F1B33, 0 0 0 4px #D4AF5A, 0 8px 16px rgba(0, 0, 0, 0.35)" }
-    },
-    {
-      "id": "decoRuby",
-      "ui": {
-        "ink": "#F6E9DD",
-        "ink2": "#D2B8B0",
-        "ink3": "#A08581",
-        "surface": "#2B0F1A",
-        "surface2": "#3E1A29",
-        "border": "#8B6A55",
-        "borderStrong": "#E3BE92",
-        "buttonPrimaryBg": "#E3BE92",
-        "buttonPrimaryInk": "#2B0F1A"
-      },
-      "status": {
-        "success": "#86D9A8",
-        "successBg": "#18382D",
-        "warning": "#F0C265",
-        "warningBg": "#403115",
-        "danger": "#FF9A86",
-        "dangerBg": "#4A2020"
-      },
-      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
-      "shadow": { "hard": "0 0 0 3px #2B0F1A, 0 0 0 4px #E3BE92, 0 8px 16px rgba(0, 0, 0, 0.4)" }
-    },
-    {
       "id": "glass",
       "ui": {
         "ink": "#EAF1F8",
@@ -124,28 +76,172 @@
       "shadow": { "hard": "0 10px 28px rgba(20, 50, 80, 0.28)" }
     },
     {
-      "id": "poster",
+      "id": "mint",
       "ui": {
-        "ink": "#1B1B1B",
-        "ink2": "#4A4A4A",
-        "ink3": "#7A7A7A",
-        "surface": "#FFF8E1",
-        "surface2": "#FFD84D",
-        "border": "#1B1B1B",
-        "borderStrong": "#1B1B1B",
-        "buttonPrimaryBg": "#2B59C3",
+        "ink": "#173026",
+        "ink2": "#4C6B5D",
+        "ink3": "#7F9A8D",
+        "surface": "#F6FBF8",
+        "surface2": "#E2F2E9",
+        "border": "#CFE5D8",
+        "borderStrong": "#9FC8B0",
+        "buttonPrimaryBg": "#1E9468",
         "buttonPrimaryInk": "#FFFFFF"
       },
       "status": {
-        "success": "#1E7A45",
-        "successBg": "#CDEFD8",
-        "warning": "#8A5200",
-        "warningBg": "#FFE3A3",
-        "danger": "#C62F1B",
-        "dangerBg": "#FFD3CB"
+        "success": "#1E7A4A",
+        "successBg": "#D6F0E0",
+        "warning": "#9A6200",
+        "warningBg": "#FBEFD2",
+        "danger": "#C23B22",
+        "dangerBg": "#FBE3DD"
       },
-      "radius": { "chip": 8, "button": 12, "card": 16, "input": 12 },
-      "shadow": { "hard": "0 4px 0 #1B1B1B" }
+      "radius": { "chip": 12, "button": 16, "card": 22, "input": 16 },
+      "shadow": { "hard": "0 8px 22px rgba(20, 70, 50, 0.18), 0 1px 3px rgba(20, 70, 50, 0.16)" }
+    },
+    {
+      "id": "peach",
+      "ui": {
+        "ink": "#35210F",
+        "ink2": "#7A5B43",
+        "ink3": "#A88B73",
+        "surface": "#FFF9F3",
+        "surface2": "#FFE8D6",
+        "border": "#F3D5BC",
+        "borderStrong": "#E2B48F",
+        "buttonPrimaryBg": "#D9582B",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#2F7D4F",
+        "successBg": "#DDF1E4",
+        "warning": "#9A5A00",
+        "warningBg": "#FFE6B8",
+        "danger": "#B8301B",
+        "dangerBg": "#FFD9D0"
+      },
+      "radius": { "chip": 10, "button": 18, "card": 24, "input": 18 },
+      "shadow": { "hard": "0 8px 22px rgba(120, 60, 20, 0.2), 0 1px 3px rgba(120, 60, 20, 0.16)" }
+    },
+    {
+      "id": "lavender",
+      "ui": {
+        "ink": "#241A3D",
+        "ink2": "#5F5380",
+        "ink3": "#9188AD",
+        "surface": "#FBF9FF",
+        "surface2": "#ECE6FA",
+        "border": "#DDD4F2",
+        "borderStrong": "#B9AADF",
+        "buttonPrimaryBg": "#6A4CC4",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#2A7C52",
+        "successBg": "#DBF0E4",
+        "warning": "#97600A",
+        "warningBg": "#FBEBCB",
+        "danger": "#BC3350",
+        "dangerBg": "#FBDDE4"
+      },
+      "radius": { "chip": 10, "button": 14, "card": 18, "input": 14 },
+      "shadow": { "hard": "0 8px 24px rgba(60, 40, 120, 0.2), 0 1px 3px rgba(60, 40, 120, 0.16)" }
+    },
+    {
+      "id": "sky",
+      "ui": {
+        "ink": "#10253A",
+        "ink2": "#46607A",
+        "ink3": "#7C93AA",
+        "surface": "#F3F9FE",
+        "surface2": "#DCEBF8",
+        "border": "#C6DCEF",
+        "borderStrong": "#94BADD",
+        "buttonPrimaryBg": "#1C74D9",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#1F7A4A",
+        "successBg": "#D8F0E2",
+        "warning": "#955A00",
+        "warningBg": "#FBEBC8",
+        "danger": "#BE3320",
+        "dangerBg": "#FBDDD6"
+      },
+      "radius": { "chip": 6, "button": 8, "card": 10, "input": 8 },
+      "shadow": { "hard": "0 6px 18px rgba(20, 70, 130, 0.22), 0 1px 2px rgba(20, 70, 130, 0.18)" }
+    },
+    {
+      "id": "graphite",
+      "ui": {
+        "ink": "#ECEFF1",
+        "ink2": "#AEB6BD",
+        "ink3": "#7C858D",
+        "surface": "#1E2227",
+        "surface2": "#2A3037",
+        "border": "#3A424B",
+        "borderStrong": "#58626D",
+        "buttonPrimaryBg": "#FF8A3D",
+        "buttonPrimaryInk": "#1E1409"
+      },
+      "status": {
+        "success": "#7BD3A0",
+        "successBg": "#1B3A2B",
+        "warning": "#F0BA55",
+        "warningBg": "#3B3016",
+        "danger": "#FF8F7A",
+        "dangerBg": "#43211C"
+      },
+      "radius": { "chip": 4, "button": 6, "card": 8, "input": 6 },
+      "shadow": { "hard": "0 8px 20px rgba(0, 0, 0, 0.45)" }
+    },
+    {
+      "id": "forest",
+      "ui": {
+        "ink": "#E8F1E4",
+        "ink2": "#AFC4AA",
+        "ink3": "#7F967B",
+        "surface": "#14261D",
+        "surface2": "#1F3A2B",
+        "border": "#2F5440",
+        "borderStrong": "#4F7F63",
+        "buttonPrimaryBg": "#8BC34A",
+        "buttonPrimaryInk": "#10200F"
+      },
+      "status": {
+        "success": "#8EE0A8",
+        "successBg": "#1B4030",
+        "warning": "#EEC25F",
+        "warningBg": "#3E3416",
+        "danger": "#FF9A86",
+        "dangerBg": "#47241E"
+      },
+      "radius": { "chip": 8, "button": 10, "card": 14, "input": 10 },
+      "shadow": { "hard": "0 8px 20px rgba(0, 10, 4, 0.45)" }
+    },
+    {
+      "id": "ink",
+      "ui": {
+        "ink": "#F2F2F2",
+        "ink2": "#B4B4BC",
+        "ink3": "#80808A",
+        "surface": "#14141A",
+        "surface2": "#1F1F28",
+        "border": "#33333F",
+        "borderStrong": "#5A5A6B",
+        "buttonPrimaryBg": "#F2F2F2",
+        "buttonPrimaryInk": "#14141A"
+      },
+      "status": {
+        "success": "#7BD3A0",
+        "successBg": "#16342A",
+        "warning": "#F0BA55",
+        "warningBg": "#3A2F15",
+        "danger": "#FF8F7A",
+        "dangerBg": "#40201C"
+      },
+      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
+      "shadow": { "hard": "0 6px 18px rgba(0, 0, 0, 0.5)" }
     }
   ]
 }

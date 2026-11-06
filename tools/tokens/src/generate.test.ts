@@ -55,11 +55,15 @@ describe('токены', () => {
     expect(read('apps/client/src/theme/themes.ts')).toBe(renderThemesTs(themes));
     expect(themes.themes.map((t) => t.id)).toEqual([
       'soft',
-      'deco',
-      'decoRuby',
       'glass',
       'glassLight',
-      'poster',
+      'mint',
+      'peach',
+      'lavender',
+      'sky',
+      'graphite',
+      'forest',
+      'ink',
     ]);
   });
 

@@ -23,52 +23,6 @@
   --shadow-hard: 0 8px 24px rgba(60, 45, 25, 0.2), 0 1px 3px rgba(60, 45, 25, 0.18);
 }
 
-[data-theme='deco'] {
-  --ui-ink: #F2EAD3;
-  --ui-ink2: #BFC3D6;
-  --ui-ink3: #8189A6;
-  --ui-surface: #0F1B33;
-  --ui-surface2: #1A2A4A;
-  --ui-border: #6F5E2E;
-  --ui-border-strong: #D4AF5A;
-  --ui-button-primary-bg: #D4AF5A;
-  --ui-button-primary-ink: #0F1B33;
-  --status-success: #7BD3A0;
-  --status-success-bg: #16382E;
-  --status-warning: #EDBF5C;
-  --status-warning-bg: #3A3014;
-  --status-danger: #FF8F7A;
-  --status-danger-bg: #40201D;
-  --radius-chip: 2px;
-  --radius-button: 2px;
-  --radius-card: 4px;
-  --radius-input: 2px;
-  --shadow-hard: 0 0 0 3px #0F1B33, 0 0 0 4px #D4AF5A, 0 8px 16px rgba(0, 0, 0, 0.35);
-}
-
-[data-theme='decoRuby'] {
-  --ui-ink: #F6E9DD;
-  --ui-ink2: #D2B8B0;
-  --ui-ink3: #A08581;
-  --ui-surface: #2B0F1A;
-  --ui-surface2: #3E1A29;
-  --ui-border: #8B6A55;
-  --ui-border-strong: #E3BE92;
-  --ui-button-primary-bg: #E3BE92;
-  --ui-button-primary-ink: #2B0F1A;
-  --status-success: #86D9A8;
-  --status-success-bg: #18382D;
-  --status-warning: #F0C265;
-  --status-warning-bg: #403115;
-  --status-danger: #FF9A86;
-  --status-danger-bg: #4A2020;
-  --radius-chip: 2px;
-  --radius-button: 2px;
-  --radius-card: 4px;
-  --radius-input: 2px;
-  --shadow-hard: 0 0 0 3px #2B0F1A, 0 0 0 4px #E3BE92, 0 8px 16px rgba(0, 0, 0, 0.4);
-}
-
 [data-theme='glass'] {
   --ui-ink: #EAF1F8;
   --ui-ink2: #A9B8C8;
@@ -115,25 +69,163 @@
   --shadow-hard: 0 10px 28px rgba(20, 50, 80, 0.28);
 }
 
-[data-theme='poster'] {
-  --ui-ink: #1B1B1B;
-  --ui-ink2: #4A4A4A;
-  --ui-ink3: #7A7A7A;
-  --ui-surface: #FFF8E1;
-  --ui-surface2: #FFD84D;
-  --ui-border: #1B1B1B;
-  --ui-border-strong: #1B1B1B;
-  --ui-button-primary-bg: #2B59C3;
+[data-theme='mint'] {
+  --ui-ink: #173026;
+  --ui-ink2: #4C6B5D;
+  --ui-ink3: #7F9A8D;
+  --ui-surface: #F6FBF8;
+  --ui-surface2: #E2F2E9;
+  --ui-border: #CFE5D8;
+  --ui-border-strong: #9FC8B0;
+  --ui-button-primary-bg: #1E9468;
   --ui-button-primary-ink: #FFFFFF;
-  --status-success: #1E7A45;
-  --status-success-bg: #CDEFD8;
-  --status-warning: #8A5200;
-  --status-warning-bg: #FFE3A3;
-  --status-danger: #C62F1B;
-  --status-danger-bg: #FFD3CB;
+  --status-success: #1E7A4A;
+  --status-success-bg: #D6F0E0;
+  --status-warning: #9A6200;
+  --status-warning-bg: #FBEFD2;
+  --status-danger: #C23B22;
+  --status-danger-bg: #FBE3DD;
+  --radius-chip: 12px;
+  --radius-button: 16px;
+  --radius-card: 22px;
+  --radius-input: 16px;
+  --shadow-hard: 0 8px 22px rgba(20, 70, 50, 0.18), 0 1px 3px rgba(20, 70, 50, 0.16);
+}
+
+[data-theme='peach'] {
+  --ui-ink: #35210F;
+  --ui-ink2: #7A5B43;
+  --ui-ink3: #A88B73;
+  --ui-surface: #FFF9F3;
+  --ui-surface2: #FFE8D6;
+  --ui-border: #F3D5BC;
+  --ui-border-strong: #E2B48F;
+  --ui-button-primary-bg: #D9582B;
+  --ui-button-primary-ink: #FFFFFF;
+  --status-success: #2F7D4F;
+  --status-success-bg: #DDF1E4;
+  --status-warning: #9A5A00;
+  --status-warning-bg: #FFE6B8;
+  --status-danger: #B8301B;
+  --status-danger-bg: #FFD9D0;
+  --radius-chip: 10px;
+  --radius-button: 18px;
+  --radius-card: 24px;
+  --radius-input: 18px;
+  --shadow-hard: 0 8px 22px rgba(120, 60, 20, 0.2), 0 1px 3px rgba(120, 60, 20, 0.16);
+}
+
+[data-theme='lavender'] {
+  --ui-ink: #241A3D;
+  --ui-ink2: #5F5380;
+  --ui-ink3: #9188AD;
+  --ui-surface: #FBF9FF;
+  --ui-surface2: #ECE6FA;
+  --ui-border: #DDD4F2;
+  --ui-border-strong: #B9AADF;
+  --ui-button-primary-bg: #6A4CC4;
+  --ui-button-primary-ink: #FFFFFF;
+  --status-success: #2A7C52;
+  --status-success-bg: #DBF0E4;
+  --status-warning: #97600A;
+  --status-warning-bg: #FBEBCB;
+  --status-danger: #BC3350;
+  --status-danger-bg: #FBDDE4;
+  --radius-chip: 10px;
+  --radius-button: 14px;
+  --radius-card: 18px;
+  --radius-input: 14px;
+  --shadow-hard: 0 8px 24px rgba(60, 40, 120, 0.2), 0 1px 3px rgba(60, 40, 120, 0.16);
+}
+
+[data-theme='sky'] {
+  --ui-ink: #10253A;
+  --ui-ink2: #46607A;
+  --ui-ink3: #7C93AA;
+  --ui-surface: #F3F9FE;
+  --ui-surface2: #DCEBF8;
+  --ui-border: #C6DCEF;
+  --ui-border-strong: #94BADD;
+  --ui-button-primary-bg: #1C74D9;
+  --ui-button-primary-ink: #FFFFFF;
+  --status-success: #1F7A4A;
+  --status-success-bg: #D8F0E2;
+  --status-warning: #955A00;
+  --status-warning-bg: #FBEBC8;
+  --status-danger: #BE3320;
+  --status-danger-bg: #FBDDD6;
+  --radius-chip: 6px;
+  --radius-button: 8px;
+  --radius-card: 10px;
+  --radius-input: 8px;
+  --shadow-hard: 0 6px 18px rgba(20, 70, 130, 0.22), 0 1px 2px rgba(20, 70, 130, 0.18);
+}
+
+[data-theme='graphite'] {
+  --ui-ink: #ECEFF1;
+  --ui-ink2: #AEB6BD;
+  --ui-ink3: #7C858D;
+  --ui-surface: #1E2227;
+  --ui-surface2: #2A3037;
+  --ui-border: #3A424B;
+  --ui-border-strong: #58626D;
+  --ui-button-primary-bg: #FF8A3D;
+  --ui-button-primary-ink: #1E1409;
+  --status-success: #7BD3A0;
+  --status-success-bg: #1B3A2B;
+  --status-warning: #F0BA55;
+  --status-warning-bg: #3B3016;
+  --status-danger: #FF8F7A;
+  --status-danger-bg: #43211C;
+  --radius-chip: 4px;
+  --radius-button: 6px;
+  --radius-card: 8px;
+  --radius-input: 6px;
+  --shadow-hard: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='forest'] {
+  --ui-ink: #E8F1E4;
+  --ui-ink2: #AFC4AA;
+  --ui-ink3: #7F967B;
+  --ui-surface: #14261D;
+  --ui-surface2: #1F3A2B;
+  --ui-border: #2F5440;
+  --ui-border-strong: #4F7F63;
+  --ui-button-primary-bg: #8BC34A;
+  --ui-button-primary-ink: #10200F;
+  --status-success: #8EE0A8;
+  --status-success-bg: #1B4030;
+  --status-warning: #EEC25F;
+  --status-warning-bg: #3E3416;
+  --status-danger: #FF9A86;
+  --status-danger-bg: #47241E;
   --radius-chip: 8px;
-  --radius-button: 12px;
-  --radius-card: 16px;
-  --radius-input: 12px;
-  --shadow-hard: 0 4px 0 #1B1B1B;
+  --radius-button: 10px;
+  --radius-card: 14px;
+  --radius-input: 10px;
+  --shadow-hard: 0 8px 20px rgba(0, 10, 4, 0.45);
+}
+
+[data-theme='ink'] {
+  --ui-ink: #F2F2F2;
+  --ui-ink2: #B4B4BC;
+  --ui-ink3: #80808A;
+  --ui-surface: #14141A;
+  --ui-surface2: #1F1F28;
+  --ui-border: #33333F;
+  --ui-border-strong: #5A5A6B;
+  --ui-button-primary-bg: #F2F2F2;
+  --ui-button-primary-ink: #14141A;
+  --status-success: #7BD3A0;
+  --status-success-bg: #16342A;
+  --status-warning: #F0BA55;
+  --status-warning-bg: #3A2F15;
+  --status-danger: #FF8F7A;
+  --status-danger-bg: #40201C;
+  --radius-chip: 2px;
+  --radius-button: 2px;
+  --radius-card: 4px;
+  --radius-input: 2px;
+  --shadow-hard: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
