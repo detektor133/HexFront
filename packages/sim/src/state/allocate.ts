@@ -87,36 +87,50 @@ export function planControls(u: Unit, armyId: number): boolean {
 }
 
 // Гексы линии для n отрядов: n ≤ M — самые угрожаемые, при равенстве — равномерно вдоль линии;
-// n > M — все гексы и вторые/третьи места на самых угрожаемых.
+// n > M — все гексы и вторые/третьи места на самых угрожаемых. При наступлении (`front` не пуст)
+// сначала заполняются гексы наступающего фронта до предела отряда на гекс, и только излишек уходит
+// на остальную линию: иначе большая часть войска стояла бы без дела на участках, где не наступают.
 function lineSlots(
   line: readonly HexId[],
   w: Map<HexId, number>,
   n: number,
   cap: (h: HexId) => number,
+  front: ReadonlySet<HexId> = new Set(),
+  held: ReadonlySet<HexId> = new Set(),
 ): HexId[] {
   const m = line.length;
   if (m === 0 || n === 0) return [];
   const even = new Set<number>();
   for (let k = 0; k < Math.min(n, m); k += 1) even.add(intDiv((2 * k + 1) * m, 2 * Math.min(n, m)));
+  // Вес врага скачет каждый тик; гекс, который отряды уже держат, весит на половину и FP больше, иначе
+  // «лишнее» место при делении отрядов по гексам перескакивало бы туда-сюда и отряды бегали бы вдоль линии.
+  const score = (h: HexId): number => {
+    const base = w.get(h) ?? 0;
+    return held.has(h) ? base + Math.max(FP, intDiv(base, 2)) : base;
+  };
   const order = line
     .map((h, i) => ({ h, i }))
     .filter(({ h }) => cap(h) > 0)
     .sort(
       (a, b) =>
-        (w.get(b.h) ?? 0) - (w.get(a.h) ?? 0) ||
-        Number(!even.has(a.i)) - Number(!even.has(b.i)) ||
-        a.i - b.i,
+        score(b.h) - score(a.h) || Number(!even.has(a.i)) - Number(!even.has(b.i)) || a.i - b.i,
     );
   const out: HexId[] = [];
   const used = new Map<HexId, number>();
-  for (let round = 0; out.length < n && round < MAX_UNITS_PER_HEX; round += 1) {
-    for (const { h } of order) {
-      if (out.length >= n) break;
-      if ((used.get(h) ?? 0) >= cap(h)) continue;
-      used.set(h, (used.get(h) ?? 0) + 1);
-      out.push(h);
+  const fill = (hexes: readonly HexId[], rounds = MAX_UNITS_PER_HEX): void => {
+    for (let round = 0; out.length < n && round < rounds; round += 1) {
+      for (const h of hexes) {
+        if (out.length >= n) break;
+        if ((used.get(h) ?? 0) >= cap(h)) continue;
+        used.set(h, (used.get(h) ?? 0) + 1);
+        out.push(h);
+      }
     }
-  }
+  };
+  const ordered = order.map(({ h }) => h);
+  // Гексы наступающего фронта заполняются первыми, излишек отрядов уходит на остальную линию.
+  fill(ordered.filter((h) => front.has(h)));
+  fill(ordered);
   return out;
 }
 
@@ -240,6 +254,11 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
       w.set(h, (w.get(h) ?? 0) * OFFENSIVE_FACING_WEIGHT);
     }
   }
+  const attackFront = new Set<HexId>();
+  if (plan.kind === 'front' && plan.offensive?.active) {
+    const dist = lineDistance(state, plan.offensive.hexes);
+    for (const h of facingHexes(state, plan.edges, dist)) attackFront.add(h);
+  }
   const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
   const lineUnits = units.filter((u) => u.type !== 'artillery');
   const arty = units.filter((u) => u.type === 'artillery');
@@ -253,7 +272,12 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
   const slots = new Map<number, HexId>();
   runs.forEach((run, r) => {
     const mine = groups[r] ?? [];
-    for (const [id, h] of assignLine(state, lineSlots(run, w, mine.length, cap), mine, w)) {
+    const runSet = new Set(run);
+    const held = new Set(
+      mine.flatMap((u) => [u.slot, u.hex].filter((h) => h >= 0 && runSet.has(h)).slice(0, 1)),
+    );
+    const placed = lineSlots(run, w, mine.length, cap, attackFront, held);
+    for (const [id, h] of assignLine(state, placed, mine, w)) {
       slots.set(id, h);
     }
   });

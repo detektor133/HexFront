@@ -89,7 +89,10 @@ describe('фронт армии с «А» — только граница с в�
     let done = false;
     for (let t = 0; t < 1500 && !done; t += 1) {
       s.runAuto(1);
-      done ||= s.state.events.some((e) => e.t === 'offensiveDone');
+      // Наступление кончается событием или тем, что враг потерял всю землю и направление снято.
+      done ||=
+        s.state.events.some((e) => e.t === 'offensiveDone') ||
+        s.state.hexes.owner.every((o) => o === 0);
       expect(neutralEdges(s, id)).toEqual([]);
     }
     expect(done).toBe(true);

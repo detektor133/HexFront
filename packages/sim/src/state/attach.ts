@@ -5,7 +5,13 @@
 import type { MatchState, Unit } from './types.ts';
 import { FRONT_REBALANCE_SURPLUS } from '../balance.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { intDiv } from '../math/int.ts';
+import { FP, intDiv } from '../math/int.ts';
+
+/**
+ * Предел веса гекса при расчёте долей линий: вес врага скачет в десятки раз за секунды, а отряды
+ * между линиями ходят минутами — без предела доли «качались» бы и отряды ездили между линиями.
+ */
+const QUOTA_WEIGHT_CAP = 3 * FP;
 
 /**
  * Линии фронта: связные по соседству группы гексов плана, порядок гексов — как в плане.
@@ -80,7 +86,7 @@ export function attachUnits(
     else attached[r]?.push(u);
   }
   const want = quotas(
-    runs.map((run) => run.reduce((s, h) => s + (weight.get(h) ?? 0), 0)),
+    runs.map((run) => run.reduce((s, h) => s + Math.min(QUOTA_WEIGHT_CAP, weight.get(h) ?? 0), 0)),
     units.length,
   );
   const deficit = (r: number): number => (want[r] ?? 0) - (attached[r]?.length ?? 0);
@@ -96,8 +102,10 @@ export function attachUnits(
   };
   for (const u of loose.sort((a, b) => a.id - b.id)) attached[neediest(u)]?.push(u);
   // Перекос: избыток на одной линии и нехватка на другой — отряд ближайший к нуждающейся линии.
+  // Порог растёт с войском: четверть отрядов — это уже перекос, а не колебание веса.
+  const surplusMin = Math.max(FRONT_REBALANCE_SURPLUS, intDiv(units.length, 4));
   for (let r = 0; r < runs.length; r += 1) {
-    while (-deficit(r) >= FRONT_REBALANCE_SURPLUS) {
+    while (-deficit(r) >= surplusMin) {
       const needy = runs.findIndex((_, d) => d !== r && deficit(d) >= 1);
       if (needy < 0) break;
       const from = attached[r] ?? [];
