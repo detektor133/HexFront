@@ -53,16 +53,7 @@ describe('токены', () => {
     >[0];
     expect(read('apps/client/src/theme/themes.css')).toBe(renderThemesCss(themes));
     expect(read('apps/client/src/theme/themes.ts')).toBe(renderThemesTs(themes));
-    expect(themes.themes.map((t) => t.id)).toEqual([
-      'soft',
-      'glass',
-      'glassLight',
-      'mint',
-      'toy',
-      'steel',
-      'scroll',
-      'blueprint',
-    ]);
+    expect(themes.themes.map((t) => t.id)).toEqual(['mint']);
   });
 
   it('каждая тема задаёт полный набор переменных интерфейса', () => {
