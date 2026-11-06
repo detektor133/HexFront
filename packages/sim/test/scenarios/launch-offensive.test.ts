@@ -52,15 +52,16 @@ describe('наступление одной командой', () => {
     expect(army?.auto).toBe(false);
   });
 
-  it('опустевшая безымянная армия, откуда забрали отряды, исчезает', () => {
+  it('единственная армия без дела получает первый приказ сама, новая не создаётся', () => {
     const s = game();
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: '' } }]);
     const home = s.state.armies.find((a) => a.owner === 0);
     if (!home) throw new Error('нет стартовой армии');
     for (const u of s.state.units) if (u.owner === 0) u.armyId = home.id;
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 1200 } }]);
-    expect(s.state.armies.some((a) => a.id === home.id)).toBe(false);
-    expect(s.state.armies.some((a) => a.owner === 0 && a.dir !== undefined)).toBe(true);
+    const own = s.state.armies.filter((a) => a.owner === 0);
+    expect(own.map((a) => a.id)).toEqual([home.id]);
+    expect(own[0]?.dir?.target).toBe(1);
   });
 
   it('делит армию надвое по числу солдат, вторая половина — новая армия без направления', () => {

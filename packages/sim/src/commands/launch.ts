@@ -238,6 +238,21 @@ function prepare(
       : cmd.armyId === NEW_ARMY
         ? undefined
         : state.armies.find((a) => a.id === cmd.armyId);
+  // Единственная армия без дела — стартовая «Армия 1»: приказ достаётся ей, а не новой армии,
+  // иначе новая забирала бы все отряды, а стартовая исчезала и первой армией игрока становилась «Армия 2».
+  if (!army) {
+    const own = state.armies.filter((a) => a.owner === playerId);
+    const [only] = own;
+    if (
+      own.length === 1 &&
+      only !== undefined &&
+      only.dir === undefined &&
+      only.wanted === undefined &&
+      !state.plans.some((p) => p.armyId === only.id)
+    ) {
+      army = only;
+    }
+  }
   if (!army) {
     executeArmyCommand(state, playerId, { t: 'createArmy', name: '' });
     army = state.armies.at(-1);
