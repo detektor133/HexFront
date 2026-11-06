@@ -15,8 +15,9 @@ import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
+import { armyName } from './army-name.ts';
 import {
-  autoNewArmyCost,
+  autoArmy,
   autoOrder,
   isFree,
   nearestFreeArmy,
@@ -24,6 +25,7 @@ import {
   strengthVs,
 } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
+import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
@@ -47,8 +49,10 @@ export function TerritoryMenu(props: {
   readonly at: { readonly x: number; readonly y: number };
   readonly send: (cmd: Command) => void;
   readonly onClose: () => void;
+  /** Выбрать армию на карте (клик по подписи армии, которая держит эту страну). */
+  readonly onSelectArmy?: (armyId: number) => void;
 }): React.JSX.Element | null {
-  const { view, map, other, hex, at, send, onClose } = props;
+  const { view, map, other, hex, at, send, onClose, onSelectArmy } = props;
   const ref = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(120);
   useLayoutEffect(() => {
@@ -92,6 +96,7 @@ export function TerritoryMenu(props: {
   const free = nearestFreeArmy(view, map, hex);
   // Армия, уже стоящая на эту страну: от неё зависят кнопки «Оборона» и «Снять с фронта».
   const holder = neutral ? undefined : view.armies.find((a) => a.dir?.target === other);
+  const holders = neutral ? [] : view.armies.filter((a) => a.dir?.target === other);
   const strength = neutral ? null : strengthVs(view, other);
   const StrengthIcon =
     strength === 'stronger' ? IconChevronsUp : strength === 'weaker' ? IconChevronsDown : IconEqual;
@@ -126,6 +131,25 @@ export function TerritoryMenu(props: {
         </IconButton>
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
+      {!neutral && onSelectArmy && holders.length > 0 && (
+        <div className={styles.holders}>
+          {holders.map((army) => (
+            <button
+              key={army.id}
+              type="button"
+              className={styles.holder}
+              title={t('order.holder')}
+              onClick={() => {
+                onSelectArmy(army.id);
+                onClose();
+              }}
+            >
+              <span className={styles.holderDot} style={{ background: armyColor(army.number) }} />
+              <span className={styles.holderName}>{armyName(army)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className={styles.actions}>
         {neutral ? (
           <OrderSplit
@@ -133,6 +157,7 @@ export function TerritoryMenu(props: {
             icon={<IconFlag size={20} aria-hidden="true" />}
             label="menu.occupy"
             tutorial="occupy"
+            auto={free ? { kind: 'army', army: free } : null}
             disabled={free ? null : t('order.noFree')}
             armies={view.armies}
             onAuto={() => free && go(orderArmy(view, free, -1, 'attack', hex))}
@@ -146,7 +171,7 @@ export function TerritoryMenu(props: {
                 icon={<IconShield size={20} aria-hidden="true" />}
                 label="menu.holdShort"
                 tutorial="hold"
-                cost={autoNewArmyCost(view, map, other, hex)}
+                auto={autoArmy(view, map, other, hex)}
                 disabled={null}
                 armies={view.armies}
                 onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}

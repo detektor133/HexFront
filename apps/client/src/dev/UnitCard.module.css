@@ -1,5 +1,6 @@
 /* Окно отрядов: колонка карточек (по одной на армию); плашки как у фишек и ряд маленьких кнопок (HoI4). */
 .stack {
+  animation: stack-in 160ms ease-out;
   position: absolute;
   left: var(--space-lg);
   bottom: calc(var(--dock-h, 0px) + var(--space-md));
@@ -8,25 +9,48 @@
   width: 168px;
   max-height: calc(100vh - var(--dock-h, 0px) - 2 * var(--space-md));
   max-height: calc(100dvh - var(--dock-h, 0px) - 2 * var(--space-md));
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.stack::-webkit-scrollbar {
-  display: none;
-}
-
-.body {
   display: flex;
   flex-direction: column;
+}
+
+/* Окно появляется и гаснет за 160 мс (CARD_FADE_MS в MatchSurface), а не возникает и пропадает рывком. */
+@keyframes stack-in {
+  from {
+    opacity: 0;
+    translate: -8px 0;
+  }
+}
+
+.closing {
+  opacity: 0;
+  translate: -8px 0;
+  transition:
+    opacity 160ms ease-in,
+    translate 160ms ease-in;
+  pointer-events: none;
+}
+
+/* Карточки сжимаются по высоте: у каждой прокручивается только список, шапка и кнопки на месте.
+   Если не помещаются и они — прокручивается колонка. */
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: var(--space-sm);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-strong) transparent;
 }
 
 .card {
   position: relative;
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: var(--space-xs);
+  min-height: 0;
   padding: var(--space-sm);
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
@@ -38,6 +62,7 @@
 /* Заголовок карточки армии: цвет и название. */
 .head {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-xs);
   padding-right: 22px;
@@ -61,8 +86,19 @@
 
 .list {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border-strong) transparent;
+}
+
+/* Плашки не сжимаются: при нехватке места список прокручивается, а не мнёт плашки. */
+.list > .plate {
+  flex: 0 0 auto;
 }
 
 .plate {
@@ -166,6 +202,7 @@
 
 .actions {
   display: flex;
+  flex: 0 0 auto;
   gap: var(--space-xs);
 }
 

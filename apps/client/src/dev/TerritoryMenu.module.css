@@ -121,3 +121,44 @@
   color: var(--ui-ink2);
   font-size: var(--font-size-caption);
 }
+
+/* Армии, которые держат эту страну: подпись с цветом, клик выбирает армию на карте. */
+.holders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.holder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  max-width: 100%;
+  padding: 0 var(--space-sm);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface2);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.holder:hover,
+.holder:focus-visible {
+  background: var(--ui-surface);
+}
+
+.holderDot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.holderName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

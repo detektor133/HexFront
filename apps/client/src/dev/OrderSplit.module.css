@@ -157,8 +157,19 @@
 .cost {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ui-ink2);
   font-size: 11px;
   line-height: 12px;
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }

@@ -15,7 +15,8 @@ import {
 } from '@hexfront/sim';
 
 import { armyLevels, maxArmySoldiers } from './army-limit.ts';
-import { NEW_ARMY, armyCounts, orderFields } from './direction-order.ts';
+import { NEW_ARMY, ORDER_TYPES, armyCounts, orderFields, type Counts } from './direction-order.ts';
+import { countsFromShares, defaultShares, sharesFromCounts } from './force-share.ts';
 
 /** Целей-соседей дальше стольких гексов от своей границы паритет не учитывает. */
 const THREAT_RANGE = 3;
@@ -93,39 +94,67 @@ export function parityLevel(view: PlayerView, map: MapStatic, target: number): n
   return levels.find((size) => size >= enemy) ?? levels.at(-1) ?? 1;
 }
 
-/** Золото на набор солдат пехотой (состав по умолчанию). */
-export function recruitGold(soldiers: number): number {
-  return Math.round((Math.max(0, soldiers) * COST_GOLD_PER_SOLDIER.infantry) / FP);
+/** Золото на солдат состава: пехота, бронетехника и артиллерия стоят по-разному. */
+export function countsGold(counts: Counts): number {
+  return ORDER_TYPES.reduce(
+    (sum, type) => sum + Math.round((counts[type] * COST_GOLD_PER_SOLDIER[type]) / FP),
+    0,
+  );
+}
+
+/** Солдаты армии в отрядах по типам, целые. */
+function haveCounts(view: PlayerView, army: ArmyView): Counts {
+  const have: Counts = { infantry: 0, armor: 0, artillery: 0 };
+  for (const u of view.units) {
+    if (u.owner === view.playerId && u.armyId === army.id)
+      have[u.type] += Math.floor(u.soldiers / FP);
+  }
+  return have;
+}
+
+/** Состав новой армии на соседа: размер «в паритете» и доли по умолчанию 75/20/5. */
+export function newArmyCounts(view: PlayerView, map: MapStatic, target: number): Counts {
+  const soldiers = parityLevel(view, map, target);
+  return countsFromShares(soldiers, defaultShares(view, soldiers));
 }
 
 /** Золото на создание новой армии «в паритете» с соседом. */
 export function newArmyCost(view: PlayerView, map: MapStatic, target: number): number {
-  return recruitGold(parityLevel(view, map, target));
+  return countsGold(newArmyCounts(view, map, target));
 }
 
+/** Кого возьмёт автомат: готовую армию (стоящую на цель или свободную рядом) или новую с ценой. */
+export type AutoArmy =
+  | { readonly kind: 'new'; readonly cost: number }
+  | { readonly kind: 'army'; readonly army: ArmyView };
+
 /**
- * Автомат создаст новую армию на соседа: армии на него ещё нет и свободной рядом тоже.
- * @returns золото на набор или null, если возьмётся готовая армия
+ * Армия, которую выберет автоподбор приказа на соседа (так же, как в autoOrder).
+ * @returns готовая армия или новая с золотом на набор
  */
-export function autoNewArmyCost(
+export function autoArmy(
   view: PlayerView,
   map: MapStatic,
   target: number,
   nearHex: number,
-): number | null {
-  if (view.armies.some((a) => a.dir?.target === target)) return null;
-  if (nearestFreeArmy(view, map, nearHex)) return null;
-  return newArmyCost(view, map, target);
+): AutoArmy {
+  const current = view.armies.find((a) => a.dir?.target === target);
+  const army = current ?? nearestFreeArmy(view, map, nearHex);
+  return army ? { kind: 'army', army } : { kind: 'new', cost: newArmyCost(view, map, target) };
 }
 
-/** Золото, чтобы довести армию до её предела: набор недостающих солдат. */
-export function armyFillCost(view: PlayerView, army: ArmyView): number {
-  const have = Math.floor(
-    view.units
-      .filter((u) => u.owner === view.playerId && u.armyId === army.id)
-      .reduce((sum, u) => sum + u.soldiers, 0) / FP,
-  );
-  return recruitGold((army.wanted ?? 0) - have);
+/**
+ * Золото, чтобы довести армию до заданного размера с её долями типов: докупается только недостающее
+ * по каждому типу (уже стоящие отряды не оплачиваются снова).
+ */
+export function armyResizeCost(view: PlayerView, army: ArmyView, size: number): number {
+  const wanted = countsFromShares(size, sharesFromCounts(armyCounts(view, army)));
+  const have = haveCounts(view, army);
+  return countsGold({
+    infantry: Math.max(0, wanted.infantry - have.infantry),
+    armor: Math.max(0, wanted.armor - have.armor),
+    artillery: Math.max(0, wanted.artillery - have.artillery),
+  });
 }
 
 /** Приказ армии на цель в нужном режиме: размер и состав армии сохраняются. */
@@ -154,8 +183,7 @@ export function orderNewArmy(
   return {
     t: mode === 'hold' ? 'holdBorder' : 'launchOffensive',
     target,
-    soldiers: parityLevel(view, map, target),
-    armyId: NEW_ARMY,
+    ...orderFields(newArmyCounts(view, map, target), NEW_ARMY),
   };
 }
 

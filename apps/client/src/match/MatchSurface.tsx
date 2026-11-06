@@ -21,6 +21,7 @@ import { UnitCard } from '../dev/UnitCard.tsx';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
 import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
+import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
@@ -35,6 +36,9 @@ interface MatchSurfaceProps {
 
 /** Высота тулбара приказов армии с отступом, px: карточки гекса и отряда встают выше него. */
 const ARMY_TOOLS_H = 64;
+
+/** Время затухания окна отрядов, мс (как в UnitCard.module.css). */
+const CARD_FADE_MS = 160;
 
 export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   tutorial = null,
@@ -125,6 +129,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     groupedCardFixture && fixtureSourceUnit
       ? { hex: null, units: [2_147_483_646, 2_147_483_647], target: null }
       : sb.picked;
+  // Окно отрядов закрывается плавно: после снятия выбора его ещё показывают на время затухания.
+  const unitCard = useLingering(
+    cardView && cardPicked.units.length > 0 && !sb.tool
+      ? { view: cardView, picked: cardPicked }
+      : null,
+    CARD_FADE_MS,
+  );
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   // Тулбар приказов стоит над нижней панелью вне её высоты; карточкам над ней нужен запас под него.
@@ -148,7 +159,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     leaderboardRows: view?.ranking?.length ?? 0,
     ...(leaderboardSize === undefined ? {} : { leaderboardSize }),
     cardHeight: cardH,
-    cardOpen: cardPicked.units.length > 0 || sb.picked.hex !== null,
+    cardOpen: unitCard.value !== null || sb.picked.hex !== null,
     popupOpen,
     ...(taxAnchor === undefined ? {} : { popupAnchorX: taxAnchor.x, popupAnchorY: taxAnchor.y }),
     ...(taxPopupSize === undefined ? {} : { popupSize: taxPopupSize }),
@@ -307,6 +318,17 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           at={sb.menu}
           send={sb.send}
           onClose={sb.closeMenu}
+          onSelectArmy={(armyId) => {
+            sb.setArmy(armyId);
+            sb.pick({
+              hex: null,
+              units: view.units
+                .filter((u) => u.owner === view.playerId && u.armyId === armyId)
+                .map((u) => u.id),
+              target: null,
+            });
+            sb.focusArmy(armyId);
+          }}
         />
       )}
       {view && (
@@ -372,11 +394,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {cardView && map && styleFor('card') && cardPicked.units.length > 0 && !sb.tool && (
+      {unitCard.value && map && styleFor('card') && (
         <UnitCard
-          view={cardView}
+          view={unitCard.value.view}
           map={map}
-          picked={cardPicked}
+          picked={unitCard.value.picked}
+          closing={unitCard.closing}
           send={sb.send}
           onPick={sb.pick}
           onHeight={setCardH}

@@ -5,7 +5,7 @@ import type { Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import styles from './BorderSignals.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
-import { autoNewArmyCost, autoOrder, contacts, orderArmy } from './army-order.ts';
+import { autoArmy, autoOrder, contacts, orderArmy } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -138,7 +138,7 @@ export function BorderSignals(props: {
                 icon={<IconShield size={18} aria-hidden="true" />}
                 label="menu.holdShort"
                 tutorial="signal-hold"
-                cost={autoNewArmyCost(view, map, other, hex)}
+                auto={autoArmy(view, map, other, hex)}
                 disabled={null}
                 armies={view.armies}
                 onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}

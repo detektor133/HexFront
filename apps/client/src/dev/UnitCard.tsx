@@ -125,6 +125,8 @@ export function UnitCard(props: {
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
   onHeight?: (px: number) => void;
+  /** Окно закрывается: плавно гаснет и не принимает нажатий. */
+  closing?: boolean;
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const cardRef = useRef<HTMLElement>(null);
@@ -231,7 +233,12 @@ export function UnitCard(props: {
     </div>
   ) : null;
   return (
-    <section ref={cardRef} className={styles.stack} style={props.style} aria-label={title}>
+    <section
+      ref={cardRef}
+      className={`${styles.stack} ${props.closing ? styles.closing : ''}`}
+      style={props.style}
+      aria-label={title}
+    >
       <div ref={contentRef} className={styles.body}>
         {groups.map((group, index) => (
           <div key={group.key} className={styles.card}>

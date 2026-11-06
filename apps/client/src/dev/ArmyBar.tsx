@@ -7,7 +7,7 @@ import {
   IconStarFilled,
   IconSwords,
 } from '@tabler/icons-react';
-import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
+import { type WheelEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   FP,
@@ -33,7 +33,7 @@ import {
   type StepPct,
 } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
-import { armyFillCost } from './army-order.ts';
+import { armyResizeCost } from './army-order.ts';
 import { armyCounts, orderFields } from './direction-order.ts';
 import { countsFromShares, sharesFromCounts } from './force-share.ts';
 import type { Picked } from './sandbox-selection.ts';
@@ -42,7 +42,6 @@ import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
-import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const FULL = 1000;
@@ -186,8 +185,6 @@ function Tool(props: {
   disabled?: string | null;
   active?: boolean;
   tutorial?: string;
-  /** Золото, которого стоит приказ (довести армию до предела): мелко под значком. */
-  cost?: number;
 }): React.JSX.Element {
   const label = props.disabled ?? t(props.label);
   return (
@@ -201,12 +198,6 @@ function Tool(props: {
       onClick={props.onClick}
     >
       {props.glyph ?? <Icon name={props.icon ?? ''} />}
-      {props.cost ? (
-        <span className={styles.toolCost}>
-          <GoldIcon />
-          {props.cost}
-        </span>
-      ) : null}
     </IconButton>
   );
 }
@@ -436,6 +427,9 @@ export function ArmyBar(props: {
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  // Армий больше, чем влезает: появляется настоящая полоса прокрутки (иначе лента не перехватывает нажатия).
+  const [overflow, setOverflow] = useState(false);
   const [compAnchor, setCompAnchor] = useState<DOMRect | null>(null);
   const [stepPct, setStepPct] = useState<StepPct>(readStep);
   const chooseStep = (pct: StepPct): void => {
@@ -446,6 +440,16 @@ export function ArmyBar(props: {
       // Хранилище закрыто: выбор шага действует до перезагрузки.
     }
   };
+  useLayoutEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const measure = (): void => setOverflow(strip.scrollWidth > strip.clientWidth + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(strip);
+    if (strip.firstElementChild) ro.observe(strip.firstElementChild);
+    return () => ro.disconnect();
+  }, []);
   const { onHeight } = props;
   useLayoutEffect(() => {
     const el = contentRef.current;
@@ -514,6 +518,12 @@ export function ArmyBar(props: {
     event.currentTarget.scrollLeft += delta;
   };
   const reserve = mine.filter((u) => u.armyId === null);
+  // Выбранная армия всегда в видимой части ленты, даже если её выбрали на карте или клавишей.
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector('[aria-pressed="true"]')
+      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [selected]);
   return (
     <div className={styles.dock} style={props.style}>
       <div className={styles.content} ref={contentRef}>
@@ -523,7 +533,6 @@ export function ArmyBar(props: {
               glyph={<IconShield size={18} aria-hidden="true" />}
               tutorial="army-hold"
               label="menu.hold"
-              cost={armyFillCost(view, army)}
               onClick={() => holdArmy(army)}
               active={props.holdPicking || army.dir?.mode === 'hold'}
             />
@@ -531,7 +540,6 @@ export function ArmyBar(props: {
               glyph={<IconSwords size={18} aria-hidden="true" />}
               tutorial="army-attack"
               label="menu.attack"
-              cost={armyFillCost(view, army)}
               onClick={() => attackArmy(army)}
               active={army.dir?.mode === 'attack'}
               disabled={attackBlocked(army)}
@@ -547,6 +555,7 @@ export function ArmyBar(props: {
               onStep={chooseStep}
               onPlus={() => resize(army, 1)}
               disabled={resizeBlocked(army, 1)}
+              cost={armyResizeCost(view, army, stepSize(baseSize(army, 1), stepPct, 1, limitMax))}
               tutorial="army-stronger"
             />
             <Tool
@@ -596,7 +605,12 @@ export function ArmyBar(props: {
             onClose={() => setCompAnchor(null)}
           />
         )}
-        <div className={styles.strip} onWheel={onStripWheel}>
+        <div
+          ref={stripRef}
+          className={styles.strip}
+          data-overflow={overflow}
+          onWheel={onStripWheel}
+        >
           <div className={styles.stripContent}>
             {view.armies.map((a) => {
               const units = mine.filter((u) => u.armyId === a.id);

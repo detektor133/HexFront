@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import styles from './StepPlus.module.css';
 import { STEP_CHOICES, type StepPct } from './army-limit.ts';
 import { t } from '../i18n/dict.ts';
+import { GoldIcon } from '../ui/gold-icon.tsx';
 
 /**
  * «Усилить»: нажатие добавляет выбранную долю размера армии, стрелка рядом выбирает долю по
@@ -16,6 +17,8 @@ export function StepPlus(props: {
   /** Почему усилить нельзя (кнопка серая); null — можно. */
   readonly disabled: string | null;
   readonly tutorial?: string;
+  /** Золото, которого стоит нажатие (докупка недостающих солдат); мелко под процентом. */
+  readonly cost?: number | undefined;
 }): React.JSX.Element {
   const { step, onStep, onPlus, disabled } = props;
   const [open, setOpen] = useState(false);
@@ -35,12 +38,20 @@ export function StepPlus(props: {
         className={styles.plus}
         data-tutorial={props.tutorial}
         disabled={disabled !== null}
-        title={disabled ?? `${t('army.stronger')} +${step}%`}
+        title={disabled ?? `${t('army.stronger')} +${step}%${props.cost ? ` · ${props.cost}` : ''}`}
         aria-label={`${t('army.stronger')} +${step}%`}
         onClick={onPlus}
       >
-        <IconPlus size={18} aria-hidden="true" />
-        <span className={styles.pct}>{step}%</span>
+        <span className={styles.top}>
+          <IconPlus size={18} aria-hidden="true" />
+          <span className={styles.pct}>{step}%</span>
+        </span>
+        {props.cost ? (
+          <span className={styles.cost}>
+            <GoldIcon />
+            {props.cost}
+          </span>
+        ) : null}
       </button>
       <button
         type="button"

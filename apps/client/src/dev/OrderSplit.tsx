@@ -5,7 +5,7 @@ import type { ArmyView } from '@hexfront/sim';
 
 import styles from './OrderSplit.module.css';
 import { armyName } from './army-name.ts';
-import { isFree } from './army-order.ts';
+import { isFree, type AutoArmy } from './army-order.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { armyColor } from '../theme/colors.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
@@ -26,8 +26,8 @@ export function OrderSplit(props: {
   readonly tutorial?: string;
   /** «Призрак»: фон и рамка как у кнопок панели, без заливки цветом; по умолчанию — заливка. */
   readonly tone?: 'fill' | 'ghost';
-  /** Золото на набор новой армии: мелким шрифтом под подписью; нет — армия уже есть. */
-  readonly cost?: number | null | undefined;
+  /** Кого возьмёт автоподбор: мелко под подписью — «Новая» с золотом или цвет и имя армии. */
+  readonly auto?: AutoArmy | null | undefined;
   /** Малый вид: только значок и стрелка. */
   readonly compact?: boolean;
 }): React.JSX.Element {
@@ -45,7 +45,7 @@ export function OrderSplit(props: {
   return (
     <div
       ref={ref}
-      className={`${styles.split} ${props.compact ? styles.compact : ''} ${props.tone === 'ghost' ? styles.ghost : ''} ${props.cost ? styles.withCost : ''}`}
+      className={`${styles.split} ${props.compact ? styles.compact : ''} ${props.tone === 'ghost' ? styles.ghost : ''} ${props.auto ? styles.withCost : ''}`}
     >
       <button
         type="button"
@@ -55,16 +55,27 @@ export function OrderSplit(props: {
         title={disabled ?? t(label)}
         onClick={onAuto}
       >
-        {props.cost ? (
+        {props.auto ? (
           <span className={styles.stack}>
             <span className={styles.line}>
               {icon}
               {!props.compact && <span>{t(label)}</span>}
             </span>
-            <span className={styles.cost} title={t('order.cost')}>
-              <GoldIcon />
-              {props.cost}
-            </span>
+            {props.auto.kind === 'new' ? (
+              <span className={styles.cost} title={t('order.cost')}>
+                {t('order.newArmy')}
+                <GoldIcon />
+                {props.auto.cost}
+              </span>
+            ) : (
+              <span className={styles.cost} title={t('order.takes')}>
+                <span
+                  className={styles.dot}
+                  style={{ background: armyColor(props.auto.army.number) }}
+                />
+                {armyName(props.auto.army)}
+              </span>
+            )}
           </span>
         ) : (
           <>
