@@ -15,11 +15,8 @@ import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
 import { limitCommand, maxArmySoldiers } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
-import { armyCounts, type Counts } from './direction-order.ts';
+import { armyCounts, orderFields, type Counts } from './direction-order.ts';
 import { sharesFromCounts } from './force-share.ts';
-import { offensiveButtons } from './offensive-buttons.ts';
-import type { Tool as PlanTool } from './plan-draft.ts';
-import type { ToolState } from './plan-tools.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
@@ -150,7 +147,9 @@ function Icon(props: { name: string; className?: string | undefined }): React.JS
 }
 
 function Tool(props: {
-  icon: string;
+  icon?: string;
+  /** Готовый значок вместо набора ICONS. */
+  glyph?: React.ReactNode;
   label: MessageKey;
   onClick: () => void;
   disabled?: string | null;
@@ -168,7 +167,7 @@ function Tool(props: {
       disabled={Boolean(props.disabled)}
       onClick={props.onClick}
     >
-      <Icon name={props.icon} />
+      {props.glyph ?? <Icon name={props.icon ?? ''} />}
     </IconButton>
   );
 }
@@ -187,28 +186,6 @@ function Meter(props: {
         <span style={{ width: `${pct}%`, background: props.color }} />
       </span>
     </span>
-  );
-}
-
-// ▶ «Начать» и ■ «Стоп» справа на карточке армии (art/ui.md); неактивная — приглушена.
-function RunButton(props: {
-  icon: 'start' | 'stop';
-  label: MessageKey;
-  /** Почему кнопка приглушена; null — без пояснения. */
-  hint: string | null;
-  enabled: boolean;
-  onClick: () => void;
-}): React.JSX.Element {
-  return (
-    <IconButton
-      type="button"
-      className={styles.run}
-      label={props.hint ?? t(props.label)}
-      disabled={!props.enabled}
-      onClick={props.onClick}
-    >
-      <Icon name={props.icon} className={styles.runIcon} />
-    </IconButton>
   );
 }
 
@@ -253,18 +230,13 @@ function ArmyCard(props: {
   selected: boolean;
   /** Выбрана часть отрядов армии — тонкая рамка (07-controls.md, «Что выбрано»). */
   partial: boolean;
-  /** Линия наступления армии: ▶/■ на карточке; null — кнопок нет. */
-  run: { readonly start: boolean; readonly stop: boolean } | null;
-  /** Подсказка приглушённой ▶ (у армии с auto без фронта). */
-  runHint: string | null;
-  onRun: (start: boolean) => void;
   onRename: (name: string) => void;
   onClick: () => void;
   /** ПКМ: если выбраны отряды — перевести их в эту армию, иначе выбрать армию. */
   onContextAction: () => void;
   onDoubleClick?: () => void;
 }): React.JSX.Element {
-  const { stats, run } = props;
+  const { stats } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
   const [limitAnchor, setLimitAnchor] = useState<DOMRect | null>(null);
@@ -391,31 +363,6 @@ function ArmyCard(props: {
           onClose={() => setLimitAnchor(null)}
         />
       )}
-      {/* Колонка ▶ ■ только у армии с линией наступления. */}
-      {run && (
-        <span className={styles.side}>
-          <span className={styles.runs}>
-            {
-              <>
-                <RunButton
-                  icon="start"
-                  label="plan.start"
-                  hint={run.start ? null : props.runHint}
-                  enabled={run.start}
-                  onClick={() => props.onRun(true)}
-                />
-                <RunButton
-                  icon="stop"
-                  label="plan.stop"
-                  hint={null}
-                  enabled={run.stop}
-                  onClick={() => props.onRun(false)}
-                />
-              </>
-            }
-          </span>
-        </span>
-      )}
     </div>
   );
 }
@@ -437,8 +384,10 @@ export function ArmyBar(props: {
   groups?: readonly number[];
   send: (cmd: Command) => void;
   onPick: (p: Picked) => void;
-  tool: ToolState | null;
-  onTool: (t: ToolState | null) => void;
+  /** Включён выбор страны для «Держать» на карте. */
+  holdPicking: boolean;
+  /** Включает выбор страны для «Держать» у армии; null — выключает. */
+  onHoldPick: (armyId: number | null) => void;
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
@@ -460,14 +409,28 @@ export function ArmyBar(props: {
   // планов (07-controls.md, «Что выбрано»).
   const only = props.partial.length === 1 ? props.partial[0] : undefined;
   const army = view.armies.find((a) => a.id === (selected ?? only));
-  const whole = army !== undefined && army.id === selected;
-  const needWhole = whole ? null : t('plan.needWholeArmy');
-  const plan = army ? view.plans.find((p) => p.armyId === army.id) : undefined;
-  const active = (tool: PlanTool): boolean =>
-    props.tool?.tool === tool && props.tool.armyId === army?.id;
-  // Повторное нажатие на включённый инструмент — выключить (как в HoI4).
-  const use = (tool: PlanTool): void =>
-    army ? props.onTool(active(tool) ? null : { tool, armyId: army.id }) : undefined;
+  // «Наступать» — по всем фронтам армии с воюющей страной (цель приказа); без войны серая.
+  const warWith = (target: number): boolean =>
+    target >= 0 && (view.diplomacy?.relations[target] ?? 'war') === 'war';
+  const attackBlocked = (a: ArmyView): string | null =>
+    a.dir !== undefined && warWith(a.dir.target) ? null : t('army.attackNeedWar');
+  const attackArmy = (a: ArmyView): void => {
+    if (a.dir === undefined || !warWith(a.dir.target)) return;
+    send({
+      t: 'launchOffensive',
+      target: a.dir.target,
+      ...orderFields(armyCounts(view, a), a.id),
+    });
+  };
+  // «Держать»: наступающая армия переходит в оборону на ту же цель; без приказа (или на ничьей
+  // земле) включается выбор страны на карте.
+  const holdArmy = (a: ArmyView): void => {
+    if (a.dir?.mode === 'attack' && a.dir.target >= 0) {
+      send({ t: 'holdBorder', target: a.dir.target, ...orderFields(armyCounts(view, a), a.id) });
+      return;
+    }
+    props.onHoldPick(props.holdPicking ? null : a.id);
+  };
   const select = (armyId: number, units: readonly UnitView[]): void => {
     const off = armyId === selected;
     props.onSelect(off ? null : armyId);
@@ -480,44 +443,25 @@ export function ArmyBar(props: {
     event.currentTarget.scrollLeft += delta;
   };
   const reserve = mine.filter((u) => u.armyId === null);
-  const runOf = (a: ArmyView) => {
-    const p = view.plans.find((x) => x.armyId === a.id);
-    const front = p?.kind === 'front';
-    const auto = a.auto ? { front, wanted: front && p.startWanted } : undefined;
-    return offensiveButtons(front ? p.offensive : null, auto);
-  };
   return (
     <div className={styles.dock} style={props.style}>
       <div className={styles.content} ref={contentRef}>
         {army && (
           <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
             <Tool
-              icon="front"
-              label="plan.front"
-              onClick={() => use('front')}
-              active={active('front')}
-              disabled={needWhole}
+              glyph={<IconShield size={18} aria-hidden="true" />}
+              tutorial="army-hold"
+              label="menu.hold"
+              onClick={() => holdArmy(army)}
+              active={props.holdPicking || army.dir?.mode === 'hold'}
             />
             <Tool
-              icon="offensive"
-              label="plan.offensive"
-              onClick={() => use('offensive')}
-              active={active('offensive')}
-              disabled={needWhole ?? (plan?.kind === 'front' ? null : t('plan.needFront'))}
-            />
-            <Tool
-              icon="line"
-              label="plan.line"
-              onClick={() => use('line')}
-              active={active('line')}
-              disabled={needWhole}
-            />
-            <Tool
-              icon="erase"
-              label="plan.erase"
-              onClick={() => use('erase')}
-              active={active('erase')}
-              disabled={needWhole ?? (view.plans.length > 0 ? null : t('plan.nothingToErase'))}
+              glyph={<IconSwords size={18} aria-hidden="true" />}
+              tutorial="army-attack"
+              label="menu.attack"
+              onClick={() => attackArmy(army)}
+              active={army.dir?.mode === 'attack'}
+              disabled={attackBlocked(army)}
             />
             <Tool
               icon="split"
@@ -575,9 +519,6 @@ export function ArmyBar(props: {
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}
-                  run={runOf(a)}
-                  runHint={t('plan.needFront')}
-                  onRun={(go) => send({ t: go ? 'startOffensive' : 'stopOffensive', armyId: a.id })}
                   onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
                   onClick={() => select(a.id, units)}
                   onContextAction={() => {

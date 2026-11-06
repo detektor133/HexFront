@@ -314,8 +314,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           groups={sb.groupDigits}
           send={sb.send}
           onPick={sb.pick}
-          tool={sb.tool}
-          onTool={sb.setTool}
+          holdPicking={sb.holdPick !== null}
+          onHoldPick={sb.setHoldPick}
           style={styleFor('bottom-panel')}
         />
       )}

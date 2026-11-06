@@ -614,8 +614,8 @@ export function SandboxSurface({ debug = false }: { debug?: boolean } = {}): Rea
           send={sb.send}
           onPick={sb.pick}
           pickedUnits={sb.picked.units}
-          tool={sb.tool}
-          onTool={sb.setTool}
+          holdPicking={false}
+          onHoldPick={() => undefined}
         />
       )}
       {(loaded === 'error' || sb.error) && (

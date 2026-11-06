@@ -14,6 +14,7 @@ import {
 
 import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
+import { armyCounts, orderFields } from '../dev/direction-order.ts';
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
 import { applyHudPreview, readHudPreview } from '../dev/hud-preview.ts';
@@ -193,6 +194,9 @@ interface Sandbox {
   readonly mapModes: MapModes;
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
+  /** Армия, для которой «Держать» ждёт выбора страны на карте. */
+  readonly holdPick: number | null;
+  setHoldPick(armyId: number | null): void;
   readonly army: number | null;
   readonly fog: boolean;
   readonly paused: boolean;
@@ -244,6 +248,12 @@ export function useSandbox(
   useEffect(() => groups.subscribe(bumpGroups), [groups]);
   const armyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
+  const holdPickRef = useRef<number | null>(null);
+  const [holdPick, setHoldPickState] = useState<number | null>(null);
+  const setHoldPick = useCallback((armyId: number | null) => {
+    holdPickRef.current = armyId;
+    setHoldPickState(armyId);
+  }, []);
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -497,6 +507,24 @@ export function useSandbox(
     ): void => {
       const current = viewRef.current;
       setMenu(null);
+      // «Держать» без приказа: следующий тап по чужой стране ставит армии фронт на её границе.
+      const holdArmy = holdPickRef.current;
+      if (holdArmy !== null) {
+        setHoldPick(null);
+        const owner =
+          current && inBounds(h, map.width, map.height)
+            ? (current.hexes.owner[hexId(h, map.width)] ?? -1)
+            : -1;
+        const army = current?.armies.find((a) => a.id === holdArmy);
+        if (current && army && owner >= 0 && owner !== current.playerId) {
+          match.send({
+            t: 'holdBorder',
+            target: owner,
+            ...orderFields(armyCounts(current, army), army.id),
+          });
+        }
+        return;
+      }
       if (!current || !inBounds(h, map.width, map.height)) {
         return toolRef.current ? undefined : pick(NOTHING_PICKED);
       }
@@ -625,10 +653,11 @@ export function useSandbox(
       latestEventHex: () => eventsRef.current.at(-1)?.hex ?? null,
       centerOnHex: (hex) => mapViewRef.current?.centerOn(hexFromId(hex, map.width)),
       cancelMap: () => mapViewRef.current?.cancel(),
-      toolActive: () => toolRef.current !== null,
+      toolActive: () => toolRef.current !== null || holdPickRef.current !== null,
       cancelTool: () => {
         input.cancel();
         setTool(null);
+        setHoldPick(null);
       },
       clearPick: () => {
         pick(NOTHING_PICKED);
@@ -670,6 +699,8 @@ export function useSandbox(
     mapModes,
     lastReject,
     tool,
+    holdPick,
+    setHoldPick,
     army,
     send,
     fog,
