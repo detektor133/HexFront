@@ -3,7 +3,7 @@
 // с ними, или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
-import { ARMY_NAME_MAX, dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
+import { dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
 import { pickAxes, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
@@ -171,12 +171,6 @@ export function validateHold(
   return validateDirection(state, playerId, cmd, { needWar: false, minSoldiers: 0 });
 }
 
-const armyName = (state: MatchState, target: number): string =>
-  (target === NEUTRAL_TARGET
-    ? 'Ничья земля'
-    : (state.players[target]?.name ?? `${target + 1}`)
-  ).slice(0, ARMY_NAME_MAX);
-
 /** Армия направления игрока на цель: ищется по цели, а не по имени — имя игрок может поменять. */
 export function directionArmy(
   state: MatchState,
@@ -245,7 +239,7 @@ function prepare(
         ? undefined
         : state.armies.find((a) => a.id === cmd.armyId);
   if (!army) {
-    executeArmyCommand(state, playerId, { t: 'createArmy', name: armyName(state, cmd.target) });
+    executeArmyCommand(state, playerId, { t: 'createArmy', name: '' });
     army = state.armies.at(-1);
   }
   if (!army) return null;

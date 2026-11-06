@@ -356,7 +356,7 @@ const ru = {
   'forecast.losses': 'потери',
   'army.title': 'Армии',
   'army.new': 'Новая армия',
-  'army.numbered': '{n}-я армия',
+  'army.numbered': 'Армия {n}',
   'army.units': 'отр.',
   'army.select': 'Выбрать',
   'army.reserve': 'Резерв',
