@@ -1,4 +1,13 @@
-import { IconFlag, IconShield, IconSwords, IconX } from '@tabler/icons-react';
+import {
+  IconChevronsDown,
+  IconChevronsUp,
+  IconEqual,
+  IconFlag,
+  IconShield,
+  IconShieldOff,
+  IconSwords,
+  IconX,
+} from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
@@ -6,7 +15,7 @@ import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
-import { autoOrder, isFree, nearestFreeArmy, orderArmy } from './army-order.ts';
+import { autoOrder, isFree, nearestFreeArmy, orderArmy, strengthVs } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -74,6 +83,11 @@ export function TerritoryMenu(props: {
     (army: ArmyView): void =>
       go(orderArmy(view, army, other, mode, neutral ? hex : undefined));
   const free = nearestFreeArmy(view, map, hex);
+  // Армия, уже стоящая на эту страну: от неё зависят кнопки «Оборона» и «Снять с фронта».
+  const holder = neutral ? undefined : view.armies.find((a) => a.dir?.target === other);
+  const strength = neutral ? null : strengthVs(view, other);
+  const StrengthIcon =
+    strength === 'stronger' ? IconChevronsUp : strength === 'weaker' ? IconChevronsDown : IconEqual;
   return (
     <div
       ref={ref}
@@ -92,6 +106,14 @@ export function TerritoryMenu(props: {
           }}
         />
         <span className={styles.name}>{name}</span>
+        {strength && (
+          <span
+            className={`${styles.strength} ${styles[strength]}`}
+            title={t(`menu.strength.${strength}`)}
+          >
+            <StrengthIcon size={18} aria-hidden="true" />
+          </span>
+        )}
         <IconButton label={t('menu.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} aria-hidden="true" />
         </IconButton>
@@ -111,21 +133,44 @@ export function TerritoryMenu(props: {
           />
         ) : (
           <>
-            <OrderSplit
-              tone="ghost"
-              icon={<IconShield size={20} aria-hidden="true" />}
-              label="menu.holdShort"
-              tutorial="hold"
-              disabled={null}
-              armies={view.armies}
-              onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}
-              onPick={orderBy('hold')}
-            />
+            {holder === undefined ? (
+              <OrderSplit
+                tone="ghost"
+                icon={<IconShield size={20} aria-hidden="true" />}
+                label="menu.holdShort"
+                tutorial="hold"
+                disabled={null}
+                armies={view.armies}
+                onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}
+                onPick={orderBy('hold')}
+              />
+            ) : holder.dir?.mode === 'attack' ? (
+              <button
+                type="button"
+                className={styles.ghostButton}
+                data-tutorial="hold"
+                onClick={() => go(orderArmy(view, holder, other, 'hold'))}
+              >
+                <IconShield size={20} aria-hidden="true" />
+                <span>{t('menu.defend')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.ghostButton}
+                data-tutorial="hold"
+                onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
+              >
+                <IconShieldOff size={20} aria-hidden="true" />
+                <span>{t('menu.unfront')}</span>
+              </button>
+            )}
             <button
               type="button"
               className={styles.attackButton}
               data-tutorial="attack"
               disabled={!atWar}
+              aria-pressed={holder?.dir?.mode === 'attack'}
               title={atWar ? t('menu.attack') : t('army.attackNeedWar')}
               onClick={() => go(autoOrder(view, map, other, 'attack', hex))}
             >

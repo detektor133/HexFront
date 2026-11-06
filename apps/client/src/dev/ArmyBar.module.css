@@ -285,19 +285,33 @@
   padding: var(--space-sm);
 }
 
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-xs);
-}
-
 .name {
   overflow: hidden;
   font-size: var(--font-size-label);
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Строка названия: колонки фиксированной ширины — приказ, звёзды, тревога; значки не ездят. */
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 40px 22px;
+  align-items: center;
+  gap: 4px;
+}
+
+.slotOrder,
+.slotStars,
+.slotAlert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+}
+
+.slotStars {
+  justify-content: flex-start;
 }
 
 /* Название армии: без карандаша, переименование двойным кликом. */
@@ -328,6 +342,7 @@
 
 /* Число солдат под названием: крупно, цифры одной ширины, чтобы карточка не ездила. */
 .count {
+  min-width: 3.4ch;
   font-size: 22px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -433,13 +448,8 @@
 }
 
 .stuckIcon {
-  width: var(--space-lg);
-  height: 16px;
-  fill: none;
-  stroke: var(--status-warning);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  display: inline-flex;
+  color: var(--status-warning);
 }
 
 .reserve {

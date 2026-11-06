@@ -1,6 +1,7 @@
 import {
   IconAdjustmentsHorizontal,
   IconFlag,
+  IconHourglass,
   IconMinus,
   IconShield,
   IconStarFilled,
@@ -20,6 +21,7 @@ import {
 
 import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
+import { RollNumber } from './RollNumber.tsx';
 import { StepPlus } from './StepPlus.tsx';
 import {
   DEFAULT_STEP,
@@ -229,6 +231,42 @@ function OrderBadge(props: {
   );
 }
 
+/**
+ * Одно тревожное состояние армии в фиксированном месте карточки, по важности: котёл, истощение,
+ * бой, наступление без продвижения («упёрлись»). Остальные видны в подсказках.
+ */
+function alertOf(stats: ArmyStats, stuck: boolean): React.JSX.Element | null {
+  if (stats.encircled > 0) {
+    return (
+      <span title={t('army.encircled')}>
+        <Icon name="encircled" className={styles.encircledIcon} />
+      </span>
+    );
+  }
+  if (stats.starving > 0) {
+    return (
+      <span title={t('army.starving').replace('{n}', String(stats.starving))}>
+        <Icon name="warn" className={styles.alarmIcon} />
+      </span>
+    );
+  }
+  if (stats.fighting) {
+    return (
+      <span title={t('army.fighting')}>
+        <Icon name="fighting" className={styles.fightingIcon} />
+      </span>
+    );
+  }
+  if (stuck) {
+    return (
+      <span title={t('army.stuck')} className={styles.stuckIcon}>
+        <IconHourglass size={18} aria-hidden="true" />
+      </span>
+    );
+  }
+  return null;
+}
+
 function ArmyCard(props: {
   rawName: string;
   name: string;
@@ -311,41 +349,35 @@ function ArmyCard(props: {
                 {props.name}
               </span>
             )}
-            <OrderBadge dir={props.dir} />
-            {props.stars > 0 && (
-              <span className={styles.stars} title={t('army.stars')}>
-                {Array.from({ length: props.stars }, (_, i) => (
-                  <IconStarFilled key={i} size={12} aria-hidden="true" />
-                ))}
-              </span>
-            )}
-            {stats.fighting && (
-              <span title={t('army.fighting')}>
-                <Icon name="fighting" className={styles.fightingIcon} />
-              </span>
-            )}
-            {stats.encircled > 0 && (
-              <span title={t('army.encircled')}>
-                <Icon name="encircled" className={styles.encircledIcon} />
-              </span>
-            )}
-            {stats.starving > 0 && (
-              <span title={t('army.starving').replace('{n}', String(stats.starving))}>
-                <Icon name="warn" className={styles.alarmIcon} />
-              </span>
-            )}
-            {props.stuck && (
-              <span title={t('army.stuck')}>
-                <Icon name="stuck" className={styles.stuckIcon} />
-              </span>
-            )}
+            <span className={styles.slotOrder}>
+              <OrderBadge dir={props.dir} />
+            </span>
+            <span className={styles.slotStars}>
+              {props.stars > 0 && (
+                <span className={styles.stars} title={t('army.stars')}>
+                  {Array.from({ length: props.stars }, (_, i) => (
+                    <IconStarFilled key={i} size={12} aria-hidden="true" />
+                  ))}
+                </span>
+              )}
+            </span>
+            <span className={styles.slotAlert}>{alertOf(props.stats, props.stuck)}</span>
           </span>
           <span className={styles.countRow}>
-            <span className={styles.count}>{formatSoldiers(stats.soldiers)}</span>
+            <RollNumber
+              kind="main"
+              className={styles.count}
+              value={stats.soldiers}
+              text={formatSoldiers(stats.soldiers)}
+            />
             {props.wanted !== undefined && (
-              <span className={styles.limitText} title={t('army.limit')}>
-                {`→ ${props.wanted}`}
-              </span>
+              <RollNumber
+                kind="limit"
+                className={styles.limitText}
+                value={props.wanted}
+                text={`→ ${formatSoldiers(props.wanted * FP)}`}
+                title={t('army.limit')}
+              />
             )}
           </span>
         </span>

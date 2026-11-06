@@ -138,3 +138,22 @@ export function autoOrder(
   const army = current ?? nearestFreeArmy(view, map, nearHex);
   return army ? orderArmy(view, army, target, mode) : orderNewArmy(view, map, target, mode);
 }
+
+/** Во сколько раз счёт соседа должен отличаться от нашего, чтобы считать его сильнее или слабее. */
+const STRENGTH_GAP = 1.4;
+
+/**
+ * Приблизительная сила соседа относительно нас по очкам рейтинга (города, земля, войска): точных
+ * войск врага игрок не знает, ему нужен лишь знак «полезешь на сильного».
+ * @returns null, если рейтинга нет
+ */
+export function strengthVs(view: PlayerView, other: number): 'stronger' | 'even' | 'weaker' | null {
+  const ranking = view.ranking;
+  const mine = ranking?.find((r) => r.id === view.playerId)?.score;
+  const theirs = ranking?.find((r) => r.id === other)?.score;
+  if (mine === undefined || theirs === undefined) return null;
+  const mineSafe = Math.max(1, mine);
+  if (theirs > mineSafe * STRENGTH_GAP) return 'stronger';
+  if (theirs * STRENGTH_GAP < mineSafe) return 'weaker';
+  return 'even';
+}
