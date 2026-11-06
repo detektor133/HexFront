@@ -274,7 +274,7 @@ export const tokens = {
     "headWidth": 1
   },
   "selection": {
-    "color": "#C99A2E",
+    "color": "#F2B51D",
     "width": 2.5
   },
   "chip": {

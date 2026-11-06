@@ -11,7 +11,10 @@
   box-sizing: border-box;
   overflow: visible;
   background: var(--ui-panel-image) var(--ui-surface);
-  box-shadow: var(--shadow-hard);
+  /* Обводка только по нижней кромке панели, поверх жёсткой тени. */
+  box-shadow:
+    inset 0 calc(-1 * var(--ui-border-width)) 0 var(--ui-border),
+    var(--shadow-hard);
 }
 
 .hud > .slot,
@@ -323,10 +326,6 @@
   .settingsWrap {
     grid-column: 7;
     inline-size: var(--touch-target-min);
-  }
-
-  .victoryHold {
-    grid-column: 1 / -1;
   }
 }
 

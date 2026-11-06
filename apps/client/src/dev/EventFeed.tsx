@@ -90,6 +90,7 @@ export function feedRows(
   offers: readonly Offer[],
   graceLeftS?: number,
   signals = 0,
+  hold = false,
 ): number {
   const grace = graceLeftS === undefined ? 0 : 1;
   return Math.min(
@@ -97,7 +98,8 @@ export function feedRows(
     items.filter((item) => item.event.t !== 'treatyOffered').length +
       offers.length +
       grace +
-      signals,
+      signals +
+      (hold ? 1 : 0),
   );
 }
 
@@ -119,6 +121,8 @@ export function EventFeed(props: {
   /** Сигналы границы, которых не видно на экране: строка в ленте, тап ведёт к границе. */
   readonly signals?: readonly { readonly other: number; readonly hex: number }[];
   readonly onSignal?: (hex: number) => void;
+  /** Игрок, который держит нужную долю городов: до победы (или поражения) остаётся секунд. */
+  readonly hold?: { readonly player: number; readonly seconds: number } | null | undefined;
   readonly nameOf?: (playerId: number) => string;
   readonly send?: (cmd: Command) => void;
   /** Секунд до выбывания при отсутствии городов; нет — города есть. */
@@ -141,13 +145,34 @@ export function EventFeed(props: {
   const offers = props.offers ?? [];
   const grace = props.graceLeftS;
   const signals = props.signals ?? [];
-  if (items.length === 0 && offers.length === 0 && signals.length === 0 && grace === undefined) {
+  const hold = props.hold ?? null;
+  if (
+    items.length === 0 &&
+    offers.length === 0 &&
+    signals.length === 0 &&
+    grace === undefined &&
+    hold === null
+  ) {
     return null;
   }
   const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
   const me = props.localPlayerId ?? 0;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
+      {hold !== null && (
+        <div className={styles.slot}>
+          <div
+            className={`${styles.item} ${hold.player === me ? '' : styles.important} ${styles.open}`}
+            style={{ borderRightColor: ownerColor(hold.player) }}
+            role="status"
+          >
+            <IconTrophy size={18} aria-hidden className={styles.icon} />
+            <span
+              className={styles.name}
+            >{`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}</span>
+          </div>
+        </div>
+      )}
       {grace !== undefined && (
         <div className={styles.slot}>
           <div className={`${styles.item} ${styles.important}`} role="alert">

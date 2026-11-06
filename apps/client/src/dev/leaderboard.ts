@@ -19,11 +19,31 @@ export function leaderboardRows(view: PlayerView): LeaderboardRow[] {
   }));
 }
 
-/** Сортирует строки по очкам и идентификатору игрока. */
+/**
+ * Сортирует строки по очкам; при равных очках выше тот, у кого больше городов, затем земли, затем
+ * меньший номер: каждое место занимает один игрок.
+ */
 export function sortLeaderboardRows(rows: readonly LeaderboardRow[]): readonly LeaderboardRow[] {
   return [...rows].sort(
-    (first, second) => second.score - first.score || first.playerId - second.playerId,
+    (first, second) =>
+      second.score - first.score ||
+      second.cities - first.cities ||
+      second.hexes - first.hexes ||
+      first.playerId - second.playerId,
   );
+}
+
+/**
+ * Гекс, к которому ведёт камеру клик по стране: столица, иначе любой видимый город, иначе любая
+ * видимая клетка страны.
+ * @returns номер гекса или null, если страны сейчас не видно
+ */
+export function countryHex(view: PlayerView, playerId: number): number | null {
+  const cities = view.cities.filter((city) => city.owner === playerId);
+  const city = cities.find((c) => c.isCapital) ?? cities[0];
+  if (city) return city.hex;
+  const index = view.hexes.owner.findIndex((owner) => owner === playerId);
+  return index < 0 ? null : index;
 }
 
 /** Возвращает строки в порядке отображения лидерборда. */

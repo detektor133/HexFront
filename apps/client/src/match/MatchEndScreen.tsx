@@ -53,10 +53,6 @@ function victoryReason(reason: WinReason | undefined): string {
   return t('match.reason.lastStanding');
 }
 
-function holdClock(seconds: number): string {
-  return `00:${String(Math.max(0, seconds)).padStart(2, '0')}`;
-}
-
 // Заголовок и пояснение: победа, поражение (победил другой) или выбывание.
 function heading(props: MatchEndScreenProps): React.JSX.Element[] {
   if (props.eliminated) {
@@ -124,20 +120,12 @@ function statistics(props: MatchEndScreenProps): React.JSX.Element {
 
 export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | null {
   const [watching, setWatching] = useState(false);
-  if (watching || (props.winner < 0 && !props.eliminated && !props.victoryHold)) return null;
+  if (watching || (props.winner < 0 && !props.eliminated)) return null;
   const ended = props.eliminated || props.winner >= 0;
-  const hold = props.victoryHold;
   return (
     <section className={styles.card} role="dialog" aria-label={t('match.end')}>
       {[
         ...(ended ? heading(props) : []),
-        ...(hold && !ended
-          ? [
-              <p key="victory-hold" className={styles.reason}>
-                {`${t('leaderboard.player')} ${hold.player} ${t('match.holdsCities')} · ${holdClock(hold.seconds)}`}
-              </p>,
-            ]
-          : []),
         ...(ended ? [standings(props), statistics(props)] : []),
         ...(props.eliminated
           ? [

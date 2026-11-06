@@ -1,13 +1,22 @@
+import { IconTrophy } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { PlayerView } from '@hexfront/sim';
 
 import styles from './Leaderboard.module.css';
-import { leaderboardRows, sortLeaderboardRows, type LeaderboardRow } from './leaderboard.ts';
+import {
+  countryHex,
+  leaderboardRows,
+  sortLeaderboardRows,
+  type LeaderboardRow,
+} from './leaderboard.ts';
 import { t } from '../i18n/dict.ts';
+import { tokens } from '../theme/tokens.ts';
 
 interface LeaderboardProps {
   readonly view: PlayerView;
+  /** Клик по стране: камера идёт к её столице или видимой земле. */
+  readonly onPick?: (hex: number) => void;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
   readonly style?: React.CSSProperties | undefined;
@@ -38,6 +47,7 @@ function isDesktopViewport(): boolean {
 /** Показывает сводку матча и обновляет её раз в секунду. */
 export function Leaderboard({
   view,
+  onPick,
   open = true,
   onOpenChange = () => undefined,
   style,
@@ -80,7 +90,6 @@ export function Leaderboard({
   }, [onSize]);
   const me = rows.find((row) => row.playerId === view.playerId);
   const rank = me?.place ?? '-';
-  const visibleRows = sortLeaderboardRows(rows).slice(0, 5);
   if (!open && !isDesktopViewport()) {
     return (
       <button
@@ -94,14 +103,12 @@ export function Leaderboard({
       </button>
     );
   }
-  const displayedPlaces = new Map<number, number>();
-  visibleRows.forEach((row, index) => {
-    const previous = visibleRows[index - 1];
-    displayedPlaces.set(
-      row.playerId,
-      previous?.score === row.score ? (displayedPlaces.get(previous.playerId) ?? 1) : index + 1,
-    );
-  });
+  // Каждое место занимает один игрок (равные очки решают города и земля); свой ряд виден всегда.
+  const sorted = sortLeaderboardRows(rows);
+  const shown = sorted.slice(0, 5).map((row, index) => ({ row, place: index + 1 }));
+  const mineIndex = sorted.findIndex((row) => row.playerId === view.playerId);
+  const mine = sorted[mineIndex];
+  if (mine && mineIndex >= 5) shown.push({ row: mine, place: mineIndex + 1 });
   return (
     <section
       ref={panelRef}
@@ -109,36 +116,45 @@ export function Leaderboard({
       style={style}
       aria-label={t('leaderboard.title')}
     >
-      <h2 className={styles.title}>{t('leaderboard.title')}</h2>
-      <p>
-        {t('leaderboard.aliveCount').replace(
-          '{count}',
-          String(view.players.filter((player) => player.status === 'alive').length),
-        )}
-      </p>
+      <h2 className={styles.title}>
+        <IconTrophy size={16} aria-hidden="true" />
+        <span>{t('leaderboard.title')}</span>
+        <span className={styles.alive}>
+          {t('leaderboard.aliveCount').replace(
+            '{count}',
+            String(view.players.filter((player) => player.status === 'alive').length),
+          )}
+        </span>
+      </h2>
       <ol
         className={styles.rows}
         aria-label={`${t('leaderboard.place')} / ${t('leaderboard.player')} / ${t('leaderboard.score')}`}
       >
-        {visibleRows.slice(0, 5).map((row) => (
-          <li className={styles.row} key={row.playerId} role="row">
-            <span className={styles.place} role="rowheader">
-              {displayedPlaces.get(row.playerId) ?? row.place}
-            </span>
-            <span
-              className={styles.player}
-              role="cell"
-              title={
-                view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`
-              }
-            >
-              {view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`}
-            </span>
-            <span className={styles.score} role="cell">
-              {row.score}
-            </span>
-          </li>
-        ))}
+        {shown.map(({ row, place }) => {
+          const name =
+            view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`;
+          const hex = countryHex(view, row.playerId);
+          const color = tokens.players.palette[row.playerId]?.line ?? tokens.ui.ink;
+          const eliminated = view.players[row.playerId]?.status === 'eliminated';
+          return (
+            <li key={row.playerId}>
+              <button
+                type="button"
+                className={`${styles.row} ${row.playerId === view.playerId ? styles.mine : ''} ${eliminated ? styles.eliminated : ''}`}
+                disabled={hex === null || !onPick}
+                title={name}
+                onClick={() => {
+                  if (hex !== null) onPick?.(hex);
+                }}
+              >
+                <span className={styles.place}>{place}</span>
+                <span className={styles.swatch} style={{ background: color }} aria-hidden="true" />
+                <span className={styles.player}>{name}</span>
+                <span className={styles.score}>{row.score}</span>
+              </button>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

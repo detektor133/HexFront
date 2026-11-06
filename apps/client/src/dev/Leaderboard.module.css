@@ -4,9 +4,11 @@
   box-sizing: border-box;
   width: max-content;
   max-width: calc(100vw - 16px);
-  padding: 6px;
+  padding: var(--space-xs);
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   font-variant-numeric: tabular-nums;
 }
@@ -19,21 +21,30 @@
   overflow: hidden;
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
 }
 
+/* Заголовок: кубок, название и число живых; одна строка без лишних абзацев. */
 .title {
-  margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-xs);
+  padding: 0 var(--space-xs);
   color: var(--ui-ink);
   font: inherit;
-  line-height: 16px;
+  line-height: 20px;
 }
 
-.panel p {
-  margin: 0 0 2px;
-  line-height: 16px;
+.alive {
+  margin-left: auto;
+  padding-left: var(--space-sm);
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
 }
 
 .rows {
@@ -45,12 +56,43 @@
   font-size: var(--font-size-caption);
 }
 
+/* Строка — кнопка: нажатие ведёт камеру к стране. Подсветка при наведении, свой ряд выделен. */
 .row {
   display: grid;
-  grid-template-columns: max-content minmax(0, 12ch) max-content;
-  gap: 4px;
+  grid-template-columns: 1.5ch 10px minmax(0, 12ch) max-content;
+  gap: var(--space-xs);
   align-items: center;
-  min-height: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 22px;
+  padding: 0 var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover:not(:disabled),
+.row:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.row:disabled {
+  cursor: default;
+}
+
+.mine {
+  background: var(--ui-surface2);
+  font-weight: 600;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 .place,
@@ -59,19 +101,18 @@
   white-space: nowrap;
 }
 
+.place {
+  color: var(--ui-ink2);
+}
+
 .player {
   min-width: 0;
+  max-width: 12ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 12ch;
 }
 
 .eliminated {
   color: var(--ui-ink3);
-}
-
-@media (max-width: 600px) {
-  .panel {
-  }
 }

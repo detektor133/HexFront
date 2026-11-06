@@ -72,7 +72,9 @@
   /* Над карточками, вне потока: выбор армии не растит нижнюю панель и ничего не сдвигает. */
   position: absolute;
   bottom: 100%;
-  left: 0;
+  left: 50%;
+  translate: -50% 0;
+  justify-content: center;
   align-self: flex-start;
   gap: 2px;
   max-width: 100%;

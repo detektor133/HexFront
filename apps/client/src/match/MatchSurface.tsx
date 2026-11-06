@@ -141,6 +141,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       view?.diplomacy?.incoming ?? [],
       view?.me.graceLeftS,
       offscreen.length,
+      Boolean(view?.victoryHold),
     ),
     tutorialVisible: false,
     leaderboardOpen,
@@ -236,6 +237,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         offers={view?.diplomacy?.incoming ?? []}
         signals={offscreen}
         onSignal={sb.centerOnHex}
+        hold={view?.victoryHold}
         nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
         send={sb.send}
         graceLeftS={view?.me.graceLeftS}
@@ -278,6 +280,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {view && styleFor('leaderboard') && (
         <Leaderboard
           view={view}
+          onPick={sb.centerOnHex}
           open={leaderboardOpen}
           onOpenChange={setLeaderboardOpen}
           onSize={setLeaderboardSize}
