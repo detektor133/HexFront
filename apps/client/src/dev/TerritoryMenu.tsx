@@ -1,21 +1,12 @@
-import {
-  IconCheck,
-  IconFlag,
-  IconShield,
-  IconShieldOff,
-  IconSwords,
-  IconX,
-} from '@tabler/icons-react';
+import { IconFlag, IconShield, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { FP, type ArmyView, type Command, type PlayerView } from '@hexfront/sim';
+import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
+import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
-import { maxArmySoldiers } from './army-limit.ts';
-import { armyName } from './army-name.ts';
-import { NEW_ARMY, armyCounts, orderFields, totalOf } from './direction-order.ts';
-import { countsFromShares, defaultShares, sharesFromCounts, type Shares } from './force-share.ts';
+import { autoOrder, isFree, nearestFreeArmy, orderArmy } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -24,45 +15,26 @@ const MENU_WIDTH = 264;
 const EDGE = 8;
 
 /**
- * Меню земли по ПКМ (удержанию пальцем) без выбранных отрядов. Чужая страна: дипломатия, «держать
- * границу» и, на войне, «наступать»; ничья земля: «занять». Слайдер — сколько солдат на этом
- * направлении; дальше ИИ набирает, подводит и ведёт армию «Фронт: …».
+ * Компактное меню земли по ЛКМ (удержанию пальцем) без выбранных отрядов и без выбранной армии.
+ * Чужая страна: дипломатия, «Держать ▾» (автоподбор армии, стрелка — выбор) и «Наступать» (серая,
+ * пока нет войны). Ничья земля: «Занять ▾» — ближайшая свободная армия, стрелка — любая.
+ * Размер и состав армии здесь не меняются: только на панели армии.
  */
 export function TerritoryMenu(props: {
   readonly view: PlayerView;
+  readonly map: MapStatic;
   /** Игрок, чья это земля, или -1 — ничья земля. */
   readonly other: number;
-  /** Гекс нажатия (меню им не пользуется: ось удара выбирает ИИ). */
+  /** Гекс нажатия: ближайшая армия считается от него, а для ничьей земли он — приоритет волны. */
   readonly hex: number;
   /** Точка нажатия в координатах страницы. */
   readonly at: { readonly x: number; readonly y: number };
   readonly send: (cmd: Command) => void;
   readonly onClose: () => void;
 }): React.JSX.Element | null {
-  const { view, other, at, send, onClose } = props;
-  const max = maxArmySoldiers(view);
-  // Армия приказа: уже стоящая на эту цель выбрана сразу и показывает свой состав; «Новая» — с нуля.
-  const existing = view.armies.find((a) => a.dir?.target === other);
-  const [armyId, setArmyId] = useState<number>(existing?.id ?? NEW_ARMY);
-  // Состав приказа: общее число и доли по типам; у существующей армии — её собственные.
-  const fresh = (): { total: number; shares: Shares } => {
-    const total = Math.max(1, Math.floor(max / 2));
-    return { total, shares: defaultShares(view, total) };
-  };
-  const fromArmy = (army: ArmyView): { total: number; shares: Shares } => {
-    const counts = armyCounts(view, army);
-    return { total: Math.min(max, totalOf(counts)), shares: sharesFromCounts(counts) };
-  };
-  // Размер и состав меняются только на карточке самой армии; приказ берёт армию как есть.
-  const [force, setForce] = useState(() => (existing ? fromArmy(existing) : fresh()));
-  const pickArmy = (id: number): void => {
-    setArmyId(id);
-    const army = view.armies.find((a) => a.id === id);
-    setForce(army ? fromArmy(army) : fresh());
-  };
+  const { view, map, other, hex, at, send, onClose } = props;
   const ref = useRef<HTMLDivElement | null>(null);
-  // Реальная высота окна: оно растёт от числа источников, и фиксированная оценка уводила его за край.
-  const [height, setHeight] = useState(220);
+  const [height, setHeight] = useState(120);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -90,22 +62,18 @@ export function TerritoryMenu(props: {
   const player = neutral ? null : view.players[other];
   if (!neutral && (!player || player.status !== 'alive')) return null;
   const atWar = !neutral && (view.diplomacy?.relations[other] ?? 'war') === 'war';
-  const counts = countsFromShares(force.total, force.shares);
-  const amount = force.total;
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - height - EDGE));
-  const mine = view.units.filter((u) => u.owner === view.playerId);
-  const soldiersOf = (armyId: number | null): number =>
-    Math.floor(
-      mine.filter((u) => u.armyId === armyId).reduce((sum, u) => sum + u.soldiers, 0) / FP,
-    );
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
-  // Клик не выбирает место удара: ось наступления и приоритет занятия определяет ИИ.
-  const where = orderFields(counts, armyId);
   const go = (command: Command): void => {
     send(command);
     onClose();
   };
+  const orderBy =
+    (mode: 'hold' | 'attack') =>
+    (army: ArmyView): void =>
+      go(orderArmy(view, army, other, mode, neutral ? hex : undefined));
+  const free = nearestFreeArmy(view, map, hex);
   return (
     <div
       ref={ref}
@@ -129,72 +97,45 @@ export function TerritoryMenu(props: {
         </IconButton>
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
-      <div className={styles.attack}>
-        <div className={styles.sources} role="group" aria-label={t('menu.army')}>
-          <button
-            type="button"
-            className={armyId === NEW_ARMY ? styles.sourceOn : styles.source}
-            aria-pressed={armyId === NEW_ARMY}
-            onClick={() => pickArmy(NEW_ARMY)}
-          >
-            <span className={styles.sourceName}>{t('menu.newArmy')}</span>
-          </button>
-          {view.armies.map((army) => (
-            <button
-              key={army.id}
-              type="button"
-              className={armyId === army.id ? styles.sourceOn : styles.source}
-              aria-pressed={armyId === army.id}
-              title={army.id === existing?.id ? t('menu.onTarget') : undefined}
-              onClick={() => pickArmy(army.id)}
-            >
-              <span className={styles.sourceName}>{armyName(army)}</span>
-              <span>{soldiersOf(army.id)}</span>
-              {army.id === existing?.id && <IconCheck size={14} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-        <div className={styles.actions}>
-          {!neutral && (
+      <div className={styles.actions}>
+        {neutral ? (
+          <OrderSplit
+            icon={<IconFlag size={20} aria-hidden="true" />}
+            label="menu.occupy"
+            tutorial="occupy"
+            disabled={free ? null : t('order.noFree')}
+            armies={view.armies}
+            onAuto={() => free && go(orderArmy(view, free, -1, 'attack', hex))}
+            onPick={orderBy('attack')}
+          />
+        ) : (
+          <>
+            <OrderSplit
+              icon={<IconShield size={20} aria-hidden="true" />}
+              label="menu.holdShort"
+              tutorial="hold"
+              disabled={null}
+              armies={view.armies}
+              onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}
+              onPick={orderBy('hold')}
+            />
             <button
               type="button"
-              className={styles.act}
-              data-tutorial="hold"
-              disabled={amount < 1}
-              onClick={() => go({ t: 'holdBorder', target: other, ...where })}
+              className={styles.attackButton}
+              data-tutorial="attack"
+              disabled={!atWar}
+              title={atWar ? t('menu.attack') : t('army.attackNeedWar')}
+              onClick={() => go(autoOrder(view, map, other, 'attack', hex))}
             >
-              <IconShield size={20} aria-hidden="true" />
-              {t('menu.holdShort')}
+              <IconSwords size={20} aria-hidden="true" />
+              <span>{t('menu.attack')}</span>
             </button>
-          )}
-          {(atWar || neutral) && (
-            <button
-              type="button"
-              className={styles.actGo}
-              data-tutorial={neutral ? 'occupy' : 'attack'}
-              disabled={amount < 1}
-              onClick={() => go({ t: 'launchOffensive', target: other, ...where })}
-            >
-              {neutral ? (
-                <IconFlag size={20} aria-hidden="true" />
-              ) : (
-                <IconSwords size={20} aria-hidden="true" />
-              )}
-              {t(neutral ? 'menu.occupy' : 'menu.attack')}
-            </button>
-          )}
-        </div>
-        {existing && (
-          <button
-            type="button"
-            className={styles.release}
-            onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
-          >
-            <IconShieldOff size={16} aria-hidden="true" />
-            {t('menu.release')}
-          </button>
+          </>
         )}
       </div>
+      {neutral && view.armies.length > 0 && view.armies.every((a) => !isFree(a)) && (
+        <p className={styles.hint}>{t('order.noFree')}</p>
+      )}
     </div>
   );
 }

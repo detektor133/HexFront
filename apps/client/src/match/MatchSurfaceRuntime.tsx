@@ -14,6 +14,7 @@ import {
 
 import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
+import { orderArmy } from '../dev/army-order.ts';
 import { armyCounts, orderFields } from '../dev/direction-order.ts';
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { appendEvents, type EventFeedItem } from '../dev/event-feed.ts';
@@ -507,6 +508,12 @@ export function useSandbox(
       if (owner === current.playerId) return false;
       // Ничья суша — тоже направление («занять»); вода — нет.
       if (owner < 0 && map.terrain[hex] === TERRAIN.water) return false;
+      // Выбрана армия — тап по ничьей земле сразу ставит ей занятие, без меню.
+      const picked = current.armies.find((a) => a.id === armyRef.current);
+      if (owner < 0 && picked) {
+        match.send(orderArmy(current, picked, -1, 'attack', hex));
+        return true;
+      }
       setMenu({ other: owner, hex, x: screen.x, y: screen.y });
       return true;
     };
