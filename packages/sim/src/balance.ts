@@ -247,6 +247,9 @@ export const RECRUIT_PER_100_S: ByUnit<Fp> = {
   artillery: fp(0.75),
 };
 
+/** Уровни размера армии (рота…корпус): знаменатели доли от предела государства (люди плюс армия). */
+export const ARMY_LEVEL_DENOMS = [16, 8, 4, 2, 1] as const;
+
 export const RECRUIT_MIN: Fp = fp(50);
 export const RECRUIT_STEP: Fp = fp(50);
 export const RECRUIT_MIN_HEX_POP_RATIO: Fp = fp(0.1);

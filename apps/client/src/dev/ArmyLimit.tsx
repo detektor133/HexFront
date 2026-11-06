@@ -16,11 +16,10 @@ export function ArmyLimit(props: {
   readonly anchor: DOMRect;
   readonly value: number;
   readonly shares: Shares;
-  readonly max: number;
   readonly onApply: (soldiers: number, counts: Counts) => void;
   readonly onClose: () => void;
 }): React.JSX.Element {
-  const { anchor, max, onApply, onClose } = props;
+  const { anchor, onApply, onClose } = props;
   const [force, setForce] = useState({ total: props.value, shares: props.shares });
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -48,7 +47,6 @@ export function ArmyLimit(props: {
     >
       <ForceEditor
         total={force.total}
-        max={max}
         shares={force.shares}
         onChange={(total, shares) => setForce({ total, shares })}
         onCommit={(total, shares) => onApply(total, countsFromShares(total, shares))}

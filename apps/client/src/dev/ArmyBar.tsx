@@ -1,4 +1,4 @@
-import { IconFlag, IconShield, IconSwords } from '@tabler/icons-react';
+import { IconFlag, IconMinus, IconPlus, IconShield, IconSwords } from '@tabler/icons-react';
 import { type WheelEvent, useLayoutEffect, useRef, useState } from 'react';
 
 import {
@@ -13,10 +13,18 @@ import {
 
 import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
-import { limitCommand, maxArmySoldiers } from './army-limit.ts';
+import {
+  LEVEL_NAMES,
+  armyLevels,
+  armySize,
+  levelIndex,
+  limitCommand,
+  maxArmySoldiers,
+  stepLevel,
+} from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { armyCounts, orderFields, type Counts } from './direction-order.ts';
-import { sharesFromCounts } from './force-share.ts';
+import { countsFromShares, sharesFromCounts } from './force-share.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
@@ -216,6 +224,8 @@ function ArmyCard(props: {
   stats: ArmyStats;
   /** Заказанная численность армии (меню страны): рядом с числом солдат. */
   wanted?: number | undefined;
+  /** Название уровня размера армии на карточке. */
+  levelLabel: string;
   /** Лимит любой армии: предел числа и применение; `wanted` пуст — лимита нет («∞»). */
   limit: {
     readonly max: number;
@@ -313,7 +323,7 @@ function ArmyCard(props: {
                   setLimitAnchor(event.currentTarget.getBoundingClientRect());
                 }}
               >
-                {props.wanted === undefined ? '∞' : formatSoldiers(props.wanted * FP)}
+                {props.levelLabel}
               </button>
             </span>
             {stats.fighting && (
@@ -358,7 +368,6 @@ function ArmyCard(props: {
           anchor={limitAnchor}
           value={props.wanted ?? Math.min(props.limit.max, Math.floor(stats.soldiers / FP))}
           shares={sharesFromCounts(props.limit.counts)}
-          max={props.limit.max}
           onApply={props.limit.onApply}
           onClose={() => setLimitAnchor(null)}
         />
@@ -431,6 +440,31 @@ export function ArmyBar(props: {
     }
     props.onHoldPick(props.holdPicking ? null : a.id);
   };
+  // Уровни размера армии (рота…корпус) — доли предела государства, а не число.
+  const levels = armyLevels(maxArmySoldiers(view));
+  const sizeOf = (a: ArmyView): number =>
+    armySize(
+      a,
+      Math.floor(
+        mine.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0) / FP,
+      ),
+    );
+  const levelLabelOf = (a: ArmyView, _units: readonly UnitView[]): string => {
+    const index = levelIndex(levels, sizeOf(a));
+    const name = LEVEL_NAMES[index];
+    return t(name === undefined ? 'army.level.none' : name);
+  };
+  const resizeBlocked = (a: ArmyView, dir: 1 | -1): string | null =>
+    stepLevel(levels, sizeOf(a), dir) === null
+      ? t(dir === 1 ? 'army.strongest' : 'army.weakest')
+      : null;
+  const resize = (a: ArmyView, dir: 1 | -1): void => {
+    const next = stepLevel(levels, sizeOf(a), dir);
+    if (next === null) return;
+    const counts = countsFromShares(next, sharesFromCounts(armyCounts(view, a)));
+    const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
+    send(limitCommand(a, next, mix && { armor: mix.armor, artillery: mix.artillery }));
+  };
   const select = (armyId: number, units: readonly UnitView[]): void => {
     const off = armyId === selected;
     props.onSelect(off ? null : armyId);
@@ -462,6 +496,19 @@ export function ArmyBar(props: {
               onClick={() => attackArmy(army)}
               active={army.dir?.mode === 'attack'}
               disabled={attackBlocked(army)}
+            />
+            <Tool
+              glyph={<IconPlus size={18} aria-hidden="true" />}
+              tutorial="army-stronger"
+              label="army.stronger"
+              onClick={() => resize(army, 1)}
+              disabled={resizeBlocked(army, 1)}
+            />
+            <Tool
+              glyph={<IconMinus size={18} aria-hidden="true" />}
+              label="army.weaker"
+              onClick={() => resize(army, -1)}
+              disabled={resizeBlocked(army, -1)}
             />
             <Tool
               icon="split"
@@ -501,6 +548,7 @@ export function ArmyBar(props: {
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
                   wanted={a.wanted}
+                  levelLabel={levelLabelOf(a, units)}
                   dir={a.dir}
                   limit={{
                     max: maxArmySoldiers(view),

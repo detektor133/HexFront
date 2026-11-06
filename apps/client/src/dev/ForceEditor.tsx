@@ -10,40 +10,27 @@ import { UnitGlyph } from './unit-glyph.tsx';
 import { t, type MessageKey } from '../i18n/dict.ts';
 
 /**
- * Сколько войск и из чего: крупное число и один ползунок; «Состав» раскрывает три связанных
- * ползунка долей (пехота, бронетехника, артиллерия) с подписью «процент · солдат». Цифры не вводятся.
+ * Из чего армия: число солдат (задаётся уровнем на панели армии, здесь только показано) и «Состав»
+ * с тремя связанными ползунками долей (пехота, бронетехника, артиллерия), подпись «процент · солдат».
  */
 export function ForceEditor(props: {
   readonly total: number;
-  readonly max: number;
   readonly shares: Shares;
   readonly onChange: (total: number, shares: Shares) => void;
   /** Игрок отпустил ползунок: значение окончательное — можно применять приказом. */
   readonly onCommit?: (total: number, shares: Shares) => void;
 }): React.JSX.Element {
-  const { total, max, shares, onChange, onCommit } = props;
+  const { total, shares, onChange, onCommit } = props;
   const commit = (): void => onCommit?.(total, shares);
   const [open, setOpen] = useState(false);
   const counts = countsFromShares(total, shares);
   const Chevron = open ? IconChevronUp : IconChevronDown;
   return (
     <div className={styles.force}>
-      <label className={styles.head}>
+      <div className={styles.head}>
         <span>{t('menu.total')}</span>
         <b className={styles.number}>{total}</b>
-        <input
-          className={styles.slider}
-          type="range"
-          min={0}
-          max={max}
-          step={1}
-          value={Math.min(total, max)}
-          aria-label={t('menu.total')}
-          onChange={(event) => onChange(Number(event.target.value), shares)}
-          onPointerUp={commit}
-          onKeyUp={commit}
-        />
-      </label>
+      </div>
       <button
         type="button"
         className={styles.toggle}
