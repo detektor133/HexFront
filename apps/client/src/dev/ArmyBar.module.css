@@ -131,7 +131,7 @@
 .card {
   box-sizing: border-box;
   display: flex;
-  flex: 0 0 238px;
+  flex: 0 0 168px;
   overflow: hidden;
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
@@ -323,6 +323,37 @@
   text-align: center;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* Число солдат под названием: крупно, цифры одной ширины, чтобы карточка не ездила. */
+.count {
+  font-size: var(--font-size-hudValue, 15px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* Два вертикальных столбика справа, как на фишке отряда: организация и снабжение. */
+.bars {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 6px 6px 6px 0;
+}
+
+.vbar {
+  position: relative;
+  width: 4px;
+  overflow: hidden;
+  background: var(--chip-track);
+  border-radius: 2px;
+}
+
+.vbar > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
 }
 
 .num {

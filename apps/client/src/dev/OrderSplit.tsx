@@ -23,7 +23,9 @@ export function OrderSplit(props: {
   readonly onAuto: () => void;
   readonly onPick: (army: ArmyView) => void;
   readonly tutorial?: string;
-  /** Малый вид: только значок и стрелка (сигнал на карте). */
+  /** «Призрак»: фон и рамка как у кнопок панели, без заливки цветом; по умолчанию — заливка. */
+  readonly tone?: 'fill' | 'ghost';
+  /** Малый вид: только значок и стрелка. */
   readonly compact?: boolean;
 }): React.JSX.Element {
   const { icon, label, disabled, armies, onAuto, onPick } = props;
@@ -38,7 +40,10 @@ export function OrderSplit(props: {
     return () => window.removeEventListener('pointerdown', onDown);
   }, [open]);
   return (
-    <div ref={ref} className={`${styles.split} ${props.compact ? styles.compact : ''}`}>
+    <div
+      ref={ref}
+      className={`${styles.split} ${props.compact ? styles.compact : ''} ${props.tone === 'ghost' ? styles.ghost : ''}`}
+    >
       <button
         type="button"
         className={styles.main}

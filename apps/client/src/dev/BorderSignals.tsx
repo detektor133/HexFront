@@ -1,5 +1,5 @@
 import { IconShield, IconX } from '@tabler/icons-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Command, MapStatic, PlayerView } from '@hexfront/sim';
 
@@ -14,13 +14,26 @@ import { IconButton } from '../ui/icon-button.tsx';
 export interface SignalCamera {
   readonly from: { readonly x: number; readonly y: number };
   readonly to: { readonly x: number; readonly y: number };
-  readonly screen: { readonly left: number; readonly top: number; readonly width: number };
+  readonly screen: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
+}
+
+/** Сигнал вне экрана: сосед и гекс границы, к которому ведёт строка ленты. */
+export interface OffscreenSignal {
+  readonly other: number;
+  readonly hex: number;
 }
 
 /**
- * Сигнал границы: значок щита цвета соседа прямо на границе, где появилась общая граница и ни одна
- * армия не стоит на соседа. Тап раскрывает «Держать ▾» и крестик; без нажатия сигнал остаётся.
- * Положение меняется только по событиям камеры и прямо в DOM, без опроса и без перерисовки React.
+ * Сигнал границы: плашка с «Держать ▾» и крестиком прямо над границей, где появилась общая
+ * граница и ни одна армия не стоит на соседа. Появляется с выпрыгиванием и кольцом, остаётся, пока
+ * не закроют или не нажмут «Держать». Если границу не видно на экране, плашка прячется, а в ленте
+ * событий появляется строка со ссылкой к ней. Положение меняется только по событиям камеры и
+ * прямо в DOM, без опроса и без перерисовки React.
  */
 export function BorderSignals(props: {
   readonly view: PlayerView;
@@ -29,10 +42,11 @@ export function BorderSignals(props: {
   readonly camera: () => SignalCamera | null;
   readonly subscribeCamera: (listener: () => void) => () => void;
   readonly hexWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
+  /** Сигналы, которых сейчас не видно на экране (для ленты событий). */
+  readonly onOffscreen: (signals: readonly OffscreenSignal[]) => void;
 }): React.JSX.Element | null {
-  const { view, map, send, camera, subscribeCamera, hexWorld } = props;
+  const { view, map, send, camera, subscribeCamera, hexWorld, onOffscreen } = props;
   const [closed, setClosed] = useState<ReadonlySet<number>>(new Set());
-  const [expanded, setExpanded] = useState<number | null>(null);
   // Якорь сигнала не прыгает: гекс границы запоминается, пока он остаётся своим.
   const anchors = useRef(new Map<number, number>());
   const neighbours = useMemo(() => {
@@ -54,35 +68,48 @@ export function BorderSignals(props: {
     [neighbours, closed, view.armies],
   );
   const nodes = useRef(new Map<number, HTMLElement>());
+  const reported = useRef('');
   const place = useMemo(
     () => (): void => {
       const cam = camera();
       if (!cam) return;
       const scale = cam.screen.width / (cam.to.x - cam.from.x);
+      const away: OffscreenSignal[] = [];
       for (const [other, hex] of open) {
         const node = nodes.current.get(other);
         const world = hexWorld(hex);
-        if (!node || !world) continue;
+        if (!world) continue;
         const x = cam.screen.left + (world.x - cam.from.x) * scale;
         const y = cam.screen.top + (world.y - cam.from.y) * scale;
+        const visible =
+          x >= cam.screen.left &&
+          x <= cam.screen.left + cam.screen.width &&
+          y >= cam.screen.top &&
+          y <= cam.screen.top + cam.screen.height;
+        if (!visible) away.push({ other, hex });
+        if (!node) continue;
         node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+        node.style.visibility = visible ? 'visible' : 'hidden';
+      }
+      const key = away.map((a) => `${a.other}:${a.hex}`).join(',');
+      if (key !== reported.current) {
+        reported.current = key;
+        onOffscreen(away);
       }
     },
-    [open, camera, hexWorld],
+    [open, camera, hexWorld, onOffscreen],
   );
   useLayoutEffect(() => {
     place();
     return subscribeCamera(place);
   }, [place, subscribeCamera]);
-  useEffect(() => {
-    if (expanded === null) return;
-    const onDown = (event: PointerEvent): void => {
-      const node = nodes.current.get(expanded);
-      if (node && !node.contains(event.target as Node)) setExpanded(null);
-    };
-    window.addEventListener('pointerdown', onDown);
-    return () => window.removeEventListener('pointerdown', onDown);
-  }, [expanded]);
+  // Закрытые и обработанные сигналы пропадают и из ленты.
+  useLayoutEffect(() => {
+    if (open.length === 0 && reported.current !== '') {
+      reported.current = '';
+      onOffscreen([]);
+    }
+  }, [open.length, onOffscreen]);
   if (open.length === 0) return null;
   return (
     <>
@@ -98,42 +125,26 @@ export function BorderSignals(props: {
               else nodes.current.delete(other);
             }}
           >
-            <div className={styles.signal}>
-              <button
-                type="button"
-                className={styles.badge}
-                style={{ borderColor: color, color }}
-                title={name}
-                aria-label={name}
-                aria-expanded={expanded === other}
-                onClick={() => setExpanded((now) => (now === other ? null : other))}
+            <div className={styles.signal} style={{ color }} role="group" aria-label={name}>
+              <span className={styles.ripple} aria-hidden="true" />
+              <span className={styles.dot} title={name} />
+              <OrderSplit
+                tone="ghost"
+                icon={<IconShield size={18} aria-hidden="true" />}
+                label="menu.holdShort"
+                tutorial="signal-hold"
+                disabled={null}
+                armies={view.armies}
+                onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
+                onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
+              />
+              <IconButton
+                label={t('menu.close')}
+                className={styles.close}
+                onClick={() => setClosed((now) => new Set(now).add(other))}
               >
-                <IconShield size={18} aria-hidden="true" />
-              </button>
-              {expanded === other && (
-                <div className={styles.actions}>
-                  <OrderSplit
-                    compact
-                    icon={<IconShield size={16} aria-hidden="true" />}
-                    label="menu.holdShort"
-                    tutorial="signal-hold"
-                    disabled={null}
-                    armies={view.armies}
-                    onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
-                    onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
-                  />
-                  <IconButton
-                    label={t('menu.close')}
-                    className={styles.close}
-                    onClick={() => {
-                      setClosed((now) => new Set(now).add(other));
-                      setExpanded(null);
-                    }}
-                  >
-                    <IconX size={14} aria-hidden="true" />
-                  </IconButton>
-                </div>
-              )}
+                <IconX size={16} aria-hidden="true" />
+              </IconButton>
             </div>
           </div>
         );

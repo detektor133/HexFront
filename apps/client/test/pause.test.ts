@@ -176,6 +176,7 @@ function mockRuntime(
       focusHex: vi.fn(),
       cameraRect: () => null,
       subscribeCamera: () => () => undefined,
+      centerOnHex: vi.fn(),
       hexWorld: () => null,
       send: vi.fn(),
       setFog: vi.fn(),

@@ -100,6 +100,7 @@ export function TerritoryMenu(props: {
       <div className={styles.actions}>
         {neutral ? (
           <OrderSplit
+            tone="ghost"
             icon={<IconFlag size={20} aria-hidden="true" />}
             label="menu.occupy"
             tutorial="occupy"
@@ -111,6 +112,7 @@ export function TerritoryMenu(props: {
         ) : (
           <>
             <OrderSplit
+              tone="ghost"
               icon={<IconShield size={20} aria-hidden="true" />}
               label="menu.holdShort"
               tutorial="hold"

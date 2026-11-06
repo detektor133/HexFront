@@ -104,3 +104,27 @@
 .compact .arrow {
   padding: 0 2px;
 }
+
+/* Призрак: как кнопки панели армии — поверхность и рамка, без заливки цветом. */
+.ghost .main,
+.ghost .arrow {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+}
+
+.ghost .arrow {
+  border-left-color: var(--ui-border);
+}
+
+.ghost .main:hover,
+.ghost .arrow:hover,
+.ghost .main:focus-visible,
+.ghost .arrow:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.ghost .main:disabled,
+.ghost .arrow:disabled {
+  color: var(--ui-ink3);
+}

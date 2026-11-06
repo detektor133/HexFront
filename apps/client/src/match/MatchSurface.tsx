@@ -43,6 +43,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
+  const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const [popupOpen, setPopupOpen] = useState(false);
@@ -135,7 +136,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     hudHeight: hudH,
     bottomPanelHeight: dockH,
     cardReserve: toolsShown ? ARMY_TOOLS_H : 0,
-    eventRows: feedRows(sb.events, view?.diplomacy?.incoming ?? [], view?.me.graceLeftS),
+    eventRows: feedRows(
+      sb.events,
+      view?.diplomacy?.incoming ?? [],
+      view?.me.graceLeftS,
+      offscreen.length,
+    ),
     tutorialVisible: false,
     leaderboardOpen,
     leaderboardRows: view?.ranking?.length ?? 0,
@@ -228,6 +234,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       <EventFeed
         items={sb.events}
         offers={view?.diplomacy?.incoming ?? []}
+        signals={offscreen}
+        onSignal={sb.centerOnHex}
         nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
         send={sb.send}
         graceLeftS={view?.me.graceLeftS}
@@ -283,6 +291,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           send={sb.send}
           camera={tutorialCamera}
           subscribeCamera={subscribeCamera}
+          onOffscreen={setOffscreen}
           hexWorld={tutorialHexWorld}
         />
       )}

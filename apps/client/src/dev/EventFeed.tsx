@@ -6,6 +6,7 @@ import {
   IconHammer,
   IconHeartHandshake,
   IconInfoCircle,
+  IconShield,
   IconLink,
   IconLinkOff,
   IconSkull,
@@ -88,11 +89,15 @@ export function feedRows(
   items: readonly EventFeedItem[],
   offers: readonly Offer[],
   graceLeftS?: number,
+  signals = 0,
 ): number {
   const grace = graceLeftS === undefined ? 0 : 1;
   return Math.min(
     4,
-    items.filter((item) => item.event.t !== 'treatyOffered').length + offers.length + grace,
+    items.filter((item) => item.event.t !== 'treatyOffered').length +
+      offers.length +
+      grace +
+      signals,
   );
 }
 
@@ -111,6 +116,9 @@ function diplomacyOther(event: GameEvent, me: number): number | null {
 export function EventFeed(props: {
   readonly items: readonly EventFeedItem[];
   readonly offers?: readonly Offer[];
+  /** Сигналы границы, которых не видно на экране: строка в ленте, тап ведёт к границе. */
+  readonly signals?: readonly { readonly other: number; readonly hex: number }[];
+  readonly onSignal?: (hex: number) => void;
   readonly nameOf?: (playerId: number) => string;
   readonly send?: (cmd: Command) => void;
   /** Секунд до выбывания при отсутствии городов; нет — города есть. */
@@ -132,7 +140,10 @@ export function EventFeed(props: {
   const items = visibleEvents(props.items, now).filter((item) => item.event.t !== 'treatyOffered');
   const offers = props.offers ?? [];
   const grace = props.graceLeftS;
-  if (items.length === 0 && offers.length === 0 && grace === undefined) return null;
+  const signals = props.signals ?? [];
+  if (items.length === 0 && offers.length === 0 && signals.length === 0 && grace === undefined) {
+    return null;
+  }
   const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
   const me = props.localPlayerId ?? 0;
   return (
@@ -147,6 +158,21 @@ export function EventFeed(props: {
           </div>
         </div>
       )}
+      {signals.map(({ other, hex }) => (
+        <div className={styles.slot} key={`signal:${other}`}>
+          <button
+            type="button"
+            className={`${styles.item} ${styles.important}`}
+            style={{ borderRightColor: ownerColor(other) }}
+            title={t('signal.border')}
+            aria-label={`${t('signal.border')}: ${nameOf(other)}`}
+            onClick={() => props.onSignal?.(hex)}
+          >
+            <IconShield size={18} aria-hidden className={styles.icon} />
+            <span className={styles.name}>{`${t('signal.border')}: ${nameOf(other)}`}</span>
+          </button>
+        </div>
+      ))}
       {offers.map((offer) => (
         <div className={styles.slot} key={`offer:${offer.from}`}>
           <div

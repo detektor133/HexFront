@@ -187,13 +187,12 @@ function Tool(props: {
   );
 }
 
+/** Вертикальный столбик на карточке: доля снизу вверх, как у фишки отряда. */
 function Meter(props: { label: MessageKey; share: number; color: string }): React.JSX.Element {
   const pct = Math.round(Math.max(0, Math.min(1, props.share)) * 100);
   return (
-    <span className={styles.row} title={`${t(props.label)}: ${pct}%`}>
-      <span className={styles.meter}>
-        <span style={{ width: `${pct}%`, background: props.color }} />
-      </span>
+    <span className={styles.vbar} title={`${t(props.label)}: ${pct}%`}>
+      <span style={{ height: `${pct}%`, background: props.color }} />
     </span>
   );
 }
@@ -327,6 +326,9 @@ function ArmyCard(props: {
               </span>
             )}
           </span>
+          <span className={styles.count}>{formatSoldiers(stats.soldiers)}</span>
+        </span>
+        <span className={styles.bars}>
           <Meter
             label="army.org"
             share={stats.org}

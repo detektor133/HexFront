@@ -212,6 +212,8 @@ interface Sandbox {
   focusHex(hex: number): void;
   /** Видимая область карты в мировых координатах (обучение следит за камерой и ставит метки). */
   cameraRect(): { readonly from: Point; readonly to: Point } | null;
+  /** Центрирует камеру на гексе, ничего не выбирая. */
+  centerOnHex(hex: number): void;
   /** Подписка на сдвиг камеры (плашки на карте); возвращает отписку. */
   subscribeCamera(listener: () => void): () => void;
   /** Центр гекса в мировых координатах. */
@@ -742,6 +744,11 @@ export function useSandbox(
       }
     },
     cameraRect: () => mapViewRef.current?.visibleWorldRect?.() ?? null,
+    centerOnHex(hex) {
+      if (typeof loaded !== 'string') {
+        mapViewRef.current?.centerOn(hexFromId(hex, loaded.map.width), tokens.motion.map);
+      }
+    },
     subscribeCamera(listener) {
       cameraListenersRef.current.add(listener);
       return () => cameraListenersRef.current.delete(listener);
