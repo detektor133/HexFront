@@ -1,26 +1,18 @@
-/* Сигналы границы: стопка плашек под верхней панелью. */
-.stack {
-  position: absolute;
-  top: calc(var(--hud-h, 0px) + var(--space-sm));
-  left: var(--space-md);
+/* Сигнал границы: маленькая плашка над границей, следует за картой. */
+.signal {
+  position: fixed;
   z-index: 4;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  max-width: calc(100vw - var(--space-md) * 2);
-}
-
-.signal {
-  display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
+  gap: var(--space-xs);
+  padding: 2px var(--space-xs);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   corner-shape: var(--ui-corner);
   background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   box-shadow: var(--shadow-hard);
+  transform: translate(-50%, -120%);
 }
 
 .dot {
@@ -30,19 +22,10 @@
   border-radius: 50%;
 }
 
-.name {
-  min-width: 0;
-  max-width: 140px;
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .close {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   padding: 0;
   border: 0;

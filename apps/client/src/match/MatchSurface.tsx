@@ -273,7 +273,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         />
       )}
       {view && map && !debug && !tutorial && !pauseState.menuOpen && (
-        <BorderSignals view={view} map={map} send={sb.send} />
+        <BorderSignals
+          view={view}
+          map={map}
+          send={sb.send}
+          camera={tutorialCamera}
+          hexWorld={tutorialHexWorld}
+        />
       )}
       {view && map && sb.menu && !pauseState.menuOpen && (
         <TerritoryMenu

@@ -6,14 +6,15 @@ import { ARMY_LEVEL_DENOMS, FP, type ArmyView, type Command, type PlayerView } f
 export const LIMIT_STEP = 10;
 
 /**
- * Предел лимита: солдаты в отрядах плюс половина населения — недостающих ИИ закупит и подведёт.
+ * Предел лимита и основа уровней армии: половина суммы солдат и людей. Набор переводит людей в
+ * солдат один к одному, поэтому сумма не прыгает, когда армия растёт, и названия уровней стоят на месте.
  * @returns солдат, не меньше 1
  */
 export function maxArmySoldiers(view: PlayerView): number {
   const total = view.units
     .filter((unit) => unit.owner === view.playerId)
     .reduce((sum, unit) => sum + unit.soldiers, 0);
-  return Math.max(1, Math.floor((total + view.me.popTotal / 2) / FP));
+  return Math.max(1, Math.floor((total + view.me.popTotal) / (2 * FP)));
 }
 
 /** Доля предела, округлённая до целых солдат. */
@@ -62,18 +63,21 @@ export function armySize(army: ArmyView, soldiers: number): number {
   return army.wanted ?? soldiers;
 }
 
-/** Индекс уровня, не превышающего размер (−1 — меньше роты). */
+/**
+ * Индекс ближайшего к размеру уровня (−1 — меньше половины роты). Ближайший, а не «не больше»,
+ * чтобы название не прыгало, когда предел чуть сдвигается.
+ */
 export function levelIndex(levels: readonly number[], size: number): number {
-  let index = -1;
+  const first = levels[0];
+  if (first === undefined || size < first / 2) return -1;
+  let best = 0;
   levels.forEach((value, i) => {
-    if (value <= size) index = i;
+    if (Math.abs(value - size) < Math.abs((levels[best] ?? 0) - size)) best = i;
   });
-  return index;
+  return best;
 }
 
-/** Следующий размер по уровням вверх или вниз от текущего; null — выше корпуса или ниже роты. */
+/** Размер следующего уровня вверх или вниз от ближайшего к текущему; null — выше корпуса или ниже роты. */
 export function stepLevel(levels: readonly number[], size: number, dir: 1 | -1): number | null {
-  const next =
-    dir === 1 ? levels.find((value) => value > size) : [...levels].reverse().find((v) => v < size);
-  return next ?? null;
+  return levels[levelIndex(levels, size) + dir] ?? null;
 }

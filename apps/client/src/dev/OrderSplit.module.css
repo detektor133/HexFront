@@ -93,3 +93,14 @@
   border-radius: 50%;
   background: var(--status-warning);
 }
+
+/* Малый вид: значок и стрелка, без подписи и без больших полей — для сигнала на карте. */
+.compact .main,
+.compact .arrow {
+  min-height: 30px;
+  padding: 0 var(--space-xs);
+}
+
+.compact .arrow {
+  padding: 0 2px;
+}

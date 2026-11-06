@@ -458,24 +458,23 @@ export function ArmyBar(props: {
   };
   // Уровни размера армии (рота…корпус) — доли предела государства, а не число.
   const levels = armyLevels(maxArmySoldiers(view));
-  const sizeOf = (a: ArmyView): number =>
-    armySize(
-      a,
-      Math.floor(
-        mine.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0) / FP,
-      ),
-    );
+  const soldiersOf = (a: ArmyView): number =>
+    Math.floor(mine.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0) / FP);
+  const sizeOf = (a: ArmyView): number => armySize(a, soldiersOf(a));
   const levelLabelOf = (a: ArmyView, _units: readonly UnitView[]): string => {
     const index = levelIndex(levels, sizeOf(a));
     const name = LEVEL_NAMES[index];
     return t(name === undefined ? 'army.level.none' : name);
   };
+  // «Усилить» считает от большего из предела и фактической численности, чтобы не уменьшить.
+  const stepSize = (a: ArmyView, dir: 1 | -1): number =>
+    dir === 1 ? Math.max(sizeOf(a), soldiersOf(a)) : sizeOf(a);
   const resizeBlocked = (a: ArmyView, dir: 1 | -1): string | null =>
-    stepLevel(levels, sizeOf(a), dir) === null
+    stepLevel(levels, stepSize(a, dir), dir) === null
       ? t(dir === 1 ? 'army.strongest' : 'army.weakest')
       : null;
   const resize = (a: ArmyView, dir: 1 | -1): void => {
-    const next = stepLevel(levels, sizeOf(a), dir);
+    const next = stepLevel(levels, stepSize(a, dir), dir);
     if (next === null) return;
     const counts = countsFromShares(next, sharesFromCounts(armyCounts(view, a)));
     const mix = counts.armor + counts.artillery > 0 ? counts : undefined;

@@ -23,6 +23,8 @@ export function OrderSplit(props: {
   readonly onAuto: () => void;
   readonly onPick: (army: ArmyView) => void;
   readonly tutorial?: string;
+  /** Малый вид: только значок и стрелка (сигнал на карте). */
+  readonly compact?: boolean;
 }): React.JSX.Element {
   const { icon, label, disabled, armies, onAuto, onPick } = props;
   const [open, setOpen] = useState(false);
@@ -36,7 +38,7 @@ export function OrderSplit(props: {
     return () => window.removeEventListener('pointerdown', onDown);
   }, [open]);
   return (
-    <div ref={ref} className={styles.split}>
+    <div ref={ref} className={`${styles.split} ${props.compact ? styles.compact : ''}`}>
       <button
         type="button"
         className={styles.main}
@@ -46,7 +48,7 @@ export function OrderSplit(props: {
         onClick={onAuto}
       >
         {icon}
-        <span>{t(label)}</span>
+        {!props.compact && <span>{t(label)}</span>}
       </button>
       <button
         type="button"

@@ -51,7 +51,9 @@ describe('уровни размера армии', () => {
     expect(stepLevel(levels, 160, 1)).toBeNull();
     expect(stepLevel(levels, 10, -1)).toBeNull();
     expect(levelIndex(levels, 45)).toBe(2);
-    expect(levelIndex(levels, 5)).toBe(-1);
+    expect(levelIndex(levels, 4)).toBe(-1);
+    // Предел чуть сдвинулся (рост населения): название уровня то же.
+    expect(levelIndex(armyLevels(170), 80)).toBe(levelIndex(armyLevels(160), 80));
   });
 });
 
