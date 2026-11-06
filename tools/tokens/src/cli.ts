@@ -2,15 +2,26 @@
 // --check не пишет файлы, а падает, если сгенерированные файлы устарели.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { renderCss, renderTs, type TokenValue } from './generate.ts';
+import {
+  renderCss,
+  renderThemesCss,
+  renderThemesTs,
+  renderTs,
+  type TokenValue,
+} from './generate.ts';
 
 const root = new URL('../../../', import.meta.url);
 const source = JSON.parse(
   readFileSync(new URL('docs/art/tokens.json', root), 'utf8'),
 ) as TokenValue;
+const themes = JSON.parse(
+  readFileSync(new URL('docs/art/themes.json', root), 'utf8'),
+) as Parameters<typeof renderThemesCss>[0];
 const outputs: [URL, string][] = [
   [new URL('apps/client/src/theme/tokens.ts', root), renderTs(source)],
   [new URL('apps/client/src/theme/tokens.css', root), renderCss(source)],
+  [new URL('apps/client/src/theme/themes.css', root), renderThemesCss(themes)],
+  [new URL('apps/client/src/theme/themes.ts', root), renderThemesTs(themes)],
 ];
 
 const check = process.argv.includes('--check');

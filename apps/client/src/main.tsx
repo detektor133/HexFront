@@ -9,7 +9,9 @@ import { applyDocumentLang } from './i18n/document-lang.ts';
 import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
 import { isDevPath, isMatchPath } from './routes.ts';
+import { applyTheme, currentTheme } from './theme/theme.ts';
 import './theme/tokens.css';
+import './theme/themes.css';
 import './theme/fonts.css';
 import './theme/global.css';
 
@@ -29,6 +31,7 @@ export function App(): React.JSX.Element {
 const root = document.getElementById('root');
 if (!root) throw new Error('нет элемента #root');
 applyDocumentLang(document.documentElement);
+applyTheme(currentTheme());
 createRoot(root).render(
   <StrictMode>
     <App />

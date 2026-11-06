@@ -22,6 +22,7 @@ import {
   formatRate,
   formatRateFull,
 } from '../i18n/format.ts';
+import { chooseTheme, currentTheme, themeIds, type ThemeId } from '../theme/theme.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 import { MetricIcon, type MetricIconName } from '../ui/metric-icon.tsx';
 
@@ -123,6 +124,7 @@ function Settings(props: {
   onOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>(currentTheme);
   const wrapRef = useRef<HTMLDivElement>(null);
   const { onOpenChange } = props;
   useDismiss(
@@ -166,6 +168,25 @@ function Settings(props: {
               </span>
             </button>
           )}
+          <fieldset className={styles.themeGroup}>
+            <legend className={styles.themeLabel}>{t('settings.theme')}</legend>
+            <div className={styles.themeButtons}>
+              {themeIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={theme === id}
+                  className={theme === id ? styles.themeActive : styles.themeButton}
+                  onClick={() => {
+                    chooseTheme(id);
+                    setTheme(id);
+                  }}
+                >
+                  {t(`theme.${id}`)}
+                </button>
+              ))}
+            </div>
+          </fieldset>
         </div>
       )}
     </div>

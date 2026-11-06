@@ -1,0 +1,103 @@
+{
+  "$schema": "hexfront-themes-v1",
+  "$comment": "Темы интерфейса (HUD, карточки, меню). Переопределяют только группы tokens.json: ui, status, radius, shadow. Карта (рельеф, территории, фишки) от темы не зависит. Базовые значения tokens.json — запасной вариант без data-theme. Решение владельца 2026-11-06: градиенты, тени, размытие, тёмные панели и скругления больше токенов разрешены, если их задаёт тема; backdrop-filter не используется — под панелями живой WebGL-холст.",
+  "default": "soft",
+  "themes": [
+    {
+      "id": "soft",
+      "ui": {
+        "ink": "#2A2622",
+        "ink2": "#6A635A",
+        "ink3": "#9A9288",
+        "surface": "#FFFDF8",
+        "surface2": "#F3EEE4",
+        "border": "#E6DFD2",
+        "borderStrong": "#CFC5B3",
+        "buttonPrimaryBg": "#2F7D6B",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#2F7D4F",
+        "successBg": "#E1F2E7",
+        "warning": "#A8680F",
+        "warningBg": "#FBEFD9",
+        "danger": "#C23B22",
+        "dangerBg": "#FBE6E1"
+      },
+      "radius": { "chip": 10, "button": 14, "card": 20, "input": 14 },
+      "shadow": { "hard": "0 8px 24px rgba(60, 45, 25, 0.2), 0 1px 3px rgba(60, 45, 25, 0.18)" }
+    },
+    {
+      "id": "deco",
+      "ui": {
+        "ink": "#F4EAD0",
+        "ink2": "#CDBE97",
+        "ink3": "#968B6D",
+        "surface": "#10241F",
+        "surface2": "#1A332D",
+        "border": "#8A7236",
+        "borderStrong": "#C9A24B",
+        "buttonPrimaryBg": "#C9A24B",
+        "buttonPrimaryInk": "#10241F"
+      },
+      "status": {
+        "success": "#7BD3A0",
+        "successBg": "#17372B",
+        "warning": "#E6B450",
+        "warningBg": "#3A2F14",
+        "danger": "#FF8A73",
+        "dangerBg": "#3D1D17"
+      },
+      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
+      "shadow": { "hard": "0 0 0 3px #10241F, 0 0 0 4px #C9A24B, 0 8px 16px rgba(0, 0, 0, 0.35)" }
+    },
+    {
+      "id": "glass",
+      "ui": {
+        "ink": "#EAF1F8",
+        "ink2": "#A9B8C8",
+        "ink3": "#74869A",
+        "surface": "rgba(16, 24, 36, 0.86)",
+        "surface2": "rgba(255, 255, 255, 0.08)",
+        "border": "rgba(255, 255, 255, 0.16)",
+        "borderStrong": "rgba(255, 255, 255, 0.34)",
+        "buttonPrimaryBg": "#5AB0F0",
+        "buttonPrimaryInk": "#07121D"
+      },
+      "status": {
+        "success": "#6FD39A",
+        "successBg": "rgba(111, 211, 154, 0.16)",
+        "warning": "#F0B84E",
+        "warningBg": "rgba(240, 184, 78, 0.16)",
+        "danger": "#FF8C78",
+        "dangerBg": "rgba(255, 140, 120, 0.16)"
+      },
+      "radius": { "chip": 6, "button": 10, "card": 14, "input": 10 },
+      "shadow": { "hard": "0 10px 30px rgba(0, 0, 0, 0.38)" }
+    },
+    {
+      "id": "poster",
+      "ui": {
+        "ink": "#1B1B1B",
+        "ink2": "#4A4A4A",
+        "ink3": "#7A7A7A",
+        "surface": "#FFFFFF",
+        "surface2": "#FFF1C9",
+        "border": "#1B1B1B",
+        "borderStrong": "#1B1B1B",
+        "buttonPrimaryBg": "#E8503A",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#1E8A4C",
+        "successBg": "#CDEFD8",
+        "warning": "#A86400",
+        "warningBg": "#FFE3A3",
+        "danger": "#C62F1B",
+        "dangerBg": "#FFD3CB"
+      },
+      "radius": { "chip": 8, "button": 12, "card": 16, "input": 12 },
+      "shadow": { "hard": "0 4px 0 #1B1B1B" }
+    }
+  ]
+}

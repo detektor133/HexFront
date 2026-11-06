@@ -60,6 +60,30 @@ export function renderCss(raw: TokenValue): string {
   return `/* ${HEADER} */\n\n:root {\n${lines}\n}\n`;
 }
 
+type ThemesSource = { default: string; themes: { id: string; [key: string]: TokenValue }[] };
+
+/** CSS тем интерфейса: по блоку `[data-theme]` на тему, имена переменных — как у renderCss. */
+export function renderThemesCss(raw: ThemesSource): string {
+  const blocks = raw.themes.map(({ id, ...groups }) => {
+    const vars: [string, string][] = [];
+    flatten(strip(groups), [], vars);
+    const lines = vars.map(([k, v]) => `  --${k}: ${v};`).join('\n');
+    return `[data-theme='${id}'] {\n${lines}\n}\n`;
+  });
+  return `/* ${HEADER} */\n\n${blocks.join('\n')}`;
+}
+
+/** TypeScript-модуль со списком тем и темой по умолчанию. */
+export function renderThemesTs(raw: ThemesSource): string {
+  const ids = raw.themes.map((t) => t.id);
+  const list = JSON.stringify(ids);
+  return (
+    `// ${HEADER}\n\nexport const themeIds = ${list} as const;\n\n` +
+    `export type ThemeId = (typeof themeIds)[number];\n\n` +
+    `export const defaultTheme: ThemeId = '${raw.default}';\n`
+  );
+}
+
 function channel(hex: string, offset: number): number {
   const c = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;

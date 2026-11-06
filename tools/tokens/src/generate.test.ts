@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { contrast, renderCss, renderTs, type TokenValue } from './generate.ts';
+import {
+  contrast,
+  renderCss,
+  renderThemesCss,
+  renderThemesTs,
+  renderTs,
+  type TokenValue,
+} from './generate.ts';
 
 const root = new URL('../../../', import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, root), 'utf8');
@@ -38,6 +45,26 @@ describe('токены', () => {
     const source = tokens as unknown as TokenValue;
     expect(read('apps/client/src/theme/tokens.ts')).toBe(renderTs(source));
     expect(read('apps/client/src/theme/tokens.css')).toBe(renderCss(source));
+  });
+
+  it('темы интерфейса: сгенерированные themes.css и themes.ts совпадают с themes.json', () => {
+    const themes = JSON.parse(read('docs/art/themes.json')) as Parameters<
+      typeof renderThemesCss
+    >[0];
+    expect(read('apps/client/src/theme/themes.css')).toBe(renderThemesCss(themes));
+    expect(read('apps/client/src/theme/themes.ts')).toBe(renderThemesTs(themes));
+    expect(themes.themes.map((t) => t.id)).toEqual(['soft', 'deco', 'glass', 'poster']);
+  });
+
+  it('каждая тема задаёт полный набор переменных интерфейса', () => {
+    const css = renderThemesCss(
+      JSON.parse(read('docs/art/themes.json')) as Parameters<typeof renderThemesCss>[0],
+    );
+    for (const block of css.split('[data-theme=').slice(1)) {
+      for (const name of ['--ui-ink', '--ui-surface', '--ui-button-primary-bg', '--shadow-hard']) {
+        expect(block).toContain(name);
+      }
+    }
   });
 
   it('комментарии $… не попадают в вывод', () => {

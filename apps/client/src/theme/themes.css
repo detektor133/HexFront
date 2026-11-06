@@ -1,0 +1,93 @@
+/* Сгенерировано tools/tokens из docs/art/tokens.json — не редактировать вручную. */
+
+[data-theme='soft'] {
+  --ui-ink: #2A2622;
+  --ui-ink2: #6A635A;
+  --ui-ink3: #9A9288;
+  --ui-surface: #FFFDF8;
+  --ui-surface2: #F3EEE4;
+  --ui-border: #E6DFD2;
+  --ui-border-strong: #CFC5B3;
+  --ui-button-primary-bg: #2F7D6B;
+  --ui-button-primary-ink: #FFFFFF;
+  --status-success: #2F7D4F;
+  --status-success-bg: #E1F2E7;
+  --status-warning: #A8680F;
+  --status-warning-bg: #FBEFD9;
+  --status-danger: #C23B22;
+  --status-danger-bg: #FBE6E1;
+  --radius-chip: 10px;
+  --radius-button: 14px;
+  --radius-card: 20px;
+  --radius-input: 14px;
+  --shadow-hard: 0 8px 24px rgba(60, 45, 25, 0.2), 0 1px 3px rgba(60, 45, 25, 0.18);
+}
+
+[data-theme='deco'] {
+  --ui-ink: #F4EAD0;
+  --ui-ink2: #CDBE97;
+  --ui-ink3: #968B6D;
+  --ui-surface: #10241F;
+  --ui-surface2: #1A332D;
+  --ui-border: #8A7236;
+  --ui-border-strong: #C9A24B;
+  --ui-button-primary-bg: #C9A24B;
+  --ui-button-primary-ink: #10241F;
+  --status-success: #7BD3A0;
+  --status-success-bg: #17372B;
+  --status-warning: #E6B450;
+  --status-warning-bg: #3A2F14;
+  --status-danger: #FF8A73;
+  --status-danger-bg: #3D1D17;
+  --radius-chip: 2px;
+  --radius-button: 2px;
+  --radius-card: 4px;
+  --radius-input: 2px;
+  --shadow-hard: 0 0 0 3px #10241F, 0 0 0 4px #C9A24B, 0 8px 16px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='glass'] {
+  --ui-ink: #EAF1F8;
+  --ui-ink2: #A9B8C8;
+  --ui-ink3: #74869A;
+  --ui-surface: rgba(16, 24, 36, 0.86);
+  --ui-surface2: rgba(255, 255, 255, 0.08);
+  --ui-border: rgba(255, 255, 255, 0.16);
+  --ui-border-strong: rgba(255, 255, 255, 0.34);
+  --ui-button-primary-bg: #5AB0F0;
+  --ui-button-primary-ink: #07121D;
+  --status-success: #6FD39A;
+  --status-success-bg: rgba(111, 211, 154, 0.16);
+  --status-warning: #F0B84E;
+  --status-warning-bg: rgba(240, 184, 78, 0.16);
+  --status-danger: #FF8C78;
+  --status-danger-bg: rgba(255, 140, 120, 0.16);
+  --radius-chip: 6px;
+  --radius-button: 10px;
+  --radius-card: 14px;
+  --radius-input: 10px;
+  --shadow-hard: 0 10px 30px rgba(0, 0, 0, 0.38);
+}
+
+[data-theme='poster'] {
+  --ui-ink: #1B1B1B;
+  --ui-ink2: #4A4A4A;
+  --ui-ink3: #7A7A7A;
+  --ui-surface: #FFFFFF;
+  --ui-surface2: #FFF1C9;
+  --ui-border: #1B1B1B;
+  --ui-border-strong: #1B1B1B;
+  --ui-button-primary-bg: #E8503A;
+  --ui-button-primary-ink: #FFFFFF;
+  --status-success: #1E8A4C;
+  --status-success-bg: #CDEFD8;
+  --status-warning: #A86400;
+  --status-warning-bg: #FFE3A3;
+  --status-danger: #C62F1B;
+  --status-danger-bg: #FFD3CB;
+  --radius-chip: 8px;
+  --radius-button: 12px;
+  --radius-card: 16px;
+  --radius-input: 12px;
+  --shadow-hard: 0 4px 0 #1B1B1B;
+}
