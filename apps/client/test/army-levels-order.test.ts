@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ArmyView, MapStatic, PlayerView } from '@hexfront/sim';
 
-import { armyLevels, levelIndex, stepLevel } from '../src/dev/army-limit.ts';
+import { armyLevels, stepSize } from '../src/dev/army-limit.ts';
 import { autoOrder, contacts, isFree, nearestFreeArmy, orderArmy } from '../src/dev/army-order.ts';
 import { NEW_ARMY } from '../src/dev/direction-order.ts';
 
@@ -43,17 +43,14 @@ describe('уровни размера армии', () => {
     expect(armyLevels(3)).toEqual([1, 2, 3]);
   });
 
-  it('усилить и уменьшить идут по соседним уровням, у краёв — null', () => {
-    const levels = armyLevels(160);
-    expect(stepLevel(levels, 40, 1)).toBe(80);
-    expect(stepLevel(levels, 40, -1)).toBe(20);
-    expect(stepLevel(levels, 45, 1)).toBe(80);
-    expect(stepLevel(levels, 160, 1)).toBeNull();
-    expect(stepLevel(levels, 10, -1)).toBeNull();
-    expect(levelIndex(levels, 45)).toBe(2);
-    expect(levelIndex(levels, 4)).toBe(-1);
-    // Предел чуть сдвинулся (рост населения): название уровня то же.
-    expect(levelIndex(armyLevels(170), 80)).toBe(levelIndex(armyLevels(160), 80));
+  it('шаг «+/−» — доля текущего размера: растёт с армией, не ниже одного и не выше предела', () => {
+    expect(stepSize(400, 25, 1, 1000)).toBe(500);
+    expect(stepSize(400, 25, -1, 1000)).toBe(300);
+    expect(stepSize(50, 10, 1, 1000)).toBe(55);
+    expect(stepSize(3, 10, 1, 1000)).toBe(4);
+    expect(stepSize(1, 50, -1, 1000)).toBe(1);
+    expect(stepSize(900, 50, 1, 1000)).toBe(1000);
+    expect(stepSize(1000, 25, 1, 1000)).toBe(1000);
   });
 });
 

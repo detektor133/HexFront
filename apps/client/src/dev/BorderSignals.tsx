@@ -22,6 +22,9 @@ export interface SignalCamera {
   };
 }
 
+/** Наименьший масштаб плашки при сильном отдалении карты. */
+const MIN_SCALE = 0.4;
+
 /** Сигнал вне экрана: сосед и гекс границы, к которому ведёт строка ленты. */
 export interface OffscreenSignal {
   readonly other: number;
@@ -88,7 +91,9 @@ export function BorderSignals(props: {
           y <= cam.screen.top + cam.screen.height;
         if (!visible) away.push({ other, hex });
         if (!node) continue;
-        node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+        // Плашка уменьшается вместе с картой, чтобы при отдалении не закрывать её.
+        const k = Math.max(MIN_SCALE, Math.min(1, scale));
+        node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) scale(${k.toFixed(3)})`;
         node.style.visibility = visible ? 'visible' : 'hidden';
       }
       const key = away.map((a) => `${a.other}:${a.hex}`).join(',');

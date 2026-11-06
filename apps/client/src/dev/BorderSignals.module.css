@@ -67,7 +67,7 @@
   background: currentColor;
 }
 
-/* Крестик — такая же кнопка-призрак, как остальные: тот же размер, фон и рамка при наведении. */
+/* Крестик — кнопка-призрак внутри общей рамки плашки: без своей рамки, подсветка при наведении. */
 .close {
   display: grid;
   flex: 0 0 auto;
@@ -75,9 +75,9 @@
   height: var(--touch-target-min);
   place-items: center;
   padding: 0;
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border: 0;
   border-radius: var(--radius-button);
-  background: var(--ui-surface);
+  background: transparent;
   color: var(--ui-ink2);
   cursor: pointer;
 }

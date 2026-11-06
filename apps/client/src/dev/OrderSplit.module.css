@@ -105,16 +105,23 @@
   padding: 0 2px;
 }
 
-/* Призрак: как кнопки панели армии — поверхность и рамка, без заливки цветом. */
+/* Призрак: без внутренних рамок и разделителей, стрелка выглядит частью кнопки. Подсветка при наведении. */
 .ghost .main,
 .ghost .arrow {
-  border-color: var(--ui-border);
-  background: var(--ui-surface);
-  color: var(--ui-ink);
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.ghost .main {
+  padding: 0 var(--space-sm) 0 var(--space-md);
+  border-radius: var(--radius-button);
 }
 
 .ghost .arrow {
-  border-left-color: var(--ui-border);
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-button);
+  color: var(--ui-ink2);
 }
 
 .ghost .main:hover,

@@ -1,0 +1,90 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.plus,
+.arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-xs);
+  border: 1.5px solid transparent;
+  background: var(--ui-panel-image) var(--ui-surface);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plus {
+  min-width: 44px;
+  border-radius: var(--radius-button) 0 0 var(--radius-button);
+}
+
+.arrow {
+  min-width: 24px;
+  padding: 0;
+  border-radius: 0 var(--radius-button) var(--radius-button) 0;
+  color: var(--ui-ink2);
+}
+
+.plus:hover,
+.arrow:hover,
+.plus:focus-visible,
+.arrow:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.plus:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.pct {
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  position: absolute;
+  bottom: calc(100% + var(--space-xs));
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-xs);
+  list-style: none;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.item,
+.itemOn {
+  min-width: 72px;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-button);
+  background: none;
+  color: var(--ui-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.itemOn {
+  background: var(--ui-surface2);
+  font-weight: 600;
+}

@@ -131,7 +131,8 @@
 .card {
   box-sizing: border-box;
   display: flex;
-  flex: 0 0 168px;
+  flex: 0 0 210px;
+  min-height: 78px;
   overflow: hidden;
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
@@ -303,7 +304,7 @@
 .nameText {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--font-size-label);
+  font-size: var(--font-size-body);
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -327,10 +328,25 @@
 
 /* Число солдат под названием: крупно, цифры одной ширины, чтобы карточка не ездила. */
 .count {
-  font-size: var(--font-size-hudValue, 15px);
+  font-size: 22px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+
+.countRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+/* Предел армии рядом с числом: цифры одной ширины, подпись не прыгает. */
+.limitText {
+  color: var(--ui-ink3);
+  font-size: var(--font-size-label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Два вертикальных столбика справа, как на фишке отряда: организация и снабжение. */
@@ -338,12 +354,12 @@
   display: flex;
   flex: 0 0 auto;
   gap: 2px;
-  padding: 6px 6px 6px 0;
+  padding: 10px 10px 10px 0;
 }
 
 .vbar {
   position: relative;
-  width: 4px;
+  width: 6px;
   overflow: hidden;
   background: var(--chip-track);
   border-radius: 2px;

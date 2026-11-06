@@ -36,15 +36,6 @@ export function limitCommand(
   return { t: 'setArmyLimit', armyId: army.id, soldiers, ...(mix ? { mix } : {}) };
 }
 
-/** Названия уровней размера армии по возрастанию. */
-export const LEVEL_NAMES = [
-  'army.level.company',
-  'army.level.battalion',
-  'army.level.regiment',
-  'army.level.division',
-  'army.level.corps',
-] as const;
-
 /**
  * Размеры уровней армии, солдат: доля предела государства (ARMY_LEVEL_DENOMS), строго по
  * возрастанию — на малых картах совпавшие уровни сливаются.
@@ -63,21 +54,17 @@ export function armySize(army: ArmyView, soldiers: number): number {
   return army.wanted ?? soldiers;
 }
 
-/**
- * Индекс ближайшего к размеру уровня (−1 — меньше половины роты). Ближайший, а не «не больше»,
- * чтобы название не прыгало, когда предел чуть сдвигается.
- */
-export function levelIndex(levels: readonly number[], size: number): number {
-  const first = levels[0];
-  if (first === undefined || size < first / 2) return -1;
-  let best = 0;
-  levels.forEach((value, i) => {
-    if (Math.abs(value - size) < Math.abs((levels[best] ?? 0) - size)) best = i;
-  });
-  return best;
-}
+/** Варианты шага «+/−» в процентах от текущего размера армии. */
+export const STEP_CHOICES = [10, 25, 50, 100] as const;
+export type StepPct = (typeof STEP_CHOICES)[number];
+export const DEFAULT_STEP: StepPct = 25;
 
-/** Размер следующего уровня вверх или вниз от ближайшего к текущему; null — выше корпуса или ниже роты. */
-export function stepLevel(levels: readonly number[], size: number, dir: 1 | -1): number | null {
-  return levels[levelIndex(levels, size) + dir] ?? null;
+/**
+ * Размер армии после шага «усилить» или «уменьшить» на долю текущего размера: шаг растёт вместе с
+ * армией, хардкода числа нет. Не меньше одного солдата и не больше предела.
+ * @returns солдат; равен size, если шаг невозможен
+ */
+export function stepSize(size: number, pct: number, dir: 1 | -1, max: number): number {
+  const delta = Math.max(1, Math.ceil((size * pct) / 100));
+  return dir === 1 ? Math.min(max, size + delta) : Math.max(1, size - delta);
 }

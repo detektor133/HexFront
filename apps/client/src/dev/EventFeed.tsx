@@ -162,7 +162,7 @@ export function EventFeed(props: {
         <div className={styles.slot} key={`signal:${other}`}>
           <button
             type="button"
-            className={`${styles.item} ${styles.important}`}
+            className={`${styles.item} ${styles.important} ${styles.offer} ${styles.signalRow}`}
             style={{ borderRightColor: ownerColor(other) }}
             title={t('signal.border')}
             aria-label={`${t('signal.border')}: ${nameOf(other)}`}

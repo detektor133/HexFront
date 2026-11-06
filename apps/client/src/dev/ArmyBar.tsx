@@ -1,7 +1,7 @@
 import {
+  IconAdjustmentsHorizontal,
   IconFlag,
   IconMinus,
-  IconPlus,
   IconShield,
   IconStarFilled,
   IconSwords,
@@ -20,14 +20,15 @@ import {
 
 import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
+import { StepPlus } from './StepPlus.tsx';
 import {
-  LEVEL_NAMES,
-  armyLevels,
+  DEFAULT_STEP,
+  STEP_CHOICES,
   armySize,
-  levelIndex,
   limitCommand,
   maxArmySoldiers,
-  stepLevel,
+  stepSize,
+  type StepPct,
 } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { armyCounts, orderFields } from './direction-order.ts';
@@ -41,6 +42,17 @@ import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const FULL = 1000;
+const STEP_KEY = 'hexfront.armyStep';
+
+/** Сохранённый шаг «+/−» игрока или шаг по умолчанию. */
+function readStep(): StepPct {
+  try {
+    const saved = Number(localStorage.getItem(STEP_KEY));
+    return STEP_CHOICES.find((pct) => pct === saved) ?? DEFAULT_STEP;
+  } catch {
+    return DEFAULT_STEP;
+  }
+}
 
 /** Сводка армии: средние по солдатам организация и снабжение (0..1), отряды в истощении. */
 export interface ArmyStats {
@@ -166,7 +178,7 @@ function Tool(props: {
   /** Готовый значок вместо набора ICONS. */
   glyph?: React.ReactNode;
   label: MessageKey;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: string | null;
   active?: boolean;
   tutorial?: string;
@@ -224,6 +236,8 @@ function ArmyCard(props: {
   stats: ArmyStats;
   /** Звёзды опыта армии 0..3. */
   stars: number;
+  /** Предел армии (заказанная численность): рядом с числом солдат; нет — лимита нет. */
+  wanted?: number | undefined;
   /** Приказ армии: режим и цель (id игрока или −1); нет — приказа нет. */
   dir?: ArmyView['dir'] | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
@@ -326,7 +340,14 @@ function ArmyCard(props: {
               </span>
             )}
           </span>
-          <span className={styles.count}>{formatSoldiers(stats.soldiers)}</span>
+          <span className={styles.countRow}>
+            <span className={styles.count}>{formatSoldiers(stats.soldiers)}</span>
+            {props.wanted !== undefined && (
+              <span className={styles.limitText} title={t('army.limit')}>
+                {`→ ${props.wanted}`}
+              </span>
+            )}
+          </span>
         </span>
         <span className={styles.bars}>
           <Meter
@@ -374,6 +395,15 @@ export function ArmyBar(props: {
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
   const [compAnchor, setCompAnchor] = useState<DOMRect | null>(null);
+  const [stepPct, setStepPct] = useState<StepPct>(readStep);
+  const chooseStep = (pct: StepPct): void => {
+    setStepPct(pct);
+    try {
+      localStorage.setItem(STEP_KEY, String(pct));
+    } catch {
+      // Хранилище закрыто: выбор шага действует до перезагрузки.
+    }
+  };
   const { onHeight } = props;
   useLayoutEffect(() => {
     const el = contentRef.current;
@@ -413,25 +443,19 @@ export function ArmyBar(props: {
     props.onHoldPick(props.holdPicking ? null : a.id);
   };
   // Уровни размера армии (рота…корпус) — доли предела государства, а не число.
-  const levels = armyLevels(maxArmySoldiers(view));
   const soldiersOf = (a: ArmyView): number =>
     Math.floor(mine.filter((u) => u.armyId === a.id).reduce((sum, u) => sum + u.soldiers, 0) / FP);
   const sizeOf = (a: ArmyView): number => armySize(a, soldiersOf(a));
-  const levelLabelOf = (a: ArmyView): string => {
-    const index = levelIndex(levels, sizeOf(a));
-    const name = LEVEL_NAMES[index];
-    return t(name === undefined ? 'army.level.none' : name);
-  };
+  const limitMax = maxArmySoldiers(view);
   // «Усилить» считает от большего из предела и фактической численности, чтобы не уменьшить.
-  const stepSize = (a: ArmyView, dir: 1 | -1): number =>
+  const baseSize = (a: ArmyView, dir: 1 | -1): number =>
     dir === 1 ? Math.max(sizeOf(a), soldiersOf(a)) : sizeOf(a);
   const resizeBlocked = (a: ArmyView, dir: 1 | -1): string | null =>
-    stepLevel(levels, stepSize(a, dir), dir) === null
+    stepSize(baseSize(a, dir), stepPct, dir, limitMax) === baseSize(a, dir)
       ? t(dir === 1 ? 'army.strongest' : 'army.weakest')
       : null;
   const resize = (a: ArmyView, dir: 1 | -1): void => {
-    const next = stepLevel(levels, stepSize(a, dir), dir);
-    if (next === null) return;
+    const next = stepSize(baseSize(a, dir), stepPct, dir, limitMax);
     const counts = countsFromShares(next, sharesFromCounts(armyCounts(view, a)));
     const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
     send(limitCommand(a, next, mix && { armor: mix.armor, artillery: mix.artillery }));
@@ -474,22 +498,19 @@ export function ArmyBar(props: {
               onClick={() => resize(army, -1)}
               disabled={resizeBlocked(army, -1)}
             />
-            <button
-              type="button"
-              className={styles.level}
-              data-tutorial="army-limit"
-              title={t('army.composition')}
-              aria-expanded={compAnchor !== null}
-              onClick={(event) => setCompAnchor(event.currentTarget.getBoundingClientRect())}
-            >
-              {levelLabelOf(army)}
-            </button>
-            <Tool
-              glyph={<IconPlus size={18} aria-hidden="true" />}
-              tutorial="army-stronger"
-              label="army.stronger"
-              onClick={() => resize(army, 1)}
+            <StepPlus
+              step={stepPct}
+              onStep={chooseStep}
+              onPlus={() => resize(army, 1)}
               disabled={resizeBlocked(army, 1)}
+              tutorial="army-stronger"
+            />
+            <Tool
+              glyph={<IconAdjustmentsHorizontal size={18} aria-hidden="true" />}
+              tutorial="army-limit"
+              label="army.composition"
+              onClick={(event) => setCompAnchor(event.currentTarget.getBoundingClientRect())}
+              active={compAnchor !== null}
             />
             <Tool
               icon="split"
@@ -543,6 +564,7 @@ export function ArmyBar(props: {
                   color={armyColor(a.number)}
                   stats={armyStats(units)}
                   stars={a.stars ?? 0}
+                  wanted={a.wanted}
                   dir={a.dir}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
