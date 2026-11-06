@@ -5,32 +5,26 @@ import {
   IconPackage,
   IconRoute2,
   IconShield,
-  IconUserPlus,
   IconX,
 } from '@tabler/icons-react';
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 
 import {
   TERRAIN_NAMES,
   TICKS_PER_S,
-  type ArmyView,
   type Command,
   type MapStatic,
   type PlayerView,
-  type UnitType,
   IMPROVEMENT_COST,
-  RECRUIT_MIN,
 } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import styles from './HexCard.module.css';
-import { armyName } from './army-name.ts';
 import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
-import { UnitGlyph } from './unit-glyph.tsx';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
-import { formatFp, formatRate, formatSoldiers } from '../i18n/format.ts';
-import type { RecruitAmount, RecruitOption, Selection } from '../local/messages.ts';
+import { formatFp, formatRate } from '../i18n/format.ts';
+import type { Selection } from '../local/messages.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 import { MetricIcon, MetricRow } from '../ui/metric-icon.tsx';
@@ -155,156 +149,6 @@ function Price(props: { value: string; ok: boolean }): React.JSX.Element {
   );
 }
 
-function RecruitButton(props: {
-  options: readonly RecruitOption[];
-  /** Свои армии: новобранцы идут в выбранную или в резерв. */
-  armies: readonly ArmyView[];
-  send: (cmd: Command) => void;
-  cityId: number;
-}): React.JSX.Element | null {
-  const reasonId = useId();
-  const [type, setType] = useState<UnitType>(
-    props.options.some((option) => option.type === 'infantry')
-      ? 'infantry'
-      : (props.options[0]?.type ?? 'infantry'),
-  );
-  const [soldiers, setSoldiers] = useState(RECRUIT_MIN);
-  // Куда придут новобранцы: null — в резерв.
-  const [armyId, setArmyId] = useState<number | null>(null);
-  const o = props.options.find((option) => option.type === type);
-  if (!o) return null;
-  const amount: RecruitAmount | undefined = o.amounts.find((x) => x.soldiers === soldiers);
-  const current =
-    amount ??
-    o.amounts.reduce<RecruitAmount | undefined>(
-      (nearest, candidate) =>
-        !nearest || Math.abs(candidate.soldiers - soldiers) < Math.abs(nearest.soldiers - soldiers)
-          ? candidate
-          : nearest,
-      undefined,
-    );
-  const selectedSoldiers = current?.soldiers ?? RECRUIT_MIN;
-  const check = current?.check;
-  const label = t(`unit.${type}` as MessageKey);
-  const reason = check
-    ? check.ok
-      ? null
-      : reasonText(check.reason)
-    : reasonText('notEnoughPeople');
-  const blocked = !check || (!check.ok && check.reason !== 'notEnoughGold');
-  return (
-    <div className={`${styles.action} ${styles.recruitBlock}`}>
-      <div className={styles.recruitControl}>
-        <div className={styles.recruitTypes} role="group" aria-label={t('recruit.type')}>
-          {props.options.map((option) => {
-            const typeLabel = t(`unit.${option.type}` as MessageKey);
-            return (
-              <button
-                key={option.type}
-                type="button"
-                className={styles.recruitType}
-                aria-label={typeLabel}
-                aria-pressed={option.type === type}
-                disabled={option.amounts.length === 0}
-                title={typeLabel}
-                onClick={() => {
-                  setType(option.type);
-                  const nearest = option.amounts.reduce<RecruitAmount | undefined>(
-                    (best, candidate) =>
-                      !best ||
-                      Math.abs(candidate.soldiers - selectedSoldiers) <
-                        Math.abs(best.soldiers - selectedSoldiers)
-                        ? candidate
-                        : best,
-                    undefined,
-                  );
-                  if (nearest) setSoldiers(nearest.soldiers);
-                }}
-              >
-                <UnitGlyph className={styles.glyph} type={option.type} />
-              </button>
-            );
-          })}
-        </div>
-        {props.armies.length > 0 && (
-          <label className={styles.recruitTarget}>
-            <span>{t('recruit.to')}</span>
-            <select
-              value={armyId ?? ''}
-              aria-label={t('recruit.to')}
-              onChange={(event) =>
-                setArmyId(
-                  event.currentTarget.value === '' ? null : Number(event.currentTarget.value),
-                )
-              }
-            >
-              <option value="">{t('army.reserve')}</option>
-              {props.armies.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {armyName(a)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className={styles.recruitRange}>
-          <span>{label}</span>
-          <input
-            type="range"
-            min={o.amounts[0]?.soldiers ?? RECRUIT_MIN}
-            max={o.amounts.at(-1)?.soldiers ?? RECRUIT_MIN}
-            step={
-              o.amounts[1] ? o.amounts[1].soldiers - (o.amounts[0]?.soldiers ?? 0) : RECRUIT_MIN
-            }
-            value={selectedSoldiers}
-            disabled={o.amounts.length === 0}
-            aria-label={t('recruit.amount')}
-            onChange={(event) => {
-              const next = o.amounts.find((x) => x.soldiers === Number(event.currentTarget.value));
-              if (next) setSoldiers(next.soldiers);
-            }}
-          />
-          <span>{formatSoldiers(selectedSoldiers)}</span>
-        </label>
-        <span className={styles.recruitInfo}>
-          {check?.cost !== undefined && <Price value={formatFp(check.cost)} ok={check.ok} />}
-          {check?.timeS !== undefined && (
-            <span className={styles.time}>
-              <MetricIcon name="time" />
-              {formatFp(check.timeS)} {t('card.seconds')}
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          data-tutorial="recruit"
-          className={`${styles.button} ${styles.recruitAction}${check?.ok ? ` ${styles.accent}` : ''}${blocked ? ` ${styles.muted}` : ''}`}
-          disabled={!check?.ok}
-          aria-label={t('recruit.queue')}
-          {...(reason ? { 'aria-describedby': reasonId } : {})}
-          title={t('recruit.queue')}
-          onClick={() =>
-            props.send({
-              t: 'recruit',
-              cityId: props.cityId,
-              type,
-              soldiers: selectedSoldiers,
-              ...(armyId !== null && props.armies.some((a) => a.id === armyId) ? { armyId } : {}),
-            })
-          }
-        >
-          <IconUserPlus size={16} aria-hidden="true" />
-        </button>
-      </div>
-      {reason && (
-        <span id={reasonId} className={styles.srOnly}>
-          {reason}
-        </span>
-      )}
-    </div>
-  );
-}
-
 // Причина недоступности основания: для населения — с числами, иначе — общий текст отказа.
 function blockedText(a: HexAction, s: Selection, view: PlayerView): string | null {
   if (!a.blocked) return null;
@@ -370,7 +214,6 @@ export function HexCard(props: {
     foundCityCost,
     IMPROVEMENT_COST[Math.min(improvement, IMPROVEMENT_COST.length - 1)] ?? 0,
   );
-  const recruiting = visible && c ? view.recruits.find((r) => r.cityId === c.id) : undefined;
   return (
     <section ref={cardRef} className={styles.card} style={props.style} aria-label={title}>
       <div ref={contentRef} className={styles.cardBody}>
@@ -433,17 +276,6 @@ export function HexCard(props: {
               />
             ))}
           </div>
-        )}
-        {recruiting && (
-          <p className={styles.progressText}>
-            {t('recruit.queue')}: {t(`unit.${recruiting.type}` as MessageKey)}{' '}
-            {formatSoldiers(recruiting.soldiers)} · <MetricIcon name="time" /> {t('card.left')}{' '}
-            {Math.ceil((recruiting.totalTicks - recruiting.progressTicks) / TICKS_PER_S)}{' '}
-            {t('card.seconds')}
-          </p>
-        )}
-        {c && !recruiting && (
-          <RecruitButton options={s.recruit} send={send} cityId={c.id} armies={view.armies} />
         )}
       </div>
     </section>

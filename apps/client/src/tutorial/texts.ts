@@ -161,20 +161,6 @@ const TEXTS: Readonly<Record<string, Both>> = {
       mouse: 'Left-click the marked hex, then the city icon.',
     },
   },
-  'core.recruit': {
-    ru: {
-      title: 'Набор войск',
-      text: 'Солдаты набираются в городах из людей и стоят золота. Выбери тип, число и нажми значок набора: отряд появится через несколько секунд.',
-      touch: 'Коснись своего города и нажми значок набора.',
-      mouse: 'Нажми левой кнопкой на свой город и на значок набора.',
-    },
-    en: {
-      title: 'Recruiting',
-      text: 'Soldiers are recruited in cities from people and cost gold. Pick a type and amount and press recruit: the unit appears in a few seconds.',
-      touch: 'Tap your city and press the recruit icon.',
-      mouse: 'Left-click your city and the recruit icon.',
-    },
-  },
   'core.hammer': {
     ru: {
       title: 'Молоточек: строительство',

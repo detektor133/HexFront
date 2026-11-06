@@ -145,7 +145,7 @@ describe('война и строительство в обучении', () => {
 
   it('молоточек учит строить: шаги идут по режиму строительства и самой стройке', () => {
     const ids = STEPS.core.map((x) => x.id);
-    expect(ids.indexOf('hammer')).toBeGreaterThan(ids.indexOf('recruit'));
+    expect(ids.indexOf('hammer')).toBeGreaterThan(ids.indexOf('city'));
     expect(ids.indexOf('improve')).toBeLessThan(ids.indexOf('enemy'));
     expect(ids.indexOf('war')).toBeLessThan(ids.indexOf('attack'));
     const s = start();

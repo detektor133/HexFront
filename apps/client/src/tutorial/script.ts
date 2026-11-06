@@ -119,10 +119,6 @@ export function cityProgress(ctx: TutorialCtx): number {
   return need <= 0 ? 0 : Math.min(1, (ctx.view.hexes.pop[site] ?? 0) / need);
 }
 
-function capitalHex(ctx: TutorialCtx): number | null {
-  return ctx.view.cities.find((c) => c.owner === me(ctx) && c.isCapital)?.hex ?? null;
-}
-
 function enemyCity(ctx: TutorialCtx): { readonly hex: number; readonly owner: number } | null {
   const city = ctx.view.cities.find((c) => c.owner >= 0 && c.owner !== me(ctx));
   return city ? { hex: city.hex, owner: city.owner } : null;
@@ -168,12 +164,6 @@ const CORE: readonly Step[] = [
     base: (c) => c.view.cities.filter((x) => x.owner === me(c)).length + builtOwn(c, 'foundCity'),
     done: (c, b) =>
       c.view.cities.filter((x) => x.owner === me(c)).length + builtOwn(c, 'foundCity') > b,
-  },
-  {
-    id: 'recruit',
-    target: { ui: 'recruit', fallbackHex: capitalHex },
-    base: (c) => c.view.recruits.length,
-    done: (c, b) => c.view.recruits.length > b,
   },
   {
     id: 'hammer',
