@@ -30,26 +30,50 @@
     {
       "id": "deco",
       "ui": {
-        "ink": "#F4EAD0",
-        "ink2": "#CDBE97",
-        "ink3": "#968B6D",
-        "surface": "#10241F",
-        "surface2": "#1A332D",
-        "border": "#8A7236",
-        "borderStrong": "#C9A24B",
-        "buttonPrimaryBg": "#C9A24B",
-        "buttonPrimaryInk": "#10241F"
+        "ink": "#F2EAD3",
+        "ink2": "#BFC3D6",
+        "ink3": "#8189A6",
+        "surface": "#0F1B33",
+        "surface2": "#1A2A4A",
+        "border": "#6F5E2E",
+        "borderStrong": "#D4AF5A",
+        "buttonPrimaryBg": "#D4AF5A",
+        "buttonPrimaryInk": "#0F1B33"
       },
       "status": {
         "success": "#7BD3A0",
-        "successBg": "#17372B",
-        "warning": "#E6B450",
-        "warningBg": "#3A2F14",
-        "danger": "#FF8A73",
-        "dangerBg": "#3D1D17"
+        "successBg": "#16382E",
+        "warning": "#EDBF5C",
+        "warningBg": "#3A3014",
+        "danger": "#FF8F7A",
+        "dangerBg": "#40201D"
       },
       "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
-      "shadow": { "hard": "0 0 0 3px #10241F, 0 0 0 4px #C9A24B, 0 8px 16px rgba(0, 0, 0, 0.35)" }
+      "shadow": { "hard": "0 0 0 3px #0F1B33, 0 0 0 4px #D4AF5A, 0 8px 16px rgba(0, 0, 0, 0.35)" }
+    },
+    {
+      "id": "decoRuby",
+      "ui": {
+        "ink": "#F6E9DD",
+        "ink2": "#D2B8B0",
+        "ink3": "#A08581",
+        "surface": "#2B0F1A",
+        "surface2": "#3E1A29",
+        "border": "#8B6A55",
+        "borderStrong": "#E3BE92",
+        "buttonPrimaryBg": "#E3BE92",
+        "buttonPrimaryInk": "#2B0F1A"
+      },
+      "status": {
+        "success": "#86D9A8",
+        "successBg": "#18382D",
+        "warning": "#F0C265",
+        "warningBg": "#403115",
+        "danger": "#FF9A86",
+        "dangerBg": "#4A2020"
+      },
+      "radius": { "chip": 2, "button": 2, "card": 4, "input": 2 },
+      "shadow": { "hard": "0 0 0 3px #2B0F1A, 0 0 0 4px #E3BE92, 0 8px 16px rgba(0, 0, 0, 0.4)" }
     },
     {
       "id": "glass",
@@ -57,7 +81,7 @@
         "ink": "#EAF1F8",
         "ink2": "#A9B8C8",
         "ink3": "#74869A",
-        "surface": "rgba(16, 24, 36, 0.86)",
+        "surface": "rgba(14, 22, 34, 0.86)",
         "surface2": "rgba(255, 255, 255, 0.08)",
         "border": "rgba(255, 255, 255, 0.16)",
         "borderStrong": "rgba(255, 255, 255, 0.34)",
@@ -76,22 +100,46 @@
       "shadow": { "hard": "0 10px 30px rgba(0, 0, 0, 0.38)" }
     },
     {
+      "id": "glassLight",
+      "ui": {
+        "ink": "#14222F",
+        "ink2": "#42586B",
+        "ink3": "#6F8496",
+        "surface": "rgba(206, 224, 238, 0.9)",
+        "surface2": "rgba(255, 255, 255, 0.34)",
+        "border": "rgba(20, 34, 47, 0.18)",
+        "borderStrong": "rgba(20, 34, 47, 0.4)",
+        "buttonPrimaryBg": "#2B6CB0",
+        "buttonPrimaryInk": "#FFFFFF"
+      },
+      "status": {
+        "success": "#1F7A4A",
+        "successBg": "rgba(31, 122, 74, 0.16)",
+        "warning": "#8A5A0A",
+        "warningBg": "rgba(168, 104, 15, 0.18)",
+        "danger": "#B3361F",
+        "dangerBg": "rgba(194, 59, 34, 0.16)"
+      },
+      "radius": { "chip": 6, "button": 10, "card": 14, "input": 10 },
+      "shadow": { "hard": "0 10px 28px rgba(20, 50, 80, 0.28)" }
+    },
+    {
       "id": "poster",
       "ui": {
         "ink": "#1B1B1B",
         "ink2": "#4A4A4A",
         "ink3": "#7A7A7A",
-        "surface": "#FFFFFF",
-        "surface2": "#FFF1C9",
+        "surface": "#FFF8E1",
+        "surface2": "#FFD84D",
         "border": "#1B1B1B",
         "borderStrong": "#1B1B1B",
-        "buttonPrimaryBg": "#E8503A",
+        "buttonPrimaryBg": "#2B59C3",
         "buttonPrimaryInk": "#FFFFFF"
       },
       "status": {
-        "success": "#1E8A4C",
+        "success": "#1E7A45",
         "successBg": "#CDEFD8",
-        "warning": "#A86400",
+        "warning": "#8A5200",
         "warningBg": "#FFE3A3",
         "danger": "#C62F1B",
         "dangerBg": "#FFD3CB"
