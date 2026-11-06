@@ -305,6 +305,7 @@ export const tokens = {
     "borderWidth": 1,
     "borderStyle": "solid",
     "panelImage": "none",
+    "corner": "round",
     "displayTransform": "none",
     "displaySpacing": "0em"
   },

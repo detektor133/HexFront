@@ -36,9 +36,10 @@
   color: var(--ui-ink);
   font-size: 13px;
   white-space: nowrap;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   transform: translateX(-50%);
   animation: build-badge 1100ms ease-out both;

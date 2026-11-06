@@ -7,7 +7,7 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   box-shadow: var(--shadow-hard);
 }
@@ -18,7 +18,7 @@
   padding: 0 var(--space-sm);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
 }

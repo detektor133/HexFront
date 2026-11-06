@@ -152,6 +152,7 @@
   --ui-border-width: 1px;
   --ui-border-style: solid;
   --ui-panel-image: none;
+  --ui-corner: round;
   --ui-display-transform: none;
   --ui-display-spacing: 0em;
   --status-success: #2E7D4F;

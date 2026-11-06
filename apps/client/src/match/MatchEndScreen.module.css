@@ -11,9 +11,10 @@
   padding: var(--space-xl);
   box-sizing: border-box;
   overflow-y: auto;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   color: var(--ui-ink);
 }

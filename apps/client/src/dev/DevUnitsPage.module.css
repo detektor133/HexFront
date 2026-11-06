@@ -17,7 +17,7 @@
 .canvas {
   height: 580px;
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
 }
 
 .stackCanvas {

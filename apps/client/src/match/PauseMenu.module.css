@@ -5,9 +5,10 @@
   box-sizing: border-box;
   gap: var(--space-sm);
   padding: var(--space-lg);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
 }
 

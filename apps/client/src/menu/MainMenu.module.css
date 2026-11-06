@@ -21,9 +21,10 @@
   width: min(100%, 420px);
   box-sizing: border-box;
   padding: var(--space-xl);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
 }
@@ -84,7 +85,7 @@
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-input);
   color: var(--ui-ink);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   font: inherit;
 }
 
@@ -99,7 +100,8 @@
   padding: var(--space-sm);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
-  background: var(--ui-surface) var(--ui-panel-image);
+  corner-shape: var(--ui-corner);
+  background: var(--ui-panel-image) var(--ui-surface);
   box-shadow: var(--shadow-hard);
 }
 
@@ -185,7 +187,7 @@
   padding: var(--space-sm) var(--space-md);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
   text-align: left;
@@ -217,7 +219,7 @@
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
 }
@@ -239,7 +241,7 @@
   font: inherit;
   font-weight: 600;
   text-decoration: none;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
 }

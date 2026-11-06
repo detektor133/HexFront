@@ -53,7 +53,7 @@ describe('токены', () => {
     >[0];
     expect(read('apps/client/src/theme/themes.css')).toBe(renderThemesCss(themes));
     expect(read('apps/client/src/theme/themes.ts')).toBe(renderThemesTs(themes));
-    expect(themes.themes.map((t) => t.id)).toEqual(['mint']);
+    expect(themes.themes.map((t) => t.id)).toEqual(['mint', 'hoi', 'civ', 'kingdom']);
   });
 
   it('каждая тема задаёт полный набор переменных интерфейса', () => {

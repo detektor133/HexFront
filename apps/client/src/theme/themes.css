@@ -23,3 +23,96 @@
   --radius-input: 16px;
   --shadow-hard: 0 8px 22px rgba(10, 70, 40, 0.3), 0 1px 3px rgba(10, 70, 40, 0.22);
 }
+
+[data-theme='hoi'] {
+  --ui-ink: #E9E7DA;
+  --ui-ink2: #B5B8A4;
+  --ui-ink3: #80856F;
+  --ui-surface: #1F2420;
+  --ui-surface2: #2B332C;
+  --ui-border: #4A5446;
+  --ui-border-strong: #8B9272;
+  --ui-button-primary-bg: #B8923A;
+  --ui-button-primary-ink: #1B1608;
+  --ui-border-width: 2px;
+  --ui-corner: bevel;
+  --ui-panel-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 4px), linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%);
+  --ui-display-transform: uppercase;
+  --ui-display-spacing: 0.05em;
+  --status-success: #8ED8A0;
+  --status-success-bg: #243C28;
+  --status-warning: #F0BE4E;
+  --status-warning-bg: #443816;
+  --status-danger: #FF9580;
+  --status-danger-bg: #4A2620;
+  --radius-chip: 3px;
+  --radius-button: 4px;
+  --radius-card: 8px;
+  --radius-input: 3px;
+  --shadow-hard: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 0 1px #0D100D, 0 8px 18px rgba(0, 0, 0, 0.5);
+  --space-xs: 3px;
+  --space-sm: 6px;
+  --space-md: 10px;
+  --space-lg: 14px;
+  --space-xl: 20px;
+  --font-display-family: 'Oswald';
+}
+
+[data-theme='civ'] {
+  --ui-ink: #2B2417;
+  --ui-ink2: #5E4E2F;
+  --ui-ink3: #8D7A52;
+  --ui-surface: #F4EBD3;
+  --ui-surface2: #E8D9B3;
+  --ui-border: #B28A33;
+  --ui-border-strong: #7C5F1E;
+  --ui-button-primary-bg: #1F4E5F;
+  --ui-button-primary-ink: #F6EBCB;
+  --ui-border-width: 2px;
+  --ui-panel-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.1 0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(150, 105, 30, 0.12));
+  --ui-display-transform: uppercase;
+  --ui-display-spacing: 0.06em;
+  --status-success: #2F6B3A;
+  --status-success-bg: #D3E3B8;
+  --status-warning: #8A5200;
+  --status-warning-bg: #F3D894;
+  --status-danger: #A32A18;
+  --status-danger-bg: #EFC3B2;
+  --radius-chip: 4px;
+  --radius-button: 6px;
+  --radius-card: 8px;
+  --radius-input: 5px;
+  --shadow-hard: 0 0 0 1px #F4EBD3, 0 0 0 3px #B28A33, 0 10px 20px rgba(60, 40, 10, 0.35);
+  --font-display-family: 'Forum';
+}
+
+[data-theme='kingdom'] {
+  --ui-ink: #EFE2C8;
+  --ui-ink2: #C4B190;
+  --ui-ink3: #8F7D5E;
+  --ui-surface: #2A1D16;
+  --ui-surface2: #3A2A20;
+  --ui-border: #6B4A2C;
+  --ui-border-strong: #C9A25A;
+  --ui-button-primary-bg: #8E2B22;
+  --ui-button-primary-ink: #F7E9C8;
+  --ui-border-width: 2px;
+  --ui-corner: scoop;
+  --ui-panel-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(ellipse at top, rgba(255, 220, 150, 0.08), transparent 70%);
+  --status-success: #9AD9A5;
+  --status-success-bg: #233A2A;
+  --status-warning: #EEC25F;
+  --status-warning-bg: #463816;
+  --status-danger: #FF9A86;
+  --status-danger-bg: #4E2620;
+  --radius-chip: 4px;
+  --radius-button: 6px;
+  --radius-card: 10px;
+  --radius-input: 5px;
+  --shadow-hard: 0 0 0 1px #120B07, inset 0 0 0 1px rgba(201, 162, 90, 0.35), 0 10px 22px rgba(0, 0, 0, 0.55);
+  --font-display-family: 'Alegreya SC';
+  --font-ui-family: 'Alegreya';
+  --font-size-caption: 13px;
+  --font-size-body: 15px;
+  --font-size-label: 14px;
+}

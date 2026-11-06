@@ -11,6 +11,7 @@
 
 .ring {
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
 }
 
 .ringRound {
@@ -28,9 +29,10 @@
   width: min(380px, calc(100vw - 24px));
   padding: var(--space-md);
   color: var(--ui-ink);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   transform: translateX(-50%);
 }
@@ -103,7 +105,7 @@
 
 .secondary {
   color: var(--ui-ink);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
 }
 

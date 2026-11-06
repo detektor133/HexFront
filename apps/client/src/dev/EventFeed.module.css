@@ -38,7 +38,7 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-left: 0;
   border-right: 4px solid var(--ui-ink);
@@ -106,7 +106,7 @@ div.item {
   }
 
   100% {
-    background: var(--ui-surface) var(--ui-panel-image);
+    background: var(--ui-panel-image) var(--ui-surface);
   }
 }
 

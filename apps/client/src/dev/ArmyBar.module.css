@@ -17,7 +17,7 @@
   height: var(--space-xl);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-chip);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
@@ -78,9 +78,10 @@
   max-width: 100%;
   margin-bottom: var(--space-sm);
   padding: var(--space-xs);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
 }
 
@@ -95,7 +96,7 @@
   padding: 0 var(--space-xs);
   border: 1.5px solid transparent;
   border-radius: var(--radius-button);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
@@ -132,9 +133,10 @@
   display: flex;
   flex: 0 0 238px;
   overflow: hidden;
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
   color: var(--ui-ink);
 }
@@ -173,7 +175,7 @@
   width: 100%;
   padding: 0;
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: inherit;
   font: inherit;
 }
@@ -374,9 +376,10 @@
   justify-content: center;
   gap: 2px;
   padding: var(--space-xs);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
 }
 

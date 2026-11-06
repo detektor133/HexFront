@@ -16,9 +16,10 @@
   max-width: calc(100% - 2 * var(--space-md));
   box-sizing: border-box;
   padding: var(--space-md);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
 }
 
@@ -50,7 +51,7 @@
   min-height: var(--touch-target-min);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-  background: var(--ui-surface) var(--ui-panel-image);
+  background: var(--ui-panel-image) var(--ui-surface);
   color: var(--ui-ink);
   font: inherit;
   font-variant-numeric: tabular-nums;
