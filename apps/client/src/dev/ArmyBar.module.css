@@ -392,9 +392,13 @@
 /* Число войск армии в заголовке справа от названия. */
 .troops {
   display: inline-flex;
-  flex-direction: column;
   align-items: flex-end;
   margin-left: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
   font-size: var(--font-size-label);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -428,20 +432,18 @@
 }
 
 /* Лимит армии: «→ N» открывает поповер; пунктир — признак, что число можно менять. */
-.limit {
-  padding: 0;
-  color: var(--ui-ink3);
-  font: inherit;
-  font-size: var(--font-size-caption);
-  font-weight: 400;
-  background: none;
-  border: 0;
-  border-bottom: 1px dashed var(--ui-border-strong);
-  cursor: pointer;
+.sizeRow {
+  display: flex;
+  align-items: center;
 }
 
-.limit::before {
-  content: '→ ';
+.sizeRange {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--ui-button-primary-bg);
+  cursor: pointer;
 }
 
 /* Значок приказа армии: режим и цвет цели. */

@@ -116,6 +116,14 @@ export function dropEmptyArmies(state: MatchState, armyIds: ReadonlySet<number>)
   }
 }
 
+/** Наименьший свободный номер армии игрока: после роспуска «Армия 1» новая снова «Армия 1». */
+function freeArmyNumber(state: MatchState, playerId: number): number {
+  const used = new Set(state.armies.filter((a) => a.owner === playerId).map((a) => a.number));
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return n;
+}
+
 /** Применяет команду армии. Вызывается только после успешной проверки. */
 export function executeArmyCommand(state: MatchState, playerId: number, cmd: ArmyCommand): void {
   switch (cmd.t) {
@@ -127,7 +135,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       state.armies.push({
         id: state.nextId,
         owner: playerId,
-        number: player.armiesCreated,
+        number: freeArmyNumber(state, playerId),
         name: cmd.name,
         auto: player.autoCommand,
       });
@@ -169,7 +177,7 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       const half = {
         id: state.nextId,
         owner: playerId,
-        number: player.armiesCreated,
+        number: freeArmyNumber(state, playerId),
         name: '',
         auto: source.auto,
       };

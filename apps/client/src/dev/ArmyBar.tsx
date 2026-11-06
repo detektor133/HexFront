@@ -16,7 +16,7 @@ import { ArmyLimit } from './ArmyLimit.tsx';
 import { limitCommand, maxArmySoldiers } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { armyCounts, type Counts } from './direction-order.ts';
-import { sharesFromCounts } from './force-share.ts';
+import { countsFromShares, sharesFromCounts } from './force-share.ts';
 import { offensiveButtons } from './offensive-buttons.ts';
 import type { Tool as PlanTool } from './plan-draft.ts';
 import type { ToolState } from './plan-tools.ts';
@@ -268,6 +268,18 @@ function ArmyCard(props: {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.rawName);
   const [limitAnchor, setLimitAnchor] = useState<DOMRect | null>(null);
+  // Размер армии — ползунок прямо на карточке: применяется, когда отпустил, как и раньше.
+  const [draftSize, setDraftSize] = useState<number | null>(null);
+  const currentSize = props.wanted ?? Math.min(props.limit.max, Math.floor(stats.soldiers / FP));
+  const applySize = (): void => {
+    if (draftSize === null) return;
+    setDraftSize(null);
+    if (draftSize === currentSize) return;
+    props.limit.onApply(
+      draftSize,
+      countsFromShares(draftSize, sharesFromCounts(props.limit.counts)),
+    );
+  };
   const frame = props.selected ? styles.selected : props.partial ? styles.partial : '';
   const beginEditing = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -329,21 +341,17 @@ function ArmyCard(props: {
               </button>
             )}
             <OrderBadge dir={props.dir} />
-            <span className={styles.troops} title={t('unit.soldiers')}>
+            <button
+              type="button"
+              className={styles.troops}
+              title={t('army.limit')}
+              onClick={(event) => {
+                event.stopPropagation();
+                setLimitAnchor(event.currentTarget.getBoundingClientRect());
+              }}
+            >
               {formatSoldiers(stats.soldiers)}
-              <button
-                type="button"
-                className={styles.limit}
-                data-tutorial="army-limit"
-                title={t('army.limit')}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setLimitAnchor(event.currentTarget.getBoundingClientRect());
-                }}
-              >
-                {props.wanted === undefined ? '∞' : formatSoldiers(props.wanted * FP)}
-              </button>
-            </span>
+            </button>
             {stats.fighting && (
               <span title={t('army.fighting')}>
                 <Icon name="fighting" className={styles.fightingIcon} />
@@ -364,6 +372,21 @@ function ArmyCard(props: {
                 <Icon name="stuck" className={styles.stuckIcon} />
               </span>
             )}
+          </span>
+          <span className={styles.sizeRow} data-tutorial="army-limit">
+            <input
+              type="range"
+              className={styles.sizeRange}
+              min={1}
+              max={Math.max(1, props.limit.max)}
+              value={draftSize ?? currentSize}
+              aria-label={t('army.limit')}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setDraftSize(Number(event.target.value))}
+              onPointerUp={applySize}
+              onKeyUp={applySize}
+              onBlur={applySize}
+            />
           </span>
           <Meter
             icon="org"
