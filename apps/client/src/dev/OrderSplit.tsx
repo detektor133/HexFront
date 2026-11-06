@@ -8,6 +8,7 @@ import { armyName } from './army-name.ts';
 import { isFree } from './army-order.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { armyColor } from '../theme/colors.ts';
+import { GoldIcon } from '../ui/gold-icon.tsx';
 
 /**
  * Кнопка приказа со стрелкой вниз: основная часть отдаёт приказ автоподбором армии, стрелка
@@ -25,6 +26,8 @@ export function OrderSplit(props: {
   readonly tutorial?: string;
   /** «Призрак»: фон и рамка как у кнопок панели, без заливки цветом; по умолчанию — заливка. */
   readonly tone?: 'fill' | 'ghost';
+  /** Золото на набор новой армии: мелким шрифтом под подписью; нет — армия уже есть. */
+  readonly cost?: number | null | undefined;
   /** Малый вид: только значок и стрелка. */
   readonly compact?: boolean;
 }): React.JSX.Element {
@@ -42,7 +45,7 @@ export function OrderSplit(props: {
   return (
     <div
       ref={ref}
-      className={`${styles.split} ${props.compact ? styles.compact : ''} ${props.tone === 'ghost' ? styles.ghost : ''}`}
+      className={`${styles.split} ${props.compact ? styles.compact : ''} ${props.tone === 'ghost' ? styles.ghost : ''} ${props.cost ? styles.withCost : ''}`}
     >
       <button
         type="button"
@@ -52,8 +55,23 @@ export function OrderSplit(props: {
         title={disabled ?? t(label)}
         onClick={onAuto}
       >
-        {icon}
-        {!props.compact && <span>{t(label)}</span>}
+        {props.cost ? (
+          <span className={styles.stack}>
+            <span className={styles.line}>
+              {icon}
+              {!props.compact && <span>{t(label)}</span>}
+            </span>
+            <span className={styles.cost} title={t('order.cost')}>
+              <GoldIcon />
+              {props.cost}
+            </span>
+          </span>
+        ) : (
+          <>
+            {icon}
+            {!props.compact && <span>{t(label)}</span>}
+          </>
+        )}
       </button>
       <button
         type="button"

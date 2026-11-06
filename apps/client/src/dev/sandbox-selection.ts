@@ -123,18 +123,6 @@ export function toggleUnitSelection(
   return { hex: null, units, target: null };
 }
 
-/**
- * Тап по фишке отряда армии выбирает всю армию (панель армии открывается сразу). Отряды без армии
- * и попадание сразу в несколько армий остаются как есть.
- */
-export function withWholeArmy(view: PlayerView, ids: readonly number[]): readonly number[] {
-  const hit = view.units.filter((u) => ids.includes(u.id) && u.owner === view.playerId);
-  const armies = new Set(hit.map((u) => u.armyId));
-  const army = hit[0]?.armyId ?? null;
-  if (armies.size !== 1 || army === null) return ids;
-  return view.units.filter((u) => u.owner === view.playerId && u.armyId === army).map((u) => u.id);
-}
-
 /** Армии выбранных отрядов: выбранная целиком и затронутые частично. */
 export interface ArmySelection {
   readonly whole: number | null;

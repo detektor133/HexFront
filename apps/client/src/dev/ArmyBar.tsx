@@ -33,6 +33,7 @@ import {
   type StepPct,
 } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
+import { armyFillCost } from './army-order.ts';
 import { armyCounts, orderFields } from './direction-order.ts';
 import { countsFromShares, sharesFromCounts } from './force-share.ts';
 import type { Picked } from './sandbox-selection.ts';
@@ -41,6 +42,7 @@ import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatSoldiers } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
+import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const FULL = 1000;
@@ -184,6 +186,8 @@ function Tool(props: {
   disabled?: string | null;
   active?: boolean;
   tutorial?: string;
+  /** Золото, которого стоит приказ (довести армию до предела): мелко под значком. */
+  cost?: number;
 }): React.JSX.Element {
   const label = props.disabled ?? t(props.label);
   return (
@@ -197,6 +201,12 @@ function Tool(props: {
       onClick={props.onClick}
     >
       {props.glyph ?? <Icon name={props.icon ?? ''} />}
+      {props.cost ? (
+        <span className={styles.toolCost}>
+          <GoldIcon />
+          {props.cost}
+        </span>
+      ) : null}
     </IconButton>
   );
 }
@@ -513,6 +523,7 @@ export function ArmyBar(props: {
               glyph={<IconShield size={18} aria-hidden="true" />}
               tutorial="army-hold"
               label="menu.hold"
+              cost={armyFillCost(view, army)}
               onClick={() => holdArmy(army)}
               active={props.holdPicking || army.dir?.mode === 'hold'}
             />
@@ -520,6 +531,7 @@ export function ArmyBar(props: {
               glyph={<IconSwords size={18} aria-hidden="true" />}
               tutorial="army-attack"
               label="menu.attack"
+              cost={armyFillCost(view, army)}
               onClick={() => attackArmy(army)}
               active={army.dir?.mode === 'attack'}
               disabled={attackBlocked(army)}

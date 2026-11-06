@@ -1,6 +1,7 @@
 // Приказы «Держать», «Наступать» и «Занять» из сигнала границы и меню страны: какая армия идёт
 // (свободная ближайшая, выбранная игроком или новая «в паритете» с соседом) и с каким размером.
 import {
+  COST_GOLD_PER_SOLDIER,
   FP,
   distance,
   hexFromId,
@@ -90,6 +91,41 @@ export function parityLevel(view: PlayerView, map: MapStatic, target: number): n
   }
   const levels = armyLevels(maxArmySoldiers(view));
   return levels.find((size) => size >= enemy) ?? levels.at(-1) ?? 1;
+}
+
+/** Золото на набор солдат пехотой (состав по умолчанию). */
+export function recruitGold(soldiers: number): number {
+  return Math.round((Math.max(0, soldiers) * COST_GOLD_PER_SOLDIER.infantry) / FP);
+}
+
+/** Золото на создание новой армии «в паритете» с соседом. */
+export function newArmyCost(view: PlayerView, map: MapStatic, target: number): number {
+  return recruitGold(parityLevel(view, map, target));
+}
+
+/**
+ * Автомат создаст новую армию на соседа: армии на него ещё нет и свободной рядом тоже.
+ * @returns золото на набор или null, если возьмётся готовая армия
+ */
+export function autoNewArmyCost(
+  view: PlayerView,
+  map: MapStatic,
+  target: number,
+  nearHex: number,
+): number | null {
+  if (view.armies.some((a) => a.dir?.target === target)) return null;
+  if (nearestFreeArmy(view, map, nearHex)) return null;
+  return newArmyCost(view, map, target);
+}
+
+/** Золото, чтобы довести армию до её предела: набор недостающих солдат. */
+export function armyFillCost(view: PlayerView, army: ArmyView): number {
+  const have = Math.floor(
+    view.units
+      .filter((u) => u.owner === view.playerId && u.armyId === army.id)
+      .reduce((sum, u) => sum + u.soldiers, 0) / FP,
+  );
+  return recruitGold((army.wanted ?? 0) - have);
 }
 
 /** Приказ армии на цель в нужном режиме: размер и состав армии сохраняются. */

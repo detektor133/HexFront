@@ -26,7 +26,6 @@ import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
 import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
-  withWholeArmy,
   NOTHING_PICKED,
   orderHex,
   selectHexOnly,
@@ -580,9 +579,7 @@ export function useSandbox(
       }
       if (kind === 'select') {
         const hit = layerRef.current?.unitsAt(world) ?? [];
-        if (hit.length > 0) {
-          return pick(selectUnits(current, pickedRef.current, withWholeArmy(current, hit)));
-        }
+        if (hit.length > 0) return pick(selectUnits(current, pickedRef.current, hit));
         // ЛКМ по чужой или ничьей земле — то же меню, что по ПКМ; карточка чужого гекса не открывается.
         if ((current.hexes.owner[hex] ?? -1) !== current.playerId) {
           if (pickedRef.current.units.length === 0) openMenuAt(hex, screen);

@@ -15,7 +15,14 @@ import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
-import { autoOrder, isFree, nearestFreeArmy, orderArmy, strengthVs } from './army-order.ts';
+import {
+  autoNewArmyCost,
+  autoOrder,
+  isFree,
+  nearestFreeArmy,
+  orderArmy,
+  strengthVs,
+} from './army-order.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -139,6 +146,7 @@ export function TerritoryMenu(props: {
                 icon={<IconShield size={20} aria-hidden="true" />}
                 label="menu.holdShort"
                 tutorial="hold"
+                cost={autoNewArmyCost(view, map, other, hex)}
                 disabled={null}
                 armies={view.armies}
                 onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}

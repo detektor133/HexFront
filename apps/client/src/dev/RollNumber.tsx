@@ -43,6 +43,11 @@ export function RollNumber(props: {
       if (props.text !== shown.text) setShown({ ...shown, text: props.text });
       return undefined;
     }
+    // Сокращённая запись (2,3к) не изменилась — анимировать нечего: значение обновляется молча.
+    if (props.text === shown.text) {
+      setShown({ ...shown, value: props.value });
+      return undefined;
+    }
     const apply = (): void => {
       const now = latest.current;
       lastChange.current = performance.now();

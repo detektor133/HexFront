@@ -550,3 +550,18 @@
   height: 8px;
   border-radius: 50%;
 }
+
+/* Цена под значком кнопки панели: мелко, кнопка вытягивается по высоте. */
+.tool {
+  flex-direction: column;
+  gap: 0;
+}
+
+.toolCost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ui-ink2);
+  font-size: 10px;
+  line-height: 11px;
+}
