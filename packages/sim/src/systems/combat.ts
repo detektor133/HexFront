@@ -6,6 +6,7 @@ import {
   RETREAT_DAMAGE_TAKEN_MULT,
   TICKS_PER_S,
 } from '../balance.ts';
+import { experienceSystem, orgPct } from './experience.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import {
@@ -108,6 +109,11 @@ function addHit(
   hits.set(key, h);
 }
 
+// Потеря org отряда меньше на бонус звёзд его армии.
+function orgTaken(u: Unit, org: number): number {
+  return intDiv(org * (100 - orgPct(u.stars)), 100);
+}
+
 // Потери за тик делятся по солдатам; отступающий под атакой теряет × RETREAT_DAMAGE_TAKEN_MULT.
 function collectHits(b: Battle, hits: Map<Unit | City, Hit>): void {
   const attLoss = intDiv(fpMul(b.defense as Fp, CASUALTY_RATE), TICKS_PER_S);
@@ -115,13 +121,15 @@ function collectHits(b: Battle, hits: Map<Unit | City, Hit>): void {
   const attOrg = intDiv(orgLossPerS(b.defense, b.attack), TICKS_PER_S);
   const defOrg = intDiv(orgLossPerS(b.attack, b.defense), TICKS_PER_S);
   const attTotal = b.attackers.reduce((s, u) => s + u.soldiers, 0);
-  for (const u of b.attackers) addHit(hits, u, intDiv(attLoss * u.soldiers, attTotal), attOrg);
+  for (const u of b.attackers) {
+    addHit(hits, u, intDiv(attLoss * u.soldiers, attTotal), orgTaken(u, attOrg));
+  }
   const defTotal = b.defenders.reduce((s, u) => s + u.soldiers, b.city?.defenders ?? 0);
   if (defTotal <= 0) return;
   for (const u of b.defenders) {
     const share = intDiv(defLoss * u.soldiers, defTotal);
     const mult = u.order === 'retreat' ? RETREAT_DAMAGE_TAKEN_MULT : FP;
-    addHit(hits, u, fpMul(share as Fp, mult as Fp), defOrg);
+    addHit(hits, u, fpMul(share as Fp, mult as Fp), orgTaken(u, defOrg));
   }
   if (b.city) addHit(hits, b.city, intDiv(defLoss * b.city.defenders, defTotal), defOrg);
 }
@@ -250,4 +258,5 @@ export function combatSystem(state: MatchState): void {
       u.target = -1;
     }
   }
+  experienceSystem(state);
 }

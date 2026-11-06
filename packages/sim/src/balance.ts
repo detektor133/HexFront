@@ -247,6 +247,15 @@ export const RECRUIT_PER_100_S: ByUnit<Fp> = {
   artillery: fp(0.75),
 };
 
+/**
+ * Опыт армии (звёзды): тиков боя до 1, 2, 3 звезды и бонусы звёзд в процентах — сила в бою,
+ * организация (регенерация и меньшие потери org), скорость восполнения потерь. [ТЮНИНГ]
+ */
+export const XP_STAR_TICKS = [450, 1800, 4800] as const;
+export const STAR_POWER_PCT = [3, 7, 12] as const;
+export const STAR_ORG_PCT = [3, 7, 12] as const;
+export const STAR_REPLENISH_PCT = [10, 20, 35] as const;
+
 /** Уровни размера армии (рота…корпус): знаменатели доли от предела государства (люди плюс армия). */
 export const ARMY_LEVEL_DENOMS = [16, 8, 4, 2, 1] as const;
 

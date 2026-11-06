@@ -103,6 +103,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.auto ? 1 : 0);
     // Поле появилось позже: без него хэш прежних матчей не меняется.
     if (a.wanted !== undefined) int(s, a.wanted);
+    if (a.xp !== undefined && a.xp > 0) int(s, a.xp);
     if (a.mix !== undefined) {
       int(s, a.mix.armor);
       int(s, a.mix.artillery);

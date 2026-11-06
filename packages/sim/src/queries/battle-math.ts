@@ -21,9 +21,15 @@ import {
 } from '../balance.ts';
 import { TERRAIN_NAMES, type MapStatic } from '../map/types.ts';
 import { distance, hexFromId, neighbors, type HexId } from '../math/hex.ts';
-import { FP, fpDiv, fpMul, type Fp } from '../math/int.ts';
+import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { fortLevel } from '../state/fort.ts';
 import type { UnitOrder } from '../state/types.ts';
+import { powerPct } from '../systems/experience.ts';
+
+/** Множитель силы от звёзд опыта: 1 + бонус звёзд. */
+function starMult(stars: number | undefined): Fp {
+  return (FP + intDiv(FP * powerPct(stars), 100)) as Fp;
+}
 
 /** Боец для формул: отряд из состояния или из снимка игрока. */
 export interface Fighter {
@@ -33,6 +39,8 @@ export interface Fighter {
   readonly supplyLevel: Fp;
   readonly hex: HexId;
   readonly order: UnitOrder;
+  /** Звёзды опыта армии 0..3; нет поля — ноль. */
+  readonly stars?: number | undefined;
 }
 
 /** Местность боя: карта, постройки гексов и признак города на гексе. */
@@ -90,7 +98,10 @@ export function attackContribution(
   hex: HexId,
   all: readonly Fighter[],
 ): number {
-  let base = fpMul(fpMul(f.soldiers, ATK[f.type]), supplyCombatMult(f.supplyLevel));
+  let base = fpMul(
+    fpMul(fpMul(f.soldiers, ATK[f.type]), supplyCombatMult(f.supplyLevel)),
+    starMult(f.stars),
+  );
   const dir = hexDirection(map, f.hex, hex);
   if (dir >= 0 && ((map.rivers[f.hex] ?? 0) >> dir) & 1)
     base = fpMul(base as Fp, RIVER_ATTACK_MULT);
@@ -127,7 +138,10 @@ export function defensePower(
 ): number {
   let raw: number = fpMul(militia, DEF.infantry);
   for (const f of defenders) {
-    raw += fpMul(fpMul(f.soldiers, DEF[f.type]), supplyCombatMult(f.supplyLevel));
+    raw += fpMul(
+      fpMul(fpMul(f.soldiers, DEF[f.type]), supplyCombatMult(f.supplyLevel)),
+      starMult(f.stars),
+    );
   }
   const name = TERRAIN_NAMES[ground.map.terrain[hex] ?? 0];
   let mult = (name === undefined || name === 'water' ? FP : DEF_MULT[name]) as Fp;

@@ -8,6 +8,7 @@ import {
   ORG_REGEN_PER_S,
   TICKS_PER_S,
 } from '../balance.ts';
+import { orgPct } from './experience.ts';
 import { intDiv, type Fp } from '../math/int.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
 
@@ -23,7 +24,8 @@ export function orgRegenSystem(state: MatchState): void {
   for (const u of state.units) {
     if (u.inBattle || u.order === 'retreat' || u.supplyLevel < ATTRITION_THRESHOLD) continue;
     if (state.players[u.owner]?.bankrupt) continue;
-    u.org = Math.min(ORG_MAX, u.org + ORG_PER_TICK) as Fp;
+    const regen = intDiv(ORG_PER_TICK * (100 + orgPct(u.stars)), 100);
+    u.org = Math.min(ORG_MAX, u.org + regen) as Fp;
   }
   for (const c of state.cities) {
     if (c.owner === NEUTRAL || c.inBattle) continue;

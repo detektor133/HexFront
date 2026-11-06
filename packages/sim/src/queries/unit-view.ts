@@ -7,6 +7,7 @@ import type { Fp } from '../math/int.ts';
 import type { MatchState, UnitOrder } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { isStarving } from '../systems/attrition.ts';
+import { starsOf } from '../systems/experience.ts';
 
 /** Отряд в снимке; поля null/пусто у чужих отрядов. */
 export interface UnitView {
@@ -36,6 +37,8 @@ export interface UnitView {
   readonly gather?: HexId;
   /** Атакующий неартиллерийский отряд получает бонус от своей артиллерии. */
   readonly artillerySupport: boolean;
+  /** Звёзды опыта армии 0..3: видны и у чужих отрядов. */
+  readonly stars?: number;
   readonly attackState?: AttackState | null;
 }
 
@@ -53,6 +56,8 @@ export interface ArmyView {
   readonly name: string;
   /** Автокомандование (CR-006). */
   readonly auto: boolean;
+  /** Звёзды опыта армии 0..3. */
+  readonly stars?: number;
   /** Заказанная численность, солдат: ИИ закупает и подводит недостающих (меню страны). */
   readonly wanted?: number;
   /** Состав заказа: танки и артиллерия (остальное — пехота); нет поля — тип не важен. */
@@ -85,6 +90,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         armyId: mine ? u.armyId : null,
         path: mine ? [...u.path] : [],
         fireTarget: mine ? u.fireTarget : -1,
+        stars: u.stars ?? 0,
         gather: mine ? u.gather : -1,
         artillerySupport:
           mine &&
@@ -105,6 +111,7 @@ export function armyViews(state: MatchState, playerId: number): ArmyView[] {
       number: a.number,
       name: a.name,
       auto: a.auto,
+      stars: starsOf(a.xp ?? 0),
       ...(a.wanted === undefined ? {} : { wanted: a.wanted }),
       ...(a.mix === undefined ? {} : { mix: a.mix }),
       ...(a.dir === undefined ? {} : { dir: a.dir }),

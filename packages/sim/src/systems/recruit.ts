@@ -1,5 +1,6 @@
 // Набор: очереди и появление отрядов.
 // GDD: docs/gdd/05-armies.md — «Набор»
+import { replenishPct, starsOf } from './experience.ts';
 import { procure } from './procure.ts';
 import { MAX_UNITS_PER_HEX, ORG_MAX, TICKS_PER_S } from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
@@ -104,6 +105,13 @@ function distributeReserve(state: MatchState): void {
   }
 }
 
+// Набор армии со звёздами идёт быстрее: лишний тик прогресса в доле тиков по бонусу звёзд.
+function replenishExtra(state: MatchState, r: Recruitment): number {
+  const army = r.armyId === undefined ? undefined : state.armies.find((a) => a.id === r.armyId);
+  const pct = replenishPct(starsOf(army?.xp ?? 0));
+  return state.tick % 100 < pct ? 1 : 0;
+}
+
 export function recruitSystem(state: MatchState): void {
   distributeReserve(state);
   procure(state);
@@ -115,7 +123,7 @@ export function recruitSystem(state: MatchState): void {
       state.events.push({ t: 'recruitCancelled', ...event });
       continue;
     }
-    if (r.progressTicks < r.totalTicks) r.progressTicks += 1;
+    if (r.progressTicks < r.totalTicks) r.progressTicks += 1 + replenishExtra(state, r);
     if (r.progressTicks >= r.totalTicks && reinforce(state, r)) {
       state.events.push({ t: 'unitRecruited', ...event });
       continue;
