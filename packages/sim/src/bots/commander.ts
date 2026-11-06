@@ -3,6 +3,7 @@
 // границы с врагом (не больше одной армии на кусок), свои потерянные гексы у фронта — отбить; ничья
 // земля — занять без плана, нейтральный город — штурм при прогнозе «успех», в приоритете; ▶ без
 // линии — построить линию; лишние отряды резерва — в самую слабую армию. Сам на игроков не наступает.
+import { breakout } from './commander-breakout.ts';
 import { commanderLine } from './commander-line.ts';
 import { strike } from './commander-strike.ts';
 import { warWith } from './war.ts';
@@ -390,11 +391,21 @@ export function decide(
   const piece = piecesOf(map, view, expansion, commanderContext).get(armyId);
   // Бот: свободные отряды бьют по вражескому городу, если прогноз боя — победа (commander-strike).
   // Пока рядом есть ничья земля и нет контакта с врагом, армия растит государство, а не воюет.
+  // Окружённые отряды сначала прорываются к своей земле: остальные приказы их не касаются.
+  const trapped = breakout(map, view, units);
+  out.push(...trapped.commands);
   const struck =
     bot && (piece !== undefined || commanderContext.emptyNeutral.length === 0)
-      ? strike(map, view, units.filter(idle))
+      ? strike(
+          map,
+          view,
+          units.filter((u) => idle(u) && !trapped.ids.has(u.id)),
+        )
       : [];
-  const striking = new Set(struck.flatMap((c) => (c.t === 'move' ? c.unitIds : [])));
+  const striking = new Set([
+    ...trapped.ids,
+    ...struck.flatMap((c) => (c.t === 'move' ? c.unitIds : [])),
+  ]);
   out.push(...struck);
   const plan = view.plans.find((p) => p.armyId === armyId);
   if (piece) {

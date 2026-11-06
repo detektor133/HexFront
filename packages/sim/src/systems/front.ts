@@ -15,7 +15,7 @@ import { mergeUnits, splitUnit } from '../commands/unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath } from '../queries/unit-path.ts';
-import { allocate, currentCoverage, planControls } from '../state/allocate.ts';
+import { allocate, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
@@ -175,15 +175,13 @@ function runPlan(state: MatchState, armyId: number): void {
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);
   const units = allUnits(state).filter((u) => planControls(u, plan.armyId));
-  const lineSet = new Set(next.line);
-  const settled = units.every(
-    (u) => u.slot >= 0 && (u.type === 'artillery' || lineSet.has(u.slot)),
-  );
-  const old = currentCoverage(state, next, units);
-  // Против «дрожания»: при малом выигрыше покрытия места не меняются.
-  const keep = settled && next.coverage <= old + fpMul(old as Fp, FRONT_REALLOC_GAIN_MIN);
+  // Против «дрожания»: при малом выигрыше покрытия стоящие отряды остаются, а место ищется лишь
+  // новым и тем, у кого линия ушла из-под ног (новый отряд не перетасовывает всю армию).
+  const keep =
+    next.coverage <= next.keptCoverage + fpMul(next.keptCoverage as Fp, FRONT_REALLOC_GAIN_MIN);
+  const chosen = keep ? next.kept : next.slots;
   for (const u of units) {
-    const slot = keep ? u.slot : next.slots.get(u.id);
+    const slot = chosen.get(u.id);
     if (slot === undefined) u.slot = -1;
     else goTo(state, u, slot, next.line);
   }

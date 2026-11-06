@@ -10,6 +10,7 @@ import {
   FRONT_WEIGHT_FLANK,
   MAX_UNITS_PER_HEX,
   OFFENSIVE_FACING_WEIGHT,
+  OFFENSIVE_STACK,
 } from '../balance.ts';
 import { attachUnits, lineRuns } from './attach.ts';
 import { isDepot } from './depot.ts';
@@ -18,6 +19,7 @@ import { facingHexes, lineDistance } from './offensive-steps.ts';
 import { type ArmyPlan, type MatchState, type Unit } from './types.ts';
 import { allUnits } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
+import { minCostAssignment } from '../math/assign.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 
@@ -34,6 +36,10 @@ export interface Allocation {
   readonly line: readonly HexId[];
   /** Вес гекса линии, fixed-point. */
   readonly weight: ReadonlyMap<HexId, number>;
+  /** Места при наименьших переменах: стоящие на линии не двигаются, место ищется только остальным. */
+  readonly kept: ReadonlyMap<number, HexId>;
+  /** Покрытие `kept`, сравнимое с `coverage` полной перестановки. */
+  readonly keptCoverage: number;
 }
 
 function around(state: MatchState, hex: HexId): HexId[] {
@@ -128,8 +134,13 @@ function lineSlots(
     }
   };
   const ordered = order.map(({ h }) => h);
-  // Гексы наступающего фронта заполняются первыми, излишек отрядов уходит на остальную линию.
-  fill(ordered.filter((h) => front.has(h)));
+  // Гексы наступающего фронта заполняются первыми, но не больше OFFENSIVE_STACK отрядов на гекс
+  // (больше шагов за раз всё равно не сделать), излишек уходит на остальную линию.
+  fill(
+    ordered.filter((h) => front.has(h)),
+    OFFENSIVE_STACK,
+  );
+  fill(ordered.filter((h) => !front.has(h)));
   fill(ordered);
   return out;
 }
@@ -137,10 +148,19 @@ function lineSlots(
 /** Штраф к расстоянию, когда род войск не тот, что нужен на местности (броня — равнина, пехота — прочее). */
 const TYPE_PENALTY = 2;
 
-// Места — отрядам с наименьшим общим переходом. Сначала отряд остаётся там, где уже стоит или куда
-// уже идёт, если это место нужно и теперь: пересмотр линии не меняет отряды местами и не гоняет их
-// навстречу друг другу. Остальные пары берутся по возрастанию расстояния (с поправкой на род
-// войск), а не «место по важности — ближайшему отряду»: слабому месту не достаётся дальний отряд.
+/** Шаг стоимости в назначении: один гекс пути; полшага — выигрыш отряда, уже идущего на это место. */
+const STEP_COST = 10;
+
+/** Выигрыш отряда, уже идущего на это место, — полшага. */
+const STAY_BONUS = 5;
+
+/** Крупнее этого назначение по венгерскому алгоритму слишком дорого — берём жадный перебор пар. */
+const OPTIMAL_ASSIGN_MAX = 120;
+
+// Места — отрядам с наименьшим общим переходом: оптимальное назначение по сумме расстояний (с
+// поправкой на род войск), а не «место по важности — ближайшему отряду» или жадный перебор пар:
+// ни слабому месту не достаётся дальний отряд, ни ближний отряд не идёт туда, где стоит дальний.
+// Отряд, уже идущий на это место, немного предпочитает его — пересмотр не гоняет отряды туда-сюда.
 function assignLine(
   state: MatchState,
   slots: HexId[],
@@ -149,17 +169,26 @@ function assignLine(
 ): Map<number, HexId> {
   const { width } = state.map;
   const out = new Map<number, HexId>();
-  const open = [...slots];
-  const free: Unit[] = [];
-  for (const u of units) {
-    const keep = [u.slot, u.hex].find((h) => h >= 0 && open.includes(h));
-    if (keep === undefined) {
-      free.push(u);
-      continue;
+  if (slots.length === 0 || units.length === 0) return out;
+  if (units.length <= OPTIMAL_ASSIGN_MAX && slots.length <= OPTIMAL_ASSIGN_MAX) {
+    const costOf = (u: Unit, h: HexId): number => {
+      const wanted = state.map.terrain[h] === TERRAIN.plains ? 'armor' : 'infantry';
+      const miles =
+        distance(hexFromId(u.hex, width), hexFromId(h, width)) +
+        (u.type === wanted ? 0 : TYPE_PENALTY);
+      return miles * STEP_COST - (u.slot === h ? STAY_BONUS : 0);
+    };
+    if (units.length <= slots.length) {
+      const pick = minCostAssignment(units.map((u) => slots.map((h) => costOf(u, h))));
+      units.forEach((u, i) => out.set(u.id, slots[pick[i] as number] as HexId));
+    } else {
+      const pick = minCostAssignment(slots.map((h) => units.map((u) => costOf(u, h))));
+      slots.forEach((h, i) => out.set((units[pick[i] as number] as Unit).id, h));
     }
-    out.set(u.id, keep);
-    open.splice(open.indexOf(keep), 1);
+    return out;
   }
+  const open = [...slots];
+  const free = units;
   const pairs: { readonly u: Unit; readonly s: number; readonly cost: number }[] = [];
   open.forEach((h, s) => {
     const plains = state.map.terrain[h] === TERRAIN.plains;
@@ -270,23 +299,62 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
   const runs = lineRuns(state, line);
   const groups = attachUnits(state, runs, w, lineUnits);
   const slots = new Map<number, HexId>();
+  // Расстановка с наименьшими переменами: уже стоящие на линии остаются, места ищутся лишь новым,
+  // потерявшим место и тем, чья линия сдвинулась. Её покрытие сравнивается с полной перестановкой.
+  const kept = new Map<number, HexId>();
   runs.forEach((run, r) => {
     const mine = groups[r] ?? [];
     const runSet = new Set(run);
     const held = new Set(
       mine.flatMap((u) => [u.slot, u.hex].filter((h) => h >= 0 && runSet.has(h)).slice(0, 1)),
     );
-    const placed = lineSlots(run, w, mine.length, cap, attackFront, held);
-    for (const [id, h] of assignLine(state, placed, mine, w)) {
+    const target = lineSlots(run, w, mine.length, cap, attackFront, held);
+    for (const [id, h] of assignLine(state, target, mine, w)) {
       slots.set(id, h);
     }
+    const stay = mine.filter((u) => runSet.has(u.slot));
+    const rest = [...target];
+    for (const u of stay) {
+      kept.set(u.id, u.slot);
+      const i = rest.indexOf(u.slot);
+      if (i >= 0) rest.splice(i, 1);
+    }
+    const open = mine.filter((u) => !runSet.has(u.slot));
+    const extra = lineSlots(run, w, stay.length + open.length, cap, attackFront, held);
+    for (const h of extra) {
+      if (rest.length >= open.length) break;
+      rest.push(h);
+    }
+    // Набор мест уже устойчив; кто на каком — снова по наименьшему общему переходу, чтобы дальний
+    // не шёл на место рядом с ближним, который держит менее нужное.
+    const pool = [...stay.map((u) => u.slot), ...rest];
+    for (const [id, h] of assignLine(state, pool, mine, w)) kept.set(id, h);
   });
   const art = assignArtillery(state, owner, arty, line, w);
-  for (const [id, h] of art.slots) slots.set(id, h);
-  const occupied = new Set(slots.values());
-  const lineCoverage = line.filter((h) => occupied.has(h)).reduce((s, h) => s + (w.get(h) ?? 0), 0);
-  return { slots, coverage: lineCoverage + art.covered, line, weight: w };
+  for (const [id, h] of art.slots) {
+    slots.set(id, h);
+    const was = arty.find((a) => a.id === id);
+    kept.set(id, was !== undefined && was.slot >= 0 && !onLineSet(line, was.slot) ? was.slot : h);
+  }
+  const coverageOf = (placed: ReadonlyMap<number, HexId>): number => {
+    const occupied = new Set(
+      [...placed].filter(([id]) => !arty.some((a) => a.id === id)).map(([, h]) => h),
+    );
+    return (
+      line.filter((h) => occupied.has(h)).reduce((s, h) => s + (w.get(h) ?? 0), 0) + art.covered
+    );
+  };
+  return {
+    slots,
+    coverage: coverageOf(slots),
+    line,
+    weight: w,
+    kept,
+    keptCoverage: coverageOf(kept),
+  };
 }
+
+const onLineSet = (line: readonly HexId[], h: number): boolean => line.includes(h);
 
 /**
  * Покрытие текущих мест отрядов (для порога перестановки): занятые гексы линии и вес линии под

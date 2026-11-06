@@ -199,6 +199,7 @@
 | `FRONT_WEIGHT_FLANK` | 1 `[ТЮНИНГ]` |
 | `FRONT_REBALANCE_SURPLUS` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_ECHELON_PERIOD` | 2 `[ТЮНИНГ]` |
+| `OFFENSIVE_STACK` | 2 `[ТЮНИНГ]` |
 | `PROCURE_BATCH` | 300 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |

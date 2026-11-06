@@ -12,6 +12,7 @@ import {
 } from '../balance.ts';
 import { blocOf } from '../commands/launch.ts';
 import { executeUnitCommand, validateUnitCommand } from '../commands/unit.ts';
+import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId } from '../math/hex.ts';
 import { forecastInState } from '../queries/forecast.ts';
 import { findPath, isHostileHex } from '../queries/unit-path.ts';
@@ -111,6 +112,44 @@ const POCKET_REACH = 20;
 const POCKET_BATCH = 8;
 
 /**
+ * Оторванные куски врага: связные (по его гексам) куски земли воюющего игрока, не содержащие его
+ * столицу, — любого размера, не только окружённые целиком своей землёй. Кусок у кромки воды или
+ * границы карты, куда столица не дотягивается, — тоже котёл. Нет столицы — главным считается
+ * самый большой кусок.
+ * @returns куски — гексы по возрастанию HexId
+ */
+function cutOffPieces(state: MatchState, owner: number): number[][] {
+  const out: number[][] = [];
+  for (const p of state.players) {
+    if (p.id === owner || p.status !== 'alive' || !atWar(state, owner, p.id)) continue;
+    const mine = (h: number): boolean =>
+      state.hexes.owner[h] === p.id && state.map.terrain[h] !== TERRAIN.water;
+    const seen = new Set<number>();
+    const pieces: number[][] = [];
+    for (let start = 0; start < state.hexes.owner.length; start += 1) {
+      if (seen.has(start) || !mine(start)) continue;
+      const piece = [start];
+      seen.add(start);
+      for (let i = 0; i < piece.length; i += 1) {
+        for (const n of adjacentHexes(state, piece[i] as number)) {
+          if (seen.has(n) || !mine(n)) continue;
+          seen.add(n);
+          piece.push(n);
+        }
+      }
+      pieces.push(piece.sort((x, y) => x - y));
+    }
+    if (pieces.length < 2) continue;
+    const capital = state.cities.find((c) => c.id === p.capitalCityId)?.hex;
+    const main =
+      pieces.find((piece) => capital !== undefined && piece.includes(capital)) ??
+      [...pieces].sort((a, b) => b.length - a.length)[0];
+    out.push(...pieces.filter((piece) => piece !== main));
+  }
+  return out;
+}
+
+/**
  * Закрытие котлов: чужие и ничьи куски внутри своей земли берутся независимо от линии наступления.
  * Заходят гексы котла, прилегающие к своей земле: пустой гекс — одним отрядом, гекс с врагом —
  * минимальной группой, которой прогноз боя обещает победу. Котёл съедается слоями, как анклав.
@@ -130,7 +169,10 @@ function closePockets(state: MatchState, owner: number, armies: readonly Army[])
   );
   const own = (h: number): boolean => state.hexes.owner[h] === owner;
   const targets: number[] = [];
-  for (const hole of holeComponents(state, owner, POCKET_MAX_LAND)) {
+  for (const hole of [
+    ...holeComponents(state, owner, POCKET_MAX_LAND),
+    ...cutOffPieces(state, owner),
+  ]) {
     for (const h of hole) {
       if (heading.has(h)) continue;
       const touches = adjacentHexes(state, h).some(own);
@@ -138,7 +180,7 @@ function closePockets(state: MatchState, owner: number, armies: readonly Army[])
     }
   }
   const used = new Set<number>();
-  for (const hex of targets.slice(0, POCKET_BATCH)) {
+  for (const hex of [...new Set(targets)].slice(0, POCKET_BATCH)) {
     const pool = free
       .filter((u) => !used.has(u.id) && distance(at(u.hex), at(hex)) <= POCKET_REACH)
       .sort((a, b) => distance(at(a.hex), at(hex)) - distance(at(b.hex), at(hex)) || a.id - b.id);
