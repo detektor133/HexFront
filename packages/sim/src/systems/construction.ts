@@ -2,6 +2,7 @@
 // GDD: docs/gdd/03-cities-buildings.md
 import { MILITIA_PER_LEVEL, ORG_MAX } from '../balance.ts';
 import { advanceRoad, queueAutoRoad, roadLost } from './road-construction.ts';
+import { pickCityName } from '../map/city-names.ts';
 import { withDepot, withFort } from '../state/building.ts';
 import { depotLevel } from '../state/depot.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
@@ -19,7 +20,7 @@ function complete(state: MatchState, c: Construction): void {
         hex: c.hex,
         owner: c.owner,
         level: 1,
-        name: '',
+        name: pickCityName(state.seed, state.nextId, state.cities),
         // Новый город получает полное ополчение (03-cities-buildings.md, «Захват города»).
         defenders: MILITIA_PER_LEVEL,
         defenseOrg: ORG_MAX,

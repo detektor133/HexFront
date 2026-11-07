@@ -140,6 +140,8 @@ export interface PlayerView {
     readonly progressTicks: number;
     readonly totalTicks: number;
     readonly path: readonly HexId[];
+    /** Дорога проложена игроком вручную. */
+    readonly manual?: boolean;
   }[];
   /** Свои наборы в очереди городов; чужие не видны (08-match.md, «Туман войны»). */
   readonly recruits: readonly {
@@ -326,6 +328,7 @@ export function playerView(
         progressTicks: c.progressTicks,
         totalTicks: c.totalTicks,
         path: [...(c.path ?? [])],
+        ...(c.manual === true ? { manual: true } : {}),
       })),
     recruits: state.recruits
       .filter((r) => r.owner === playerId)

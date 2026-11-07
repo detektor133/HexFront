@@ -230,13 +230,14 @@ export const tokens = {
   },
   "armies": {
     "palette": [
-      "#7B3F8C",
+      "#6A3FA0",
+      "#B24A00",
       "#0B7F8E",
-      "#9E2C8C",
+      "#C0307E",
+      "#8A7400",
       "#4F6475",
-      "#946A08",
-      "#636A1C",
-      "#94561B"
+      "#6B4226",
+      "#333333"
     ],
     "defenseTeeth": {
       "length": 5,

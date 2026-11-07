@@ -20,6 +20,9 @@ const PAN_MIN_FRACTION = 0.04;
 const ZOOM_MIN_FRACTION = 0.06;
 const POLL_MS = 250;
 
+/** Через сколько миллисекунд ожидания шага появляется «Пропустить». */
+const SKIP_AFTER_MS = 60_000;
+
 /** Касание или мышь: от этого зависит, что написано в подсказке. */
 export function isTouchDevice(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
@@ -42,8 +45,10 @@ export function TutorialOverlay(props: {
   } | null;
   readonly hexWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
   readonly hexRadius: number;
+  /** Шаг сменился: режиссёр урока ведёт соперника по номеру шага. */
+  readonly onStage?: (stepId: string) => void;
 }): React.JSX.Element | null {
-  const { chapter, camera, hexWorld, hexRadius } = props;
+  const { chapter, camera, hexWorld, hexRadius, onStage } = props;
   const [pans, setPans] = useState(0);
   const [zooms, setZooms] = useState(0);
   const last = useRef<{ cx: number; cy: number; w: number } | null>(null);
@@ -89,6 +94,17 @@ export function TutorialOverlay(props: {
 
   const step = progress ? currentStep(chapter, progress.index) : undefined;
   const total = STEPS[chapter].length;
+  const stepId = step?.id ?? '';
+  useEffect(() => {
+    if (stepId !== '') onStage?.(stepId);
+  }, [stepId, onStage]);
+  // Шаг, который долго не выходит, можно пропустить: урок не должен упираться в тупик.
+  const [canSkip, setCanSkip] = useState(false);
+  useEffect(() => {
+    setCanSkip(false);
+    const timer = window.setTimeout(() => setCanSkip(true), SKIP_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [stepId]);
   useEffect(() => {
     if (progress && !step && !finished) {
       markDone(chapter);
@@ -192,6 +208,17 @@ export function TutorialOverlay(props: {
         {waiting !== undefined && (
           <div className={styles.bar} role="progressbar" aria-valuenow={Math.round(waiting * 100)}>
             <span className={styles.fill} style={{ width: `${Math.round(waiting * 100)}%` }} />
+          </div>
+        )}
+        {!step.manual && canSkip && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={() => setProgress(next(chapter, progress, ctx))}
+            >
+              {t('tutorial.skip')}
+            </button>
           </div>
         )}
         {step.manual && (

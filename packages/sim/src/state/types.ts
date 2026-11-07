@@ -55,8 +55,8 @@ export interface City {
   readonly hex: HexId;
   owner: number;
   level: number;
-  /** Название с карты; у столиц пустое — имя выбирает интерфейс. */
-  readonly name: string;
+  /** Название: с карты у ничьих городов, у основанных игроком и столиц — из списка, игрок переименует. */
+  name: string;
   /** Оборона города: гарнизон нейтрального или ополчение города игрока, fixed-point солдат. */
   defenders: Fp;
   /** Организованность обороны города, fixed-point. */
@@ -131,6 +131,8 @@ export interface Construction {
   readonly totalTicks: number;
   /** Только для road: гексы без дороги в порядке прокладки, по одному за ROAD_BUILD_S_PER_HEX. */
   readonly path?: readonly HexId[];
+  /** Дорога проложена игроком вручную: ей не нужен город или склад на конце. */
+  readonly manual?: boolean;
 }
 
 /**

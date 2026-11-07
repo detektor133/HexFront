@@ -6,6 +6,8 @@ import type { FromWorker, MapMaskMode, ToWorker } from './messages.ts';
 export interface LocalMatch {
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  /** Шаг матча-урока для режиссёра соперника. */
+  setTutorialStage?(stage: string): void;
   setPaused(on: boolean): void;
   step(): void;
   setSpeed(value: number): void;
@@ -66,6 +68,7 @@ export function startLocalMatch(
   return {
     send: (cmd) => post({ t: 'command', cmd }),
     setFog: (on) => post({ t: 'fog', on }),
+    setTutorialStage: (stage) => post({ t: 'tutorialStage', stage }),
     setPaused: (on) => post({ t: 'pause', on }),
     step: () => post({ t: 'step' }),
     setSpeed: (value) => post({ t: 'speed', value }),

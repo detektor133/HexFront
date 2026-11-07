@@ -66,6 +66,8 @@ export type Command =
   | { readonly t: 'upgradeCity'; readonly cityId: number }
   | { readonly t: 'improve'; readonly hex: HexId }
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
+  /** Прокладывает дорогу вручную по точкам: от первой к последней по своей земле. */
+  | { readonly t: 'buildRoad'; readonly points: readonly HexId[] }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
   | { readonly t: 'rebuildSupply'; readonly hex: HexId }
   | { readonly t: 'createArmy'; readonly name: string }
@@ -106,6 +108,8 @@ export type Command =
       readonly mix?: ArmyMix;
     }
   | { readonly t: 'renameArmy'; readonly armyId: number; readonly name: string }
+  /** Переименовывает свой город. */
+  | { readonly t: 'renameCity'; readonly cityId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
   /** Делит армию на две примерно равные по числу солдат; вторая половина — новая армия. */
   | { readonly t: 'splitArmy'; readonly armyId: number }
@@ -146,6 +150,7 @@ export const REJECT_REASONS = [
   'notIsolated',
   'noPath',
   'alreadyBuilding',
+  'alreadyBuilt',
   'bankrupt',
   'badUnitType',
   'invalidAmount',

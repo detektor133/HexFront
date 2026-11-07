@@ -131,6 +131,9 @@ onmessage = (event: MessageEvent<ToWorker>): void => {
       if (engine) engine.queue(msg.cmd);
       else pendingCommands.push(msg);
       return;
+    case 'tutorialStage':
+      engine?.setTutorialStage(msg.stage);
+      return;
     case 'fog':
       engine?.setFog(msg.on);
       deltaStream.requestFull();

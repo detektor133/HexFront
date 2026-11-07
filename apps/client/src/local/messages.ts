@@ -69,6 +69,7 @@ export type ToWorker =
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }
+  | { readonly t: 'tutorialStage'; readonly stage: string }
   | { readonly t: 'pause'; readonly on: boolean }
   | { readonly t: 'step' }
   | { readonly t: 'speed'; readonly value: number }

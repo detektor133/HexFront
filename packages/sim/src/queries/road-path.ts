@@ -2,15 +2,21 @@
 // GDD: docs/gdd/04-roads-supply.md — «Дороги»; docs/gdd/01-map.md — «Дороги».
 import { MOVE_TIME_S, ROAD_PATH_EXISTING_COST } from '../balance.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
+import type { MapStatic } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
-import type { MatchState } from '../state/types.ts';
+
+/** Всё, что нужно прокладке дороги от мира: карта, владельцы гексов и уже построенные дороги. */
+export interface RoadGround {
+  readonly map: MapStatic;
+  readonly hexes: { readonly owner: ArrayLike<number>; readonly road: ArrayLike<number> };
+}
 
 /**
  * Стоимость входа дороги в гекс: время хода по местности; перевал — как холмы.
  * @returns fixed-point секунд или null, если дорога здесь невозможна
  */
-export function roadStepCost(state: MatchState, hex: HexId): number | null {
+export function roadStepCost(state: RoadGround, hex: HexId): number | null {
   const terrain = state.map.terrain[hex] ?? TERRAIN.water;
   const isPass = state.map.features[hex] === FEATURE.pass;
   if (terrain === TERRAIN.water) return null;
@@ -39,7 +45,7 @@ function reconstruct(prev: Int32Array, end: HexId): HexId[] {
  * @returns гексы от from до цели включительно или null, если пути нет
  */
 export function findRoadPath(
-  state: MatchState,
+  state: RoadGround,
   owner: number,
   from: HexId,
   isTarget: (hex: HexId) => boolean,

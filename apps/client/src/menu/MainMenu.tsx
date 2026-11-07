@@ -10,10 +10,11 @@ import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { createMapView, type MapView } from '../render/map-view.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
-import { TutorialAsk, TutorialChapters } from './TutorialMenu.tsx';
+import { TutorialAsk } from './TutorialMenu.tsx';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
+import { tutorialUrl } from '../tutorial/links.ts';
 
 const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
@@ -72,7 +73,6 @@ export function MainMenu(): React.JSX.Element {
   const chooser = MAPS.find((m) => m.id === map);
   // Новичку один раз предлагают обучение; позже оно открывается кнопкой в меню.
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
-  const [chaptersOpen, setChaptersOpen] = useState<boolean>(false);
 
   useEffect(() => {
     let disposed = false;
@@ -166,8 +166,6 @@ export function MainMenu(): React.JSX.Element {
               setAskOpen(false);
             }}
           />
-        ) : chaptersOpen ? (
-          <TutorialChapters name={nickname} color={color} onClose={() => setChaptersOpen(false)} />
         ) : (
           <>
             <h1 id="main-menu-title" className={styles.title}>
@@ -269,13 +267,9 @@ export function MainMenu(): React.JSX.Element {
             >
               {t('menu.play')}
             </a>
-            <button
-              type="button"
-              className={styles.tutorialButton}
-              onClick={() => setChaptersOpen(true)}
-            >
+            <a className={styles.tutorialButton} role="button" href={tutorialUrl(nickname, color)}>
               {t('tutorial.menuButton')}
-            </button>
+            </a>
           </>
         )}
       </section>

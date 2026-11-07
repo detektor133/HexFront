@@ -36,6 +36,7 @@ import {
 } from '@hexfront/sim';
 
 import type { MapMaskMode, RecruitOption, Selection, ViewPayload } from './messages.ts';
+import { createDirector, directorCommands } from './tutorial-director.ts';
 
 /**
  * В локальном режиме игрок-человек — всегда id 0; армиями с auto у всех командует commander,
@@ -60,6 +61,8 @@ function boostPeople(state: MatchState): void {
 export interface LocalEngine {
   readonly state: MatchState;
   queue(cmd: Command): void;
+  /** Шаг матча-урока: по нему режиссёр управляет соперником. */
+  setTutorialStage(stage: string): void;
   setFog(on: boolean): void;
   setObserver(playerId: number | null): void;
   /** Путь и время для выбранных отрядов игрока; состояние не меняется. */
@@ -145,6 +148,11 @@ export function createLocalEngine(
     if (me) me.autoCommand = false;
     for (const army of state.armies) if (army.owner === HUMAN_ID) army.auto = false;
   }
+  // Матч-урок: соперником управляет только режиссёр урока, его командир отключён.
+  if (tutorial) {
+    for (const p of state.players) if (p.id !== HUMAN_ID) p.autoCommand = false;
+    for (const army of state.armies) if (army.owner !== HUMAN_ID) army.auto = false;
+  }
   let pending: Command[] = [];
   // Стартовые отряды человека сразу в армии с приказом занимать ничью землю (ИИ раскидывает их роем),
   // а не стоят без дела, пока игрок не откроет меню.
@@ -157,6 +165,7 @@ export function createLocalEngine(
       pending.push({ t: 'launchOffensive', target: -1, soldiers: Math.ceil(soldiers / FP) });
     }
   }
+  const director = createDirector();
   let selected: number | null = null;
   let observerId: number | null = null;
   let pendingEvents: MatchState['events'] = [];
@@ -164,6 +173,7 @@ export function createLocalEngine(
     const botContext = createBotTickContext(state);
     step(state, [
       ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
+      ...(tutorial ? directorCommands(state, director) : []),
       ...commanderCommands(state, bots, botContext),
       ...botCommands(state, bots, botContext),
     ]);
@@ -197,6 +207,9 @@ export function createLocalEngine(
     state,
     queue(cmd) {
       pending.push(cmd);
+    },
+    setTutorialStage(stage) {
+      director.stage = stage;
     },
     setFog(on) {
       state.fog = on;

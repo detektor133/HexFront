@@ -174,6 +174,8 @@ export const DEPOT_SUPPLY: readonly Fp[] = [fp(120), fp(240), fp(400), fp(600), 
 /** Улучшение склада с уровня 1..4: цена, золото; время, секунды. */
 export const DEPOT_UPGRADE_COST: readonly Fp[] = [fp(120), fp(220), fp(350), fp(520)];
 export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30), fp(40), fp(50)];
+/** Сколько точек можно задать дороге вручную. */
+export const MAX_ROAD_POINTS = 16;
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */

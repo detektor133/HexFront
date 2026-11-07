@@ -60,6 +60,7 @@ export function queueAutoRoad(
 export function roadLost(state: MatchState, c: Construction): boolean {
   const built = intDiv(c.progressTicks, ROAD_TICKS_PER_HEX);
   const targetLost =
+    c.manual !== true &&
     !state.cities.some((city) => city.hex === c.hex && city.owner === c.owner) &&
     !(isDepot(state.hexes.building[c.hex] ?? 0) && state.hexes.owner[c.hex] === c.owner);
   return targetLost || (c.path ?? []).slice(built).some((h) => state.hexes.owner[h] !== c.owner);

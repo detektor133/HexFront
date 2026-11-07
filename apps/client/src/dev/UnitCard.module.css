@@ -6,7 +6,7 @@
   bottom: calc(var(--dock-h, 0px) + var(--space-md));
   z-index: 2;
   box-sizing: border-box;
-  width: 168px;
+  width: 280px;
   max-height: calc(100vh - var(--dock-h, 0px) - 2 * var(--space-md));
   max-height: calc(100dvh - var(--dock-h, 0px) - 2 * var(--space-md));
   display: flex;
@@ -30,11 +30,11 @@
   pointer-events: none;
 }
 
-/* Карточки сжимаются по высоте: у каждой прокручивается только список, шапка и кнопки на месте.
-   Если не помещаются и они — прокручивается колонка. */
+/* Карточки не сжимаются: у каждой прокручивается только список (его высота ограничена), шапка и кнопки
+   на месте. Если не помещаются несколько карточек — прокручивается колонка. */
 .body {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: var(--space-sm);
   min-height: 0;
@@ -47,7 +47,7 @@
 .card {
   position: relative;
   display: flex;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: var(--space-xs);
   min-height: 0;
@@ -65,15 +65,15 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-xs);
-  padding-right: 22px;
-  font-size: var(--font-size-caption);
+  padding-right: 28px;
+  font-size: var(--font-size-label);
   font-weight: 600;
 }
 
 .swatch {
-  flex: 0 0 10px;
-  width: 10px;
-  height: 10px;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
 }
 
@@ -86,10 +86,12 @@
 
 .list {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xs);
   min-height: 0;
+  max-height: max(160px, calc(100vh - var(--dock-h, 0px) - 240px));
+  max-height: max(160px, calc(100dvh - var(--dock-h, 0px) - 240px));
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -106,8 +108,8 @@
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 32px;
-  padding: 0 var(--space-xs) 0 0;
+  min-height: 48px;
+  padding: 0 var(--space-sm) 0 0;
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-chip);
   background: var(--ui-panel-image) var(--ui-surface);
@@ -127,7 +129,7 @@
 
 .badge {
   display: grid;
-  flex: 0 0 30px;
+  flex: 0 0 44px;
   align-self: stretch;
   place-items: center;
   background: var(--relation-own);
@@ -135,8 +137,8 @@
 }
 
 .glyph {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -151,7 +153,7 @@
 
 .soldiers {
   flex: 1;
-  font-size: var(--font-size-label);
+  font-size: var(--font-size-body);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -160,12 +162,12 @@
   display: flex;
   gap: 2px;
   align-self: stretch;
-  padding: 4px 0;
+  padding: 6px 0;
 }
 
 .track {
   position: relative;
-  width: 4px;
+  width: 6px;
   background: var(--chip-track);
 }
 
@@ -208,8 +210,8 @@
 
 .action {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   padding: 0;
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);

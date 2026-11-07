@@ -152,7 +152,10 @@ const TYPE_PENALTY = 2;
 const STEP_COST = 10;
 
 /** Выигрыш отряда, уже идущего на это место, — полшага. */
-const STAY_BONUS = 5;
+const STAY_BONUS = 15;
+
+/** Отряд уже стоит на своём месте: уходить с него ради выигрыша в несколько гексов не стоит. */
+const SETTLED_BONUS = 40;
 
 /** Крупнее этого назначение по венгерскому алгоритму слишком дорого — берём жадный перебор пар. */
 const OPTIMAL_ASSIGN_MAX = 120;
@@ -176,7 +179,8 @@ function assignLine(
       const miles =
         distance(hexFromId(u.hex, width), hexFromId(h, width)) +
         (u.type === wanted ? 0 : TYPE_PENALTY);
-      return miles * STEP_COST - (u.slot === h ? STAY_BONUS : 0);
+      const bonus = u.slot === h ? (u.hex === h ? SETTLED_BONUS : STAY_BONUS) : 0;
+      return miles * STEP_COST - bonus;
     };
     if (units.length <= slots.length) {
       const pick = minCostAssignment(units.map((u) => slots.map((h) => costOf(u, h))));

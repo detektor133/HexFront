@@ -220,6 +220,8 @@ interface Sandbox {
   hexWorld(hex: number): Point | null;
   send(cmd: Command): void;
   setFog(on: boolean): void;
+  /** Шаг матча-урока для режиссёра соперника. */
+  setTutorialStage(stage: string): void;
   setPaused(on: boolean): void;
   step(): void;
   setSpeed(value: number): void;
@@ -326,6 +328,9 @@ export function useSandbox(
     [syncQueueMarks],
   );
   const send = useCallback((cmd: Command) => matchRef.current?.send(cmd), []);
+  const setTutorialStage = useCallback((stage: string) => {
+    matchRef.current?.setTutorialStage?.(stage);
+  }, []);
   const setFog = useCallback((on: boolean) => {
     matchRef.current?.setView(observerIdRef.current, on);
     setFogState(on);
@@ -571,7 +576,15 @@ export function useSandbox(
       // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
       if (mapModesRef.current.build !== null) {
         if (kind === 'order') return mapModesRef.current.setBuild(null);
-        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen)) return;
+        if (
+          mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen, {
+            view: current,
+            map,
+            preview: setRoadPreview,
+          })
+        ) {
+          return;
+        }
       }
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {
@@ -764,6 +777,7 @@ export function useSandbox(
       pick({ hex, units: [], target: null });
     },
     setFog,
+    setTutorialStage,
     setPaused,
     step,
     setSpeed,

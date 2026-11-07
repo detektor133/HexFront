@@ -15,24 +15,24 @@ type Both = { readonly ru: Copy; readonly en: Copy };
 const TEXTS: Readonly<Record<string, Both>> = {
   'core.welcome': {
     ru: {
-      title: 'Учебный матч',
-      text: 'Здесь никто не нападёт, пока ты сам не начнёшь войну. Шаг засчитывается, когда ты действительно сделал действие. Выйти можно в любой момент.',
+      title: 'Первая война',
+      text: 'Цель урока — победить: занять землю, построить город и склад, собрать армию, подвести её к врагу с боепитанием и взять его столицу. Соперник делает только то, что нужно уроку. Шаг засчитывается, когда ты правда сделал действие. Выйти можно в любой момент.',
     },
     en: {
-      title: 'Practice match',
-      text: 'Nobody attacks you until you start a war. A step counts only when you really do the action. You can leave at any time.',
+      title: 'The first war',
+      text: 'The goal is to win: take land, build a city and a depot, raise an army, bring it to the enemy with supplies and capture their capital. The rival does only what the lesson needs. A step counts when you really do the action. You can leave at any time.',
     },
   },
   'core.pan': {
     ru: {
       title: 'Двигай карту',
-      text: 'Смотри, что вокруг: карта больше экрана.',
+      text: 'Карта больше экрана. Посмотри, что вокруг.',
       touch: 'Потяни карту одним пальцем за пустое место.',
       mouse: 'Зажми правую кнопку мыши на пустом месте и потяни.',
     },
     en: {
       title: 'Move the map',
-      text: 'The map is bigger than the screen.',
+      text: 'The map is bigger than the screen. Look around.',
       touch: 'Drag the map with one finger on an empty spot.',
       mouse: 'Hold the right mouse button on an empty spot and drag.',
     },
@@ -96,11 +96,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.occupy': {
     ru: {
       title: 'Занять землю',
-      text: 'Задай, сколько войск послать, и нажми «Занять»: ИИ сам разошлёт отряды и захватит землю вокруг. «Состав» раскрывает, из чего собирать армию.',
+      text: 'Нажми «Занять»: ближайшая свободная армия сама разойдётся по ничьей земле и захватит её вокруг. Под кнопкой видно, какая армия получит приказ.',
     },
     en: {
       title: 'Occupy land',
-      text: 'Choose how many troops to send and press Occupy: the AI spreads the units and takes the land. Composition shows what the army is made of.',
+      text: 'Press Occupy: the nearest free army spreads over neutral land and takes it. Under the button you can see which army gets the order.',
     },
   },
   'core.people': {
@@ -139,279 +139,246 @@ const TEXTS: Readonly<Record<string, Both>> = {
   },
   'core.wait': {
     ru: {
-      title: 'Город растёт из людей',
-      text: 'Город можно основать на своём гексе, где достаточно людей и далеко от других городов. Люди растут сами, а налог их замедляет: подожди, пока подсвеченный гекс наполнится.',
+      title: 'Подожди людей',
+      text: 'Город нельзя основать, пока на гексе мало людей. Полоса показывает, сколько набралось: дай стране вырасти.',
     },
     en: {
-      title: 'Cities grow from people',
-      text: 'A city can be founded on your hex with enough people and far from other cities. People grow on their own and tax slows them: wait for the marked hex to fill up.',
+      title: 'Wait for people',
+      text: 'A city cannot be founded until the hex has enough people. The bar shows how many there are: let the country grow.',
     },
   },
   'core.city': {
     ru: {
-      title: 'Основай город',
-      text: 'Людей хватает. Откроется карточка гекса: нажми «основать город». Стройка идёт 30 секунд и стоит золота.',
-      touch: 'Коснись подсвеченного гекса, затем значка города.',
-      mouse: 'Нажми левую кнопку мыши на подсвеченном гексе, затем на значок города.',
+      title: 'Основать город',
+      text: 'Города дают людей, золото и снабжение. Нажми на подсвеченный гекс своей земли и выбери «Основать город»: рядом с ним сам проложится дорога к столице.',
+      touch: 'Коснись гекса и нажми кнопку города в карточке.',
+      mouse: 'Нажми на гекс левой кнопкой и выбери кнопку города в карточке.',
     },
     en: {
       title: 'Found a city',
-      text: 'There are enough people. The hex card opens: press found city. Construction takes 30 seconds and costs gold.',
-      touch: 'Tap the marked hex, then the city icon.',
-      mouse: 'Left-click the marked hex, then the city icon.',
+      text: 'Cities give people, gold and supply. Select the marked hex of your land and press Found a city: a road to the capital is laid automatically.',
+      touch: 'Tap the hex, then the city button in the card.',
+      mouse: 'Left-click the hex, then the city button in the card.',
+    },
+  },
+  'core.cityName': {
+    ru: {
+      title: 'Название города',
+      text: 'У каждого города есть название — оно написано над ним на карте. Новому городу имя дано сразу; изменить его можно в карточке города карандашом рядом с названием. Поменяй, если хочешь, и иди дальше.',
+    },
+    en: {
+      title: 'City name',
+      text: 'Every city has a name written above it on the map. A new city gets one right away; change it with the pencil next to the name in the city card. Rename it if you like and move on.',
+    },
+  },
+  'core.supplyIntro': {
+    ru: {
+      title: 'Снабжение',
+      text: 'Армия без снабжения слабеет и гибнет. Снабжение идёт от столицы и складов по дорогам. Чем дальше фронт от сети, тем хуже снабжение. Поэтому на пути к врагу нужны склады и дороги.',
+    },
+    en: {
+      title: 'Supply',
+      text: 'An army without supply weakens and dies. Supply flows from the capital and depots along roads. The farther the front is from the network, the worse the supply. So you need depots and roads on the way to the enemy.',
+    },
+  },
+  'core.supplyMode': {
+    ru: {
+      title: 'Карта снабжения',
+      text: 'Включи карту снабжения: каждый гекс окрашен от красного (нет снабжения) до зелёного (полное). Склад и дорога сдвинут зелёный к границе.',
+      touch: 'Коснись значка карты снабжения.',
+      mouse: 'Нажми значок карты снабжения.',
+    },
+    en: {
+      title: 'Supply map',
+      text: 'Turn on the supply map: each hex is coloured from red (no supply) to green (full). A depot and a road move the green toward the border.',
+      touch: 'Tap the supply map icon.',
+      mouse: 'Click the supply map icon.',
     },
   },
   'core.hammer': {
     ru: {
-      title: 'Молоточек: строительство',
-      text: 'Всё, что строится на карте, — через молоточек справа внизу: он включает режим строительства и подсвечивает гексы, где можно строить прямо сейчас.',
-      touch: 'Коснись молоточка.',
-      mouse: 'Нажми на молоточек.',
+      title: 'Режим строительства',
+      text: 'Молоточек открывает ряд построек: город, склад, укрепление, благоустройство и дорога. Включи его.',
     },
     en: {
-      title: 'Hammer: building',
-      text: 'Everything built on the map goes through the hammer at the bottom right: it turns on build mode and highlights hexes where you can build right now.',
-      touch: 'Tap the hammer.',
-      mouse: 'Click the hammer.',
+      title: 'Build mode',
+      text: 'The hammer opens a row of buildings: city, depot, fort, improvement and road. Turn it on.',
     },
   },
-  'core.improveTool': {
+  'core.depotTool': {
     ru: {
-      title: 'Что строить',
-      text: 'В ряду над молоточком — город, склад, укрепление и благоустройство. Выбери благоустройство: оно дёшево и поднимает предел людей на гексе. В панели видно цену и твоё золото.',
+      title: 'Склад',
+      text: 'Склад — узел снабжения: от него армия получает боеприпасы и провиант. Выбери склад, подсвечены гексы, где его можно поставить.',
     },
     en: {
-      title: 'What to build',
-      text: 'The row above the hammer has city, depot, fort and improvement. Pick improvement: it is cheap and raises a hex population limit. The bar shows the price and your gold.',
+      title: 'Depot',
+      text: 'A depot is a supply node: the army gets ammo and food from it. Choose the depot; the hexes where it can be placed are highlighted.',
     },
   },
-  'core.improve': {
+  'core.depot': {
     ru: {
-      title: 'Построй',
-      text: 'Нажми на подсвеченный гекс: золото спишется сразу, стройка пойдёт, режим останется включённым. Если гекс бледнее — золота мало, клик объяснит. Выйти из режима — Esc, правая кнопка или молоточек.',
+      title: 'Поставь склад',
+      text: 'Поставь склад на подсвеченный гекс ближе к границе с врагом: так снабжение дотянется до фронта. Склад сам просит дорогу к основной сети.',
       touch: 'Коснись подсвеченного гекса.',
       mouse: 'Нажми левую кнопку мыши на подсвеченном гексе.',
     },
     en: {
-      title: 'Build',
-      text: 'Press a highlighted hex: gold is spent at once, construction starts and the mode stays on. A paler hex means gold is short and the click explains. Leave the mode with Esc, right click or the hammer.',
+      title: 'Place a depot',
+      text: 'Place a depot on a highlighted hex closer to the enemy border so supply reaches the front. A depot asks for a road to the main network by itself.',
       touch: 'Tap a highlighted hex.',
       mouse: 'Left-click a highlighted hex.',
     },
   },
-  'core.war': {
+  'core.roadTool': {
     ru: {
-      title: 'Объяви войну',
-      text: 'Пока вы в мире, наступать нельзя. Нажми значок мечей в меню соперника: война объявлена, и появится кнопка «Наступать». Из войны выход один — мир.',
-      touch: 'Коснись значка мечей в меню.',
-      mouse: 'Нажми на значок мечей в меню.',
+      title: 'Дорога вручную',
+      text: 'Дороги авто-прокладываются коротким путём, но иногда нужен свой маршрут. Выбери инструмент «Дорога» рядом со складом.',
     },
     en: {
-      title: 'Declare war',
-      text: 'You cannot attack while at peace. Press the swords icon in the rival menu: war is declared and the Attack button appears. The only way out of war is peace.',
-      touch: 'Tap the swords icon in the menu.',
-      mouse: 'Click the swords icon in the menu.',
+      title: 'A road by hand',
+      text: 'Roads are laid along the shortest path, but sometimes you need your own route. Choose the Road tool next to the depot.',
+    },
+  },
+  'core.road': {
+    ru: {
+      title: 'Проложи дорогу',
+      text: 'Нажми начальную точку на своей земле (например, у столицы), затем следующие точки, и ещё раз нажми последнюю — дорога пойдёт по твоему маршруту. Цена видна в подсказке.',
+      touch: 'Касайся точек по порядку, затем коснись последней ещё раз.',
+      mouse: 'Нажимай левой кнопкой точки по порядку, затем ещё раз нажми последнюю.',
+    },
+    en: {
+      title: 'Lay the road',
+      text: 'Click a start point on your land (for example near the capital), then the next points, and click the last one again: the road follows your route. The price is shown in the hint.',
+      touch: 'Tap the points in order, then tap the last one again.',
+      mouse: 'Left-click the points in order, then click the last one again.',
+    },
+  },
+  'core.armyIntro': {
+    ru: {
+      title: 'Армии',
+      text: 'Внизу — карточки армий: цвет, число солдат, организация и снабжение. Армия — группа отрядов с общим приказом.',
+    },
+    en: {
+      title: 'Armies',
+      text: 'Army cards are at the bottom: colour, soldiers, organisation and supply. An army is a group of units with a common order.',
+    },
+  },
+  'core.armyPick': {
+    ru: {
+      title: 'Выбери армию',
+      text: 'Нажми на карточку армии: появятся её приказы, а на карте подсветятся её отряды.',
+      touch: 'Коснись карточки армии.',
+      mouse: 'Нажми левой кнопкой на карточку армии.',
+    },
+    en: {
+      title: 'Select the army',
+      text: 'Press the army card: its orders appear and its units are highlighted on the map.',
+      touch: 'Tap the army card.',
+      mouse: 'Left-click the army card.',
+    },
+  },
+  'core.armyPlus': {
+    ru: {
+      title: 'Усили армию',
+      text: 'Кнопка «+» увеличивает армию на выбранную долю, под ней — цена докупки солдат. Стрелка рядом меняет шаг. Доведи армию примерно до 400 солдат: нажимай «+» или выбери шаг побольше.',
+    },
+    en: {
+      title: 'Strengthen the army',
+      text: 'The + button grows the army by the chosen share; the price of the extra soldiers is under it. The arrow next to it changes the step. Bring the army to about 400 soldiers: press + or pick a bigger step.',
+    },
+  },
+  'core.recruit': {
+    ru: {
+      title: 'Набор войск',
+      text: 'Солдаты набираются из людей за золото и приходят в армию. Подожди, пока полоса дойдёт до конца.',
+    },
+    en: {
+      title: 'Recruitment',
+      text: 'Soldiers are recruited from people for gold and join the army. Wait until the bar fills up.',
     },
   },
   'core.enemy': {
     ru: {
       title: 'Соперник',
-      text: 'На другом конце карты чужая страна. Нажми на неё без выбранных отрядов: откроется меню с дипломатией и приказами.',
+      text: 'Вот земля соперника. Нажми на неё без выбранных отрядов: откроется меню страны с дипломатией и приказами армии.',
       touch: 'Коснись подсвеченного гекса.',
       mouse: 'Нажми левую кнопку мыши на подсвеченном гексе.',
     },
     en: {
       title: 'The rival',
-      text: 'A foreign country lies across the map. Press it with no units selected: a menu with diplomacy and orders opens.',
+      text: 'This is the rival’s land. Press it with no units selected: the country menu opens with diplomacy and army orders.',
       touch: 'Tap the marked hex.',
       mouse: 'Left-click the marked hex.',
     },
   },
-  'core.attack': {
+  'core.hold': {
     ru: {
-      title: 'Наступление',
-      text: 'Война объявлена. Нажми «Наступать»: ИИ сам выберет, где бить, построит линии и поведёт армию. «Держать» вместо этого просто прикроет границу.',
+      title: 'Держи границу',
+      text: 'Нажми «Держать»: армия встанет фронтом вдоль границы с соперником и распределит отряды по ней. Если армии нет, нужное число солдат наберётся заново. Соперник заметил это и начал укрепляться.',
     },
     en: {
-      title: 'Offensive',
-      text: 'War is declared. Press Attack: the AI picks where to strike, draws the lines and leads the army. Hold just covers the border instead.',
+      title: 'Hold the border',
+      text: 'Press Hold: the army forms a front along the rival’s border and spreads its units. If there is no army, the soldiers are recruited anew. The rival noticed and began to dig in.',
+    },
+  },
+  'core.front': {
+    ru: {
+      title: 'Армия идёт к фронту',
+      text: 'Отряды идут по своей земле к границе. Полоса показывает, как близко армия.',
+    },
+    en: {
+      title: 'The army marches to the front',
+      text: 'Units march across your land to the border. The bar shows how close the army is.',
+    },
+  },
+  'core.supplyFront': {
+    ru: {
+      title: 'Снабжение фронта',
+      text: 'Посмотри на полоску снабжения у отряда на границе: нужно, чтобы она была не пустой. Если пуста, дострой склад или дорогу ближе к фронту (молоточек → склад / дорога) и подожди: армия без снабжения проиграет бой.',
+    },
+    en: {
+      title: 'Front supply',
+      text: 'Look at the supply bar of the unit at the border: it must not be empty. If it is, finish a depot or road closer to the front (hammer → depot / road) and wait: an army without supply loses the fight.',
+    },
+  },
+  'core.war': {
+    ru: {
+      title: 'Объяви войну',
+      text: 'Пока мир, нападать нельзя. Открой меню соперника и объяви войну: с этого момента армия сможет наступать.',
+    },
+    en: {
+      title: 'Declare war',
+      text: 'While at peace you cannot attack. Open the rival’s menu and declare war: from now on the army can advance.',
+    },
+  },
+  'core.attack': {
+    ru: {
+      title: 'В наступление',
+      text: 'Нажми «Наступать»: командир сам выберет направления удара и поведёт отряды на соперника. Прогноз боя виден над вражеским гексом: бей там, где он обещает победу.',
+    },
+    en: {
+      title: 'Attack',
+      text: 'Press Attack: the commander picks the strike axes and leads the units against the rival. The battle forecast is shown above the enemy hex: strike where it promises victory.',
+    },
+  },
+  'core.conquer': {
+    ru: {
+      title: 'Возьми столицу',
+      text: 'Продвигайся, пока не захватишь столицу соперника. Если наступление застряло, усиль армию кнопкой «+» и следи за снабжением.',
+    },
+    en: {
+      title: 'Capture the capital',
+      text: 'Advance until you capture the rival’s capital. If the offensive stalls, strengthen the army with + and watch the supply.',
     },
   },
   'core.finish': {
     ru: {
-      title: 'Основы пройдены',
-      text: 'Дальше — сама игра: расширяйся, расти города, держи снабжение. Главы про снабжение, армии и строительство — в меню «Обучение».',
+      title: 'Победа!',
+      text: 'Ты занял землю, построил город, склад и дорогу, собрал армию, подвёл её к фронту со снабжением и взял столицу. Это весь цикл игры. Можно вернуться в меню или остаться в матче.',
     },
     en: {
-      title: 'Basics done',
-      text: 'Now the game itself: expand, grow cities, keep supply. Chapters on supply, armies and building are in the Tutorial menu.',
-    },
-  },
-  'supply.intro': {
-    ru: {
-      title: 'Снабжение',
-      text: 'Армия ест. Чем дальше от склада и города, тем хуже снабжение, и отряды теряют организацию. Общий показатель — в шапке.',
-    },
-    en: {
-      title: 'Supply',
-      text: 'Armies eat. The farther from a depot or city, the worse the supply and the more organisation units lose. The overall figure is in the top bar.',
-    },
-  },
-  'supply.mode': {
-    ru: {
-      title: 'Карта снабжения',
-      text: 'Включи режим карты снабжения: зелёное — снабжено, красное — нет.',
-      touch: 'Коснись значка карты снабжения справа внизу.',
-      mouse: 'Нажми на значок карты снабжения справа внизу.',
-    },
-    en: {
-      title: 'Supply map',
-      text: 'Switch to the supply map: green is supplied, red is not.',
-      touch: 'Tap the supply map icon at the bottom right.',
-      mouse: 'Click the supply map icon at the bottom right.',
-    },
-  },
-  'supply.hammer': {
-    ru: {
-      title: 'Строительство',
-      text: 'Молоточек включает режим строительства: подсвечены гексы, где можно строить прямо сейчас.',
-    },
-    en: {
-      title: 'Building',
-      text: 'The hammer turns on build mode: hexes where you can build right now are highlighted.',
-    },
-  },
-  'supply.depotTool': {
-    ru: { title: 'Склад', text: 'Выбери склад в ряду построек: он кормит армию рядом.' },
-    en: { title: 'Depot', text: 'Pick the depot in the row: it feeds the army nearby.' },
-  },
-  'supply.depot': {
-    ru: {
-      title: 'Поставь склад',
-      text: 'Нажми на подсвеченный гекс. В панели видно цену и золото; если золота мало, гекс бледнее и кнопка скажет почему.',
-    },
-    en: {
-      title: 'Place a depot',
-      text: 'Press a highlighted hex. The bar shows the price and your gold; if gold is short the hex is paler and the click tells you why.',
-    },
-  },
-  'supply.finish': {
-    ru: {
-      title: 'Готово',
-      text: 'Склады улучшаются до пятого уровня и расширяют снабжение. Держи их у фронта.',
-    },
-    en: {
-      title: 'Done',
-      text: 'Depots upgrade to level five and widen supply. Keep them near the front.',
-    },
-  },
-  'armies.cards': {
-    ru: {
-      title: 'Армии',
-      text: 'Отряды сведены в армии. На карточке: имя, организация, снабжение, число солдат и лимит. Значок показывает приказ: щит, мечи или флаг.',
-    },
-    en: {
-      title: 'Armies',
-      text: 'Units are grouped into armies. The card shows name, organisation, supply, soldier count and the limit. The icon shows the order: shield, swords or flag.',
-    },
-  },
-  'armies.pick': {
-    ru: {
-      title: 'Выбери армию',
-      text: 'Выбери карточку: над ней появятся приказы.',
-      touch: 'Коснись карточки армии.',
-      mouse: 'Нажми левую кнопку мыши на карточке армии.',
-    },
-    en: {
-      title: 'Pick an army',
-      text: 'Pick a card: orders appear above it.',
-      touch: 'Tap the army card.',
-      mouse: 'Left-click the army card.',
-    },
-  },
-  'armies.limit': {
-    ru: {
-      title: 'Лимит армии',
-      text: 'Число с «∞» — лимит армии. Задай его ползунком: ИИ будет добирать армию до лимита из резерва и закупкой, «Состав» меняет типы войск.',
-    },
-    en: {
-      title: 'Army limit',
-      text: 'The number with ∞ is the army limit. Set it with the slider: the AI tops the army up from the reserve and by recruiting; Composition changes unit types.',
-    },
-  },
-  'armies.split': {
-    ru: {
-      title: 'Раздели армию',
-      text: 'Нажми на значок деления: армия разойдётся на две примерно равные части.',
-    },
-    en: {
-      title: 'Split the army',
-      text: 'Press the split icon: the army divides into two roughly equal halves.',
-    },
-  },
-  'armies.finish': {
-    ru: {
-      title: 'Готово',
-      text: 'Армия остаётся со своими отрядами и лимитом, пока ты сам её не расформируешь.',
-    },
-    en: { title: 'Done', text: 'An army keeps its units and limit until you disband it yourself.' },
-  },
-  'building.hammer': {
-    ru: { title: 'Строительство', text: 'Включи молоточек: откроется ряд построек.' },
-    en: { title: 'Building', text: 'Turn on the hammer: a row of buildings opens.' },
-  },
-  'building.fortTool': {
-    ru: {
-      title: 'Укрепление',
-      text: 'Укрепление усиливает оборону гекса у границы; его можно улучшить до укрепрайона.',
-    },
-    en: {
-      title: 'Fortification',
-      text: 'A fort strengthens a border hex; it upgrades to a fortified region.',
-    },
-  },
-  'building.fort': {
-    ru: {
-      title: 'Поставь укрепление',
-      text: 'Нажми на подсвеченный гекс. Золото спишется сразу, стройка пойдёт.',
-    },
-    en: {
-      title: 'Place a fort',
-      text: 'Press a highlighted hex. Gold is spent at once and construction starts.',
-    },
-  },
-  'building.improveTool': {
-    ru: { title: 'Благоустройство', text: 'Благоустройство увеличивает население гекса.' },
-    en: { title: 'Improvement', text: 'An improvement raises a hex population limit.' },
-  },
-  'building.improve': {
-    ru: {
-      title: 'Улучши гекс',
-      text: 'Нажми на подсвеченный гекс: рядом с гексом появится знак стройки.',
-    },
-    en: {
-      title: 'Improve a hex',
-      text: 'Press a highlighted hex: a construction mark appears there.',
-    },
-  },
-  'building.list': {
-    ru: {
-      title: 'Список построек',
-      text: 'Здесь все города, склады, укрепления и стройки: оттуда улучшают и находят их на карте.',
-    },
-    en: {
-      title: 'Buildings list',
-      text: 'All cities, depots, forts and constructions: upgrade them and find them on the map from here.',
-    },
-  },
-  'building.finish': {
-    ru: {
-      title: 'Готово',
-      text: 'Улучшения идут по уровням: город, склад и укрепление растут за золото и время.',
-    },
-    en: {
-      title: 'Done',
-      text: 'Upgrades go by level: cities, depots and forts grow for gold and time.',
+      title: 'Victory!',
+      text: 'You took land, built a city, a depot and a road, raised an army, brought it to the front with supply and captured the capital. That is the whole game loop. Go back to the menu or stay in the match.',
     },
   },
 };

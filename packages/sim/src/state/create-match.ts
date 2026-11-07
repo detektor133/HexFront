@@ -19,6 +19,7 @@ import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { addUnit, rebuildUnitIndex } from './unit-index.ts';
+import { pickCityName } from '../map/city-names.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
@@ -121,7 +122,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
     hex: capital,
     owner: playerId,
     level: 1,
-    name: '',
+    name: pickCityName(state.seed, cityId, state.cities),
     defenders: MILITIA_PER_LEVEL,
     defenseOrg: ORG_MAX,
     inBattle: false,

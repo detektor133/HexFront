@@ -3,14 +3,16 @@ import {
   IconBuildingCommunity,
   IconChevronsUp,
   IconPackage,
+  IconPencil,
   IconRoute2,
   IconShield,
   IconX,
 } from '@tabler/icons-react';
-import { useId, useLayoutEffect, useRef } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   TERRAIN_NAMES,
+  CITY_NAME_MAX,
   TICKS_PER_S,
   type Command,
   type MapStatic,
@@ -28,6 +30,60 @@ import type { Selection } from '../local/messages.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 import { MetricIcon, MetricRow } from '../ui/metric-icon.tsx';
+
+/** Название своего города: нажатие на карандаш открывает поле, Enter или уход из поля сохраняет. */
+function CityName(props: {
+  readonly cityId: number;
+  readonly name: string;
+  readonly editable: boolean;
+  readonly fallback: string;
+  readonly send: (cmd: Command) => void;
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(props.name);
+  const save = (): void => {
+    const next = draft.trim();
+    if (next !== '' && next !== props.name) {
+      props.send({ t: 'renameCity', cityId: props.cityId, name: next });
+    }
+    setEditing(false);
+  };
+  if (editing) {
+    return (
+      <input
+        className={styles.nameInput}
+        value={draft}
+        maxLength={CITY_NAME_MAX}
+        aria-label={t('card.rename')}
+        autoFocus
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === 'Enter') save();
+          if (event.key === 'Escape') setEditing(false);
+        }}
+      />
+    );
+  }
+  return (
+    <h2 className={styles.title}>
+      {props.name || props.fallback}
+      {props.editable && (
+        <IconButton
+          className={styles.renameButton}
+          label={t('card.rename')}
+          onClick={() => {
+            setDraft(props.name);
+            setEditing(true);
+          }}
+        >
+          <IconPencil size={14} aria-hidden="true" />
+        </IconButton>
+      )}
+    </h2>
+  );
+}
 
 function ActionButton(props: {
   a: HexAction;
@@ -195,9 +251,10 @@ export function HexCard(props: {
   // Снабжение, золото и связь со столицей есть только у своего города.
   const mine = c !== null && c.owner === view.playerId;
   const hasLinkStatus = mine && c !== null && !c.isCapital;
-  const title = c
+  const kind = c
     ? `${c.isCapital ? t('card.capital') : t('card.city')} · ${t('card.level')} ${c.level}`
     : t(`terrain.${terrain}` as MessageKey);
+  const title = c && c.name !== '' ? c.name : kind;
   const job = visible
     ? view.constructions.find((x) => x.hex === s.hex && x.kind !== 'road')
     : undefined;
@@ -219,8 +276,21 @@ export function HexCard(props: {
       <div ref={contentRef} className={styles.cardBody}>
         <div className={styles.header}>
           <div>
-            <h2 className={styles.title}>{title}</h2>
-            <p className={styles.subtitle}>{ownerText}</p>
+            {c ? (
+              <CityName
+                key={c.id}
+                cityId={c.id}
+                name={c.name}
+                editable={mine}
+                fallback={kind}
+                send={send}
+              />
+            ) : (
+              <h2 className={styles.title}>{title}</h2>
+            )}
+            <p className={styles.subtitle}>
+              {c && c.name !== '' ? `${kind} · ${ownerText}` : ownerText}
+            </p>
           </div>
           <IconButton className={styles.iconButton} label={t('card.close')} onClick={props.onClose}>
             <IconX className={styles.icon} size={16} aria-hidden="true" />

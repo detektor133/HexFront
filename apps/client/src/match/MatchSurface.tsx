@@ -37,6 +37,15 @@ interface MatchSurfaceProps {
 /** Высота тулбара приказов армии с отступом, px: карточки гекса и отряда встают выше него. */
 const ARMY_TOOLS_H = 64;
 
+/** Окно отрядов растёт по содержимому от нижнего края: из раскладки берутся только левый край и ширина. */
+function unitCardStyle(
+  layout: React.CSSProperties | undefined,
+  lift: number,
+): React.CSSProperties | undefined {
+  if (!layout) return layout;
+  return { left: layout.left, width: layout.width, '--dock-h': `${lift}px` } as React.CSSProperties;
+}
+
 /** Время затухания окна отрядов, мс (как в UnitCard.module.css). */
 const CARD_FADE_MS = 160;
 
@@ -380,6 +389,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           buildingsOpen={buildingsOpen}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
+          road={sb.mapModes.road}
         />
       )}
       {view && !debug && buildingsOpen && (
@@ -403,7 +413,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           send={sb.send}
           onPick={sb.pick}
           onHeight={setCardH}
-          style={styleFor('card')}
+          style={unitCardStyle(styleFor('card'), dockH + (toolsShown ? ARMY_TOOLS_H : 0))}
         />
       )}
       {view &&
@@ -429,6 +439,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           ctx={tutorialCtx}
           camera={tutorialCamera}
           hexWorld={tutorialHexWorld}
+          onStage={sb.setTutorialStage}
           hexRadius={tokens.map.hexRadius}
         />
       )}
