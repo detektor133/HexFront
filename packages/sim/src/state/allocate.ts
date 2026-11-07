@@ -88,7 +88,9 @@ export const SLOT_DETACHED = -2;
 
 /** Отряд армии, которым сейчас может распоряжаться план. */
 export function planControls(u: Unit, armyId: number): boolean {
-  if (u.armyId !== armyId || u.order === 'retreat' || u.slot === SLOT_DETACHED) return false;
+  if (u.armyId !== armyId || u.order === 'retreat' || u.sea || u.slot === SLOT_DETACHED) {
+    return false;
+  }
   return u.order === 'idle' || (u.order === 'move' && u.slot >= 0);
 }
 

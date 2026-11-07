@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { applyCommands } from '../../src/commands/apply.ts';
 import { withDepot } from '../../src/state/building.ts';
 import { isPortOf } from '../../src/state/port.ts';
-import { at, city, own, scenario } from '../scenario/dsl.ts';
+import { assignFront, assignUnits, at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
 
 // Два острова A: западный с портом у воды, восточный с портом; на востоке — берег B.
 const MAP = `
@@ -82,5 +82,46 @@ describe('порты и морские переправы', () => {
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'move', unitIds: [unit], to: 1 + w } }]);
     expect(s.unitById(unit)?.sea).toBe(true);
     expect(s.unitById(unit)?.path.length).toBeGreaterThan(0);
+  });
+
+  it('обычный приказ «идти» на другой берег прокладывает путь через порты: суша, море, суша', () => {
+    const { s, w } = setup();
+    const walker = s.unit('A', 'infantry', 200, at(0, 2));
+    const target = 6 + 2 * w;
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'move', unitIds: [walker], to: target } }]);
+    const path = s.unitById(walker)?.path ?? [];
+    expect(path.length).toBeGreaterThan(0);
+    expect(path.some((h) => s.state.map.terrain[h] === 0)).toBe(true);
+    s.runSeconds(90);
+    const u = s.unitById(walker);
+    expect(u?.hex).toBe(target);
+    expect(u?.sea).toBe(false);
+  });
+
+  it('без двух своих портов или если суша есть, море в путь не попадает', () => {
+    const { s, w, west } = setup();
+    // Склад на востоке снят: порт один, на другой берег пути нет.
+    s.state.hexes.building[5 + w] = 0;
+    const walker = s.unit('A', 'infantry', 200, at(0, 2));
+    const before = s.unitById(walker)?.path.length ?? 0;
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'move', unitIds: [walker], to: 6 + 2 * w } }]);
+    expect(s.unitById(walker)?.path.length ?? 0).toBe(before);
+    // Внутри острова путь сухопутный.
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'move', unitIds: [walker], to: west } }]);
+    const path = s.unitById(walker)?.path ?? [];
+    expect(path.every((h) => s.state.map.terrain[h] !== 0)).toBe(true);
+  });
+
+  it('фронт на другом берегу: распределение само отправляет отряды через порты', () => {
+    const { s, w } = setup();
+    const ids = [s.unit('A', 'infantry', 200, at(0, 2)), s.unit('A', 'infantry', 200, at(1, 2))];
+    s.cmd('A', createArmy(''));
+    s.runTicks(1);
+    const army = s.armiesOf('A').at(-1)?.id ?? -1;
+    s.cmd('A', assignUnits(ids, army));
+    s.cmd('A', assignFront(army, 'B', null));
+    s.runSeconds(150);
+    const east = ids.filter((id) => (s.unitById(id)?.hex ?? 0) % w >= 5);
+    expect(east.length).toBeGreaterThan(0);
   });
 });

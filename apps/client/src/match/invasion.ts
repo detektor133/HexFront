@@ -11,7 +11,6 @@ import {
   portCapacity,
   sailCost,
   seaTargets,
-  waterNeighbors,
   type Command,
   type MapStatic,
   type PlayerView,
@@ -70,35 +69,6 @@ export function armyPorts(world: InvasionWorld, armyId: number): number[] {
     }
   }
   return [...ports].filter((p) => sailors(view, armyId, p).length > 0).sort((a, b) => a - b);
-}
-
-/** Связаны ли два гекса сушей (любой, без воды): между такими портами плыть незачем. */
-export function landConnected(map: MapStatic, a: number, b: number, limit = 6000): boolean {
-  const seen = new Set<number>([a]);
-  const queue = [a];
-  for (let i = 0; i < queue.length && i < limit; i += 1) {
-    const h = queue[i] as number;
-    if (h === b) return true;
-    const col = h % map.width;
-    const row = Math.floor(h / map.width);
-    for (const [dc, dr] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-      [1, -1],
-      [-1, 1],
-    ] as const) {
-      const c = col + dc;
-      const r = row + dr;
-      if (c < 0 || r < 0 || c >= map.width || r >= map.height) continue;
-      const n = c + r * map.width;
-      if (seen.has(n) || map.terrain[n] === TERRAIN.water) continue;
-      seen.add(n);
-      queue.push(n);
-    }
-  }
-  return false;
 }
 
 /**
@@ -251,32 +221,4 @@ export function useInvasion(
 /** Есть ли у армии отряды в портах: иначе кнопка вторжения серая. */
 export function canInvade(view: PlayerView, map: MapStatic, armyId: number): boolean {
   return armyPorts({ view, map }, armyId).length > 0;
-}
-
-/** Порт ли гекс игрока: для приказа «идти» в соседний порт по морю. */
-export function ownPort(view: PlayerView, map: MapStatic, hex: number): boolean {
-  return isPortOf({ map, hexes: view.hexes }, view.playerId, hex);
-}
-
-export { waterNeighbors };
-
-/**
- * Обычный приказ «идти» из порта в другой свой порт, до которого сушей не дойти: отряды плывут.
- * @returns id отрядов для переправы или null, если приказ обычный
- */
-export function seaOrderUnits(
-  view: PlayerView,
-  map: MapStatic,
-  unitIds: readonly number[],
-  to: number,
-): number[] | null {
-  if (unitIds.length === 0 || !ownPort(view, map, to)) return null;
-  const units = unitIds
-    .map((id) => view.units.find((u) => u.id === id))
-    .filter((u): u is UnitView => u !== undefined && u.owner === view.playerId);
-  const from = units[0]?.hex;
-  if (from === undefined || from === to || units.length !== unitIds.length) return null;
-  if (units.some((u) => u.hex !== from || u.sea || u.inBattle)) return null;
-  if (!ownPort(view, map, from) || landConnected(map, from, to)) return null;
-  return units.map((u) => u.id);
 }

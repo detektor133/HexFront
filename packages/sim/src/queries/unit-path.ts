@@ -15,10 +15,12 @@ import {
   type LandTerrain,
   type UnitType,
 } from '../balance.ts';
+import { planSeaRoute } from './sea-route.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush, type MinHeap } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { isPortOf } from '../state/port.ts';
 import { atWar, protectsFrom } from '../state/relations.ts';
 import type { MatchState } from '../state/types.ts';
 import { unitIndex } from '../state/unit-index.ts';
@@ -105,9 +107,9 @@ export interface Mover {
  * @returns тики, не меньше 1; null — гекс непроходим или не сосед
  */
 export function stepTicks(state: MatchState, m: Mover, from: HexId, to: HexId): number | null {
-  // Вода доступна только плывущему отряду, и проход по ней одинаково быстр.
+  // Вода в путь попадает только из морского звена составного поиска; проход по ней одинаково быстр.
   if ((state.map.terrain[to] ?? 0) === TERRAIN.water) {
-    return m.sea ? Math.max(1, intDiv(SEA_MOVE_S_PER_HEX * TICKS_PER_S, FP)) : null;
+    return Math.max(1, intDiv(SEA_MOVE_S_PER_HEX * TICKS_PER_S, FP));
   }
   const terrain = moveTerrain(state, to);
   const dir = directionTo(state, from, to);
@@ -249,6 +251,22 @@ export function findPath(
   ownLand: LandRule = false,
   passHostile?: (hex: HexId) => boolean,
 ): HexId[] | null {
+  return (
+    landPath(state, from, to, type, owner, ownLand, passHostile) ??
+    seaPath(state, from, to, type, owner, ownLand, passHostile)
+  );
+}
+
+// Сушей: A* по времени хода.
+function landPath(
+  state: MatchState,
+  from: HexId,
+  to: HexId,
+  type: UnitType,
+  owner: number,
+  ownLand: LandRule,
+  passHostile: ((hex: HexId) => boolean) | undefined,
+): HexId[] | null {
   if (from === to) return [];
   const mover: Mover = {
     type,
@@ -268,6 +286,49 @@ export function findPath(
     (hex) => distance(hexFromId(hex, width), goal) * hMin,
     ownLand,
   );
+}
+
+// Составной путь: сушей до своего порта, по воде в другой свой порт, сушей до цели. Выбирается
+// пара портов с наименьшей суммой (суша дороже воды вдвое); сушей пробуют сначала, поэтому к морю
+// обращаются, только когда на сушу пути нет. Переправа между своими портами бесплатна.
+function seaPath(
+  state: MatchState,
+  from: HexId,
+  to: HexId,
+  type: UnitType,
+  owner: number,
+  ownLand: LandRule,
+  passHostile: ((hex: HexId) => boolean) | undefined,
+): HexId[] | null {
+  if ((state.map.terrain[to] ?? 0) === TERRAIN.water) return null;
+  const ports: HexId[] = [];
+  for (let h = 0; h < state.hexes.owner.length; h += 1) {
+    if (isPortOf(state, owner, h)) ports.push(h);
+  }
+  if (ports.length < 2) return null;
+  const toPort = new Map<HexId, HexId[]>();
+  const fromPort = new Map<HexId, HexId[]>();
+  for (const port of ports) {
+    const legA = landPath(state, from, port, type, owner, ownLand, passHostile);
+    if (legA) toPort.set(port, legA);
+    const legB = landPath(state, port, to, type, owner, ownLand, passHostile);
+    if (legB) fromPort.set(port, legB);
+  }
+  let best: HexId[] | null = null;
+  let bestCost = Number.MAX_SAFE_INTEGER;
+  for (const [a, legA] of toPort) {
+    for (const [b, legB] of fromPort) {
+      if (a === b) continue;
+      const sea = planSeaRoute(state.map, a, b);
+      if (!sea) continue;
+      const cost = 2 * legA.length + sea.length + 2 * legB.length;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = [...legA, ...sea, ...legB];
+      }
+    }
+  }
+  return best;
 }
 
 /**

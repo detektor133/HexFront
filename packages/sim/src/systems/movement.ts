@@ -6,6 +6,7 @@ import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { isHostileHex, ownUnitsAt, peaceBlocked, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
+import { isPortOf } from '../state/port.ts';
 import { isAllied } from '../state/relations.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 import { moveUnit } from '../state/unit-index.ts';
@@ -20,7 +21,10 @@ function stop(unit: Unit): void {
 
 // Гекс стал непроходимым: отряд встаёт.
 function blocked(state: MatchState, unit: Unit, next: HexId): boolean {
-  if (state.map.terrain[next] === TERRAIN.water) return !unit.sea;
+  // В воду можно ступить только плывущему отряду или из своего порта (звено составного пути).
+  if (state.map.terrain[next] === TERRAIN.water) {
+    return !unit.sea && !isPortOf(state, unit.owner, unit.hex);
+  }
   if (peaceBlocked(state, unit.owner, next)) return true;
   return unit.type === 'artillery' && state.hexes.owner[next] !== unit.owner;
 }
@@ -46,6 +50,7 @@ function startStep(state: MatchState, unit: Unit, next: HexId): boolean {
     return false;
   }
   if (meetEnemy(state, unit, next)) return false;
+  if (state.map.terrain[next] === TERRAIN.water) unit.sea = true;
   // Полный гекс впереди: ждём, пока освободится место.
   if (isFull(state, unit, next)) return false;
   const ticks = stepTicks(state, unit, unit.hex, next);

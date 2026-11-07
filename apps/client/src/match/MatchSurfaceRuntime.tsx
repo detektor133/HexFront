@@ -12,7 +12,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
-import { useInvasion, seaOrderUnits, type Invasion } from './invasion.ts';
+import { useInvasion, type Invasion } from './invasion.ts';
 import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { orderArmy } from '../dev/army-order.ts';
@@ -638,14 +638,6 @@ export function useSandbox(
     // Обычный приказ заменяет цепочку Shift+ПКМ.
     const order = (hex: number): void => {
       queueRef.current = EMPTY_QUEUE;
-      // Приказ «идти» в другой свой порт, куда по суше не дойти, — переправа по морю (бесплатно).
-      const current = viewRef.current;
-      const picked = pickedRef.current;
-      const ships = current ? seaOrderUnits(current, map, picked.units, hex) : null;
-      if (ships) {
-        match.send({ t: 'sail', unitIds: ships, to: hex });
-        return;
-      }
       plainOrder(hex);
       syncQueueMarks();
     };
