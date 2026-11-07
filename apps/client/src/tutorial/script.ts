@@ -207,9 +207,6 @@ export function depotCount(ctx: TutorialCtx): number {
   return built + builtOwn(ctx, 'depot');
 }
 
-const manualRoad = (ctx: TutorialCtx): boolean =>
-  ctx.view.constructions.some((c) => c.kind === 'road' && c.manual === true);
-
 const cityCount = (ctx: TutorialCtx): number =>
   ctx.view.cities.filter((x) => x.owner === me(ctx)).length + builtOwn(ctx, 'foundCity');
 
@@ -297,8 +294,6 @@ const CORE: readonly Step[] = [
   { id: 'hammer', target: { ui: 'hammer' }, done: (c) => c.build !== null },
   { id: 'depotTool', target: { ui: 'build-depot' }, done: (c) => c.build === 'depot' },
   { id: 'depot', target: { hex: depotSite }, base: depotCount, done: (c, b) => depotCount(c) > b },
-  { id: 'roadTool', target: { ui: 'build-road' }, done: (c) => c.build === 'road' },
-  { id: 'road', target: { ui: 'build-hint' }, done: (c) => manualRoad(c) },
   { id: 'armyPick', target: { ui: 'army-card' }, done: (c) => c.army !== null },
   { id: 'armyPlus', target: { ui: 'army-stronger' }, done: (c) => armyOrder(c) >= ARMY_GOAL },
   {

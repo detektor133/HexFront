@@ -80,13 +80,12 @@ describe('обучение: сценарий', () => {
     for (const step of STEPS.core) expect(hasCopy('core', step.id), step.id).toBe(true);
   });
 
-  it('обучение проводит по всему циклу: земля, город, склад, дорога, армия, фронт, война', () => {
+  it('обучение проводит по всему циклу: земля, город, склад, армия, фронт, война', () => {
     const ids = STEPS.core.map((x) => x.id);
     const order = [
       'occupy',
       'city',
       'depot',
-      'road',
       'armyPlus',
       'recruit',
       'hold',
@@ -241,7 +240,6 @@ describe('урок проходим от начала до победы', () => 
         !s.view().units.some((u) => u.hex === h && u.owner !== 0),
     );
     own.sort((a, b) => gap(a, border) - gap(b, border) || a - b);
-    const capital = s.view().cities.find((c) => c.owner === 0 && c.isCapital)?.hex ?? 0;
     let depotHex = -1;
     for (const h of own.slice(0, 12)) {
       s.queue({ t: 'build', hex: h, kind: 'depot' });
@@ -253,7 +251,6 @@ describe('урок проходим от начала до победы', () => 
     }
     expect(depotHex).toBeGreaterThanOrEqual(0);
     s.tick(1500);
-    s.queue({ t: 'buildRoad', points: [capital, depotHex] });
     s.tick(5);
 
     // Армия до нужного размера.

@@ -3,72 +3,14 @@
 // пока режим включён, и сразу после стройки.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  SUPPLY_REBUILD_COST_PER_HEX,
-  TERRAIN,
-  isDepot,
-  planRoadRoute,
-  roadEndsAreNodes,
-  type Command,
-  type MapStatic,
-  type PlayerView,
-} from '@hexfront/sim';
+import type { Command } from '@hexfront/sim';
 
 import type { EconomyLayer } from '../dev/economy-layer.ts';
 import type { LocalMatch } from '../local/local-match.ts';
 import type { MapMaskMode, MapMaskReply } from '../local/messages.ts';
 
 export type MapMode = 'normal' | 'supply';
-export type BuildTool = 'city' | 'fort' | 'depot' | 'improve' | 'road';
-
-/** Что нужно клику по гексу для дороги вручную: мир игрока и показ маршрута на карте. */
-export interface RoadContext {
-  readonly view: PlayerView;
-  readonly map: MapStatic;
-  readonly preview: (path: readonly number[] | null) => void;
-}
-
-/** Дорога вручную: сколько точек задано и сколько стоит текущий маршрут (fixed-point золота). */
-export interface RoadInfo {
-  readonly points: number;
-  readonly cost: number | null;
-  /** Ключ причины отказа последнего нажатия (reason.*); null — всё в порядке. */
-  readonly error: string | null;
-  /** Сколько новых гексов займёт дорога по текущим точкам. */
-  readonly hexes: number;
-}
-
-/** Мир для дороги: снимок и карта. */
-export interface RoadWorld {
-  readonly view: PlayerView;
-  readonly map: MapStatic;
-}
-
-const NO_ROAD: RoadInfo = { points: 0, cost: null, error: null, hexes: 0 };
-
-/** Узлы сети игрока в снимке: его города и склады. */
-function roadNodesOf(view: PlayerView): Set<number> {
-  const nodes = new Set<number>();
-  for (const c of view.cities) if (c.owner === view.playerId) nodes.add(c.hex);
-  view.hexes.owner.forEach((o, h) => {
-    if (o === view.playerId && isDepot(view.hexes.building[h] ?? 0)) nodes.add(h);
-  });
-  return nodes;
-}
-
-/** Маска подсветки дороги: сначала только узлы, после начала — вся своя суша для промежуточных точек. */
-function roadMask(world: RoadWorld, started: boolean): Uint8Array {
-  const { view, map } = world;
-  const nodes = roadNodesOf(view);
-  const mask = new Uint8Array(view.hexes.owner.length);
-  for (let h = 0; h < mask.length; h += 1) {
-    if (nodes.has(h)) mask[h] = 1;
-    else if (started && view.hexes.owner[h] === view.playerId && map.terrain[h] !== TERRAIN.water) {
-      mask[h] = 2;
-    }
-  }
-  return mask;
-}
+export type BuildTool = 'city' | 'fort' | 'depot' | 'improve';
 
 /** Как часто обновляется маска, мс: стройка и захват гексов меняют её не чаще секунды. */
 const REFRESH_MS = 1000;
@@ -82,16 +24,12 @@ export function buildCommand(tool: BuildTool, hex: number): Command {
       return { t: 'foundCity', hex };
     case 'improve':
       return { t: 'improve', hex };
-    case 'road':
-      return { t: 'buildRoad', points: [hex, hex] };
     default:
       return { t: 'build', hex, kind: tool };
   }
 }
 
 function modeOf(mapMode: MapMode, build: BuildTool | null): MapMaskMode | null {
-  // У дороги вручную маски нет: она ведётся по точкам, а не по подсвеченным гексам.
-  if (build === 'road') return null;
   if (build) return `build:${build}`;
   return mapMode === 'supply' ? 'supply' : null;
 }
@@ -110,8 +48,6 @@ export interface MapModes {
   readonly feedback: BuildFeedback | null;
   readonly mapMode: MapMode;
   readonly build: BuildTool | null;
-  /** Состояние дороги вручную (пока выбран инструмент «Дорога»). */
-  readonly road: RoadInfo;
   setMapMode(mode: MapMode): void;
   setBuild(tool: BuildTool | null): void;
   /** Обрабатывает ответ воркера с маской режима карты. */
@@ -124,14 +60,12 @@ export interface MapModes {
     hex: number,
     send: (cmd: Command) => void,
     at?: { readonly x: number; readonly y: number },
-    road?: RoadContext,
   ): boolean;
 }
 
 export function useMapModes(
   matchRef: React.RefObject<LocalMatch | null>,
   layerRef: React.RefObject<EconomyLayer | null>,
-  roadWorld?: () => RoadWorld | null,
 ): MapModes {
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   const [build, setBuildState] = useState<BuildTool | null>(null);
@@ -141,9 +75,6 @@ export function useMapModes(
   const requestId = useRef(0);
   const refreshTimer = useRef<number | null>(null);
   const [feedback, setFeedback] = useState<BuildFeedback | null>(null);
-  const roadPoints = useRef<number[]>([]);
-  const roadPreview = useRef<RoadContext['preview'] | null>(null);
-  const [road, setRoad] = useState<RoadInfo>(NO_ROAD);
   const feedbackId = useRef(0);
 
   const request = useCallback(() => {
@@ -158,22 +89,7 @@ export function useMapModes(
     modeRef.current = mode;
     buildRef.current = build;
     maskRef.current = new Uint8Array(0);
-    // Смена инструмента или выход из режима сбрасывает набранные точки дороги и её показ на карте.
-    roadPoints.current = [];
-    setRoad(NO_ROAD);
-    roadPreview.current?.(null);
     if (mode === null) {
-      if (build === 'road' && roadWorld) {
-        // Дорога вручную: подсветка узлов и своей земли считается здесь, воркер маску не строит.
-        const paint = (): void => {
-          const world = roadWorld();
-          if (world)
-            layerRef.current?.setMapMask('build', roadMask(world, roadPoints.current.length > 0));
-        };
-        paint();
-        const timer = window.setInterval(paint, REFRESH_MS);
-        return () => window.clearInterval(timer);
-      }
       layerRef.current?.setMapMask(null, null);
       return;
     }
@@ -214,89 +130,9 @@ export function useMapModes(
       hex: number,
       send: (cmd: Command) => void,
       at?: { readonly x: number; readonly y: number },
-      roadContext?: RoadContext,
     ): boolean => {
       const tool = buildRef.current;
       if (tool === null) return false;
-      if (tool === 'road') {
-        if (!roadContext) return true;
-        roadPreview.current = roadContext.preview;
-        const { view, map } = roadContext;
-        const nodes = roadNodesOf(view);
-        const points = roadPoints.current;
-        const fail = (error: string): boolean => {
-          setRoad((now) => ({ ...now, error }));
-          if (at) {
-            feedbackId.current += 1;
-            setFeedback({ id: feedbackId.current, kind: 'blocked', x: at.x, y: at.y });
-          }
-          return true;
-        };
-        const update = (next: number[]): void => {
-          roadPoints.current = next;
-          let cost: number | null = null;
-          let hexes = 0;
-          let error: string | null = null;
-          if (next.length >= 2) {
-            const route = planRoadRoute(
-              { map, hexes: view.hexes },
-              view.playerId,
-              next,
-              new Set(view.cities.map((c) => c.hex)),
-            );
-            if (route.ok) {
-              hexes = route.toBuild.length;
-              cost = SUPPLY_REBUILD_COST_PER_HEX * hexes;
-              roadContext.preview(route.path);
-            } else {
-              error = route.reason;
-              roadContext.preview(null);
-            }
-          } else {
-            roadContext.preview(null);
-          }
-          setRoad({ points: next.length, cost, error, hexes });
-        };
-        // Нажатие по последней точке снимает её.
-        if (points.length > 0 && points.at(-1) === hex) {
-          update(points.slice(0, -1));
-          return true;
-        }
-        if (points.length === 0) {
-          if (!nodes.has(hex)) return fail('roadNeedsNodes');
-          update([hex]);
-          return true;
-        }
-        if (view.hexes.owner[hex] !== view.playerId || map.terrain[hex] === TERRAIN.water) {
-          return fail('notOwnHex');
-        }
-        const next = [...points, hex];
-        // Город или склад в конце — дорога сразу проводится.
-        if (nodes.has(hex)) {
-          const route = planRoadRoute(
-            { map, hexes: view.hexes },
-            view.playerId,
-            next,
-            new Set(view.cities.map((c) => c.hex)),
-          );
-          if (!route.ok) {
-            update(next);
-            return fail(route.reason);
-          }
-          if (!roadEndsAreNodes(next, nodes)) return fail('roadNeedsNodes');
-          send({ t: 'buildRoad', points: next });
-          roadPoints.current = [];
-          roadContext.preview(null);
-          setRoad(NO_ROAD);
-          if (at) {
-            feedbackId.current += 1;
-            setFeedback({ id: feedbackId.current, kind: 'ok', x: at.x, y: at.y });
-          }
-          return true;
-        }
-        update(next);
-        return true;
-      }
       // 1 — можно построить; 2 — не хватает золота, 0 — нельзя: клик объясняет отказ.
       const mask = maskRef.current[hex];
       if (at) {
@@ -318,7 +154,6 @@ export function useMapModes(
     feedback,
     mapMode,
     build,
-    road,
     setMapMode: (mode) => {
       setMapModeState(mode);
       setBuildState(null);

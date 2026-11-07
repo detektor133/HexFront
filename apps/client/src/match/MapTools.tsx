@@ -5,22 +5,14 @@ import {
   IconListDetails,
   IconMap2,
   IconPackage,
-  IconRoute,
   IconShield,
 } from '@tabler/icons-react';
 
-import {
-  CITY_FOUND_BASE_COST,
-  DEPOT_COST,
-  FORT_COST,
-  FP,
-  IMPROVEMENT_COST,
-  SUPPLY_REBUILD_COST_PER_HEX,
-} from '@hexfront/sim';
+import { CITY_FOUND_BASE_COST, DEPOT_COST, FORT_COST, FP, IMPROVEMENT_COST } from '@hexfront/sim';
 
 import styles from './MapTools.module.css';
-import type { BuildTool, MapMode, RoadInfo } from './map-modes.ts';
-import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
+import type { BuildTool, MapMode } from './map-modes.ts';
+import { t, type MessageKey } from '../i18n/dict.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const BUILD_TOOLS: readonly {
@@ -32,7 +24,6 @@ const BUILD_TOOLS: readonly {
   { tool: 'depot', icon: IconPackage, label: 'mapTools.depot' },
   { tool: 'fort', icon: IconShield, label: 'mapTools.fort' },
   { tool: 'improve', icon: IconChevronsUp, label: 'mapTools.improve' },
-  { tool: 'road', icon: IconRoute, label: 'mapTools.road' },
 ];
 
 /** Наименьшая цена стройки, fixed-point; `more` — цена растёт (город — с числом основанных). */
@@ -41,7 +32,6 @@ const BUILD_PRICES: Record<BuildTool, { readonly fp: number; readonly more: bool
   depot: { fp: DEPOT_COST, more: false },
   fort: { fp: FORT_COST, more: false },
   improve: { fp: IMPROVEMENT_COST[0], more: true },
-  road: { fp: SUPPLY_REBUILD_COST_PER_HEX, more: true },
 };
 
 interface Props {
@@ -55,8 +45,6 @@ interface Props {
   readonly gold: number;
   readonly buildingsOpen: boolean;
   readonly onToggleBuildings: () => void;
-  /** Дорога вручную: сколько точек задано и цена маршрута. */
-  readonly road?: RoadInfo;
 }
 
 /** Правый нижний угол: молоточек (режим строительства) и режимы карты — обычная и снабжение. */
@@ -69,7 +57,6 @@ export function MapTools({
   gold,
   buildingsOpen,
   onToggleBuildings,
-  road,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
   return (
@@ -96,11 +83,6 @@ export function MapTools({
             );
           })}
         </div>
-      )}
-      {hammerOn && build === 'road' && road?.error && (
-        <p className={styles.hintError} role="alert">
-          {reasonText(road.error)}
-        </p>
       )}
       <div className={styles.column}>
         <IconButton

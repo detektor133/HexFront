@@ -106,9 +106,6 @@ export function diplomacyCommands(
   const all = [...land, ...overseas(state, me, context, new Set(land.map((r) => r.id)))];
   const myViolations = d.violations[me] ?? 0;
   const atWarNow = all.filter((r) => relationOf(state, me, r.id) === 'war');
-  const pacts = all.filter((r) =>
-    ['pact', 'alliance'].includes(relationOf(state, me, r.id)),
-  ).length;
   const worstThreat = (except: number): number =>
     Math.max(0, ...all.filter((r) => r.id !== except).map((r) => r.threat));
 
@@ -119,9 +116,7 @@ export function diplomacyCommands(
     const danger = Math.max(worstThreat(o.from), offerer?.threat ?? 0);
     const gain = offerer?.opportunity ?? 0;
     const trusted = (d.violations[o.from] ?? 0) <= myViolations + 1;
-    // Договор нужен один: со всеми дружить нельзя, иначе некому воевать. Мир с воюющим берётся всегда.
-    const free = pacts === 0 || relationOf(state, me, o.from) === 'war';
-    out.push({ t: 'answerTreaty', from: o.from, accept: free && trusted && danger >= gain });
+    out.push({ t: 'answerTreaty', from: o.from, accept: trusted && danger >= gain });
   }
 
   // Война: сильнейшая по соотношению сил цель, с которой я не в войне; разрыв договора дороже —
@@ -143,10 +138,7 @@ export function diplomacyCommands(
   // минуту на бота (по окну тиков), чтобы отказы не превращались в спам.
   if (state.tick % PROPOSE_PERIOD_TICKS >= BOT_EASY_THINK_TICKS) return out;
   const proposed = new Set(d.offers.filter((o) => o.from === me).map((o) => o.to));
-  // Пакт предлагается только самому опасному соседу и только пока своего пакта нет.
-  const strongest = [...all].sort((a, c) => c.threat - a.threat || a.id - c.id)[0];
   for (const r of all) {
-    if (pacts > 0 || r.id !== strongest?.id) continue;
     if (r.threat < FP || proposed.has(r.id)) continue;
     const rel = relationOf(state, me, r.id);
     if (rel === 'pact' || rel === 'alliance') continue;

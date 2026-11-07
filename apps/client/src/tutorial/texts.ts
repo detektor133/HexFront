@@ -172,11 +172,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.hammer': {
     ru: {
       title: 'Режим строительства',
-      text: 'Молоточек открывает ряд построек: город, склад, укрепление, благоустройство и дорога. Включи его.',
+      text: 'Молоточек открывает ряд построек: город, склад, укрепление, и благоустройство. Включи его.',
     },
     en: {
       title: 'Build mode',
-      text: 'The hammer opens a row of buildings: city, depot, fort, improvement and road. Turn it on.',
+      text: 'The hammer opens a row of buildings: city, depot, fort and improvement. Turn it on.',
     },
   },
   'core.depotTool': {
@@ -201,30 +201,6 @@ const TEXTS: Readonly<Record<string, Both>> = {
       text: 'Place a depot on a highlighted hex closer to the enemy border so supply reaches the front. A depot asks for a road to the main network by itself.',
       touch: 'Tap a highlighted hex.',
       mouse: 'Left-click a highlighted hex.',
-    },
-  },
-  'core.roadTool': {
-    ru: {
-      title: 'Дорога вручную',
-      text: 'Дороги прокладываются сами, но иногда нужен свой маршрут между городами и складами. Выбери инструмент «Дорога».',
-    },
-    en: {
-      title: 'A road by hand',
-      text: 'Roads are laid along the shortest path, but sometimes you need your own route. Choose the Road tool next to the depot.',
-    },
-  },
-  'core.road': {
-    ru: {
-      title: 'Проложи дорогу',
-      text: 'Нажми свой город или склад — начало, затем (по желанию) гексы своей земли, чтобы изогнуть путь, и в конце другой свой город или склад: дорога проложится. Цена и ошибки видны в карточке строительства.',
-      touch: 'Касайся точек по порядку.',
-      mouse: 'Нажимай левой кнопкой точки по порядку.',
-    },
-    en: {
-      title: 'Lay the road',
-      text: 'Click your city or depot to start, then (optionally) hexes of your land to bend the path, and finally another city or depot: the road is laid. The price and errors are in the build card.',
-      touch: 'Tap the points in order.',
-      mouse: 'Left-click the points in order.',
     },
   },
   'core.armyPick': {
@@ -298,11 +274,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.supplyFront': {
     ru: {
       title: 'Снабжение фронта',
-      text: 'Посмотри на полоску снабжения у отряда на границе: нужно, чтобы она была не пустой. Если пуста, дострой склад или дорогу ближе к фронту (молоточек → склад / дорога) и подожди: армия без снабжения проиграет бой.',
+      text: 'Посмотри на полоску снабжения у отряда на границе: нужно, чтобы она была не пустой. Если пуста, поставь склад ближе к фронту (молоточек → склад) и подожди: армия без снабжения проиграет бой.',
     },
     en: {
       title: 'Front supply',
-      text: 'Look at the supply bar of the unit at the border: it must not be empty. If it is, finish a depot or road closer to the front (hammer → depot / road) and wait: an army without supply loses the fight.',
+      text: 'Look at the supply bar of the unit at the border: it must not be empty. If it is, place a depot closer to the front (hammer → depot) and wait: an army without supply loses the fight.',
     },
   },
   'core.war': {
@@ -338,11 +314,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.finish': {
     ru: {
       title: 'Победа!',
-      text: 'Ты занял землю, построил город, склад и дорогу, собрал армию, подвёл её к фронту со снабжением и взял столицу. Это весь цикл игры. Можно вернуться в меню или остаться в матче.',
+      text: 'Ты занял землю, построил город и склад, собрал армию, подвёл её к фронту со снабжением и взял столицу. Это весь цикл игры. Можно вернуться в меню или остаться в матче.',
     },
     en: {
       title: 'Victory!',
-      text: 'You took land, built a city, a depot and a road, raised an army, brought it to the front with supply and captured the capital. That is the whole game loop. Go back to the menu or stay in the match.',
+      text: 'You took land, built a city and a depot, raised an army, brought it to the front with supply and captured the capital. That is the whole game loop. Go back to the menu or stay in the match.',
     },
   },
 };

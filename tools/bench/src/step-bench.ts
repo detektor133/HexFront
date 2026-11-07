@@ -18,9 +18,12 @@ const TARGET_P99_MS = 10;
 const times: number[] = [];
 let fighting = 0;
 let battles = 0;
-let last = syntheticMatch();
+// Нагрузочный режим: BENCH_UNITS=2000 BENCH_BATTLES=100 — масштабные бои (цели не проверяются).
+const UNITS = Number(process.env.BENCH_UNITS ?? 200);
+const BATTLE_COUNT = Number(process.env.BENCH_BATTLES ?? 20);
+let last = syntheticMatch(UNITS, BATTLE_COUNT);
 for (let series = 0; series < SERIES; series += 1) {
-  last = syntheticMatch();
+  last = syntheticMatch(UNITS, BATTLE_COUNT);
   const { state, fronts } = last;
   for (let i = 0; i < WARMUP_STEPS; i += 1) step(state, rearm(state, fronts));
   for (let i = 0; i < SERIES_STEPS; i += 1) {

@@ -136,11 +136,11 @@ export interface Front {
 }
 
 // 20 боёв на границах соседних игроков: по 2 отряда с каждой стороны.
-function battles(state: MatchState): Front[] {
+function battles(state: MatchState, count: number): Front[] {
   const { width } = state.map;
   const fronts: Front[] = [];
   const used = new Set<number>();
-  for (let id = 0; id < state.hexes.owner.length && fronts.length < BATTLES; id += 1) {
+  for (let id = 0; id < state.hexes.owner.length && fronts.length < count; id += 1) {
     const a = state.hexes.owner[id] ?? -1;
     if (a < 0 || used.has(a) || state.cities.some((c) => c.hex === id)) continue;
     for (const n of neighbors(hexFromId(id, width))) {
@@ -182,17 +182,20 @@ function planFronts(state: MatchState): void {
 }
 
 /** Синтетический матч и его фронты. */
-export function syntheticMatch(): { state: MatchState; fronts: Front[] } {
+export function syntheticMatch(
+  units: number = UNITS,
+  battleCount: number = BATTLES,
+): { state: MatchState; fronts: Front[] } {
   const state = createMatch(
     buildMap(),
     Array.from({ length: PLAYERS }, (_, i) => ({ name: `P${i}` })),
     7,
   );
   partition(state);
-  const fronts = battles(state);
+  const fronts = battles(state, battleCount);
   // Остальные отряды — в тылу, половина идёт маршем по своей земле.
   let i = 0;
-  while (state.units.length < UNITS) {
+  while (state.units.length < units) {
     const owner = i % PLAYERS;
     const own = state.hexes.owner.findIndex((o, id) => o === owner && id % 3 === i % 3);
     const u = unit(state, owner, i % 4 === 0 ? 'artillery' : 'infantry', own, 300);

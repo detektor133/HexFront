@@ -15,14 +15,14 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { mergeUnits } from '../commands/unit.ts';
-import { distance, hexFromId } from '../math/hex.ts';
+import { distance, hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
 import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
 import type { MatchState, Unit } from '../state/types.ts';
-import { allUnits } from '../state/unit-index.ts';
+import { allUnits, unitIndex } from '../state/unit-index.ts';
 
 /**
  * Предел отряда при слиянии, fixed-point: CONSOLIDATE_MAX для небольшого войска, а у большого —
@@ -44,14 +44,25 @@ export function consolidate(state: MatchState): void {
   const groups = new Map<string, Unit[]>();
   // Армия занимает ничью землю роем (нет плана) — её отряды не стягиваем: рой на то и рассыпан.
   const planned = new Set(state.plans.map((p) => p.armyId));
-  const foes = allUnits(state).filter((u) => state.players[u.owner] !== undefined);
-  const nearFoe = (u: Unit): boolean =>
-    foes.some(
-      (e) =>
-        e.owner !== u.owner &&
-        atWar(state, u.owner, e.owner) &&
-        distance(hexFromId(u.hex, width), hexFromId(e.hex, width)) <= CONSOLIDATE_SAFE,
-    );
+  // Враг рядом ищется по индексу гексов в радиусе CONSOLIDATE_SAFE, а не перебором всех отрядов
+  // для каждого отряда: на тысячах отрядов перебор давал заметный провал раз в период слияния.
+  const { unitsByHex } = unitIndex(state);
+  const { height } = state.map;
+  const nearFoe = (u: Unit): boolean => {
+    for (const h of spiral(hexFromId(u.hex, width), CONSOLIDATE_SAFE)) {
+      if (!inBounds(h, width, height)) continue;
+      for (const e of unitsByHex[hexId(h, width)] ?? []) {
+        if (
+          e.owner !== u.owner &&
+          state.players[e.owner] !== undefined &&
+          atWar(state, u.owner, e.owner)
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
   for (const u of allUnits(state)) {
     if (u.type === 'artillery' || u.slot === SLOT_DETACHED) continue;
     const key = `${u.owner}|${u.armyId}|${u.type}`;

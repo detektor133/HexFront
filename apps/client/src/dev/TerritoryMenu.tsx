@@ -95,8 +95,10 @@ export function TerritoryMenu(props: {
       go(orderArmy(view, army, other, mode, neutral ? hex : undefined));
   const free = nearestFreeArmy(view, map, hex);
   // Армия, уже стоящая на эту страну: от неё зависят кнопки «Оборона» и «Снять с фронта».
-  const holder = neutral ? undefined : view.armies.find((a) => a.dir?.target === other);
-  const holders = neutral ? [] : view.armies.filter((a) => a.dir?.target === other);
+  // Снятое с фронта направление остаётся у армии в режиме idle: оно уже ничего не держит.
+  const onFront = (a: ArmyView): boolean => a.dir?.target === other && a.dir.mode !== 'idle';
+  const holder = neutral ? undefined : view.armies.find(onFront);
+  const holders = neutral ? [] : view.armies.filter(onFront);
   const strength = neutral ? null : strengthVs(view, other);
   const StrengthIcon =
     strength === 'stronger' ? IconChevronsUp : strength === 'weaker' ? IconChevronsDown : IconEqual;

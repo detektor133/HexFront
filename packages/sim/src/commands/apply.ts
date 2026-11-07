@@ -1,7 +1,6 @@
 // Проверка и применение команд — первый шаг тика (sim-core.md, «Порядок систем», п. 1).
 import { executeArmyCommand, validateArmyCommand } from './army.ts';
 import { stillAuto, takeOver } from './auto.ts';
-import { executeBuildRoad, validateBuildRoad } from './build-road.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { executeDiplomacy, validateDiplomacy } from './diplomacy.ts';
 import { executeInvade, validateInvade } from './invade.ts';
@@ -81,8 +80,6 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
       return validateDiplomacy(state, playerId, cmd);
     case 'renameCity':
       return validateRenameCity(state, playerId, cmd);
-    case 'buildRoad':
-      return validateBuildRoad(state, playerId, cmd);
     case 'sail':
       return validateSail(state, playerId, cmd);
     case 'invade':
@@ -154,9 +151,6 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'renameCity':
       executeRenameCity(state, cmd);
-      return;
-    case 'buildRoad':
-      executeBuildRoad(state, playerId, cmd);
       return;
     case 'sail':
       executeSail(state, playerId, cmd);

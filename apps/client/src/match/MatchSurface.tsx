@@ -392,7 +392,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           buildingsOpen={buildingsOpen}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
-          road={sb.mapModes.road}
         />
       )}
       {view && !debug && buildingsOpen && (

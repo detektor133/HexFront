@@ -200,8 +200,6 @@
 | `FRONT_REBALANCE_SURPLUS` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_ECHELON_PERIOD` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_STACK` | 2 `[ТЮНИНГ]` |
-| `MAX_ROAD_POINTS` | 8 |
-| `ROAD_MAX_NEW_HEXES` | 24 `[ТЮНИНГ]` |
 | `PORT_CAPACITY_PER_LEVEL` | 600 солдат `[ТЮНИНГ]` |
 | `SEA_MAX_HEXES` | 40 `[ТЮНИНГ]` |
 | `SEA_MOVE_S_PER_HEX` | 0,8 с `[ТЮНИНГ]` |

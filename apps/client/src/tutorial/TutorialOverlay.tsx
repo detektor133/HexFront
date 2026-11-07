@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import styles from './TutorialOverlay.module.css';
 import { begin, currentStep, markDone, next, settle, type Progress } from './engine.ts';
@@ -99,7 +99,15 @@ export function TutorialOverlay(props: {
   const [pans, setPans] = useState(0);
   const [zooms, setZooms] = useState(0);
   const last = useRef<{ cx: number; cy: number; w: number } | null>(null);
-  const [mark, setMark] = useState<Mark | null>(null);
+  // Кольцо и стрелка двигаются вместе с картой каждый кадр прямо в DOM, без перерисовки React:
+  // реакт-состояние знает лишь, есть ли метка и круглая ли она. Карточка закреплена на шаг по
+  // первой метке и не ездит за картой.
+  const [shape, setShape] = useState<'none' | 'round' | 'box'>('none');
+  const [anchor, setAnchor] = useState<Mark | null>(null);
+  const markRef = useRef<Mark | null>(null);
+  const anchorSet = useRef(false);
+  const ringEl = useRef<HTMLDivElement>(null);
+  const arrowEl = useRef<SVGSVGElement>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [finished, setFinished] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -108,6 +116,34 @@ export function TutorialOverlay(props: {
     [props.ctx, pans, zooms],
   );
   const touch = useMemo(isTouchDevice, []);
+
+  /** Принимает свежую метку цели: двигает кольцо и стрелку, при смене вида обновляет состояние. */
+  const publish = useCallback((next: Mark | null): void => {
+    markRef.current = next;
+    setShape((now) => {
+      const wanted = next === null ? 'none' : next.round ? 'round' : 'box';
+      return now === wanted ? now : wanted;
+    });
+    if (next === null) return;
+    if (!anchorSet.current) {
+      anchorSet.current = true;
+      setAnchor(next);
+    }
+    const ring = ringEl.current;
+    if (ring) {
+      ring.style.left = `${next.x}px`;
+      ring.style.top = `${next.y}px`;
+      ring.style.width = `${next.w}px`;
+      ring.style.height = `${next.h}px`;
+    }
+    const arrow = arrowEl.current;
+    if (arrow) {
+      const a = arrowStyle(next);
+      arrow.style.left = `${a.left}px`;
+      arrow.style.top = `${a.top}px`;
+      arrow.style.transform = a.transform ?? '';
+    }
+  }, []);
 
   // Камера: раз в четверть секунды сравниваем видимую область с прошлой.
   useEffect(() => {
@@ -163,7 +199,7 @@ export function TutorialOverlay(props: {
   useEffect(() => {
     const target: Target | undefined = step?.target;
     if (!target || !ctx) {
-      setMark(null);
+      publish(null);
       return;
     }
     const compute = (): void => {
@@ -188,7 +224,7 @@ export function TutorialOverlay(props: {
           .find((node) => node !== null && node.getBoundingClientRect().width > 0);
         const rect = el?.getBoundingClientRect();
         if (rect && rect.width > 0 && rect.height > 0) {
-          setMark({
+          publish({
             x: rect.left - 4,
             y: rect.top - 4,
             w: rect.width + 8,
@@ -197,18 +233,18 @@ export function TutorialOverlay(props: {
           });
           return;
         }
-        setMark(fromHex(target.fallbackHex?.(ctx) ?? null));
+        publish(fromHex(target.fallbackHex?.(ctx) ?? null));
         return;
       }
       if ('chip' in target) {
         const hex = target.chip(ctx);
         const cam = camera();
         const world = hex === null ? null : chipWorld(hex);
-        if (!cam || !world) return setMark(null);
+        if (!cam || !world) return publish(null);
         const scale = cam.screen.width / (cam.to.x - cam.from.x);
         const w = Math.max(76, CHIP_W * scale);
         const hh = Math.max(36, CHIP_H * scale);
-        setMark({
+        publish({
           x: cam.screen.left + (world.x - cam.from.x) * scale - w / 2,
           y: cam.screen.top + (world.y - cam.from.y) * scale - hh / 2,
           w,
@@ -217,12 +253,22 @@ export function TutorialOverlay(props: {
         });
         return;
       }
-      setMark(fromHex(target.hex(ctx)));
+      publish(fromHex(target.hex(ctx)));
     };
-    compute();
-    const timer = window.setInterval(compute, POLL_MS / 2);
-    return () => window.clearInterval(timer);
-  }, [step, ctx, camera, hexWorld, chipWorld, hexRadius]);
+    let frame = 0;
+    const loop = (): void => {
+      compute();
+      frame = window.requestAnimationFrame(loop);
+    };
+    loop();
+    return () => window.cancelAnimationFrame(frame);
+  }, [step, ctx, camera, hexWorld, chipWorld, hexRadius, publish]);
+
+  // Новый шаг — новое место карточки.
+  useEffect(() => {
+    anchorSet.current = false;
+    setAnchor(null);
+  }, [stepId]);
 
   const exit = (): void => window.location.assign('/');
   if (dismissed) return null;
@@ -250,17 +296,20 @@ export function TutorialOverlay(props: {
   if (!step || !progress || !ctx) return null;
   const copy = stepCopy(chapter, step.id, touch);
   const waiting = step.progress?.(ctx);
-  const cardPosition = cardPlace(mark);
+  const cardPosition = cardPlace(anchor);
+  const mark = markRef.current;
   return (
     <>
-      {mark && (
+      {mark && shape !== 'none' && (
         <>
           <div
-            className={mark.round ? styles.ringRound : styles.ring}
+            ref={ringEl}
+            className={shape === 'round' ? styles.ringRound : styles.ring}
             style={{ left: mark.x, top: mark.y, width: mark.w, height: mark.h }}
             aria-hidden="true"
           />
           <svg
+            ref={arrowEl}
             className={styles.arrow}
             viewBox="0 0 24 32"
             width="30"

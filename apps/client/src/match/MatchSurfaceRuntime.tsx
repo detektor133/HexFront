@@ -320,10 +320,7 @@ export function useSandbox(
     snapshotTelemetryRef.current = createSnapshotTelemetry();
   }
 
-  const mapModes = useMapModes(matchRef, layerRef, () => {
-    const current = viewRef.current;
-    return current && typeof loaded !== 'string' ? { view: current, map: loaded.map } : null;
-  });
+  const mapModes = useMapModes(matchRef, layerRef);
   const mapModesRef = useRef(mapModes);
   mapModesRef.current = mapModes;
   const invasion = useInvasion(layerRef, () => {
@@ -630,15 +627,7 @@ export function useSandbox(
       // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
       if (mapModesRef.current.build !== null) {
         if (kind === 'order') return mapModesRef.current.setBuild(null);
-        if (
-          mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen, {
-            view: current,
-            map,
-            preview: setRoadPreview,
-          })
-        ) {
-          return;
-        }
+        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen)) return;
       }
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {

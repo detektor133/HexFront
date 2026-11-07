@@ -7,11 +7,11 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { supplyCombatMult } from './combat.ts';
-import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { hexFromId, hexId, inBounds, neighbors, spiral, type HexId } from '../math/hex.ts';
 import { fpMul, intDiv, type Fp } from '../math/int.ts';
 import { atWar } from '../state/relations.ts';
 import type { MatchState, Unit } from '../state/types.ts';
-import { allUnits } from '../state/unit-index.ts';
+import { unitIndex } from '../state/unit-index.ts';
 
 // Самый крупный отряд, при равенстве — с меньшим id (отряды отсортированы по id).
 function largest(units: readonly Unit[]): Unit | undefined {
@@ -28,16 +28,30 @@ function bordersOwner(state: MatchState, hex: HexId, owner: number): boolean {
 }
 
 /**
+ * Вражеские отряды в радиусе ARTY_RANGE от батареи: выбираются по индексу гексов, а не перебором
+ * всех отрядов матча, иначе обстрел растёт как «батареи × отряды» и тормозит большие бои.
+ * Результат упорядочен по id, как state.units: от порядка зависит выбор среди равных целей.
+ */
+function enemiesInRange(state: MatchState, art: Unit): Unit[] {
+  const { width, height } = state.map;
+  const { unitsByHex } = unitIndex(state);
+  const found: Unit[] = [];
+  for (const h of spiral(hexFromId(art.hex, width), ARTY_RANGE)) {
+    if (!inBounds(h, width, height)) continue;
+    for (const u of unitsByHex[hexId(h, width)] ?? []) {
+      if (atWar(state, art.owner, u.owner)) found.push(u);
+    }
+  }
+  return found.sort((a, b) => a.id - b.id);
+}
+
+/**
  * Цель артиллерии: фокус огня, если он в радиусе; иначе атакующий наш гекс → самый крупный
  * отряд у нашей территории → вражеская артиллерия → самый крупный отряд в радиусе.
  * @returns вражеский отряд в радиусе ARTY_RANGE или undefined
  */
 export function fireTargetOf(state: MatchState, art: Unit): Unit | undefined {
-  const { width } = state.map;
-  const at = hexFromId(art.hex, width);
-  const inRange = allUnits(state).filter(
-    (u) => atWar(state, art.owner, u.owner) && distance(at, hexFromId(u.hex, width)) <= ARTY_RANGE,
-  );
+  const inRange = enemiesInRange(state, art);
   const focused = inRange.find((u) => u.id === art.focus);
   if (focused) return focused;
   const attacking = inRange.filter(

@@ -183,9 +183,6 @@ export const SEA_MAX_HEXES = 40;
 export const SEA_MOVE_S_PER_HEX: Fp = fp(0.8);
 /** Золото за одного солдата на одну клетку воды при вторжении и высадке не в свой порт. */
 export const SEA_COST_PER_SOLDIER_HEX: Fp = fp(0.02);
-export const MAX_ROAD_POINTS = 8;
-/** Сколько новых гексов дороги можно заказать одной командой: дорога связывает узлы, а не мостит страну. */
-export const ROAD_MAX_NEW_HEXES = 24;
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */
