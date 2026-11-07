@@ -1,5 +1,6 @@
 import {
   IconAdjustmentsHorizontal,
+  IconAnchor,
   IconFlag,
   IconHourglass,
   IconMinus,
@@ -422,6 +423,12 @@ export function ArmyBar(props: {
   holdPicking: boolean;
   /** Включает выбор страны для «Держать» у армии; null — выключает. */
   onHoldPick: (armyId: number | null) => void;
+  /** Начать морское вторжение армией: выбор порта, затем гекса высадки. */
+  onInvade?: (armyId: number) => void;
+  /** Идёт выбор вторжения. */
+  invading?: boolean;
+  /** У армии есть отряды в порту: иначе кнопка вторжения серая. */
+  canInvade?: (armyId: number) => boolean;
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
@@ -565,6 +572,16 @@ export function ArmyBar(props: {
               onClick={(event) => setCompAnchor(event.currentTarget.getBoundingClientRect())}
               active={compAnchor !== null}
             />
+            {props.onInvade && (
+              <Tool
+                glyph={<IconAnchor size={18} aria-hidden="true" />}
+                tutorial="army-invade"
+                label="army.invade"
+                onClick={() => props.onInvade?.(army.id)}
+                active={props.invading === true}
+                disabled={props.canInvade?.(army.id) === false ? t('army.invadeNoPort') : null}
+              />
+            )}
             <Tool
               icon="split"
               tutorial="army-split"

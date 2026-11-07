@@ -19,7 +19,7 @@ import {
 import type { Point } from '../render/hex-geometry.ts';
 import { signedDistanceField } from '../render/icon-sdf.ts';
 
-export type MapIconKind = 'city' | 'capital' | 'fort' | 'depot' | 'improvement' | 'dot';
+export type MapIconKind = 'city' | 'capital' | 'fort' | 'depot' | 'port' | 'improvement' | 'dot';
 
 export interface MapIcon {
   readonly kind: MapIconKind;
@@ -50,6 +50,13 @@ const ICON_PATHS: Readonly<Record<MapIconKind, readonly string[]>> = {
     'M12 12l0 9',
     'M12 12l-8 -4.5',
     'M16 5.25l-8 4.5',
+  ],
+  // Порт — склад у воды: якорь вместо ящика.
+  port: [
+    'M12 6m-2.2 0a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0',
+    'M12 8.2v13',
+    'M8 12h8',
+    'M4.5 15.5a7.5 7.5 0 0 0 15 0',
   ],
   capital: ['M12 2l2.9 6.6l7.1 0.7l-5.4 4.7l1.6 7l-6.2 -3.7l-6.2 3.7l1.6 -7l-5.4 -4.7l7.1 -0.7z'],
   improvement: ['M7 11l5 -5l5 5', 'M7 17l5 -5l5 5'],

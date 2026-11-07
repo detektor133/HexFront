@@ -94,6 +94,20 @@ export function neutralNear(ctx: TutorialCtx): number | null {
   return best;
 }
 
+/** Своя суша без фишек и городов рядом с отрядом: куда нажать, чтобы снять выбор. */
+export function ownEmptyNear(ctx: TutorialCtx): number | null {
+  const at = unitHex(ctx);
+  if (at === null) return null;
+  const busy = new Set([...ctx.view.units.map((u) => u.hex), ...ctx.view.cities.map((c) => c.hex)]);
+  let best: number | null = null;
+  for (let h = 0; h < ctx.view.hexes.owner.length; h += 1) {
+    if (ctx.view.hexes.owner[h] !== me(ctx) || busy.has(h) || ctx.map.terrain[h] === TERRAIN.water)
+      continue;
+    if (best === null || dist(ctx, h, at) < dist(ctx, best, at)) best = h;
+  }
+  return best;
+}
+
 /** Лучший свой гекс для города: дальше всего от других городов и ближе всего к нужным людям. */
 export function citySite(ctx: TutorialCtx): number | null {
   const owner = ctx.view.hexes.owner;
@@ -215,7 +229,6 @@ export function frontSupplied(ctx: TutorialCtx): boolean {
 }
 
 const CORE: readonly Step[] = [
-  { id: 'welcome', manual: true },
   { id: 'pan', base: (c) => c.pans, done: (c, b) => c.pans > b },
   { id: 'zoom', base: (c) => c.zooms, done: (c, b) => c.zooms > b },
   { id: 'select', target: { hex: unitHex }, done: (c) => c.picked.units.length > 0 },
@@ -227,14 +240,20 @@ const CORE: readonly Step[] = [
       ownUnits(c).some((u) => u.path.length > 0) ||
       c.view.hexes.owner.filter((o) => o === me(c)).length > b,
   },
+  // Пока выбраны отряды или армия, нажатие по земле лишь снимает выбор (или ставит армии приказ),
+  // поэтому выбор снимается отдельным шагом: только так нажатие по ничьей земле откроет меню.
+  {
+    id: 'deselect',
+    target: { hex: ownEmptyNear },
+    done: (c) => c.picked.units.length === 0 && c.army === null,
+  },
   { id: 'menu', target: { hex: neutralNear }, done: (c) => c.menuOther === -1 },
   {
     id: 'occupy',
     target: { ui: 'occupy', fallbackHex: neutralNear },
     done: (c) => c.view.armies.some((a) => a.dir?.target === -1 && a.dir.mode === 'attack'),
   },
-  { id: 'people', manual: true, target: { ui: 'pop' } },
-  { id: 'gold', manual: true, target: { ui: 'gold' } },
+  { id: 'economy', manual: true, target: { ui: 'pop' } },
   { id: 'tax', target: { ui: 'tax' }, base: taxOf, done: (c, b) => taxOf(c) !== b },
   {
     id: 'wait',
@@ -248,15 +267,12 @@ const CORE: readonly Step[] = [
     base: cityCount,
     done: (c, b) => cityCount(c) > b,
   },
-  { id: 'cityName', manual: true },
-  { id: 'supplyIntro', manual: true, target: { ui: 'supply' } },
   { id: 'supplyMode', target: { ui: 'supply-mode' }, done: (c) => c.mapMode === 'supply' },
   { id: 'hammer', target: { ui: 'hammer' }, done: (c) => c.build !== null },
   { id: 'depotTool', target: { ui: 'build-depot' }, done: (c) => c.build === 'depot' },
   { id: 'depot', base: depotCount, done: (c, b) => depotCount(c) > b },
   { id: 'roadTool', target: { ui: 'build-road' }, done: (c) => c.build === 'road' },
-  { id: 'road', target: { ui: 'road-hint' }, done: (c) => manualRoad(c) },
-  { id: 'armyIntro', manual: true, target: { ui: 'army-card' } },
+  { id: 'road', target: { ui: 'build-hint' }, done: (c) => manualRoad(c) },
   { id: 'armyPick', target: { ui: 'army-card' }, done: (c) => c.army !== null },
   { id: 'armyPlus', target: { ui: 'army-stronger' }, done: (c) => armyOrder(c) >= ARMY_GOAL },
   {

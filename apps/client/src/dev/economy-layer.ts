@@ -5,6 +5,8 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import {
   LINK,
+  isDepot,
+  waterNeighbors,
   hexFromId,
   hexId,
   inBounds,
@@ -76,6 +78,8 @@ export interface EconomyLayer {
   setMapMask(kind: MaskKind | null, mask: Uint8Array | null): void;
   /** Номера точек цепочки приказов Shift+ПКМ на карте (пусто — убрать). */
   setQueueMarks(hexes: readonly number[]): void;
+  /** Подписи на гексах (цена вторжения): текст по центру гекса; пусто — убрать. */
+  setHexLabels(labels: readonly { readonly hex: number; readonly text: string }[]): void;
   /**
    * Цель приказа, пока палец держит (или мышь наводит): подсветка гекса и плашка прогноза над
    * ним, если там враг; null — убрать.
@@ -197,6 +201,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const labels = new Container();
   const mapIcons = createMapIconLayer();
   const queueMarks = new Container();
+  const hexLabels = new Container();
 
   const container = new Container();
   container.addChild(territory.fill, roads, roadPreview, constructionEffects, cityEffects);
@@ -215,6 +220,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     marks,
     mapIcons.container,
     queueMarks,
+    hexLabels,
     unitLayer.container,
     labels,
     territoryLabels,
@@ -386,6 +392,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         building,
         improvement,
         city: cityHexes.has(hex),
+        port: isDepot(building) && waterNeighbors(map, hex).length > 0,
       });
     });
     return out;
@@ -555,6 +562,28 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     },
     setPlanHover(world) {
       planLayer.setHover(world);
+    },
+    setHexLabels(entries) {
+      hexLabels
+        .removeChildren()
+        .forEach((child) => child.destroy({ children: true, context: true }));
+      for (const entry of entries) {
+        const at = center(entry.hex);
+        const label = new Text({
+          text: entry.text,
+          style: {
+            fontFamily: tokens.font.ui.family,
+            fontWeight: '600',
+            fontSize: radius * 0.55,
+            fill: tokens.ui.ink,
+            stroke: { color: tokens.ui.surface, width: radius * 0.18 },
+          },
+        });
+        label.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
+        label.anchor.set(0.5);
+        label.position.set(at.x, at.y);
+        hexLabels.addChild(label);
+      }
     },
     setQueueMarks(hexes) {
       queueMarks

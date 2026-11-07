@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
+import { InvasionCard } from './InvasionCard.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
+import { canInvade } from './invasion.ts';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
@@ -361,6 +363,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('pause-menu')}
         />
       )}
+      {sb.invasion.hint.stage !== 'off' && (
+        <InvasionCard hint={sb.invasion.hint} onCancel={sb.invasion.cancel} top={hudH} />
+      )}
       {view && styleFor('bottom-panel') && (
         <ArmyBar
           view={view}
@@ -375,6 +380,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onPick={sb.pick}
           holdPicking={sb.holdPick !== null}
           onHoldPick={sb.setHoldPick}
+          onInvade={sb.invasion.start}
+          invading={sb.invasion.hint.stage !== 'off'}
+          canInvade={(armyId) => (map ? canInvade(view, map, armyId) : false)}
           style={styleFor('bottom-panel')}
         />
       )}

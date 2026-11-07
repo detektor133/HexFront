@@ -102,14 +102,32 @@ describe('обучение: сценарий', () => {
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
 
-  it('шаг-объяснение стоит, пока не нажали «Понятно»; шаги с действием идут по действию', () => {
+  it('обучение не начинается с описания: первый шаг — действие, объяснение стоит до «Понятно»', () => {
     const s = start();
     const ctx = ctxOf(s.view());
+    expect(STEPS.core[0]?.manual).not.toBe(true);
     const first = settle('core', begin('core', ctx), ctx);
     expect(first.index).toBe(0);
-    const pan = next('core', first, ctx);
-    expect(settle('core', pan, ctx).index).toBe(1);
-    expect(settle('core', pan, ctxOf(s.view(), { pans: 1 })).index).toBeGreaterThan(1);
+    expect(settle('core', first, ctxOf(s.view(), { pans: 1 })).index).toBeGreaterThan(0);
+    const economy = STEPS.core.findIndex((x) => x.id === 'economy');
+    const at = { index: economy, base: 0 };
+    expect(settle('core', at, ctx).index).toBe(economy);
+    expect(next('core', at, ctx).index).toBe(economy + 1);
+  });
+
+  it('после приказа выбор снимается отдельным шагом, и только потом нажатие по ничьей земле открывает меню', () => {
+    const ids = STEPS.core.map((x) => x.id);
+    expect(ids.indexOf('deselect')).toBe(ids.indexOf('move') + 1);
+    expect(ids.indexOf('menu')).toBe(ids.indexOf('deselect') + 1);
+    const s = start();
+    const view = s.view();
+    const selected = { hex: null, units: [view.units[0]?.id ?? -1], target: null };
+    const deselect = STEPS.core.find((x) => x.id === 'deselect');
+    expect(deselect?.done?.(ctxOf(view, { picked: selected }), 0)).toBe(false);
+    expect(deselect?.done?.(ctxOf(view, { picked: selected, army: 1 }), 0)).toBe(false);
+    expect(deselect?.done?.(ctxOf(view), 0)).toBe(true);
+    const target = deselect?.target;
+    expect(target && 'hex' in target ? target.hex(ctxOf(view)) : null).not.toBeNull();
   });
 
   it('выбор отряда засчитывает шаг «выбери», а подсказка смотрит на гекс отряда', () => {

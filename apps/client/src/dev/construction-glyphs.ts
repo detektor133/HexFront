@@ -12,6 +12,8 @@ export interface ConstructionGlyph {
   readonly improvement: number;
   /** На гексе стоит город: знаки делят гекс. */
   readonly city: boolean;
+  /** Склад стоит у воды: это порт, знак — якорь. */
+  readonly port?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export function drawConstructions(
     // На гексе могут стоять и укрепление, и склад: два знака рядом.
     const kinds = [
       ...(isFort(glyph.building) ? (['fort'] as const) : []),
-      ...(isDepot(glyph.building) ? (['depot'] as const) : []),
+      ...(isDepot(glyph.building) ? ([glyph.port === true ? 'port' : 'depot'] as const) : []),
     ];
     const kind = kinds[0] ?? null;
     const size = R * (glyph.city ? 0.62 : kinds.length > 1 ? 0.6 : 0.8);

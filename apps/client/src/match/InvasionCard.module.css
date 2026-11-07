@@ -1,0 +1,66 @@
+/* Карточка морского вторжения под HUD по центру: шаги, вместимость порта и причина отказа. */
+.card {
+  position: fixed;
+  left: 50%;
+  z-index: 3;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 24px));
+  padding: var(--space-sm) var(--space-md);
+  color: var(--ui-ink);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+  transform: translateX(-50%);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+
+.close {
+  display: grid;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin: calc(-0.5 * (var(--touch-target-min) - 24px));
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-ink2);
+  cursor: pointer;
+}
+
+.steps {
+  margin: var(--space-xs) 0 0;
+  padding-left: 1.2em;
+  font-size: var(--font-size-label);
+  line-height: 1.35;
+}
+
+.now {
+  font-weight: 700;
+}
+
+.note {
+  margin: var(--space-xs) 0 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-label);
+}
+
+.error {
+  margin: var(--space-xs) 0 0;
+  color: var(--status-danger);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+}

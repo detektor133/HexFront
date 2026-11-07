@@ -74,7 +74,7 @@
   flex: 0 0 12px;
   width: 12px;
   height: 12px;
-  border-radius: 2px;
+  border-radius: 50%;
 }
 
 .headName {
@@ -242,6 +242,9 @@
 
 /* Выбранный на карте отряд — золотая рамка, как на фишке. */
 .plateSelected {
+  background: color-mix(in srgb, var(--selection-color) 22%, var(--ui-surface));
   border-color: var(--selection-color);
+  outline: 2px solid var(--selection-color);
+  outline-offset: 0;
   box-shadow: inset 0 0 0 1px var(--selection-color);
 }

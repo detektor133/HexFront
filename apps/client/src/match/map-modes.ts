@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   SUPPLY_REBUILD_COST_PER_HEX,
+  TERRAIN,
+  isDepot,
   planRoadRoute,
+  roadEndsAreNodes,
   type Command,
   type MapStatic,
   type PlayerView,
@@ -29,6 +32,42 @@ export interface RoadContext {
 export interface RoadInfo {
   readonly points: number;
   readonly cost: number | null;
+  /** Ключ причины отказа последнего нажатия (reason.*); null — всё в порядке. */
+  readonly error: string | null;
+  /** Сколько новых гексов займёт дорога по текущим точкам. */
+  readonly hexes: number;
+}
+
+/** Мир для дороги: снимок и карта. */
+export interface RoadWorld {
+  readonly view: PlayerView;
+  readonly map: MapStatic;
+}
+
+const NO_ROAD: RoadInfo = { points: 0, cost: null, error: null, hexes: 0 };
+
+/** Узлы сети игрока в снимке: его города и склады. */
+function roadNodesOf(view: PlayerView): Set<number> {
+  const nodes = new Set<number>();
+  for (const c of view.cities) if (c.owner === view.playerId) nodes.add(c.hex);
+  view.hexes.owner.forEach((o, h) => {
+    if (o === view.playerId && isDepot(view.hexes.building[h] ?? 0)) nodes.add(h);
+  });
+  return nodes;
+}
+
+/** Маска подсветки дороги: сначала только узлы, после начала — вся своя суша для промежуточных точек. */
+function roadMask(world: RoadWorld, started: boolean): Uint8Array {
+  const { view, map } = world;
+  const nodes = roadNodesOf(view);
+  const mask = new Uint8Array(view.hexes.owner.length);
+  for (let h = 0; h < mask.length; h += 1) {
+    if (nodes.has(h)) mask[h] = 1;
+    else if (started && view.hexes.owner[h] === view.playerId && map.terrain[h] !== TERRAIN.water) {
+      mask[h] = 2;
+    }
+  }
+  return mask;
 }
 
 /** Как часто обновляется маска, мс: стройка и захват гексов меняют её не чаще секунды. */
@@ -92,6 +131,7 @@ export interface MapModes {
 export function useMapModes(
   matchRef: React.RefObject<LocalMatch | null>,
   layerRef: React.RefObject<EconomyLayer | null>,
+  roadWorld?: () => RoadWorld | null,
 ): MapModes {
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   const [build, setBuildState] = useState<BuildTool | null>(null);
@@ -103,7 +143,7 @@ export function useMapModes(
   const [feedback, setFeedback] = useState<BuildFeedback | null>(null);
   const roadPoints = useRef<number[]>([]);
   const roadPreview = useRef<RoadContext['preview'] | null>(null);
-  const [road, setRoad] = useState<RoadInfo>({ points: 0, cost: null });
+  const [road, setRoad] = useState<RoadInfo>(NO_ROAD);
   const feedbackId = useRef(0);
 
   const request = useCallback(() => {
@@ -120,9 +160,20 @@ export function useMapModes(
     maskRef.current = new Uint8Array(0);
     // Смена инструмента или выход из режима сбрасывает набранные точки дороги и её показ на карте.
     roadPoints.current = [];
-    setRoad({ points: 0, cost: null });
+    setRoad(NO_ROAD);
     roadPreview.current?.(null);
     if (mode === null) {
+      if (build === 'road' && roadWorld) {
+        // Дорога вручную: подсветка узлов и своей земли считается здесь, воркер маску не строит.
+        const paint = (): void => {
+          const world = roadWorld();
+          if (world)
+            layerRef.current?.setMapMask('build', roadMask(world, roadPoints.current.length > 0));
+        };
+        paint();
+        const timer = window.setInterval(paint, REFRESH_MS);
+        return () => window.clearInterval(timer);
+      }
       layerRef.current?.setMapMask(null, null);
       return;
     }
@@ -170,47 +221,80 @@ export function useMapModes(
       if (tool === 'road') {
         if (!roadContext) return true;
         roadPreview.current = roadContext.preview;
+        const { view, map } = roadContext;
+        const nodes = roadNodesOf(view);
         const points = roadPoints.current;
-        const last = points.at(-1);
-        // Повторный клик по последней точке проводит дорогу, по первой единственной — сбрасывает.
-        if (last === hex) {
-          if (points.length >= 2) {
-            send({ t: 'buildRoad', points: [...points] });
-            roadPoints.current = [];
-            roadContext.preview(null);
-            setRoad({ points: 0, cost: null });
+        const fail = (error: string): boolean => {
+          setRoad((now) => ({ ...now, error }));
+          if (at) {
+            feedbackId.current += 1;
+            setFeedback({ id: feedbackId.current, kind: 'blocked', x: at.x, y: at.y });
+          }
+          return true;
+        };
+        const update = (next: number[]): void => {
+          roadPoints.current = next;
+          let cost: number | null = null;
+          let hexes = 0;
+          let error: string | null = null;
+          if (next.length >= 2) {
+            const route = planRoadRoute(
+              { map, hexes: view.hexes },
+              view.playerId,
+              next,
+              new Set(view.cities.map((c) => c.hex)),
+            );
+            if (route.ok) {
+              hexes = route.toBuild.length;
+              cost = SUPPLY_REBUILD_COST_PER_HEX * hexes;
+              roadContext.preview(route.path);
+            } else {
+              error = route.reason;
+              roadContext.preview(null);
+            }
           } else {
-            roadPoints.current = [];
-            setRoad({ points: 0, cost: null });
+            roadContext.preview(null);
+          }
+          setRoad({ points: next.length, cost, error, hexes });
+        };
+        // Нажатие по последней точке снимает её.
+        if (points.length > 0 && points.at(-1) === hex) {
+          update(points.slice(0, -1));
+          return true;
+        }
+        if (points.length === 0) {
+          if (!nodes.has(hex)) return fail('roadNeedsNodes');
+          update([hex]);
+          return true;
+        }
+        if (view.hexes.owner[hex] !== view.playerId || map.terrain[hex] === TERRAIN.water) {
+          return fail('notOwnHex');
+        }
+        const next = [...points, hex];
+        // Город или склад в конце — дорога сразу проводится.
+        if (nodes.has(hex)) {
+          const route = planRoadRoute(
+            { map, hexes: view.hexes },
+            view.playerId,
+            next,
+            new Set(view.cities.map((c) => c.hex)),
+          );
+          if (!route.ok) {
+            update(next);
+            return fail(route.reason);
+          }
+          if (!roadEndsAreNodes(next, nodes)) return fail('roadNeedsNodes');
+          send({ t: 'buildRoad', points: next });
+          roadPoints.current = [];
+          roadContext.preview(null);
+          setRoad(NO_ROAD);
+          if (at) {
+            feedbackId.current += 1;
+            setFeedback({ id: feedbackId.current, kind: 'ok', x: at.x, y: at.y });
           }
           return true;
         }
-        const next = [...points, hex];
-        let cost: number | null = null;
-        let ok = true;
-        if (next.length >= 2) {
-          const route = planRoadRoute(
-            { map: roadContext.map, hexes: roadContext.view.hexes },
-            roadContext.view.playerId,
-            next,
-            new Set(roadContext.view.cities.map((c) => c.hex)),
-          );
-          ok = route.ok || route.reason === 'alreadyBuilt';
-          if (route.ok) {
-            cost = SUPPLY_REBUILD_COST_PER_HEX * route.toBuild.length;
-            roadContext.preview(route.path);
-          }
-        } else if (roadContext.view.hexes.owner[hex] !== roadContext.view.playerId) {
-          ok = false;
-        }
-        if (ok) {
-          roadPoints.current = next;
-          setRoad({ points: next.length, cost });
-        }
-        if (at) {
-          feedbackId.current += 1;
-          setFeedback({ id: feedbackId.current, kind: ok ? 'ok' : 'blocked', x: at.x, y: at.y });
-        }
+        update(next);
         return true;
       }
       // 1 — можно построить; 2 — не хватает золота, 0 — нельзя: клик объясняет отказ.

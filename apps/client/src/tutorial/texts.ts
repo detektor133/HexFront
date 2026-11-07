@@ -13,16 +13,6 @@ interface Copy {
 type Both = { readonly ru: Copy; readonly en: Copy };
 
 const TEXTS: Readonly<Record<string, Both>> = {
-  'core.welcome': {
-    ru: {
-      title: 'Первая война',
-      text: 'Цель урока — победить: занять землю, построить город и склад, собрать армию, подвести её к врагу с боепитанием и взять его столицу. Соперник делает только то, что нужно уроку. Шаг засчитывается, когда ты правда сделал действие. Выйти можно в любой момент.',
-    },
-    en: {
-      title: 'The first war',
-      text: 'The goal is to win: take land, build a city and a depot, raise an army, bring it to the enemy with supplies and capture their capital. The rival does only what the lesson needs. A step counts when you really do the action. You can leave at any time.',
-    },
-  },
   'core.pan': {
     ru: {
       title: 'Двигай карту',
@@ -79,6 +69,30 @@ const TEXTS: Readonly<Record<string, Both>> = {
       mouse: 'Right-click the marked hex.',
     },
   },
+  'core.deselect': {
+    ru: {
+      title: 'Сними выбор',
+      text: 'Пока выбран отряд, нажатие по земле не открывает меню. Нажми на свою пустую землю или клавишу Esc — выбор снимется.',
+      touch: 'Коснись подсвеченной своей земли без фишек.',
+      mouse: 'Нажми Esc или левой кнопкой на свою пустую землю.',
+    },
+    en: {
+      title: 'Clear the selection',
+      text: 'While a unit is selected, pressing land does not open the menu. Press your own empty land or Esc to clear the selection.',
+      touch: 'Tap your own land without chips.',
+      mouse: 'Press Esc or left-click your own empty land.',
+    },
+  },
+  'core.economy': {
+    ru: {
+      title: 'Люди и золото',
+      text: 'Народ растёт на твоей земле: из него набираются солдаты и появляются города. Золото идёт от налога и тратится на стройку и армию.',
+    },
+    en: {
+      title: 'People and gold',
+      text: 'People grow on your land: soldiers and cities come from them. Gold comes from tax and pays for buildings and the army.',
+    },
+  },
   'core.menu': {
     ru: {
       title: 'Меню земли',
@@ -101,26 +115,6 @@ const TEXTS: Readonly<Record<string, Both>> = {
     en: {
       title: 'Occupy land',
       text: 'Press Occupy: the nearest free army spreads over neutral land and takes it. Under the button you can see which army gets the order.',
-    },
-  },
-  'core.people': {
-    ru: {
-      title: 'Люди',
-      text: 'Народ — основа всего. Он растёт на твоей земле, из людей набираются солдаты и появляются города. Рядом с числом — прирост в секунду.',
-    },
-    en: {
-      title: 'People',
-      text: 'People are the base of everything. They grow on your land; soldiers are recruited from them and cities are founded on them. The number beside it is growth per second.',
-    },
-  },
-  'core.gold': {
-    ru: {
-      title: 'Золото',
-      text: 'Золото приходит от налога и тратится на стройку и набор. Под числом — прибыль в секунду: содержание войск её уменьшает.',
-    },
-    en: {
-      title: 'Gold',
-      text: 'Gold comes from tax and is spent on building and recruiting. Below the number is income per second; army upkeep reduces it.',
     },
   },
   'core.tax': {
@@ -159,26 +153,6 @@ const TEXTS: Readonly<Record<string, Both>> = {
       text: 'Cities give people, gold and supply. Select the marked hex of your land and press Found a city: a road to the capital is laid automatically.',
       touch: 'Tap the hex, then the city button in the card.',
       mouse: 'Left-click the hex, then the city button in the card.',
-    },
-  },
-  'core.cityName': {
-    ru: {
-      title: 'Название города',
-      text: 'У каждого города есть название — оно написано над ним на карте. Новому городу имя дано сразу; изменить его можно в карточке города карандашом рядом с названием. Поменяй, если хочешь, и иди дальше.',
-    },
-    en: {
-      title: 'City name',
-      text: 'Every city has a name written above it on the map. A new city gets one right away; change it with the pencil next to the name in the city card. Rename it if you like and move on.',
-    },
-  },
-  'core.supplyIntro': {
-    ru: {
-      title: 'Снабжение',
-      text: 'Армия без снабжения слабеет и гибнет. Снабжение идёт от столицы и складов по дорогам. Чем дальше фронт от сети, тем хуже снабжение. Поэтому на пути к врагу нужны склады и дороги.',
-    },
-    en: {
-      title: 'Supply',
-      text: 'An army without supply weakens and dies. Supply flows from the capital and depots along roads. The farther the front is from the network, the worse the supply. So you need depots and roads on the way to the enemy.',
     },
   },
   'core.supplyMode': {
@@ -232,7 +206,7 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.roadTool': {
     ru: {
       title: 'Дорога вручную',
-      text: 'Дороги авто-прокладываются коротким путём, но иногда нужен свой маршрут. Выбери инструмент «Дорога» рядом со складом.',
+      text: 'Дороги прокладываются сами, но иногда нужен свой маршрут между городами и складами. Выбери инструмент «Дорога».',
     },
     en: {
       title: 'A road by hand',
@@ -242,25 +216,15 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.road': {
     ru: {
       title: 'Проложи дорогу',
-      text: 'Нажми начальную точку на своей земле (например, у столицы), затем следующие точки, и ещё раз нажми последнюю — дорога пойдёт по твоему маршруту. Цена видна в подсказке.',
-      touch: 'Касайся точек по порядку, затем коснись последней ещё раз.',
-      mouse: 'Нажимай левой кнопкой точки по порядку, затем ещё раз нажми последнюю.',
+      text: 'Нажми свой город или склад — начало, затем (по желанию) гексы своей земли, чтобы изогнуть путь, и в конце другой свой город или склад: дорога проложится. Цена и ошибки видны в карточке строительства.',
+      touch: 'Касайся точек по порядку.',
+      mouse: 'Нажимай левой кнопкой точки по порядку.',
     },
     en: {
       title: 'Lay the road',
-      text: 'Click a start point on your land (for example near the capital), then the next points, and click the last one again: the road follows your route. The price is shown in the hint.',
-      touch: 'Tap the points in order, then tap the last one again.',
-      mouse: 'Left-click the points in order, then click the last one again.',
-    },
-  },
-  'core.armyIntro': {
-    ru: {
-      title: 'Армии',
-      text: 'Внизу — карточки армий: цвет, число солдат, организация и снабжение. Армия — группа отрядов с общим приказом.',
-    },
-    en: {
-      title: 'Armies',
-      text: 'Army cards are at the bottom: colour, soldiers, organisation and supply. An army is a group of units with a common order.',
+      text: 'Click your city or depot to start, then (optionally) hexes of your land to bend the path, and finally another city or depot: the road is laid. The price and errors are in the build card.',
+      touch: 'Tap the points in order.',
+      mouse: 'Left-click the points in order.',
     },
   },
   'core.armyPick': {

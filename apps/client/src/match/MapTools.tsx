@@ -20,7 +20,7 @@ import {
 
 import styles from './MapTools.module.css';
 import type { BuildTool, MapMode, RoadInfo } from './map-modes.ts';
-import { t, type MessageKey } from '../i18n/dict.ts';
+import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const BUILD_TOOLS: readonly {
@@ -76,6 +76,45 @@ export function MapTools({
   const poor = price !== null && gold < price.fp;
   return (
     <div className={styles.root} style={{ bottom }} data-testid="map-tools">
+      {hammerOn && build !== null && (
+        <section className={styles.hint} aria-live="polite" data-tutorial="build-hint">
+          <h2 className={styles.hintTitle}>
+            {t(BUILD_TOOLS.find((x) => x.tool === build)?.label ?? 'mapTools.build')}
+          </h2>
+          {build === 'road' ? (
+            <ol className={styles.hintSteps}>
+              <li className={road && road.points === 0 ? styles.stepNow : undefined}>
+                {t('mapTools.road.step1')}
+              </li>
+              <li className={road && road.points >= 1 ? styles.stepNow : undefined}>
+                {t('mapTools.road.step2')}
+              </li>
+              <li>{t('mapTools.road.step3')}</li>
+            </ol>
+          ) : (
+            <p className={styles.hintText}>{t(`mapTools.hint.${build}` as MessageKey)}</p>
+          )}
+          {build === 'road' && road && road.points > 0 && (
+            <p className={styles.hintText} data-tutorial="road-hint">
+              {t('mapTools.road.points')
+                .replace('{n}', String(road.points))
+                .replace('{h}', String(road.hexes))}
+              {road.cost !== null ? ` · ${Math.floor(road.cost / FP)}` : ''}
+            </p>
+          )}
+          {build === 'road' && road?.error && (
+            <p className={styles.hintError} role="alert">
+              {reasonText(road.error)}
+            </p>
+          )}
+          {price && build !== 'road' && (
+            <p className={poor ? styles.priceBad : styles.price}>
+              {Math.floor(price.fp / FP)}
+              {price.more ? '+' : ''} / {Math.floor(gold / FP)}
+            </p>
+          )}
+        </section>
+      )}
       {hammerOn && (
         <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
           {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => (
@@ -90,21 +129,6 @@ export function MapTools({
               <Icon size={22} stroke={1.75} />
             </IconButton>
           ))}
-          {build === 'road' && (
-            <span className={styles.price} aria-live="polite" data-tutorial="road-hint">
-              {road && road.points >= 2
-                ? `${t('mapTools.roadConfirm')} · ${Math.floor((road.cost ?? 0) / FP)} / ${Math.floor(gold / FP)}`
-                : road && road.points === 1
-                  ? t('mapTools.roadNext')
-                  : t('mapTools.roadStart')}
-            </span>
-          )}
-          {price && build !== 'road' && (
-            <span className={poor ? styles.priceBad : styles.price} aria-live="polite">
-              {Math.floor(price.fp / FP)}
-              {price.more ? '+' : ''} / {Math.floor(gold / FP)}
-            </span>
-          )}
         </div>
       )}
       <div className={styles.column}>

@@ -179,12 +179,21 @@ function drawAttackArrow(g: Graphics, s: ChipState, sq: number): void {
     .stroke({ color: tokens.ui.ink2, width: 2, cap: 'round', join: 'round' });
 }
 
+/** Выбранная фишка: тёмный внешний контур поверх золотой рамки, чтобы выбор был виден на любой земле. */
+const HALO = 3;
+function selectionHalo(g: Graphics, left: number, top: number, w: number, r: number): void {
+  g.roundRect(left - HALO, top - HALO, w + HALO * 2, H + HALO * 2, r + HALO).stroke({
+    color: tokens.ui.ink,
+    width: 2,
+  });
+}
+
 // Корпус: белая плашка с обводкой (золото — выбрано, красная — котёл), закладка армии, квадрат.
 function body(g: Graphics, s: ChipState, left: number, w: number): number {
   const top = -H / 2;
   const r = tokens.radius.chip;
   const border = s.selected
-    ? { color: tokens.selection.color, width: tokens.selection.width }
+    ? { color: tokens.selection.color, width: tokens.selection.width + 1.5 }
     : s.encircled
       ? { color: tokens.status.encircled, width: 2 }
       : { color: s.color, width: OUTLINE };
@@ -199,6 +208,7 @@ function body(g: Graphics, s: ChipState, left: number, w: number): number {
     g.roundRect(sq, top, SQUARE, H, r).fill(s.color);
     g.rect(sq + r, top, SQUARE - r, H).fill(s.color);
   }
+  if (s.selected) selectionHalo(g, left, top, w, r);
   g.roundRect(left, top, w, H, r).stroke(border);
   drawStars(g, s, left);
   drawTypeGlyph(g, s.type, sq + (SQUARE - GLYPH) / 2, top + (H - GLYPH) / 2, tokens.ui.surface);
@@ -264,10 +274,11 @@ function drawCompact(p: Parts, s: ChipState): number {
   const r = tokens.radius.chip;
   const { g } = p;
   const border = s.selected
-    ? { color: tokens.selection.color, width: tokens.selection.width }
+    ? { color: tokens.selection.color, width: tokens.selection.width + 1.5 }
     : { color: tokens.ui.surface, width: OUTLINE };
   g.roundRect(left, top, w, H, r).fill(s.color);
   if (s.army) g.roundRect(left, top, TAB + r, H, r).fill(s.army);
+  if (s.selected) selectionHalo(g, left, top, w, r);
   g.roundRect(left, top, w, H, r).stroke(border);
   p.label.position.set(left + (s.army ? TAB : 0) + (w - (s.army ? TAB : 0)) / 2, 0);
   drawCount(p, s, left + w, top);

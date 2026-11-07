@@ -12,6 +12,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { useInvasion, seaOrderUnits, type Invasion } from './invasion.ts';
 import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { orderArmy } from '../dev/army-order.ts';
@@ -193,6 +194,8 @@ interface Sandbox {
   readonly menu: TerritoryMenuState | null;
   closeMenu(): void;
   readonly mapModes: MapModes;
+  /** Морское вторжение: выбор порта отправки и гекса высадки. */
+  readonly invasion: Invasion;
   readonly lastReject: string | null;
   readonly tool: ToolState | null;
   /** Армия, для которой «Держать» ждёт выбора страны на карте. */
@@ -300,9 +303,18 @@ export function useSandbox(
     snapshotTelemetryRef.current = createSnapshotTelemetry();
   }
 
-  const mapModes = useMapModes(matchRef, layerRef);
+  const mapModes = useMapModes(matchRef, layerRef, () => {
+    const current = viewRef.current;
+    return current && typeof loaded !== 'string' ? { view: current, map: loaded.map } : null;
+  });
   const mapModesRef = useRef(mapModes);
   mapModesRef.current = mapModes;
+  const invasion = useInvasion(layerRef, () => {
+    const current = viewRef.current;
+    return current && typeof loaded !== 'string' ? { view: current, map: loaded.map } : null;
+  });
+  const invasionRef = useRef(invasion);
+  invasionRef.current = invasion;
 
   const queueRef = useRef<OrderQueue>(EMPTY_QUEUE);
   const syncQueueMarks = useCallback(() => {
@@ -573,6 +585,11 @@ export function useSandbox(
         }
         return;
       }
+      // Морское вторжение: два нажатия (порт отправки, гекс высадки); ПКМ и Esc отменяют.
+      if (invasionRef.current.hint.stage !== 'off') {
+        if (kind === 'order') return invasionRef.current.cancel();
+        if (invasionRef.current.clickHex(hex, (cmd) => match.send(cmd))) return;
+      }
       // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
       if (mapModesRef.current.build !== null) {
         if (kind === 'order') return mapModesRef.current.setBuild(null);
@@ -621,6 +638,14 @@ export function useSandbox(
     // Обычный приказ заменяет цепочку Shift+ПКМ.
     const order = (hex: number): void => {
       queueRef.current = EMPTY_QUEUE;
+      // Приказ «идти» в другой свой порт, куда по суше не дойти, — переправа по морю (бесплатно).
+      const current = viewRef.current;
+      const picked = pickedRef.current;
+      const ships = current ? seaOrderUnits(current, map, picked.units, hex) : null;
+      if (ships) {
+        match.send({ t: 'sail', unitIds: ships, to: hex });
+        return;
+      }
       plainOrder(hex);
       syncQueueMarks();
     };
@@ -737,6 +762,7 @@ export function useSandbox(
     menu,
     closeMenu: () => setMenu(null),
     mapModes,
+    invasion,
     lastReject,
     tool,
     holdPick,
