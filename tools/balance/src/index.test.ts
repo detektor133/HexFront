@@ -46,21 +46,21 @@ describe('запуск балансировочных матчей', () => {
         seed: 41,
         ticks: 0,
         revision: 'test-revision',
-        map: { id: 'proc-29', players: 30, width: 80, height: 60 },
+        map: { id: 'proc-29', players: 30, width: 76, height: 56 },
       },
       {
         runIndex: 1,
         seed: 42,
         ticks: 0,
         revision: 'test-revision',
-        map: { id: 'proc-2a', players: 30, width: 80, height: 60 },
+        map: { id: 'proc-2a', players: 30, width: 76, height: 56 },
       },
       {
         runIndex: 2,
         seed: 43,
         ticks: 0,
         revision: 'test-revision',
-        map: { id: 'proc-2b', players: 30, width: 80, height: 60 },
+        map: { id: 'proc-2b', players: 30, width: 76, height: 56 },
       },
     ]);
     for (const result of results) {
@@ -125,7 +125,7 @@ describe('запуск балансировочных матчей', () => {
     expect(csv).toContain('runIndex,seed,revision,players,mapId,mapWidth,mapHeight');
     expect(csv).toContain('durationTicks,neutralHexShareAt3MinTick');
     expect(csv).toContain('populationTimeline,goldTimeline,placesByStartPosition');
-    expect(csv).toContain('0,41,test-revision,30,proc-29,80,60');
+    expect(csv).toContain('0,41,test-revision,30,proc-29,76,56');
   });
 
   it('форматирует детерминированный Markdown с параметрами и таблицей матчей', async () => {
@@ -145,6 +145,6 @@ describe('запуск балансировочных матчей', () => {
     expect(first).toBe(second);
     expect(first).toContain('# Отчёт балансировочного прогона');
     expect(first).toContain('| Запуск | Сид | Ревизия | Карта | Длительность, тики |');
-    expect(first).toContain('| 0 | 41 | test-revision | proc-29 (80×60) | 0 |');
+    expect(first).toContain('| 0 | 41 | test-revision | proc-29 (76×56) | 0 |');
   });
 });

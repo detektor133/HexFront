@@ -67,7 +67,7 @@ function CityName(props: {
     );
   }
   return (
-    <h2 className={styles.title}>
+    <h2 className={`${styles.title} ${styles.cityTitle}`}>
       {props.name || props.fallback}
       {props.editable && (
         <IconButton
