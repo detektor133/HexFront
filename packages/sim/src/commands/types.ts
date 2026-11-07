@@ -69,6 +69,13 @@ export type Command =
   /** Прокладывает дорогу вручную по точкам: от первой к последней по своей земле. */
   | { readonly t: 'buildRoad'; readonly points: readonly HexId[] }
   /** Отряды в порту плывут в другой свой порт или на берег (вторжение за золото). */
+  /** Армия идёт в порт отправки, садится на корабли и высаживается на берег (вторжение). */
+  | {
+      readonly t: 'invade';
+      readonly armyId: number;
+      readonly from: HexId;
+      readonly to: HexId;
+    }
   | { readonly t: 'sail'; readonly unitIds: readonly number[]; readonly to: HexId }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
   | { readonly t: 'rebuildSupply'; readonly hex: HexId }
@@ -157,6 +164,7 @@ export const REJECT_REASONS = [
   'notAtPort',
   'portCapacity',
   'noSeaPath',
+  'needWar',
   'roadTooLong',
   'bankrupt',
   'badUnitType',

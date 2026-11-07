@@ -78,3 +78,40 @@ export function planSeaRoute(map: MapStatic, from: HexId, to: HexId): HexId[] | 
   for (let at = goal; at >= 0; at = field.prev[at] ?? -1) path.push(at);
   return path.reverse();
 }
+
+/**
+ * Путь по воде от клетки воды start до гекса суши to (соседнего с водой): клетки воды и сам to.
+ * Для возврата отряда в порт, когда на воде приказ пропал.
+ * @returns путь без start или null, если не дойти за SEA_MAX_HEXES
+ */
+export function planSeaRouteFrom(map: MapStatic, start: HexId, to: HexId): HexId[] | null {
+  const goals = new Set(waterNeighbors(map, to));
+  if (goals.size === 0) return null;
+  const size = map.width * map.height;
+  const dist = new Int16Array(size).fill(-1);
+  const prev = new Int32Array(size).fill(-1);
+  dist[start] = 0;
+  const queue: HexId[] = [start];
+  let goal = goals.has(start) ? start : -1;
+  for (let i = 0; i < queue.length && goal < 0; i += 1) {
+    const h = queue[i] as HexId;
+    const d = dist[h] as number;
+    if (d >= SEA_MAX_HEXES * 2) continue;
+    for (const n of neighbors(hexFromId(h, map.width))) {
+      if (!inBounds(n, map.width, map.height)) continue;
+      const id = hexId(n, map.width);
+      if (map.terrain[id] !== TERRAIN.water || dist[id] !== -1) continue;
+      dist[id] = d + 1;
+      prev[id] = h;
+      queue.push(id);
+      if (goals.has(id)) {
+        goal = id;
+        break;
+      }
+    }
+  }
+  if (goal < 0) return null;
+  const path: HexId[] = [to];
+  for (let at = goal; at !== start && at >= 0; at = prev[at] ?? -1) path.push(at);
+  return path.reverse();
+}

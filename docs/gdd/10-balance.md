@@ -203,7 +203,7 @@
 | `MAX_ROAD_POINTS` | 8 |
 | `ROAD_MAX_NEW_HEXES` | 24 `[ТЮНИНГ]` |
 | `PORT_CAPACITY_PER_LEVEL` | 600 солдат `[ТЮНИНГ]` |
-| `SEA_MAX_HEXES` | 14 `[ТЮНИНГ]` |
+| `SEA_MAX_HEXES` | 40 `[ТЮНИНГ]` |
 | `SEA_MOVE_S_PER_HEX` | 0,8 с `[ТЮНИНГ]` |
 | `SEA_COST_PER_SOLDIER_HEX` | 0,02 золота `[ТЮНИНГ]` |
 | `PROCURE_BATCH` | 300 `[ТЮНИНГ]` |

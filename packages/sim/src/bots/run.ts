@@ -6,6 +6,7 @@ import { brainDecide, resolveBotWeights, type BotWeightsByPlayer } from './brain
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
 import { diplomacyCommands } from './diplomacy.ts';
+import { seaCommands } from './sea.ts';
 import {
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
@@ -128,6 +129,9 @@ export function botCommands(
       out.push({ playerId: p.id, cmd });
     }
     for (const cmd of diplomacyCommands(state, p.id, tickContext)) {
+      out.push({ playerId: p.id, cmd });
+    }
+    for (const cmd of seaCommands(state, p.id, tickContext)) {
       out.push({ playerId: p.id, cmd });
     }
   }

@@ -4,6 +4,7 @@ import { stillAuto, takeOver } from './auto.ts';
 import { executeBuildRoad, validateBuildRoad } from './build-road.ts';
 import { startConstruction, validateConstruction } from './construction.ts';
 import { executeDiplomacy, validateDiplomacy } from './diplomacy.ts';
+import { executeInvade, validateInvade } from './invade.ts';
 import { executeHold, executeLaunch, validateHold, validateLaunch } from './launch.ts';
 import { executePlanCommand, validatePlanCommand } from './plan.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
@@ -84,6 +85,8 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
       return validateBuildRoad(state, playerId, cmd);
     case 'sail':
       return validateSail(state, playerId, cmd);
+    case 'invade':
+      return validateInvade(state, playerId, cmd);
     case 'launchOffensive':
       return validateLaunch(state, playerId, cmd);
     case 'holdBorder':
@@ -157,6 +160,9 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'sail':
       executeSail(state, playerId, cmd);
+      return;
+    case 'invade':
+      executeInvade(state, playerId, cmd);
       return;
     case 'launchOffensive':
       executeLaunch(state, playerId, cmd);

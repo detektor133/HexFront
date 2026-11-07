@@ -6,8 +6,7 @@ import type { HexId } from '../math/hex.ts';
 import { fpMul, type Fp } from '../math/int.ts';
 import { planSeaRoute } from '../queries/sea-route.ts';
 import { peaceBlocked } from '../queries/unit-path.ts';
-import { depotLevel } from '../state/depot.ts';
-import { isPortOf, type PortGround } from '../state/port.ts';
+import { isPortOf, portLevel, type PortGround } from '../state/port.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 
 /** Аргументы переправы: отряды в порту и гекс назначения (свой порт или берег). */
@@ -16,9 +15,16 @@ export interface SailCommand {
   readonly to: HexId;
 }
 
-/** Вместимость порта за одну отправку, fixed-point солдат: растёт с уровнем склада (код здания). */
-export function portCapacity(building: number): number {
-  return PORT_CAPACITY_PER_LEVEL * depotLevel(building);
+/** Сколько солдат порт может держать в море одновременно, fixed-point: растёт с уровнем порта. */
+export function portCapacity(level: number): number {
+  return PORT_CAPACITY_PER_LEVEL * level;
+}
+
+/** Солдаты, которые сейчас в море и вышли из этого порта: занятая часть его вместимости. */
+export function atSea(state: MatchState, port: HexId): number {
+  let total = 0;
+  for (const u of state.units) if (u.sea && u.seaFrom === port) total += u.soldiers;
+  return total;
 }
 
 /**
@@ -68,7 +74,10 @@ export function validateSail(state: MatchState, playerId: number, cmd: SailComma
   const route = planSeaRoute(state.map, from, cmd.to);
   if (!route) return rejected('noSeaPath');
   const soldiers = units.reduce((sum, u) => sum + u.soldiers, 0);
-  if (soldiers > portCapacity(state.hexes.building[from] ?? 0)) return rejected('portCapacity');
+  const busy = atSea(state, from);
+  if (busy > 0 && soldiers + busy > portCapacity(portLevel(state, from))) {
+    return rejected('portCapacity');
+  }
   const cost = sailCost(state, playerId, units, cmd.to, route.length - 1);
   const player = state.players[playerId];
   if (cost > 0 && (!player || player.bankrupt || player.gold < cost)) {
@@ -88,6 +97,7 @@ export function executeSail(state: MatchState, playerId: number, cmd: SailComman
   player.gold = (player.gold - sailCost(state, playerId, units, cmd.to, route.length - 1)) as Fp;
   for (const u of units) {
     u.sea = true;
+    u.seaFrom = from;
     u.path = [...route];
     u.moveTicks = 0;
     u.moveTotal = 0;

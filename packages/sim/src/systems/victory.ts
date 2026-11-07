@@ -31,7 +31,7 @@ function coalition(state: MatchState, playerId: number): number[] {
  * VICTORY_HOLD_S подряд. Победа фиксируется один раз; остановка матча — забота сервера.
  */
 export function victorySystem(state: MatchState): void {
-  if (state.winner >= 0) return;
+  if (state.winner >= 0 || state.noVictory === true) return;
   const alive = state.players.filter((p) => p.status === 'alive');
   const [first] = alive;
   if (state.players.length >= 2 && alive.length === 1 && first) {

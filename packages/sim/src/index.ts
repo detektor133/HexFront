@@ -48,9 +48,9 @@ export { findPath, isHostileHex, stepTicks, type Mover } from './queries/unit-pa
 export { findNearestPath } from './queries/unit-path.ts';
 export { captureHex } from './state/capture.ts';
 export { ARMY_NAME_MAX } from './commands/army.ts';
-export { isPortOf, waterNeighbors, type PortGround } from './state/port.ts';
+export { isPortHex, isPortOf, portLevel, waterNeighbors, type PortGround } from './state/port.ts';
 export { planSeaRoute, seaTargets } from './queries/sea-route.ts';
-export { portCapacity, sailCost } from './commands/sail.ts';
+export { atSea, portCapacity, sailCost } from './commands/sail.ts';
 export { planRoadRoute, roadEndsAreNodes, type RoadRoute } from './queries/road-route.ts';
 export { CITY_NAME_MAX } from './map/city-names.ts';
 export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';

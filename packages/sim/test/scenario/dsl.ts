@@ -532,6 +532,7 @@ function makeScenario(
         lowSupplyTicks: 0,
         encircled: false,
         sea: false,
+        seaFrom: -1,
         target: -1,
         inBattle: false,
         focus: -1,

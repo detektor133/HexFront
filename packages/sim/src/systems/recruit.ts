@@ -60,6 +60,7 @@ function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
     lowSupplyTicks: 0,
     encircled: false,
     sea: false,
+    seaFrom: -1,
     target: -1,
     inBattle: false,
     focus: -1,

@@ -223,6 +223,7 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
     lowSupplyTicks: unit.lowSupplyTicks,
     encircled: unit.encircled,
     sea: false,
+    seaFrom: -1,
     target: -1,
     inBattle: false,
     focus: -1,

@@ -34,6 +34,8 @@ export interface MatchOptions {
   readonly fog?: boolean;
   /** Дипломатия: по умолчанию все в мире, войну объявляют (CR-007); нет — все в войне. */
   readonly diplomacy?: boolean;
+  /** Матч-урок: победа не фиксируется, урок сам решает, когда он закончен. */
+  readonly noVictory?: boolean;
 }
 
 function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchState {
@@ -54,6 +56,7 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     tick: 0,
     seed: seed >>> 0,
     fog: options.fog ?? true,
+    ...(options.noVictory === true ? { noVictory: true } : {}),
     map,
     hexes: {
       owner: new Int16Array(size).fill(NEUTRAL),
@@ -175,6 +178,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
       lowSupplyTicks: 0,
       encircled: false,
       sea: false,
+      seaFrom: -1,
       target: -1,
       inBattle: false,
       focus: -1,

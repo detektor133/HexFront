@@ -178,7 +178,7 @@ export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30), fp(40), fp(5
 /** Вместимость порта за одну отправку на каждый уровень склада, солдат (fixed-point). */
 export const PORT_CAPACITY_PER_LEVEL = 600 * 1000;
 /** Дальше стольких клеток воды от порта плыть нельзя. */
-export const SEA_MAX_HEXES = 14;
+export const SEA_MAX_HEXES = 40;
 /** Время прохода одной клетки воды, секунд. */
 export const SEA_MOVE_S_PER_HEX: Fp = fp(0.8);
 /** Золото за одного солдата на одну клетку воды при вторжении и высадке не в свой порт. */
