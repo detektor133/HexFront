@@ -6,6 +6,7 @@ import {
   previewPath,
   buildMask,
   supplyLevels,
+  type BotLevel,
   type BuildMaskKind,
   type PathPreview,
   checkConstruction,
@@ -134,6 +135,7 @@ export function createLocalEngine(
   playerName = '',
   diplomacy = false,
   tutorial = false,
+  botLevel: BotLevel = 'medium',
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
@@ -169,6 +171,7 @@ export function createLocalEngine(
       pending.push({ t: 'launchOffensive', target: -1, soldiers: Math.ceil(soldiers / FP) });
     }
   }
+  const levels = Array.from({ length: players }, () => botLevel);
   const director = createDirector();
   let selected: number | null = null;
   let observerId: number | null = null;
@@ -178,8 +181,8 @@ export function createLocalEngine(
     step(state, [
       ...pending.map((cmd) => ({ playerId: HUMAN_ID, cmd })),
       ...(tutorial ? directorCommands(state, director) : []),
-      ...commanderCommands(state, bots, botContext),
-      ...botCommands(state, bots, botContext),
+      ...commanderCommands(state, bots, levels, botContext),
+      ...botCommands(state, bots, levels, botContext),
     ]);
     pending = [];
     if (tutorial) boostPeople(state);

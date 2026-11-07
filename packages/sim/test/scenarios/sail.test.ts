@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
+import { TERRAIN } from '../../src/map/types.ts';
+import { findPath } from '../../src/queries/unit-path.ts';
+import { armyViews } from '../../src/queries/unit-view.ts';
 import { withDepot } from '../../src/state/building.ts';
 import { isPortHex, isPortOf } from '../../src/state/port.ts';
 import { assignFront, assignUnits, at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
@@ -196,9 +199,65 @@ describe('порты и морские переправы', () => {
       { playerId: 0, cmd: { t: 'invade', armyId: army, from: west, to: shore } },
     ]);
     expect(s.state.players[0]?.gold ?? 0).toBeLessThan(gold);
-    s.runSeconds(120);
+    // Пока десант в пути, у армии стоит признак вторжения (якорь), у армии с простым перемещением — нет.
+    s.runSeconds(3);
+    expect(armyViews(s.state, 0).find((a) => a.id === army)?.sea).toBe(true);
+    s.runSeconds(117);
+    expect(armyViews(s.state, 0).find((a) => a.id === army)?.sea).toBeUndefined();
     const here = [unit, walker].map((id) => s.unitById(id)?.hex);
     expect(here.every((h) => h === shore || h === undefined)).toBe(true);
     expect(s.state.hexes.owner[shore]).toBe(0);
+  });
+});
+
+describe('значок якоря: только приказ вторжения', () => {
+  it('отряд, плывущий вручную через sail, не делает армию десантной', () => {
+    const { s, east, unit } = setup();
+    s.cmd('A', createArmy(''));
+    s.runTicks(1);
+    const army = s.armiesOf('A').at(-1)?.id ?? -1;
+    s.cmd('A', assignUnits([unit], army));
+    s.runTicks(2);
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'sail', unitIds: [unit], to: east } }]);
+    expect(s.unitById(unit)?.sea).toBe(true);
+    expect(armyViews(s.state, 0).find((a) => a.id === army)?.sea).toBeUndefined();
+  });
+});
+
+describe('составной путь: порт выгоднее обхода', () => {
+  // Озеро посередине: сушей вокруг него далеко, по воде между портами — короче.
+  const LAKE = `
+    A1 a  a  a  a  a  a  a  a  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  ~  ~  ~  ~  ~  ~  ~  a  a
+    a  a  a  a  a  a  a  a  a  a  a
+  `;
+
+  it('если через воду быстрее, чем сушей вокруг, путь идёт через порты', () => {
+    const s = scenario(LAKE, { legend });
+    const w = s.state.map.width;
+    const west = 1 + 5 * w;
+    const east = 9 + 5 * w;
+    for (const h of [west, east]) {
+      s.state.hexes.building[h] = withDepot(s.state.hexes.building[h] ?? 0, 1);
+    }
+    const path = findPath(s.state, west, east, 'infantry', 0);
+    expect(path).not.toBeNull();
+    expect(path?.some((h) => s.state.map.terrain[h] === TERRAIN.water)).toBe(true);
+  });
+
+  it('без портов путь идёт только сушей', () => {
+    const s = scenario(LAKE, { legend });
+    const w = s.state.map.width;
+    const path = findPath(s.state, 1 + 5 * w, 9 + 5 * w, 'infantry', 0);
+    expect(path?.every((h) => s.state.map.terrain[h] !== TERRAIN.water)).toBe(true);
   });
 });

@@ -8,17 +8,34 @@ import { createBotTickContext, type BotTickContext } from './context.ts';
 import { diplomacyCommands } from './diplomacy.ts';
 import { seaCommands } from './sea.ts';
 import {
+  BOT_EASY_COMMANDER_EVERY,
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
+  BOT_NORMAL_COMMANDER_EVERY,
+  BOT_NORMAL_THINK_TICKS,
   BOT_THINK_TICKS,
   COMMANDER_TICKS,
 } from '../balance.ts';
 import type { BotLevel } from './types.ts';
 import type { PlayerCommand } from '../commands/types.ts';
-import { fp, type Fp } from '../math/int.ts';
+import { fp, intDiv, type Fp } from '../math/int.ts';
 import { commanderView } from '../queries/player-view.ts';
 import type { MatchState } from '../state/types.ts';
 export type { BotLevel } from './types.ts';
+
+/** Как часто думает бот каждого уровня, тиков. */
+const THINK_TICKS: Readonly<Record<BotLevel, number>> = {
+  easy: BOT_EASY_THINK_TICKS,
+  normal: BOT_NORMAL_THINK_TICKS,
+  medium: BOT_THINK_TICKS,
+};
+
+/** Раз в сколько своих очередей commander бота каждого уровня командует армиями. */
+const COMMANDER_EVERY: Readonly<Record<BotLevel, number>> = {
+  easy: BOT_EASY_COMMANDER_EVERY,
+  normal: BOT_NORMAL_COMMANDER_EVERY,
+  medium: 1,
+};
 
 function isBotTickContext(
   value: readonly (BotLevel | undefined)[] | BotTickContext | undefined,
@@ -73,6 +90,9 @@ export function commanderCommands(
   }));
   for (const p of state.players) {
     if (p.status !== 'alive' || p.id % COMMANDER_TICKS !== turn) continue;
+    // Слабые боты командуют армиями реже: их очередь пропускается.
+    const every = botIds.has(p.id) ? COMMANDER_EVERY[levels[p.id] ?? 'medium'] : 1;
+    if (every > 1 && intDiv(state.tick, COMMANDER_TICKS) % every !== 0) continue;
     const armies = armiesByOwner.get(p.id) ?? [];
     if (armies.length === 0) continue;
     const view = commanderView(state, p.id, viewContext, cities);
@@ -122,7 +142,7 @@ export function botCommands(
   for (const p of state.players) {
     if (p.status !== 'alive' || !bots.includes(p.id)) continue;
     const level = levels[p.id] ?? 'medium';
-    const thinkTicks = level === 'easy' ? BOT_EASY_THINK_TICKS : BOT_THINK_TICKS;
+    const thinkTicks = THINK_TICKS[level];
     if (p.id % thinkTicks !== state.tick % thinkTicks) continue;
     const commands = brainDecide(state, p.id, tickContext, level, weights);
     for (const cmd of commands) {

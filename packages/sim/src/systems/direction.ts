@@ -13,6 +13,7 @@ import {
   releaseDirection,
 } from '../commands/launch.ts';
 import { placeFront } from '../commands/plan.ts';
+import { onSeaMission } from '../queries/unit-view.ts';
 import type { MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -39,6 +40,13 @@ export function maintainDirections(state: MatchState): void {
   syncFronts(state);
   commandAssaults(state);
   if (state.tick % TICKS_PER_S !== 0) return;
+  // Десант высадился (ни на воде, ни путей через воду) — приказ вторжения исполнен.
+  for (const army of state.armies) {
+    if (army.invading !== true) continue;
+    if (!allUnits(state).some((u) => u.armyId === army.id && onSeaMission(state, u))) {
+      delete army.invading;
+    }
+  }
   for (const army of [...state.armies]) {
     const dir = army.dir;
     if (!dir || dir.mode === 'idle') continue;

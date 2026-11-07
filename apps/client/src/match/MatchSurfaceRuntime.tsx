@@ -518,6 +518,7 @@ export function useSandbox(
         telemetry: debug,
         initialGold: setup.initialGold,
         tutorial: setup.tutorial !== null,
+        botLevel: setup.botLevel,
         playerName:
           setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
         playerColors: matchPlayerColors(

@@ -69,12 +69,17 @@ function ownFreeHex(state: MatchState, playerId: number, hex: HexId): RejectReas
 
 // Дистанция ≥ 4 до любого города, включая города в процессе основания.
 function tooCloseToCity(state: MatchState, hex: HexId): boolean {
-  const h = hexFromId(hex, state.map.width);
-  const sites = [
-    ...state.cities.map((c) => c.hex),
-    ...state.constructions.filter((c) => c.kind === 'foundCity').map((c) => c.hex),
-  ];
-  return sites.some((site) => distance(hexFromId(site, state.map.width), h) < CITY_MIN_DISTANCE);
+  const { width } = state.map;
+  const h = hexFromId(hex, width);
+  for (const c of state.cities) {
+    if (distance(hexFromId(c.hex, width), h) < CITY_MIN_DISTANCE) return true;
+  }
+  for (const c of state.constructions) {
+    if (c.kind === 'foundCity' && distance(hexFromId(c.hex, width), h) < CITY_MIN_DISTANCE) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Склад не ближе DEPOT_MIN_DISTANCE к СВОЕМУ складу или городу: чужой город или склад на границе

@@ -8,6 +8,7 @@ import {
 import type { CommandOption, CommandOptionEntry } from './options/types.ts';
 import type { BotOptionDefinitions } from './options/types.ts';
 import { createBotSnapshot } from './snapshot.ts';
+import type { BotLevel } from './types.ts';
 import easyWeights from './weights-easy.json' with { type: 'json' };
 import mediumWeights from './weights.json' with { type: 'json' };
 import type { Command } from '../commands/types.ts';
@@ -25,7 +26,7 @@ export const BOT_EASY_WEIGHTS: BotWeights = easyWeights;
 export function resolveBotWeights(
   weights: BotWeights | BotWeightsByPlayer | undefined,
   playerId: number,
-  level: 'easy' | 'medium',
+  level: BotLevel,
 ): BotWeights {
   if (weights === undefined) return level === 'easy' ? BOT_EASY_WEIGHTS : BOT_WEIGHTS;
   if (Array.isArray(weights)) {
@@ -130,7 +131,7 @@ export function brainDecide(
   state: MatchState,
   playerId: number,
   context: BotTickContext,
-  _level: 'easy' | 'medium' = 'medium',
+  _level: BotLevel = 'medium',
   botWeights?: BotWeights | BotWeightsByPlayer,
 ): Command[] {
   return planBotActions(state, playerId, context, resolveBotWeights(botWeights, playerId, _level));

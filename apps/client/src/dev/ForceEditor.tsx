@@ -19,27 +19,35 @@ export function ForceEditor(props: {
   readonly onChange: (total: number, shares: Shares) => void;
   /** Игрок отпустил ползунок: значение окончательное — можно применять приказом. */
   readonly onCommit?: (total: number, shares: Shares) => void;
+  /** Только состав: без строки «Всего» и кнопки раскрытия, ползунки видны сразу. */
+  readonly onlyComposition?: boolean;
 }): React.JSX.Element {
   const { total, shares, onChange, onCommit } = props;
+  const only = props.onlyComposition === true;
   const commit = (): void => onCommit?.(total, shares);
-  const [open, setOpen] = useState(false);
+  const [expanded, setOpen] = useState(false);
+  const open = only || expanded;
   const counts = countsFromShares(total, shares);
   const Chevron = open ? IconChevronUp : IconChevronDown;
   return (
     <div className={styles.force}>
-      <div className={styles.head}>
-        <span>{t('menu.total')}</span>
-        <b className={styles.number}>{total}</b>
-      </div>
-      <button
-        type="button"
-        className={styles.toggle}
-        aria-expanded={open}
-        onClick={() => setOpen((now) => !now)}
-      >
-        {t('menu.composition')}
-        <Chevron size={16} aria-hidden="true" />
-      </button>
+      {!only && (
+        <div className={styles.head}>
+          <span>{t('menu.total')}</span>
+          <b className={styles.number}>{total}</b>
+        </div>
+      )}
+      {!only && (
+        <button
+          type="button"
+          className={styles.toggle}
+          aria-expanded={open}
+          onClick={() => setOpen((now) => !now)}
+        >
+          {t('menu.composition')}
+          <Chevron size={16} aria-hidden="true" />
+        </button>
+      )}
       {open &&
         ORDER_TYPES.map((type) => (
           <Share

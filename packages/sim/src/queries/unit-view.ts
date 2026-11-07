@@ -5,7 +5,7 @@ import { isSupportedByArtillery } from './battle-math.ts';
 import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
-import type { MatchState, UnitOrder } from '../state/types.ts';
+import type { MatchState, Unit, UnitOrder } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { isStarving } from '../systems/attrition.ts';
 import { starsOf } from '../systems/experience.ts';
@@ -108,12 +108,17 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
     });
 }
 
+/** Отряд на воде или с путём через воду: десант ещё не высадился. */
+export function onSeaMission(state: MatchState, u: Unit): boolean {
+  return u.sea || u.path.some((h) => state.map.terrain[h] === TERRAIN.water);
+}
+
 /** Свои армии для снимка. */
 export function armyViews(state: MatchState, playerId: number): ArmyView[] {
   const landing = new Set<number>();
   for (const u of allUnits(state)) {
     if (u.owner !== playerId || u.armyId === null || landing.has(u.armyId)) continue;
-    if (u.sea || u.path.some((h) => state.map.terrain[h] === TERRAIN.water)) landing.add(u.armyId);
+    if (onSeaMission(state, u)) landing.add(u.armyId);
   }
   return state.armies
     .filter((a) => a.owner === playerId)
@@ -126,6 +131,6 @@ export function armyViews(state: MatchState, playerId: number): ArmyView[] {
       ...(a.wanted === undefined ? {} : { wanted: a.wanted }),
       ...(a.mix === undefined ? {} : { mix: a.mix }),
       ...(a.dir === undefined ? {} : { dir: a.dir }),
-      ...(landing.has(a.id) ? { sea: true } : {}),
+      ...(a.invading === true && landing.has(a.id) ? { sea: true } : {}),
     }));
 }

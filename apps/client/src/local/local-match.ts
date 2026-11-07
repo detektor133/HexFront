@@ -1,5 +1,5 @@
 // Страница ↔ Web Worker: запуск локального матча и отправка команд.
-import type { Command } from '@hexfront/sim';
+import type { BotLevel, Command } from '@hexfront/sim';
 
 import type { FromWorker, MapMaskMode, ToWorker } from './messages.ts';
 
@@ -41,6 +41,7 @@ export function startLocalMatch(
     readonly autoCommand?: boolean;
     readonly initialGold?: number | null;
     readonly tutorial?: boolean;
+    readonly botLevel?: BotLevel;
   } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
@@ -59,6 +60,7 @@ export function startLocalMatch(
     ...(options.playerName ? { playerName: options.playerName } : {}),
     ...(options.playerColors ? { playerColors: options.playerColors } : {}),
     ...(options.tutorial ? { tutorial: true } : {}),
+    ...(options.botLevel ? { botLevel: options.botLevel } : {}),
     ...(options.initialGold !== undefined && options.initialGold !== null
       ? { initialGold: options.initialGold }
       : {}),

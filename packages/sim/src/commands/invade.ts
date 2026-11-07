@@ -91,6 +91,7 @@ export function executeInvade(state: MatchState, playerId: number, cmd: InvadeCo
   releaseDirection(state, army);
   removePlan(state, army.id);
   army.auto = false;
+  army.invading = true;
   for (const { unit, path } of sailors) {
     unit.slot = SLOT_DETACHED;
     unit.gather = -1;

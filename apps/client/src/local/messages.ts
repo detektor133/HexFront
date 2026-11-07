@@ -4,6 +4,7 @@ import type {
   PathPreview,
   Command,
   ConstructionCheck,
+  BotLevel,
   CityInfo,
   Fp,
   PlayerView,
@@ -66,6 +67,8 @@ export type ToWorker =
       readonly initialGold?: number;
       /** Матч-урок: стартовые отряды не получают автозанятие земли. */
       readonly tutorial?: boolean;
+      /** Сложность ботов матча; нет поля — полная сила. */
+      readonly botLevel?: BotLevel;
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }

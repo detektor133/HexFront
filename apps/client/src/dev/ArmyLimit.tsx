@@ -43,9 +43,10 @@ export function ArmyLimit(props: {
       className={styles.pop}
       style={{ left, bottom: window.innerHeight - anchor.top + 8, width: WIDTH }}
       role="dialog"
-      aria-label={t('army.limit')}
+      aria-label={t('army.composition')}
     >
       <ForceEditor
+        onlyComposition
         total={force.total}
         shares={force.shares}
         onChange={(total, shares) => setForce({ total, shares })}

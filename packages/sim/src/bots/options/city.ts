@@ -56,10 +56,13 @@ export function cityOptions(
   }
   if (!state.map || !state.hexes) return result;
   for (const hex of context.ownedHexes[playerId] ?? []) {
-    const improvement = new Uint8Array(state.hexes.improvement);
+    // Предел людей с лишним благоустройством: уровень на миг поднимается в самом массиве и
+    // возвращается — копия массива карты на каждый гекс игрока стоила миллисекунды на каждое решение.
+    const { improvement } = state.hexes;
+    const before = hexPopCap(state, hex);
     improvement[hex] = (improvement[hex] ?? 0) + 1;
-    const improvedCap = (hexPopCap({ map: state.map, hexes: { improvement } }, hex) -
-      hexPopCap(state, hex)) as Fp;
+    const improvedCap = (hexPopCap(state, hex) - before) as Fp;
+    improvement[hex] = (improvement[hex] ?? 1) - 1;
     const improve = constructionOption(
       state,
       playerId,

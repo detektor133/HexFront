@@ -20,6 +20,8 @@ export const TICKS_PER_S = intDiv(1000, TICK_MS);
 export const NETWORK_RECALC_TICKS = 10;
 export const VISION_RECALC_TICKS = 10;
 export const FRONT_ALLOC_TICKS = 50;
+/** Сколько отрядов армии получают новый маршрут за одну расстановку: остальные — в следующую. */
+export const FRONT_ROUTE_BUDGET = 12;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;
@@ -35,6 +37,11 @@ export const COMMANDER_TICKS = 5;
 export const BOT_THINK_TICKS = 10;
 /** Период экономического решения easy-бота, тиков. */
 export const BOT_EASY_THINK_TICKS = 30;
+/** Средняя сложность: как часто бот думает, тиков. */
+export const BOT_NORMAL_THINK_TICKS = 20;
+/** Слабые боты командуют армиями реже: commander ходит раз в столько своих очередей. */
+export const BOT_EASY_COMMANDER_EVERY = 3;
+export const BOT_NORMAL_COMMANDER_EVERY = 2;
 /** Первые 5 минут матча боты не объявляют войну: игрок успевает расти, а не отбиваться на старте. */
 export const BOT_WAR_GRACE_TICKS = 3000;
 

@@ -7,6 +7,7 @@ import { maintainDirections } from './direction.ts';
 import {
   FRONT_ALLOC_TICKS,
   FRONT_HOLD_DENOM,
+  FRONT_ROUTE_BUDGET,
   FRONT_REALLOC_GAIN_MIN,
   FRONT_SPLIT_MIN,
   FRONT_THREAT_RANGE,
@@ -55,7 +56,13 @@ function routeTo(
 // Отряд идёт на своё место или встаёт на нём в оборону. Идущий отряд не бросает начатый переход:
 // новый маршрут строится от гекса, в который он уже вступает, а прогресс шага сохраняется. Иначе
 // пересмотр мест чаще времени перехода гонял бы отряд «почти дошёл — откат — снова» без конца.
-function goTo(state: MatchState, u: Unit, slot: number, line: readonly HexId[]): void {
+function goTo(
+  state: MatchState,
+  u: Unit,
+  slot: number,
+  line: readonly HexId[],
+  budget: { left: number },
+): void {
   u.slot = slot;
   if (u.hex === slot) {
     // Место — гекс, из которого отряд уже выходит: начатый шаг доводится, откатывать фишку нельзя.
@@ -77,6 +84,10 @@ function goTo(state: MatchState, u: Unit, slot: number, line: readonly HexId[]):
     u.path = [slot];
     return;
   }
+  // Поиск путей дорог: сотни отрядов, меняющих место разом, останавливали игру на секунды. За одну
+  // расстановку маршрут получают не больше FRONT_ROUTE_BUDGET отрядов армии, остальные — в следующую.
+  if (budget.left <= 0) return;
+  budget.left -= 1;
   const route = routeTo(state, u, entering ?? u.hex, slot, line);
   if (!route) {
     u.slot = -1;
@@ -180,10 +191,11 @@ function runPlan(state: MatchState, armyId: number): void {
   const keep =
     next.coverage <= next.keptCoverage + fpMul(next.keptCoverage as Fp, FRONT_REALLOC_GAIN_MIN);
   const chosen = keep ? next.kept : next.slots;
+  const budget = { left: FRONT_ROUTE_BUDGET };
   for (const u of units) {
     const slot = chosen.get(u.id);
     if (slot === undefined) u.slot = -1;
-    else goTo(state, u, slot, next.line);
+    else goTo(state, u, slot, next.line, budget);
   }
 }
 

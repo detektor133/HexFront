@@ -35,6 +35,10 @@ const PLAYERS_MIN = 2;
 const PLAYERS_MAX = 30;
 const PLAYERS_DEFAULT = 12;
 const COLOR_KEY = 'hexfront.color';
+const LEVEL_KEY = 'hexfront.botLevel';
+const LEVELS = ['easy', 'normal', 'hard'] as const;
+type MenuLevel = (typeof LEVELS)[number];
+const LEVEL_DEFAULT: MenuLevel = 'normal';
 
 function readStorage(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
@@ -46,7 +50,13 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
-function matchUrl(nickname: string, color: string, map: MenuMap, players: number): string {
+function matchUrl(
+  nickname: string,
+  color: string,
+  map: MenuMap,
+  players: number,
+  level: MenuLevel,
+): string {
   const start =
     map === 'gen'
       ? quickMatchUrl()
@@ -54,6 +64,7 @@ function matchUrl(nickname: string, color: string, map: MenuMap, players: number
   const url = new URL(start, window.location.origin);
   if (nickname !== '') url.searchParams.set('name', nickname);
   url.searchParams.set('color', color);
+  url.searchParams.set('difficulty', level);
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
@@ -74,6 +85,10 @@ export function MainMenu(): React.JSX.Element {
     return Number.isInteger(saved)
       ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, saved))
       : PLAYERS_DEFAULT;
+  });
+  const [level, setLevel] = useState<MenuLevel>(() => {
+    const saved = readStorage(LEVEL_KEY, LEVEL_DEFAULT);
+    return LEVELS.find((l) => l === saved) ?? LEVEL_DEFAULT;
   });
   const chooser = MAPS.find((m) => m.id === map);
   // Новичку один раз предлагают обучение; позже оно открывается кнопкой в меню.
@@ -155,6 +170,7 @@ export function MainMenu(): React.JSX.Element {
     localStorage.setItem(NICKNAME_KEY, nickname);
     localStorage.setItem(MAP_KEY, map);
     localStorage.setItem(PLAYERS_KEY, String(players));
+    localStorage.setItem(LEVEL_KEY, level);
   };
 
   return (
@@ -207,6 +223,23 @@ export function MainMenu(): React.JSX.Element {
                 />
               </label>
             )}
+            <div className={styles.field}>
+              <span className={styles.label}>{t('menu.difficulty')}</span>
+              <div className={styles.segmented} role="radiogroup" aria-label={t('menu.difficulty')}>
+                {LEVELS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={l === level}
+                    className={`${styles.segment} ${l === level ? styles.chosen : ''}`}
+                    onClick={() => setLevel(l)}
+                  >
+                    <span>{t(`menu.difficulty.${l}` as MessageKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className={styles.identityRow}>
               <div ref={colorsRef} className={styles.colorPicker}>
                 {!isColorPickerOpen &&
@@ -267,7 +300,7 @@ export function MainMenu(): React.JSX.Element {
             <a
               className={styles.play}
               role="button"
-              href={matchUrl(nickname, color, map, players)}
+              href={matchUrl(nickname, color, map, players, level)}
               onClick={handlePlay}
             >
               {t('menu.play')}

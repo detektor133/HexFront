@@ -6,11 +6,16 @@ import type { HexId } from '../math/hex.ts';
 export interface UnitHexIndex {
   readonly unitsByHex: Array<Unit[] | undefined>;
   readonly cityByHex: Array<City | undefined>;
+  /** Номер правки: растёт при любом изменении состава отрядов по гексам (для кэшей запросов). */
+  rev: number;
 }
+
+let revisions = 0;
 
 const indexes = new WeakMap<MatchState, UnitHexIndex>();
 
 function addToBucket(index: UnitHexIndex, unit: Unit): void {
+  index.rev = ++revisions;
   const bucket = index.unitsByHex[unit.hex] ?? [];
   bucket.push(unit);
   index.unitsByHex[unit.hex] = bucket;
@@ -21,6 +26,7 @@ export function rebuildUnitIndex(state: MatchState): UnitHexIndex {
   const index: UnitHexIndex = {
     unitsByHex: new Array<Unit[] | undefined>(state.map.width * state.map.height),
     cityByHex: new Array<City | undefined>(state.map.width * state.map.height),
+    rev: ++revisions,
   };
   for (const unit of state.units) addToBucket(index, unit);
   for (const city of state.cities) index.cityByHex[city.hex] = city;
@@ -57,6 +63,7 @@ export function removeUnitFromIndex(state: MatchState, unit: Unit): void {
   if (!bucket) return;
   const position = bucket.indexOf(unit);
   if (position >= 0) bucket.splice(position, 1);
+  if (index) index.rev = ++revisions;
   if (bucket.length === 0 && index) index.unitsByHex[unit.hex] = undefined;
 }
 
@@ -67,6 +74,7 @@ export function moveUnitInIndex(state: MatchState, unit: Unit, from: HexId): voi
   const oldBucket = index.unitsByHex[from];
   const position = oldBucket?.indexOf(unit) ?? -1;
   if (oldBucket && position >= 0) oldBucket.splice(position, 1);
+  index.rev = ++revisions;
   if (oldBucket?.length === 0) index.unitsByHex[from] = undefined;
   addToBucket(index, unit);
 }

@@ -54,6 +54,9 @@ export function armySize(army: ArmyView, soldiers: number): number {
   return army.wanted ?? soldiers;
 }
 
+/** Первый «плюс» армии с нулевым лимитом даёт столько солдат. */
+export const FIRST_STEP_SOLDIERS = 200;
+
 /** Варианты шага «+/−» в процентах от текущего размера армии. */
 export const STEP_CHOICES = [10, 25, 50, 100] as const;
 export type StepPct = (typeof STEP_CHOICES)[number];
@@ -65,6 +68,8 @@ export const DEFAULT_STEP: StepPct = 25;
  * @returns солдат; равен size, если шаг невозможен
  */
 export function stepSize(size: number, pct: number, dir: 1 | -1, max: number): number {
+  // Армия без лимита сразу получает осмысленный размер: шаги 1, 2, 4 солдата — это очень долго.
+  if (dir === 1 && size <= 0) return Math.min(max, FIRST_STEP_SOLDIERS);
   const delta = Math.max(1, Math.ceil((size * pct) / 100));
   return dir === 1 ? Math.min(max, size + delta) : Math.max(1, size - delta);
 }

@@ -1,3 +1,5 @@
+import type { BotLevel } from '@hexfront/sim';
+
 import { readMapRequest, type MapRequest } from './map-request.ts';
 
 const SPEED_MAX = 20;
@@ -13,6 +15,15 @@ export interface LocalMatchSetup {
   readonly initialGold: number | null;
   /** Глава обучения (`tutorial=core`): матч-урок, соперник пассивен, автозанятие не включается. */
   readonly tutorial: string | null;
+  /** Сложность ботов (`difficulty=easy|normal|hard`); без параметра — полная сила. */
+  readonly botLevel: BotLevel;
+}
+
+/** Сложность из адреса: «hard» — полная сила бота (`medium` в sim). */
+function botLevelParam(value: string | null): BotLevel {
+  if (value === 'easy') return 'easy';
+  if (value === 'normal') return 'normal';
+  return 'medium';
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
@@ -51,5 +62,6 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     // initialGold=N — стартовое золото игрока в золоте (для проверки закупки), 0 — без золота.
     initialGold: goldParam(params.get('initialGold')),
     tutorial,
+    botLevel: botLevelParam(params.get('difficulty')),
   };
 }

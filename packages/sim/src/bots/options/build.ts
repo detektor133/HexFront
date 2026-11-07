@@ -1,7 +1,7 @@
 import type { BotOptionDefinitions, CommandOption } from './types.ts';
 import { BUILDING_DEFS } from '../../balance.ts';
 import { checkConstruction } from '../../commands/construction.ts';
-import { distance, hexFromId, hexId, inBounds, neighbors } from '../../math/hex.ts';
+import { distance, hexFromId, hexId, inBounds, neighbors, spiral } from '../../math/hex.ts';
 import { isFort } from '../../state/fort.ts';
 import { atWar } from '../../state/relations.ts';
 import type { MatchState } from '../../state/types.ts';
@@ -21,16 +21,8 @@ function fortBudget(playerId: number, context: BotTickContext): number {
   return Math.max(2, intDiv((context.citiesByPlayer[playerId] ?? []).length, 2));
 }
 
-/**
- * Укрепление нужно только на гексе у врага: рядом (не дальше двух гексов) отряд или земля игрока,
- * с которым война, — и пока бюджет укреплений не выбран.
- */
-function fortWanted(
-  state: MatchState,
-  playerId: number,
-  context: BotTickContext,
-  hex: number,
-): boolean {
+/** Выбран ли бюджет укреплений игрока: готовые и строящиеся. Считается раз на выбор опций. */
+function fortsFull(state: MatchState, playerId: number, context: BotTickContext): boolean {
   let forts = 0;
   for (const h of context.ownedHexes[playerId] ?? []) {
     if (isFort(state.hexes.building[h] ?? 0)) forts += 1;
@@ -38,18 +30,30 @@ function fortWanted(
   for (const c of state.constructions) {
     if (c.owner === playerId && c.kind === 'fort') forts += 1;
   }
-  if (forts >= fortBudget(playerId, context)) return false;
-  const origin = hexFromId(hex, state.map.width);
+  return forts >= fortBudget(playerId, context);
+}
+
+/**
+ * Укрепление нужно только на гексе у врага: рядом (не дальше двух гексов) отряд или земля игрока,
+ * с которым война. Отряды ищутся по индексу гексов, а не перебором всех отрядов матча.
+ */
+function fortWanted(
+  state: MatchState,
+  playerId: number,
+  context: BotTickContext,
+  hex: number,
+): boolean {
+  const { width, height } = state.map;
   const hostile = (owner: number): boolean =>
     owner >= 0 && owner !== playerId && atWar(state, playerId, owner);
-  for (const unit of state.units) {
-    if (hostile(unit.owner) && distance(origin, hexFromId(unit.hex, state.map.width)) <= 2) {
+  for (const h of spiral(hexFromId(hex, width), 2)) {
+    if (!inBounds(h, width, height)) continue;
+    if ((context.unitsByHex[hexId(h, width)] ?? []).some((unit) => hostile(unit.owner)))
       return true;
-    }
   }
-  for (const n of neighbors(origin)) {
-    if (!inBounds(n, state.map.width, state.map.height)) continue;
-    if (hostile(state.hexes.owner[hexId(n, state.map.width)] ?? -1)) return true;
+  for (const n of neighbors(hexFromId(hex, width))) {
+    if (!inBounds(n, width, height)) continue;
+    if (hostile(state.hexes.owner[hexId(n, width)] ?? -1)) return true;
   }
   return false;
 }
@@ -67,10 +71,12 @@ export function buildOptions(
     (a, b) => a - b,
   );
   const units = context.unitsByPlayer[playerId] ?? [];
+  const fortBudgetSpent = fortsFull(state, playerId, context);
   for (const hex of hexes) {
     const origin = hexFromId(hex, state.map.width);
     for (const [kind, definition] of Object.entries(definitions.buildings)) {
-      if (kind === 'fort' && !fortWanted(state, playerId, context, hex)) continue;
+      if (kind === 'fort' && (fortBudgetSpent || !fortWanted(state, playerId, context, hex)))
+        continue;
       const command = { t: 'build', hex, kind: kind as keyof typeof BUILDING_DEFS } as const;
       const check = Object.hasOwn(BUILDING_DEFS, kind)
         ? checkConstruction(state, playerId, command)

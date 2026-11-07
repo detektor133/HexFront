@@ -15,12 +15,11 @@ import {
   type LandTerrain,
   type UnitType,
 } from '../balance.ts';
-import { planSeaRoute } from './sea-route.ts';
+import { composeSeaPath, ownPortSet } from './sea-path.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush, type MinHeap } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
-import { isPortOf } from '../state/port.ts';
 import { atWar, protectsFrom } from '../state/relations.ts';
 import type { MatchState } from '../state/types.ts';
 import { unitIndex } from '../state/unit-index.ts';
@@ -69,17 +68,34 @@ export function peaceBlocked(state: MatchState, owner: number, hex: HexId): bool
   return (unitIndex(state).unitsByHex[hex] ?? []).some((u) => protectsFrom(state, owner, u.owner));
 }
 
+// Маска зоны контроля игрока: гексы, рядом с которыми стоит отряд того, с кем война. Строится раз
+// на состав отрядов и тик: поиск пути спрашивает её на каждом шаге, а считать соседей заново — дорого.
+const zocMasks = new WeakMap<
+  MatchState,
+  { rev: number; tick: number; masks: Map<number, Uint8Array> }
+>();
+
 /** Зона контроля: рядом с гексом стоит отряд другого игрока. */
 function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
-  const { width, height } = state.map;
-  for (const n of neighbors(hexFromId(hex, width))) {
-    if (!inBounds(n, width, height)) continue;
-    const id = hexId(n, width);
-    if ((unitIndex(state).unitsByHex[id] ?? []).some((unit) => atWar(state, owner, unit.owner))) {
-      return true;
-    }
+  const index = unitIndex(state);
+  let cache = zocMasks.get(state);
+  if (!cache || cache.rev !== index.rev || cache.tick !== state.tick) {
+    cache = { rev: index.rev, tick: state.tick, masks: new Map() };
+    zocMasks.set(state, cache);
   }
-  return false;
+  let mask = cache.masks.get(owner);
+  if (!mask) {
+    const { width, height } = state.map;
+    mask = new Uint8Array(width * height);
+    for (const unit of state.units) {
+      if (!atWar(state, owner, unit.owner)) continue;
+      for (const n of neighbors(hexFromId(unit.hex, width))) {
+        if (inBounds(n, width, height)) mask[hexId(n, width)] = 1;
+      }
+    }
+    cache.masks.set(owner, mask);
+  }
+  return mask[hex] === 1;
 }
 
 // Направление ребра from→to (индекс в neighbors) или -1, если гексы не соседи.
@@ -196,6 +212,7 @@ function search(
   isGoal: (hex: HexId) => boolean,
   h: (hex: HexId) => number,
   ownLand: LandRule = false,
+  limit: number = UNREACHED,
 ): HexId[] | null {
   const { width, height } = state.map;
   const buffers = buffersFor(state);
@@ -220,7 +237,7 @@ function search(
       if (ownLand === true && land !== mover.owner) continue;
       if (ownLand === 'safe' && land !== mover.owner && land >= 0) continue;
       const cost = stepTicks(state, mover, hex, id);
-      if (cost === null || gh + cost >= distanceAt(buffers, id)) continue;
+      if (cost === null || gh + cost >= distanceAt(buffers, id) || gh + cost > limit) continue;
       buffers.generation[id] = buffers.currentGeneration;
       buffers.g[id] = gh + cost;
       buffers.prev[id] = hex;
@@ -251,11 +268,74 @@ export function findPath(
   ownLand: LandRule = false,
   passHostile?: (hex: HexId) => boolean,
 ): HexId[] | null {
-  return (
-    landPath(state, from, to, type, owner, ownLand, passHostile) ??
-    seaPath(state, from, to, type, owner, ownLand, passHostile)
-  );
+  return computePath(state, from, to, type, owner, ownLand, passHostile);
 }
+
+function computePath(
+  state: MatchState,
+  from: HexId,
+  to: HexId,
+  type: UnitType,
+  owner: number,
+  ownLand: LandRule,
+  passHostile: ((hex: HexId) => boolean) | undefined,
+): HexId[] | null {
+  const land = landPath(state, from, to, type, owner, ownLand, passHostile);
+  const mover: Mover = { type, owner, supplyLevel: FP as Fp };
+  const { width } = state.map;
+  const straight = distance(hexFromId(from, width), hexFromId(to, width));
+  let landTicks = UNREACHED;
+  if (land) {
+    landTicks = pathTicks(state, mover, from, land);
+    // Море рассматривается, когда сушей приходится обходить горы и заливы: путь заметно длиннее прямой.
+    if (2 * land.length <= 3 * straight + SEA_CONSIDER_SLACK) return land;
+    // И в начале, и в конце пути должен быть свой порт не дальше, чем идти сушей.
+    const ports = ownPortSet(state, owner);
+    if (ports.size < 2 || !portsNear(state, ports, from, to, land.length)) return land;
+  }
+  // Звенья составного пути не дольше всего пути по суше: иначе морской путь не выиграет.
+  const sea = seaPath(state, from, to, type, owner, ownLand, passHostile, landTicks);
+  if (!sea) return land;
+  if (!land) return sea;
+  return pathTicks(state, mover, from, sea) < landTicks ? sea : land;
+}
+
+/** Запас в гексах: путь по суше не длиннее 1,5 прямой плюс столько — море не рассматривается. */
+const SEA_CONSIDER_SLACK = 2;
+
+/** Есть ли свои порты не дальше reach гексов и от начала, и от цели. */
+function portsNear(
+  state: MatchState,
+  ports: ReadonlySet<HexId>,
+  from: HexId,
+  to: HexId,
+  reach: number,
+): boolean {
+  const { width } = state.map;
+  const a = hexFromId(from, width);
+  const b = hexFromId(to, width);
+  let nearFrom = false;
+  let nearTo = false;
+  for (const port of ports) {
+    const at = hexFromId(port, width);
+    if (distance(at, a) <= reach) nearFrom = true;
+    if (distance(at, b) <= reach) nearTo = true;
+  }
+  return nearFrom && nearTo;
+}
+
+/** Время хода по пути, тики; шаг без прохода считается очень долгим. */
+function pathTicks(state: MatchState, m: Mover, from: HexId, path: readonly HexId[]): number {
+  let total = 0;
+  let at = from;
+  for (const hex of path) {
+    total += stepTicks(state, m, at, hex) ?? UNREACHED_TICKS;
+    at = hex;
+  }
+  return total;
+}
+
+const UNREACHED_TICKS = 100_000;
 
 // Сушей: A* по времени хода.
 function landPath(
@@ -266,6 +346,7 @@ function landPath(
   owner: number,
   ownLand: LandRule,
   passHostile: ((hex: HexId) => boolean) | undefined,
+  limit: number = UNREACHED,
 ): HexId[] | null {
   if (from === to) return [];
   const mover: Mover = {
@@ -285,12 +366,11 @@ function landPath(
     (hex) => hex === to,
     (hex) => distance(hexFromId(hex, width), goal) * hMin,
     ownLand,
+    limit,
   );
 }
 
-// Составной путь: сушей до своего порта, по воде в другой свой порт, сушей до цели. Выбирается
-// пара портов с наименьшей суммой (суша дороже воды вдвое); сушей пробуют сначала, поэтому к морю
-// обращаются, только когда на сушу пути нет. Переправа между своими портами бесплатна.
+// Составной путь: настоящий поиск по суше для звеньев и волна до ближайших портов (sea-path.ts).
 function seaPath(
   state: MatchState,
   from: HexId,
@@ -299,36 +379,69 @@ function seaPath(
   owner: number,
   ownLand: LandRule,
   passHostile: ((hex: HexId) => boolean) | undefined,
+  limit: number,
 ): HexId[] | null {
   if ((state.map.terrain[to] ?? 0) === TERRAIN.water) return null;
-  const ports: HexId[] = [];
-  for (let h = 0; h < state.hexes.owner.length; h += 1) {
-    if (isPortOf(state, owner, h)) ports.push(h);
-  }
-  if (ports.length < 2) return null;
-  const toPort = new Map<HexId, HexId[]>();
-  const fromPort = new Map<HexId, HexId[]>();
-  for (const port of ports) {
-    const legA = landPath(state, from, port, type, owner, ownLand, passHostile);
-    if (legA) toPort.set(port, legA);
-    const legB = landPath(state, port, to, type, owner, ownLand, passHostile);
-    if (legB) fromPort.set(port, legB);
-  }
-  let best: HexId[] | null = null;
-  let bestCost = Number.MAX_SAFE_INTEGER;
-  for (const [a, legA] of toPort) {
-    for (const [b, legB] of fromPort) {
-      if (a === b) continue;
-      const sea = planSeaRoute(state.map, a, b);
-      if (!sea) continue;
-      const cost = 2 * legA.length + sea.length + 2 * legB.length;
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = [...legA, ...sea, ...legB];
-      }
+  const mover: Mover = {
+    type,
+    owner,
+    supplyLevel: FP as Fp,
+    ...(passHostile ? { passHostile } : {}),
+  };
+  return composeSeaPath(
+    state,
+    owner,
+    from,
+    to,
+    {
+      flood: (start, ports, want, cap) =>
+        floodPorts(state, start, mover, ownLand, ports, want, cap),
+      leg: (a, b, cap) => landPath(state, a, b, type, owner, ownLand, passHostile, cap),
+    },
+    limit,
+  );
+}
+
+// Волна Дейкстры от гекса: останавливается, найдя want ближайших портов; порты — по времени хода.
+function floodPorts(
+  state: MatchState,
+  from: HexId,
+  mover: Mover,
+  ownLand: LandRule,
+  ports: ReadonlySet<HexId>,
+  want: number,
+  limit: number,
+): Map<HexId, number> {
+  const { width, height } = state.map;
+  const buffers = buffersFor(state);
+  beginSearch(buffers);
+  buffers.generation[from] = buffers.currentGeneration;
+  buffers.g[from] = 0;
+  heapPush(buffers.heap, 0, from);
+  const found = new Map<HexId, number>();
+  for (let top = heapPop(buffers.heap); top; top = heapPop(buffers.heap)) {
+    const hex = top[1];
+    const gh = distanceAt(buffers, hex);
+    if (top[0] > gh) continue;
+    if (ports.has(hex)) {
+      found.set(hex, gh);
+      if (found.size >= want) break;
+    }
+    for (const n of neighbors(hexFromId(hex, width))) {
+      if (!inBounds(n, width, height)) continue;
+      const id = hexId(n, width);
+      if (!canEnter(state, mover, id, false)) continue;
+      const land = state.hexes.owner[id] ?? -1;
+      if (ownLand === true && land !== mover.owner) continue;
+      if (ownLand === 'safe' && land !== mover.owner && land >= 0) continue;
+      const cost = stepTicks(state, mover, hex, id);
+      if (cost === null || gh + cost >= distanceAt(buffers, id) || gh + cost > limit) continue;
+      buffers.generation[id] = buffers.currentGeneration;
+      buffers.g[id] = gh + cost;
+      heapPush(buffers.heap, gh + cost, id);
     }
   }
-  return best;
+  return found;
 }
 
 /**

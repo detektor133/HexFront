@@ -39,16 +39,12 @@ function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][]
  * @returns списки сущностей по игрокам и общие агрегаты тика
  */
 export function createBotTickContext(state: MatchState): BotTickContext {
-  const unitsByHex = Array.from({ length: state.hexes.owner.length }, () => [] as Unit[]);
   const unitsByPlayer = playerLists<Unit>(state.players.length);
   const armiesByPlayer = playerLists<Army>(state.players.length);
   const citiesByPlayer = playerLists<City>(state.players.length);
   const plansByPlayer = playerLists<ArmyPlan>(state.players.length);
   const armyOwners = new Map<number, number>();
-  for (const unit of state.units) {
-    unitsByPlayer[unit.owner]?.push(unit);
-    unitsByHex[unit.hex]?.push(unit);
-  }
+  for (const unit of state.units) unitsByPlayer[unit.owner]?.push(unit);
   for (const army of state.armies) {
     armiesByPlayer[army.owner]?.push(army);
     armyOwners.set(army.id, army.owner);
@@ -58,14 +54,33 @@ export function createBotTickContext(state: MatchState): BotTickContext {
     const owner = armyOwners.get(plan.armyId);
     if (owner !== undefined) plansByPlayer[owner]?.push(plan);
   }
-  const hexes = mapOwnedHexes(state);
-  const playerView = createPlayerViewContext(state);
+  // Тяжёлые части (списки гексов, отряды по гексам, доходы) считаются только когда кто-то из ботов
+  // их спросил: в большинстве тиков никто не думает, и строить их впустую стоило пятую долю тика.
+  let hexes: ReturnType<typeof mapOwnedHexes> | undefined;
+  let byHex: Unit[][] | undefined;
+  let view: PlayerViewContext | undefined;
+  const mapped = (): ReturnType<typeof mapOwnedHexes> => (hexes ??= mapOwnedHexes(state));
+  const viewContext = (): PlayerViewContext => (view ??= createPlayerViewContext(state));
   return {
-    playerView,
-    incomeBases: playerView.incomeBases,
-    ownedHexes: hexes.owned,
-    borderHexes: hexes.border,
-    unitsByHex,
+    get playerView() {
+      return viewContext();
+    },
+    get incomeBases() {
+      return viewContext().incomeBases;
+    },
+    get ownedHexes() {
+      return mapped().owned;
+    },
+    get borderHexes() {
+      return mapped().border;
+    },
+    get unitsByHex() {
+      if (!byHex) {
+        byHex = new Array<Unit[] | undefined>(state.hexes.owner.length) as Unit[][];
+        for (const unit of state.units) (byHex[unit.hex] ??= []).push(unit);
+      }
+      return byHex;
+    },
     unitsByPlayer,
     armiesByPlayer,
     citiesByPlayer,

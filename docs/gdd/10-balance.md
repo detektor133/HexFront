@@ -12,6 +12,7 @@
 | `NETWORK_RECALC_TICKS` | 10 |
 | `VISION_RECALC_TICKS` | 10 |
 | `FRONT_ALLOC_TICKS` | 50 |
+| `FRONT_ROUTE_BUDGET` | 12 `[ТЮНИНГ]` |
 | `OFFENSIVE_STEP_TICKS` | 20 |
 | `OFFENSIVE_STUCK_TICKS` | 100 |
 | `OFFENSIVE_STALL_TICKS` | 300 `[ТЮНИНГ]` |
@@ -27,6 +28,9 @@
 | Константа | Значение |
 | --- | --- |
 | `BOT_EASY_THINK_TICKS` | 30 `[ТЮНИНГ]` |
+| `BOT_NORMAL_THINK_TICKS` | 20 `[ТЮНИНГ]` |
+| `BOT_EASY_COMMANDER_EVERY` | 3 `[ТЮНИНГ]` |
+| `BOT_NORMAL_COMMANDER_EVERY` | 2 `[ТЮНИНГ]` |
 | `BOT_WAR_GRACE_TICKS` | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_LINE_MAX_DEPTH` | 6 |
 

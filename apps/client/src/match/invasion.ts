@@ -40,6 +40,11 @@ function portGround(world: InvasionWorld) {
   return { map: world.map, hexes: world.view.hexes, cities: world.view.cities };
 }
 
+/** Война с игроком: без дипломатии в матче воюют все. */
+function atWarWith(view: PlayerView, other: number): boolean {
+  return (view.diplomacy?.relations[other] ?? 'war') === 'war';
+}
+
 /** Свои порты игрока в снимке: гексы, откуда можно отплыть. */
 export function ownPorts(world: InvasionWorld): number[] {
   const g = portGround(world);
@@ -106,8 +111,10 @@ export function useInvasion(
       for (const [hex, seaHexes] of seaTargets(map, from)) {
         if (map.terrain[hex] === TERRAIN.water) continue;
         const free = isPortOf(g, view.playerId, hex);
-        // Своя земля, кроме портов, не цель вторжения: высаживаются на чужую и ничью.
-        if (view.hexes.owner[hex] === view.playerId && !free) continue;
+        // Своя земля, кроме портов, не цель вторжения: высаживаются на землю тех, с кем война, и на ничью.
+        const owner = view.hexes.owner[hex] ?? -1;
+        if (owner === view.playerId && !free) continue;
+        if (owner >= 0 && owner !== view.playerId && !atWarWith(view, owner)) continue;
         const gold = sailCost(g, view.playerId, units, hex, seaHexes);
         mask[hex] = 1;
         labels.push({ hex, text: String(Math.ceil(gold / FP)) });

@@ -71,6 +71,7 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     msg.playerName ?? '',
     true,
     msg.tutorial === true,
+    msg.botLevel ?? 'medium',
   );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });
