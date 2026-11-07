@@ -68,6 +68,8 @@ export type Command =
   | { readonly t: 'build'; readonly hex: HexId; readonly kind: 'fort' | 'depot' }
   /** Прокладывает дорогу вручную по точкам: от первой к последней по своей земле. */
   | { readonly t: 'buildRoad'; readonly points: readonly HexId[] }
+  /** Отряды в порту плывут в другой свой порт или на берег (вторжение за золото). */
+  | { readonly t: 'sail'; readonly unitIds: readonly number[]; readonly to: HexId }
   | { readonly t: 'rebuildSupply'; readonly cityId: number }
   | { readonly t: 'rebuildSupply'; readonly hex: HexId }
   | { readonly t: 'createArmy'; readonly name: string }
@@ -151,6 +153,11 @@ export const REJECT_REASONS = [
   'noPath',
   'alreadyBuilding',
   'alreadyBuilt',
+  'roadNeedsNodes',
+  'notAtPort',
+  'portCapacity',
+  'noSeaPath',
+  'roadTooLong',
   'bankrupt',
   'badUnitType',
   'invalidAmount',

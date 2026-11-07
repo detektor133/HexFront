@@ -116,6 +116,7 @@ function unit(
     armyId: null,
     lowSupplyTicks: 0,
     encircled: false,
+    sea: false,
     target: -1,
     inBattle: false,
     focus: -1,

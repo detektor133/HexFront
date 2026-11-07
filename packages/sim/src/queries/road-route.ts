@@ -2,13 +2,16 @@
 // промежуточные точки. Один расчёт на команду и на предпросмотр в интерфейсе.
 // GDD: docs/gdd/04-roads-supply.md — «Дорога вручную».
 import { findRoadPath, roadStepCost, type RoadGround } from './road-path.ts';
-import { MAX_ROAD_POINTS } from '../balance.ts';
+import { MAX_ROAD_POINTS, ROAD_MAX_NEW_HEXES } from '../balance.ts';
 import type { HexId } from '../math/hex.ts';
 
 /** Маршрут: все гексы пути подряд и те из них, где дороги ещё нет (в порядке прокладки). */
 export type RoadRoute =
   | { readonly ok: true; readonly path: HexId[]; readonly toBuild: HexId[] }
-  | { readonly ok: false; readonly reason: 'badHex' | 'notOwnHex' | 'noPath' | 'alreadyBuilt' };
+  | {
+      readonly ok: false;
+      readonly reason: 'badHex' | 'notOwnHex' | 'noPath' | 'alreadyBuilt' | 'roadTooLong';
+    };
 
 /**
  * Считает маршрут по точкам: между соседними точками — кратчайший путь по своим гексам.
@@ -44,5 +47,18 @@ export function planRoadRoute(
     seen.add(h);
     return g.hexes.road[h] !== 1 && !cityHexes.has(h);
   });
-  return toBuild.length === 0 ? { ok: false, reason: 'alreadyBuilt' } : { ok: true, path, toBuild };
+  if (toBuild.length === 0) return { ok: false, reason: 'alreadyBuilt' };
+  if (toBuild.length > ROAD_MAX_NEW_HEXES) return { ok: false, reason: 'roadTooLong' };
+  return { ok: true, path, toBuild };
+}
+
+/**
+ * Начало и конец дороги — свой город или склад (узлы сети): так дорога соединяет узлы, а не
+ * превращает произвольные гексы в магистраль. Промежуточные точки только задают форму маршрута.
+ * @returns true, если оба конца — узлы
+ */
+export function roadEndsAreNodes(points: readonly HexId[], nodes: ReadonlySet<HexId>): boolean {
+  const first = points[0];
+  const last = points.at(-1);
+  return first !== undefined && last !== undefined && nodes.has(first) && nodes.has(last);
 }

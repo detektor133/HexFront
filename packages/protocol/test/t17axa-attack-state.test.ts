@@ -25,6 +25,7 @@ function view(): PlayerView {
     moveTotal: 0,
     supplyLevel: 1000 as Fp,
     encircled: false,
+    sea: false,
     starving: false,
     armyId: null,
     path: [],

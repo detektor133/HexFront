@@ -9,6 +9,7 @@ import { executePlanCommand, validatePlanCommand } from './plan.ts';
 import { startRebuildSupply, validateRebuildSupply } from './rebuild-supply.ts';
 import { startRecruit, validateRecruit } from './recruit.ts';
 import { executeRenameCity, validateRenameCity } from './rename-city.ts';
+import { executeSail, validateSail } from './sail.ts';
 import { validateSetTax } from './set-tax.ts';
 import { rejected, type Command, type PlayerCommand, type Validation } from './types.ts';
 import { executeUnitCommand, validateUnitCommand } from './unit.ts';
@@ -81,6 +82,8 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
       return validateRenameCity(state, playerId, cmd);
     case 'buildRoad':
       return validateBuildRoad(state, playerId, cmd);
+    case 'sail':
+      return validateSail(state, playerId, cmd);
     case 'launchOffensive':
       return validateLaunch(state, playerId, cmd);
     case 'holdBorder':
@@ -151,6 +154,9 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
       return;
     case 'buildRoad':
       executeBuildRoad(state, playerId, cmd);
+      return;
+    case 'sail':
+      executeSail(state, playerId, cmd);
       return;
     case 'launchOffensive':
       executeLaunch(state, playerId, cmd);

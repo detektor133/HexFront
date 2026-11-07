@@ -166,6 +166,8 @@ export function validateUnitCommand(
   if (!owned.ok) return rejected(owned.reason);
   // Отступающий отряд приказов не принимает (06-combat.md, «Отступление»).
   if (owned.units.some((u) => u.order === 'retreat')) return rejected('retreating');
+  // Плывущему отряду приказов нет: он причалит сам (03-cities-buildings.md, «Порты»).
+  if (owned.units.some((u) => u.sea)) return rejected('badOrder');
   switch (cmd.t) {
     case 'move':
       return validateMove(state, owned.units, cmd.to, cmd.via);
@@ -220,6 +222,7 @@ export function splitUnit(state: MatchState, unit: Unit, soldiers: Fp): Unit {
     armyId: unit.armyId,
     lowSupplyTicks: unit.lowSupplyTicks,
     encircled: unit.encircled,
+    sea: false,
     target: -1,
     inBattle: false,
     focus: -1,

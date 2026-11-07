@@ -86,6 +86,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.armyId ?? -1);
     int(s, a.lowSupplyTicks);
     int(s, a.encircled ? 1 : 0);
+    int(s, a.sea ? 1 : 0);
     int(s, a.target);
     int(s, a.inBattle ? 1 : 0);
     int(s, a.focus);

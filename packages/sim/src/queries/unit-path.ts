@@ -8,6 +8,7 @@ import {
   UNIT_SPEED_MULT,
   RIVER_MOVE_PENALTY_S,
   ROAD_MOVE_MULT,
+  SEA_MOVE_S_PER_HEX,
   SPEED,
   TICKS_PER_S,
   ZOC_MOVE_MULT,
@@ -91,6 +92,8 @@ export interface Mover {
   readonly type: UnitType;
   readonly owner: number;
   readonly supplyLevel: Fp;
+  /** Отряд плывёт: ему доступны клетки воды. */
+  readonly sea?: boolean;
   /** Вражеский гекс, который можно пройти с боем (слабый враг по прогнозу); иначе враг — преграда. */
   readonly passHostile?: (hex: HexId) => boolean;
 }
@@ -102,6 +105,10 @@ export interface Mover {
  * @returns тики, не меньше 1; null — гекс непроходим или не сосед
  */
 export function stepTicks(state: MatchState, m: Mover, from: HexId, to: HexId): number | null {
+  // Вода доступна только плывущему отряду, и проход по ней одинаково быстр.
+  if ((state.map.terrain[to] ?? 0) === TERRAIN.water) {
+    return m.sea ? Math.max(1, intDiv(SEA_MOVE_S_PER_HEX * TICKS_PER_S, FP)) : null;
+  }
   const terrain = moveTerrain(state, to);
   const dir = directionTo(state, from, to);
   if (terrain === null || dir < 0) return null;

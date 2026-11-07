@@ -27,6 +27,8 @@ export interface UnitView {
   /** Снабжённость — только своих отрядов; у чужих неизвестна. */
   readonly supplyLevel: Fp | null;
   readonly encircled: boolean | null;
+  /** Отряд плывёт по воде между портами. */
+  readonly sea: boolean;
   /** Свой отряд прямо сейчас теряет солдат от истощения; у чужих неизвестно. */
   readonly starving: boolean | null;
   readonly armyId: number | null;
@@ -86,6 +88,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         moveTotal: u.moveTotal,
         supplyLevel: mine ? u.supplyLevel : null,
         encircled: mine ? u.encircled : null,
+        sea: u.sea,
         starving: mine ? isStarving(u) : null,
         armyId: mine ? u.armyId : null,
         path: mine ? [...u.path] : [],

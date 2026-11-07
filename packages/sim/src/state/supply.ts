@@ -216,6 +216,12 @@ export function recomputeSupply(state: MatchState, owner: number): void {
   for (const net of nets) state.supplyRatios.set(net.id, r2.get(net.id) ?? (FP as Fp));
   const bankrupt = state.players[owner]?.bankrupt === true;
   for (const u of units) {
+    // Плывущий отряд везёт припасы с собой: котла и штрафов за дальность на воде нет.
+    if (u.sea) {
+      u.encircled = false;
+      u.supplyLevel = FP as Fp;
+      continue;
+    }
     const o = final.get(u);
     u.encircled = o === undefined;
     const level = o ? fpMul(r2.get(o.net.id) ?? (FP as Fp), o.eff) : 0;

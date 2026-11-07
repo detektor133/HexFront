@@ -20,7 +20,7 @@ function stop(unit: Unit): void {
 
 // Гекс стал непроходимым: отряд встаёт.
 function blocked(state: MatchState, unit: Unit, next: HexId): boolean {
-  if (state.map.terrain[next] === TERRAIN.water) return true;
+  if (state.map.terrain[next] === TERRAIN.water) return !unit.sea;
   if (peaceBlocked(state, unit.owner, next)) return true;
   return unit.type === 'artillery' && state.hexes.owner[next] !== unit.owner;
 }
@@ -64,7 +64,9 @@ function arrive(state: MatchState, unit: Unit, next: HexId): void {
   unit.moveTotal = 0;
   // Союзную землю проходят без захвата (CR-007).
   const land = state.hexes.owner[next] ?? -1;
-  if (unit.type !== 'artillery' && !isAllied(state, unit.owner, land)) {
+  const onWater = state.map.terrain[next] === TERRAIN.water;
+  if (!onWater) unit.sea = false;
+  if (!onWater && unit.type !== 'artillery' && !isAllied(state, unit.owner, land)) {
     captureHex(state, next, unit.owner);
   }
   if (unit.path.length === 0 && unit.order === 'move') unit.order = 'idle';

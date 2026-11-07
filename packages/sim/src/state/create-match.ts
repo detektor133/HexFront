@@ -174,6 +174,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
       armyId,
       lowSupplyTicks: 0,
       encircled: false,
+      sea: false,
       target: -1,
       inBattle: false,
       focus: -1,

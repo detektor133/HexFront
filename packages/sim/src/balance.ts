@@ -175,7 +175,17 @@ export const DEPOT_SUPPLY: readonly Fp[] = [fp(120), fp(240), fp(400), fp(600), 
 export const DEPOT_UPGRADE_COST: readonly Fp[] = [fp(120), fp(220), fp(350), fp(520)];
 export const DEPOT_UPGRADE_TIME_S: readonly Fp[] = [fp(20), fp(30), fp(40), fp(50)];
 /** Сколько точек можно задать дороге вручную. */
-export const MAX_ROAD_POINTS = 16;
+/** Вместимость порта за одну отправку на каждый уровень склада, солдат (fixed-point). */
+export const PORT_CAPACITY_PER_LEVEL = 600 * 1000;
+/** Дальше стольких клеток воды от порта плыть нельзя. */
+export const SEA_MAX_HEXES = 14;
+/** Время прохода одной клетки воды, секунд. */
+export const SEA_MOVE_S_PER_HEX: Fp = fp(0.8);
+/** Золото за одного солдата на одну клетку воды при вторжении и высадке не в свой порт. */
+export const SEA_COST_PER_SOLDIER_HEX: Fp = fp(0.02);
+export const MAX_ROAD_POINTS = 8;
+/** Сколько новых гексов дороги можно заказать одной командой: дорога связывает узлы, а не мостит страну. */
+export const ROAD_MAX_NEW_HEXES = 24;
 export const ROAD_BUILD_S_PER_HEX: Fp = fp(1.5);
 export const SUPPLY_REBUILD_COST_PER_HEX: Fp = fp(15);
 /** Вес гекса существующей дороги при поиске пути. */

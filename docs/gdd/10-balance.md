@@ -200,7 +200,12 @@
 | `FRONT_REBALANCE_SURPLUS` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_ECHELON_PERIOD` | 2 `[ТЮНИНГ]` |
 | `OFFENSIVE_STACK` | 2 `[ТЮНИНГ]` |
-| `MAX_ROAD_POINTS` | 16 |
+| `MAX_ROAD_POINTS` | 8 |
+| `ROAD_MAX_NEW_HEXES` | 24 `[ТЮНИНГ]` |
+| `PORT_CAPACITY_PER_LEVEL` | 600 солдат `[ТЮНИНГ]` |
+| `SEA_MAX_HEXES` | 14 `[ТЮНИНГ]` |
+| `SEA_MOVE_S_PER_HEX` | 0,8 с `[ТЮНИНГ]` |
+| `SEA_COST_PER_SOLDIER_HEX` | 0,02 золота `[ТЮНИНГ]` |
 | `PROCURE_BATCH` | 300 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
