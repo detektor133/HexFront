@@ -216,7 +216,16 @@ function Meter(props: { label: MessageKey; share: number; color: string }): Reac
 /** Значок приказа армии: щит — держит границу, мечи — наступает, флаг — занимает; точка — цвет цели. */
 function OrderBadge(props: {
   readonly dir: ArmyView['dir'] | undefined;
+  /** Морской десант: якорь вместо значка приказа. */
+  readonly sea?: boolean | undefined;
 }): React.JSX.Element | null {
+  if (props.sea === true) {
+    return (
+      <span className={styles.order} title={t('army.invade')}>
+        <IconAnchor size={14} aria-hidden="true" />
+      </span>
+    );
+  }
   const dir = props.dir;
   if (!dir || dir.mode === 'idle') return null;
   const neutral = dir.target < 0;
@@ -280,6 +289,8 @@ function ArmyCard(props: {
   wanted?: number | undefined;
   /** Приказ армии: режим и цель (id игрока или −1); нет — приказа нет. */
   dir?: ArmyView['dir'] | undefined;
+  /** Армия в морском десанте. */
+  sea?: boolean | undefined;
   /** Наступление армии стоит без продвижения — значок «упёрлись». */
   stuck: boolean;
   selected: boolean;
@@ -352,7 +363,7 @@ function ArmyCard(props: {
               </span>
             )}
             <span className={styles.slotOrder}>
-              <OrderBadge dir={props.dir} />
+              <OrderBadge dir={props.dir} sea={props.sea} />
             </span>
             <span className={styles.slotAlert}>{alertOf(props.stats, props.stuck)}</span>
           </span>
@@ -638,6 +649,7 @@ export function ArmyBar(props: {
                   stars={a.stars ?? 0}
                   wanted={a.wanted}
                   dir={a.dir}
+                  sea={a.sea}
                   stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
                   selected={a.id === selected}
                   partial={props.partial.includes(a.id)}

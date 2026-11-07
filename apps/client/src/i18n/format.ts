@@ -73,6 +73,19 @@ const THOUSAND = 1000;
 const TEN_THOUSAND = 10_000;
 const MILLION = 1_000_000;
 
+// Формат десятых создаётся раз на язык: пересоздание на каждую фишку стоило миллисекунды на тысячах.
+let tenthsFormat: { readonly locale: string; readonly format: Intl.NumberFormat } | null = null;
+
+function formatTenths(value: number): string {
+  if (tenthsFormat === null || tenthsFormat.locale !== locale) {
+    tenthsFormat = {
+      locale,
+      format: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }),
+    };
+  }
+  return tenthsFormat.format.format(value);
+}
+
 /**
  * Солдаты на фишке (units.md, «Формат числа»): «850», «1,4к», «12к»; округление вниз —
  * показываем не больше, чем есть.
@@ -83,7 +96,7 @@ export function formatSoldiers(fp: number): string {
   if (n < THOUSAND) return String(n);
   if (n < TEN_THOUSAND) {
     const tenths = Math.floor(n / (THOUSAND / 10)) / 10;
-    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(tenths)}${k}`;
+    return `${formatTenths(tenths)}${k}`;
   }
   return `${Math.floor(n / THOUSAND)}${k}`;
 }

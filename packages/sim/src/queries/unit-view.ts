@@ -2,6 +2,7 @@
 // у чужих (снабжение, армия, путь) не передаётся (08-match.md, «Туман войны»).
 import type { UnitType } from '../balance.ts';
 import { isSupportedByArtillery } from './battle-math.ts';
+import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import type { Fp } from '../math/int.ts';
 import type { MatchState, UnitOrder } from '../state/types.ts';
@@ -66,6 +67,8 @@ export interface ArmyView {
   readonly mix?: { readonly armor: number; readonly artillery: number };
   /** Направление армии: цель (id игрока или -1 — ничья земля) и режим. */
   readonly dir?: { readonly target: number; readonly mode: 'hold' | 'attack' | 'idle' };
+  /** Армия в морском десанте: отряд на воде или его путь ведёт через воду (значок якоря). */
+  readonly sea?: boolean;
 }
 
 /** Отряды для снимка игрока playerId. */
@@ -107,6 +110,11 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
 
 /** Свои армии для снимка. */
 export function armyViews(state: MatchState, playerId: number): ArmyView[] {
+  const landing = new Set<number>();
+  for (const u of allUnits(state)) {
+    if (u.owner !== playerId || u.armyId === null || landing.has(u.armyId)) continue;
+    if (u.sea || u.path.some((h) => state.map.terrain[h] === TERRAIN.water)) landing.add(u.armyId);
+  }
   return state.armies
     .filter((a) => a.owner === playerId)
     .map((a) => ({
@@ -118,5 +126,6 @@ export function armyViews(state: MatchState, playerId: number): ArmyView[] {
       ...(a.wanted === undefined ? {} : { wanted: a.wanted }),
       ...(a.mix === undefined ? {} : { mix: a.mix }),
       ...(a.dir === undefined ? {} : { dir: a.dir }),
+      ...(landing.has(a.id) ? { sea: true } : {}),
     }));
 }

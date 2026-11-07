@@ -26,6 +26,12 @@ export function isFree(army: ArmyView): boolean {
   return army.dir === undefined || army.dir.mode === 'idle';
 }
 
+/** Армия, уже стоящая на цель: действующая важнее армии с снятым направлением (idle). */
+export function armyOn(view: PlayerView, target: number): ArmyView | undefined {
+  const mine = view.armies.filter((a) => a.dir?.target === target);
+  return mine.find((a) => a.dir?.mode !== 'idle') ?? mine[0];
+}
+
 /** Свои гексы, граничащие с землёй игрока `target`: по ним считаются близость и паритет. */
 export function borderHexes(view: PlayerView, map: MapStatic, target: number): number[] {
   const found: number[] = [];
@@ -138,7 +144,7 @@ export function autoArmy(
   target: number,
   nearHex: number,
 ): AutoArmy {
-  const current = view.armies.find((a) => a.dir?.target === target);
+  const current = armyOn(view, target);
   const army = current ?? nearestFreeArmy(view, map, nearHex);
   return army ? { kind: 'army', army } : { kind: 'new', cost: newArmyCost(view, map, target) };
 }
@@ -198,7 +204,7 @@ export function autoOrder(
   mode: 'hold' | 'attack',
   nearHex: number,
 ): Command {
-  const current = view.armies.find((a) => a.dir?.target === target);
+  const current = armyOn(view, target);
   const army = current ?? nearestFreeArmy(view, map, nearHex);
   return army ? orderArmy(view, army, target, mode) : orderNewArmy(view, map, target, mode);
 }

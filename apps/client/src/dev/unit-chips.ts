@@ -7,72 +7,40 @@ import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { DIRECTIONS, type UnitType } from '@hexfront/sim';
 
+import {
+  type ChipState,
+  ATTACK_ARROW,
+  ATTACK_SLOT,
+  BAR_GAP,
+  BAR_INSET,
+  BAR_W,
+  COUNT_PX,
+  COUNT_R,
+  GHOST_DASH,
+  GLYPH,
+  H,
+  LABEL_PX,
+  LOW_SUPPLY,
+  MID_SUPPLY,
+  MIN_TEXT,
+  OUTLINE,
+  PAD,
+  RETREAT_ALPHA,
+  SQUARE,
+  STAR_R,
+  STAR_STEP,
+  TAB,
+  TAB_STARS,
+  TEXT_SLACK,
+  WARN,
+  barsWidth,
+  tabWidth,
+} from './chip-layout.ts';
 import { formatSoldiers } from '../i18n/format.ts';
 import { hexCenter } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
-const H = 26;
-const TAB = 6;
-/** Закладка со звёздами опыта: шире обычной, звёзды стоят столбиком. */
-const TAB_STARS = 12;
-const STAR_R = 3.4;
-const STAR_STEP = 7.5;
-const SQUARE = 24;
-const PAD = 5;
-const MIN_TEXT = 22;
-/** Запас ширины числа: ширину текста меряют и до загрузки шрифта Golos, он шире запасного. */
-const TEXT_SLACK = 4;
-const GLYPH = 14;
-const OUTLINE = 1.5;
-/** Вертикальные столбики: ширина, зазор, отступ от края плашки. */
-const BAR_W = 4;
-const BAR_GAP = 2;
-const BAR_INSET = 4;
-const ATTACK_SLOT = 12;
-const ATTACK_ARROW = 10;
-/** Треугольник нехватки снабжения в правом верхнем углу квадрата. */
-const WARN = 8;
-const LABEL_PX = 12;
-const COUNT_PX = 11;
-const COUNT_R = 8;
-const RETREAT_ALPHA = 0.6;
-/** Пунктир фишки-призрака набора, px. */
-const GHOST_DASH = 3;
-/** Снабжение: ниже 50 % — истощение грозит (красный), ниже 75 % — жёлтый (04-roads-supply.md). */
-const LOW_SUPPLY = 0.5;
-const MID_SUPPLY = 0.75;
-
-/** Что показывает фишка: отношение, армия, тип, солдаты и состояния из units.md. */
-export interface ChipState {
-  /** Цвет фишки по отношению к игроку (`relation`). */
-  readonly color: string;
-  /** Цвет армии (закладка слева); null — резерв или чужой отряд. */
-  readonly army: string | null;
-  readonly type: UnitType;
-  readonly soldiers: number;
-  /** Организация 0..1 (у призрака набора — прогресс набора). */
-  readonly org: number;
-  /** Снабжённость 0..1; null — чужой отряд (неизвестно). */
-  readonly supply: number | null;
-  /** Идёт истощение — отряд теряет солдат от нехватки снабжения. */
-  readonly starving: boolean;
-  readonly selected: boolean;
-  readonly retreating: boolean;
-  readonly encircled: boolean;
-  readonly ghost: boolean;
-  /** Направление к целевому соседнему гексу; null — приказа атаки нет. */
-  readonly attackDirection?: number | null;
-  /** Число одинаковых отрядов в стопке; нет или 1 — один отряд. */
-  readonly count?: number;
-  /** Звёзды опыта армии 0..3: столбик на закладке, видны и у чужих отрядов. */
-  readonly stars?: number;
-}
-
-/** Ширина закладки слева: цвет армии, а со звёздами — шире; чужой отряд со звёздами тоже с закладкой. */
-function tabWidth(s: ChipState): number {
-  if ((s.stars ?? 0) > 0) return TAB_STARS;
-  return s.army ? TAB : 0;
-}
+export type { ChipState } from './chip-layout.ts';
 
 // Звёзды опыта: белые пятиконечные, столбиком по центру закладки.
 function drawStars(g: Graphics, s: ChipState, left: number): void {
@@ -146,10 +114,6 @@ interface Parts {
   readonly label: BitmapText;
   /** Число отрядов стопки в кружке на правом верхнем углу фишки. */
   readonly count: BitmapText;
-}
-
-function barsWidth(s: ChipState): number {
-  return (s.supply === null ? 1 : 2) * (BAR_W + BAR_GAP) - BAR_GAP + BAR_INSET;
 }
 
 function drawAttackArrow(g: Graphics, s: ChipState, sq: number): void {

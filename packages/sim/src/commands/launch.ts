@@ -177,7 +177,10 @@ export function directionArmy(
   playerId: number,
   target: number,
 ): Army | undefined {
-  return state.armies.find((a) => a.owner === playerId && a.dir?.target === target);
+  // Снятое направление остаётся у армии как idle: действующая армия на цель важнее такой тени,
+  // иначе «снять с фронта» и повторный приказ доставались бы не той армии.
+  const mine = state.armies.filter((a) => a.owner === playerId && a.dir?.target === target);
+  return mine.find((a) => a.dir?.mode !== 'idle') ?? mine[0];
 }
 
 // Свободные отряды: сначала резерв, затем стоящие отряды армий без плана и без заказа; ближе к

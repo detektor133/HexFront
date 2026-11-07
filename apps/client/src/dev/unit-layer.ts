@@ -17,6 +17,7 @@ import {
 import { markerAt, type MarkerAnchor } from './battle-panel.ts';
 import { battlePulseScale, encircledDashOffset } from './battle-visuals.ts';
 import type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
+import { createChipGpu } from './chip-gpu.ts';
 import {
   COMPACT_BELOW,
   attackShift,
@@ -84,6 +85,11 @@ export interface UnitLayer {
 }
 
 export type { UnitLayerCacheTelemetry } from './cache-telemetry.ts';
+
+/** Фишка слоя: на GPU это только ширина для попадания, без собственных объектов. */
+interface ChipHandle {
+  width(): number;
+}
 
 interface Entry {
   readonly key: string;
@@ -155,13 +161,17 @@ export function createUnitLayer(
   radius: number,
   center: (hex: number) => Point,
 ): UnitLayer {
+  // Фишки рисует GPU одним вызовом; без него (тесты в Node, ?chips=legacy) — по объекту на фишку.
+  const gpu = createChipGpu();
   const container = new Container();
   const ground = new Graphics();
   const battles = new Container();
   const chipsLayer = new Container();
   chipsLayer.addChild(ground);
+  if (gpu) chipsLayer.addChild(gpu.container);
   container.addChild(chipsLayer, battles);
-  const chips = new Map<string, Chip>();
+  const chips = new Map<string, ChipHandle>();
+  let shownCompact = false;
   let entries: Entry[] = [];
   let view: PlayerView | null = null;
   let snapAt = 0;
@@ -458,16 +468,36 @@ export function createUnitLayer(
     }
   }
 
+  function syncGpuChips(gpuChips: NonNullable<typeof gpu>): void {
+    const keep = new Set(entries.map((e) => e.key));
+    const unitIds = new Set(entries.flatMap((entry) => entry.units));
+    pruneUnitLayerCaches(shown, drawnAt, chips, encircledSince, unitIds, keep);
+    const widths = gpuChips.sync(
+      entries.map((e) => ({ key: e.key, state: e.state })),
+      compact,
+    );
+    shownCompact = compact;
+    for (const e of entries) {
+      if (!chips.has(e.key)) {
+        // Новая фишка (отряд встал или начал путь) стартует с прежнего места своих отрядов.
+        const from = e.units.map((id) => shown.get(id)).find((pt) => pt !== undefined);
+        if (from) drawnAt.set(e.key, from);
+      }
+      chips.set(e.key, { width: () => widths.get(e.key) ?? 0 });
+    }
+  }
+
   function syncChips(): void {
+    if (gpu) return syncGpuChips(gpu);
     const keep = new Set(entries.map((e) => e.key));
     for (const [key, chip] of chips) {
       if (keep.has(key)) continue;
-      chip.destroy();
+      (chip as Chip).destroy();
     }
     const unitIds = new Set(entries.flatMap((entry) => entry.units));
     pruneUnitLayerCaches(shown, drawnAt, chips, encircledSince, unitIds, keep);
     for (const e of entries) {
-      let chip = chips.get(e.key);
+      let chip = chips.get(e.key) as Chip | undefined;
       if (!chip) {
         chip = createChip();
         chips.set(e.key, chip);
@@ -542,13 +572,19 @@ export function createUnitLayer(
       compact = next * scale < COMPACT_BELOW;
       const res = Math.ceil((window.devicePixelRatio * scale * next) / RES_STEP) * RES_STEP;
       textRes = Math.max(1, res * 2);
-      for (const chip of chips.values()) {
-        chip.setResolution(textRes);
-        chip.setCompact(compact);
+      gpu?.setScale(next, scale);
+      if (!gpu) {
+        for (const chip of chips.values()) {
+          (chip as Chip).setResolution(textRes);
+          (chip as Chip).setCompact(compact);
+        }
       }
-      // Размер фишки изменился — сдвиги стопок и над городами пересчитываем.
+      // Размер фишки изменился — сдвиги стопок и над городами пересчитываем; свёртка в щит
+      // меняет ширины фишек, на GPU их тоже пересчитывает синхронизация.
       if (resized && view) {
         entries = build(view);
+        syncChips();
+      } else if (gpu && view && compact !== shownCompact) {
         syncChips();
       }
     },
@@ -560,9 +596,9 @@ export function createUnitLayer(
       const frac = Math.min(1, Math.max(0, (nowMs - snapAt) / TICK_MS));
       const blend = lastFrame === 0 ? 1 : 1 - Math.exp(-(nowMs - lastFrame) / SMOOTH_MS);
       lastFrame = nowMs;
-      for (const e of entries) {
+      entries.forEach((e, index) => {
         const chip = chips.get(e.key);
-        if (!chip) continue;
+        if (!chip) return;
         const target = e.at(frac);
         const prev = drawnAt.get(e.key) ?? target;
         const at = {
@@ -571,13 +607,17 @@ export function createUnitLayer(
         };
         drawnAt.set(e.key, at);
         for (const id of e.units) shown.set(id, at);
-        chip.root.position.set(at.x, at.y);
-        chip.root.scale.set(chipWorld());
-      }
+        if (gpu) gpu.place(index, at.x, at.y);
+        else {
+          (chip as Chip).root.position.set(at.x, at.y);
+          (chip as Chip).root.scale.set(chipWorld());
+        }
+      });
+      gpu?.flush();
       drawGround(view, frac, nowMs);
     },
     destroy() {
-      for (const chip of chips.values()) chip.destroy();
+      if (!gpu) for (const chip of chips.values()) (chip as Chip).destroy();
       for (const marker of battleMarkers.values()) marker.destroy();
       battleMarkerColors.clear();
       container.destroy({ children: true, context: true });

@@ -65,7 +65,9 @@ export function BorderSignals(props: {
     () =>
       [...neighbours]
         .filter(
-          ([other]) => !closed.has(other) && !view.armies.some((a) => a.dir?.target === other),
+          ([other]) =>
+            !closed.has(other) &&
+            !view.armies.some((a) => a.dir?.target === other && a.dir.mode !== 'idle'),
         )
         .sort((a, b) => a[0] - b[0]),
     [neighbours, closed, view.armies],

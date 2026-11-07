@@ -1,9 +1,18 @@
 // Основная сеть снабжения игрока: узлы (свои гексы с дорогой или городом), связанные со столицей.
 // GDD: docs/gdd/04-roads-supply.md — «Сети снабжения». Кэш и изоляция — networkSystem (02/T7).
 import { isDepot } from './depot.ts';
-import { markNetworkClean, markSupplyDirty, networkNeedsRecompute } from './derived-cache.ts';
+import {
+  cachedSeaLinks,
+  clearSeaLinks,
+  markNetworkClean,
+  markSupplyDirty,
+  networkNeedsRecompute,
+  storeSeaLinks,
+} from './derived-cache.ts';
+import { isPortOf, waterNeighbors } from './port.ts';
 import type { MatchState } from './types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { seaField } from '../queries/sea-route.ts';
 
 /** Является ли гекс узлом сети игрока: свой и с дорогой, городом или складом. */
 export function isNetworkNode(state: MatchState, playerId: number, hex: HexId): boolean {
@@ -13,6 +22,33 @@ export function isNetworkNode(state: MatchState, playerId: number, hex: HexId): 
     isDepot(state.hexes.building[hex] ?? 0) ||
     state.cities.some((c) => c.hex === hex)
   );
+}
+
+/**
+ * Морские связи портов игрока: два свои порта связаны, если между ними есть путь по воде не длиннее
+ * SEA_MAX_HEXES. Связь работает как дорога: через цепочку портов (складов и городов) снабжение
+ * доходит до заморского города или склада от столицы.
+ * @returns порт → связанные с ним порты
+ */
+export function seaLinks(state: MatchState, playerId: number): Map<HexId, HexId[]> {
+  const cached = cachedSeaLinks(state, playerId);
+  if (cached) return cached;
+  const links = new Map<HexId, HexId[]>();
+  const ports: HexId[] = [];
+  for (let h = 0; h < state.hexes.owner.length; h += 1) {
+    if (state.hexes.owner[h] === playerId && isNetworkNode(state, playerId, h)) {
+      if (isPortOf(state, playerId, h)) ports.push(h);
+    }
+  }
+  for (const a of ports) {
+    const field = seaField(state.map, a);
+    const linked = ports.filter(
+      (b) => b !== a && waterNeighbors(state.map, b).some((w) => (field.dist[w] ?? -1) > 0),
+    );
+    if (linked.length > 0) links.set(a, linked);
+  }
+  storeSeaLinks(state, playerId, links);
+  return links;
 }
 
 /**
@@ -26,13 +62,12 @@ export function mainNetworkMask(state: MatchState, playerId: number): Uint8Array
   const capital = state.cities.find((c) => c.id === capitalId && c.owner === playerId);
   if (!capital) return mask;
   const queue: HexId[] = [capital.hex];
+  const sea = seaLinks(state, playerId);
   mask[capital.hex] = 1;
   while (queue.length > 0) {
     const hex = queue.shift() as HexId;
-    for (const n of neighbors(hexFromId(hex, width))) {
-      if (!inBounds(n, width, height)) continue;
-      const id = hexId(n, width);
-      if (mask[id] === 1 || !isNetworkNode(state, playerId, id)) continue;
+    for (const id of nodeNeighbors(state, playerId, hex, sea)) {
+      if (mask[id] === 1) continue;
       mask[id] = 1;
       queue.push(id);
     }
@@ -40,11 +75,30 @@ export function mainNetworkMask(state: MatchState, playerId: number): Uint8Array
   return mask;
 }
 
+// Соседи узла по сети: смежные узлы и связанные морем порты.
+function nodeNeighbors(
+  state: MatchState,
+  playerId: number,
+  hex: HexId,
+  sea: ReadonlyMap<HexId, readonly HexId[]>,
+): HexId[] {
+  const { width, height } = state.map;
+  const out: HexId[] = [];
+  for (const n of neighbors(hexFromId(hex, width))) {
+    if (!inBounds(n, width, height)) continue;
+    const id = hexId(n, width);
+    if (isNetworkNode(state, playerId, id)) out.push(id);
+  }
+  out.push(...(sea.get(hex) ?? []));
+  return out;
+}
+
 // Все узлы игрока раскладываются по компонентам; обход по возрастанию HexId, поэтому стартовый
 // гекс компоненты — её наименьший HexId, и id сети не зависит от истории.
 function components(state: MatchState, playerId: number): { id: number; hexes: HexId[] }[] {
   const { width, height } = state.map;
   const size = width * height;
+  const sea = seaLinks(state, playerId);
   const seen = new Uint8Array(size);
   const result: { id: number; hexes: HexId[] }[] = [];
   for (let start = 0; start < size; start += 1) {
@@ -55,10 +109,8 @@ function components(state: MatchState, playerId: number): { id: number; hexes: H
     while (queue.length > 0) {
       const hex = queue.shift() as HexId;
       hexes.push(hex);
-      for (const n of neighbors(hexFromId(hex, width))) {
-        if (!inBounds(n, width, height)) continue;
-        const id = hexId(n, width);
-        if (seen[id] === 1 || !isNetworkNode(state, playerId, id)) continue;
+      for (const id of nodeNeighbors(state, playerId, hex, sea)) {
+        if (seen[id] === 1) continue;
         seen[id] = 1;
         queue.push(id);
       }
@@ -71,6 +123,7 @@ function components(state: MatchState, playerId: number): { id: number; hexes: H
 /** Пересчитывает сети одного игрока: компоненты узлов, основная — со столицей. */
 export function recomputeNetworks(state: MatchState, playerId: number, force = false): void {
   if (!force && !networkNeedsRecompute(state, playerId)) return;
+  clearSeaLinks(state, playerId);
   const { network } = state.hexes;
   const own = new Set(state.networks.filter((n) => n.owner === playerId).map((n) => n.id));
   network.forEach((id, hex) => {

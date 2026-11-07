@@ -243,6 +243,36 @@ describe('наступление одной командой', () => {
     expect(mine()).toBeGreaterThan(before + 6);
   });
 
+  it('объявление войны не сбивает армию, державшую границу: направление и фронт остаются', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
+    const army = s.state.armies.find((a) => a.owner === 0);
+    s.runSeconds(3);
+    applyCommands(s.state, [{ playerId: 1, cmd: { t: 'declareWar', target: 0 } }]);
+    s.runSeconds(5);
+    const now = s.state.armies.find((a) => a.id === army?.id);
+    expect(now?.dir).toMatchObject({ target: 1, mode: 'hold' });
+    expect(s.state.plans.some((p) => p.armyId === army?.id && p.kind === 'front')).toBe(true);
+  });
+
+  it('снять с фронта снимает действующую армию, а не тень снятого направления', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
+    const first = s.state.armies.find((a) => a.owner === 0);
+    if (!first) throw new Error('нет армии');
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 0 } }]);
+    expect(first.dir?.mode).toBe('idle');
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'createArmy', name: 'Вторая' } }]);
+    const second = s.state.armies.find((a) => a.name === 'Вторая');
+    if (!second) throw new Error('нет второй');
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 300, armyId: second.id } },
+    ]);
+    expect(second.dir?.mode).toBe('hold');
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 0 } }]);
+    expect(second.dir?.mode).toBe('idle');
+  });
+
   it('новый кусок границы с целью получает фронт сам: направление «держать» поддерживает его', () => {
     const s = game();
     applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 600 } }]);
