@@ -1,5 +1,5 @@
-// Режиссёр матча-урока: соперник не думает и не растёт сам, он делает ровно то, что нужно текущему
-// шагу урока. Номер шага приходит со страницы; каждое действие срабатывает один раз.
+// Режиссёр матча-урока: соперник не думает сам, он делает ровно то, что нужно текущему
+// шагу урока: растёт, пока игрок учится экономике, и обороняется, когда игрок подводит армию. Номер шага приходит со страницы; каждое действие срабатывает один раз.
 import { FP, type Fp, type MatchState, type PlayerCommand } from '@hexfront/sim';
 
 /** Игрок-соперник в матче-уроке. */
@@ -9,7 +9,10 @@ export const TUTORIAL_ENEMY = 1;
 const TUTORIAL_HUMAN = 0;
 
 /** Сколько солдат соперник набирает на границе, когда игрок подводит армию. */
-export const ENEMY_DEFENDERS = 350;
+export const ENEMY_DEFENDERS = 250;
+
+/** Сколько солдат соперник посылает занимать ничью землю, пока игрок учится экономике. */
+export const ENEMY_SETTLERS = 250;
 
 /** Золото соперника на оборону, монет: хватает на любой набор урока. */
 const ENEMY_GOLD = 3000;
@@ -33,6 +36,15 @@ export function directorCommands(state: MatchState, director: TutorialDirector):
   const out: PlayerCommand[] = [];
   const enemy = state.players[TUTORIAL_ENEMY];
   if (!enemy || enemy.status !== 'alive') return out;
+  // Пока игрок изучает людей и золото, соперник тоже растёт: занимает ничью землю рядом с собой.
+  if (director.stage === 'economy' && !director.fired.has('settle')) {
+    director.fired.add('settle');
+    enemy.gold = (enemy.gold + ENEMY_GOLD * FP) as Fp;
+    out.push({
+      playerId: TUTORIAL_ENEMY,
+      cmd: { t: 'launchOffensive', target: -1, soldiers: ENEMY_SETTLERS },
+    });
+  }
   if (director.stage === 'hold' && !director.fired.has('defend')) {
     director.fired.add('defend');
     enemy.gold = (enemy.gold + ENEMY_GOLD * FP) as Fp;

@@ -182,7 +182,7 @@ describe('матч-урок', () => {
     expect(war?.done?.(ctxOf(s.view()), 0)).toBe(true);
   });
 
-  it('соперник стоит и ничего не делает, пока урок не дошёл до шага «держи границу»', () => {
+  it('соперник растёт на шаге про экономику и стоит на остальных до шага «держи границу»', () => {
     const s = start();
     const foeHexes = (): number => s.view().hexes.owner.filter((o) => o === 1).length;
     const foeUnits = (): number => s.view().units.filter((u) => u.owner === 1).length;
@@ -192,6 +192,18 @@ describe('матч-урок', () => {
     s.tick(1200);
     expect(foeHexes()).toBe(hexes);
     expect(foeUnits()).toBe(units);
+  });
+});
+
+describe('соперник под режиссёром', () => {
+  it('на шаге про экономику занимает ничью землю, а победа в уроке не фиксируется сама', () => {
+    const s = start();
+    const foeHexes = (): number => s.view().hexes.owner.filter((o) => o === 1).length;
+    const before = foeHexes();
+    s.engine.setTutorialStage('economy');
+    s.tick(1500);
+    expect(foeHexes()).toBeGreaterThan(before);
+    expect(s.engine.state.noVictory).toBe(true);
   });
 });
 
@@ -263,11 +275,19 @@ describe('урок проходим от начала до победы', () => 
     // Война и наступление до победы.
     s.queue({ t: 'declareWar', target: 1 });
     s.tick(3);
-    s.queue({ t: 'launchOffensive', target: 1, soldiers: ARMY_GOAL, armyId: army?.id ?? 0 });
+    // Столицу берут с запасом сил: игрок усиливает армию, как просит шаг «Возьми столицу».
+    s.queue({ t: 'setArmyLimit', armyId: army?.id ?? 0, soldiers: ARMY_GOAL * 2 });
+    s.tick(1500);
+    s.queue({ t: 'launchOffensive', target: 1, soldiers: ARMY_GOAL * 2, armyId: army?.id ?? 0 });
     const capitalHex = enemyCapital(me())?.hex ?? -1;
     let won = false;
     for (let i = 0; i < 12000 && !won; i += 100) {
       s.tick(100);
+      // Наступление застряло у столицы: игрок выделяет все отряды и бьёт по ней вместе (ПКМ).
+      if (i > 0 && i % 1000 === 0) {
+        const all = s.view().units.filter((u) => u.owner === 0 && u.type !== 'artillery');
+        s.queue({ t: 'attack', unitIds: all.map((u) => u.id), target: capitalHex });
+      }
       won =
         s.view().winner >= 0 || s.view().cities.some((c) => c.hex === capitalHex && c.owner === 0);
     }

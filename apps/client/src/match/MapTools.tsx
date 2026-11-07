@@ -72,64 +72,35 @@ export function MapTools({
   road,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
-  const price = build === null ? null : BUILD_PRICES[build];
-  const poor = price !== null && gold < price.fp;
   return (
     <div className={styles.root} style={{ bottom }} data-testid="map-tools">
-      {hammerOn && build !== null && (
-        <section className={styles.hint} aria-live="polite" data-tutorial="build-hint">
-          <h2 className={styles.hintTitle}>
-            {t(BUILD_TOOLS.find((x) => x.tool === build)?.label ?? 'mapTools.build')}
-          </h2>
-          {build === 'road' ? (
-            <ol className={styles.hintSteps}>
-              <li className={road && road.points === 0 ? styles.stepNow : undefined}>
-                {t('mapTools.road.step1')}
-              </li>
-              <li className={road && road.points >= 1 ? styles.stepNow : undefined}>
-                {t('mapTools.road.step2')}
-              </li>
-              <li>{t('mapTools.road.step3')}</li>
-            </ol>
-          ) : (
-            <p className={styles.hintText}>{t(`mapTools.hint.${build}` as MessageKey)}</p>
-          )}
-          {build === 'road' && road && road.points > 0 && (
-            <p className={styles.hintText} data-tutorial="road-hint">
-              {t('mapTools.road.points')
-                .replace('{n}', String(road.points))
-                .replace('{h}', String(road.hexes))}
-              {road.cost !== null ? ` · ${Math.floor(road.cost / FP)}` : ''}
-            </p>
-          )}
-          {build === 'road' && road?.error && (
-            <p className={styles.hintError} role="alert">
-              {reasonText(road.error)}
-            </p>
-          )}
-          {price && build !== 'road' && (
-            <p className={poor ? styles.priceBad : styles.price}>
-              {Math.floor(price.fp / FP)}
-              {price.more ? '+' : ''} / {Math.floor(gold / FP)}
-            </p>
-          )}
-        </section>
-      )}
       {hammerOn && (
         <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
-          {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => (
-            <IconButton
-              key={tool}
-              data-tutorial={`build-${tool}`}
-              label={t(label)}
-              className={tool === build ? styles.active : styles.button}
-              aria-pressed={tool === build}
-              onClick={() => setBuild(tool)}
-            >
-              <Icon size={22} stroke={1.75} />
-            </IconButton>
-          ))}
+          {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => {
+            const cost = BUILD_PRICES[tool];
+            return (
+              <IconButton
+                key={tool}
+                data-tutorial={`build-${tool}`}
+                label={t(label)}
+                className={tool === build ? styles.toolActive : styles.tool}
+                aria-pressed={tool === build}
+                onClick={() => setBuild(tool)}
+              >
+                <Icon size={22} stroke={1.75} />
+                <span className={gold < cost.fp ? styles.costBad : styles.cost}>
+                  {Math.floor(cost.fp / FP)}
+                  {cost.more ? '+' : ''}
+                </span>
+              </IconButton>
+            );
+          })}
         </div>
+      )}
+      {hammerOn && build === 'road' && road?.error && (
+        <p className={styles.hintError} role="alert">
+          {reasonText(road.error)}
+        </p>
       )}
       <div className={styles.column}>
         <IconButton

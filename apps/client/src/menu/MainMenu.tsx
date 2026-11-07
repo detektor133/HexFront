@@ -41,11 +41,16 @@ function readStorage(key: string, fallback: string): string {
 }
 
 // Ссылка на матч: случайная карта — как раньше (готовые зёрна), остальные — по id карты.
+/** Случайное зерно матча на Европе: стартовые позиции и порядок игроков каждый раз другие. */
+function randomSeed(): number {
+  return Math.floor(Math.random() * 1_000_000_000);
+}
+
 function matchUrl(nickname: string, color: string, map: MenuMap, players: number): string {
   const start =
     map === 'gen'
       ? quickMatchUrl()
-      : `/match?map=${map}&seed=42&players=${map === 'europe' ? players : 2}`;
+      : `/match?map=${map}&seed=${map === 'europe' ? randomSeed() : 42}&players=${map === 'europe' ? players : 2}`;
   const url = new URL(start, window.location.origin);
   if (nickname !== '') url.searchParams.set('name', nickname);
   url.searchParams.set('color', color);

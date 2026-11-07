@@ -140,7 +140,11 @@ export function createLocalEngine(
   const setup = Array.from({ length: players }, (_, i) => ({
     name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
   }));
-  const state = createMatch(loaded.map, setup, seed, { fog, diplomacy });
+  const state = createMatch(loaded.map, setup, seed, {
+    fog,
+    diplomacy,
+    ...(tutorial ? { noVictory: true } : {}),
+  });
   // Человек сам ведёт войска (меню направлений): автокомандование стартовой армии выключено, иначе
   // commander двигал бы отряды и сбрасывал планы. У ботов оно остаётся — это их мозг.
   if (!bots.includes(HUMAN_ID)) {

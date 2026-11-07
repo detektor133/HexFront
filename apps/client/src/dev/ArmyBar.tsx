@@ -354,15 +354,6 @@ function ArmyCard(props: {
             <span className={styles.slotOrder}>
               <OrderBadge dir={props.dir} />
             </span>
-            <span className={styles.slotStars}>
-              {props.stars > 0 && (
-                <span className={styles.stars} title={t('army.stars')}>
-                  {Array.from({ length: props.stars }, (_, i) => (
-                    <IconStarFilled key={i} size={12} aria-hidden="true" />
-                  ))}
-                </span>
-              )}
-            </span>
             <span className={styles.slotAlert}>{alertOf(props.stats, props.stuck)}</span>
           </span>
           <span className={styles.countRow}>
@@ -381,6 +372,15 @@ function ArmyCard(props: {
                 title={t('army.limit')}
               />
             )}
+            <span className={styles.slotStars}>
+              {props.stars > 0 && (
+                <span className={styles.stars} title={t('army.stars')}>
+                  {Array.from({ length: props.stars }, (_, i) => (
+                    <IconStarFilled key={i} size={12} aria-hidden="true" />
+                  ))}
+                </span>
+              )}
+            </span>
           </span>
         </span>
         <span className={styles.bars}>
@@ -427,8 +427,6 @@ export function ArmyBar(props: {
   onInvade?: (armyId: number) => void;
   /** Идёт выбор вторжения. */
   invading?: boolean;
-  /** У армии есть отряды в порту: иначе кнопка вторжения серая. */
-  canInvade?: (armyId: number) => boolean;
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
   style?: React.CSSProperties | undefined;
@@ -579,7 +577,6 @@ export function ArmyBar(props: {
                 label="army.invade"
                 onClick={() => props.onInvade?.(army.id)}
                 active={props.invading === true}
-                disabled={props.canInvade?.(army.id) === false ? t('army.invadeNoPort') : null}
               />
             )}
             <Tool

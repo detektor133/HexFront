@@ -314,13 +314,19 @@
 /* Строка названия: колонки фиксированной ширины — приказ, звёзды, тревога; значки не ездят. */
 .head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px 40px 22px;
+  grid-template-columns: minmax(0, 1fr) 28px 20px;
   align-items: center;
   gap: 4px;
 }
 
+/* Звёзды стоят в строке числа, справа: название получает всё освободившееся место. */
+.slotStars {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
 .slotOrder,
-.slotStars,
 .slotAlert {
   display: flex;
   align-items: center;

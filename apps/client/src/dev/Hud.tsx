@@ -303,6 +303,7 @@ export function Hud(props: {
           >
             <input
               className={styles.slider}
+              data-tutorial="tax-slider"
               type="range"
               min={0}
               max={TAX_MAX}

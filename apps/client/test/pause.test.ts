@@ -188,7 +188,8 @@ function mockRuntime(
       setArmy: vi.fn(),
       setRoadPreview: vi.fn(),
       invasion: {
-        hint: { stage: 'off', error: null, soldiers: 0, capacity: 0 },
+        stage: 'off',
+        armyId: null,
         start: () => undefined,
         cancel: () => undefined,
         clickHex: () => false,

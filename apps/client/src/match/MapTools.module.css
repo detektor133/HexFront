@@ -48,62 +48,56 @@
   border-color: var(--ui-button-primary-bg);
 }
 
-/* Цена выбранной стройки и золото: красным, когда не хватает. */
-.price,
-.priceBad {
-  align-self: center;
-  padding: 0 var(--space-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.price {
+/* Кнопка постройки: значок и мелкая цена под ним; красным, когда золота не хватает. */
+.tool,
+.toolActive {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 48px;
+  height: 52px;
+  padding: 0;
   color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
 }
 
-.priceBad {
+.toolActive {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+.cost,
+.costBad {
+  font-size: 10px;
+  line-height: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.costBad {
   color: var(--status-danger);
   font-weight: 600;
 }
 
-/* Карточка-подсказка режима строительства: что строим, куда нажимать, сколько стоит и почему нельзя. */
-.hint {
-  box-sizing: border-box;
-  width: 280px;
-  max-width: calc(100vw - 24px);
-  padding: var(--space-sm) var(--space-md);
-  color: var(--ui-ink);
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-card);
-  corner-shape: var(--ui-corner);
-  box-shadow: var(--shadow-hard);
-}
-
-.hintTitle {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--font-size-body);
-  font-weight: 600;
-}
-
-.hintText,
-.hintSteps {
-  margin: 0;
-  font-size: var(--font-size-label);
-  line-height: 1.35;
-}
-
-.hintSteps {
-  padding-left: 1.2em;
-}
-
-.stepNow {
-  font-weight: 700;
+.toolActive .costBad {
+  color: inherit;
 }
 
 .hintError {
-  margin: var(--space-xs) 0 0;
+  align-self: flex-end;
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
   color: var(--status-danger);
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
   font-size: var(--font-size-label);
   font-weight: 600;
+  pointer-events: auto;
 }

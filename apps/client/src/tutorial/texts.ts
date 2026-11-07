@@ -328,11 +328,11 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.conquer': {
     ru: {
       title: 'Возьми столицу',
-      text: 'Продвигайся, пока не захватишь столицу соперника. Если наступление застряло, усиль армию кнопкой «+» и следи за снабжением.',
+      text: 'Продвигайся, пока не захватишь столицу соперника. Если наступление застряло у столицы, усиль армию кнопкой «+», выдели все отряды и ударь по столице вместе (ПКМ по ней), следи за снабжением.',
     },
     en: {
       title: 'Capture the capital',
-      text: 'Advance until you capture the rival’s capital. If the offensive stalls, strengthen the army with + and watch the supply.',
+      text: 'Advance until you capture the rival’s capital. If the offensive stalls at the capital, strengthen the army with +, select all units and strike the capital together (right-click it), and watch the supply.',
     },
   },
   'core.finish': {

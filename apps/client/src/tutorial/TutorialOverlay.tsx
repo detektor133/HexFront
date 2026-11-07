@@ -23,12 +23,15 @@ const POLL_MS = 250;
 /** Наименьший диаметр кольца вокруг гекса, px. */
 const MIN_RING = 64;
 
+/** Размеры фишки отряда в мировых единицах: кольцо вокруг самой фишки. */
+const CHIP_W = 64;
+const CHIP_H = 24;
+
 /** Размеры карточки подсказки для выбора места, px. */
 const CARD_W = 380;
 const CARD_H = 230;
 const CARD_TOP = 72;
 const CARD_BOTTOM = 132;
-const CARD_GAP = 24;
 
 /** Через сколько миллисекунд ожидания шага появляется «Пропустить». */
 const SKIP_AFTER_MS = 60_000;
@@ -38,35 +41,26 @@ export function isTouchDevice(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 }
 
-/** Куда ставить карточку: угол, где она не закрывает цель (иначе по гекс нельзя было бы нажать). */
+/**
+ * Куда ставить карточку: рядом с целью, с той стороны, где нет стрелки (стрелка стоит над целью),
+ * по центру цели и в границах окна; карточка не закрывает цель, HUD и панель армий.
+ */
 function cardPlace(mark: Mark | null): React.CSSProperties {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const height = typeof window === 'undefined' ? 800 : window.innerHeight;
-  if (width < CARD_W + 24 * 2) {
-    const topHalf = mark !== null && mark.y + mark.h / 2 < height / 2;
-    return topHalf ? { bottom: CARD_BOTTOM, left: 12 } : { top: CARD_TOP, left: 12 };
-  }
-  const corners: readonly {
-    readonly style: React.CSSProperties;
-    readonly x: number;
-    readonly y: number;
-  }[] = [
-    { style: { top: CARD_TOP, right: 12 }, x: width - CARD_W - 12, y: CARD_TOP },
-    { style: { top: CARD_TOP, left: 12 }, x: 12, y: CARD_TOP },
-    {
-      style: { bottom: CARD_BOTTOM, right: 12 },
-      x: width - CARD_W - 12,
-      y: height - CARD_BOTTOM - CARD_H,
-    },
-    { style: { bottom: CARD_BOTTOM, left: 12 }, x: 12, y: height - CARD_BOTTOM - CARD_H },
-  ];
-  if (mark === null) return { top: CARD_TOP, right: 12 };
-  const clear = (c: { readonly x: number; readonly y: number }): boolean =>
-    mark.x + mark.w + CARD_GAP < c.x ||
-    mark.x - CARD_GAP > c.x + CARD_W ||
-    mark.y + mark.h + CARD_GAP < c.y ||
-    mark.y - CARD_GAP > c.y + CARD_H;
-  return (corners.find(clear) ?? corners[0])?.style ?? { top: CARD_TOP, right: 12 };
+  const narrow = width < CARD_W + 24;
+  if (mark === null)
+    return { top: CARD_TOP, left: narrow ? 12 : Math.max(12, (width - CARD_W) / 2) };
+  const left = narrow
+    ? 12
+    : Math.min(Math.max(12, mark.x + mark.w / 2 - CARD_W / 2), width - CARD_W - 12);
+  const below = mark.y + mark.h + 56;
+  if (below + CARD_H <= height - CARD_BOTTOM + 40) return { top: below, left };
+  const above = mark.y - 56 - CARD_H;
+  if (above >= CARD_TOP) return { top: above, left };
+  // Цель слишком велика или у края: угол, не закрывающий цель.
+  const farLeft = mark.x + mark.w / 2 > width / 2;
+  return { top: CARD_TOP, ...(farLeft ? { left: 12 } : { right: 12 }) };
 }
 
 /** Стрелка над целью (под ней, если цель у верхнего края) указывает на неё. */
@@ -96,10 +90,12 @@ export function TutorialOverlay(props: {
   } | null;
   readonly hexWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
   readonly hexRadius: number;
+  /** Центр фишки отряда на гексе в мировых координатах. */
+  readonly chipWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
   /** Шаг сменился: режиссёр урока ведёт соперника по номеру шага. */
   readonly onStage?: (stepId: string) => void;
 }): React.JSX.Element | null {
-  const { chapter, camera, hexWorld, hexRadius, onStage } = props;
+  const { chapter, camera, hexWorld, chipWorld, hexRadius, onStage } = props;
   const [pans, setPans] = useState(0);
   const [zooms, setZooms] = useState(0);
   const last = useRef<{ cx: number; cy: number; w: number } | null>(null);
@@ -186,7 +182,10 @@ export function TutorialOverlay(props: {
         };
       };
       if ('ui' in target) {
-        const el = document.querySelector(`[data-tutorial="${target.ui}"]`);
+        const names = typeof target.ui === 'string' ? [target.ui] : target.ui;
+        const el = names
+          .map((name) => document.querySelector(`[data-tutorial="${name}"]`))
+          .find((node) => node !== null && node.getBoundingClientRect().width > 0);
         const rect = el?.getBoundingClientRect();
         if (rect && rect.width > 0 && rect.height > 0) {
           setMark({
@@ -201,12 +200,29 @@ export function TutorialOverlay(props: {
         setMark(fromHex(target.fallbackHex?.(ctx) ?? null));
         return;
       }
+      if ('chip' in target) {
+        const hex = target.chip(ctx);
+        const cam = camera();
+        const world = hex === null ? null : chipWorld(hex);
+        if (!cam || !world) return setMark(null);
+        const scale = cam.screen.width / (cam.to.x - cam.from.x);
+        const w = Math.max(76, CHIP_W * scale);
+        const hh = Math.max(36, CHIP_H * scale);
+        setMark({
+          x: cam.screen.left + (world.x - cam.from.x) * scale - w / 2,
+          y: cam.screen.top + (world.y - cam.from.y) * scale - hh / 2,
+          w,
+          h: hh,
+          round: false,
+        });
+        return;
+      }
       setMark(fromHex(target.hex(ctx)));
     };
     compute();
     const timer = window.setInterval(compute, POLL_MS / 2);
     return () => window.clearInterval(timer);
-  }, [step, ctx, camera, hexWorld, hexRadius]);
+  }, [step, ctx, camera, hexWorld, chipWorld, hexRadius]);
 
   const exit = (): void => window.location.assign('/');
   if (dismissed) return null;

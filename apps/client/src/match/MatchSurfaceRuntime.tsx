@@ -12,6 +12,7 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { coastPath, isOwnCoast, ownCoast } from './coast-defense.ts';
 import { useInvasion, type Invasion } from './invasion.ts';
 import { useMapModes, type MapModes } from './map-modes.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
@@ -221,6 +222,8 @@ interface Sandbox {
   subscribeCamera(listener: () => void): () => void;
   /** Центр гекса в мировых координатах. */
   hexWorld(hex: number): Point | null;
+  /** Центр фишки отряда на гексе в мировых координатах. */
+  chipWorld(hex: number): Point | null;
   send(cmd: Command): void;
   setFog(on: boolean): void;
   /** Шаг матча-урока для режиссёра соперника. */
@@ -260,7 +263,21 @@ export function useSandbox(
   const [tool, setToolState] = useState<ToolState | null>(null);
   const cameraListenersRef = useRef(new Set<() => void>());
   const holdPickRef = useRef<number | null>(null);
+  const coastStartRef = useRef<number | null>(null);
   const [holdPick, setHoldPickState] = useState<number | null>(null);
+  // Пока армия ждёт цель «Держать», свои гексы у моря подсвечены: линия обороны вдоль берега.
+  useEffect(() => {
+    if (holdPick === null) return;
+    const current = viewRef.current;
+    if (!current || typeof loaded === 'string') return;
+    const mask = new Uint8Array(current.hexes.owner.length);
+    for (const h of ownCoast(current, loaded.map)) mask[h] = 1;
+    layerRef.current?.setMapMask('build', mask);
+    return () => {
+      layerRef.current?.setMapMask(null, null);
+      coastStartRef.current = null;
+    };
+  }, [holdPick, loaded]);
   const setHoldPick = useCallback((armyId: number | null) => {
     holdPickRef.current = armyId;
     setHoldPickState(armyId);
@@ -551,6 +568,26 @@ export function useSandbox(
       // «Держать» без приказа: следующий тап по чужой стране ставит армии фронт на её границе.
       const holdArmy = holdPickRef.current;
       if (holdArmy !== null) {
+        const tapped = inBounds(h, map.width, map.height) ? hexId(h, map.width) : -1;
+        // Свой берег: два нажатия (начало и конец участка) ставят армии линию обороны вдоль моря.
+        if (current && tapped >= 0 && isOwnCoast(current, map, tapped)) {
+          const first = coastStartRef.current;
+          if (first === null) {
+            coastStartRef.current = tapped;
+            layerRef.current?.setQueueMarks([tapped]);
+            return;
+          }
+          const line = coastPath(current, map, first, tapped);
+          coastStartRef.current = null;
+          layerRef.current?.setQueueMarks([]);
+          if (line) {
+            setHoldPick(null);
+            match.send({ t: 'setDefenseLine', armyId: holdArmy, points: line });
+          }
+          return;
+        }
+        coastStartRef.current = null;
+        layerRef.current?.setQueueMarks([]);
         setHoldPick(null);
         const owner =
           current && inBounds(h, map.width, map.height)
@@ -586,7 +623,7 @@ export function useSandbox(
         return;
       }
       // Морское вторжение: два нажатия (порт отправки, гекс высадки); ПКМ и Esc отменяют.
-      if (invasionRef.current.hint.stage !== 'off') {
+      if (invasionRef.current.stage !== 'off') {
         if (kind === 'order') return invasionRef.current.cancel();
         if (invasionRef.current.clickHex(hex, (cmd) => match.send(cmd))) return;
       }
@@ -787,6 +824,9 @@ export function useSandbox(
     hexWorld(hex) {
       if (typeof loaded === 'string') return null;
       return hexCenter(hexFromId(hex, loaded.map.width), tokens.map.hexRadius);
+    },
+    chipWorld(hex) {
+      return layerRef.current?.chipAt(hex) ?? null;
     },
     focusHex(hex) {
       if (typeof loaded !== 'string') {

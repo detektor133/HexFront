@@ -1,14 +1,13 @@
-// Морское вторжение двумя нажатиями (03-cities-buildings.md, «Порты»): сначала порт, откуда отплыть
-// (подсвечены только порты, где стоят отряды выбранной армии), затем гекс высадки (подсвечены те,
-// куда можно приплыть; на гексе — цена). Свой порт — бесплатно, остальное — золото по числу солдат
-// и длине пути по воде.
+// Морское вторжение двумя нажатиями (03-cities-buildings.md, «Порты»): сначала порт, откуда
+// отплыть (подсвечены все свои порты), затем гекс высадки (подсвечена любая чужая или ничья земля у
+// воды; на гексе — цена в золоте, свой порт бесплатно). Армия снимается со старого приказа и
+// получает новый — вторжение: идёт в порт, садится на корабли очередью и высаживается.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   FP,
   TERRAIN,
   isPortOf,
-  portCapacity,
   sailCost,
   seaTargets,
   type Command,
@@ -26,49 +25,37 @@ export interface InvasionWorld {
 
 export type InvasionStage = 'off' | 'from' | 'to';
 
-export interface InvasionHint {
-  readonly stage: InvasionStage;
-  /** Ключ причины, по которой нажатие не принято или нельзя начать (reason.* / invade.*). */
-  readonly error: string | null;
-  /** Сколько солдат поплывёт и вместимость порта (для подписи шага «куда»). */
-  readonly soldiers: number;
-  readonly capacity: number;
-}
-
 export interface Invasion {
-  readonly hint: InvasionHint;
+  readonly stage: InvasionStage;
+  /** Армия, получающая приказ вторжения. */
+  readonly armyId: number | null;
   start(armyId: number): void;
   cancel(): void;
   /** Нажатие по гексу в режиме вторжения; true — нажатие израсходовано. */
   clickHex(hex: number, send: (cmd: Command) => void): boolean;
 }
 
-const OFF: InvasionHint = { stage: 'off', error: null, soldiers: 0, capacity: 0 };
-
-/** Отряды армии в порту hex, которые могут отплыть. */
-export function sailors(view: PlayerView, armyId: number, hex: number): UnitView[] {
-  return view.units.filter(
-    (u) =>
-      u.owner === view.playerId &&
-      u.armyId === armyId &&
-      u.hex === hex &&
-      !u.sea &&
-      !u.inBattle &&
-      u.order !== 'retreat',
-  );
+/** Мир порта для sim-функций: карта, владельцы, здания и города снимка. */
+function portGround(world: InvasionWorld) {
+  return { map: world.map, hexes: world.view.hexes, cities: world.view.cities };
 }
 
-/** Порты игрока, в которых стоят отряды армии. */
-export function armyPorts(world: InvasionWorld, armyId: number): number[] {
-  const { view, map } = world;
-  const g = { map, hexes: view.hexes };
-  const ports = new Set<number>();
-  for (const u of view.units) {
-    if (u.owner === view.playerId && u.armyId === armyId && isPortOf(g, view.playerId, u.hex)) {
-      ports.add(u.hex);
-    }
-  }
-  return [...ports].filter((p) => sailors(view, armyId, p).length > 0).sort((a, b) => a - b);
+/** Свои порты игрока в снимке: гексы, откуда можно отплыть. */
+export function ownPorts(world: InvasionWorld): number[] {
+  const g = portGround(world);
+  const { view } = world;
+  const out: number[] = [];
+  view.hexes.owner.forEach((o, h) => {
+    if (o === view.playerId && isPortOf(g, view.playerId, h)) out.push(h);
+  });
+  return out;
+}
+
+/** Отряды армии, которые поплывут. */
+function armyUnits(view: PlayerView, armyId: number): UnitView[] {
+  return view.units.filter(
+    (u) => u.owner === view.playerId && u.armyId === armyId && !u.sea && u.order !== 'retreat',
+  );
 }
 
 /**
@@ -80,12 +67,9 @@ export function useInvasion(
   world: () => InvasionWorld | null,
 ): Invasion {
   const [stage, setStage] = useState<InvasionStage>('off');
-  const [error, setError] = useState<string | null>(null);
-  const [soldiers, setSoldiers] = useState(0);
-  const [capacity, setCapacity] = useState(0);
-  const armyRef = useRef<number | null>(null);
+  const [armyId, setArmyId] = useState<number | null>(null);
   const fromRef = useRef<number | null>(null);
-  const targetsRef = useRef<Map<number, number>>(new Map());
+  const targetsRef = useRef<Set<number>>(new Set());
 
   const clear = useCallback(() => {
     layerRef.current?.setMapMask(null, null);
@@ -93,73 +77,55 @@ export function useInvasion(
   }, [layerRef]);
 
   const cancel = useCallback(() => {
-    armyRef.current = null;
     fromRef.current = null;
-    targetsRef.current = new Map();
+    targetsRef.current = new Set();
     setStage('off');
-    setError(null);
+    setArmyId(null);
     clear();
   }, [clear]);
 
-  const showFrom = useCallback(
-    (armyId: number): boolean => {
-      const w = world();
-      if (!w) return false;
-      const ports = armyPorts(w, armyId);
-      const mask = new Uint8Array(w.view.hexes.owner.length);
-      for (const p of ports) mask[p] = 1;
-      layerRef.current?.setMapMask('build', mask);
-      layerRef.current?.setHexLabels([]);
-      return ports.length > 0;
-    },
-    [layerRef, world],
-  );
+  const showFrom = useCallback((): void => {
+    const w = world();
+    if (!w) return;
+    const mask = new Uint8Array(w.view.hexes.owner.length);
+    for (const p of ownPorts(w)) mask[p] = 1;
+    layerRef.current?.setMapMask('build', mask);
+    layerRef.current?.setHexLabels([]);
+  }, [layerRef, world]);
 
   const showTo = useCallback(
-    (armyId: number, from: number): void => {
+    (army: number, from: number): void => {
       const w = world();
       if (!w) return;
       const { view, map } = w;
-      const units = sailors(view, armyId, from);
-      const g = { map, hexes: view.hexes };
-      const targets = seaTargets(map, from);
+      const units = armyUnits(view, army);
+      const g = portGround(w);
       const mask = new Uint8Array(view.hexes.owner.length);
       const labels: { hex: number; text: string }[] = [];
-      const reachable = new Map<number, number>();
-      for (const [hex, seaHexes] of targets) {
-        if (hex === from) continue;
-        const owner = view.hexes.owner[hex] ?? -1;
-        if (
-          owner >= 0 &&
-          owner !== view.playerId &&
-          (view.diplomacy?.relations[owner] ?? 'war') !== 'war'
-        )
-          continue;
+      const reachable = new Set<number>();
+      for (const [hex, seaHexes] of seaTargets(map, from)) {
+        if (map.terrain[hex] === TERRAIN.water) continue;
         const free = isPortOf(g, view.playerId, hex);
+        // Своя земля, кроме портов, не цель вторжения: высаживаются на чужую и ничью.
+        if (view.hexes.owner[hex] === view.playerId && !free) continue;
         const gold = sailCost(g, view.playerId, units, hex, seaHexes);
-        mask[hex] = free ? 1 : 2;
-        labels.push({ hex, text: free ? '0' : String(Math.ceil(gold / FP)) });
-        reachable.set(hex, seaHexes);
+        mask[hex] = 1;
+        labels.push({ hex, text: String(Math.ceil(gold / FP)) });
+        reachable.add(hex);
       }
       targetsRef.current = reachable;
       layerRef.current?.setMapMask('build', mask);
       layerRef.current?.setHexLabels(labels);
-      setSoldiers(Math.floor(units.reduce((s, u) => s + u.soldiers, 0) / FP));
     },
     [layerRef, world],
   );
 
   const start = useCallback(
-    (armyId: number) => {
+    (id: number) => {
       cancel();
-      armyRef.current = armyId;
-      if (showFrom(armyId)) {
-        setStage('from');
-        setError(null);
-      } else {
-        setStage('from');
-        setError('invade.noPort');
-      }
+      setArmyId(id);
+      setStage('from');
+      showFrom();
     },
     [cancel, showFrom],
   );
@@ -175,21 +141,13 @@ export function useInvasion(
 
   const clickHex = useCallback(
     (hex: number, send: (cmd: Command) => void): boolean => {
-      const armyId = armyRef.current;
       const w = world();
       if (stage === 'off' || armyId === null || !w) return false;
-      const { view, map } = w;
       if (stage === 'from') {
-        if (!armyPorts(w, armyId).includes(hex)) {
-          setError('invade.pickPort');
-          return true;
-        }
+        if (!ownPorts(w).includes(hex)) return true;
         fromRef.current = hex;
-        const units = sailors(view, armyId, hex);
-        setCapacity(Math.floor(portCapacity(view.hexes.building[hex] ?? 0) / FP));
         showTo(armyId, hex);
         setStage('to');
-        setError(units.length === 0 ? 'invade.noPort' : null);
         return true;
       }
       const from = fromRef.current;
@@ -197,28 +155,17 @@ export function useInvasion(
       if (hex === from) {
         // Нажатие по порту отправки возвращает к выбору порта.
         fromRef.current = null;
-        showFrom(armyId);
+        showFrom();
         setStage('from');
-        setError(null);
         return true;
       }
-      if (!targetsRef.current.has(hex) || map.terrain[hex] === TERRAIN.water) {
-        setError('invade.pickTarget');
-        return true;
-      }
-      const units = sailors(view, armyId, from);
-      send({ t: 'sail', unitIds: units.map((u) => u.id), to: hex });
+      if (!targetsRef.current.has(hex)) return true;
+      send({ t: 'invade', armyId, from, to: hex });
       cancel();
       return true;
     },
-    [stage, world, showFrom, showTo, cancel],
+    [stage, armyId, world, showFrom, showTo, cancel],
   );
 
-  const hint: InvasionHint = stage === 'off' ? OFF : { stage, error, soldiers, capacity };
-  return { hint, start, cancel, clickHex };
-}
-
-/** Есть ли у армии отряды в портах: иначе кнопка вторжения серая. */
-export function canInvade(view: PlayerView, map: MapStatic, armyId: number): boolean {
-  return armyPorts({ view, map }, armyId).length > 0;
+  return { stage, armyId, start, cancel, clickHex };
 }

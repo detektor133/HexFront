@@ -5,6 +5,7 @@
 import {
   CITY_FOUND_MIN_POP_RATIO,
   CITY_MIN_DISTANCE,
+  DEPOT_MIN_DISTANCE,
   FP,
   distance,
   fpMul,
@@ -43,8 +44,14 @@ export interface TutorialCtx {
 
 /** Куда смотрит подсказка: элемент интерфейса по `data-tutorial` или гекс на карте. */
 export type Target =
-  | { readonly ui: string; readonly fallbackHex?: (ctx: TutorialCtx) => number | null }
-  | { readonly hex: (ctx: TutorialCtx) => number | null };
+  | {
+      /** Элемент интерфейса; список — берётся первый из найденных (окно может быть закрыто). */
+      readonly ui: string | readonly string[];
+      readonly fallbackHex?: (ctx: TutorialCtx) => number | null;
+    }
+  | { readonly hex: (ctx: TutorialCtx) => number | null }
+  /** Фишка отряда на гексе: рамка вокруг самой фишки, а не гекса. */
+  | { readonly chip: (ctx: TutorialCtx) => number | null };
 
 export interface Step {
   readonly id: string;
@@ -166,6 +173,25 @@ export function enemyBorderHex(ctx: TutorialCtx): number | null {
   return best;
 }
 
+/** Куда ставить склад: свой гекс без города, ближайший к границе с соперником и не рядом с другим складом. */
+export function depotSite(ctx: TutorialCtx): number | null {
+  const border = enemyBorderHex(ctx);
+  if (border === null) return null;
+  const owner = ctx.view.hexes.owner;
+  const depots: number[] = [];
+  for (let h = 0; h < owner.length; h += 1) {
+    if (owner[h] === me(ctx) && isDepot(ctx.view.hexes.building[h] ?? 0)) depots.push(h);
+  }
+  const cities = new Set(ctx.view.cities.map((c) => c.hex));
+  let best: number | null = null;
+  for (let h = 0; h < owner.length; h += 1) {
+    if (owner[h] !== me(ctx) || cities.has(h) || ctx.map.terrain[h] === TERRAIN.water) continue;
+    if (depots.some((d) => dist(ctx, d, h) < DEPOT_MIN_DISTANCE)) continue;
+    if (best === null || dist(ctx, h, border) < dist(ctx, best, border)) best = h;
+  }
+  return best;
+}
+
 const taxOf = (ctx: TutorialCtx): number =>
   ctx.view.players.find((p) => p.id === me(ctx))?.taxTarget ?? 0;
 
@@ -231,7 +257,7 @@ export function frontSupplied(ctx: TutorialCtx): boolean {
 const CORE: readonly Step[] = [
   { id: 'pan', base: (c) => c.pans, done: (c, b) => c.pans > b },
   { id: 'zoom', base: (c) => c.zooms, done: (c, b) => c.zooms > b },
-  { id: 'select', target: { hex: unitHex }, done: (c) => c.picked.units.length > 0 },
+  { id: 'select', target: { chip: unitHex }, done: (c) => c.picked.units.length > 0 },
   {
     id: 'move',
     target: { hex: neutralNear },
@@ -254,7 +280,7 @@ const CORE: readonly Step[] = [
     done: (c) => c.view.armies.some((a) => a.dir?.target === -1 && a.dir.mode === 'attack'),
   },
   { id: 'economy', manual: true, target: { ui: 'pop' } },
-  { id: 'tax', target: { ui: 'tax' }, base: taxOf, done: (c, b) => taxOf(c) !== b },
+  { id: 'tax', target: { ui: ['tax-slider', 'tax'] }, base: taxOf, done: (c, b) => taxOf(c) !== b },
   {
     id: 'wait',
     target: { hex: citySite },
@@ -270,7 +296,7 @@ const CORE: readonly Step[] = [
   { id: 'supplyMode', target: { ui: 'supply-mode' }, done: (c) => c.mapMode === 'supply' },
   { id: 'hammer', target: { ui: 'hammer' }, done: (c) => c.build !== null },
   { id: 'depotTool', target: { ui: 'build-depot' }, done: (c) => c.build === 'depot' },
-  { id: 'depot', base: depotCount, done: (c, b) => depotCount(c) > b },
+  { id: 'depot', target: { hex: depotSite }, base: depotCount, done: (c, b) => depotCount(c) > b },
   { id: 'roadTool', target: { ui: 'build-road' }, done: (c) => c.build === 'road' },
   { id: 'road', target: { ui: 'build-hint' }, done: (c) => manualRoad(c) },
   { id: 'armyPick', target: { ui: 'army-card' }, done: (c) => c.army !== null },

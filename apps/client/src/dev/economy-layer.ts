@@ -574,15 +574,28 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
           style: {
             fontFamily: tokens.font.ui.family,
             fontWeight: '600',
-            fontSize: radius * 0.55,
+            fontSize: radius * 0.5,
             fill: tokens.ui.ink,
-            stroke: { color: tokens.ui.surface, width: radius * 0.18 },
           },
         });
         label.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
-        label.anchor.set(0.5);
-        label.position.set(at.x, at.y);
-        hexLabels.addChild(label);
+        label.anchor.set(0, 0.5);
+        const coin = radius * 0.26;
+        const gap = radius * 0.1;
+        const pad = radius * 0.14;
+        const width = pad + coin * 2 + gap + label.width + pad;
+        const height = radius * 0.66;
+        const left = at.x - width / 2;
+        // Плашка с монетой: цена высадки, как золото в сигнале границы.
+        const badge = new Graphics()
+          .roundRect(left, at.y - height / 2, width, height, height / 2)
+          .fill(tokens.ui.surface)
+          .stroke({ color: tokens.ui.ink, width: 1.2 })
+          .circle(left + pad + coin, at.y, coin)
+          .fill(tokens.selection.color)
+          .stroke({ color: tokens.ui.ink, width: 1 });
+        label.position.set(left + pad + coin * 2 + gap, at.y);
+        hexLabels.addChild(badge, label);
       }
     },
     setQueueMarks(hexes) {

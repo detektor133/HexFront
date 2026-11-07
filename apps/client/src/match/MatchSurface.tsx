@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
-import { InvasionCard } from './InvasionCard.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
-import { canInvade } from './invasion.ts';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
@@ -230,6 +228,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     [],
   );
   const tutorialHexWorld = useCallback((hex: number) => sbRef.current.hexWorld(hex), []);
+  const tutorialChipWorld = useCallback((hex: number) => sbRef.current.chipWorld(hex), []);
   const styleFor = (id: string): React.CSSProperties | undefined => {
     const element = layout.elements.find((item) => item.id === id);
     if (!element) return undefined;
@@ -363,9 +362,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={styleFor('pause-menu')}
         />
       )}
-      {sb.invasion.hint.stage !== 'off' && (
-        <InvasionCard hint={sb.invasion.hint} onCancel={sb.invasion.cancel} top={hudH} />
-      )}
       {view && styleFor('bottom-panel') && (
         <ArmyBar
           view={view}
@@ -381,8 +377,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           holdPicking={sb.holdPick !== null}
           onHoldPick={sb.setHoldPick}
           onInvade={sb.invasion.start}
-          invading={sb.invasion.hint.stage !== 'off'}
-          canInvade={(armyId) => (map ? canInvade(view, map, armyId) : false)}
+          invading={sb.invasion.stage !== 'off'}
           style={styleFor('bottom-panel')}
         />
       )}
@@ -447,6 +442,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           ctx={tutorialCtx}
           camera={tutorialCamera}
           hexWorld={tutorialHexWorld}
+          chipWorld={tutorialChipWorld}
           onStage={sb.setTutorialStage}
           hexRadius={tokens.map.hexRadius}
         />
