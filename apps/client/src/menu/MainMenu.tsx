@@ -11,7 +11,10 @@ import { createMapView, type MapView } from '../render/map-view.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
 import { TutorialAsk } from './TutorialMenu.tsx';
+import { isCoarsePointer } from '../input/touch-tap.ts';
+import { followInApp } from '../nav.ts';
 import { SettingsPanel } from '../settings/SettingsPanel.tsx';
+import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
@@ -168,6 +171,14 @@ export function MainMenu(): React.JSX.Element {
     localStorage.setItem(COLOR_KEY, next);
   };
 
+  // «Играть» и «Обучение» на телефоне сразу включают полный экран (нужен жест, это он) и ведут в
+  // матч внутри страницы: перезагрузка вывела бы браузер из полного экрана.
+  const enter = (event: React.MouseEvent<HTMLAnchorElement>, url: string, save: boolean): void => {
+    if (save) handlePlay();
+    if (isCoarsePointer() && fullscreenWanted()) void setFullscreen(true);
+    followInApp(event, url);
+  };
+
   const handlePlay = (): void => {
     localStorage.setItem(NICKNAME_KEY, nickname);
     localStorage.setItem(MAP_KEY, map);
@@ -303,11 +314,18 @@ export function MainMenu(): React.JSX.Element {
               className={styles.play}
               role="button"
               href={matchUrl(nickname, color, map, players, level)}
-              onClick={handlePlay}
+              onClick={(event) =>
+                enter(event, matchUrl(nickname, color, map, players, level), true)
+              }
             >
               {t('menu.play')}
             </a>
-            <a className={styles.tutorialButton} role="button" href={tutorialUrl(nickname, color)}>
+            <a
+              className={styles.tutorialButton}
+              role="button"
+              href={tutorialUrl(nickname, color)}
+              onClick={(event) => enter(event, tutorialUrl(nickname, color), false)}
+            >
               {t('tutorial.menuButton')}
             </a>
             <button

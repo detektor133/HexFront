@@ -6,7 +6,9 @@
   bottom: calc(var(--dock-h, 0px) + var(--space-md));
   z-index: 2;
   box-sizing: border-box;
-  width: 280px;
+  width: max-content;
+  min-width: 160px;
+  max-width: min(280px, calc(100vw - 2 * var(--space-lg)));
   max-height: calc(100vh - var(--dock-h, 0px) - var(--top-inset, 0px) - 2 * var(--space-md));
   max-height: calc(100dvh - var(--dock-h, 0px) - var(--top-inset, 0px) - 2 * var(--space-md));
   display: flex;
@@ -86,7 +88,7 @@
 
 .rows {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--space-xs);
   margin: 0;
   padding: 0;
@@ -94,11 +96,11 @@
 }
 
 .row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  min-height: 36px;
-  padding: 0 var(--space-sm) 0 0;
+  gap: var(--space-xs);
+  min-height: 28px;
+  padding-right: var(--space-sm);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-chip);
   background: var(--ui-panel-image) var(--ui-surface);
@@ -107,16 +109,16 @@
 
 .badge {
   display: grid;
-  flex: 0 0 36px;
   align-self: stretch;
   place-items: center;
+  width: 28px;
   background: var(--relation-own);
   color: var(--ui-surface);
 }
 
 .glyph {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -129,15 +131,6 @@
   stroke: none;
 }
 
-.rowName {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ui-ink2);
-}
-
 .soldiers {
   font-size: var(--font-size-body);
   font-weight: 600;
@@ -145,10 +138,9 @@
 }
 
 .count {
-  min-width: 28px;
   color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-  text-align: right;
 }
 
 .partial {

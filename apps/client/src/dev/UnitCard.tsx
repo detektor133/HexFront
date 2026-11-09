@@ -25,7 +25,7 @@ import { IconButton } from '../ui/icon-button.tsx';
 
 const TYPE_ORDER: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
 
-/** Строки окна: род войск, солдаты (сокращённо) и число отрядов этого рода. */
+/** Значки родов войск: значок, солдаты (сокращённо) и, если отрядов несколько, их число. */
 function TypeRows(props: { readonly units: readonly UnitView[] }): React.JSX.Element {
   return (
     <ul className={styles.rows}>
@@ -33,17 +33,14 @@ function TypeRows(props: { readonly units: readonly UnitView[] }): React.JSX.Ele
         const of = props.units.filter((u) => u.type === type);
         if (of.length === 0) return null;
         const soldiers = of.reduce((sum, u) => sum + u.soldiers, 0);
-        const label = t(`unit.${type}` as MessageKey);
+        const label = `${t(`unit.${type}` as MessageKey)}: ${formatCompact(soldiers)}, ${t('unit.count')} ${of.length}`;
         return (
-          <li key={type} className={styles.row} title={label}>
+          <li key={type} className={styles.row} title={label} aria-label={label}>
             <span className={styles.badge}>
               <UnitGlyph className={styles.glyph} type={type} />
             </span>
-            <span className={styles.rowName}>{label}</span>
             <span className={styles.soldiers}>{formatCompact(soldiers)}</span>
-            <span className={styles.count} title={t('unit.count')}>
-              {'×' + String(of.length)}
-            </span>
+            {of.length > 1 && <span className={styles.count}>{'×' + String(of.length)}</span>}
           </li>
         );
       })}

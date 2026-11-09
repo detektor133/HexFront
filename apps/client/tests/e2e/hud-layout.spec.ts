@@ -37,6 +37,8 @@ for (const width of WIDTHS) {
               ':scope > svg, :scope > [class*="slotText"], :scope > [class*="rate"], :scope > [class*="taxButton"]',
             )
           : []) {
+          // display: contents (телефон в портрете): сам элемент без рамки, его дети лежат в сетке слота.
+          if (['contents', 'none'].includes(getComputedStyle(child).display)) continue;
           const childRect = child.getBoundingClientRect();
           childRects.push(childRect);
           if (childRect.width <= 0 || childRect.height <= 0)
@@ -80,6 +82,7 @@ for (const width of WIDTHS) {
             ancestor = ancestor.parentElement
           ) {
             const ancestorStyle = getComputedStyle(ancestor);
+            if (ancestorStyle.display === 'contents') continue;
             const clips = ['hidden', 'clip', 'scroll', 'auto'].some(
               (overflow) =>
                 ancestorStyle.overflowX === overflow || ancestorStyle.overflowY === overflow,
@@ -107,7 +110,8 @@ for (const width of WIDTHS) {
         const taxButtonRect = taxButton?.getBoundingClientRect();
         const taxContents = taxButton
           ? Array.from(taxButton.children).filter(
-              (child): child is Element => child instanceof Element,
+              (child): child is Element =>
+                child instanceof Element && getComputedStyle(child).display !== 'contents',
             )
           : [];
         for (const child of taxContents) {

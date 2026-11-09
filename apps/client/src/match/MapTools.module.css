@@ -101,3 +101,8 @@
   font-weight: 600;
   pointer-events: auto;
 }
+
+/* Низкий экран: кнопки сверху справа, колонка не помещается над панелью армий. */
+.fromTop {
+  align-items: flex-start;
+}

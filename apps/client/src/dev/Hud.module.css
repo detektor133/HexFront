@@ -454,3 +454,70 @@
     opacity: 1;
   }
 }
+
+/* Телефон в портрете: у каждой ячейки две строки одной высоты. Значение — в первой, по центру ячейки;
+   во второй — значок и прирост (если есть). Значения всех ячеек стоят на одной линии и помещаются в
+   узкую ячейку: значок рядом с ними съедал бы место. */
+@media (max-width: 600px) {
+  .slot,
+  .taxButton {
+    display: grid;
+    grid-template-columns: 12px minmax(0, auto);
+    grid-template-rows: 16px 14px;
+    column-gap: 2px;
+    row-gap: 0;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .slot > svg,
+  .taxButton > svg {
+    grid-row: 2;
+    grid-column: 1;
+    inline-size: 12px;
+    block-size: 12px;
+  }
+
+  .slotText {
+    display: contents;
+  }
+
+  .value {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-self: center;
+    overflow: visible;
+    font-size: 13px;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .rate,
+  .rateBad {
+    grid-row: 2;
+    grid-column: 2;
+    overflow: visible;
+    font-size: 10px;
+    line-height: 14px;
+    text-align: left;
+  }
+}
+
+/* Совсем узкий экран (360 px): прирост занимает всю вторую строку, значок у таких ячеек не нужен —
+   его роль играет подпись прироста. */
+@media (max-width: 380px) {
+  .value {
+    font-size: 12px;
+  }
+
+  .slot:has(.rate, .rateBad) > svg {
+    display: none;
+  }
+
+  .rate,
+  .rateBad {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+}

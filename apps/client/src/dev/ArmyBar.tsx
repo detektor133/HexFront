@@ -490,12 +490,15 @@ export function ArmyBar(props: {
     };
   }, [onToolsHeight, toolsShown]);
   useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el || !onHeight) return;
-    const report = (entries: readonly ResizeObserverEntry[]): void =>
-      onHeight(Math.max(entries[0]?.contentRect.height ?? 0, el.scrollHeight));
+    // Высота всей нижней панели вместе с отступами: от неё считаются кнопки режимов и окна над ней.
+    const content = contentRef.current;
+    const dock = content?.parentElement;
+    if (!content || !dock || !onHeight) return;
+    const report = (): void => onHeight(Math.ceil(dock.getBoundingClientRect().height));
+    report();
     const ro = new ResizeObserver(report);
-    ro.observe(el);
+    ro.observe(dock);
+    ro.observe(content);
     return () => ro.disconnect();
   }, [onHeight]);
   const { view, send, selected } = props;

@@ -8,6 +8,7 @@ import { messages, t } from './i18n/dict.ts';
 import { applyDocumentLang } from './i18n/document-lang.ts';
 import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
+import { useLocation } from './nav.ts';
 import { isDevPath, isMatchPath } from './routes.ts';
 import { applyTheme, currentTheme } from './theme/theme.ts';
 import './theme/tokens.css';
@@ -16,9 +17,10 @@ import './theme/fonts.css';
 import './theme/global.css';
 
 export function App(): React.JSX.Element {
-  const path = window.location.pathname;
+  const { pathname: path, search } = useLocation();
   if (path === '/' || path === '/menu') return <MainMenu />;
-  if (isMatchPath(path)) return <MatchPage />;
+  // Ключ по строке запроса: переход к другому матчу собирает экран заново.
+  if (isMatchPath(path)) return <MatchPage key={search} />;
   if (import.meta.env.PROD && isDevPath(path)) return <p>{messages.ru['dev.notFound']}</p>;
   if (path === '/dev/map') return <DevMapPage />;
   if (path === '/dev/units') return <DevUnitsPage />;

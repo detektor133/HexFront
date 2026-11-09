@@ -46,6 +46,8 @@ interface Props {
   readonly setBuild: (tool: BuildTool | null) => void;
   /** Отступ от низа страницы, px: над панелью армий. */
   readonly bottom: number;
+  /** Отступ от верха, px: на низком экране (телефон в ландшафте) кнопки стоят под HUD, а не над панелью армий. */
+  readonly top?: number | undefined;
   /** Золото игрока, fixed-point: рядом с ценой выбранной стройки. */
   readonly gold: number;
   /** Цена основания следующего города, fixed-point. */
@@ -61,6 +63,7 @@ export function MapTools({
   setMapMode,
   setBuild,
   bottom,
+  top,
   gold,
   cityCost,
   buildingsOpen,
@@ -69,7 +72,11 @@ export function MapTools({
   const hammerOn = build !== null;
   const prices = buildPrices(cityCost);
   return (
-    <div className={styles.root} style={{ bottom }} data-testid="map-tools">
+    <div
+      className={top === undefined ? styles.root : `${styles.root} ${styles.fromTop}`}
+      style={top === undefined ? { bottom } : { top }}
+      data-testid="map-tools"
+    >
       {hammerOn && (
         <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
           {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => {

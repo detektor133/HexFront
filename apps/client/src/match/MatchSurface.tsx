@@ -49,7 +49,6 @@ function unitCardStyle(
   if (!layout) return layout;
   return {
     left: layout.left,
-    width: layout.width,
     '--dock-h': `${lift}px`,
     '--top-inset': `${topInset}px`,
   } as React.CSSProperties;
@@ -162,9 +161,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   // Армии, часть отрядов которых выбрана на карте, — тонкая рамка на карточке.
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   // Тулбар приказов стоит над нижней панелью вне её высоты; карточкам над ней нужен запас под него.
+  // На телефоне панель приказов уступает место окну «Постройки» и режиму строительства.
+  const hideTools = phoneView && (buildingsOpen || sb.mapModes.build !== null);
   const toolsShown =
-    (view?.armies.some((a) => a.id === army) ?? false) ||
-    partial.filter((a) => a !== army).length === 1;
+    !hideTools &&
+    ((view?.armies.some((a) => a.id === army) ?? false) ||
+      partial.filter((a) => a !== army).length === 1);
   const layout = computeMatchLayout({
     viewport,
     hudHeight: hudH,
@@ -393,7 +395,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           pickedUnits={sb.picked.units}
           onHeight={handleArmyBarHeight}
           onToolsHeight={setToolsH}
-          hideTools={buildingsOpen && phoneView}
+          hideTools={hideTools}
           onSelect={sb.setArmy}
           onFocusArmy={sb.focusArmy}
           groups={sb.groupDigits}
@@ -407,13 +409,14 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         />
       )}
       <BuildFeedbackMark feedback={sb.mapModes.feedback} />
-      {view && !debug && (
+      {view && !debug && !pauseState.menuOpen && (
         <MapTools
           mapMode={sb.mapModes.mapMode}
           build={sb.mapModes.build}
           setMapMode={sb.mapModes.setMapMode}
           setBuild={sb.mapModes.setBuild}
-          bottom={dockH + 12}
+          bottom={dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0) + 12}
+          top={phoneView && viewport.width > viewport.height ? hudH + 8 : undefined}
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           cityCost={view.me.foundCityCost}
           buildingsOpen={buildingsOpen}
@@ -428,7 +431,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onClose={() => setBuildingsOpen(false)}
           top={hudH}
           viewport={viewport}
-          bottomInset={dockH + 8}
+          bottomInset={dockH}
           avoidY={(() => {
             const lb = layout.elements.find((item) => item.id === 'leaderboard');
             return lb ? lb.y + lb.height : 0;

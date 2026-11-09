@@ -19,18 +19,19 @@ async function problems(page: Page): Promise<string[]> {
     const W = window.innerWidth;
     const H = window.innerHeight;
     const boxes: { name: string; r: DOMRect; el: HTMLElement }[] = [];
+    // Видимые «плашки»: элементы с фоном или рамкой, кроме самой карты и мелких украшений.
     for (const el of document.querySelectorAll<HTMLElement>('body *')) {
+      if (el.tagName === 'CANVAS' || el.closest('canvas') || el.closest('svg')) continue;
       const cs = getComputedStyle(el);
-      if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
-      if (el.tagName === 'CANVAS' || el.closest('canvas')) continue;
       const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8) continue;
-      if (cs.visibility === 'hidden' || Number(cs.opacity) === 0 || cs.pointerEvents === 'none') {
-        if (!el.matches('[class*="dock"]')) continue;
-      }
-      let depth = 0;
-      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) depth += 1;
-      if (depth > 4 || el.matches('[class*="map"]:not([data-testid])')) continue;
+      if (r.width < 24 || r.height < 24) continue;
+      if (r.width >= W - 1 && r.height >= H - 1) continue;
+      if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+      const bg = cs.backgroundColor;
+      const filled = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+      const framed = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+      if (!filled && !framed && cs.backgroundImage === 'none') continue;
+      if (el.matches('[class*="map"]:not([data-testid])')) continue;
       const name =
         el.getAttribute('data-testid') ??
         (String(el.className)
@@ -38,6 +39,13 @@ async function problems(page: Page): Promise<string[]> {
           .trim()
           .split(/\s+/u)[0] ||
           el.tagName);
+      // Плашка внутри прокручиваемой ленты (армии внизу) может уходить за край: её листают пальцем.
+      let clipped = false;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const o = getComputedStyle(p).overflowX;
+        if (o === 'auto' || o === 'scroll') clipped = true;
+      }
+      if (clipped) continue;
       boxes.push({ name, r, el });
       if (r.left < -0.5 || r.top < -0.5 || r.right > W + 0.5 || r.bottom > H + 0.5) {
         out.push(
@@ -59,6 +67,24 @@ async function problems(page: Page): Promise<string[]> {
         const oy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
         if (ox > 2 && oy > 2)
           out.push(`${a.name} лежит на ${b.name} (${Math.round(ox)}×${Math.round(oy)})`);
+      }
+    }
+    // Текст верхней панели не обрезан и не вылезает из своей ячейки.
+    for (const el of document.querySelectorAll<HTMLElement>(
+      'header [class*="value"], header [class*="rate"]',
+    )) {
+      if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1) {
+        out.push(`текст верхней панели обрезан: "${el.textContent ?? ''}"`);
+      }
+    }
+    const hud = document.querySelector('header');
+    if (hud) {
+      const hr = hud.getBoundingClientRect();
+      for (const el of hud.querySelectorAll<HTMLElement>('[class*="value"], [class*="rate"]')) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && (r.left < hr.left - 0.5 || r.right > hr.right + 0.5)) {
+          out.push(`текст верхней панели вне панели: "${el.textContent ?? ''}"`);
+        }
       }
     }
     if (document.documentElement.scrollWidth > W) out.push('горизонтальная прокрутка страницы');
