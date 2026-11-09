@@ -1,11 +1,12 @@
-import { IconShield, IconX } from '@tabler/icons-react';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { IconShield, IconSwords, IconX } from '@tabler/icons-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import styles from './BorderSignals.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
 import { autoArmy, autoOrder, contacts, orderArmy } from './army-order.ts';
+import type { EventFeedItem } from './event-feed.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -21,6 +22,9 @@ export interface SignalCamera {
     readonly height: number;
   };
 }
+
+/** Сколько висит сигнал объявленной нам войны, мс. */
+export const WAR_SIGNAL_MS = 20_000;
 
 /** Наименьший масштаб плашки при сильном отдалении карты. */
 const MIN_SCALE = 0.4;
@@ -47,8 +51,40 @@ export function BorderSignals(props: {
   readonly hexWorld: (hex: number) => { readonly x: number; readonly y: number } | null;
   /** Сигналы, которых сейчас не видно на экране (для ленты событий). */
   readonly onOffscreen: (signals: readonly OffscreenSignal[]) => void;
+  /** События матча: по объявленной нам войне появляется свой сигнал. */
+  readonly events?: readonly EventFeedItem[];
 }): React.JSX.Element | null {
-  const { view, map, send, camera, subscribeCamera, hexWorld, onOffscreen } = props;
+  const { view, map, send, camera, subscribeCamera, hexWorld, onOffscreen, events = [] } = props;
+  // Объявленные нам войны: сосед → id события; сигнал гаснет сам через WAR_SIGNAL_MS.
+  const [wars, setWars] = useState<ReadonlyMap<number, string>>(new Map());
+  const seenWars = useRef(new Set<string>());
+  const warTimers = useRef(new Set<number>());
+  useEffect(() => {
+    for (const item of events) {
+      const e = item.event;
+      if (e.t !== 'warDeclared' || e.targetId !== view.playerId) continue;
+      if (seenWars.current.has(item.id)) continue;
+      seenWars.current.add(item.id);
+      const other = e.playerId;
+      setWars((now) => new Map(now).set(other, item.id));
+      const timer = window.setTimeout(() => {
+        warTimers.current.delete(timer);
+        setWars((now) => {
+          if (now.get(other) !== item.id) return now;
+          const next = new Map(now);
+          next.delete(other);
+          return next;
+        });
+      }, WAR_SIGNAL_MS);
+      warTimers.current.add(timer);
+    }
+  }, [events, view.playerId]);
+  useEffect(
+    () => () => {
+      for (const timer of warTimers.current) window.clearTimeout(timer);
+    },
+    [],
+  );
   const [closed, setClosed] = useState<ReadonlySet<number>>(new Set());
   // Якорь сигнала не прыгает: гекс границы запоминается, пока он остаётся своим.
   const anchors = useRef(new Map<number, number>());
@@ -61,17 +97,24 @@ export function BorderSignals(props: {
     }
     return found;
   }, [view, map]);
-  const open = useMemo(
-    () =>
-      [...neighbours]
-        .filter(
-          ([other]) =>
-            !closed.has(other) &&
-            !view.armies.some((a) => a.dir?.target === other && a.dir.mode !== 'idle'),
-        )
-        .sort((a, b) => a[0] - b[0]),
-    [neighbours, closed, view.armies],
-  );
+  const open = useMemo(() => {
+    const held = (other: number): boolean =>
+      view.armies.some((a) => a.dir?.target === other && a.dir.mode !== 'idle');
+    const list: { other: number; hex: number; war: string | null; held: boolean }[] = [];
+    for (const [other, hex] of neighbours) {
+      const war = wars.get(other) ?? null;
+      if (war !== null) list.push({ other, hex, war, held: held(other) });
+      else if (!closed.has(other) && !held(other))
+        list.push({ other, hex, war: null, held: false });
+    }
+    // Война с тем, с кем границы нет: сигнал встаёт у его столицы.
+    for (const [other, war] of wars) {
+      if (neighbours.has(other)) continue;
+      const capital = view.cities.find((c) => c.owner === other && c.isCapital);
+      if (capital) list.push({ other, hex: capital.hex, war, held: held(other) });
+    }
+    return list.sort((a, b) => a.other - b.other);
+  }, [neighbours, closed, wars, view.armies, view.cities]);
   const nodes = useRef(new Map<number, HTMLElement>());
   const reported = useRef('');
   const place = useMemo(
@@ -80,7 +123,7 @@ export function BorderSignals(props: {
       if (!cam) return;
       const scale = cam.screen.width / (cam.to.x - cam.from.x);
       const away: OffscreenSignal[] = [];
-      for (const [other, hex] of open) {
+      for (const { other, hex } of open) {
         const node = nodes.current.get(other);
         const world = hexWorld(hex);
         if (!world) continue;
@@ -120,7 +163,7 @@ export function BorderSignals(props: {
   if (open.length === 0) return null;
   return (
     <>
-      {open.map(([other, hex]) => {
+      {open.map(({ other, hex, war, held }) => {
         const color = tokens.players.palette[other]?.line ?? tokens.ui.ink;
         const name = view.players[other]?.name ?? String(other + 1);
         return (
@@ -132,27 +175,44 @@ export function BorderSignals(props: {
               else nodes.current.delete(other);
             }}
           >
-            <div className={styles.signal} style={{ color }} role="group" aria-label={name}>
+            <div
+              key={war ?? 'border'}
+              className={styles.signal}
+              style={{ color }}
+              role="group"
+              aria-label={name}
+            >
               <span className={styles.ripple} aria-hidden="true" />
               <span className={styles.dot} title={name} />
-              <OrderSplit
-                tone="ghost"
-                icon={<IconShield size={18} aria-hidden="true" />}
-                label="menu.holdShort"
-                tutorial="signal-hold"
-                auto={autoArmy(view, map, other, hex)}
-                disabled={null}
-                armies={view.armies}
-                onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
-                onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
-              />
-              <IconButton
-                label={t('menu.close')}
-                className={styles.close}
-                onClick={() => setClosed((now) => new Set(now).add(other))}
-              >
-                <IconX size={16} aria-hidden="true" />
-              </IconButton>
+              {war !== null && (
+                <span className={styles.war} title={t('signal.war')}>
+                  <IconSwords size={18} aria-hidden="true" />
+                  {held && <span>{t('signal.war')}</span>}
+                </span>
+              )}
+              {!held && (
+                <OrderSplit
+                  tone="ghost"
+                  icon={<IconShield size={18} aria-hidden="true" />}
+                  label="menu.holdShort"
+                  tutorial="signal-hold"
+                  auto={autoArmy(view, map, other, hex)}
+                  disabled={null}
+                  armies={view.armies}
+                  onAuto={() => send(autoOrder(view, map, other, 'hold', hex))}
+                  onPick={(army) => send(orderArmy(view, army, other, 'hold'))}
+                />
+              )}
+              {war === null && (
+                <IconButton
+                  label={t('menu.close')}
+                  className={styles.close}
+                  onClick={() => setClosed((now) => new Set(now).add(other))}
+                >
+                  <IconX size={16} aria-hidden="true" />
+                </IconButton>
+              )}
+              {war !== null && <span className={styles.timer} aria-hidden="true" />}
             </div>
           </div>
         );

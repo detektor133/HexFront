@@ -181,3 +181,40 @@
 .empty {
   padding: var(--space-sm) 0;
 }
+
+.bulk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 36px;
+  margin: 0 var(--space-sm) var(--space-xs);
+  padding: 0 var(--space-sm);
+  color: var(--ui-button-primary-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-button-primary-bg);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-button-primary-bg);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+}
+
+.bulk:disabled {
+  color: var(--ui-ink3);
+  cursor: default;
+  background: var(--ui-surface2);
+  border-color: var(--ui-border);
+}
+
+.bulk > :nth-child(2) {
+  flex: 1;
+  text-align: left;
+}
+
+.bulkCount {
+  font-size: var(--font-size-caption);
+}
+
+.bulk .cost,
+.bulk .poor {
+  color: inherit;
+}

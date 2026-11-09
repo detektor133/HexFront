@@ -115,7 +115,7 @@ export function packChip(
   const layout = chipLayout(s, label.length, compact);
   const mode = s.ghost ? 2 : compact ? 1 : 0;
   const warn =
-    s.supply !== null && (s.supply < LOW_SUPPLY || s.starving) ? (s.starving ? 2 : 1) : 0;
+    s.starving || (s.supply !== null && s.supply < LOW_SUPPLY) ? (s.starving ? 2 : 1) : 0;
   const color = toChannels(s.color);
   const army = toChannels(s.army ?? s.color);
   const sup = s.supply === null ? color : toChannels(supplyColor(s.supply, s.starving));

@@ -14,7 +14,7 @@ import type { Command, PlayerView } from '@hexfront/sim';
 import styles from './BuildingsPanel.module.css';
 import { buildingsList, type SiteRow } from '../dev/buildings-list.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
-import { formatFp, formatRate } from '../i18n/format.ts';
+import { formatCompact, formatRate } from '../i18n/format.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 
@@ -41,6 +41,8 @@ interface Props {
   readonly onClose: () => void;
   /** Высота верхней полосы HUD: окно по умолчанию — под ней. */
   readonly top: number;
+  /** Нижний край таблицы лидеров, px: окно по умолчанию стоит ниже неё, не перекрывая. */
+  readonly avoidY?: number;
 }
 
 /** Окно можно двигать за заголовок; оно остаётся целиком в пределах экрана. */
@@ -74,7 +76,7 @@ function Cost({ value, gold }: { value: number; gold: number }): React.JSX.Eleme
   return (
     <span className={value > gold ? styles.poor : styles.cost}>
       <GoldIcon />
-      {formatFp(value)}
+      {formatCompact(value)}
     </span>
   );
 }
@@ -105,12 +107,22 @@ function UpgradeButton(props: {
 }
 
 /** Окно «Постройки»: где что построено, с улучшением и переходом к месту на карте. */
-export function BuildingsPanel({ view, send, onFocus, onClose, top }: Props): React.JSX.Element {
+export function BuildingsPanel({
+  view,
+  send,
+  onFocus,
+  onClose,
+  top,
+  avoidY = 0,
+}: Props): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('cities');
   const list = buildingsList(view);
   const { pos, handle } = useDraggable({
     x: Math.max(MARGIN, window.innerWidth - WIDTH - 16),
-    y: top + 72,
+    y: Math.min(
+      Math.max(top + 72, avoidY + 12, Math.round(window.innerHeight * 0.34)),
+      Math.max(top + 72, window.innerHeight - 340),
+    ),
   });
   const sites = (
     rows: readonly SiteRow[],
@@ -138,6 +150,31 @@ export function BuildingsPanel({ view, send, onFocus, onClose, top }: Props): Re
         />
       </li>
     ));
+  // «Улучшить всё»: +1 уровень каждой постройке вкладки, у которой он есть и которая не занята.
+  const bulk: { readonly cost: number; readonly cmd: Command }[] =
+    tab === 'cities'
+      ? list.cities.flatMap((c) =>
+          c.upgradeCost === null || c.busy
+            ? []
+            : [{ cost: c.upgradeCost, cmd: { t: 'upgradeCity', cityId: c.id } as Command }],
+        )
+      : tab === 'building'
+        ? []
+        : (tab === 'forts' ? list.forts : list.depots).flatMap((row) =>
+            row.upgradeCost === null || row.busy
+              ? []
+              : [
+                  {
+                    cost: row.upgradeCost,
+                    cmd: {
+                      t: 'build',
+                      hex: row.hex,
+                      kind: tab === 'forts' ? 'fort' : 'depot',
+                    } as Command,
+                  },
+                ],
+          );
+  const bulkCost = bulk.reduce((sum, item) => sum + item.cost, 0);
   const rows =
     tab === 'cities'
       ? list.cities.map((c) => (
@@ -150,7 +187,7 @@ export function BuildingsPanel({ view, send, onFocus, onClose, top }: Props): Re
               )}
               <span className={styles.name}>{c.name || t('buildings.city')}</span>
               <Level level={c.level} />
-              <span className={styles.meta}>{formatFp(c.pop)}</span>
+              <span className={styles.meta}>{formatCompact(c.pop)}</span>
               {c.isolated && <span className={styles.warn}>{t('buildings.isolated')}</span>}
             </button>
             <UpgradeButton
@@ -185,7 +222,7 @@ export function BuildingsPanel({ view, send, onFocus, onClose, top }: Props): Re
         <h2 className={styles.title}>{t('buildings.title')}</h2>
         <span className={styles.summary}>
           <GoldIcon />
-          {formatFp(list.gold)} · {formatRate(list.incomePerS)}
+          {formatCompact(list.gold)} · {formatRate(list.incomePerS)}
         </span>
         <IconButton label={t('buildings.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} stroke={1.75} />
@@ -214,6 +251,21 @@ export function BuildingsPanel({ view, send, onFocus, onClose, top }: Props): Re
           </IconButton>
         ))}
       </div>
+      {tab !== 'building' && (
+        <button
+          type="button"
+          className={styles.bulk}
+          data-testid="upgrade-all"
+          disabled={bulk.length === 0 || bulkCost > list.gold}
+          title={t('buildings.upgradeAllHint')}
+          onClick={() => bulk.forEach((item) => send(item.cmd))}
+        >
+          <IconChevronsUp size={18} stroke={1.75} />
+          <span>{t('buildings.upgradeAll')}</span>
+          {bulk.length > 0 && <span className={styles.bulkCount}>{'×' + String(bulk.length)}</span>}
+          {bulk.length > 0 && <Cost value={bulkCost} gold={list.gold} />}
+        </button>
+      )}
       <ul className={styles.list}>
         {rows.length > 0 ? rows : <li className={styles.empty}>{t('buildings.empty')}</li>}
       </ul>

@@ -250,3 +250,22 @@
   color: var(--ui-ink2);
   font-weight: 400;
 }
+
+.settingsButton {
+  display: inline-flex;
+  width: 100%;
+  margin-top: var(--space-sm);
+  min-height: var(--touch-target-min);
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.settings {
+  margin-top: var(--space-sm);
+}

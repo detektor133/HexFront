@@ -23,6 +23,7 @@ import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
 import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
+import { brightnessStyle, useBrightness } from '../settings/brightness.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
 import type { ChapterId, TutorialCtx } from '../tutorial/script.ts';
@@ -56,6 +57,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
+  const [brightness] = useBrightness();
   const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
@@ -237,6 +239,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       delete style.width;
       delete style.height;
     }
+    // Пауза-меню растёт по содержимому: в нём может открыться панель настроек.
+    if (id === 'pause-menu') delete style.height;
     if (id === 'leaderboard') {
       delete style.width;
       delete style.height;
@@ -252,7 +256,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   };
   return (
     <div className={styles.page}>
-      <div ref={hostRef} className={styles.map} />
+      <div ref={hostRef} className={styles.map} style={brightnessStyle(brightness)} />
       <EventFeed
         items={sb.events}
         offers={view?.diplomacy?.incoming ?? []}
@@ -317,6 +321,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           subscribeCamera={subscribeCamera}
           onOffscreen={setOffscreen}
           hexWorld={tutorialHexWorld}
+          events={sb.events}
         />
       )}
       {view && map && sb.menu && !pauseState.menuOpen && (
@@ -390,6 +395,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setBuild={sb.mapModes.setBuild}
           bottom={dockH + 12}
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
+          cityCost={view.me.foundCityCost}
           buildingsOpen={buildingsOpen}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
         />
@@ -401,6 +407,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onFocus={sb.focusHex}
           onClose={() => setBuildingsOpen(false)}
           top={hudH}
+          avoidY={(() => {
+            const lb = layout.elements.find((item) => item.id === 'leaderboard');
+            return lb ? lb.y + lb.height : 0;
+          })()}
         />
       )}
       {(loaded === 'error' || sb.error) && (

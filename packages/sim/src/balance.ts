@@ -362,6 +362,8 @@ export const FLANK_MAX: Fp = fp(1.3);
 export const ARTY_RANGE = 2;
 export const ARTY_DMG_PER_SOLDIER_S: Fp = fp(0.004);
 export const ARTY_ORG_DMG_PER_SOLDIER_S: Fp = fp(0.002);
+/** Общая сила обстрела: +30 % к урону солдатам и организованности (константы выше слишком грубы для долей). */
+export const ARTY_POWER_MULT: Fp = fp(1.3);
 export const ARTY_SUPPORT_BONUS: Fp = fp(1.3);
 export const ARTY_SUPPORT_MIN_SOLDIERS: Fp = fp(100);
 export const ARTY_FLEE_LOSS: Fp = fp(0.1);

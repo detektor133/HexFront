@@ -1,4 +1,5 @@
 import {
+  IconChevronDown,
   IconChevronsDown,
   IconChevronsUp,
   IconEqual,
@@ -13,6 +14,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
+import splitStyles from './OrderSplit.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
 import { armyName } from './army-name.ts';
@@ -78,6 +80,7 @@ export function TerritoryMenu(props: {
       window.removeEventListener('pointerdown', onDown);
     };
   }, [onClose]);
+  const [swapOpen, setSwapOpen] = useState<number | null>(null);
   const neutral = other < 0;
   const player = neutral ? null : view.players[other];
   if (!neutral && (!player || player.status !== 'alive')) return null;
@@ -94,6 +97,11 @@ export function TerritoryMenu(props: {
     (army: ArmyView): void =>
       go(orderArmy(view, army, other, mode, neutral ? hex : undefined));
   const free = nearestFreeArmy(view, map, hex);
+  // Смена армии на фронте: прежняя снимается, новая встаёт в том же режиме (держит или наступает).
+  const swapHolder = (from: ArmyView, to: ArmyView): void => {
+    send({ t: 'holdBorder', target: other, soldiers: 0 });
+    go(orderArmy(view, to, other, from.dir?.mode === 'attack' ? 'attack' : 'hold'));
+  };
   // Армия, уже стоящая на эту страну: от неё зависят кнопки «Оборона» и «Снять с фронта».
   // Снятое с фронта направление остаётся у армии в режиме idle: оно уже ничего не держит.
   const onFront = (a: ArmyView): boolean => a.dir?.target === other && a.dir.mode !== 'idle';
@@ -136,19 +144,56 @@ export function TerritoryMenu(props: {
       {!neutral && onSelectArmy && holders.length > 0 && (
         <div className={styles.holders}>
           {holders.map((army) => (
-            <button
-              key={army.id}
-              type="button"
-              className={styles.holder}
-              title={t('order.holder')}
-              onClick={() => {
-                onSelectArmy(army.id);
-                onClose();
-              }}
-            >
-              <span className={styles.holderDot} style={{ background: armyColor(army.number) }} />
-              <span className={styles.holderName}>{armyName(army)}</span>
-            </button>
+            <div key={army.id} className={styles.holderRow}>
+              <button
+                type="button"
+                className={styles.holder}
+                title={t('order.holder')}
+                onClick={() => {
+                  onSelectArmy(army.id);
+                  onClose();
+                }}
+              >
+                <span className={styles.holderDot} style={{ background: armyColor(army.number) }} />
+                <span className={styles.holderName}>{armyName(army)}</span>
+              </button>
+              <button
+                type="button"
+                className={styles.holderArrow}
+                aria-label={t('order.swapHolder')}
+                aria-expanded={swapOpen === army.id}
+                title={t('order.swapHolder')}
+                onClick={() => setSwapOpen((now) => (now === army.id ? null : army.id))}
+              >
+                <IconChevronDown size={16} aria-hidden="true" />
+              </button>
+              {swapOpen === army.id && (
+                <ul className={splitStyles.list} role="listbox" aria-label={t('order.swapHolder')}>
+                  {view.armies
+                    .filter((a) => a.id !== army.id)
+                    .map((candidate) => (
+                      <li key={candidate.id}>
+                        <button
+                          type="button"
+                          className={splitStyles.item}
+                          role="option"
+                          aria-selected={false}
+                          onClick={() => swapHolder(army, candidate)}
+                        >
+                          <span
+                            className={splitStyles.swatch}
+                            style={{ background: armyColor(candidate.number) }}
+                          />
+                          <span className={splitStyles.itemName}>{armyName(candidate)}</span>
+                          {!isFree(candidate) && (
+                            <span className={splitStyles.busy} title={t('order.busy')} />
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
           ))}
         </div>
       )}

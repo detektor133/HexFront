@@ -551,6 +551,8 @@ export function useSandbox(
         match.send(orderArmy(current, picked, -1, 'attack', hex));
         return true;
       }
+      // Меню открыто — выбор карточки армии сбрасывается: он только мешал бы дальше.
+      setArmyRef.current(null);
       setMenu({ other: owner, hex, x: screen.x, y: screen.y });
       return true;
     };
@@ -602,7 +604,9 @@ export function useSandbox(
         return;
       }
       if (!current || !inBounds(h, map.width, map.height)) {
-        return toolRef.current ? undefined : pick(NOTHING_PICKED);
+        if (toolRef.current) return undefined;
+        setArmyRef.current(null);
+        return pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
       // Shift+ПКМ: цепочка приказов — точка добавляется после предыдущих, отряды идут сразу.
@@ -628,7 +632,24 @@ export function useSandbox(
       // Режим строительства: ЛКМ по подсвеченному гексу строит, ПКМ выходит из режима.
       if (mapModesRef.current.build !== null) {
         if (kind === 'order') return mapModesRef.current.setBuild(null);
-        if (mapModesRef.current.clickHex(hex, (cmd) => match.send(cmd), screen)) return;
+        // ЛКМ по чужой или ничьей земле — выход из режима строительства и меню этой земли.
+        if (
+          kind === 'select' &&
+          (current.hexes.owner[hex] ?? -1) !== current.playerId &&
+          openMenuAt(hex, screen)
+        ) {
+          mapModesRef.current.setBuild(null);
+          return;
+        }
+        if (
+          mapModesRef.current.clickHex(
+            hex,
+            (cmd) => match.send(cmd),
+            screen,
+            (h) => current.cities.find((c) => c.hex === h)?.id,
+          )
+        )
+          return;
       }
       if (input.tap(world, kind) || input.onHandle(world)) return;
       if (kind === 'order' && pickedRef.current.units.length === 0 && openMenuAt(hex, screen)) {
@@ -637,10 +658,13 @@ export function useSandbox(
       if (kind === 'select') {
         const hit = layerRef.current?.unitsAt(world) ?? [];
         if (hit.length > 0) return pick(selectUnits(current, pickedRef.current, hit));
-        // ЛКМ по чужой или ничьей земле — то же меню, что по ПКМ; карточка чужого гекса не открывается.
+        // ЛКМ по чужой или ничьей земле — то же меню, что по ПКМ, даже если выбрана армия: выбор
+        // сбрасывается, карточка чужого гекса не открывается.
         if ((current.hexes.owner[hex] ?? -1) !== current.playerId) {
-          if (pickedRef.current.units.length === 0) openMenuAt(hex, screen);
-          return pick(NOTHING_PICKED);
+          pick(NOTHING_PICKED);
+          setArmyRef.current(null);
+          openMenuAt(hex, screen);
+          return;
         }
         return pick(selectHexOnly(hex));
       }

@@ -22,6 +22,7 @@ import {
   formatRate,
   formatRateFull,
 } from '../i18n/format.ts';
+import { SettingsPanel } from '../settings/SettingsPanel.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 import { MetricIcon, type MetricIconName } from '../ui/metric-icon.tsx';
 
@@ -166,6 +167,7 @@ function Settings(props: {
               </span>
             </button>
           )}
+          <SettingsPanel />
         </div>
       )}
     </div>

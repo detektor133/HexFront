@@ -3,6 +3,7 @@
 import {
   ARTY_DMG_PER_SOLDIER_S,
   ARTY_ORG_DMG_PER_SOLDIER_S,
+  ARTY_POWER_MULT,
   ARTY_RANGE,
   TICKS_PER_S,
 } from '../balance.ts';
@@ -81,13 +82,11 @@ export function artillerySystem(state: MatchState): void {
     const target = fireTargetOf(state, art);
     if (!target) continue;
     art.fireTarget = target.id;
-    const dmg = fpMul(
-      fpMul(art.soldiers, ARTY_DMG_PER_SOLDIER_S),
-      supplyCombatMult(art.supplyLevel),
-    );
+    const power = fpMul(art.soldiers, ARTY_POWER_MULT);
+    const dmg = fpMul(fpMul(power, ARTY_DMG_PER_SOLDIER_S), supplyCombatMult(art.supplyLevel));
     const hit = hits.get(target) ?? { soldiers: 0, org: 0 };
     hit.soldiers += intDiv(dmg, TICKS_PER_S);
-    hit.org += intDiv(fpMul(art.soldiers, ARTY_ORG_DMG_PER_SOLDIER_S), TICKS_PER_S);
+    hit.org += intDiv(fpMul(power, ARTY_ORG_DMG_PER_SOLDIER_S), TICKS_PER_S);
     hits.set(target, hit);
   }
   for (const [u, h] of hits) {

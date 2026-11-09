@@ -11,12 +11,19 @@ export const BUILD_NO = 0;
 export const BUILD_OK = 1;
 export const BUILD_NO_GOLD = 2;
 
-type BuildCommand = Extract<Command, { t: 'foundCity' | 'improve' | 'build' }>;
+type BuildCommand = Extract<Command, { t: 'foundCity' | 'upgradeCity' | 'improve' | 'build' }>;
 
-function commandFor(kind: BuildMaskKind, hex: HexId): BuildCommand {
+function commandFor(
+  cityIds: ReadonlyMap<HexId, number>,
+  kind: BuildMaskKind,
+  hex: HexId,
+): BuildCommand {
   switch (kind) {
-    case 'city':
-      return { t: 'foundCity', hex };
+    case 'city': {
+      // На гексе города инструмент «город» улучшает его, на пустом — основывает новый.
+      const cityId = cityIds.get(hex);
+      return cityId === undefined ? { t: 'foundCity', hex } : { t: 'upgradeCity', cityId };
+    }
     case 'improve':
       return { t: 'improve', hex };
     default:
@@ -30,9 +37,10 @@ function commandFor(kind: BuildMaskKind, hex: HexId): BuildCommand {
  */
 export function buildMask(state: MatchState, playerId: number, kind: BuildMaskKind): Uint8Array {
   const out = new Uint8Array(state.hexes.owner.length);
+  const cityIds = new Map(state.cities.map((c) => [c.hex, c.id] as const));
   state.hexes.owner.forEach((owner, hex) => {
     if (owner !== playerId) return;
-    const check = checkConstruction(state, playerId, commandFor(kind, hex));
+    const check = checkConstruction(state, playerId, commandFor(cityIds, kind, hex));
     if (check.ok) out[hex] = BUILD_OK;
     else if (check.reason === 'notEnoughGold') out[hex] = BUILD_NO_GOLD;
   });

@@ -1,10 +1,16 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { FP } from '@hexfront/sim';
+
 import styles from './StepPlus.module.css';
 import { STEP_CHOICES, type StepPct } from './army-limit.ts';
 import { t } from '../i18n/dict.ts';
+import { formatCompact } from '../i18n/format.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
+
+/** Сколько висит облачко с пределом, мс (совпадает с анимацией в CSS). */
+const BUBBLE_MS = 1700;
 
 /**
  * «Усилить»: нажатие добавляет выбранную долю размера армии, стрелка рядом выбирает долю по
@@ -19,10 +25,25 @@ export function StepPlus(props: {
   readonly tutorial?: string;
   /** Золото, которого стоит нажатие (докупка недостающих солдат); мелко под процентом. */
   readonly cost?: number | undefined;
+  /** Лимит армии после нажатия и предел государства, солдат: облачко над кнопкой после нажатия. */
+  readonly limit?: { readonly next: number; readonly max: number } | undefined;
 }): React.JSX.Element {
   const { step, onStep, onPlus, disabled } = props;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  // Облачко с пределом армии: каждое нажатие показывает его заново и оно гаснет само.
+  // Значения запоминаются в момент нажатия: после ответа матча кнопка уже считает следующий шаг.
+  const [bubble, setBubble] = useState<{
+    readonly id: number;
+    readonly next: number;
+    readonly max: number;
+  } | null>(null);
+  const bubbleId = useRef(0);
+  useEffect(() => {
+    if (bubble === null) return;
+    const timer = window.setTimeout(() => setBubble(null), BUBBLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [bubble]);
   useEffect(() => {
     if (!open) return;
     const onDown = (event: PointerEvent): void => {
@@ -40,7 +61,13 @@ export function StepPlus(props: {
         disabled={disabled !== null}
         title={disabled ?? `${t('army.stronger')} +${step}%${props.cost ? ` · ${props.cost}` : ''}`}
         aria-label={`${t('army.stronger')} +${step}%`}
-        onClick={onPlus}
+        onClick={() => {
+          onPlus();
+          if (props.limit) {
+            bubbleId.current += 1;
+            setBubble({ id: bubbleId.current, ...props.limit });
+          }
+        }}
       >
         <span className={styles.top}>
           <IconPlus size={18} aria-hidden="true" />
@@ -53,6 +80,15 @@ export function StepPlus(props: {
           </span>
         ) : null}
       </button>
+      {bubble !== null && (
+        <span key={bubble.id} className={styles.bubble} role="status">
+          <span className={styles.bubbleLabel}>{t('army.limitMax')}</span>
+          <span className={styles.bubbleValue}>
+            {formatCompact(bubble.next * FP)}
+            <span className={styles.bubbleMax}>{'/ ' + formatCompact(bubble.max * FP)}</span>
+          </span>
+        </span>
+      )}
       <button
         type="button"
         className={styles.arrow}

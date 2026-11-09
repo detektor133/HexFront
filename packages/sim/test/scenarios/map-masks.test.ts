@@ -27,6 +27,14 @@ describe('маска «где можно строить»', () => {
     expect(buildMask(s.state, s.player('A').id, 'fort')[mine]).toBe(BUILD_NO_GOLD);
   });
 
+  it('инструмент «город» на гексе своего города — улучшение, на пустой земле — основание', () => {
+    const s = scenario(MAP, { legend });
+    const mask = buildMask(s.state, s.player('A').id, 'city');
+    expect(mask[idOf(s, at(0, 0))]).toBe(BUILD_OK);
+    s.player('A').gold = 0 as never;
+    expect(buildMask(s.state, s.player('A').id, 'city')[idOf(s, at(0, 0))]).toBe(BUILD_NO_GOLD);
+  });
+
   it('укрепление не ставится в городе', () => {
     const s = scenario(MAP, { legend });
     expect(buildMask(s.state, s.player('A').id, 'fort')[idOf(s, at(0, 0))]).toBe(BUILD_NO);

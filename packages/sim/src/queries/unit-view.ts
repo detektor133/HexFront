@@ -92,7 +92,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         supplyLevel: mine ? u.supplyLevel : null,
         encircled: mine ? u.encircled : null,
         sea: u.sea,
-        starving: mine ? isStarving(u) : null,
+        starving: isStarving(u),
         armyId: mine ? u.armyId : null,
         path: mine ? [...u.path] : [],
         fireTarget: mine ? u.fireTarget : -1,

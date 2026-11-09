@@ -106,3 +106,66 @@
   background: var(--ui-surface2);
   font-weight: 600;
 }
+
+/* Облачко над кнопкой: лимит армии после нажатия и предел государства, всплывает и гаснет. */
+.bubble {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding: 4px var(--space-sm);
+  color: var(--ui-ink);
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+  transform: translateX(-50%);
+  animation: step-bubble 1700ms ease-out both;
+}
+
+.bubbleLabel {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.bubbleValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bubbleMax {
+  margin-left: 3px;
+  color: var(--ui-ink2);
+  font-weight: 400;
+}
+
+@keyframes step-bubble {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  15%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation-duration: 1ms;
+    animation-fill-mode: none;
+  }
+}

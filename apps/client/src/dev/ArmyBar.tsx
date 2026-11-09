@@ -573,6 +573,7 @@ export function ArmyBar(props: {
               disabled={resizeBlocked(army, 1)}
               cost={armyResizeCost(view, army, stepSize(baseSize(army, 1), stepPct, 1, limitMax))}
               tutorial="army-stronger"
+              limit={{ next: stepSize(baseSize(army, 1), stepPct, 1, limitMax), max: limitMax }}
             />
             <Tool
               glyph={<IconAdjustmentsHorizontal size={18} aria-hidden="true" />}

@@ -88,6 +88,39 @@
   color: var(--ui-ink);
 }
 
+/* Сигнал войны: значок мечей и полоска таймера, которая за WAR_SIGNAL_MS убывает до нуля. */
+.war {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+  color: var(--status-danger);
+  font-weight: 600;
+}
+
+.timer {
+  position: absolute;
+  right: var(--space-xs);
+  bottom: 2px;
+  left: var(--space-xs);
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.6;
+  transform-origin: 0 50%;
+  animation: signal-timer 20s linear forwards;
+}
+
+@keyframes signal-timer {
+  0% {
+    transform: scaleX(1);
+  }
+
+  100% {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes signal-pop {
   0% {
     opacity: 0;

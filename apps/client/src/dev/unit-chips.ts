@@ -183,7 +183,7 @@ function body(g: Graphics, s: ChipState, left: number, w: number): number {
 function marks(p: Parts, s: ChipState, sq: number): void {
   const { g } = p;
   const top = -H / 2;
-  if (s.supply !== null && (s.supply < LOW_SUPPLY || s.starving)) {
+  if (s.starving || (s.supply !== null && s.supply < LOW_SUPPLY)) {
     const x = sq + SQUARE - WARN / 2 - 2;
     const y = top + WARN / 2 + 2;
     g.poly([x, y - WARN / 2, x + WARN / 2, y + WARN / 2, x - WARN / 2, y + WARN / 2])

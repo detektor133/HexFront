@@ -8,11 +8,12 @@ import {
   IconShield,
 } from '@tabler/icons-react';
 
-import { CITY_FOUND_BASE_COST, DEPOT_COST, FORT_COST, FP, IMPROVEMENT_COST } from '@hexfront/sim';
+import { DEPOT_COST, FORT_COST, IMPROVEMENT_COST } from '@hexfront/sim';
 
 import styles from './MapTools.module.css';
 import type { BuildTool, MapMode } from './map-modes.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { formatCompact } from '../i18n/format.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const BUILD_TOOLS: readonly {
@@ -26,13 +27,17 @@ const BUILD_TOOLS: readonly {
   { tool: 'improve', icon: IconChevronsUp, label: 'mapTools.improve' },
 ];
 
-/** Наименьшая цена стройки, fixed-point; `more` — цена растёт (город — с числом основанных). */
-const BUILD_PRICES: Record<BuildTool, { readonly fp: number; readonly more: boolean }> = {
-  city: { fp: CITY_FOUND_BASE_COST, more: true },
-  depot: { fp: DEPOT_COST, more: false },
-  fort: { fp: FORT_COST, more: false },
-  improve: { fp: IMPROVEMENT_COST[0], more: true },
-};
+/** Цена стройки, fixed-point; `more` — цена растёт с уровнем (улучшение гекса), показана наименьшая. */
+function buildPrices(
+  cityCost: number,
+): Record<BuildTool, { readonly fp: number; readonly more: boolean }> {
+  return {
+    city: { fp: cityCost, more: false },
+    depot: { fp: DEPOT_COST, more: false },
+    fort: { fp: FORT_COST, more: false },
+    improve: { fp: IMPROVEMENT_COST[0], more: true },
+  };
+}
 
 interface Props {
   readonly mapMode: MapMode;
@@ -43,6 +48,8 @@ interface Props {
   readonly bottom: number;
   /** Золото игрока, fixed-point: рядом с ценой выбранной стройки. */
   readonly gold: number;
+  /** Цена основания следующего города, fixed-point. */
+  readonly cityCost: number;
   readonly buildingsOpen: boolean;
   readonly onToggleBuildings: () => void;
 }
@@ -55,16 +62,18 @@ export function MapTools({
   setBuild,
   bottom,
   gold,
+  cityCost,
   buildingsOpen,
   onToggleBuildings,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
+  const prices = buildPrices(cityCost);
   return (
     <div className={styles.root} style={{ bottom }} data-testid="map-tools">
       {hammerOn && (
         <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
           {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => {
-            const cost = BUILD_PRICES[tool];
+            const cost = prices[tool];
             return (
               <IconButton
                 key={tool}
@@ -76,7 +85,7 @@ export function MapTools({
               >
                 <Icon size={22} stroke={1.75} />
                 <span className={gold < cost.fp ? styles.costBad : styles.cost}>
-                  {Math.floor(cost.fp / FP)}
+                  {formatCompact(cost.fp)}
                   {cost.more ? '+' : ''}
                 </span>
               </IconButton>
@@ -116,7 +125,7 @@ export function MapTools({
           label={t('mapTools.supply')}
           className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
           aria-pressed={mapMode === 'supply'}
-          onClick={() => setMapMode('supply')}
+          onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
         >
           <IconPackage size={22} stroke={1.75} />
         </IconButton>

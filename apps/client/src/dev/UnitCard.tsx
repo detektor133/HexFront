@@ -4,12 +4,12 @@ import { useLayoutEffect, useRef } from 'react';
 import {
   FP,
   MAX_UNITS_PER_HEX,
-  ORG_MAX,
   type ArmyView,
   type Command,
   type Fp,
   type MapStatic,
   type PlayerView,
+  type UnitType,
   type UnitView,
 } from '@hexfront/sim';
 
@@ -19,52 +19,35 @@ import { measureCardHeight } from './card-measurement.ts';
 import type { Picked } from './sandbox-selection.ts';
 import { UnitGlyph } from './unit-glyph.tsx';
 import { t, type MessageKey } from '../i18n/dict.ts';
-import { formatSoldiers } from '../i18n/format.ts';
+import { formatCompact } from '../i18n/format.ts';
 import { armyColor } from '../theme/colors.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
-/** Плашка отряда как фишка на карте: знак цвета армии, число солдат, столбики организации и снабжения. */
-function UnitPlate(props: {
-  u: UnitView;
-  view: PlayerView;
-  /** Отряд выбран на карте: золотая рамка, как у фишки. */
-  selected?: boolean;
-  onClick?: ((event: React.MouseEvent) => void) | undefined;
-}): React.JSX.Element {
-  const { u, view } = props;
-  const army = view.armies.find((a) => a.id === u.armyId);
-  const org = Math.max(0, Math.min(1, u.org / ORG_MAX));
-  const supply = Math.max(0, Math.min(1, (u.supplyLevel ?? FP) / FP));
-  const label = `${t(`unit.${u.type}` as MessageKey)} · ${formatSoldiers(u.soldiers)}`;
+const TYPE_ORDER: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
+
+/** Строки окна: род войск, солдаты (сокращённо) и число отрядов этого рода. */
+function TypeRows(props: { readonly units: readonly UnitView[] }): React.JSX.Element {
   return (
-    <button
-      type="button"
-      className={`${styles.plate} ${props.selected ? styles.plateSelected : ''}`}
-      aria-pressed={props.selected ?? false}
-      title={label}
-      aria-label={label}
-      onClick={props.onClick}
-    >
-      <span
-        className={styles.badge}
-        style={army ? { background: armyColor(army.number) } : undefined}
-      >
-        <UnitGlyph className={styles.glyph} type={u.type} />
-      </span>
-      <span className={styles.soldiers}>{formatSoldiers(u.soldiers)}</span>
-      <span className={styles.bars} aria-hidden="true">
-        <span className={styles.track}>
-          <span className={styles.fill} style={{ height: `${org * 100}%` }} />
-        </span>
-        <span className={styles.track}>
-          <span
-            className={styles.fill}
-            data-kind={u.encircled || supply < 0.5 ? 'low' : 'supply'}
-            style={{ height: `${supply * 100}%` }}
-          />
-        </span>
-      </span>
-    </button>
+    <ul className={styles.rows}>
+      {TYPE_ORDER.map((type) => {
+        const of = props.units.filter((u) => u.type === type);
+        if (of.length === 0) return null;
+        const soldiers = of.reduce((sum, u) => sum + u.soldiers, 0);
+        const label = t(`unit.${type}` as MessageKey);
+        return (
+          <li key={type} className={styles.row} title={label}>
+            <span className={styles.badge}>
+              <UnitGlyph className={styles.glyph} type={type} />
+            </span>
+            <span className={styles.rowName}>{label}</span>
+            <span className={styles.soldiers}>{formatCompact(soldiers)}</span>
+            <span className={styles.count} title={t('unit.count')}>
+              {'×' + String(of.length)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -84,31 +67,27 @@ function ArtilleryStatus({ unit }: { unit: UnitView }): React.JSX.Element | null
   ) : null;
 }
 
-/** Группа окна: армия (или резерв) и отряды, которые в ней показываются. */
+/** Группа окна: армия (или резерв), выбранные отряды и сколько всего отрядов в армии. */
 interface Group {
   readonly key: string;
   readonly army: ArmyView | null;
   readonly shown: readonly UnitView[];
+  readonly total: number;
 }
 
-/** Одна армия — полный список её отрядов; несколько армий или резерв — только выбранные, по карточке на армию. */
+/** По карточке на армию (или резерв): в ней только выбранные отряды. */
 function groupsOf(view: PlayerView, units: readonly UnitView[]): readonly Group[] {
   const armyIds = [...new Set(units.map((u) => u.armyId))];
-  const byId = (id: number | null): ArmyView | null =>
-    id === null ? null : (view.armies.find((a) => a.id === id) ?? null);
-  const only = armyIds.length === 1 ? armyIds[0] : undefined;
-  if (only !== undefined && only !== null) {
-    const all = view.units
-      .filter((u) => u.owner === view.playerId && u.armyId === only)
-      .sort((a, b) => a.id - b.id);
-    return [{ key: String(only), army: byId(only), shown: all }];
-  }
   return armyIds
     .sort((a, b) => (a ?? -1) - (b ?? -1))
     .map((id) => ({
       key: String(id),
-      army: byId(id),
+      army: id === null ? null : (view.armies.find((a) => a.id === id) ?? null),
       shown: units.filter((u) => u.armyId === id),
+      total:
+        id === null
+          ? units.filter((u) => u.armyId === null).length
+          : view.units.filter((u) => u.owner === view.playerId && u.armyId === id).length,
     }));
 }
 
@@ -152,8 +131,7 @@ export function UnitCard(props: {
   const mine = units.every((u) => u.owner === view.playerId);
   const groups: readonly Group[] = mine
     ? groupsOf(view, units)
-    : [{ key: 'foreign', army: null, shown: units }];
-  const selectedIds = new Set(units.map((u) => u.id));
+    : [{ key: 'foreign', army: null, shown: units, total: units.length }];
   const mergeable =
     first.armyId !== null &&
     units.every((u) => u.hex === first.hex && u.type === first.type && u.armyId === first.armyId);
@@ -177,21 +155,6 @@ export function UnitCard(props: {
   const title = units.length === 1 ? t(`unit.${first.type}` as MessageKey) : t('unit.groups');
   const tip = (base: MessageKey, reason: MessageKey | null): string =>
     reason ? `${t(base)}: ${t(reason)}` : t(base);
-  // Нажатие по плашке: выбрать только этот отряд; Ctrl/⌘ — добавить или снять; повторное нажатие
-  // по единственному выбранному выбирает все отряды армии.
-  const clickPlate = (u: UnitView, group: Group, event: React.MouseEvent): void => {
-    if (event.ctrlKey || event.metaKey) {
-      const next = selectedIds.has(u.id) ? units.filter((x) => x.id !== u.id) : [...units, u];
-      props.onPick({ hex: null, units: next.map((x) => x.id), target: null });
-      return;
-    }
-    const alone = selectedIds.size === 1 && selectedIds.has(u.id);
-    props.onPick({
-      hex: null,
-      units: (alone ? group.shown : [u]).map((x) => x.id),
-      target: null,
-    });
-  };
   const actions = mine ? (
     <div className={styles.actions}>
       <IconButton
@@ -262,17 +225,14 @@ export function UnitCard(props: {
                 </span>
               </div>
             )}
-            <div className={styles.list}>
-              {group.shown.map((u) => (
-                <UnitPlate
-                  key={u.id}
-                  u={u}
-                  view={view}
-                  selected={mine && selectedIds.has(u.id)}
-                  onClick={mine ? (event) => clickPlate(u, group, event) : undefined}
-                />
-              ))}
-            </div>
+            <TypeRows units={group.shown} />
+            {mine && group.shown.length < group.total && (
+              <p className={styles.partial}>
+                {t('unit.selectedOf')
+                  .replace('{n}', String(group.shown.length))
+                  .replace('{m}', String(group.total))}
+              </p>
+            )}
             {index === groups.length - 1 && (
               <>
                 {units.length === 1 && <ArtilleryStatus unit={first} />}

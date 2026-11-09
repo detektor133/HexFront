@@ -11,6 +11,7 @@ import { createMapView, type MapView } from '../render/map-view.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
 import { TutorialAsk } from './TutorialMenu.tsx';
+import { SettingsPanel } from '../settings/SettingsPanel.tsx';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
@@ -92,6 +93,7 @@ export function MainMenu(): React.JSX.Element {
   });
   const chooser = MAPS.find((m) => m.id === map);
   // Новичку один раз предлагают обучение; позже оно открывается кнопкой в меню.
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
 
   useEffect(() => {
@@ -308,6 +310,19 @@ export function MainMenu(): React.JSX.Element {
             <a className={styles.tutorialButton} role="button" href={tutorialUrl(nickname, color)}>
               {t('tutorial.menuButton')}
             </a>
+            <button
+              type="button"
+              className={styles.settingsButton}
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((open) => !open)}
+            >
+              {t('settings.title')}
+            </button>
+            {settingsOpen && (
+              <div className={styles.settings}>
+                <SettingsPanel />
+              </div>
+            )}
           </>
         )}
       </section>

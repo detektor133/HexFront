@@ -1,0 +1,39 @@
+.panel {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--ui-ink2);
+  font-size: var(--font-size-label);
+}
+
+.value {
+  margin-left: auto;
+  color: var(--ui-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.reset {
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface2);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.reset:disabled {
+  color: var(--ui-ink3);
+  cursor: default;
+}

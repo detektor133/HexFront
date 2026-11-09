@@ -18,10 +18,10 @@ const REFRESH_MS = 1000;
 const AFTER_COMMAND_MS = 250;
 
 /** Команда стройки выбранного здания на гексе. */
-export function buildCommand(tool: BuildTool, hex: number): Command {
+export function buildCommand(tool: BuildTool, hex: number, cityId?: number): Command {
   switch (tool) {
     case 'city':
-      return { t: 'foundCity', hex };
+      return cityId === undefined ? { t: 'foundCity', hex } : { t: 'upgradeCity', cityId };
     case 'improve':
       return { t: 'improve', hex };
     default:
@@ -60,6 +60,8 @@ export interface MapModes {
     hex: number,
     send: (cmd: Command) => void,
     at?: { readonly x: number; readonly y: number },
+    /** Город на гексе (id) — инструмент «город» улучшает его, а не основывает новый. */
+    cityAt?: (hex: number) => number | undefined,
   ): boolean;
 }
 
@@ -130,6 +132,7 @@ export function useMapModes(
       hex: number,
       send: (cmd: Command) => void,
       at?: { readonly x: number; readonly y: number },
+      cityAt?: (hex: number) => number | undefined,
     ): boolean => {
       const tool = buildRef.current;
       if (tool === null) return false;
@@ -141,7 +144,7 @@ export function useMapModes(
         setFeedback({ id: feedbackId.current, kind, x: at.x, y: at.y });
       }
       if (mask === 1) {
-        send(buildCommand(tool, hex));
+        send(buildCommand(tool, hex, cityAt?.(hex)));
         if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
         refreshTimer.current = window.setTimeout(request, AFTER_COMMAND_MS);
       }
@@ -158,7 +161,11 @@ export function useMapModes(
       setMapModeState(mode);
       setBuildState(null);
     },
-    setBuild: (tool) => setBuildState(tool),
+    setBuild: (tool) => {
+      // Режим строительства заменяет режим снабжения: выйдя из стройки, игрок видит обычную карту.
+      if (tool !== null) setMapModeState('normal');
+      setBuildState(tool);
+    },
     handleReply,
     clickHex,
   };
