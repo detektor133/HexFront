@@ -43,6 +43,10 @@ interface Props {
   readonly top: number;
   /** Нижний край таблицы лидеров, px: окно по умолчанию стоит ниже неё, не перекрывая. */
   readonly avoidY?: number;
+  /** Размер видимой области, px: на телефоне окно занимает свободное место между HUD и панелью армий. */
+  readonly viewport?: { readonly width: number; readonly height: number };
+  /** Высота нижней панели армий, px. */
+  readonly bottomInset?: number;
 }
 
 /** Окно можно двигать за заголовок; оно остаётся целиком в пределах экрана. */
@@ -114,16 +118,29 @@ export function BuildingsPanel({
   onClose,
   top,
   avoidY = 0,
+  viewport = { width: window.innerWidth, height: window.innerHeight },
+  bottomInset = 0,
 }: Props): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('cities');
   const list = buildingsList(view);
+  const phone = viewport.width <= 600 || viewport.height <= 500;
   const { pos, handle } = useDraggable({
-    x: Math.max(MARGIN, window.innerWidth - WIDTH - 16),
+    x: Math.max(MARGIN, viewport.width - WIDTH - 16),
     y: Math.min(
-      Math.max(top + 72, avoidY + 12, Math.round(window.innerHeight * 0.34)),
-      Math.max(top + 72, window.innerHeight - 340),
+      Math.max(top + 72, avoidY + 12, Math.round(viewport.height * 0.34)),
+      Math.max(top + 72, viewport.height - 340),
     ),
   });
+  // Телефон: окно не двигается, а стоит между HUD и панелью армий — слева, на всю ширину в портрете.
+  const phoneStyle: React.CSSProperties = {
+    left: MARGIN,
+    top: top + MARGIN,
+    width:
+      viewport.width > viewport.height
+        ? Math.min(WIDTH, Math.round(viewport.width / 2))
+        : viewport.width - MARGIN * 2,
+    maxHeight: Math.max(120, viewport.height - top - bottomInset - MARGIN * 3),
+  };
   const sites = (
     rows: readonly SiteRow[],
     icon: React.JSX.Element,
@@ -214,11 +231,11 @@ export function BuildingsPanel({
   return (
     <section
       className={styles.panel}
-      style={{ left: pos.x, top: pos.y, width: WIDTH }}
+      style={phone ? phoneStyle : { left: pos.x, top: pos.y, width: WIDTH }}
       aria-label={t('buildings.title')}
       data-testid="buildings-panel"
     >
-      <header className={styles.header} {...handle}>
+      <header className={styles.header} {...(phone ? {} : handle)}>
         <h2 className={styles.title}>{t('buildings.title')}</h2>
         <span className={styles.summary}>
           <GoldIcon />

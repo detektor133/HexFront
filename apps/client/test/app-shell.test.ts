@@ -40,7 +40,8 @@ describe('оболочка страницы', () => {
     expect(existsSync(`${DIST_DIRECTORY}/icon-192.png`)).toBe(true);
     expect(existsSync(`${DIST_DIRECTORY}/icon-512.png`)).toBe(true);
     expect(manifest).toContain('"name":"Hexfront"');
-    expect(manifest).toContain('"display":"standalone"');
+    expect(manifest).toContain('"display":"fullscreen"');
+    expect(manifest).toContain('"display_override":["fullscreen","standalone"]');
     expect(manifest).toContain('"start_url":"/"');
     expect(indexHtml).toContain(`<meta name="theme-color" content="${tokens.ui.surface}"`);
   });

@@ -24,9 +24,11 @@ import { useTelemetry } from '../dev/telemetry-client.ts';
 import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
 import { brightnessStyle, useBrightness } from '../settings/brightness.ts';
+import { enterFullscreenOnFirstTap } from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
 import type { ChapterId, TutorialCtx } from '../tutorial/script.ts';
+import { useViewport } from '../ui/viewport.ts';
 
 /** Экран локального матча игрока с отдельной отладочной панелью. */
 interface MatchSurfaceProps {
@@ -42,9 +44,15 @@ const ARMY_TOOLS_H = 64;
 function unitCardStyle(
   layout: React.CSSProperties | undefined,
   lift: number,
+  topInset: number,
 ): React.CSSProperties | undefined {
   if (!layout) return layout;
-  return { left: layout.left, width: layout.width, '--dock-h': `${lift}px` } as React.CSSProperties;
+  return {
+    left: layout.left,
+    width: layout.width,
+    '--dock-h': `${lift}px`,
+    '--top-inset': `${topInset}px`,
+  } as React.CSSProperties;
 }
 
 /** Время затухания окна отрядов, мс (как в UnitCard.module.css). */
@@ -58,6 +66,9 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
   const [brightness] = useBrightness();
+  const viewport = useViewport();
+  const phoneView = viewport.width <= 600 || viewport.height <= 500;
+  useEffect(() => enterFullscreenOnFirstTap(), []);
   const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
@@ -111,6 +122,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   // Карточки гекса и отряда — над нижней панелью: её высота меряется, а не задаётся числом.
   const [dockH, setDockH] = useState(0);
   const [hudH, setHudH] = useState(0);
+  const [toolsH, setToolsH] = useState(0);
   const [cardH, setCardH] = useState(0);
   const [leaderboardSize, setLeaderboardSize] = useState<
     { readonly width: number; readonly height: number } | undefined
@@ -154,10 +166,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     (view?.armies.some((a) => a.id === army) ?? false) ||
     partial.filter((a) => a !== army).length === 1;
   const layout = computeMatchLayout({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
+    viewport,
     hudHeight: hudH,
     bottomPanelHeight: dockH,
-    cardReserve: toolsShown ? ARMY_TOOLS_H : 0,
+    cardReserve: toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0,
     eventRows: feedRows(
       sb.events,
       view?.diplomacy?.incoming ?? [],
@@ -239,6 +251,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       delete style.width;
       delete style.height;
     }
+    // Нижняя панель прижата к низу экрана и растёт по содержимому: высота из раскладки её не режет.
+    if (id === 'bottom-panel') {
+      delete style.top;
+      delete style.height;
+      style.bottom = 0;
+    }
     // Пауза-меню растёт по содержимому: в нём может открыться панель настроек.
     if (id === 'pause-menu') delete style.height;
     if (id === 'leaderboard') {
@@ -246,10 +264,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       delete style.height;
       if (leaderboardSize === undefined) {
         delete style.left;
-        style.right = `${window.innerWidth <= 600 || window.innerHeight <= 500 ? 8 : 16}px`;
+        style.right = `${viewport.width <= 600 || viewport.height <= 500 ? 8 : 16}px`;
       }
     }
-    if (id === 'card' && window.innerWidth > 600 && window.innerHeight > 500) {
+    if (id === 'card' && viewport.width > 600 && viewport.height > 500) {
       delete style.width;
     }
     return style;
@@ -374,6 +392,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           partial={partial.filter((a) => a !== army)}
           pickedUnits={sb.picked.units}
           onHeight={handleArmyBarHeight}
+          onToolsHeight={setToolsH}
+          hideTools={buildingsOpen && phoneView}
           onSelect={sb.setArmy}
           onFocusArmy={sb.focusArmy}
           groups={sb.groupDigits}
@@ -407,6 +427,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onFocus={sb.focusHex}
           onClose={() => setBuildingsOpen(false)}
           top={hudH}
+          viewport={viewport}
+          bottomInset={dockH + 8}
           avoidY={(() => {
             const lb = layout.elements.find((item) => item.id === 'leaderboard');
             return lb ? lb.y + lb.height : 0;
@@ -416,7 +438,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {unitCard.value && map && styleFor('card') && (
+      {unitCard.value && map && styleFor('card') && !(buildingsOpen && phoneView) && (
         <UnitCard
           view={unitCard.value.view}
           map={map}
@@ -425,7 +447,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           send={sb.send}
           onPick={sb.pick}
           onHeight={setCardH}
-          style={unitCardStyle(styleFor('card'), dockH + (toolsShown ? ARMY_TOOLS_H : 0))}
+          style={unitCardStyle(
+            styleFor('card'),
+            dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0),
+            hudH,
+          )}
         />
       )}
       {view &&

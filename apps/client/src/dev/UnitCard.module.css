@@ -7,8 +7,8 @@
   z-index: 2;
   box-sizing: border-box;
   width: 280px;
-  max-height: calc(100vh - var(--dock-h, 0px) - 2 * var(--space-md));
-  max-height: calc(100dvh - var(--dock-h, 0px) - 2 * var(--space-md));
+  max-height: calc(100vh - var(--dock-h, 0px) - var(--top-inset, 0px) - 2 * var(--space-md));
+  max-height: calc(100dvh - var(--dock-h, 0px) - var(--top-inset, 0px) - 2 * var(--space-md));
   display: flex;
   flex-direction: column;
 }

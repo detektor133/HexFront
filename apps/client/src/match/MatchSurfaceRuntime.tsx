@@ -46,6 +46,7 @@ import {
 import { reasonText, t } from '../i18n/dict.ts';
 import { ControlGroups } from '../input/control-groups.ts';
 import { createHotkeyHandler } from '../input/hotkeys.ts';
+import { isCoarsePointer, touchTapKind } from '../input/touch-tap.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
@@ -558,7 +559,7 @@ export function useSandbox(
     };
     const onTap = (
       h: { q: number; r: number },
-      kind: TapKind,
+      rawKind: TapKind,
       world: Point,
       shift?: boolean,
       screen?: Point,
@@ -609,6 +610,18 @@ export function useSandbox(
         return pick(NOTHING_PICKED);
       }
       const hex = hexId(h, map.width);
+      // Телефон: с выбранными отрядами тап — приказ; стройка, вторжение и инструменты — как ЛКМ.
+      const kind = touchTapKind(rawKind, {
+        coarse: isCoarsePointer(),
+        selectedUnits: pickedRef.current.units.length,
+        modal:
+          mapModesRef.current.build !== null ||
+          invasionRef.current.stage !== 'off' ||
+          toolRef.current !== null,
+        ownChip: (layerRef.current?.unitsAt(world) ?? []).some(
+          (id) => current.units.find((u) => u.id === id)?.owner === current.playerId,
+        ),
+      });
       // Shift+ПКМ: цепочка приказов — точка добавляется после предыдущих, отряды идут сразу.
       if (
         kind === 'order' &&

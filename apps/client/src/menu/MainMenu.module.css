@@ -269,3 +269,27 @@
 .settings {
   margin-top: var(--space-sm);
 }
+
+/* Низкий экран (телефон в ландшафте): карточка плотнее, чтобы почти помещаться без прокрутки. */
+@media (max-height: 500px) {
+  .page {
+    place-items: start center;
+    padding: var(--space-sm);
+  }
+
+  .card {
+    padding: var(--space-md);
+  }
+
+  .subtitle {
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .field {
+    margin-top: var(--space-sm);
+  }
+
+  .play {
+    margin-top: var(--space-md);
+  }
+}

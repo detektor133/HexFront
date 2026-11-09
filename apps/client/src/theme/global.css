@@ -5,6 +5,15 @@ body,
   margin: 0;
 }
 
+/* Телефон: высота видимой области без адресной строки, чтобы нижняя панель не уезжала под неё. */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
 body {
   background: var(--map-background);
   color: var(--ui-ink);

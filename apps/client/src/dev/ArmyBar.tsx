@@ -440,6 +440,10 @@ export function ArmyBar(props: {
   invading?: boolean;
   /** Высота нижней панели (тулбар + карточки), px: карточки гекса и отряда встают над ней. */
   onHeight?: (px: number) => void;
+  /** Высота панели приказов над карточками (с отступом), px; 0 — панели нет. */
+  onToolsHeight?: (px: number) => void;
+  /** Панель приказов скрыта: на телефоне её место занимает окно «Постройки». */
+  hideTools?: boolean;
   style?: React.CSSProperties | undefined;
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -466,7 +470,25 @@ export function ArmyBar(props: {
     if (strip.firstElementChild) ro.observe(strip.firstElementChild);
     return () => ro.disconnect();
   }, []);
-  const { onHeight } = props;
+  const { onHeight, onToolsHeight } = props;
+  // Панель приказов на узком экране переносится на две строки: окна над ней сдвигаются на её высоту.
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const toolsShown = props.selected !== null && props.hideTools !== true;
+  useLayoutEffect(() => {
+    const el = toolsRef.current;
+    if (!el || !onToolsHeight) {
+      onToolsHeight?.(0);
+      return;
+    }
+    const report = (): void => onToolsHeight(Math.ceil(el.getBoundingClientRect().height) + 8);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      onToolsHeight(0);
+    };
+  }, [onToolsHeight, toolsShown]);
   useLayoutEffect(() => {
     const el = contentRef.current;
     if (!el || !onHeight) return;
@@ -543,8 +565,8 @@ export function ArmyBar(props: {
   return (
     <div className={styles.dock} style={props.style}>
       <div className={styles.content} ref={contentRef}>
-        {army && (
-          <div className={styles.tools} role="toolbar" aria-label={armyName(army)}>
+        {army && props.hideTools !== true && (
+          <div ref={toolsRef} className={styles.tools} role="toolbar" aria-label={armyName(army)}>
             <Tool
               glyph={<IconShield size={18} aria-hidden="true" />}
               tutorial="army-hold"

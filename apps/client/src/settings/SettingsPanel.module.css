@@ -37,3 +37,9 @@
   color: var(--ui-ink3);
   cursor: default;
 }
+
+.hint {
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}

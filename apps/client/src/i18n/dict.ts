@@ -83,6 +83,9 @@ const ru = {
   'menu.subtitle': 'Локальная игра против ботов',
   'menu.play': 'Играть',
   'settings.brightness': 'Яркость карты',
+  'settings.fullscreen': 'Во весь экран',
+  'settings.iosHint':
+    'Чтобы убрать адресную строку: «Поделиться» → «На экран Домой», затем запускайте игру с иконки.',
   'settings.reset': 'Сбросить',
   'menu.map': 'Карта',
   'menu.map.europe': 'Европа',
@@ -515,6 +518,9 @@ const en: Record<MessageKey, string> = {
   'menu.subtitle': 'Local game against bots',
   'menu.play': 'Play',
   'settings.brightness': 'Map brightness',
+  'settings.fullscreen': 'Fullscreen',
+  'settings.iosHint':
+    'To hide the address bar: Share → Add to Home Screen, then launch the game from the icon.',
   'settings.reset': 'Reset',
   'menu.map': 'Map',
   'menu.map.europe': 'Europe',
