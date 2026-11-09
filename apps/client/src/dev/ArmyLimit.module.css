@@ -103,3 +103,9 @@
   border: 0;
   border-radius: var(--radius-button);
 }
+
+/* Низкий экран: облачко листается внутри, а не вылезает за верх. */
+.pop {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

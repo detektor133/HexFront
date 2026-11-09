@@ -2,6 +2,8 @@ import {
   IconArrowBackUp,
   IconCheck,
   IconBuildingCastle,
+  IconChevronLeft,
+  IconChevronRight,
   IconFlag,
   IconHammer,
   IconHeartHandshake,
@@ -79,6 +81,26 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
   return <IconInfoCircle size={18} aria-hidden />;
 }
 
+/** Стрелка у правого края записи: свернуть до значка и обратно. */
+function Fold(props: { readonly folded: boolean; readonly onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className={styles.fold}
+      aria-label={t(props.folded ? 'feed.unfold' : 'feed.fold')}
+      title={t(props.folded ? 'feed.unfold' : 'feed.fold')}
+      aria-expanded={!props.folded}
+      onClick={props.onToggle}
+    >
+      {props.folded ? (
+        <IconChevronRight size={14} aria-hidden />
+      ) : (
+        <IconChevronLeft size={14} aria-hidden />
+      )}
+    </button>
+  );
+}
+
 const ownerColor = (playerId: number): string =>
   tokens.players.palette[playerId]?.line ?? tokens.ui.ink;
 
@@ -133,6 +155,14 @@ export function EventFeed(props: {
   readonly style?: React.CSSProperties | undefined;
 }): React.JSX.Element | null {
   const [now, setNow] = useState<number>(props.now);
+  // Свёрнутые записи (ключи строк): остаётся значок, у некоторых — короткая подпись.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string): void =>
+    setFolded((now) => {
+      const next = new Set(now);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   useEffect(() => {
     setNow(props.now);
   }, [props.now]);
@@ -160,7 +190,7 @@ export function EventFeed(props: {
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
       {hold !== null && (
-        <div className={styles.slot}>
+        <div className={styles.slot} data-mini={folded.has('hold')}>
           <div
             className={`${styles.item} ${hold.player === me ? '' : styles.important} ${styles.open}`}
             style={{ borderRightColor: ownerColor(hold.player) }}
@@ -170,21 +200,29 @@ export function EventFeed(props: {
             <span
               className={styles.name}
             >{`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}</span>
+            <span className={styles.short}>{`00:${String(hold.seconds).padStart(2, '0')}`}</span>
           </div>
+          <Fold folded={folded.has('hold')} onToggle={() => toggle('hold')} />
         </div>
       )}
       {grace !== undefined && (
-        <div className={styles.slot}>
+        <div className={styles.slot} data-mini={folded.has('grace')}>
           <div className={`${styles.item} ${styles.important}`} role="alert">
             <IconBuildingCastle size={18} aria-hidden className={styles.icon} />
             <span
               className={styles.name}
             >{`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}</span>
+            <span className={styles.short}>{grace}</span>
           </div>
+          <Fold folded={folded.has('grace')} onToggle={() => toggle('grace')} />
         </div>
       )}
       {signals.map(({ other, hex }) => (
-        <div className={styles.slot} key={`signal:${other}`}>
+        <div
+          className={styles.slot}
+          key={`signal:${other}`}
+          data-mini={folded.has(`signal:${other}`)}
+        >
           <button
             type="button"
             className={`${styles.item} ${styles.important} ${styles.offer} ${styles.signalRow}`}
@@ -196,10 +234,15 @@ export function EventFeed(props: {
             <IconShield size={18} aria-hidden className={styles.icon} />
             <span className={styles.name}>{`${t('signal.border')}: ${nameOf(other)}`}</span>
           </button>
+          <Fold folded={folded.has(`signal:${other}`)} onToggle={() => toggle(`signal:${other}`)} />
         </div>
       ))}
       {offers.map((offer) => (
-        <div className={styles.slot} key={`offer:${offer.from}`}>
+        <div
+          className={styles.slot}
+          key={`offer:${offer.from}`}
+          data-mini={folded.has(`offer:${offer.from}`)}
+        >
           <div
             className={`${styles.item} ${styles.offer}`}
             style={{ borderRightColor: ownerColor(offer.from) }}
@@ -228,6 +271,10 @@ export function EventFeed(props: {
               <IconX size={18} aria-hidden="true" />
             </IconButton>
           </div>
+          <Fold
+            folded={folded.has(`offer:${offer.from}`)}
+            onToggle={() => toggle(`offer:${offer.from}`)}
+          />
         </div>
       ))}
       {items.map((item) =>
@@ -247,7 +294,7 @@ export function EventFeed(props: {
           const style = { borderRightColor: ownerColor(item.event.playerId) };
 
           return (
-            <div className={styles.slot} key={item.id}>
+            <div className={styles.slot} key={item.id} data-mini={folded.has(item.id)}>
               {item.hex === null || item.hex === undefined ? (
                 <div
                   className={className}
@@ -268,6 +315,7 @@ export function EventFeed(props: {
                   {content}
                 </button>
               )}
+              <Fold folded={folded.has(item.id)} onToggle={() => toggle(item.id)} />
             </div>
           );
         })(),

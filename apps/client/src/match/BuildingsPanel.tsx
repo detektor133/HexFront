@@ -43,10 +43,8 @@ interface Props {
   readonly top: number;
   /** Нижний край таблицы лидеров, px: окно по умолчанию стоит ниже неё, не перекрывая. */
   readonly avoidY?: number;
-  /** Размер видимой области, px: на телефоне окно занимает свободное место между HUD и панелью армий. */
+  /** Размер видимой области, px: на телефоне окно подстраивается под экран. */
   readonly viewport?: { readonly width: number; readonly height: number };
-  /** Высота нижней панели армий, px. */
-  readonly bottomInset?: number;
 }
 
 /** Окно можно двигать за заголовок; оно остаётся целиком в пределах экрана. */
@@ -119,7 +117,6 @@ export function BuildingsPanel({
   top,
   avoidY = 0,
   viewport = { width: window.innerWidth, height: window.innerHeight },
-  bottomInset = 0,
 }: Props): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('cities');
   const list = buildingsList(view);
@@ -131,16 +128,23 @@ export function BuildingsPanel({
       Math.max(top + 72, viewport.height - 340),
     ),
   });
-  // Телефон: окно не двигается, а стоит между HUD и панелью армий — слева, на всю ширину в портрете.
-  const phoneStyle: React.CSSProperties = {
-    left: MARGIN,
-    top: top + MARGIN,
-    width:
-      viewport.width > viewport.height
-        ? Math.min(WIDTH, Math.round(viewport.width / 2))
-        : viewport.width - MARGIN * 2,
-    maxHeight: Math.max(120, viewport.height - top - bottomInset - MARGIN * 3),
-  };
+  // Телефон: окно не двигается. Портрет — нижний лист на всю ширину не выше 60 % экрана; ландшафт —
+  // колонка слева от HUD до низа, не шире 45 %. Панель армий на это время скрыта, кнопки режимов
+  // карты стоят справа и окна не касаются.
+  const landscape = viewport.width > viewport.height;
+  const phoneStyle: React.CSSProperties = landscape
+    ? {
+        left: MARGIN,
+        top: top + MARGIN,
+        width: Math.min(WIDTH, Math.round(viewport.width * 0.45)),
+        maxHeight: Math.max(120, viewport.height - top - MARGIN * 2),
+      }
+    : {
+        left: MARGIN,
+        bottom: MARGIN,
+        width: viewport.width - MARGIN * 2,
+        maxHeight: Math.min(Math.round(viewport.height * 0.6), viewport.height - top - MARGIN * 2),
+      };
   const sites = (
     rows: readonly SiteRow[],
     icon: React.JSX.Element,

@@ -151,3 +151,44 @@ div.item {
 .signalRow {
   cursor: pointer;
 }
+
+/* Стрелка свёртывания у правого края записи: запись сжимается до значка, повторное нажатие раскрывает. */
+.fold {
+  display: flex;
+  flex: 0 0 22px;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  min-height: 40px;
+  padding: 0;
+  margin-left: 2px;
+  color: var(--ui-ink2);
+  cursor: pointer;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.short {
+  display: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot[data-mini='true'] .item,
+.slot[data-mini='true']:hover .item,
+.slot[data-mini='true']:focus-within .item {
+  max-width: 40px;
+}
+
+.slot[data-mini='true'] .item:has(.short) {
+  max-width: 96px;
+}
+
+.slot[data-mini='true'] .name,
+.slot[data-mini='true'] .answer {
+  display: none;
+}
+
+.slot[data-mini='true'] .short {
+  display: inline;
+}

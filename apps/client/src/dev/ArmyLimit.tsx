@@ -41,7 +41,12 @@ export function ArmyLimit(props: {
     <div
       ref={ref}
       className={styles.pop}
-      style={{ left, bottom: window.innerHeight - anchor.top + 8, width: WIDTH }}
+      style={{
+        left,
+        bottom: window.innerHeight - anchor.top + 8,
+        width: WIDTH,
+        maxHeight: Math.max(120, anchor.top - 8 - 56),
+      }}
       role="dialog"
       aria-label={t('army.composition')}
     >

@@ -1,4 +1,4 @@
-import { IconTrophy } from '@tabler/icons-react';
+import { IconChevronUp, IconTrophy } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { PlayerView } from '@hexfront/sim';
@@ -108,6 +108,10 @@ export function Leaderboard({
   const shown = sorted.slice(0, 5).map((row, index) => ({ row, place: index + 1 }));
   const mineIndex = sorted.findIndex((row) => row.playerId === view.playerId);
   const mine = sorted[mineIndex];
+  const alive = t('leaderboard.aliveCount').replace(
+    '{count}',
+    String(view.players.filter((player) => player.status === 'alive').length),
+  );
   if (mine && mineIndex >= 5) shown.push({ row: mine, place: mineIndex + 1 });
   return (
     <section
@@ -117,14 +121,27 @@ export function Leaderboard({
       aria-label={t('leaderboard.title')}
     >
       <h2 className={styles.title}>
-        <IconTrophy size={16} aria-hidden="true" />
-        <span>{t('leaderboard.title')}</span>
-        <span className={styles.alive}>
-          {t('leaderboard.aliveCount').replace(
-            '{count}',
-            String(view.players.filter((player) => player.status === 'alive').length),
-          )}
-        </span>
+        {isDesktopViewport() ? (
+          <>
+            <IconTrophy size={16} aria-hidden="true" />
+            <span>{t('leaderboard.title')}</span>
+            <span className={styles.alive}>{alive}</span>
+          </>
+        ) : (
+          // Телефон: заголовок — кнопка, второе нажатие сворачивает таблицу обратно в метку.
+          <button
+            type="button"
+            className={styles.fold}
+            aria-expanded="true"
+            aria-label={t('leaderboard.collapse')}
+            onClick={() => onOpenChange(false)}
+          >
+            <IconTrophy size={16} aria-hidden="true" />
+            <span>{t('leaderboard.title')}</span>
+            <span className={styles.alive}>{alive}</span>
+            <IconChevronUp size={16} aria-hidden="true" />
+          </button>
+        )}
       </h2>
       <ol
         className={styles.rows}

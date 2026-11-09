@@ -143,8 +143,8 @@
 .card {
   box-sizing: border-box;
   display: flex;
-  flex: 0 0 210px;
-  min-height: 78px;
+  flex: 0 0 176px;
+  min-height: 66px;
   overflow: hidden;
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
@@ -299,9 +299,9 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
 }
 
 .name {
@@ -493,7 +493,49 @@
 
 @media (max-width: 600px) {
   .dock {
-    padding: 0 var(--space-sm) var(--space-sm);
+    padding: 0 var(--space-xs) var(--space-xs);
+  }
+
+  .card {
+    flex-basis: 150px;
+    min-height: 60px;
+  }
+
+  .strip {
+    margin-bottom: var(--space-xs);
+  }
+
+  /* Приказы в один ряд: 40 px по ширине (высота по-прежнему 44), иначе на 360 px они переносятся. */
+  .tools {
+    gap: 0;
+    padding: 2px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .tool {
+    min-width: 40px;
+    padding: 0;
+  }
+}
+
+/* Телефон в ландшафте: высоты мало, поэтому всё плотнее. */
+@media (max-height: 500px) {
+  .dock {
+    padding: 0 var(--space-xs) var(--space-xs);
+  }
+
+  .strip {
+    margin-bottom: var(--space-xs);
+  }
+
+  .tools {
+    gap: 0;
+    padding: 2px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .card {
+    min-height: 60px;
   }
 }
 

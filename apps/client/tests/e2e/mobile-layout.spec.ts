@@ -87,6 +87,19 @@ async function problems(page: Page): Promise<string[]> {
         }
       }
     }
+    // Нижняя панель целиком на экране и не залезает под верхнюю.
+    const dock = document.querySelector<HTMLElement>('[class*="_dock_"]');
+    const header = document.querySelector('header')?.getBoundingClientRect();
+    if (dock && getComputedStyle(dock).display !== 'none') {
+      const d = dock.getBoundingClientRect();
+      if (d.bottom > H + 0.5) out.push('нижняя панель ниже экрана');
+      if (d.right > W + 0.5) out.push('нижняя панель шире экрана');
+      if (header && d.top < header.bottom) out.push('нижняя панель залезла под верхнюю');
+      if (d.height > H * 0.45)
+        out.push(`нижняя панель занимает ${Math.round((d.height / H) * 100)} % высоты`);
+    }
+    const top = document.querySelector('header')?.getBoundingClientRect().top ?? 0;
+    if (top < -0.5) out.push('верхняя панель уехала вверх: страница прокрутилась');
     if (document.documentElement.scrollWidth > W) out.push('горизонтальная прокрутка страницы');
     if (document.documentElement.scrollHeight > H) out.push('вертикальная прокрутка страницы');
     return out;
@@ -135,15 +148,34 @@ for (const size of SIZES) {
     report.build = await problems(page);
     await click(page, '[data-tutorial="hammer"]');
 
+    // Облачко состава армии не вылезает за экран и не закрывает верхнюю панель.
     await page.evaluate(() => {
-      document.querySelector<HTMLElement>('[class*="settingsButton"]')?.click();
+      document.querySelector<HTMLElement>('[data-tutorial="army-limit"]')?.click();
     });
     await page.waitForTimeout(350);
-    report.settings = await problems(page);
+    report.limit = await problems(page);
+    await page.keyboard.press('Escape');
+
+    // Таблица лидеров на телефоне: открывается нажатием и закрывается им же.
+    const board = '[aria-label="Таблица лидеров"], [aria-label="Leaderboard"]';
+    const chip = page.locator(`button${board}`);
+    if ((await chip.count()) > 0) {
+      await page.evaluate(
+        (sel) => document.querySelector<HTMLElement>(sel)?.click(),
+        `button${board}`,
+      );
+      await page.waitForTimeout(300);
+      report.leaderboard = await problems(page);
+      await page.evaluate(() => {
+        document.querySelector<HTMLElement>('section [aria-expanded="true"]')?.click();
+      });
+      await page.waitForTimeout(300);
+      if ((await page.locator(`button${board}`).count()) === 0) {
+        report.leaderboard.push('таблица лидеров не свернулась вторым нажатием');
+      }
+    }
 
     await page.evaluate(() => {
-      const gear = document.querySelector<HTMLElement>('[class*="settingsButton"]');
-      gear?.click();
       const pause = Array.from(document.querySelectorAll<HTMLElement>('header button')).find((b) =>
         /пауза|pause/iu.test(b.getAttribute('aria-label') ?? b.title ?? ''),
       );

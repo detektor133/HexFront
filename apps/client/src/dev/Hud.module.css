@@ -300,7 +300,7 @@
 @media (min-width: 601px) {
   .hud {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) repeat(2, var(--touch-target-min));
+    grid-template-columns: repeat(6, minmax(0, 1fr)) var(--touch-target-min);
   }
 
   .hud > :where(.slot, .taxWrap) {
@@ -324,11 +324,6 @@
   .taxWrap {
     grid-column: 3;
   }
-
-  .settingsWrap {
-    grid-column: 7;
-    inline-size: var(--touch-target-min);
-  }
 }
 
 /* Телефон в портрете: две строки, вторая мельче (ui.md). */
@@ -344,11 +339,11 @@
   }
 
   .compactValue {
-    display: none;
+    display: inline;
   }
 
   .fullValue {
-    display: inline;
+    display: none;
   }
 
   .hud > :where(.slot, .taxWrap) {

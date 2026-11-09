@@ -3,6 +3,8 @@
   position: relative;
   height: 100%;
   overflow: hidden;
+  /* clip запрещает и программную прокрутку (scrollIntoView): верхняя панель не уезжает. */
+  overflow: clip;
 }
 
 .map {

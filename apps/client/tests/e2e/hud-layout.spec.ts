@@ -20,7 +20,7 @@ for (const width of WIDTHS) {
       let previousRight = hudRect.left;
       if (hudRect.width <= 0 || hudRect.height <= 0) errors.push('HUD имеет нулевой размер');
       if (element.scrollWidth > element.clientWidth) errors.push('HUD имеет горизонтальный скролл');
-      if (groups.length !== 8) errors.push(`ожидалось 8 групп, получено ${groups.length}`);
+      if (groups.length !== 7) errors.push(`ожидалось 7 групп, получено ${groups.length}`);
       for (const [index, group] of groups.entries()) {
         const rect = group.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0)

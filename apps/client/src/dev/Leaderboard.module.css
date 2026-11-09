@@ -116,3 +116,23 @@
 .eliminated {
   color: var(--ui-ink3);
 }
+
+/* Телефон: заголовок открытой таблицы — кнопка свёртывания на всю ширину. */
+.fold {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.fold > .alive {
+  margin-left: auto;
+}

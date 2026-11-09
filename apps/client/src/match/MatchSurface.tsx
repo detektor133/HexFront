@@ -95,6 +95,24 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       }),
     [mapRequest.seed, sb.setPaused],
   );
+  // Режим строительства и выбор армии несовместимы: включённая стройка снимает выбор.
+  const buildTool = sb.mapModes.build;
+  useEffect(() => {
+    if (buildTool === null) return;
+    sb.pick(NOTHING_PICKED);
+    sb.setArmy(null);
+  }, [buildTool]);
+  // Телефон: любое нажатие вне таблицы лидеров сворачивает её в метку.
+  useEffect(() => {
+    if (!leaderboardOpen || viewport.width > 600) return;
+    const onDown = (event: PointerEvent): void => {
+      const target = event.target as Element | null;
+      if (target?.closest('[aria-label="' + t('leaderboard.title') + '"]')) return;
+      setLeaderboardOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [leaderboardOpen, viewport.width]);
   // ПКМ в матче — приказ и меню страны: контекстное меню браузера не нужно нигде на странице.
   useEffect(() => {
     const noMenu = (event: MouseEvent): void => event.preventDefault();
@@ -277,19 +295,21 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} style={brightnessStyle(brightness)} />
-      <EventFeed
-        items={sb.events}
-        offers={view?.diplomacy?.incoming ?? []}
-        signals={offscreen}
-        onSignal={sb.centerOnHex}
-        hold={view?.victoryHold}
-        nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
-        send={sb.send}
-        graceLeftS={view?.me.graceLeftS}
-        {...(view ? { localPlayerId: view.playerId } : {})}
-        now={performance.now()}
-        onFocus={sb.focusEvent}
-      />
+      {!pauseState.menuOpen && (
+        <EventFeed
+          items={sb.events}
+          offers={view?.diplomacy?.incoming ?? []}
+          signals={offscreen}
+          onSignal={sb.centerOnHex}
+          hold={view?.victoryHold}
+          nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+          send={sb.send}
+          graceLeftS={view?.me.graceLeftS}
+          {...(view ? { localPlayerId: view.playerId } : {})}
+          now={performance.now()}
+          onFocus={sb.focusEvent}
+        />
+      )}
       {view && (
         <Hud
           view={view}
@@ -405,7 +425,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onHoldPick={sb.setHoldPick}
           onInvade={sb.invasion.start}
           invading={sb.invasion.stage !== 'off'}
-          style={styleFor('bottom-panel')}
+          style={
+            phoneView && buildingsOpen
+              ? { ...styleFor('bottom-panel'), display: 'none' }
+              : styleFor('bottom-panel')
+          }
         />
       )}
       <BuildFeedbackMark feedback={sb.mapModes.feedback} />
@@ -416,7 +440,19 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           setMapMode={sb.mapModes.setMapMode}
           setBuild={sb.mapModes.setBuild}
           bottom={dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0) + 12}
-          top={phoneView && viewport.width > viewport.height ? hudH + 8 : undefined}
+          top={
+            phoneView
+              ? (viewport.width > viewport.height
+                  ? hudH
+                  : Math.max(
+                      hudH,
+                      (() => {
+                        const lb = layout.elements.find((item) => item.id === 'leaderboard');
+                        return lb ? lb.y + lb.height : 0;
+                      })(),
+                    )) + 8
+              : undefined
+          }
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           cityCost={view.me.foundCityCost}
           buildingsOpen={buildingsOpen}
@@ -431,7 +467,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onClose={() => setBuildingsOpen(false)}
           top={hudH}
           viewport={viewport}
-          bottomInset={dockH}
           avoidY={(() => {
             const lb = layout.elements.find((item) => item.id === 'leaderboard');
             return lb ? lb.y + lb.height : 0;
@@ -441,7 +476,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}
-      {unitCard.value && map && styleFor('card') && !(buildingsOpen && phoneView) && (
+      {unitCard.value && map && styleFor('card') && !phoneView && (
         <UnitCard
           view={unitCard.value.view}
           map={map}

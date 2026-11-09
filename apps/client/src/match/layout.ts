@@ -227,7 +227,12 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const cardAvailableHeight = bottomY - cardReserve - input.hudHeight - gap * 2;
   if (input.cardOpen && !input.popupOpen && !input.paused && cardAvailableHeight >= 44) {
     const cardHeight = Math.min(Math.max(44, input.cardHeight), cardAvailableHeight);
-    const cardWidth = phoneViewport ? width - edge * 2 : 320;
+    // Портрет — на всю ширину; ландшафт — не больше половины, чтобы справа осталась карта.
+    const cardWidth = !phoneViewport
+      ? 320
+      : width > height
+        ? Math.min(360, Math.round(width * 0.45))
+        : width - edge * 2;
     elements.push(
       layoutElement(
         'card',

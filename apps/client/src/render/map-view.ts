@@ -133,6 +133,9 @@ const POOL_CLEAR_MS = 15_000;
 /** Плагин отсечения подключается один раз на страницу, а не на каждую карту. */
 let cullerAdded = false;
 
+/** Как часто пересчитываются слои карты, пока меняется масштаб, мс. */
+const MID_THROTTLE_MS = 100;
+
 /** Создаёт карту в host и сообщает масштаб, детализацию и fps через onState. */
 export async function createMapView(
   host: HTMLElement,
@@ -219,15 +222,25 @@ export async function createMapView(
   });
 
   const cameraListeners = new Set<() => void>();
+  let lastMidMs = 0;
+  let lastLayerScale = 0;
   const apply = (): void => {
     world.position.set(Math.round(cam.x), Math.round(cam.y));
     world.scale.set(cam.scale);
     for (const listener of cameraListeners) listener();
     const level = detailLevel(cam.scale);
-    layer.update(cam.scale, level);
-    if (cam.scale !== drawnScale) {
+    // Щипок и колесо меняют масштаб каждый кадр, а перестройка слоёв (фишки, подписи) дорогая:
+    // пока масштаб движется, слои обновляются не чаще раза в MID_THROTTLE_MS, остальное время
+    // картинку масштабирует сам контейнер. Когда жест кончился, следующий же кадр дорисует точно.
+    const now = performance.now();
+    const moving = cam.scale !== lastLayerScale;
+    lastLayerScale = cam.scale;
+    const due = !moving || now - lastMidMs >= MID_THROTTLE_MS;
+    if (due) layer.update(cam.scale, level);
+    if (cam.scale !== drawnScale && due) {
       mid?.update(cam.scale, level);
       drawnScale = cam.scale;
+      lastMidMs = now;
     }
     onState({ scale: cam.scale, level, fps: app.ticker.FPS });
   };

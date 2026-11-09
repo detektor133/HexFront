@@ -561,9 +561,14 @@ export function ArmyBar(props: {
   const reserve = mine.filter((u) => u.armyId === null);
   // Выбранная армия всегда в видимой части ленты, даже если её выбрали на карте или клавишей.
   useEffect(() => {
-    stripRef.current
-      ?.querySelector('[aria-pressed="true"]')
-      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    // Лента листается сама, страница — нет: scrollIntoView сдвинул бы весь интерфейс вверх.
+    const strip = stripRef.current;
+    const card = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!strip || !card) return;
+    const from = card.getBoundingClientRect();
+    const box = strip.getBoundingClientRect();
+    if (from.left < box.left) strip.scrollLeft += from.left - box.left;
+    else if (from.right > box.right) strip.scrollLeft += from.right - box.right;
   }, [selected]);
   return (
     <div className={styles.dock} style={props.style}>

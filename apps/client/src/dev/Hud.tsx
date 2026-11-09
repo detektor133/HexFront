@@ -22,7 +22,6 @@ import {
   formatRate,
   formatRateFull,
 } from '../i18n/format.ts';
-import { SettingsPanel } from '../settings/SettingsPanel.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
 import { MetricIcon, type MetricIconName } from '../ui/metric-icon.tsx';
 
@@ -74,16 +73,6 @@ function Slot(props: {
   );
 }
 
-// Шестерёнка Tabler Icons «settings» (art/ui.md: кнопки меню и настроек — Tabler, outline 1,75).
-function SettingsIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" className={styles.settingsIcon} aria-hidden="true">
-      <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
-      <path d="M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
-    </svg>
-  );
-}
-
 /**
  * Закрывает открытое окно по клику вне его (и вне кнопки-открывашки) и по Esc: окно не должно
  * держать экран, пока не попадёшь именно в кнопку.
@@ -112,66 +101,6 @@ function useDismiss(
       window.removeEventListener('keydown', onKey);
     };
   }, [open, close]);
-}
-
-// Меню настроек: пока одна настройка — «Автокомандование» для новых армий (art/ui.md, CR-006).
-function Settings(props: {
-  view: PlayerView;
-  send: (cmd: Command) => void;
-  fog: boolean;
-  setFog: (on: boolean) => void;
-  showFog: boolean;
-  onOpenChange?: (open: boolean) => void;
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const { onOpenChange } = props;
-  useDismiss(
-    open,
-    [wrapRef],
-    useCallback(() => {
-      setOpen(false);
-      onOpenChange?.(false);
-    }, [onOpenChange]),
-  );
-  return (
-    <div ref={wrapRef} className={styles.settingsWrap}>
-      <IconButton
-        type="button"
-        className={`${styles.settingsButton} ${styles.hudInteractive}`}
-        label={t('settings.title')}
-        aria-expanded={open}
-        onClick={() =>
-          setOpen((open) => {
-            const next = !open;
-            props.onOpenChange?.(next);
-            return next;
-          })
-        }
-      >
-        <SettingsIcon />
-      </IconButton>
-      {open && (
-        <div className={styles.settingsMenu} role="dialog" aria-label={t('settings.title')}>
-          {props.showFog && (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={props.fog}
-              className={styles.switchRow}
-              onClick={() => props.setFog(!props.fog)}
-            >
-              <span>{t('settings.fog')}</span>
-              <span className={props.fog ? styles.switchOn : styles.switchOff}>
-                <span className={styles.knob} />
-              </span>
-            </button>
-          )}
-          <SettingsPanel />
-        </div>
-      )}
-    </div>
-  );
 }
 
 function PlayerPauseIcon(): React.JSX.Element {
@@ -332,14 +261,6 @@ export function Hud(props: {
       />
       <Slot icon="time" value={formatClock(view.tick, TICKS_PER_S)} />
       <Slot icon="place" value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`} />
-      <Settings
-        view={view}
-        send={props.send}
-        fog={props.fog}
-        setFog={props.setFog}
-        showFog={props.showFog ?? true}
-        {...(props.onPopupChange ? { onOpenChange: props.onPopupChange } : {})}
-      />
       {props.onPause && (
         <IconButton
           type="button"
