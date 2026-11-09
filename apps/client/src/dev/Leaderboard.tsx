@@ -1,4 +1,4 @@
-import { IconChevronUp, IconTrophy } from '@tabler/icons-react';
+import { IconTrophy } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { PlayerView } from '@hexfront/sim';
@@ -41,7 +41,7 @@ function useLeaderboard(view: PlayerView): readonly LeaderboardRow[] {
 }
 
 function isDesktopViewport(): boolean {
-  return window.innerWidth > 600;
+  return window.innerWidth > 600 && window.innerHeight > 500;
 }
 
 /** Показывает сводку матча и обновляет её раз в секунду. */
@@ -49,10 +49,9 @@ export function Leaderboard({
   view,
   onPick,
   open = true,
-  onOpenChange = () => undefined,
   style,
   onSize,
-}: LeaderboardProps): React.JSX.Element {
+}: LeaderboardProps): React.JSX.Element | null {
   const rows = useLeaderboard(view);
   const panelRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -88,21 +87,8 @@ export function Leaderboard({
     observer.observe(panel, { box: 'border-box' });
     return () => observer.disconnect();
   }, [onSize]);
-  const me = rows.find((row) => row.playerId === view.playerId);
-  const rank = me?.place ?? '-';
-  if (!open && !isDesktopViewport()) {
-    return (
-      <button
-        type="button"
-        className={styles.collapsed}
-        style={style}
-        onClick={() => onOpenChange(true)}
-        aria-label={t('leaderboard.title')}
-      >
-        #{rank} / {rows.length} · {me?.score ?? 0}
-      </button>
-    );
-  }
+  // Телефон: таблица скрыта, пока её не открыли нажатием на место в верхней панели.
+  if (!open && !isDesktopViewport()) return null;
   // Каждое место занимает один игрок (равные очки решают города и земля); свой ряд виден всегда.
   const sorted = sortLeaderboardRows(rows);
   const shown = sorted.slice(0, 5).map((row, index) => ({ row, place: index + 1 }));
@@ -119,29 +105,12 @@ export function Leaderboard({
       className={styles.panel}
       style={style}
       aria-label={t('leaderboard.title')}
+      data-leaderboard
     >
       <h2 className={styles.title}>
-        {isDesktopViewport() ? (
-          <>
-            <IconTrophy size={16} aria-hidden="true" />
-            <span>{t('leaderboard.title')}</span>
-            <span className={styles.alive}>{alive}</span>
-          </>
-        ) : (
-          // Телефон: заголовок — кнопка, второе нажатие сворачивает таблицу обратно в метку.
-          <button
-            type="button"
-            className={styles.fold}
-            aria-expanded="true"
-            aria-label={t('leaderboard.collapse')}
-            onClick={() => onOpenChange(false)}
-          >
-            <IconTrophy size={16} aria-hidden="true" />
-            <span>{t('leaderboard.title')}</span>
-            <span className={styles.alive}>{alive}</span>
-            <IconChevronUp size={16} aria-hidden="true" />
-          </button>
-        )}
+        <IconTrophy size={16} aria-hidden="true" />
+        <span>{t('leaderboard.title')}</span>
+        <span className={styles.alive}>{alive}</span>
       </h2>
       <ol
         className={styles.rows}

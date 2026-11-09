@@ -152,23 +152,6 @@ div.item {
   cursor: pointer;
 }
 
-/* Стрелка свёртывания у правого края записи: запись сжимается до значка, повторное нажатие раскрывает. */
-.fold {
-  display: flex;
-  flex: 0 0 22px;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  min-height: 40px;
-  padding: 0;
-  margin-left: 2px;
-  color: var(--ui-ink2);
-  cursor: pointer;
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-button);
-}
-
 .short {
   display: none;
   font-variant-numeric: tabular-nums;
@@ -177,11 +160,11 @@ div.item {
 .slot[data-mini='true'] .item,
 .slot[data-mini='true']:hover .item,
 .slot[data-mini='true']:focus-within .item {
-  max-width: 40px;
+  max-width: 76px;
 }
 
 .slot[data-mini='true'] .item:has(.short) {
-  max-width: 96px;
+  max-width: 132px;
 }
 
 .slot[data-mini='true'] .name,
@@ -191,4 +174,100 @@ div.item {
 
 .slot[data-mini='true'] .short {
   display: inline;
+}
+
+/* Содержимое строки: значок и подпись (кнопка, если строка ведёт к месту на карте). */
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+
+button.main {
+  cursor: pointer;
+}
+
+/* Стрелка в правом краю самой строки: без собственной рамки, отделена тонкой чертой. */
+.fold {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-width: 24px;
+  min-height: 0;
+  padding: 0;
+  margin-left: var(--space-xs);
+  color: var(--ui-ink2);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-left: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+}
+
+.fold:hover,
+.fold:focus-visible {
+  color: var(--ui-ink);
+  background: var(--ui-surface2);
+}
+
+/* Кнопки ответа на договор — как кнопки остального интерфейса: рамка, скругление токена, принять — главная. */
+.answer {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.accept {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+/* Сенсорный экран: наведения нет, записи сразу раскрыты. */
+@media (pointer: coarse) {
+  .item {
+    max-width: 360px;
+  }
+}
+
+/* Телефон: мельче шрифт и отступы, лента не закрывает интерфейс. */
+@media (max-width: 600px), (max-height: 500px) {
+  .item {
+    gap: var(--space-xs);
+    min-height: 32px;
+    padding: 2px 2px 2px 8px;
+    font-size: 12px;
+  }
+
+  .main {
+    gap: var(--space-xs);
+  }
+
+  .answer {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+  }
 }

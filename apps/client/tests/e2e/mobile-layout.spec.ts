@@ -45,6 +45,8 @@ async function problems(page: Page): Promise<string[]> {
         const o = getComputedStyle(p).overflowX;
         if (o === 'auto' || o === 'scroll') clipped = true;
       }
+      // Закрытая выдвижная колонка режимов карты: за краем экрана по замыслу.
+      if (el.closest('[data-open="false"]')) continue;
       if (clipped) continue;
       boxes.push({ name, r, el });
       if (r.left < -0.5 || r.top < -0.5 || r.right > W + 0.5 || r.bottom > H + 0.5) {
@@ -85,6 +87,21 @@ async function problems(page: Page): Promise<string[]> {
         if (r.width > 0 && (r.left < hr.left - 0.5 || r.right > hr.right + 0.5)) {
           out.push(`текст верхней панели вне панели: "${el.textContent ?? ''}"`);
         }
+      }
+    }
+    // Верхняя панель: значки всех ячеек видны, а в ландшафте полоса низкая и по содержимому.
+    const bar = document.querySelector('header');
+    if (bar) {
+      for (const icon of bar.querySelectorAll('svg')) {
+        const r = icon.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8) out.push('в верхней панели не виден значок');
+      }
+      if (W > H && H <= 500) {
+        const hr = bar.getBoundingClientRect();
+        if (hr.height > 40)
+          out.push(`верхняя панель в ландшафте высокая: ${Math.round(hr.height)} px`);
+        if (hr.width > W * 0.85)
+          out.push(`верхняя панель в ландшафте широкая: ${Math.round(hr.width)} px`);
       }
     }
     // Нижняя панель целиком на экране и не залезает под верхнюю.
@@ -156,23 +173,27 @@ for (const size of SIZES) {
     report.limit = await problems(page);
     await page.keyboard.press('Escape');
 
-    // Таблица лидеров на телефоне: открывается нажатием и закрывается им же.
-    const board = '[aria-label="Таблица лидеров"], [aria-label="Leaderboard"]';
-    const chip = page.locator(`button${board}`);
-    if ((await chip.count()) > 0) {
-      await page.evaluate(
-        (sel) => document.querySelector<HTMLElement>(sel)?.click(),
-        `button${board}`,
-      );
-      await page.waitForTimeout(300);
-      report.leaderboard = await problems(page);
-      await page.evaluate(() => {
-        document.querySelector<HTMLElement>('section [aria-expanded="true"]')?.click();
-      });
-      await page.waitForTimeout(300);
-      if ((await page.locator(`button${board}`).count()) === 0) {
-        report.leaderboard.push('таблица лидеров не свернулась вторым нажатием');
-      }
+    // Таблица лидеров на телефоне скрыта; место в верхней панели открывает её, любое другое нажатие закрывает.
+    report.leaderboard = [];
+    if ((await page.locator('section[data-leaderboard]').count()) > 0) {
+      report.leaderboard.push('таблица лидеров открыта без нажатия');
+    }
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('[data-leaderboard-toggle]')?.click();
+    });
+    await page.waitForTimeout(300);
+    if ((await page.locator('section[data-leaderboard]').count()) === 0) {
+      report.leaderboard.push('место в верхней панели не открыло таблицу лидеров');
+    }
+    report.leaderboard.push(...(await problems(page)));
+    await page.evaluate(() => {
+      document
+        .querySelector('canvas')
+        ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 9 }));
+    });
+    await page.waitForTimeout(300);
+    if ((await page.locator('section[data-leaderboard]').count()) > 0) {
+      report.leaderboard.push('нажатие на карту не скрыло таблицу лидеров');
     }
 
     await page.evaluate(() => {

@@ -16,7 +16,7 @@ import {
   IconTrophy,
   IconX,
 } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Command, GameEvent, PlayerView } from '@hexfront/sim';
 
@@ -81,7 +81,7 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
   return <IconInfoCircle size={18} aria-hidden />;
 }
 
-/** Стрелка у правого края записи: свернуть до значка и обратно. */
+/** Стрелка в правом краю самой строки: свернуть запись до значка и обратно. */
 function Fold(props: { readonly folded: boolean; readonly onToggle: () => void }) {
   return (
     <button
@@ -98,6 +98,65 @@ function Fold(props: { readonly folded: boolean; readonly onToggle: () => void }
         <IconChevronLeft size={14} aria-hidden />
       )}
     </button>
+  );
+}
+
+/** Строка ленты: значок, подпись, (короткая подпись и кнопки) и стрелка свёртывания — всё в одной плашке. */
+function Row(props: {
+  readonly id: string;
+  readonly icon: React.ReactNode;
+  readonly text: string;
+  /** Подпись свёрнутой строки; без неё остаётся значок. */
+  readonly short?: string | number;
+  readonly accent?: string | undefined;
+  readonly important?: boolean;
+  readonly open?: boolean;
+  readonly offer?: boolean;
+  readonly role?: string;
+  readonly folded: boolean;
+  readonly onToggle: () => void;
+  /** Нажатие по значку и подписи; без него строка не кнопка. */
+  readonly onMain?: (() => void) | undefined;
+  readonly actions?: React.ReactNode;
+}): React.JSX.Element {
+  const classes = [
+    styles.item,
+    props.important ? styles.important : '',
+    props.open ? styles.open : '',
+    props.offer ? styles.offer : '',
+  ].join(' ');
+  const body = (
+    <>
+      <span className={styles.icon}>{props.icon}</span>
+      <span className={styles.name}>{props.text}</span>
+      {props.short !== undefined && <span className={styles.short}>{props.short}</span>}
+    </>
+  );
+  return (
+    <div className={styles.slot} data-mini={props.folded}>
+      <div
+        className={classes}
+        style={props.accent ? { borderRightColor: props.accent } : undefined}
+        role={props.role}
+      >
+        {props.onMain ? (
+          <button
+            type="button"
+            className={styles.main}
+            aria-label={props.text}
+            onClick={props.onMain}
+          >
+            {body}
+          </button>
+        ) : (
+          <span className={styles.main} aria-label={props.text} role="img">
+            {body}
+          </span>
+        )}
+        {props.actions}
+        <Fold folded={props.folded} onToggle={props.onToggle} />
+      </div>
+    </div>
   );
 }
 
@@ -153,13 +212,17 @@ export function EventFeed(props: {
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
   readonly style?: React.CSSProperties | undefined;
+  /** Телефон: нажатие в любом другом месте убирает записи ленты (новые появляются снова). */
+  readonly compact?: boolean;
 }): React.JSX.Element | null {
   const [now, setNow] = useState<number>(props.now);
   // Свёрнутые записи (ключи строк): остаётся значок, у некоторых — короткая подпись.
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+  // Убранные нажатием в другом месте: до появления новой записи с другим ключом.
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string): void =>
-    setFolded((now) => {
-      const next = new Set(now);
+    setFolded((current) => {
+      const next = new Set(current);
       if (!next.delete(key)) next.add(key);
       return next;
     });
@@ -171,11 +234,32 @@ export function EventFeed(props: {
     return () => window.clearInterval(timer);
   }, []);
   // Предложения показываются из состояния (с кнопками ответа), а не одноразовой записью.
-  const items = visibleEvents(props.items, now).filter((item) => item.event.t !== 'treatyOffered');
+  const items = visibleEvents(props.items, now).filter(
+    (item) => item.event.t !== 'treatyOffered' && !dismissed.has(`event:${item.id}`),
+  );
   const offers = props.offers ?? [];
-  const grace = props.graceLeftS;
-  const signals = props.signals ?? [];
-  const hold = props.hold ?? null;
+  const grace = dismissed.has('grace') ? undefined : props.graceLeftS;
+  const signals = (props.signals ?? []).filter(({ other }) => !dismissed.has(`signal:${other}`));
+  const hold = dismissed.has('hold') ? null : (props.hold ?? null);
+  // Ключи строк, которые можно убрать нажатием в стороне; предложения договоров остаются.
+  const dismissible = useRef<string[]>([]);
+  dismissible.current = [
+    ...items.map((item) => `event:${item.id}`),
+    ...signals.map(({ other }) => `signal:${other}`),
+    ...(grace === undefined ? [] : ['grace']),
+    ...(hold === null ? [] : ['hold']),
+  ];
+  const compact = props.compact ?? false;
+  useEffect(() => {
+    if (!compact) return;
+    const onDown = (event: PointerEvent): void => {
+      if ((event.target as Element | null)?.closest('[data-feed]')) return;
+      if (dismissible.current.length === 0) return;
+      setDismissed((current) => new Set([...current, ...dismissible.current]));
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [compact]);
   if (
     items.length === 0 &&
     offers.length === 0 &&
@@ -187,139 +271,102 @@ export function EventFeed(props: {
   }
   const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
   const me = props.localPlayerId ?? 0;
+  const fold = (key: string) => ({ folded: folded.has(key), onToggle: () => toggle(key) });
   return (
-    <div className={styles.feed} style={props.style} aria-label={t('event.feed')}>
+    <div className={styles.feed} style={props.style} aria-label={t('event.feed')} data-feed>
       {hold !== null && (
-        <div className={styles.slot} data-mini={folded.has('hold')}>
-          <div
-            className={`${styles.item} ${hold.player === me ? '' : styles.important} ${styles.open}`}
-            style={{ borderRightColor: ownerColor(hold.player) }}
-            role="status"
-          >
-            <IconTrophy size={18} aria-hidden className={styles.icon} />
-            <span
-              className={styles.name}
-            >{`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}</span>
-            <span className={styles.short}>{`00:${String(hold.seconds).padStart(2, '0')}`}</span>
-          </div>
-          <Fold folded={folded.has('hold')} onToggle={() => toggle('hold')} />
-        </div>
+        <Row
+          id="hold"
+          icon={<IconTrophy size={18} aria-hidden />}
+          text={`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}
+          short={`00:${String(hold.seconds).padStart(2, '0')}`}
+          accent={ownerColor(hold.player)}
+          important={hold.player !== me}
+          open
+          role="status"
+          {...fold('hold')}
+        />
       )}
       {grace !== undefined && (
-        <div className={styles.slot} data-mini={folded.has('grace')}>
-          <div className={`${styles.item} ${styles.important}`} role="alert">
-            <IconBuildingCastle size={18} aria-hidden className={styles.icon} />
-            <span
-              className={styles.name}
-            >{`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}</span>
-            <span className={styles.short}>{grace}</span>
-          </div>
-          <Fold folded={folded.has('grace')} onToggle={() => toggle('grace')} />
-        </div>
+        <Row
+          id="grace"
+          icon={<IconBuildingCastle size={18} aria-hidden />}
+          text={`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}
+          short={grace}
+          important
+          role="alert"
+          {...fold('grace')}
+        />
       )}
       {signals.map(({ other, hex }) => (
-        <div
-          className={styles.slot}
+        <Row
           key={`signal:${other}`}
-          data-mini={folded.has(`signal:${other}`)}
-        >
-          <button
-            type="button"
-            className={`${styles.item} ${styles.important} ${styles.offer} ${styles.signalRow}`}
-            style={{ borderRightColor: ownerColor(other) }}
-            title={t('signal.border')}
-            aria-label={`${t('signal.border')}: ${nameOf(other)}`}
-            onClick={() => props.onSignal?.(hex)}
-          >
-            <IconShield size={18} aria-hidden className={styles.icon} />
-            <span className={styles.name}>{`${t('signal.border')}: ${nameOf(other)}`}</span>
-          </button>
-          <Fold folded={folded.has(`signal:${other}`)} onToggle={() => toggle(`signal:${other}`)} />
-        </div>
+          id={`signal:${other}`}
+          icon={<IconShield size={18} aria-hidden />}
+          text={`${t('signal.border')}: ${nameOf(other)}`}
+          accent={ownerColor(other)}
+          important
+          offer
+          onMain={() => props.onSignal?.(hex)}
+          {...fold(`signal:${other}`)}
+        />
       ))}
       {offers.map((offer) => (
-        <div
-          className={styles.slot}
+        <Row
           key={`offer:${offer.from}`}
-          data-mini={folded.has(`offer:${offer.from}`)}
-        >
-          <div
-            className={`${styles.item} ${styles.offer}`}
-            style={{ borderRightColor: ownerColor(offer.from) }}
-            role="status"
-          >
-            {offer.kind === 'pact' ? (
-              <IconHeartHandshake size={18} aria-hidden className={styles.icon} />
+          id={`offer:${offer.from}`}
+          icon={
+            offer.kind === 'pact' ? (
+              <IconHeartHandshake size={18} aria-hidden />
             ) : (
-              <IconLink size={18} aria-hidden className={styles.icon} />
-            )}
-            <span
-              className={styles.name}
-            >{`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}</span>
-            <IconButton
-              className={styles.answer}
-              label={t('diplomacy.accept')}
-              onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: true })}
-            >
-              <IconCheck size={18} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              className={styles.answer}
-              label={t('diplomacy.decline')}
-              onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: false })}
-            >
-              <IconX size={18} aria-hidden="true" />
-            </IconButton>
-          </div>
-          <Fold
-            folded={folded.has(`offer:${offer.from}`)}
-            onToggle={() => toggle(`offer:${offer.from}`)}
-          />
-        </div>
-      ))}
-      {items.map((item) =>
-        (() => {
-          const other = diplomacyOther(item.event, me);
-          const text = label(item.event, me);
-          const full = other === null ? text : `${text}: ${nameOf(other)}`;
-          const content = (
+              <IconLink size={18} aria-hidden />
+            )
+          }
+          text={`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}
+          accent={ownerColor(offer.from)}
+          offer
+          role="status"
+          actions={
             <>
-              <span className={styles.icon}>
-                <EventIcon event={item.event} localPlayerId={me} />
-              </span>
-              <span className={styles.name}>{full}</span>
+              <IconButton
+                className={`${styles.answer} ${styles.accept}`}
+                label={t('diplomacy.accept')}
+                onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: true })}
+              >
+                <IconCheck size={16} aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                className={styles.answer}
+                label={t('diplomacy.decline')}
+                onClick={() => props.send?.({ t: 'answerTreaty', from: offer.from, accept: false })}
+              >
+                <IconX size={16} aria-hidden="true" />
+              </IconButton>
             </>
-          );
-          const className = `${styles.item} ${item.important ? styles.important : ''}`;
-          const style = { borderRightColor: ownerColor(item.event.playerId) };
-
-          return (
-            <div className={styles.slot} key={item.id} data-mini={folded.has(item.id)}>
-              {item.hex === null || item.hex === undefined ? (
-                <div
-                  className={className}
-                  style={item.important ? undefined : style}
-                  aria-label={full}
-                  role="img"
-                >
-                  {content}
-                </div>
-              ) : (
-                <button
-                  className={className}
-                  style={item.important ? undefined : style}
-                  type="button"
-                  aria-label={full}
-                  onClick={() => props.onFocus(item)}
-                >
-                  {content}
-                </button>
-              )}
-              <Fold folded={folded.has(item.id)} onToggle={() => toggle(item.id)} />
-            </div>
-          );
-        })(),
-      )}
+          }
+          {...fold(`offer:${offer.from}`)}
+        />
+      ))}
+      {items.map((item) => {
+        const other = diplomacyOther(item.event, me);
+        const text = label(item.event, me);
+        const full = other === null ? text : `${text}: ${nameOf(other)}`;
+        const key = `event:${item.id}`;
+        return (
+          <Row
+            key={item.id}
+            id={key}
+            icon={<EventIcon event={item.event} localPlayerId={me} />}
+            text={full}
+            accent={item.important ? undefined : ownerColor(item.event.playerId)}
+            important={item.important}
+            onMain={
+              item.hex === null || item.hex === undefined ? undefined : () => props.onFocus(item)
+            }
+            {...fold(key)}
+          />
+        );
+      })}
     </div>
   );
 }

@@ -129,7 +129,9 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const leaderboardWidth = desktop
     ? (desktopLeaderboardSize?.width ?? 0)
     : input.leaderboardOpen
-      ? width - edge * 2
+      ? width > height
+        ? Math.min(320, Math.round(width * 0.45))
+        : width - edge * 2
       : 180;
   const leaderboardRows = Math.min(5, Math.max(0, input.leaderboardRows));
   const leaderboardHeight = input.leaderboardOpen
@@ -170,7 +172,7 @@ export function computeMatchLayout(input: MatchLayoutInput): MatchLayoutSnapshot
   const showLeaderboard =
     !input.paused &&
     !cardOpenOnPhone(input, width, height) &&
-    (desktop || (!landscapeWithoutSelection && leaderboardFitsViewport));
+    (desktop || (input.leaderboardOpen && leaderboardFitsViewport));
   if (showBottomPanel) {
     elements.push(
       layoutElement('bottom-panel', 'bottom-panel', 0, bottomY, width, bottomPanelHeight),

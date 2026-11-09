@@ -368,7 +368,7 @@
 /* Число солдат под названием: крупно, цифры одной ширины, чтобы карточка не ездила. */
 .count {
   min-width: 3.4ch;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -475,6 +475,24 @@
 .stuckIcon {
   display: inline-flex;
   color: var(--status-warning);
+}
+
+/* Ряд нижней панели: слева резерв и «новая армия», справа лента карточек. */
+.stripRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  min-width: 0;
+  pointer-events: none;
+}
+
+.stripRow > .strip {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.stripRow > .reserve {
+  pointer-events: auto;
 }
 
 .reserve {

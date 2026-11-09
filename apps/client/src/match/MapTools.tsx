@@ -1,5 +1,7 @@
 import {
   IconBuildingCommunity,
+  IconChevronLeft,
+  IconChevronRight,
   IconChevronsUp,
   IconHammer,
   IconListDetails,
@@ -7,6 +9,7 @@ import {
   IconPackage,
   IconShield,
 } from '@tabler/icons-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { DEPOT_COST, FORT_COST, IMPROVEMENT_COST } from '@hexfront/sim';
 
@@ -54,6 +57,8 @@ interface Props {
   readonly cityCost: number;
   readonly buildingsOpen: boolean;
   readonly onToggleBuildings: () => void;
+  /** Колонка кнопок прячется за правый край экрана, торчит только ручка (телефон в портрете). */
+  readonly drawer?: boolean;
 }
 
 /** Правый нижний угол: молоточек (режим строительства) и режимы карты — обычная и снабжение. */
@@ -68,12 +73,30 @@ export function MapTools({
   cityCost,
   buildingsOpen,
   onToggleBuildings,
+  drawer = false,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Выдвинутая колонка прячется нажатием в любом другом месте.
+  useEffect(() => {
+    if (!drawer || !open) return;
+    const onDown = (event: PointerEvent): void => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [drawer, open]);
   const prices = buildPrices(cityCost);
   return (
     <div
-      className={top === undefined ? styles.root : `${styles.root} ${styles.fromTop}`}
+      ref={rootRef}
+      className={[
+        styles.root,
+        top === undefined ? '' : styles.fromTop,
+        drawer ? styles.drawer : '',
+      ].join(' ')}
       style={top === undefined ? { bottom } : { top }}
       data-testid="map-tools"
     >
@@ -100,42 +123,55 @@ export function MapTools({
           })}
         </div>
       )}
-      <div className={styles.column}>
-        <IconButton
-          data-tutorial="buildings"
-          label={t('buildings.title')}
-          className={buildingsOpen ? styles.active : styles.button}
-          aria-pressed={buildingsOpen}
-          onClick={onToggleBuildings}
-        >
-          <IconListDetails size={22} stroke={1.75} />
-        </IconButton>
-        <IconButton
-          data-tutorial="hammer"
-          label={t('mapTools.build')}
-          className={hammerOn ? styles.active : styles.button}
-          aria-pressed={hammerOn}
-          onClick={() => setBuild(hammerOn ? null : 'city')}
-        >
-          <IconHammer size={22} stroke={1.75} />
-        </IconButton>
-        <IconButton
-          label={t('mapTools.normal')}
-          className={mapMode === 'normal' && !hammerOn ? styles.active : styles.button}
-          aria-pressed={mapMode === 'normal'}
-          onClick={() => setMapMode('normal')}
-        >
-          <IconMap2 size={22} stroke={1.75} />
-        </IconButton>
-        <IconButton
-          data-tutorial="supply-mode"
-          label={t('mapTools.supply')}
-          className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
-          aria-pressed={mapMode === 'supply'}
-          onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
-        >
-          <IconPackage size={22} stroke={1.75} />
-        </IconButton>
+      <div className={styles.group} data-open={!drawer || open}>
+        {drawer && (
+          <button
+            type="button"
+            className={styles.handle}
+            aria-label={t('mapTools.drawer')}
+            aria-expanded={open}
+            onClick={() => setOpen((now) => !now)}
+          >
+            {open ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
+          </button>
+        )}
+        <div className={styles.column} onClickCapture={() => drawer && setOpen(false)}>
+          <IconButton
+            data-tutorial="buildings"
+            label={t('buildings.title')}
+            className={buildingsOpen ? styles.active : styles.button}
+            aria-pressed={buildingsOpen}
+            onClick={onToggleBuildings}
+          >
+            <IconListDetails size={22} stroke={1.75} />
+          </IconButton>
+          <IconButton
+            data-tutorial="hammer"
+            label={t('mapTools.build')}
+            className={hammerOn ? styles.active : styles.button}
+            aria-pressed={hammerOn}
+            onClick={() => setBuild(hammerOn ? null : 'city')}
+          >
+            <IconHammer size={22} stroke={1.75} />
+          </IconButton>
+          <IconButton
+            label={t('mapTools.normal')}
+            className={mapMode === 'normal' && !hammerOn ? styles.active : styles.button}
+            aria-pressed={mapMode === 'normal'}
+            onClick={() => setMapMode('normal')}
+          >
+            <IconMap2 size={22} stroke={1.75} />
+          </IconButton>
+          <IconButton
+            data-tutorial="supply-mode"
+            label={t('mapTools.supply')}
+            className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
+            aria-pressed={mapMode === 'supply'}
+            onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
+          >
+            <IconPackage size={22} stroke={1.75} />
+          </IconButton>
+        </div>
       </div>
     </div>
   );

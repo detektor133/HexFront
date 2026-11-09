@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands, validate } from '../../src/commands/apply.ts';
+import { playerView } from '../../src/queries/player-view.ts';
 import { createDiplomacy, relationOf } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
@@ -37,6 +38,15 @@ describe('мир после войны', () => {
     ]);
     applyCommands(s.state, [{ playerId: 1, cmd: { t: 'answerTreaty', from: 0, accept: true } }]);
     expect(relationOf(s.state, 0, 1)).toBe('peace');
+  });
+
+  it('предложение выбывшего игрока пропадает из вида адресата', () => {
+    const s = game();
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'proposeTreaty', target: 1, kind: 'pact' } }]);
+    expect(playerView(s.state, 1).diplomacy?.incoming).toHaveLength(1);
+    const proposer = s.state.players[0];
+    if (proposer) proposer.status = 'eliminated';
+    expect(playerView(s.state, 1).diplomacy?.incoming).toHaveLength(0);
   });
 
   it('в мире мир предложить нельзя, а пакт можно', () => {

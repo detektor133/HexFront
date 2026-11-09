@@ -661,65 +661,70 @@ export function ArmyBar(props: {
             onClose={() => setCompAnchor(null)}
           />
         )}
-        <div
-          ref={stripRef}
-          className={styles.strip}
-          data-overflow={overflow}
-          onWheel={onStripWheel}
-        >
-          <div className={styles.stripContent}>
-            {view.armies.map((a) => {
-              const units = mine.filter((u) => u.armyId === a.id);
-              return (
-                <ArmyCard
-                  key={a.id}
-                  name={armyName(a)}
-                  rawName={a.name}
-                  color={armyColor(a.number)}
-                  stats={armyStats(units)}
-                  stars={a.stars ?? 0}
-                  wanted={a.wanted}
-                  dir={a.dir}
-                  sea={a.sea}
-                  stuck={view.plans.some((p) => p.armyId === a.id && p.kind === 'front' && p.stuck)}
-                  selected={a.id === selected}
-                  partial={props.partial.includes(a.id)}
-                  onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
-                  onClick={() => select(a.id, units)}
-                  onContextAction={() => {
-                    const ids = props.pickedUnits.filter((id) => mine.some((u) => u.id === id));
-                    if (ids.length > 0 && !ids.every((id) => units.some((u) => u.id === id))) {
-                      send({ t: 'assignUnits', unitIds: ids, armyId: a.id });
-                    } else {
-                      select(a.id, units);
-                    }
-                  }}
-                  onDoubleClick={() => props.onFocusArmy?.(a.id)}
-                />
-              );
-            })}
-            <div className={styles.reserve}>
-              <IconButton
-                type="button"
-                className={styles.iconButton}
-                label={t('army.reserve')}
-                onClick={() =>
-                  props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
-                }
-              >
-                <Icon name="reserve" />
-                <span className={styles.num}>
-                  {formatSoldiers(reserve.reduce((sum, u) => sum + u.soldiers, 0))}
-                </span>
-              </IconButton>
-              <IconButton
-                type="button"
-                className={styles.iconButton}
-                label={t('army.new')}
-                onClick={() => send({ t: 'createArmy', name: '' })}
-              >
-                <Icon name="add" />
-              </IconButton>
+        <div className={styles.stripRow}>
+          {/* Резерв и «новая армия» стоят слева и не уезжают вместе с лентой карточек. */}
+          <div className={styles.reserve}>
+            <IconButton
+              type="button"
+              className={styles.iconButton}
+              label={t('army.reserve')}
+              onClick={() =>
+                props.onPick({ hex: null, units: reserve.map((u) => u.id), target: null })
+              }
+            >
+              <Icon name="reserve" />
+              <span className={styles.num}>
+                {formatSoldiers(reserve.reduce((sum, u) => sum + u.soldiers, 0))}
+              </span>
+            </IconButton>
+            <IconButton
+              type="button"
+              className={styles.iconButton}
+              label={t('army.new')}
+              onClick={() => send({ t: 'createArmy', name: '' })}
+            >
+              <Icon name="add" />
+            </IconButton>
+          </div>
+          <div
+            ref={stripRef}
+            className={styles.strip}
+            data-overflow={overflow}
+            onWheel={onStripWheel}
+          >
+            <div className={styles.stripContent}>
+              {view.armies.map((a) => {
+                const units = mine.filter((u) => u.armyId === a.id);
+                return (
+                  <ArmyCard
+                    key={a.id}
+                    name={armyName(a)}
+                    rawName={a.name}
+                    color={armyColor(a.number)}
+                    stats={armyStats(units)}
+                    stars={a.stars ?? 0}
+                    wanted={a.wanted}
+                    dir={a.dir}
+                    sea={a.sea}
+                    stuck={view.plans.some(
+                      (p) => p.armyId === a.id && p.kind === 'front' && p.stuck,
+                    )}
+                    selected={a.id === selected}
+                    partial={props.partial.includes(a.id)}
+                    onRename={(name) => send({ t: 'renameArmy', armyId: a.id, name })}
+                    onClick={() => select(a.id, units)}
+                    onContextAction={() => {
+                      const ids = props.pickedUnits.filter((id) => mine.some((u) => u.id === id));
+                      if (ids.length > 0 && !ids.every((id) => units.some((u) => u.id === id))) {
+                        send({ t: 'assignUnits', unitIds: ids, armyId: a.id });
+                      } else {
+                        select(a.id, units);
+                      }
+                    }}
+                    onDoubleClick={() => props.onFocusArmy?.(a.id)}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>

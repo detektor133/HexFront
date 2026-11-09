@@ -106,3 +106,42 @@
 .fromTop {
   align-items: flex-start;
 }
+
+/* Портрет на телефоне: колонка выезжает из-за правого края, на виду только ручка. */
+.drawer {
+  right: 0;
+}
+
+.group {
+  display: flex;
+  align-items: flex-start;
+  transition: transform 160ms ease-out;
+}
+
+.drawer .group[data-open='false'] {
+  transform: translateX(calc(100% - 22px));
+}
+
+.handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 44px;
+  padding: 0;
+  color: var(--ui-ink);
+  cursor: pointer;
+  pointer-events: auto;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-right: 0;
+  border-radius: var(--radius-card) 0 0 var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group {
+    transition: none;
+  }
+}

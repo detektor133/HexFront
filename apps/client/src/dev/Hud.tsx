@@ -35,9 +35,18 @@ function Slot(props: {
   tone?: 'success' | 'warning' | 'danger';
   /** Метка для обучения (`data-tutorial`). */
   tutorial?: string;
+  /** Ячейка — кнопка (место в таблице лидеров открывает таблицу). */
+  onPress?: () => void;
 }): React.JSX.Element {
+  const Tag = props.onPress ? 'button' : 'div';
   return (
-    <div className={styles.slot} data-tutorial={props.tutorial}>
+    <Tag
+      className={`${styles.slot} ${props.onPress ? styles.slotButton : ''}`}
+      data-tutorial={props.tutorial}
+      {...(props.onPress
+        ? { type: 'button' as const, onClick: props.onPress, 'data-leaderboard-toggle': true }
+        : {})}
+    >
       <MetricIcon
         name={props.icon}
         className={`${styles.metricIcon} ${props.icon === 'gold' ? styles.goldIcon : ''}`}
@@ -69,7 +78,7 @@ function Slot(props: {
           </span>
         )}
       </span>
-    </div>
+    </Tag>
   );
 }
 
@@ -120,6 +129,8 @@ export function Hud(props: {
   setFog: (on: boolean) => void;
   showFog?: boolean;
   onPause?: () => void;
+  /** Телефон: нажатие на место показывает или прячет таблицу лидеров. */
+  onPlaceClick?: () => void;
   onHeight?: (height: number) => void;
   onPopupChange?: (open: boolean) => void;
   onTaxAnchor?: (anchor: { x: number; y: number }) => void;
@@ -260,7 +271,11 @@ export function Hud(props: {
         {...(supplyTone ? { tone: supplyTone } : {})}
       />
       <Slot icon="time" value={formatClock(view.tick, TICKS_PER_S)} />
-      <Slot icon="place" value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`} />
+      <Slot
+        icon="place"
+        value={compactPlace ? `#${s.place}` : `#${s.place}/${s.players}`}
+        {...(props.onPlaceClick ? { onPress: props.onPlaceClick } : {})}
+      />
       {props.onPause && (
         <IconButton
           type="button"

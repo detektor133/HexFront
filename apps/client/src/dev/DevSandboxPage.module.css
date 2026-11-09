@@ -38,3 +38,24 @@
   color: var(--ui-ink2);
   font-size: var(--font-size-caption);
 }
+
+/* Телефон: «снять выбор» — маленькая кнопка слева над панелью армий, с числом выбранных отрядов. */
+.clearSelection {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--selection-color);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-hard);
+}

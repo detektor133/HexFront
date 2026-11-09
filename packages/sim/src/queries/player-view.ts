@@ -479,7 +479,11 @@ export interface DiplomacyView {
 function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {
   const d = state.diplomacy;
   if (!d) return null;
-  const live = d.offers.filter((o) => state.tick - o.tick < OFFER_TTL_TICKS);
+  // Предложение выбывшего игрока (или ему) уже не имеет смысла: ответить некому, висеть оно не должно.
+  const alive = (id: number): boolean => state.players[id]?.status === 'alive';
+  const live = d.offers.filter(
+    (o) => state.tick - o.tick < OFFER_TTL_TICKS && alive(o.from) && alive(o.to),
+  );
   return {
     relations: state.players.map((p) =>
       p.id === playerId ? 'peace' : relationOf(state, playerId, p.id),

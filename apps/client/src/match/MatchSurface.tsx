@@ -1,3 +1,4 @@
+import { IconX } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
@@ -104,15 +105,16 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   }, [buildTool]);
   // Телефон: любое нажатие вне таблицы лидеров сворачивает её в метку.
   useEffect(() => {
-    if (!leaderboardOpen || viewport.width > 600) return;
+    if (!leaderboardOpen || !phoneView) return;
     const onDown = (event: PointerEvent): void => {
       const target = event.target as Element | null;
-      if (target?.closest('[aria-label="' + t('leaderboard.title') + '"]')) return;
+      // Сама таблица и место в верхней панели (оно её открывает и закрывает) не сворачивают таблицу.
+      if (target?.closest('[data-leaderboard], [data-leaderboard-toggle]')) return;
       setLeaderboardOpen(false);
     };
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
-  }, [leaderboardOpen, viewport.width]);
+  }, [leaderboardOpen, phoneView]);
   // ПКМ в матче — приказ и меню страны: контекстное меню браузера не нужно нигде на странице.
   useEffect(() => {
     const noMenu = (event: MouseEvent): void => event.preventDefault();
@@ -267,6 +269,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     const element = layout.elements.find((item) => item.id === id);
     if (!element) return undefined;
     const style = matchLayoutElementStyle(element);
+    // Телефон в ландшафте: верхняя полоса по содержимому, прижата к левому краю.
+    if (id === 'hud' && viewport.width > viewport.height && viewport.height <= 500) {
+      delete style.width;
+      style.left = 0;
+      style.maxWidth = '100%';
+    }
     if (id === 'popup-menu') {
       delete style.width;
       delete style.height;
@@ -308,6 +316,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           {...(view ? { localPlayerId: view.playerId } : {})}
           now={performance.now()}
           onFocus={sb.focusEvent}
+          compact={phoneView}
         />
       )}
       {view && (
@@ -325,6 +334,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onTaxAnchor={setTaxAnchor}
           onTaxSize={setTaxPopupSize}
           style={styleFor('hud')}
+          {...(phoneView ? { onPlaceClick: () => setLeaderboardOpen((open) => !open) } : {})}
           popupStyle={styleFor('popup-menu')}
           {...(debug ? {} : { onPause: pauseController.pause })}
         />
@@ -432,6 +442,22 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           }
         />
       )}
+      {phoneView && sb.picked.units.length > 0 && !hideTools && !pauseState.menuOpen && (
+        <button
+          type="button"
+          className={styles.clearSelection}
+          style={{ left: 8, bottom: dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0) + 8 }}
+          aria-label={t('selection.clear')}
+          title={t('selection.clear')}
+          onClick={() => {
+            sb.pick(NOTHING_PICKED);
+            sb.setArmy(null);
+          }}
+        >
+          <IconX size={18} aria-hidden="true" />
+          <span>{sb.picked.units.length}</span>
+        </button>
+      )}
       <BuildFeedbackMark feedback={sb.mapModes.feedback} />
       {view && !debug && !pauseState.menuOpen && (
         <MapTools
@@ -456,6 +482,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           gold={view.players.find((p) => p.id === view.playerId)?.gold ?? 0}
           cityCost={view.me.foundCityCost}
           buildingsOpen={buildingsOpen}
+          drawer={phoneView && viewport.width <= viewport.height}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
         />
       )}
