@@ -51,6 +51,7 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
+import { appSearch } from '../nav.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
@@ -302,12 +303,8 @@ export function useSandbox(
   const [menu, setMenu] = useState<TerritoryMenuState | null>(null);
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [fog, setFogState] = useState(true);
-  const [paused, setPausedState] = useState(
-    readLocalMatchSetup(window.location.search).speed === 0,
-  );
-  const [speed, setSpeedState] = useState(
-    Math.max(1, readLocalMatchSetup(window.location.search).speed),
-  );
+  const [paused, setPausedState] = useState(readLocalMatchSetup(appSearch()).speed === 0);
+  const [speed, setSpeedState] = useState(Math.max(1, readLocalMatchSetup(appSearch()).speed));
   const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
@@ -443,8 +440,8 @@ export function useSandbox(
     let appliedMessage = false;
     let startCameraApplied = false;
     const deltaApplier = new ViewDeltaApplier();
-    const setup = readLocalMatchSetup(window.location.search);
-    const hudPreview = import.meta.env.DEV ? readHudPreview(window.location.search) : null;
+    const setup = readLocalMatchSetup(appSearch());
+    const hudPreview = import.meta.env.DEV ? readHudPreview(appSearch()) : null;
     const applyStartCameraToView = (currentView: PlayerView): void => {
       if (startCameraApplied || !mapViewRef.current) return;
       const city = currentView.cities.find((item) => item.owner === currentView.playerId);
@@ -507,7 +504,7 @@ export function useSandbox(
     const match = startLocalMatch(
       json,
       mapRequest.seed,
-      readLocalMatchSetup(window.location.search),
+      readLocalMatchSetup(appSearch()),
       (m) => {
         if (m.t === 'error') return setError(m.errors.join('; '));
         // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
@@ -534,7 +531,7 @@ export function useSandbox(
     match.setView(null, !debug);
     setFogState(!debug);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(appSearch());
     const initialSelect = params.get('select');
     if (initialSelect !== null) pick({ hex: Number(initialSelect), units: [], target: null });
     const initialScale = Number(params.get('scale'));

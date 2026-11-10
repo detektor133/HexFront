@@ -28,7 +28,9 @@ function setBrowser(search: string): void {
   const listeners = new Map<string, () => void>();
   Object.assign(globalThis, {
     window: {
-      location: { search, pathname: '/match', assign: vi.fn(), reload: vi.fn() },
+      location: { search, pathname: '/match', origin: 'http://localhost', reload: vi.fn() },
+      history: { state: null, pushState: vi.fn() },
+      dispatchEvent: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       setInterval: vi.fn(),
@@ -259,7 +261,11 @@ describe('пауза локального матча', () => {
     const pauseAgainMarkup = PauseMenu(menuAgain?.props as never);
     const menuAgainButtons = (pauseAgainMarkup.props.children as unknown as ElementNode[]).slice(1);
     (menuAgainButtons[2]?.props?.onClick as (() => void) | undefined)?.();
-    expect(window.location.assign).toHaveBeenCalledWith('/');
+    expect(window.history.pushState).toHaveBeenCalledWith(
+      { hexfront: { pathname: '/', search: '' } },
+      '',
+      '/',
+    );
   });
 
   it('рендерит PauseMenu и вызывает обработчики его кнопок', async () => {
@@ -304,7 +310,11 @@ describe('пауза локального матча', () => {
     );
     const pausedAgainButtons = (pausedAgain.props?.children as unknown as ElementNode[]).slice(1);
     (pausedAgainButtons[1]?.props?.onClick as (() => void) | undefined)?.();
-    expect(window.location.assign).toHaveBeenCalledWith('/match?map=gen&seed=73&players=30');
+    expect(window.history.pushState).toHaveBeenCalledWith(
+      { hexfront: { pathname: '/match', search: '?map=gen&seed=73&players=30' } },
+      '',
+      '/',
+    );
 
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const pausedThirdTree = MatchSurface({});
@@ -315,7 +325,11 @@ describe('пауза локального матча', () => {
     );
     const pausedThirdButtons = (pausedThird.props?.children as unknown as ElementNode[]).slice(1);
     (pausedThirdButtons[2]?.props?.onClick as (() => void) | undefined)?.();
-    expect(window.location.assign).toHaveBeenCalledWith('/');
+    expect(window.history.pushState).toHaveBeenCalledWith(
+      { hexfront: { pathname: '/', search: '' } },
+      '',
+      '/',
+    );
   });
 
   it('visibilitychange hidden вызывает паузу через обработчик MatchSurface', async () => {
@@ -356,7 +370,11 @@ describe('пауза локального матча', () => {
       (child) => child?.type === 'button',
     );
     (endButtons.at(-1)?.props?.onClick as (() => void) | undefined)?.();
-    expect(window.location.assign).toHaveBeenCalledWith('/');
+    expect(window.history.pushState).toHaveBeenCalledWith(
+      { hexfront: { pathname: '/', search: '' } },
+      '',
+      '/',
+    );
   });
 
   it('/match без debug не показывает выбор скорости', async () => {

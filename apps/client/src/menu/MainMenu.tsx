@@ -131,7 +131,7 @@ export function MainMenu(): React.JSX.Element {
       const json: unknown = await response.json();
       const loaded = loadMap(json);
       if (disposed || !loaded.ok || backgroundHostRef.current === null) return;
-      mapView = await createMapView(
+      const created = await createMapView(
         backgroundHostRef.current,
         loaded.map,
         {
@@ -143,7 +143,13 @@ export function MainMenu(): React.JSX.Element {
         },
         () => undefined,
       );
-      if (disposed) return;
+      // Меню закрыли, пока холст готовился (быстрое «Играть»): отдать его сразу, иначе он останется
+      // в памяти вместе с контекстом WebGL.
+      if (disposed) {
+        created.destroy();
+        return;
+      }
+      mapView = created;
       if (pendingMessage !== null) applyMessage(pendingMessage);
     };
     void startBackground();

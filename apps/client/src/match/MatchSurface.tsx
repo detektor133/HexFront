@@ -1,6 +1,7 @@
 import { IconX } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { appSearch, navigate } from '../nav.ts';
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
 import { MapTools } from './MapTools.tsx';
@@ -62,7 +63,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   tutorial = null,
   debug = false,
 }: MatchSurfaceProps = {}) => {
-  const mapRequest = useMemo(() => readSandboxMap(window.location.search), []);
+  const mapRequest = useMemo(() => readSandboxMap(appSearch()), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
   const [brightness] = useBrightness();
@@ -84,13 +85,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           postMessage: (message) => sb.setPaused(message.type === 'pause'),
         },
         seed: mapRequest.seed,
-        navigate: (path) => {
-          window.location.assign(path);
-        },
+        navigate,
         restart: (seed) => {
-          const params = new URLSearchParams(window.location.search);
+          const params = new URLSearchParams(appSearch());
           params.set('seed', String(seed));
-          window.location.assign(`${window.location.pathname}?${params.toString()}`);
+          navigate(`/match?${params.toString()}`);
         },
         onStateChange: (paused, menuOpen) => setPauseState({ paused, menuOpen }),
       }),
@@ -152,8 +151,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   const { army } = sb;
   const view = sb.msg?.view;
-  const groupedCardFixture =
-    new URLSearchParams(window.location.search).get('unitCard') === 'groups';
+  const groupedCardFixture = new URLSearchParams(appSearch()).get('unitCard') === 'groups';
   const fixtureSourceUnit = view?.units.find(
     (unit) => unit.owner === view.playerId && unit.order !== 'retreat' && unit.armyId !== null,
   );

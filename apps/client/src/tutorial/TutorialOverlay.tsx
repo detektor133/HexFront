@@ -5,6 +5,7 @@ import { begin, currentStep, markDone, next, settle, type Progress } from './eng
 import { STEPS, type ChapterId, type Target, type TutorialCtx } from './script.ts';
 import { stepCopy } from './texts.ts';
 import { t } from '../i18n/dict.ts';
+import { navigate } from '../nav.ts';
 
 /** Метка на экране: прямоугольник или круг вокруг цели подсказки, px страницы. */
 interface Mark {
@@ -270,7 +271,7 @@ export function TutorialOverlay(props: {
     setAnchor(null);
   }, [stepId]);
 
-  const exit = (): void => window.location.assign('/');
+  const exit = (): void => navigate('/');
   if (dismissed) return null;
   if (finished) {
     return (
