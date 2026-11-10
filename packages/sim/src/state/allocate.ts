@@ -246,30 +246,56 @@ function assignArtillery(
       candidates.add(n);
     }
   }
+  // Какие гексы линии накрывает каждая позиция — один раз, а не на каждое орудие: стоимость растёт
+  // как «позиции × линия», а не «орудия × позиции × линия».
+  const sorted = [...candidates].sort((x, y) => x - y);
+  const reach = new Map<HexId, HexId[]>();
+  for (const c of sorted) {
+    const at = hexFromId(c, width);
+    reach.set(
+      c,
+      line.filter((h) => distance(hexFromId(h, width), at) <= ARTY_RANGE),
+    );
+  }
+  // Свободные места позиции: батарея не сваливается в один гекс, когда лучшие позиции заняты.
+  const room = new Map<HexId, number>();
+  for (const c of sorted) {
+    const busy = allUnits(state).filter(
+      (u) => u.owner === owner && u.hex === c && !arty.includes(u),
+    );
+    room.set(c, Math.max(0, MAX_UNITS_PER_HEX - busy.length));
+  }
   const covered = new Set<HexId>();
   const slots = new Map<number, HexId>();
   let total = 0;
   for (const a of arty) {
     let best: HexId | undefined;
     let bestGain = -1;
-    for (const c of [...candidates].sort((x, y) => x - y)) {
+    let bestRoom = -1;
+    for (const c of sorted) {
+      const free = room.get(c) ?? 0;
+      if (free <= 0) continue;
       const at = hexFromId(c, width);
-      const gain = line
-        .filter((h) => !covered.has(h) && distance(hexFromId(h, width), at) <= ARTY_RANGE)
-        .reduce((s, h) => s + (w.get(h) ?? 0), 0);
+      let gain = 0;
+      for (const h of reach.get(c) ?? []) if (!covered.has(h)) gain += w.get(h) ?? 0;
       const closer =
         best !== undefined &&
         distance(hexFromId(a.hex, width), at) <
           distance(hexFromId(a.hex, width), hexFromId(best, width));
-      if (gain > bestGain || (gain === bestGain && closer)) {
+      // Равный выигрыш: где больше свободных мест (расходятся по гексам), затем ближе к орудию.
+      if (
+        gain > bestGain ||
+        (gain === bestGain && (free > bestRoom || (free === bestRoom && closer)))
+      ) {
         best = c;
         bestGain = gain;
+        bestRoom = free;
       }
     }
     if (best === undefined) break;
     slots.set(a.id, best);
-    const at = hexFromId(best, width);
-    for (const h of line) if (distance(hexFromId(h, width), at) <= ARTY_RANGE) covered.add(h);
+    room.set(best, (room.get(best) ?? 1) - 1);
+    for (const h of reach.get(best) ?? []) covered.add(h);
     total += Math.max(0, bestGain);
   }
   return { slots, covered: total };

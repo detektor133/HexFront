@@ -20,8 +20,8 @@ export const TICKS_PER_S = intDiv(1000, TICK_MS);
 export const NETWORK_RECALC_TICKS = 10;
 export const VISION_RECALC_TICKS = 10;
 export const FRONT_ALLOC_TICKS = 50;
-/** Сколько отрядов армии получают новый маршрут за одну расстановку: остальные — в следующую. */
-export const FRONT_ROUTE_BUDGET = 12;
+/** Сколько новых маршрутов отрядов армий с планами строится за один тик; остальные ждут следующего тика. */
+export const FRONT_ROUTES_PER_TICK = 16;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;

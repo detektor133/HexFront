@@ -7,7 +7,7 @@ import { maintainDirections } from './direction.ts';
 import {
   FRONT_ALLOC_TICKS,
   FRONT_HOLD_DENOM,
-  FRONT_ROUTE_BUDGET,
+  FRONT_ROUTES_PER_TICK,
   FRONT_REALLOC_GAIN_MIN,
   FRONT_SPLIT_MIN,
   FRONT_THREAT_RANGE,
@@ -53,22 +53,17 @@ function routeTo(
   return forced && forced.length > 0 ? { slot, path: forced } : null;
 }
 
-// Отряд идёт на своё место или встаёт на нём в оборону. Идущий отряд не бросает начатый переход:
-// новый маршрут строится от гекса, в который он уже вступает, а прогресс шага сохраняется. Иначе
-// пересмотр мест чаще времени перехода гонял бы отряд «почти дошёл — откат — снова» без конца.
-function goTo(
-  state: MatchState,
-  u: Unit,
-  slot: number,
-  line: readonly HexId[],
-  budget: { left: number },
-): void {
+// Дешёвая часть: отряд уже на месте, уже идёт на него или доводит начатый шаг. Идущий отряд не
+// бросает начатый переход: новый маршрут строится от гекса, в который он уже вступает, а прогресс
+// шага сохраняется. Иначе пересмотр мест чаще времени перехода гонял бы отряд «почти дошёл — откат —
+// снова» без конца. Возвращает true, если отряду нужен новый маршрут (поиск пути — дорогая часть).
+function settle(u: Unit, slot: number): boolean {
   u.slot = slot;
   if (u.hex === slot) {
     // Место — гекс, из которого отряд уже выходит: начатый шаг доводится, откатывать фишку нельзя.
     if (u.order === 'move' && u.moveTotal > 0 && u.path.length > 0) {
       u.path = [u.path[0] as HexId];
-      return;
+      return false;
     }
     if (u.order === 'move') {
       u.path = [];
@@ -76,18 +71,20 @@ function goTo(
       u.moveTotal = 0;
     }
     u.order = 'idle';
-    return;
+    return false;
   }
-  if (u.order === 'move' && u.path.at(-1) === slot) return;
+  if (u.order === 'move' && u.path.at(-1) === slot) return false;
   const entering = u.order === 'move' && u.moveTotal > 0 ? u.path[0] : undefined;
   if (entering === slot) {
     u.path = [slot];
-    return;
+    return false;
   }
-  // Поиск путей дорог: сотни отрядов, меняющих место разом, останавливали игру на секунды. За одну
-  // расстановку маршрут получают не больше FRONT_ROUTE_BUDGET отрядов армии, остальные — в следующую.
-  if (budget.left <= 0) return;
-  budget.left -= 1;
+  return true;
+}
+
+// Дорогая часть: маршрут к месту.
+function routeUnit(state: MatchState, u: Unit, slot: number, line: readonly HexId[]): void {
+  const entering = u.order === 'move' && u.moveTotal > 0 ? u.path[0] : undefined;
   const route = routeTo(state, u, entering ?? u.hex, slot, line);
   if (!route) {
     u.slot = -1;
@@ -191,11 +188,50 @@ function runPlan(state: MatchState, armyId: number): void {
   const keep =
     next.coverage <= next.keptCoverage + fpMul(next.keptCoverage as Fp, FRONT_REALLOC_GAIN_MIN);
   const chosen = keep ? next.kept : next.slots;
-  const budget = { left: FRONT_ROUTE_BUDGET };
+  // Места назначаются сразу всем; маршруты строит routePending — по очереди, каждый тик.
   for (const u of units) {
     const slot = chosen.get(u.id);
     if (slot === undefined) u.slot = -1;
-    else goTo(state, u, slot, next.line, budget);
+    else settle(u, slot);
+  }
+}
+
+/**
+ * Поиск пути дорог для сотен отрядов разом останавливал игру на секунды, поэтому маршруты строятся
+ * не за расстановку, а каждый тик по FRONT_ROUTES_PER_TICK штук на все армии. Очередь не хранится:
+ * ждёт тот, у кого место назначено, а пути к нему нет. Первыми идут ближние к месту (быстрее встают
+ * в строй и дешевле поиск), при равенстве — меньший id; армии обходятся по кругу, чтобы большая не
+ * держала малую. Отряд без маршрута не простаивает дольше, чем очередь впереди него.
+ */
+function routePending(state: MatchState): void {
+  const { plans } = state;
+  if (plans.length === 0) return;
+  const { width } = state.map;
+  // Один проход по отрядам матча: ждущие группируются по армии с планом.
+  const planned = new Set(plans.map((p) => p.armyId));
+  const waiting = new Map<number, { u: Unit; d: number }[]>();
+  for (const u of allUnits(state)) {
+    const army = u.armyId;
+    if (army === null || u.slot < 0 || !planned.has(army) || !planControls(u, army)) continue;
+    if (!settle(u, u.slot)) continue;
+    const list = waiting.get(army) ?? [];
+    list.push({ u, d: distance(hexFromId(u.hex, width), hexFromId(u.slot, width)) });
+    waiting.set(army, list);
+  }
+  if (waiting.size === 0) return;
+  let left = FRONT_ROUTES_PER_TICK;
+  const start = state.tick % plans.length;
+  for (let k = 0; k < plans.length && left > 0; k += 1) {
+    const plan = plans[(start + k) % plans.length] as ArmyPlan;
+    const queue = waiting.get(plan.armyId);
+    if (!queue) continue;
+    queue.sort((x, y) => x.d - y.d || x.u.id - y.u.id);
+    const line = planHexes(state, plan);
+    for (const { u } of queue) {
+      if (left <= 0) break;
+      left -= 1;
+      routeUnit(state, u, u.slot, line);
+    }
   }
 }
 
@@ -207,4 +243,5 @@ export function frontSystem(state: MatchState): void {
   for (const plan of state.plans) {
     if ((state.tick + plan.armyId) % FRONT_ALLOC_TICKS === 0) runPlan(state, plan.armyId);
   }
+  routePending(state);
 }
