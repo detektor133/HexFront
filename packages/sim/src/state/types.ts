@@ -374,8 +374,24 @@ export interface Diplomacy {
   aid?: AidWar[];
   /** Голосования альянса (вход новых членов, общий мир). */
   votes?: AllianceVote[];
+  /** Итоги недавних голосований: видны игрокам, чтобы быстрый ответ ботов не прятал исход. */
+  results?: VoteResult[];
   /** Номер следующего голосования. */
   nextVote?: number;
+}
+
+/** Итог голосования: кто как ответил и принято ли; живёт RESULT_TTL_TICKS. */
+export interface VoteResult {
+  readonly id: number;
+  readonly kind: AllianceVote['kind'];
+  readonly a: number;
+  readonly b: number;
+  readonly voters: readonly number[];
+  readonly sides?: readonly (readonly number[])[];
+  readonly yes: readonly number[];
+  readonly no: readonly number[];
+  readonly passed: boolean;
+  readonly tick: number;
 }
 
 export interface AidCall {
@@ -393,10 +409,10 @@ export interface AidWar {
   ending?: number;
 }
 
-/** join — a и b становятся одним альянсом; peace — общий мир между сторонами a и b. */
+/** join — a и b становятся одним альянсом; peace — общий мир между сторонами a и b; kick — исключить b из альянса по предложению a. */
 export interface AllianceVote {
   readonly id: number;
-  readonly kind: 'join' | 'peace';
+  readonly kind: 'join' | 'peace' | 'kick';
   readonly a: number;
   readonly b: number;
   /** Избиратели: члены обеих групп (для join — без одиночного новичка). */

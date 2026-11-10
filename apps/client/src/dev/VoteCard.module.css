@@ -72,6 +72,26 @@
   border: 0;
 }
 
+.outcome {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-button);
+}
+
+.outcome[data-result='passed'] {
+  color: var(--status-success);
+  background: var(--status-success-bg);
+}
+
+.outcome[data-result='failed'] {
+  color: var(--status-danger);
+  background: var(--status-danger-bg);
+}
+
 .subject {
   display: flex;
   align-items: center;

@@ -26,9 +26,11 @@ export function VoteCard(props: {
   const title =
     vote.kind === 'peace'
       ? t('vote.peaceTitle')
-      : vote.voters.includes(vote.a) && vote.voters.includes(vote.b)
-        ? t('vote.mergeTitle')
-        : t('vote.joinTitle');
+      : vote.kind === 'kick'
+        ? t('vote.kickTitle')
+        : vote.voters.includes(vote.a) && vote.voters.includes(vote.b)
+          ? t('vote.mergeTitle')
+          : t('vote.joinTitle');
   return (
     <section className={styles.card} role="dialog" aria-label={title} data-vote={vote.kind}>
       <header className={styles.head}>
@@ -37,6 +39,11 @@ export function VoteCard(props: {
           <IconX size={16} aria-hidden="true" />
         </IconButton>
       </header>
+      {vote.result !== null && (
+        <p className={styles.outcome} data-result={vote.result}>
+          {t(vote.result === 'passed' ? 'vote.passed' : 'vote.failed')}
+        </p>
+      )}
       <p className={styles.subject}>
         <span className={styles.dot} style={{ background: colorOf(vote.a) }} />
         {nameOf(vote.a)}
@@ -87,7 +94,7 @@ export function VoteCard(props: {
                 .replace('{no}', String(no))
                 .replace('{need}', String(need))
                 .replace('{total}', String(total))}
-              {index === 0 && (
+              {index === 0 && vote.result === null && (
                 <span className={styles.left}>
                   {vote.leftS} {t('match.seconds')}
                 </span>
@@ -96,7 +103,9 @@ export function VoteCard(props: {
           </div>
         );
       })}
-      {vote.mine === null ? (
+      {vote.result !== null ? null : !vote.canVote ? (
+        <p className={styles.done}>{t('vote.watching')}</p>
+      ) : vote.mine === null ? (
         <div className={styles.actions}>
           <button type="button" className={styles.yes} onClick={() => props.onVote(true)}>
             <IconCheck size={18} aria-hidden="true" />

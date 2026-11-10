@@ -5,6 +5,7 @@ import {
   IconLinkOff,
   IconPeace,
   IconShield,
+  IconUserMinus,
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
@@ -133,6 +134,15 @@ export function DiplomacyBlock(props: {
             onClick={() => send({ t: 'proposeTreaty', target: other, kind: 'alliance' })}
           >
             <IconLink size={18} aria-hidden="true" />
+          </IconButton>
+        )}
+        {relation === 'alliance' && d.allies.length >= 2 && (
+          <IconButton
+            className={styles.action}
+            label={t('diplomacy.expel')}
+            onClick={() => send({ t: 'proposeExpel', target: other })}
+          >
+            <IconUserMinus size={18} aria-hidden="true" />
           </IconButton>
         )}
         {(relation === 'pact' || relation === 'defense' || relation === 'alliance') && (

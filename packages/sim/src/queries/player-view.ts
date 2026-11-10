@@ -25,7 +25,7 @@ import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { OFFER_TTL_TICKS, allianceOf, groupOf, relationOf } from '../state/relations.ts';
 import type { Relation, TreatyKind } from '../state/types.ts';
-import type { ConstructionKind, MatchState } from '../state/types.ts';
+import type { ConstructionKind, Diplomacy, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import {
   incomeBases,
@@ -488,7 +488,7 @@ export interface DiplomacyView {
   /** Голосования альянса, где я избиратель: ход голосов и мой ответ (null — ещё не ответил). */
   readonly votes: readonly {
     readonly id: number;
-    readonly kind: 'join' | 'peace';
+    readonly kind: 'join' | 'peace' | 'kick';
     readonly a: number;
     readonly b: number;
     readonly voters: readonly number[];
@@ -499,11 +499,55 @@ export interface DiplomacyView {
     /** Секунд до конца голосования (не решили — отказ). */
     readonly leftS: number;
     readonly mine: 'yes' | 'no' | null;
+    /** Могу ли я голосовать (инициатор и исключаемый могут лишь смотреть). */
+    readonly canVote: boolean;
+    /** Итог: принято, отклонено или null, пока идёт голосование. */
+    readonly result: 'passed' | 'failed' | null;
   }[];
   /** Альянс каждого игрока по индексу: номер блока (наименьший id члена); одиночка — свой id. */
   readonly blocs: readonly number[];
   /** Состав моего альянса (без меня). */
   readonly allies: readonly number[];
+}
+
+// Голосования для игрока: идущие и недавно законченные, где он избиратель, инициатор или цель.
+function voteViews(state: MatchState, d: Diplomacy, me: number): DiplomacyView['votes'] {
+  const involved = (v: { voters: readonly number[]; a: number; b: number }): boolean =>
+    v.voters.includes(me) || v.a === me || v.b === me;
+  const view = (
+    v: {
+      id: number;
+      kind: 'join' | 'peace' | 'kick';
+      a: number;
+      b: number;
+      voters: readonly number[];
+      sides?: readonly (readonly number[])[];
+      yes: readonly number[];
+      no: readonly number[];
+      tick: number;
+    },
+    result: 'passed' | 'failed' | null,
+  ): DiplomacyView['votes'][number] => ({
+    id: v.id,
+    kind: v.kind,
+    a: v.a,
+    b: v.b,
+    voters: [...v.voters],
+    sides: (v.sides ?? []).map((side) => [...side]),
+    yes: [...v.yes],
+    no: [...v.no],
+    leftS:
+      result === null
+        ? intDiv(Math.max(0, VOTE_TTL_TICKS - (state.tick - v.tick)) + TICKS_PER_S - 1, TICKS_PER_S)
+        : 0,
+    mine: v.yes.includes(me) ? 'yes' : v.no.includes(me) ? 'no' : null,
+    canVote: v.voters.includes(me),
+    result,
+  });
+  return [
+    ...(d.votes ?? []).filter(involved).map((v) => view(v, null)),
+    ...(d.results ?? []).filter(involved).map((r) => view(r, r.passed ? 'passed' : 'failed')),
+  ];
 }
 
 export function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {
@@ -524,27 +568,7 @@ export function diplomacyView(state: MatchState, playerId: number): DiplomacyVie
     aidCalls: (d.calls ?? [])
       .filter((c) => c.ally === playerId)
       .map((c) => ({ victim: c.victim, aggressor: c.aggressor })),
-    votes: (d.votes ?? [])
-      .filter((v) => v.voters.includes(playerId))
-      .map((v) => ({
-        id: v.id,
-        kind: v.kind,
-        a: v.a,
-        b: v.b,
-        voters: [...v.voters],
-        sides: (v.sides ?? []).map((side) => [...side]),
-        yes: [...v.yes],
-        no: [...v.no],
-        leftS: intDiv(
-          Math.max(0, VOTE_TTL_TICKS - (state.tick - v.tick)) + TICKS_PER_S - 1,
-          TICKS_PER_S,
-        ),
-        mine: v.yes.includes(playerId)
-          ? ('yes' as const)
-          : v.no.includes(playerId)
-            ? ('no' as const)
-            : null,
-      })),
+    votes: voteViews(state, d, playerId),
     blocs: state.players.map((p) => groupOf(state, p.id)[0] ?? p.id),
     allies: allianceOf(state, playerId),
   };

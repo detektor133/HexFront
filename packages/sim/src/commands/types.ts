@@ -90,7 +90,9 @@ export type Command =
   | { readonly t: 'breakTreaty'; readonly target: number }
   /** Ответ на запрос помощи оборонительного пакта: вступить в войну с агрессором или отказаться (пакт аннулируется). */
   | { readonly t: 'answerAid'; readonly aggressor: number; readonly join: boolean }
-  /** Голос в голосовании альянса (вход новых членов, общий мир). */
+  /** Предлагает исключить члена альянса (голосуют остальные члены, больше половины). */
+  | { readonly t: 'proposeExpel'; readonly target: number }
+  /** Голос в голосовании альянса (вход новых членов, общий мир, исключение). */
   | { readonly t: 'castVote'; readonly voteId: number; readonly yes: boolean }
   /**
    * Наступление с заказом числа солдат: армия, фронт, линия и старт одной командой. Цель — id игрока

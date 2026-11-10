@@ -2,9 +2,12 @@
 // большинством, запросы помощи, автоматическое вступление в войну, возврат отрядов домой.
 import { executeUnitCommand } from './unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { groupOf, relationOf, setRelation } from '../state/relations.ts';
+import { allianceOf, groupOf, relationOf, setRelation } from '../state/relations.ts';
 import type { AidCall, AllianceVote, Diplomacy, MatchState, Relation } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
+
+/** Сколько итогов голосований помнит состояние. */
+const MAX_RESULTS = 8;
 
 const alive = (state: MatchState, id: number): boolean => state.players[id]?.status === 'alive';
 
@@ -81,6 +84,12 @@ export function joinAid(state: MatchState, call: AidCall): void {
 function applyVote(state: MatchState, vote: AllianceVote): void {
   const sideA = groupOf(state, vote.a);
   const sideB = groupOf(state, vote.b);
+  if (vote.kind === 'kick') {
+    // Исключённый выходит из альянса целиком: мир со всеми членами, без нарушения.
+    for (const member of allianceOf(state, vote.b)) setRelation(state, vote.b, member, 'peace');
+    state.events.push({ t: 'treatyBroken', playerId: vote.a, targetId: vote.b, kind: 'alliance' });
+    return;
+  }
   if (vote.kind === 'join') {
     const all = [...new Set([...sideA, ...sideB])];
     for (const x of all) for (const y of all) if (x < y) setRelation(state, x, y, 'alliance');
@@ -120,6 +129,21 @@ export function settle(
   }
   if (!passed && !lost && !expired) return;
   d.votes = (d.votes ?? []).filter((v) => v !== vote);
+  // Итог остаётся на виду: ответы ботов приходят быстро, и без него исход голосования не увидеть.
+  d.results ??= [];
+  d.results.push({
+    id: vote.id,
+    kind: vote.kind,
+    a: vote.a,
+    b: vote.b,
+    voters: [...vote.voters],
+    ...(vote.sides ? { sides: vote.sides } : {}),
+    yes: [...vote.yes],
+    no: [...vote.no],
+    passed,
+    tick: state.tick,
+  });
+  if (d.results.length > MAX_RESULTS) d.results.splice(0, d.results.length - MAX_RESULTS);
   if (passed) applyVote(state, vote);
 }
 

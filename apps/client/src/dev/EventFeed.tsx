@@ -31,6 +31,12 @@ import { t, type MessageKey } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
+const VOTE_SHORT = {
+  join: 'vote.joinShort',
+  peace: 'vote.peaceShort',
+  kick: 'vote.kickShort',
+} as const;
+
 /** Вид записи-запроса в ленте. */
 export type FeedKind = 'peace' | 'pact' | 'defense' | 'alliance' | 'aid' | 'vote';
 
@@ -364,9 +370,14 @@ export function EventFeed(props: {
       ),
     });
   }
-  // Голосования: сначала те, где я ещё не ответил.
+  // Голосования: сначала те, где я ещё не ответил, потом идущие, потом законченные (итог виден 30 с).
+  const waiting = (v: { canVote: boolean; mine: string | null; result: string | null }): boolean =>
+    v.canVote && v.mine === null && v.result === null;
   const votes = [...(props.votes ?? [])].sort(
-    (x, y) => Number(x.mine !== null) - Number(y.mine !== null) || x.id - y.id,
+    (x, y) =>
+      Number(!waiting(x)) - Number(!waiting(y)) ||
+      Number(x.result !== null) - Number(y.result !== null) ||
+      x.id - y.id,
   );
   for (const vote of votes) {
     const key = `vote:${vote.id}`;
@@ -379,9 +390,13 @@ export function EventFeed(props: {
           fresh={isFresh(key)}
           icon={<IconUsers size={18} aria-hidden />}
           kind="vote"
-          text={`${t(vote.kind === 'join' ? 'vote.joinShort' : 'vote.peaceShort')}: ${nameOf(vote.a)} · ${nameOf(vote.b)}`}
-          note={`${vote.yes.length}/${vote.voters.length}`}
-          offer={vote.mine === null}
+          text={`${t(VOTE_SHORT[vote.kind])}: ${nameOf(vote.a)} · ${nameOf(vote.b)}`}
+          note={
+            vote.result === null
+              ? `${vote.yes.length}/${vote.voters.length}`
+              : t(vote.result === 'passed' ? 'vote.passed' : 'vote.failed')
+          }
+          offer={waiting(vote)}
           role="status"
           onMain={() => setVoteOpen(vote.id)}
         />
@@ -487,9 +502,12 @@ export function EventFeed(props: {
   const more = specs.length - shown.length;
   const open = !hidden;
   const HandleIcon = hidden ? IconChevronRight : IconChevronLeft;
-  const pending = (props.votes ?? []).filter((v) => v.mine === null);
-  // Новое голосование, на которое ждут ответа, открывается карточкой само — один раз.
-  const autoVote = pending.find((v) => isFresh(`vote:${v.id}`))?.id;
+  const pending = (props.votes ?? []).filter(waiting);
+  // Новое голосование открывается карточкой само — один раз: и то, где ждут моего ответа, и то,
+  // что боты уже решили (иначе быстрый ответ ботов прятал бы исход).
+  const autoVote = (props.votes ?? []).find(
+    (v) => isFresh(`vote:${v.id}`) && (waiting(v) || v.result !== null || v.a === me),
+  )?.id;
   useEffect(() => {
     seen.current = new Set(specs.map((spec) => spec.key));
     if (autoVote !== undefined) setVoteOpen(autoVote);
@@ -522,7 +540,7 @@ export function EventFeed(props: {
           </div>
         </div>
       </div>
-      {card && open && (
+      {card && (
         <VoteCard
           vote={card}
           me={me}

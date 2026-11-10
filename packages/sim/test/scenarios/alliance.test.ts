@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCommands } from '../../src/commands/apply.ts';
+import { applyCommands, validate } from '../../src/commands/apply.ts';
 import { diplomacyView } from '../../src/queries/player-view.ts';
 import { atWar, createDiplomacy, relationOf, setRelation } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
@@ -189,5 +189,42 @@ describe('альянс', () => {
     expect(atWar(s.state, 0, 2)).toBe(true);
     expect(rel(s, 1, 2)).toBe('alliance');
     expect(s.state.diplomacy?.violations[0]).toBe(1);
+  });
+
+  it('исключение: голосуют остальные члены, исключённый уходит в мир, итог виден всем', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    cmd(s, 0, { t: 'proposeTreaty', target: 2, kind: 'alliance' });
+    cmd(s, 2, { t: 'answerTreaty', from: 0, accept: true });
+    cmd(s, 1, { t: 'castVote', voteId: s.state.diplomacy?.votes?.[0]?.id ?? -1, yes: true });
+    expect(rel(s, 1, 2)).toBe('alliance');
+
+    cmd(s, 0, { t: 'proposeExpel', target: 2 });
+    const vote = s.state.diplomacy?.votes?.[0];
+    expect(vote?.kind).toBe('kick');
+    expect(vote?.voters).toEqual([0, 1]);
+    // Исключаемый смотрит, но не голосует.
+    const watched = diplomacyView(s.state, 2)?.votes[0];
+    expect(watched?.canVote).toBe(false);
+    cmd(s, 1, { t: 'castVote', voteId: vote?.id ?? -1, yes: true });
+    expect(rel(s, 0, 2)).toBe('peace');
+    expect(rel(s, 1, 2)).toBe('peace');
+    expect(rel(s, 0, 1)).toBe('alliance');
+    // Итог остаётся в снимке: у инициатора и у исключённого.
+    expect(diplomacyView(s.state, 0)?.votes.find((v) => v.id === vote?.id)?.result).toBe('passed');
+    expect(diplomacyView(s.state, 2)?.votes.find((v) => v.id === vote?.id)?.result).toBe('passed');
+    s.runTicks(301);
+    expect(diplomacyView(s.state, 0)?.votes).toEqual([]);
+  });
+
+  it('исключать нельзя, если в альянсе двое; итог отказа тоже виден', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    expect(validate(s.state, 0, { t: 'proposeExpel', target: 1 }).ok).toBe(false);
+    cmd(s, 2, { t: 'proposeTreaty', target: 0, kind: 'alliance' });
+    cmd(s, 0, { t: 'answerTreaty', from: 2, accept: true });
+    const id = s.state.diplomacy?.votes?.[0]?.id ?? -1;
+    cmd(s, 1, { t: 'castVote', voteId: id, yes: false });
+    expect(diplomacyView(s.state, 2)?.votes.find((v) => v.id === id)?.result).toBe('failed');
   });
 });

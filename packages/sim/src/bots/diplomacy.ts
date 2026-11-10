@@ -3,7 +3,7 @@
 // нет: сравниваются отношения сил в fixed-point (1,0 = равенство). Бот видит только то, что видел
 // бы игрок: соседей — по границе своих гексов.
 import type { BotTickContext } from './context.ts';
-import { BOT_EASY_THINK_TICKS, BOT_WAR_GRACE_TICKS } from '../balance.ts';
+import { BOT_EASY_THINK_TICKS, BOT_VOTE_DELAY_TICKS, BOT_WAR_GRACE_TICKS } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import { hexFromId, hexId, inBounds, neighbors } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
@@ -128,12 +128,24 @@ export function diplomacyCommands(
       join: (aggressor?.opportunity ?? FP) >= FP,
     });
   }
-  // Голосования альянса: за, если у инициатора нарушений не больше наших плюс один; мир — всегда за.
+  // Голосования альянса: бот отвечает не сразу (человек успевает увидеть ход голосования). За вход —
+  // если у инициатора нарушений не больше наших плюс один; за мир — всегда; за исключение — если у
+  // исключаемого нарушений больше наших.
+  const thinkTicks = BOT_VOTE_DELAY_TICKS + ((me * 13) % BOT_VOTE_DELAY_TICKS);
   for (const vote of (d.votes ?? []).filter(
-    (v) => v.voters.includes(me) && ![...v.yes, ...v.no].includes(me),
+    (v) =>
+      v.voters.includes(me) &&
+      ![...v.yes, ...v.no].includes(me) &&
+      state.tick - v.tick >= thinkTicks,
   )) {
     const trusted = (d.violations[vote.a] ?? 0) <= myViolations + 1;
-    out.push({ t: 'castVote', voteId: vote.id, yes: vote.kind === 'peace' || trusted });
+    const yes =
+      vote.kind === 'peace'
+        ? true
+        : vote.kind === 'kick'
+          ? (d.violations[vote.b] ?? 0) > myViolations
+          : trusted;
+    out.push({ t: 'castVote', voteId: vote.id, yes });
   }
 
   // Война: сильнейшая по соотношению сил цель, с которой я не в войне; разрыв договора дороже —

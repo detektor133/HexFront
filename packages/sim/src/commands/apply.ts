@@ -77,6 +77,7 @@ function validateCommand(state: MatchState, playerId: number, cmd: Command): Val
     case 'proposeTreaty':
     case 'answerTreaty':
     case 'answerAid':
+    case 'proposeExpel':
     case 'castVote':
     case 'breakTreaty':
       return validateDiplomacy(state, playerId, cmd);
@@ -150,6 +151,7 @@ function execute(state: MatchState, playerId: number, cmd: Command): void {
     case 'proposeTreaty':
     case 'answerTreaty':
     case 'answerAid':
+    case 'proposeExpel':
     case 'castVote':
     case 'breakTreaty':
       executeDiplomacy(state, playerId, cmd);

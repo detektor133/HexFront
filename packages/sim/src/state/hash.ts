@@ -181,10 +181,16 @@ function hashDiplomacy(s: Hasher, state: MatchState): void {
   }
   // Новые части дипломатии хэшируются, только когда есть записи: прежние матчи не меняют хэш.
   for (const c of d.calls ?? []) for (const v of [c.ally, c.victim, c.aggressor, c.tick]) int(s, v);
+  for (const r of d.results ?? []) {
+    const kind = r.kind === 'join' ? 0 : r.kind === 'peace' ? 1 : 2;
+    for (const x of [r.id, kind, r.a, r.b, r.passed ? 1 : 0, r.tick]) int(s, x);
+    for (const x of [...r.voters, ...r.yes, ...r.no]) int(s, x);
+  }
   for (const w of d.aid ?? [])
     for (const v of [w.ally, w.victim, w.aggressor, w.ending ?? -1]) int(s, v);
   for (const v of d.votes ?? []) {
-    for (const x of [v.id, v.kind === 'join' ? 0 : 1, v.a, v.b, v.tick]) int(s, x);
+    for (const x of [v.id, v.kind === 'join' ? 0 : v.kind === 'peace' ? 1 : 2, v.a, v.b, v.tick])
+      int(s, x);
     for (const x of [...v.voters, ...v.yes, ...v.no]) int(s, x);
     for (const side of v.sides ?? []) for (const x of [side.length, ...side]) int(s, x);
   }

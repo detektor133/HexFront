@@ -17,7 +17,14 @@ import type { MatchState, TreatyKind } from '../state/types.ts';
 export type DiplomacyCommand = Extract<
   Command,
   {
-    t: 'declareWar' | 'proposeTreaty' | 'answerTreaty' | 'breakTreaty' | 'answerAid' | 'castVote';
+    t:
+      | 'declareWar'
+      | 'proposeTreaty'
+      | 'answerTreaty'
+      | 'breakTreaty'
+      | 'answerAid'
+      | 'proposeExpel'
+      | 'castVote';
   }
 >;
 
@@ -47,6 +54,18 @@ export function validateDiplomacy(
   if (!state.diplomacy) return rejected('badPlayer');
   if (cmd.t === 'answerAid') {
     return liveCall(state, playerId, cmd.aggressor) ? OK : rejected('noOffer');
+  }
+  if (cmd.t === 'proposeExpel') {
+    // Исключать можно члена своего альянса, если в нём не меньше троих: иначе это просто выход.
+    const group = groupOf(state, playerId);
+    const open = state.diplomacy.votes?.some((v) => v.kind === 'kick' && v.b === cmd.target);
+    if (!Number.isInteger(cmd.target) || cmd.target === playerId || !alive(state, cmd.target)) {
+      return rejected('badPlayer');
+    }
+    if (relationOf(state, playerId, cmd.target) !== 'alliance' || group.length < 3) {
+      return rejected('sameRelation');
+    }
+    return open ? rejected('sameRelation') : OK;
   }
   if (cmd.t === 'castVote') {
     const vote = state.diplomacy.votes?.find((v) => v.id === cmd.voteId);
@@ -207,6 +226,11 @@ export function executeDiplomacy(state: MatchState, playerId: number, cmd: Diplo
       if (!call) return;
       if (cmd.join) joinAid(state, call);
       else annulAid(state, call);
+      return;
+    }
+    case 'proposeExpel': {
+      const voters = groupOf(state, playerId).filter((id) => id !== cmd.target);
+      openVote(state, 'kick', playerId, cmd.target, voters);
       return;
     }
     case 'castVote': {
