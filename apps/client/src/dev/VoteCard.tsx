@@ -21,8 +21,8 @@ export function VoteCard(props: {
   readonly onClose: () => void;
 }): React.JSX.Element {
   const { vote, me, nameOf, colorOf } = props;
-  const total = vote.voters.length;
-  const need = Math.floor(total / 2) + 1;
+  // Общий мир решает каждая сторона отдельно; вход в альянс — одна группа избирателей.
+  const sides = vote.sides.length > 0 ? vote.sides : [vote.voters];
   const title =
     vote.kind === 'peace'
       ? t('vote.peaceTitle')
@@ -44,37 +44,58 @@ export function VoteCard(props: {
         <span className={styles.dot} style={{ background: colorOf(vote.b) }} />
         {nameOf(vote.b)}
       </p>
-      <ul className={styles.voters} aria-label={t('vote.voters')}>
-        {vote.voters.map((id) => {
-          const answer = vote.yes.includes(id) ? 'yes' : vote.no.includes(id) ? 'no' : 'wait';
-          return (
-            <li key={id} className={styles.voter} data-answer={answer}>
-              <span className={styles.dot} style={{ background: colorOf(id) }} />
-              <span className={styles.name}>{id === me ? t('vote.you') : nameOf(id)}</span>
-              <span className={styles.mark} title={t(`vote.${answer}Hint` as 'vote.yesHint')}>
-                {answer === 'yes' && <IconCheck size={16} aria-hidden="true" />}
-                {answer === 'no' && <IconX size={16} aria-hidden="true" />}
-                {answer === 'wait' && <IconDots size={16} aria-hidden="true" />}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <div className={styles.bar} aria-hidden="true">
-        <span className={styles.barYes} style={{ width: `${(vote.yes.length / total) * 100}%` }} />
-        <span className={styles.barNo} style={{ width: `${(vote.no.length / total) * 100}%` }} />
-        <span className={styles.need} style={{ left: `${(need / total) * 100}%` }} />
-      </div>
-      <p className={styles.tally}>
-        {t('vote.tally')
-          .replace('{yes}', String(vote.yes.length))
-          .replace('{no}', String(vote.no.length))
-          .replace('{need}', String(need))
-          .replace('{total}', String(total))}
-        <span className={styles.left}>
-          {vote.leftS} {t('match.seconds')}
-        </span>
-      </p>
+      {sides.map((side, index) => {
+        const members = side.filter((id) => vote.voters.includes(id));
+        // Сторона из одного (сам предлагающий или согласившийся) уже ответила «за».
+        if (members.length === 0 || (sides.length > 1 && members.length === 1)) return null;
+        const total = members.length;
+        const yes = members.filter((id) => vote.yes.includes(id)).length;
+        const no = members.filter((id) => vote.no.includes(id)).length;
+        const need = Math.floor(total / 2) + 1;
+        return (
+          <div key={index} className={styles.group}>
+            {sides.length > 1 && (
+              <p className={styles.side}>
+                {t('vote.side')}:{' '}
+                {members.map((id) => (id === me ? t('vote.you') : nameOf(id))).join(', ')}
+              </p>
+            )}
+            <ul className={styles.voters} aria-label={t('vote.voters')}>
+              {members.map((id) => {
+                const answer = vote.yes.includes(id) ? 'yes' : vote.no.includes(id) ? 'no' : 'wait';
+                return (
+                  <li key={id} className={styles.voter} data-answer={answer}>
+                    <span className={styles.dot} style={{ background: colorOf(id) }} />
+                    <span className={styles.name}>{id === me ? t('vote.you') : nameOf(id)}</span>
+                    <span className={styles.mark} title={t(`vote.${answer}Hint` as 'vote.yesHint')}>
+                      {answer === 'yes' && <IconCheck size={16} aria-hidden="true" />}
+                      {answer === 'no' && <IconX size={16} aria-hidden="true" />}
+                      {answer === 'wait' && <IconDots size={16} aria-hidden="true" />}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className={styles.bar} aria-hidden="true">
+              <span className={styles.barYes} style={{ width: `${(yes / total) * 100}%` }} />
+              <span className={styles.barNo} style={{ width: `${(no / total) * 100}%` }} />
+              <span className={styles.need} style={{ left: `${(need / total) * 100}%` }} />
+            </div>
+            <p className={styles.tally}>
+              {t('vote.tally')
+                .replace('{yes}', String(yes))
+                .replace('{no}', String(no))
+                .replace('{need}', String(need))
+                .replace('{total}', String(total))}
+              {index === 0 && (
+                <span className={styles.left}>
+                  {vote.leftS} {t('match.seconds')}
+                </span>
+              )}
+            </p>
+          </div>
+        );
+      })}
       {vote.mine === null ? (
         <div className={styles.actions}>
           <button type="button" className={styles.yes} onClick={() => props.onVote(true)}>

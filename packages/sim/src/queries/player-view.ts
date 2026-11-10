@@ -492,6 +492,8 @@ export interface DiplomacyView {
     readonly a: number;
     readonly b: number;
     readonly voters: readonly number[];
+    /** Общий мир: стороны, каждая решает большинством своих членов; для входа в альянс пусто. */
+    readonly sides: readonly (readonly number[])[];
     readonly yes: readonly number[];
     readonly no: readonly number[];
     /** Секунд до конца голосования (не решили — отказ). */
@@ -530,6 +532,7 @@ export function diplomacyView(state: MatchState, playerId: number): DiplomacyVie
         a: v.a,
         b: v.b,
         voters: [...v.voters],
+        sides: (v.sides ?? []).map((side) => [...side]),
         yes: [...v.yes],
         no: [...v.no],
         leftS: intDiv(

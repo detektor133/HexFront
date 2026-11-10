@@ -93,6 +93,17 @@
   border-radius: 50%;
 }
 
+.group {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.side {
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
 .voters {
   display: grid;
   gap: 2px;
