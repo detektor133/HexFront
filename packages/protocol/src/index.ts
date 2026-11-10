@@ -29,9 +29,7 @@ export type ViewMetadata = Pick<
   | 'playerId'
   | 'victoryHold'
   | 'ranking'
-  | 'cities'
   | 'armies'
-  | 'players'
   | 'me'
   | 'constructions'
   | 'recruits'
@@ -42,6 +40,9 @@ export interface ViewDelta {
   readonly hexes: readonly HexChange[];
   readonly units: CollectionDelta<UnitView>;
   readonly fronts: CollectionDelta<PlanView>;
+  /** Города и игроки идут по id: меняется поле у одного города — шлём одну запись, а не весь список. */
+  readonly cities?: CollectionDelta<PlayerView['cities'][number]>;
+  readonly players?: CollectionDelta<PlayerView['players'][number]>;
   readonly view?: Partial<ViewMetadata>;
   readonly events: readonly GameEvent[];
 }

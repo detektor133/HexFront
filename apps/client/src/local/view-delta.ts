@@ -43,9 +43,7 @@ const METADATA_FIELDS: readonly (keyof ViewMetadata)[] = [
   'playerId',
   'victoryHold',
   'ranking',
-  'cities',
   'armies',
-  'players',
   'me',
   'constructions',
   'recruits',
@@ -120,6 +118,8 @@ export function buildViewDelta(
   for (const field of METADATA_FIELDS) {
     if (!equalValue(before[field], after[field])) Object.assign(view, { [field]: after[field] });
   }
+  const cities = collectionDelta(before.cities, after.cities);
+  const players = collectionDelta(before.players, after.players);
   return {
     t: 'delta',
     baseTick: before.tick,
@@ -128,6 +128,8 @@ export function buildViewDelta(
       hexes,
       units: collectionDelta(before.units, after.units),
       fronts: planDelta(before.plans, after.plans),
+      ...(cities.upsert.length > 0 || cities.removed.length > 0 ? { cities } : {}),
+      ...(players.upsert.length > 0 || players.removed.length > 0 ? { players } : {}),
       ...(Object.keys(view).length > 0 ? { view } : {}),
       events,
     },
@@ -303,6 +305,12 @@ export class ViewDeltaApplier {
       hexes: applyHexChanges(view, message.d.hexes),
       units: replaceCollection(view.units, message.d.units.upsert, message.d.units.removed),
       plans: replacePlans(view.plans, message.d.fronts.upsert, message.d.fronts.removed),
+      cities: message.d.cities
+        ? replaceCollection(view.cities, message.d.cities.upsert, message.d.cities.removed)
+        : view.cities,
+      players: message.d.players
+        ? replaceCollection(view.players, message.d.players.upsert, message.d.players.removed)
+        : view.players,
     };
     this.requestedEvents.push(...message.d.events);
     return this.currentView;

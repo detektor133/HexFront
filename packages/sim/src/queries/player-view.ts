@@ -321,9 +321,10 @@ export function playerView(
     players: state.players.map((p) => ({
       id: p.id,
       ...(p.name ? { name: p.name } : {}),
-      gold: p.gold,
-      taxTarget: p.taxTarget,
-      taxEffective: p.taxEffective,
+      // Казну и налог чужих не показываем: это закрытые данные и шум в дельте (меняются каждый тик).
+      gold: p.id === playerId ? p.gold : (0 as Fp),
+      taxTarget: p.id === playerId ? p.taxTarget : (0 as Fp),
+      taxEffective: p.id === playerId ? p.taxEffective : (0 as Fp),
       status: p.status,
       ...graceLeft(state, p.id),
     })),
