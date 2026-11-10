@@ -170,14 +170,22 @@ function hashConstructions(s: Hasher, state: MatchState): void {
 function hashDiplomacy(s: Hasher, state: MatchState): void {
   const d = state.diplomacy;
   if (!d) return;
-  const codes = { peace: 0, war: 1, pact: 2, alliance: 3 } as const;
+  const codes = { peace: 0, war: 1, pact: 2, alliance: 3, defense: 4 } as const;
   for (const r of d.relation) int(s, codes[r]);
   for (const v of d.violations) int(s, v);
   for (const o of d.offers) {
     int(s, o.from);
     int(s, o.to);
-    int(s, o.kind === 'pact' ? 0 : o.kind === 'alliance' ? 1 : 2);
+    int(s, o.kind === 'pact' ? 0 : o.kind === 'alliance' ? 1 : o.kind === 'defense' ? 3 : 2);
     int(s, o.tick);
+  }
+  // Новые части дипломатии хэшируются, только когда есть записи: прежние матчи не меняют хэш.
+  for (const c of d.calls ?? []) for (const v of [c.ally, c.victim, c.aggressor, c.tick]) int(s, v);
+  for (const w of d.aid ?? [])
+    for (const v of [w.ally, w.victim, w.aggressor, w.ending ?? -1]) int(s, v);
+  for (const v of d.votes ?? []) {
+    for (const x of [v.id, v.kind === 'join' ? 0 : 1, v.a, v.b, v.tick]) int(s, x);
+    for (const x of [...v.voters, ...v.yes, ...v.no]) int(s, x);
   }
 }
 

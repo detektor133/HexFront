@@ -119,7 +119,7 @@ describe('стартовое состояние', () => {
 });
 
 describe('step', () => {
-  it('вызывает 17 систем после applyCommands в порядке sim-core.md', () => {
+  it('вызывает 18 систем после applyCommands в порядке sim-core.md', () => {
     expect(SYSTEMS.map((f) => f.name)).toEqual([
       'taxSystem',
       'constructionSystem',
@@ -136,6 +136,7 @@ describe('step', () => {
       'populationSystem',
       'economySystem',
       'capitalSystem',
+      'diplomacySystem',
       'visionSystem',
       'victorySystem',
     ]);

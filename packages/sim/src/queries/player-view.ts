@@ -17,7 +17,7 @@ import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
-import { OFFER_TTL_TICKS, relationOf } from '../state/relations.ts';
+import { OFFER_TTL_TICKS, allianceOf, relationOf } from '../state/relations.ts';
 import type { Relation, TreatyKind } from '../state/types.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
@@ -477,9 +477,20 @@ export interface DiplomacyView {
   readonly violations: readonly number[];
   readonly incoming: readonly { readonly from: number; readonly kind: TreatyKind }[];
   readonly outgoing: readonly { readonly to: number; readonly kind: TreatyKind }[];
+  /** Запросы помощи мне (оборонительный пакт): вступить ли в войну с агрессором за пострадавшего. */
+  readonly aidCalls: readonly { readonly victim: number; readonly aggressor: number }[];
+  /** Голосования альянса, где я избиратель и ещё не ответил. */
+  readonly votes: readonly {
+    readonly id: number;
+    readonly kind: 'join' | 'peace';
+    readonly a: number;
+    readonly b: number;
+  }[];
+  /** Состав моего альянса (без меня). */
+  readonly allies: readonly number[];
 }
 
-function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {
+export function diplomacyView(state: MatchState, playerId: number): DiplomacyView | null {
   const d = state.diplomacy;
   if (!d) return null;
   // Предложение выбывшего игрока (или ему) уже не имеет смысла: ответить некому, висеть оно не должно.
@@ -494,5 +505,12 @@ function diplomacyView(state: MatchState, playerId: number): DiplomacyView | nul
     violations: [...d.violations],
     incoming: live.filter((o) => o.to === playerId).map((o) => ({ from: o.from, kind: o.kind })),
     outgoing: live.filter((o) => o.from === playerId).map((o) => ({ to: o.to, kind: o.kind })),
+    aidCalls: (d.calls ?? [])
+      .filter((c) => c.ally === playerId)
+      .map((c) => ({ victim: c.victim, aggressor: c.aggressor })),
+    votes: (d.votes ?? [])
+      .filter((v) => v.voters.includes(playerId) && ![...v.yes, ...v.no].includes(playerId))
+      .map((v) => ({ id: v.id, kind: v.kind, a: v.a, b: v.b })),
+    allies: allianceOf(state, playerId),
   };
 }

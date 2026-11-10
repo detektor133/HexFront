@@ -13,7 +13,7 @@ export interface TerritoryLabel {
   readonly fontSize: number;
   readonly maxWidth: number;
   /** Отношение к игроку-зрителю: значок под названием; null — мир или свой (CR-007). */
-  readonly relation: 'war' | 'pact' | 'alliance' | null;
+  readonly relation: 'war' | 'pact' | 'defense' | 'alliance' | null;
   /** Входящее предложение от этого государства: значок предложенного договора. */
   readonly offer: TreatyKind | null;
 }
@@ -176,13 +176,18 @@ function relationOfLabel(
 ): TerritoryLabel['relation'] {
   if (playerId === view.playerId) return null;
   const relation = view.diplomacy?.relations[playerId];
-  return relation === 'war' || relation === 'pact' || relation === 'alliance' ? relation : null;
+  return relation === 'war' ||
+    relation === 'pact' ||
+    relation === 'defense' ||
+    relation === 'alliance'
+    ? relation
+    : null;
 }
 
-/** Значок отношения 12 px под названием: война — скрещённые линии, пакт — кружок с чертой, союз — два кольца. */
+/** Значок отношения 12 px под названием: война — скрещённые линии, пакт — кружок с чертой, оборонительный пакт — кружок с вертикалью, альянс — два кольца. */
 function drawRelationGlyph(
   container: Container,
-  kind: 'war' | 'pact' | 'alliance',
+  kind: 'war' | 'pact' | 'defense' | 'alliance',
   at: { readonly x: number; readonly y: number },
   scale: number,
   color: string,
@@ -193,6 +198,8 @@ function drawRelationGlyph(
       g.moveTo(-5, -5).lineTo(5, 5).moveTo(5, -5).lineTo(-5, 5);
     } else if (kind === 'pact') {
       g.circle(0, 0, 5).moveTo(-3, 0).lineTo(3, 0);
+    } else if (kind === 'defense') {
+      g.circle(0, 0, 5).moveTo(0, -3).lineTo(0, 3);
     } else {
       g.circle(-3, 0, 4).circle(3, 0, 4);
     }

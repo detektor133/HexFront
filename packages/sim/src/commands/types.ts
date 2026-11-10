@@ -88,6 +88,10 @@ export type Command =
   | { readonly t: 'proposeTreaty'; readonly target: number; readonly kind: TreatyKind }
   | { readonly t: 'answerTreaty'; readonly from: number; readonly accept: boolean }
   | { readonly t: 'breakTreaty'; readonly target: number }
+  /** Ответ на запрос помощи оборонительного пакта: вступить в войну с агрессором или отказаться (пакт аннулируется). */
+  | { readonly t: 'answerAid'; readonly aggressor: number; readonly join: boolean }
+  /** Голос в голосовании альянса (вход новых членов, общий мир). */
+  | { readonly t: 'castVote'; readonly voteId: number; readonly yes: boolean }
   /**
    * Наступление с заказом числа солдат: армия, фронт, линия и старт одной командой. Цель — id игрока
    * (нужна война) или -1 (ничья земля у гекса hex).

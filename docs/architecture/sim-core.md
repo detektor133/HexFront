@@ -78,8 +78,9 @@ interface MatchState {
 14. `populationSystem` — рост, убыль, эффекты захвата.
 15. `economySystem` — доход, содержание, банкротство.
 16. `capitalSystem` — перенос столицы, выбывание.
-17. `visionSystem` — (раз в `VISION_RECALC_TICKS` тиков) инкрементальные зоны обзора.
-18. `victorySystem`.
+17. `diplomacySystem` — сроки запросов помощи и голосований альянса, конец войны помощника (возврат отрядов).
+18. `visionSystem` — (раз в `VISION_RECALC_TICKS` тиков) инкрементальные зоны обзора.
+19. `victorySystem`.
 
 ## Команды
 

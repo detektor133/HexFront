@@ -9,7 +9,7 @@ import { planSeaRouteFrom } from '../queries/sea-route.ts';
 import { isHostileHex, ownUnitsAt, peaceBlocked, stepTicks } from '../queries/unit-path.ts';
 import { captureHex } from '../state/capture.ts';
 import { isPortOf, portLevel } from '../state/port.ts';
-import { isAllied } from '../state/relations.ts';
+import { sharesWar } from '../state/relations.ts';
 import type { Unit, MatchState } from '../state/types.ts';
 import { moveUnit } from '../state/unit-index.ts';
 
@@ -105,7 +105,7 @@ function arrive(state: MatchState, unit: Unit, next: HexId): void {
     unit.sea = false;
     unit.seaFrom = -1;
   }
-  if (!onWater && unit.type !== 'artillery' && !isAllied(state, unit.owner, land)) {
+  if (!onWater && unit.type !== 'artillery' && !sharesWar(state, unit.owner, land)) {
     captureHex(state, next, unit.owner);
   }
   if (unit.path.length === 0 && unit.order === 'move') unit.order = 'idle';

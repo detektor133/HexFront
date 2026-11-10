@@ -7,6 +7,7 @@ import { attritionSystem } from './systems/attrition.ts';
 import { capitalSystem } from './systems/capital.ts';
 import { combatSystem } from './systems/combat.ts';
 import { constructionSystem } from './systems/construction.ts';
+import { diplomacySystem } from './systems/diplomacy.ts';
 import { economySystem } from './systems/economy.ts';
 import { frontSystem } from './systems/front.ts';
 import { movementSystem } from './systems/movement.ts';
@@ -39,6 +40,7 @@ export const SYSTEMS: readonly System[] = [
   populationSystem,
   economySystem,
   capitalSystem,
+  diplomacySystem,
   visionSystem,
   victorySystem,
 ];

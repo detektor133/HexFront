@@ -204,6 +204,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       offscreen.length,
       Boolean(view?.victoryHold),
       capitulating.length,
+      (view?.diplomacy?.aidCalls.length ?? 0) + (view?.diplomacy?.votes.length ?? 0),
     ),
     tutorialVisible: false,
     leaderboardOpen,
@@ -317,6 +318,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onSignal={sb.centerOnHex}
           hold={view?.victoryHold}
           capitulating={capitulating}
+          aidCalls={view?.diplomacy?.aidCalls ?? []}
+          votes={view?.diplomacy?.votes ?? []}
           nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
           send={sb.send}
           graceLeftS={view?.me.graceLeftS}

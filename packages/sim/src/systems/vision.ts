@@ -3,7 +3,7 @@
 import { VISION_CITY, VISION_RECALC_TICKS, VISION_TERRITORY, VISION_UNIT } from '../balance.ts';
 import { hexFromId, hexId, spiral, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
-import { isAllied } from '../state/relations.ts';
+import { sharesWar } from '../state/relations.ts';
 import type { MatchState, VisionSource, VisionState } from '../state/types.ts';
 
 export function createVisionState(players: number, size: number): VisionState {
@@ -53,7 +53,7 @@ function markDirty(vision: VisionState, player: number, id: number): void {
 function alliesOf(state: MatchState, player: number): number[] {
   const out: number[] = [];
   for (let other = 0; other < state.players.length; other += 1) {
-    if (isAllied(state, player, other)) out.push(other);
+    if (sharesWar(state, player, other)) out.push(other);
   }
   return out;
 }
@@ -63,7 +63,7 @@ function allianceKey(state: MatchState): string {
   const pairs: string[] = [];
   for (let a = 0; a < state.players.length; a += 1) {
     for (let b = a + 1; b < state.players.length; b += 1) {
-      if (isAllied(state, a, b)) pairs.push(`${a}-${b}`);
+      if (sharesWar(state, a, b)) pairs.push(`${a}-${b}`);
     }
   }
   return pairs.join(',');

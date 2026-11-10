@@ -4,6 +4,7 @@ import {
   IconLink,
   IconLinkOff,
   IconPeace,
+  IconShield,
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
@@ -17,6 +18,7 @@ import { IconButton } from '../ui/icon-button.tsx';
 /** Подпись входящего предложения по виду договора. */
 export function offerKey(kind: TreatyKind): MessageKey {
   if (kind === 'peace') return 'diplomacy.offerPeace';
+  if (kind === 'defense') return 'diplomacy.offerDefense';
   return kind === 'pact' ? 'diplomacy.offerPact' : 'diplomacy.offerAlliance';
 }
 
@@ -28,6 +30,7 @@ export function RelationIcon(props: {
   const size = props.size ?? 16;
   if (props.relation === 'war') return <IconSwords size={size} aria-hidden="true" />;
   if (props.relation === 'pact') return <IconHeartHandshake size={size} aria-hidden="true" />;
+  if (props.relation === 'defense') return <IconShield size={size} aria-hidden="true" />;
   if (props.relation === 'alliance') return <IconLink size={size} aria-hidden="true" />;
   return null;
 }
@@ -115,6 +118,16 @@ export function DiplomacyBlock(props: {
         {(relation === 'peace' || relation === 'pact') && (
           <IconButton
             className={styles.action}
+            label={t('diplomacy.defense')}
+            disabled={outgoing}
+            onClick={() => send({ t: 'proposeTreaty', target: other, kind: 'defense' })}
+          >
+            <IconShield size={18} aria-hidden="true" />
+          </IconButton>
+        )}
+        {(relation === 'peace' || relation === 'pact' || relation === 'defense') && (
+          <IconButton
+            className={styles.action}
             label={t('diplomacy.alliance')}
             disabled={outgoing}
             onClick={() => send({ t: 'proposeTreaty', target: other, kind: 'alliance' })}
@@ -122,7 +135,7 @@ export function DiplomacyBlock(props: {
             <IconLink size={18} aria-hidden="true" />
           </IconButton>
         )}
-        {(relation === 'pact' || relation === 'alliance') && (
+        {(relation === 'pact' || relation === 'defense' || relation === 'alliance') && (
           <IconButton
             className={styles.action}
             label={t('diplomacy.break')}

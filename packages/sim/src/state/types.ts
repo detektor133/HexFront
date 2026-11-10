@@ -349,10 +349,10 @@ export type GameEvent =
 export type WinReason = 'cities' | 'allCities' | 'lastStanding' | 'coalition';
 
 /** Отношение пары игроков (дипломатия, CR-007). */
-export type Relation = 'peace' | 'war' | 'pact' | 'alliance';
+export type Relation = 'peace' | 'war' | 'pact' | 'defense' | 'alliance';
 
-/** Вид договора: мир (из войны), пакт о ненападении, союз. */
-export type TreatyKind = 'peace' | 'pact' | 'alliance';
+/** Вид договора: мир (из войны), пакт о ненападении, оборонительный пакт, альянс. */
+export type TreatyKind = 'peace' | 'pact' | 'defense' | 'alliance';
 
 /** Предложение договора, действует OFFER_TTL_TICKS. */
 export interface TreatyOffer {
@@ -368,6 +368,42 @@ export interface Diplomacy {
   /** Нарушений договоров у каждого игрока: разорванные пакты и союзы, война против партнёра. */
   violations: number[];
   offers: TreatyOffer[];
+  /** Запросы помощи оборонительного пакта: ally спрашивают, вступить ли в войну с aggressor за victim. */
+  calls?: AidCall[];
+  /** Идущие войны по оборонительному пакту: ally воюет за victim с aggressor (общий обзор и проход). */
+  aid?: AidWar[];
+  /** Голосования альянса (вход новых членов, общий мир). */
+  votes?: AllianceVote[];
+  /** Номер следующего голосования. */
+  nextVote?: number;
+}
+
+export interface AidCall {
+  readonly ally: number;
+  readonly victim: number;
+  readonly aggressor: number;
+  readonly tick: number;
+}
+
+export interface AidWar {
+  readonly ally: number;
+  readonly victim: number;
+  readonly aggressor: number;
+  /** Тик конца войны: проход по земле пострадавшего ещё открыт, пока отряды идут домой. */
+  ending?: number;
+}
+
+/** join — a и b становятся одним альянсом; peace — общий мир между сторонами a и b. */
+export interface AllianceVote {
+  readonly id: number;
+  readonly kind: 'join' | 'peace';
+  readonly a: number;
+  readonly b: number;
+  /** Избиратели: члены обеих групп (для join — без одиночного новичка). */
+  readonly voters: readonly number[];
+  yes: number[];
+  no: number[];
+  readonly tick: number;
 }
 
 export interface MatchState {

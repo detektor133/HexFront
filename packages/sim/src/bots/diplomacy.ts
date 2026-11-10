@@ -119,6 +119,23 @@ export function diplomacyCommands(
     out.push({ t: 'answerTreaty', from: o.from, accept: trusted && danger >= gain });
   }
 
+  // Запрос помощи оборонительного пакта: вступаем, если агрессор не сильнее нас, иначе пакт рвётся.
+  for (const call of (d.calls ?? []).filter((c) => c.ally === me)) {
+    const aggressor = all.find((r) => r.id === call.aggressor);
+    out.push({
+      t: 'answerAid',
+      aggressor: call.aggressor,
+      join: (aggressor?.opportunity ?? FP) >= FP,
+    });
+  }
+  // Голосования альянса: за, если у инициатора нарушений не больше наших плюс один; мир — всегда за.
+  for (const vote of (d.votes ?? []).filter(
+    (v) => v.voters.includes(me) && ![...v.yes, ...v.no].includes(me),
+  )) {
+    const trusted = (d.violations[vote.a] ?? 0) <= myViolations + 1;
+    out.push({ t: 'castVote', voteId: vote.id, yes: vote.kind === 'peace' || trusted });
+  }
+
   // Война: сильнейшая по соотношению сил цель, с которой я не в войне; разрыв договора дороже —
   // тем дороже, чем больше нарушений у меня уже есть.
   if (atWarNow.length === 0 && state.tick >= BOT_WAR_GRACE_TICKS) {
@@ -141,7 +158,7 @@ export function diplomacyCommands(
   for (const r of all) {
     if (r.threat < FP || proposed.has(r.id)) continue;
     const rel = relationOf(state, me, r.id);
-    if (rel === 'pact' || rel === 'alliance') continue;
+    if (rel === 'pact' || rel === 'defense' || rel === 'alliance') continue;
     // С воюющим — мир, с остальными — пакт.
     out.push({ t: 'proposeTreaty', target: r.id, kind: rel === 'war' ? 'peace' : 'pact' });
   }

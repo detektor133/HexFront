@@ -97,7 +97,15 @@ describe('песочница: выбор и приказы как в HoI4', () =
     relations[ally.owner] = 'alliance';
     const allied: PlayerView = {
       ...view,
-      diplomacy: { relations, violations: [], incoming: [], outgoing: [] },
+      diplomacy: {
+        relations,
+        violations: [],
+        incoming: [],
+        outgoing: [],
+        aidCalls: [],
+        votes: [],
+        allies: [],
+      },
     };
     expect(isHostile(allied, ally.hex)).toBe(false);
   });

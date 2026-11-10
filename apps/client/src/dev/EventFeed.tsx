@@ -134,6 +134,24 @@ function Row(props: {
   );
 }
 
+/** Кнопки «да» и «нет» в строке ленты. */
+function Answer(props: { readonly onYes: () => void; readonly onNo: () => void }) {
+  return (
+    <>
+      <IconButton
+        className={`${styles.answer} ${styles.accept}`}
+        label={t('diplomacy.accept')}
+        onClick={props.onYes}
+      >
+        <IconCheck size={16} aria-hidden="true" />
+      </IconButton>
+      <IconButton className={styles.answer} label={t('diplomacy.decline')} onClick={props.onNo}>
+        <IconX size={16} aria-hidden="true" />
+      </IconButton>
+    </>
+  );
+}
+
 const ownerColor = (playerId: number): string =>
   tokens.players.palette[playerId]?.line ?? tokens.ui.ink;
 
@@ -147,6 +165,7 @@ export function feedRows(
   signals = 0,
   hold = false,
   capitulating = 0,
+  asks = 0,
 ): number {
   const grace = graceLeftS === undefined ? 0 : 1;
   const total =
@@ -155,6 +174,7 @@ export function feedRows(
     grace +
     signals +
     capitulating +
+    asks +
     (hold ? 1 : 0);
   // Лишнее сворачивается в строку «+K»: она тоже занимает место.
   return Math.min(FEED_SLOTS, total) + (total > FEED_SLOTS ? 1 : 0);
@@ -182,6 +202,14 @@ export function EventFeed(props: {
   readonly hold?: { readonly player: number; readonly seconds: number } | null | undefined;
   /** Игроки без городов: до капитуляции остаётся секунд (враг скоро выбывает). */
   readonly capitulating?: readonly { readonly player: number; readonly seconds: number }[];
+  /** Запросы помощи (оборонительный пакт) и голосования альянса, на которые игрок ещё не ответил. */
+  readonly aidCalls?: readonly { readonly victim: number; readonly aggressor: number }[];
+  readonly votes?: readonly {
+    readonly id: number;
+    readonly kind: 'join' | 'peace';
+    readonly a: number;
+    readonly b: number;
+  }[];
   readonly nameOf?: (playerId: number) => string;
   readonly send?: (cmd: Command) => void;
   /** Секунд до выбывания при отсутствии городов; нет — города есть. */
@@ -239,7 +267,9 @@ export function EventFeed(props: {
     signals.length === 0 &&
     grace === undefined &&
     hold === null &&
-    (props.capitulating ?? []).length === 0
+    (props.capitulating ?? []).length === 0 &&
+    (props.aidCalls ?? []).length === 0 &&
+    (props.votes ?? []).length === 0
   ) {
     return null;
   }
@@ -284,6 +314,51 @@ export function EventFeed(props: {
                 <IconX size={16} aria-hidden="true" />
               </IconButton>
             </>
+          }
+        />
+      ),
+    });
+  }
+  for (const call of props.aidCalls ?? []) {
+    const key = `aid:${call.aggressor}`;
+    specs.push({
+      key,
+      node: (
+        <Row
+          key={key}
+          id={key}
+          icon={<IconShield size={18} aria-hidden />}
+          text={`${nameOf(call.victim)} ${t('feed.aidAsk')} ${nameOf(call.aggressor)}`}
+          accent={ownerColor(call.victim)}
+          offer
+          role="alert"
+          actions={
+            <Answer
+              onYes={() => props.send?.({ t: 'answerAid', aggressor: call.aggressor, join: true })}
+              onNo={() => props.send?.({ t: 'answerAid', aggressor: call.aggressor, join: false })}
+            />
+          }
+        />
+      ),
+    });
+  }
+  for (const vote of props.votes ?? []) {
+    const key = `vote:${vote.id}`;
+    specs.push({
+      key,
+      node: (
+        <Row
+          key={key}
+          id={key}
+          icon={<IconLink size={18} aria-hidden />}
+          text={`${t(vote.kind === 'join' ? 'feed.voteJoin' : 'feed.votePeace')}: ${nameOf(vote.a)} · ${nameOf(vote.b)}`}
+          offer
+          role="status"
+          actions={
+            <Answer
+              onYes={() => props.send?.({ t: 'castVote', voteId: vote.id, yes: true })}
+              onNo={() => props.send?.({ t: 'castVote', voteId: vote.id, yes: false })}
+            />
           }
         />
       ),

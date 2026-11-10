@@ -166,7 +166,15 @@ describe('дипломатия в дельте (CR-007)', () => {
     const after: PlayerView = {
       ...before,
       tick: 2,
-      diplomacy: { relations: ['peace', 'war'], violations: [0, 1], incoming: [], outgoing: [] },
+      diplomacy: {
+        relations: ['peace', 'war'],
+        violations: [0, 1],
+        incoming: [],
+        outgoing: [],
+        aidCalls: [],
+        votes: [],
+        allies: [],
+      },
     };
     const delta = buildViewDelta(before, after, []);
     const applier = new ViewDeltaApplier();

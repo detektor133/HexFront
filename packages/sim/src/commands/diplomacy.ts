@@ -1,13 +1,24 @@
 // Команды дипломатии (CR-007; gdd/08-match.md, «Дипломатия»): объявление войны (сразу, без
-// предупреждения), предложение и принятие пакта или союза, разрыв договора. Договоры — не
-// гарантия: их можно нарушить, цена — счётчик нарушений игрока, который видят все.
+// предупреждения), предложение и принятие договора, разрыв договора, ответ на запрос помощи
+// оборонительного пакта и голос в альянсе. Договоры — не гарантия: их можно нарушить, цена —
+// счётчик нарушений игрока, который видят все.
+import { annulAid, joinAid, joinWars, openVote, requestAid, settle } from './alliance.ts';
 import { OK, rejected, type Command, type Validation } from './types.ts';
-import { OFFER_TTL_TICKS, relationOf, setRelation } from '../state/relations.ts';
-import type { MatchState } from '../state/types.ts';
+import { AID_TTL_TICKS } from '../balance.ts';
+import {
+  OFFER_TTL_TICKS,
+  allianceOf,
+  groupOf,
+  relationOf,
+  setRelation,
+} from '../state/relations.ts';
+import type { MatchState, TreatyKind } from '../state/types.ts';
 
 export type DiplomacyCommand = Extract<
   Command,
-  { t: 'declareWar' | 'proposeTreaty' | 'answerTreaty' | 'breakTreaty' }
+  {
+    t: 'declareWar' | 'proposeTreaty' | 'answerTreaty' | 'breakTreaty' | 'answerAid' | 'castVote';
+  }
 >;
 
 const alive = (state: MatchState, id: number): boolean =>
@@ -19,6 +30,14 @@ function liveOffer(state: MatchState, from: number, to: number) {
   );
 }
 
+const liveCall = (state: MatchState, ally: number, aggressor: number) =>
+  state.diplomacy?.calls?.find(
+    (c) => c.ally === ally && c.aggressor === aggressor && state.tick - c.tick < AID_TTL_TICKS,
+  );
+
+/** Ступени договора: новый можно заключить только выше нынешнего, вниз — разрывом. */
+const RANK = { peace: 0, pact: 1, defense: 2, alliance: 3 } as const;
+
 /** Проверяет команду дипломатии без изменения состояния. */
 export function validateDiplomacy(
   state: MatchState,
@@ -26,6 +45,14 @@ export function validateDiplomacy(
   cmd: DiplomacyCommand,
 ): Validation {
   if (!state.diplomacy) return rejected('badPlayer');
+  if (cmd.t === 'answerAid') {
+    return liveCall(state, playerId, cmd.aggressor) ? OK : rejected('noOffer');
+  }
+  if (cmd.t === 'castVote') {
+    const vote = state.diplomacy.votes?.find((v) => v.id === cmd.voteId);
+    const open = vote?.voters.includes(playerId) && ![...vote.yes, ...vote.no].includes(playerId);
+    return open ? OK : rejected('noOffer');
+  }
   const other = cmd.t === 'answerTreaty' ? cmd.from : cmd.target;
   if (other === playerId || !alive(state, other)) return rejected('badPlayer');
   const now = relationOf(state, playerId, other);
@@ -33,14 +60,16 @@ export function validateDiplomacy(
     case 'declareWar':
       return now === 'war' ? rejected('sameRelation') : OK;
     case 'proposeTreaty':
-      if (now === 'alliance' || now === cmd.kind) return rejected('sameRelation');
-      // Из войны — только мир; пакт и союз — с тем, с кем уже мир (союз ещё и из пакта).
+      // Из войны — только мир; из мира и договоров — только более тесный договор.
       if (now === 'war') return cmd.kind === 'peace' ? OK : rejected('sameRelation');
-      return cmd.kind === 'peace' ? rejected('sameRelation') : OK;
+      if (cmd.kind === 'peace') return rejected('sameRelation');
+      return RANK[cmd.kind] > RANK[now] ? OK : rejected('sameRelation');
     case 'answerTreaty':
       return liveOffer(state, cmd.from, playerId) ? OK : rejected('noOffer');
     case 'breakTreaty':
-      return now === 'pact' || now === 'alliance' ? OK : rejected('sameRelation');
+      return now === 'pact' || now === 'defense' || now === 'alliance'
+        ? OK
+        : rejected('sameRelation');
   }
 }
 
@@ -69,25 +98,78 @@ function dropOffers(state: MatchState, a: number, b: number): void {
   );
 }
 
+// Предатель: объявил войну члену своего альянса — все члены альянса воюют с ним, нарушение +1.
+function betray(state: MatchState, traitor: number): void {
+  for (const member of allianceOf(state, traitor)) {
+    setRelation(state, traitor, member, 'war');
+    state.events.push({ t: 'warDeclared', playerId: traitor, targetId: member, kind: 'alliance' });
+  }
+}
+
+function declareWar(state: MatchState, playerId: number, target: number): void {
+  const d = state.diplomacy;
+  if (!d) return;
+  const now = relationOf(state, playerId, target);
+  const breach = now === 'pact' || now === 'defense' || now === 'alliance';
+  if (breach) d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
+  dropOffers(state, playerId, target);
+  if (now === 'alliance') {
+    betray(state, playerId);
+    return;
+  }
+  setRelation(state, playerId, target, 'war');
+  state.events.push({
+    t: 'warDeclared',
+    playerId,
+    targetId: target,
+    kind: breach ? (now as Exclude<TreatyKind, 'peace'>) : null,
+  });
+  // Война одному члену альянса — война всем; оборонительные партнёры атакованного получают запрос.
+  joinWars(state, playerId, target);
+  requestAid(state, playerId, target);
+}
+
+// Договор принят адресатом. Альянс и мир, где у стороны есть альянс, решает голосование.
+function conclude(state: MatchState, from: number, to: number, kind: TreatyKind): void {
+  const sideFrom = groupOf(state, from);
+  const sideTo = groupOf(state, to);
+  const single = sideFrom.length === 1 && sideTo.length === 1;
+  if (kind === 'alliance' && !single) {
+    // Новичок без альянса сам не голосует: решают те, кто уже в альянсах.
+    const voters =
+      sideFrom.length === 1 ? sideTo : sideTo.length === 1 ? sideFrom : [...sideFrom, ...sideTo];
+    voters.sort((x, y) => x - y);
+    openVote(state, 'join', from, to, voters);
+    return;
+  }
+  if (kind === 'peace' && !single) {
+    openVote(
+      state,
+      'peace',
+      from,
+      to,
+      [...new Set([...sideFrom, ...sideTo])].sort((x, y) => x - y),
+    );
+    return;
+  }
+  setRelation(state, from, to, kind);
+  cancelAttacks(state, from, to);
+  state.events.push({ t: 'treatyMade', playerId: to, targetId: from, kind });
+}
+
+// Выход из альянса целиком: мир со всеми членами, нарушение +1.
+function leaveAlliance(state: MatchState, playerId: number): void {
+  for (const member of allianceOf(state, playerId)) setRelation(state, playerId, member, 'peace');
+}
+
 /** Применяет команду дипломатии после успешной проверки. */
 export function executeDiplomacy(state: MatchState, playerId: number, cmd: DiplomacyCommand): void {
   const d = state.diplomacy;
   if (!d) return;
   switch (cmd.t) {
-    case 'declareWar': {
-      const now = relationOf(state, playerId, cmd.target);
-      const breach = now === 'pact' || now === 'alliance';
-      if (breach) d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
-      setRelation(state, playerId, cmd.target, 'war');
-      dropOffers(state, playerId, cmd.target);
-      state.events.push({
-        t: 'warDeclared',
-        playerId,
-        targetId: cmd.target,
-        kind: breach ? (now as 'pact' | 'alliance') : null,
-      });
+    case 'declareWar':
+      declareWar(state, playerId, cmd.target);
       return;
-    }
     case 'proposeTreaty':
       dropOffers(state, playerId, cmd.target);
       d.offers.push({ from: playerId, to: cmd.target, kind: cmd.kind, tick: state.tick });
@@ -102,26 +184,34 @@ export function executeDiplomacy(state: MatchState, playerId: number, cmd: Diplo
       const offer = liveOffer(state, cmd.from, playerId);
       dropOffers(state, cmd.from, playerId);
       if (!offer || !cmd.accept) return;
-      setRelation(state, cmd.from, playerId, offer.kind);
-      cancelAttacks(state, cmd.from, playerId);
-      state.events.push({
-        t: 'treatyMade',
-        playerId,
-        targetId: cmd.from,
-        kind: offer.kind,
-      });
+      conclude(state, cmd.from, playerId, offer.kind);
       return;
     }
     case 'breakTreaty': {
       const now = relationOf(state, playerId, cmd.target);
       d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
-      setRelation(state, playerId, cmd.target, 'peace');
+      if (now === 'alliance') leaveAlliance(state, playerId);
+      else setRelation(state, playerId, cmd.target, 'peace');
       state.events.push({
         t: 'treatyBroken',
         playerId,
         targetId: cmd.target,
-        kind: now === 'alliance' ? 'alliance' : 'pact',
+        kind: now === 'alliance' ? 'alliance' : now === 'defense' ? 'defense' : 'pact',
       });
+      return;
+    }
+    case 'answerAid': {
+      const call = liveCall(state, playerId, cmd.aggressor);
+      if (!call) return;
+      if (cmd.join) joinAid(state, call);
+      else annulAid(state, call);
+      return;
+    }
+    case 'castVote': {
+      const vote = d.votes?.find((v) => v.id === cmd.voteId);
+      if (!vote) return;
+      (cmd.yes ? vote.yes : vote.no).push(playerId);
+      settle(state, d, vote, false);
       return;
     }
   }
