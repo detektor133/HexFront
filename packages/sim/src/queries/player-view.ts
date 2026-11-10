@@ -172,9 +172,13 @@ function victoryHold(state: MatchState): VictoryHold | null {
 
 function links(state: MatchState): Uint8Array {
   const main = new Set(state.networks.filter((n) => n.isMain).map((n) => n.id));
-  return Uint8Array.from(state.hexes.network, (id) =>
-    id < 0 ? LINK.none : main.has(id) ? LINK.main : LINK.isolated,
-  );
+  const network = state.hexes.network;
+  const out = new Uint8Array(network.length);
+  for (let hex = 0; hex < network.length; hex += 1) {
+    const id = network[hex] ?? -1;
+    out[hex] = id < 0 ? LINK.none : main.has(id) ? LINK.main : LINK.isolated;
+  }
+  return out;
 }
 
 function summary(
@@ -243,6 +247,28 @@ function recruitMax(state: MatchState, cityId: number): Fp {
   return (cap - (cap % RECRUIT_STEP)) as Fp;
 }
 
+// Простые циклы по типизированным массивам: `TypedArray.from(src, fn)` вызывает функцию на каждый
+// гекс и на больших картах съедал половину тика на каждого игрока.
+function ownedOnly(values: Int32Array, owner: Int16Array, playerId: number): Int32Array {
+  const out = new Int32Array(values.length);
+  for (let id = 0; id < values.length; id += 1) {
+    if (owner[id] === playerId) out[id] = values[id] ?? 0;
+  }
+  return out;
+}
+
+function visibleOnly(values: Uint8Array, visible: Uint8Array): Uint8Array {
+  const out = new Uint8Array(values.length);
+  for (let id = 0; id < values.length; id += 1) {
+    if (visible[id] === 1) out[id] = values[id] ?? 0;
+  }
+  return out;
+}
+
+function memoryCopy(memory: Uint8Array | undefined, length: number): Uint8Array {
+  return memory ? memory.slice() : new Uint8Array(length);
+}
+
 /**
  * Снимок для игрока. Массивы — копии: клиент может их менять, состояние не пострадает.
  * @returns данные для отрисовки и интерфейса
@@ -279,24 +305,16 @@ export function playerView(
     hexes: {
       // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
       owner: hexes.owner.slice(),
-      pop: state.fog
-        ? Int32Array.from(hexes.pop, (value, id) => (hexes.owner[id] === playerId ? value : 0))
-        : hexes.pop.slice(),
+      pop: state.fog ? ownedOnly(hexes.pop, hexes.owner, playerId) : hexes.pop.slice(),
       improvement: state.fog
-        ? Uint8Array.from(hexes.improvement, (_, id) => memoryImprovement?.[id] ?? 0)
+        ? memoryCopy(memoryImprovement, hexes.improvement.length)
         : hexes.improvement.slice(),
       building: state.fog
-        ? Uint8Array.from(hexes.building, (_, id) => memoryBuilding?.[id] ?? 0)
+        ? memoryCopy(memoryBuilding, hexes.building.length)
         : hexes.building.slice(),
-      road: state.fog
-        ? Uint8Array.from(hexes.road, (_, id) => memoryRoad?.[id] ?? 0)
-        : hexes.road.slice(),
-      link: Uint8Array.from(viewContext.links, (value, id) => (visible[id] === 1 ? value : 0)),
-      growth: state.fog
-        ? Int32Array.from(viewContext.growth, (value, id) =>
-            hexes.owner[id] === playerId ? value : 0,
-          )
-        : viewContext.growth,
+      road: state.fog ? memoryCopy(memoryRoad, hexes.road.length) : hexes.road.slice(),
+      link: visibleOnly(viewContext.links, visible),
+      growth: state.fog ? ownedOnly(viewContext.growth, hexes.owner, playerId) : viewContext.growth,
       visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({

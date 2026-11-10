@@ -90,6 +90,38 @@ export function canBuildViewDelta(before: PlayerView, after: PlayerView): boolea
   return sameHexShape(before, after) && before.playerId === after.playerId;
 }
 
+/**
+ * Сравнивает восемь массивов гексов; запись создаётся только для изменённого гекса.
+ * Горячий цикл (каждый тик, каждому игроку): без объектов и `Object.keys` на каждый гекс.
+ */
+function collectHexChanges(a: PlayerView['hexes'], b: PlayerView['hexes'], out: HexChange[]): void {
+  const count = b.owner.length;
+  for (let id = 0; id < count; id += 1) {
+    if (
+      a.owner[id] === b.owner[id] &&
+      a.pop[id] === b.pop[id] &&
+      a.improvement[id] === b.improvement[id] &&
+      a.building[id] === b.building[id] &&
+      a.road[id] === b.road[id] &&
+      a.link[id] === b.link[id] &&
+      a.growth[id] === b.growth[id] &&
+      a.visible[id] === b.visible[id]
+    ) {
+      continue;
+    }
+    const change: { -readonly [K in keyof HexChange]: HexChange[K] } = { id };
+    if (a.owner[id] !== b.owner[id]) change.owner = b.owner[id] as number;
+    if (a.pop[id] !== b.pop[id]) change.pop = b.pop[id] as number;
+    if (a.improvement[id] !== b.improvement[id]) change.improvement = b.improvement[id] as number;
+    if (a.building[id] !== b.building[id]) change.building = b.building[id] as number;
+    if (a.road[id] !== b.road[id]) change.road = b.road[id] as number;
+    if (a.link[id] !== b.link[id]) change.link = b.link[id] as number;
+    if (a.growth[id] !== b.growth[id]) change.growth = b.growth[id] as number;
+    if (a.visible[id] !== b.visible[id]) change.visible = b.visible[id] as number;
+    out.push(change);
+  }
+}
+
 export function buildViewDelta(
   before: PlayerView,
   after: PlayerView,
@@ -97,24 +129,7 @@ export function buildViewDelta(
 ): DeltaMessage {
   const hexes: HexChange[] = [];
   const view: Partial<ViewMetadata> = {};
-  const names: readonly (keyof PlayerView['hexes'])[] = [
-    'owner',
-    'pop',
-    'improvement',
-    'building',
-    'road',
-    'link',
-    'growth',
-    'visible',
-  ];
-  for (let id = 0; id < after.hexes.owner.length; id += 1) {
-    const change: HexChange = { id };
-    for (const name of names) {
-      const value = after.hexes[name][id];
-      if (value !== before.hexes[name][id]) Object.assign(change, { [name]: value });
-    }
-    if (Object.keys(change).length > 1) hexes.push(change);
-  }
+  collectHexChanges(before.hexes, after.hexes, hexes);
   for (const field of METADATA_FIELDS) {
     if (!equalValue(before[field], after[field])) Object.assign(view, { [field]: after[field] });
   }
