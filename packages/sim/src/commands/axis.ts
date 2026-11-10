@@ -3,6 +3,7 @@
 // городов и столицы врага, слабость обороны рядом, удобство снабжения со своей стороны. Осей
 // несколько: по одной на каждые AXIS_SOLDIERS солдат заказа, не больше AXIS_MAX.
 import { AXIS_MAX, AXIS_SOLDIERS, POCKET_MAX_LAND } from '../balance.ts';
+import { isNeckHex } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 import { edgeHex, edgeOther, type EdgeId } from '../state/edges.ts';
@@ -121,18 +122,30 @@ export function pickAxes(
     readonly value: number;
   }
   const candidates: Candidate[] = [];
-  front.forEach((piece, p) => {
-    const values = piece.map(score);
-    for (let i = 0; i < piece.length; i += 1) {
-      const from = Math.max(0, i - half);
-      const to = Math.min(piece.length, i + half + 1);
-      candidates.push({
-        piece: p,
-        index: i,
-        value: values.slice(from, to).reduce((s, v) => s + v, 0),
-      });
-    }
-  });
+  // Ось не ставится на перешеек врага (коридор в гекс): это «червяк», линия вдоль него бессмысленна.
+  // Если кроме перешейков бить нечем, берутся и они.
+  const ground = { map: state.map, hexes: state.hexes };
+  const neck = (edge: EdgeId): boolean => {
+    const other = edgeOther(state, edge);
+    return other >= 0 && isNeckHex(ground, isEnemy, other);
+  };
+  const addCandidates = (skipNecks: boolean): void => {
+    front.forEach((piece, p) => {
+      const values = piece.map(score);
+      for (let i = 0; i < piece.length; i += 1) {
+        if (skipNecks && neck(piece[i] as EdgeId)) continue;
+        const from = Math.max(0, i - half);
+        const to = Math.min(piece.length, i + half + 1);
+        candidates.push({
+          piece: p,
+          index: i,
+          value: values.slice(from, to).reduce((s, v) => s + v, 0),
+        });
+      }
+    });
+  };
+  addCandidates(true);
+  if (candidates.length === 0) addCandidates(false);
   candidates.sort((a, b) => b.value - a.value || a.piece - b.piece || a.index - b.index);
   const skipHexes = skip.map((e) => at(edgeHex(e)));
   const near = (c: Candidate): boolean => {

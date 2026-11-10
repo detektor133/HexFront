@@ -11,6 +11,7 @@ import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
 import { BorderSignals } from '../dev/BorderSignals.tsx';
+import { Celebration } from '../dev/Celebration.tsx';
 import styles from '../dev/DevSandboxPage.module.css';
 import { EventFeed, feedRows } from '../dev/EventFeed.tsx';
 import { HexCard } from '../dev/HexCard.tsx';
@@ -25,7 +26,6 @@ import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
 import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
-import { brightnessStyle, useBrightness } from '../settings/brightness.ts';
 import { enterFullscreenOnFirstTap } from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
@@ -66,7 +66,6 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const mapRequest = useMemo(() => readSandboxMap(appSearch()), []);
   const loaded = useMapJson(mapRequest);
   const hostRef = useRef<HTMLDivElement>(null);
-  const [brightness] = useBrightness();
   const viewport = useViewport();
   const phoneView = viewport.width <= 600 || viewport.height <= 500;
   useEffect(() => enterFullscreenOnFirstTap(), []);
@@ -89,6 +88,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         restart: (seed) => {
           const params = new URLSearchParams(appSearch());
           params.set('seed', String(seed));
+          // Тот же сид даёт ту же строку запроса, и экран не пересобрался бы: метка запуска меняет ключ.
+          params.set('run', String(Date.now()));
           navigate(`/match?${params.toString()}`);
         },
         onStateChange: (paused, menuOpen) => setPauseState({ paused, menuOpen }),
@@ -180,6 +181,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const partial = view ? armySelection(view, sb.picked.units).partial : [];
   // Тулбар приказов стоит над нижней панелью вне её высоты; карточкам над ней нужен запас под него.
   // На телефоне панель приказов уступает место окну «Постройки» и режиму строительства.
+  // Чужие игроки без городов: у них идёт отсчёт до капитуляции — об этом сообщает лента.
+  const capitulating = (view?.players ?? []).flatMap((p) =>
+    p.id !== view?.playerId && p.status === 'alive' && p.graceLeftS !== undefined
+      ? [{ player: p.id, seconds: p.graceLeftS }]
+      : [],
+  );
   const hideTools = phoneView && (buildingsOpen || sb.mapModes.build !== null);
   const toolsShown =
     !hideTools &&
@@ -196,6 +203,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       view?.me.graceLeftS,
       offscreen.length,
       Boolean(view?.victoryHold),
+      capitulating.length,
     ),
     tutorialVisible: false,
     leaderboardOpen,
@@ -300,7 +308,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   };
   return (
     <div className={styles.page}>
-      <div ref={hostRef} className={styles.map} style={brightnessStyle(brightness)} />
+      <div ref={hostRef} className={styles.map} />
       {!pauseState.menuOpen && (
         <EventFeed
           items={sb.events}
@@ -308,6 +316,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           signals={offscreen}
           onSignal={sb.centerOnHex}
           hold={view?.victoryHold}
+          capitulating={capitulating}
           nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
           send={sb.send}
           graceLeftS={view?.me.graceLeftS}
@@ -391,6 +400,19 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
               target: null,
             });
             sb.focusArmy(armyId);
+          }}
+        />
+      )}
+      {view && sb.celebration && (
+        <Celebration
+          cue={{
+            key: sb.celebration.key,
+            // Победа матча — плашка в итоговом экране; здесь только салют.
+            text:
+              sb.celebration.kind === 'eliminated'
+                ? `${view.players[sb.celebration.player]?.name ?? sb.celebration.player + 1} ${t('celebrate.eliminated')}`
+                : null,
+            color: tokens.players.palette[view.playerId]?.line ?? tokens.ui.ink,
           }}
         />
       )}

@@ -9,22 +9,14 @@ import {
   edgeHexes,
   edgeOther,
   facingEdges,
-  forecastBattle,
   lineDistance,
-  hexFromId,
-  hexId,
-  inBounds,
-  neighbors,
   type EdgeId,
-  type Forecast,
-  type ForecastOutcome,
   type MapStatic,
   type PlanView,
   type PlayerView,
 } from '@hexfront/sim';
 
 import type { FrontTweenCacheTelemetry } from './cache-telemetry.ts';
-import { drawForecastPresentation, forecastBadge } from './forecast-plate.ts';
 import { createFrontTweens } from './front-tween.ts';
 import {
   arrowCount,
@@ -35,7 +27,6 @@ import {
 } from './plan-arrows.ts';
 import { draftPath, frontHandles, type Draft } from './plan-draft.ts';
 import { edgeRuns } from './plan-edges.ts';
-import { isHostile } from './sandbox-selection.ts';
 import { dashedPath } from './unit-layer.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import type { Point } from '../render/hex-geometry.ts';
@@ -44,7 +35,6 @@ import { tokens } from '../theme/tokens.ts';
 
 /** Черновик: подсветка линии — доля непрозрачности. */
 const DRAFT_ALPHA = 0.6;
-const RANK: Record<ForecastOutcome, number> = { defeat: 0, stalemate: 1, victory: 2 };
 
 export interface PlanLayer {
   readonly container: Container;
@@ -160,7 +150,6 @@ export function createPlanLayer(
   container.addChild(g, arrows, labels);
   let k = 1;
   let level: DetailLevel = 2;
-  let hover: Point | null = null;
 
   const width = (w: readonly number[], detailShift = 0): number => {
     const index = Math.min(w.length - 1, Math.max(0, level - 1 + detailShift));
@@ -314,38 +303,9 @@ export function createPlanLayer(
     return runs.flat();
   }
 
-  // Самый трудный из ближайших боёв: отряды армии рядом с занятыми врагом гексами зоны.
-  // Самый трудный бой — худший исход, при равенстве — больше свои потери.
-  function worstForecast(v: PlayerView, p: FrontPlan): Forecast | null {
-    const zone = new Set(p.zone);
-    let worst: Forecast | null = null;
-    for (const u of v.units) {
-      if (u.armyId !== p.armyId || u.type === 'artillery') continue;
-      for (const n of neighbors(hexFromId(u.hex, map.width))) {
-        if (!inBounds(n, map.width, map.height)) continue;
-        const id = hexId(n, map.width);
-        if (!zone.has(id) || !isHostile(v, id)) continue;
-        const f = forecastBattle(map, v, [u.id], id);
-        const harder =
-          worst === null ||
-          RANK[f.outcome] < RANK[worst.outcome] ||
-          (RANK[f.outcome] === RANK[worst.outcome] && f.attackerLoss > worst.attackerLoss);
-        if (harder) worst = f;
-      }
-    }
-    return worst;
-  }
-
-  function drawOffensive(v: PlayerView, p: FrontPlan, showForecastCard: boolean): void {
+  function drawOffensive(p: FrontPlan): void {
     if (!p.offensive) return;
-    const pts = drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
-    const worst = worstForecast(v, p);
-    const end = pts[pts.length - 1];
-    const badge = worst ? forecastBadge(worst) : null;
-    // Иконка постоянна у конца линии; число потерь появляется только по наведению.
-    if (badge && end) {
-      drawForecastPresentation(labels, badge, end, k, showForecastCard);
-    }
+    drawOffensiveLine(p.facing, p.offensive.edges, p.offensive.active);
   }
 
   function drawDraft(v: PlayerView, d: Draft, color: string): void {
@@ -362,14 +322,6 @@ export function createPlanLayer(
       drawOffensiveLine(facing, path.edges, false, DRAFT_ALPHA);
     }
   }
-
-  const hoverNearForecast = (): boolean => {
-    if (!last || hover === null) return false;
-    const [v, , selectedArmy] = last;
-    const plan = v.plans.find((p) => p.armyId === selectedArmy);
-    if (plan?.kind !== 'front') return false;
-    return isPointNearPath(hover, runsOf(plan.offensive?.edges ?? []), 14 * k);
-  };
 
   const tweens = createFrontTweens();
   let last: Parameters<PlanLayer['setView']> | null = null;
@@ -397,10 +349,7 @@ export function createPlanLayer(
           continue;
         }
         const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
-        const paths = runsOf(p.offensive?.edges ?? []);
-        const showForecastCard =
-          p.armyId === selectedArmy && hover !== null && isPointNearPath(hover, paths, 14 * k);
-        drawOffensive(v, p, showForecastCard);
+        drawOffensive(p);
         const appearance = frontAppearance(selectedArmy, p.armyId, level - 1);
         drawFront(front, color, appearance.alpha, appearance.detailShift);
         if (p.armyId === selectedArmy && !draft) {
@@ -412,11 +361,8 @@ export function createPlanLayer(
       const dc = draft ? colorOf(draft.armyId) : null;
       if (draft && dc) drawDraft(v, draft, dc);
     },
-    setHover(world) {
-      const before = hoverNearForecast();
-      hover = world;
-      // Перерисовка нужна, только если карточка прогноза появилась или исчезла.
-      if (last && hoverNearForecast() !== before) this.setView(...last);
+    setHover() {
+      // Значка прогноза у линии нет — наведение слою не нужно.
     },
     frame(nowMs) {
       // Ещё один кадр после конца перехода — линия встаёт точно в новое положение.

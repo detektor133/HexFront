@@ -9,6 +9,10 @@ export interface EventFeedItem {
 }
 
 export const EVENT_TTL_MS = 20000;
+/** Мест в ленте: больше записей — лишние уходят в счётчик «+K». */
+export const FEED_SLOTS = 5;
+/** Сколько последних событий помнит лента: с запасом на счётчик «+K». */
+const EVENTS_KEPT = 16;
 
 export function eventHex(event: GameEvent, view: PlayerView): number | null {
   if (event.t === 'unitDestroyed' || event.t === 'unitRetreated' || event.t === 'unitCapitulated') {
@@ -80,7 +84,7 @@ export function appendEvents(
       important: isImportantEvent(event),
       expiresAt: now + EVENT_TTL_MS,
     }));
-  return [...items, ...fresh].filter((item) => item.expiresAt > now).slice(-4);
+  return [...items, ...fresh].filter((item) => item.expiresAt > now).slice(-EVENTS_KEPT);
 }
 
 export function visibleEvents(items: readonly EventFeedItem[], now: number): EventFeedItem[] {

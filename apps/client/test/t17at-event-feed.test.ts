@@ -32,7 +32,7 @@ function appendForPlayer(
 }
 
 describe('07/T17at: фильтр ленты событий', () => {
-  it('Приёмка 2: сохраняет не более четырёх последних допустимых событий и отбрасывает нерелевантные типы', () => {
+  it('Приёмка 2: сохраняет все допустимые события (до запаса ленты) и отбрасывает нерелевантные типы', () => {
     const events = [
       { t: 'unitDestroyed', playerId: 0, unitId: 1, hex: 1 },
       { t: 'unitDestroyed', playerId: 1, unitId: 2, hex: 2 },
@@ -53,8 +53,9 @@ describe('07/T17at: фильтр ленты событий', () => {
 
     const items = appendForPlayer(events, 0);
 
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(5);
     expect(items.map((item) => item.event)).toEqual([
+      expect.objectContaining({ t: 'unitDestroyed', unitId: 1, playerId: 0 }),
       expect.objectContaining({ t: 'unitCapitulated', playerId: 0 }),
       expect.objectContaining({ t: 'cityCaptured', previousOwnerId: 1, newOwnerId: 0 }),
       expect.objectContaining({ t: 'cityCaptured', previousOwnerId: 0, newOwnerId: 1 }),

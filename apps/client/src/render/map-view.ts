@@ -22,6 +22,7 @@ import { createGesture, type Gesture, type StrokePhase, type TapKind } from './g
 import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
+import { currentBrightness, onBrightness } from '../settings/brightness.ts';
 import { tokens } from '../theme/tokens.ts';
 
 export interface MapViewState {
@@ -184,16 +185,35 @@ export async function createMapView(
   const world = new Container();
   app.stage.addChild(world);
 
+  // Яркость карты: затемнение (или подсветка) лежит над рельефом и территориями, но под отрядами,
+  // подписями и планами — фильтр на весь холст гасил бы и фишки.
+  const dimmer = new Graphics();
   let layer: TerrainLayer = createTerrainLayer(map, opts.radius);
   let mid: MidLayer | null = opts.midLayer?.(map, opts.radius) ?? null;
   const mount = (): void => {
     world.addChild(layer.base);
     if (mid) world.addChild(mid.container);
     world.addChild(layer.overlay);
+    world.addChild(dimmer);
     if (mid?.top) world.addChild(mid.top);
   };
   mount();
   let bounds: Rect = mapBounds(map.width, map.height, opts.radius);
+  const redrawDimmer = (): void => {
+    const percent = currentBrightness();
+    dimmer.clear();
+    dimmer.visible = percent !== 100;
+    if (percent === 100) return;
+    // Ярче 100 % — белая добавка, темнее — чёрная прозрачная пелена.
+    const brighter = percent > 100;
+    dimmer.blendMode = brighter ? 'add' : 'normal';
+    dimmer.rect(bounds.x, bounds.y, bounds.width, bounds.height).fill({
+      color: brighter ? 0xffffff : 0x000000,
+      alpha: brighter ? ((percent - 100) / 100) * 0.6 : 1 - percent / 100,
+    });
+  };
+  redrawDimmer();
+  const stopBrightness = onBrightness(redrawDimmer);
   const view = (): Viewport => ({ width: app.screen.width, height: app.screen.height });
   let topInset = 0;
   let bottomInset = 0;
@@ -387,6 +407,7 @@ export async function createMapView(
       mid = opts.midLayer?.(map, opts.radius) ?? null;
       mount();
       bounds = mapBounds(map.width, map.height, opts.radius);
+      redrawDimmer();
       cam = clampCamera(
         {
           scale: cam.scale,
@@ -489,6 +510,7 @@ export async function createMapView(
     },
     destroy() {
       clearInterval(poolTimer);
+      stopBrightness();
       detach();
       selectionFrame?.remove();
       app.destroy({ removeView: true }, { children: true, context: true });

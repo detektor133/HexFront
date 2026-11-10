@@ -40,8 +40,9 @@ describe('T17al: раскладка ленты событий', () => {
   it('сохраняет высоту ленты по числу строк', () => {
     for (const eventRows of [1, 2, 3]) {
       const layout = computeMatchLayout({ ...baseInput(1440, 900), eventRows });
+      // Строки ленты и вкладка скрытия над ними.
       expect(layout.elements.find((element) => element.id === 'event-feed')?.height).toBe(
-        eventRows * 44,
+        (eventRows + 1) * 44,
       );
     }
   });

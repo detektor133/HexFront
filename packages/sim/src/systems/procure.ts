@@ -158,12 +158,17 @@ function orderOne(state: MatchState, army: Army): void {
   const need = mixNeed(army.wanted ?? 0, army.mix);
   const cities = cityOrder(state, army);
   let placed = 0;
+  // Общий потолок: сколько всего армии не хватает до лимита. Излишек одного типа (техники больше
+  // состава) не вычитается из недобора другого, поэтому без потолка закупка перебирала бы лимит.
+  let room = (army.wanted ?? 0) * FP - strength(state, army);
   for (const type of TYPES) {
     if (need === undefined && type !== 'infantry') return;
-    let left =
+    let left = Math.min(
+      room,
       need === undefined
         ? (army.wanted ?? 0) * FP - strength(state, army)
-        : need[type] * FP - strengthOf(state, army, type);
+        : need[type] * FP - strengthOf(state, army, type),
+    );
     for (const city of cities) {
       if (left < RECRUIT_MIN || placed >= PROCURE_CITIES) break;
       if (state.recruits.some((r) => r.cityId === city.id)) continue;
@@ -171,6 +176,7 @@ function orderOne(state: MatchState, army: Army): void {
       if (amount < RECRUIT_MIN) continue;
       startRecruit(state, army.owner, city.id, type, amount as Fp, army.id);
       left -= amount;
+      room -= amount;
       placed += 1;
     }
   }

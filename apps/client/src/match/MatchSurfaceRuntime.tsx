@@ -210,6 +210,12 @@ interface Sandbox {
   readonly speed: number;
   readonly observerId: number | null;
   readonly events: readonly EventFeedItem[];
+  /** Последний повод для праздника: разгром противника или победа коалиции игрока. */
+  readonly celebration: {
+    readonly key: string;
+    readonly kind: 'eliminated' | 'won';
+    readonly player: number;
+  } | null;
   readonly workerTelemetry: WorkerTelemetry | null;
   snapshotTelemetry(): SnapshotTelemetryCounts;
   cacheTelemetry(): CacheTelemetry;
@@ -308,6 +314,7 @@ export function useSandbox(
   const [observerId, setObserverId] = useState<number | null>(null);
   const [events, setEvents] = useState<readonly EventFeedItem[]>([]);
   const eventsRef = useRef<readonly EventFeedItem[]>([]);
+  const [celebration, setCelebration] = useState<Sandbox['celebration']>(null);
   const dockHeightRef = useRef(0);
   const hudHeightRef = useRef(0);
   const rightInsetRef = useRef(0);
@@ -480,6 +487,20 @@ export function useSandbox(
       );
       eventsRef.current = nextEvents;
       setEvents(nextEvents);
+      for (const event of m.events) {
+        if (event.t === 'playerEliminated' && event.playerId !== view.playerId) {
+          setCelebration({
+            key: `${view.tick}:e${event.playerId}`,
+            kind: 'eliminated',
+            player: event.playerId,
+          });
+        } else if (
+          event.t === 'matchWon' &&
+          (event.playerId === view.playerId || (event.allies?.includes(view.playerId) ?? false))
+        ) {
+          setCelebration({ key: `${view.tick}:won`, kind: 'won', player: event.playerId });
+        }
+      }
       const last = m.rejected.at(-1);
       if (last) setLastReject(reasonText(last.reason));
       matchRef.current?.ack(m.seq);
@@ -827,6 +848,7 @@ export function useSandbox(
     speed,
     observerId,
     events,
+    celebration,
     workerTelemetry: workerTelemetryRef.current,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },

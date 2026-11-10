@@ -13,7 +13,7 @@ import styles from './MainMenu.module.css';
 import { TutorialAsk } from './TutorialMenu.tsx';
 import { isCoarsePointer } from '../input/touch-tap.ts';
 import { followInApp } from '../nav.ts';
-import { SettingsPanel } from '../settings/SettingsPanel.tsx';
+import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -206,6 +206,8 @@ export function MainMenu(): React.JSX.Element {
               setAskOpen(false);
             }}
           />
+        ) : settingsOpen ? (
+          <SettingsScreen onBack={() => setSettingsOpen(false)} />
         ) : (
           <>
             <h1 id="main-menu-title" className={styles.title}>
@@ -337,16 +339,10 @@ export function MainMenu(): React.JSX.Element {
             <button
               type="button"
               className={styles.settingsButton}
-              aria-expanded={settingsOpen}
-              onClick={() => setSettingsOpen((open) => !open)}
+              onClick={() => setSettingsOpen(true)}
             >
               {t('settings.title')}
             </button>
-            {settingsOpen && (
-              <div className={styles.settings}>
-                <SettingsPanel />
-              </div>
-            )}
           </>
         )}
       </section>

@@ -23,7 +23,7 @@ import type { Command, GameEvent, PlayerView } from '@hexfront/sim';
 import { offerKey } from './DiplomacyBlock.tsx';
 import styles from './EventFeed.module.css';
 import type { EventFeedItem } from './event-feed.ts';
-import { visibleEvents } from './event-feed.ts';
+import { FEED_SLOTS, visibleEvents } from './event-feed.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -81,40 +81,16 @@ function EventIcon(props: { readonly event: GameEvent; readonly localPlayerId: n
   return <IconInfoCircle size={18} aria-hidden />;
 }
 
-/** Стрелка в правом краю самой строки: свернуть запись до значка и обратно. */
-function Fold(props: { readonly folded: boolean; readonly onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      className={styles.fold}
-      aria-label={t(props.folded ? 'feed.unfold' : 'feed.fold')}
-      title={t(props.folded ? 'feed.unfold' : 'feed.fold')}
-      aria-expanded={!props.folded}
-      onClick={props.onToggle}
-    >
-      {props.folded ? (
-        <IconChevronRight size={14} aria-hidden />
-      ) : (
-        <IconChevronLeft size={14} aria-hidden />
-      )}
-    </button>
-  );
-}
-
-/** Строка ленты: значок, подпись, (короткая подпись и кнопки) и стрелка свёртывания — всё в одной плашке. */
+/** Строка ленты: значок, подпись и кнопки ответа — всё в одной плашке. */
 function Row(props: {
   readonly id: string;
   readonly icon: React.ReactNode;
   readonly text: string;
-  /** Подпись свёрнутой строки; без неё остаётся значок. */
-  readonly short?: string | number;
   readonly accent?: string | undefined;
   readonly important?: boolean;
   readonly open?: boolean;
   readonly offer?: boolean;
   readonly role?: string;
-  readonly folded: boolean;
-  readonly onToggle: () => void;
   /** Нажатие по значку и подписи; без него строка не кнопка. */
   readonly onMain?: (() => void) | undefined;
   readonly actions?: React.ReactNode;
@@ -129,11 +105,10 @@ function Row(props: {
     <>
       <span className={styles.icon}>{props.icon}</span>
       <span className={styles.name}>{props.text}</span>
-      {props.short !== undefined && <span className={styles.short}>{props.short}</span>}
     </>
   );
   return (
-    <div className={styles.slot} data-mini={props.folded}>
+    <div className={styles.slot}>
       <div
         className={classes}
         style={props.accent ? { borderRightColor: props.accent } : undefined}
@@ -154,7 +129,6 @@ function Row(props: {
           </span>
         )}
         {props.actions}
-        <Fold folded={props.folded} onToggle={props.onToggle} />
       </div>
     </div>
   );
@@ -172,16 +146,18 @@ export function feedRows(
   graceLeftS?: number,
   signals = 0,
   hold = false,
+  capitulating = 0,
 ): number {
   const grace = graceLeftS === undefined ? 0 : 1;
-  return Math.min(
-    4,
+  const total =
     items.filter((item) => item.event.t !== 'treatyOffered').length +
-      offers.length +
-      grace +
-      signals +
-      (hold ? 1 : 0),
-  );
+    offers.length +
+    grace +
+    signals +
+    capitulating +
+    (hold ? 1 : 0);
+  // Лишнее сворачивается в строку «+K»: она тоже занимает место.
+  return Math.min(FEED_SLOTS, total) + (total > FEED_SLOTS ? 1 : 0);
 }
 
 function diplomacyOther(event: GameEvent, me: number): number | null {
@@ -204,6 +180,8 @@ export function EventFeed(props: {
   readonly onSignal?: (hex: number) => void;
   /** Игрок, который держит нужную долю городов: до победы (или поражения) остаётся секунд. */
   readonly hold?: { readonly player: number; readonly seconds: number } | null | undefined;
+  /** Игроки без городов: до капитуляции остаётся секунд (враг скоро выбывает). */
+  readonly capitulating?: readonly { readonly player: number; readonly seconds: number }[];
   readonly nameOf?: (playerId: number) => string;
   readonly send?: (cmd: Command) => void;
   /** Секунд до выбывания при отсутствии городов; нет — города есть. */
@@ -216,16 +194,11 @@ export function EventFeed(props: {
   readonly compact?: boolean;
 }): React.JSX.Element | null {
   const [now, setNow] = useState<number>(props.now);
-  // Свёрнутые записи (ключи строк): остаётся значок, у некоторых — короткая подпись.
-  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+  // Вся лента спрятана за вкладку у края; на ПК её раскрывает наведение, на телефоне — касание.
+  const [hidden, setHidden] = useState(false);
+  const [peek, setPeek] = useState(false);
   // Убранные нажатием в другом месте: до появления новой записи с другим ключом.
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
-  const toggle = (key: string): void =>
-    setFolded((current) => {
-      const next = new Set(current);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
   useEffect(() => {
     setNow(props.now);
   }, [props.now]);
@@ -265,56 +238,24 @@ export function EventFeed(props: {
     offers.length === 0 &&
     signals.length === 0 &&
     grace === undefined &&
-    hold === null
+    hold === null &&
+    (props.capitulating ?? []).length === 0
   ) {
     return null;
   }
   const nameOf = props.nameOf ?? ((id: number) => String(id + 1));
   const me = props.localPlayerId ?? 0;
-  const fold = (key: string) => ({ folded: folded.has(key), onToggle: () => toggle(key) });
-  return (
-    <div className={styles.feed} style={props.style} aria-label={t('event.feed')} data-feed>
-      {hold !== null && (
+  // Места ленты — строго FEED_SLOTS: сверху то, что ждёт ответа или идёт по таймеру, ниже сигналы
+  // границы и события, новые раньше старых. Не поместившееся уходит в счётчик «+K».
+  const specs: { readonly key: string; readonly node: React.JSX.Element }[] = [];
+  for (const offer of offers) {
+    const key = `offer:${offer.from}`;
+    specs.push({
+      key,
+      node: (
         <Row
-          id="hold"
-          icon={<IconTrophy size={18} aria-hidden />}
-          text={`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}
-          short={`00:${String(hold.seconds).padStart(2, '0')}`}
-          accent={ownerColor(hold.player)}
-          important={hold.player !== me}
-          open
-          role="status"
-          {...fold('hold')}
-        />
-      )}
-      {grace !== undefined && (
-        <Row
-          id="grace"
-          icon={<IconBuildingCastle size={18} aria-hidden />}
-          text={`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}
-          short={grace}
-          important
-          role="alert"
-          {...fold('grace')}
-        />
-      )}
-      {signals.map(({ other, hex }) => (
-        <Row
-          key={`signal:${other}`}
-          id={`signal:${other}`}
-          icon={<IconShield size={18} aria-hidden />}
-          text={`${t('signal.border')}: ${nameOf(other)}`}
-          accent={ownerColor(other)}
-          important
-          offer
-          onMain={() => props.onSignal?.(hex)}
-          {...fold(`signal:${other}`)}
-        />
-      ))}
-      {offers.map((offer) => (
-        <Row
-          key={`offer:${offer.from}`}
-          id={`offer:${offer.from}`}
+          key={key}
+          id={key}
           icon={
             offer.kind === 'pact' ? (
               <IconHeartHandshake size={18} aria-hidden />
@@ -344,29 +285,133 @@ export function EventFeed(props: {
               </IconButton>
             </>
           }
-          {...fold(`offer:${offer.from}`)}
         />
-      ))}
-      {items.map((item) => {
-        const other = diplomacyOther(item.event, me);
-        const text = label(item.event, me);
-        const full = other === null ? text : `${text}: ${nameOf(other)}`;
-        const key = `event:${item.id}`;
-        return (
-          <Row
-            key={item.id}
-            id={key}
-            icon={<EventIcon event={item.event} localPlayerId={me} />}
-            text={full}
-            accent={item.important ? undefined : ownerColor(item.event.playerId)}
-            important={item.important}
-            onMain={
-              item.hex === null || item.hex === undefined ? undefined : () => props.onFocus(item)
-            }
-            {...fold(key)}
-          />
-        );
-      })}
+      ),
+    });
+  }
+  if (hold !== null) {
+    specs.push({
+      key: 'hold',
+      node: (
+        <Row
+          key="hold"
+          id="hold"
+          icon={<IconTrophy size={18} aria-hidden />}
+          text={`${nameOf(hold.player)} ${t('match.holdsCities')} · 00:${String(hold.seconds).padStart(2, '0')}`}
+          accent={ownerColor(hold.player)}
+          important={hold.player !== me}
+          open
+          role="status"
+        />
+      ),
+    });
+  }
+  if (grace !== undefined) {
+    specs.push({
+      key: 'grace',
+      node: (
+        <Row
+          key="grace"
+          id="grace"
+          icon={<IconBuildingCastle size={18} aria-hidden />}
+          text={`${t('match.noCities')}: ${grace} ${t('match.seconds')}`}
+          important
+          open
+          role="alert"
+        />
+      ),
+    });
+  }
+  for (const { player, seconds } of props.capitulating ?? []) {
+    const key = `capitulation:${player}`;
+    specs.push({
+      key,
+      node: (
+        <Row
+          key={key}
+          id={key}
+          icon={<IconFlag size={18} aria-hidden />}
+          text={`${nameOf(player)} ${t('match.capitulates')}: ${seconds} ${t('match.seconds')}`}
+          accent={ownerColor(player)}
+          open
+          role="status"
+        />
+      ),
+    });
+  }
+  for (const { other, hex } of signals) {
+    const key = `signal:${other}`;
+    specs.push({
+      key,
+      node: (
+        <Row
+          key={key}
+          id={key}
+          icon={<IconShield size={18} aria-hidden />}
+          text={`${t('signal.border')}: ${nameOf(other)}`}
+          accent={ownerColor(other)}
+          important
+          offer
+          onMain={() => props.onSignal?.(hex)}
+        />
+      ),
+    });
+  }
+  for (const item of [...items].reverse()) {
+    const other = diplomacyOther(item.event, me);
+    const text = label(item.event, me);
+    const full = other === null ? text : `${text}: ${nameOf(other)}`;
+    const key = `event:${item.id}`;
+    specs.push({
+      key,
+      node: (
+        <Row
+          key={key}
+          id={key}
+          icon={<EventIcon event={item.event} localPlayerId={me} />}
+          text={full}
+          accent={item.important ? undefined : ownerColor(item.event.playerId)}
+          important={item.important}
+          onMain={
+            item.hex === null || item.hex === undefined ? undefined : () => props.onFocus(item)
+          }
+        />
+      ),
+    });
+  }
+  const shown = specs.slice(0, FEED_SLOTS);
+  const more = specs.length - shown.length;
+  const open = !hidden || peek;
+  const HandleIcon = hidden ? IconChevronRight : IconChevronLeft;
+  return (
+    <div className={styles.feed} style={props.style} aria-label={t('event.feed')} data-feed>
+      <div
+        className={styles.dock}
+        onPointerEnter={(event) => event.pointerType === 'mouse' && setPeek(true)}
+        onPointerLeave={(event) => event.pointerType === 'mouse' && setPeek(false)}
+      >
+        <button
+          type="button"
+          className={styles.handle}
+          data-alert={hidden && offers.length > 0}
+          aria-label={t(hidden ? 'feed.show' : 'feed.hide')}
+          title={t(hidden ? 'feed.show' : 'feed.hide')}
+          aria-expanded={!hidden}
+          onClick={() => {
+            setHidden(!hidden);
+            setPeek(false);
+          }}
+        >
+          <HandleIcon size={14} aria-hidden />
+          {hidden && <span className={styles.badge}>{specs.length}</span>}
+        </button>
+        {open && shown.map((spec) => spec.node)}
+        {open && more > 0 && (
+          <span className={styles.more} title={t('feed.more')} role="status">
+            +{more}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

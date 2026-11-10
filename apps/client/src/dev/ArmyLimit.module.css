@@ -109,3 +109,14 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Оценка найма под составом: золото красным, если его не хватает. */
+.hire {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.hireWarn {
+  color: var(--status-warning);
+}

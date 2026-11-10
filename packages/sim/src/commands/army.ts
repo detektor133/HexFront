@@ -1,5 +1,6 @@
 // Команды армий — групп отрядов (CR-001): createArmy, renameArmy, disbandArmy, assignUnits;
 // автокомандование — setArmyAuto, setAutoCommand (CR-006). GDD: docs/gdd/05-armies.md — «Модель».
+import { dismissUnits, dismissable } from './dismiss.ts';
 import { removePlan } from './plan.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
@@ -14,6 +15,7 @@ export type ArmyCommand = Extract<
       | 'createArmy'
       | 'renameArmy'
       | 'disbandArmy'
+      | 'dismissUnits'
       | 'splitArmy'
       | 'setArmyLimit'
       | 'assignUnits'
@@ -80,6 +82,11 @@ export function validateArmyCommand(
     return typeof cmd.on === 'boolean' ? OK : rejected('badValue');
   }
   if (cmd.t === 'setArmyAuto' && typeof cmd.on !== 'boolean') return rejected('badValue');
+  if (cmd.t === 'dismissUnits') {
+    const units = ownUnitList(state, playerId, cmd.unitIds);
+    if (!units.ok) return rejected(units.reason);
+    return units.value.every((u) => dismissable(u, playerId)) ? OK : rejected('badValue');
+  }
   if (cmd.t === 'assignUnits') {
     const units = ownUnitList(state, playerId, cmd.unitIds);
     if (!units.ok) return rejected(units.reason);
@@ -157,6 +164,9 @@ export function executeArmyCommand(state: MatchState, playerId: number, cmd: Arm
       state.armies.splice(0, state.armies.length, ...rest);
       return;
     }
+    case 'dismissUnits':
+      dismissUnits(state, playerId, cmd.unitIds);
+      return;
     case 'splitArmy': {
       const source = state.armies.find((a) => a.id === cmd.armyId);
       const player = state.players[playerId];

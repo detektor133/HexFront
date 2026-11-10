@@ -1,0 +1,129 @@
+/* Экран настроек вместо меню: «Назад» сверху, вкладки слева, параметры справа. */
+.screen {
+  display: grid;
+  gap: var(--space-md);
+  width: min(560px, 100%);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.title {
+  margin: 0;
+  color: var(--ui-ink);
+  font-family: var(--font-display-family);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
+  font-size: var(--font-size-hud-value);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-md);
+  min-height: 200px;
+}
+
+.tabs {
+  display: grid;
+  align-content: start;
+  gap: var(--space-xs);
+}
+
+.tab {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  color: var(--ui-ink2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: var(--ui-border-width) var(--ui-border-style) transparent;
+  border-radius: var(--radius-button);
+}
+
+.tabOn {
+  color: var(--ui-ink);
+  font-weight: 600;
+  background: var(--ui-surface2);
+  border-color: var(--ui-border);
+}
+
+.content {
+  min-width: 0;
+  padding-left: var(--space-md);
+  border-left: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.groupLabel {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-label);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xs);
+}
+
+.segment {
+  min-height: var(--touch-target-min);
+  color: var(--ui-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.segmentOn {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+.hint {
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+/* Узкий экран: вкладки сверху в строку. */
+@media (max-width: 480px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .content {
+    padding-left: 0;
+    border-left: 0;
+  }
+}

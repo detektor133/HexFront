@@ -266,10 +266,6 @@
   border-radius: var(--radius-button);
 }
 
-.settings {
-  margin-top: var(--space-sm);
-}
-
 /* Низкий экран (телефон в ландшафте): карточка плотнее, чтобы почти помещаться без прокрутки. */
 @media (max-height: 500px) {
   .page {

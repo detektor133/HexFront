@@ -42,11 +42,14 @@ export function writeBrightness(value: number): void {
 
 let memory: number | null = null;
 
-function current(): number {
+/** Текущая яркость, %: запись из хранилища или значение из памяти, если хранилище закрыто. */
+export function currentBrightness(): number {
   return memory ?? readBrightness();
 }
+const current = currentBrightness;
 
-function subscribe(listener: () => void): () => void {
+/** Подписка на смену яркости; возвращает отписку. */
+export function onBrightness(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -54,7 +57,7 @@ function subscribe(listener: () => void): () => void {
 /** Яркость карты, % и её запись; компонент перерисовывается при смене. */
 export function useBrightness(): readonly [number, (value: number) => void] {
   const [value, setValue] = useState(current);
-  useEffect(() => subscribe(() => setValue(current())), []);
+  useEffect(() => onBrightness(() => setValue(current())), []);
   return [value, writeBrightness];
 }
 

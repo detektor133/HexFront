@@ -118,6 +118,8 @@ export type Command =
   /** Переименовывает свой город. */
   | { readonly t: 'renameCity'; readonly cityId: number; readonly name: string }
   | { readonly t: 'disbandArmy'; readonly armyId: number }
+  /** Распускает отряды резерва: солдаты возвращаются в население. */
+  | { readonly t: 'dismissUnits'; readonly unitIds: readonly number[] }
   /** Делит армию на две примерно равные по числу солдат; вторая половина — новая армия. */
   | { readonly t: 'splitArmy'; readonly armyId: number }
   | {

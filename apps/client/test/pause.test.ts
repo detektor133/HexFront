@@ -311,7 +311,12 @@ describe('пауза локального матча', () => {
     const pausedAgainButtons = (pausedAgain.props?.children as unknown as ElementNode[]).slice(1);
     (pausedAgainButtons[1]?.props?.onClick as (() => void) | undefined)?.();
     expect(window.history.pushState).toHaveBeenCalledWith(
-      { hexfront: { pathname: '/match', search: '?map=gen&seed=73&players=30' } },
+      {
+        hexfront: {
+          pathname: '/match',
+          search: expect.stringMatching(/^\?map=gen&seed=73&players=30&run=\d+$/),
+        },
+      },
       '',
       '/',
     );

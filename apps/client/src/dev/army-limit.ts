@@ -1,6 +1,14 @@
 // Лимит армии — заказанная численность направления (`wanted`): сколько солдат держать на цели.
 // Меняется на карточке армии и в окне соседа одной и той же командой направления.
-import { ARMY_LEVEL_DENOMS, FP, type ArmyView, type Command, type PlayerView } from '@hexfront/sim';
+import {
+  ARMY_LEVEL_DENOMS,
+  COST_GOLD_PER_SOLDIER,
+  FP,
+  type ArmyView,
+  type Command,
+  type PlayerView,
+  type UnitType,
+} from '@hexfront/sim';
 
 /** Шаг кнопок −/+ лимита, солдат. */
 export const LIMIT_STEP = 10;
@@ -34,6 +42,38 @@ export function limitCommand(
   mix?: { readonly armor: number; readonly artillery: number },
 ): Command {
   return { t: 'setArmyLimit', armyId: army.id, soldiers, ...(mix ? { mix } : {}) };
+}
+
+/**
+ * Сколько и за сколько придётся нанять, чтобы армия стала такой, как заказано. Считает так же, как
+ * закупка в симуляции: типы по порядку, всего не больше разницы до лимита, поэтому излишек одного
+ * типа не вычитается из недобора другого.
+ * @returns солдат к найму и золота, целые числа
+ */
+export function hireEstimate(
+  have: Record<UnitType, number>,
+  want: Record<UnitType, number>,
+): { readonly soldiers: number; readonly gold: number } {
+  const owned = have.infantry + have.armor + have.artillery;
+  let room = Math.max(0, want.infantry + want.armor + want.artillery - owned);
+  let soldiers = 0;
+  let gold = 0;
+  for (const type of ['infantry', 'armor', 'artillery'] as const) {
+    const amount = Math.min(room, Math.max(0, want[type] - have[type]));
+    room -= amount;
+    soldiers += amount;
+    gold += (amount * COST_GOLD_PER_SOLDIER[type]) / FP;
+  }
+  return { soldiers, gold: Math.round(gold) };
+}
+
+/** Солдаты армии по типам: те, что уже стоят в отрядах. */
+export function onHand(view: PlayerView, army: ArmyView): Record<UnitType, number> {
+  const counts = { infantry: 0, armor: 0, artillery: 0 };
+  for (const u of view.units) {
+    if (u.owner === view.playerId && u.armyId === army.id) counts[u.type] += u.soldiers / FP;
+  }
+  return counts;
 }
 
 /**

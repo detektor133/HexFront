@@ -102,6 +102,8 @@ export interface PlayerView {
     readonly taxTarget: Fp;
     readonly taxEffective: Fp;
     readonly status: string;
+    /** Секунд до выбывания, пока у игрока нет городов (виден всем: капитуляция врага). */
+    readonly graceLeftS?: number;
   }[];
   /** Сводка своего государства для верхней полосы (ui.md, «HUD»). */
   readonly me: {
@@ -317,6 +319,7 @@ export function playerView(
       taxTarget: p.taxTarget,
       taxEffective: p.taxEffective,
       status: p.status,
+      ...graceLeft(state, p.id),
     })),
     constructions: state.constructions
       .filter((c) => c.owner === playerId || visible[c.hex] === 1)

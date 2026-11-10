@@ -7,6 +7,7 @@ import {
   IconShield,
   IconStarFilled,
   IconSwords,
+  IconTrash,
 } from '@tabler/icons-react';
 import { type WheelEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -24,15 +25,7 @@ import styles from './ArmyBar.module.css';
 import { ArmyLimit } from './ArmyLimit.tsx';
 import { RollNumber } from './RollNumber.tsx';
 import { StepPlus } from './StepPlus.tsx';
-import {
-  DEFAULT_STEP,
-  STEP_CHOICES,
-  armySize,
-  limitCommand,
-  maxArmySoldiers,
-  stepSize,
-  type StepPct,
-} from './army-limit.ts';
+import { armySize, limitCommand, maxArmySoldiers, onHand, stepSize } from './army-limit.ts';
 import { armyName, MAX_ARMY_NAME_LENGTH, normalizeArmyName } from './army-name.ts';
 import { armyResizeCost } from './army-order.ts';
 import { armyCounts, orderFields } from './direction-order.ts';
@@ -41,23 +34,12 @@ import type { Picked } from './sandbox-selection.ts';
 import { supplyColor } from './unit-chips.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatSoldiers } from '../i18n/format.ts';
+import { useArmyStep } from '../settings/army-step.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const FULL = 1000;
-const STEP_KEY = 'hexfront.armyStep';
-
-/** Сохранённый шаг «+/−» игрока или шаг по умолчанию. */
-function readStep(): StepPct {
-  try {
-    const saved = Number(localStorage.getItem(STEP_KEY));
-    return STEP_CHOICES.find((pct) => pct === saved) ?? DEFAULT_STEP;
-  } catch {
-    return DEFAULT_STEP;
-  }
-}
-
 /** Сводка армии: средние по солдатам организация и снабжение (0..1), отряды в истощении. */
 export interface ArmyStats {
   /** Всего солдат в армии. */
@@ -451,15 +433,7 @@ export function ArmyBar(props: {
   // Армий больше, чем влезает: появляется настоящая полоса прокрутки (иначе лента не перехватывает нажатия).
   const [overflow, setOverflow] = useState(false);
   const [compAnchor, setCompAnchor] = useState<DOMRect | null>(null);
-  const [stepPct, setStepPct] = useState<StepPct>(readStep);
-  const chooseStep = (pct: StepPct): void => {
-    setStepPct(pct);
-    try {
-      localStorage.setItem(STEP_KEY, String(pct));
-    } catch {
-      // Хранилище закрыто: выбор шага действует до перезагрузки.
-    }
-  };
+  const [stepPct, chooseStep] = useArmyStep();
   useLayoutEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
@@ -559,6 +533,10 @@ export function ArmyBar(props: {
     event.currentTarget.scrollLeft += delta;
   };
   const reserve = mine.filter((u) => u.armyId === null);
+  // Выбраны отряды резерва (кнопка «Резерв» или рамка на карте): вместо панели армии — куда их
+  // отправить или распустить в население.
+  const pickedReserve = props.pickedUnits.filter((id) => reserve.some((u) => u.id === id));
+  const reserveMode = pickedReserve.length > 0 && pickedReserve.length === props.pickedUnits.length;
   // Выбранная армия всегда в видимой части ленты, даже если её выбрали на карте или клавишей.
   useEffect(() => {
     // Лента листается сама, страница — нет: scrollIntoView сдвинул бы весь интерфейс вверх.
@@ -573,7 +551,35 @@ export function ArmyBar(props: {
   return (
     <div className={styles.dock} style={props.style}>
       <div className={styles.content} ref={contentRef}>
-        {army && props.hideTools !== true && (
+        {reserveMode && props.hideTools !== true && (
+          <div className={styles.tools} role="toolbar" aria-label={t('army.reserve')}>
+            {view.armies.map((a) => (
+              <IconButton
+                key={a.id}
+                type="button"
+                className={styles.tool}
+                label={`${t('army.sendTo')} ${armyName(a)}`}
+                onClick={() => {
+                  send({ t: 'assignUnits', unitIds: pickedReserve, armyId: a.id });
+                  props.onPick({ hex: null, units: [], target: null });
+                }}
+              >
+                <span className={styles.armyDot} style={{ background: armyColor(a.number) }}>
+                  {a.number}
+                </span>
+              </IconButton>
+            ))}
+            <Tool
+              glyph={<IconTrash size={18} aria-hidden="true" />}
+              label="army.dismiss"
+              onClick={() => {
+                send({ t: 'dismissUnits', unitIds: pickedReserve });
+                props.onPick({ hex: null, units: [], target: null });
+              }}
+            />
+          </div>
+        )}
+        {army && !reserveMode && props.hideTools !== true && (
           <div ref={toolsRef} className={styles.tools} role="toolbar" aria-label={armyName(army)}>
             <Tool
               glyph={<IconShield size={18} aria-hidden="true" />}
@@ -652,6 +658,8 @@ export function ArmyBar(props: {
             anchor={compAnchor}
             value={sizeOf(army)}
             shares={sharesFromCounts(armyCounts(view, army))}
+            have={onHand(view, army)}
+            gold={Math.floor((view.players.find((p) => p.id === view.playerId)?.gold ?? 0) / FP)}
             onApply={(soldiers, counts) => {
               const mix = counts.armor + counts.artillery > 0 ? counts : undefined;
               send(

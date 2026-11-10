@@ -633,3 +633,17 @@
   height: 8px;
   border-radius: 50%;
 }
+
+/* Кнопка армии в панели резерва: цветной кружок с номером. */
+.armyDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--ui-ink);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  border-radius: 50%;
+  border: 1.5px solid var(--ui-border-strong);
+}

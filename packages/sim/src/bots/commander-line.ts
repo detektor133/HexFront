@@ -16,7 +16,7 @@ import {
   type EdgeId,
 } from '../state/edges.ts';
 
-type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
+export type Ground = { map: MapStatic; hexes: { owner: Int16Array } };
 
 /** Что нужно линии от мира: владельцы гексов и города (снимок игрока или состояние матча). */
 export interface LineView {
@@ -25,12 +25,27 @@ export interface LineView {
 }
 
 /** Чей гекс считается вражеским: игрок цели или весь его блок. */
-type Enemy = (owner: number) => boolean;
+export type Enemy = (owner: number) => boolean;
 
 function around(map: MapStatic, h: HexId): HexId[] {
   return neighbors(hexFromId(h, map.width))
     .filter((n) => inBounds(n, map.width, map.height))
     .map((n) => hexId(n, map.width));
+}
+
+/** Гекс врага, у которого не больше стольких вражеских соседей, — перешеек (коридор в один гекс). */
+const NECK_LAND = 2;
+
+/**
+ * Перешеек: коридор врага шириной в гекс. Через него волна глубины не идёт: иначе линия котла
+ * тянулась бы по коридору в основные земли врага, а ось удара ложилась бы на «червяка».
+ */
+export function isNeckHex(g: Ground, isEnemy: Enemy, h: HexId): boolean {
+  let land = 0;
+  for (const n of around(g.map, h)) {
+    if (g.map.terrain[n] !== TERRAIN.water && isEnemy(g.hexes.owner[n] as number)) land += 1;
+  }
+  return land <= NECK_LAND;
 }
 
 // Шагов от фронта по земле врага (поиск в ширину от гексов врага за гранями фронта). Для каждого
@@ -50,7 +65,7 @@ function depthFromFront(g: Ground, front: readonly EdgeId[], isEnemy: Enemy, lim
   for (let i = 0; i < queue.length; i += 1) {
     const h = queue[i] as HexId;
     const d = dist.get(h) as number;
-    if (d >= limit) continue;
+    if (d >= limit || isNeckHex(g, isEnemy, h)) continue;
     for (const n of around(g.map, h)) {
       if (dist.has(n) || !isEnemy(g.hexes.owner[n] as number) || g.map.terrain[n] === TERRAIN.water)
         continue;
