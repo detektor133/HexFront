@@ -162,6 +162,22 @@ export function hexId(h: Hex, width: number): HexId {
 }
 
 /**
+ * Расстояние между гексами по индексам без выделения объектов: то же, что
+ * `distance(hexFromId(a), hexFromId(b))`, но для горячих циклов по всей карте.
+ * @returns число шагов по сетке
+ */
+export function hexDistanceById(a: HexId, b: HexId, width: number): number {
+  const colA = a % width;
+  const colB = b % width;
+  const dq = colA - colB;
+  const dr =
+    intDiv(a, width) -
+    intDiv(colA + (colA & 1), 2) -
+    (intDiv(b, width) - intDiv(colB + (colB & 1), 2));
+  return intDiv(Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr), 2);
+}
+
+/**
  * Гекс по индексу в плотном массиве карты шириной `width`.
  * @returns осевые координаты
  */

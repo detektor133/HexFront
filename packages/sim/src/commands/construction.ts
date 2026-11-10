@@ -22,7 +22,7 @@ import {
   TICKS_PER_S,
 } from '../balance.ts';
 import { OK, rejected, type Command, type RejectReason, type Validation } from './types.ts';
-import { distance, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
+import { distance, hexDistanceById, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { depotLevel, isDepot } from '../state/depot.ts';
 import { fortLevel } from '../state/fort.ts';
@@ -70,12 +70,11 @@ function ownFreeHex(state: MatchState, playerId: number, hex: HexId): RejectReas
 // Дистанция ≥ 4 до любого города, включая города в процессе основания.
 function tooCloseToCity(state: MatchState, hex: HexId): boolean {
   const { width } = state.map;
-  const h = hexFromId(hex, width);
   for (const c of state.cities) {
-    if (distance(hexFromId(c.hex, width), h) < CITY_MIN_DISTANCE) return true;
+    if (hexDistanceById(c.hex, hex, width) < CITY_MIN_DISTANCE) return true;
   }
   for (const c of state.constructions) {
-    if (c.kind === 'foundCity' && distance(hexFromId(c.hex, width), h) < CITY_MIN_DISTANCE) {
+    if (c.kind === 'foundCity' && hexDistanceById(c.hex, hex, width) < CITY_MIN_DISTANCE) {
       return true;
     }
   }

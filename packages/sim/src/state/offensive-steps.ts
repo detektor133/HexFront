@@ -6,36 +6,11 @@ import { canonicalEdge } from './edge-line.ts';
 import { edgeHex, edgeOther, type EdgeId } from './edges.ts';
 import type { LineGround } from './ground.ts';
 import { OFFENSIVE_FACING_RANGE } from '../balance.ts';
+import { neighborTable as sharedNeighborTable, SIDES } from '../map/neighbor-table.ts';
 import { TERRAIN } from '../map/types.ts';
-import {
-  distance,
-  hexFromId,
-  hexId,
-  inBounds,
-  neighbors,
-  type Hex,
-  type HexId,
-} from '../math/hex.ts';
+import { distance, hexFromId, type Hex, type HexId } from '../math/hex.ts';
 
-const SIDES = 6;
-
-// Соседи всех гексов карты (6 на гекс, -1 — за краем). Карта в матче не меняется — таблица
-// считается один раз на карту.
-const tables = new WeakMap<LineGround['map'], Int32Array>();
-
-function neighborTable(g: LineGround): Int32Array {
-  const cached = tables.get(g.map);
-  if (cached) return cached;
-  const { width, height } = g.map;
-  const table = new Int32Array(width * height * SIDES).fill(-1);
-  for (let h = 0; h < width * height; h += 1) {
-    neighbors(hexFromId(h, width)).forEach((n, d) => {
-      if (inBounds(n, width, height)) table[h * SIDES + d] = hexId(n, width);
-    });
-  }
-  tables.set(g.map, table);
-  return table;
-}
+const neighborTable = (g: LineGround): Int32Array => sharedNeighborTable(g.map);
 
 function adjacent(g: LineGround, hex: HexId): HexId[] {
   const table = neighborTable(g);

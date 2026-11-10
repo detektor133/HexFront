@@ -3,8 +3,9 @@
 // направления в DIRECTIONS; та же грань со стороны соседа — flipEdge.
 // GDD: docs/gdd/07-controls.md — «Планы армий».
 import type { LineGround } from './ground.ts';
+import { neighborTable } from '../map/neighbor-table.ts';
 import { TERRAIN } from '../map/types.ts';
-import { hexFromId, hexId, inBounds, neighbor, type Direction, type HexId } from '../math/hex.ts';
+import { hexFromId, neighbor, type Direction, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
 
 /** Грань: hex × 6 + d (d — направление к соседу). */
@@ -19,9 +20,8 @@ export const edgeDir = (e: EdgeId): number => e - edgeHex(e) * SIDES;
 
 /** Сосед за гранью или -1 (край карты). */
 export function edgeOther(g: LineGround, e: EdgeId): HexId {
-  const { width, height } = g.map;
-  const n = neighbor(hexFromId(edgeHex(e), width), edgeDir(e) as Direction);
-  return inBounds(n, width, height) ? hexId(n, width) : -1;
+  // Грань = hex × 6 + направление, как индекс таблицы соседей: ответ — одно чтение массива.
+  return neighborTable(g.map)[e] ?? -1;
 }
 
 /** Та же грань со стороны соседа или -1. */

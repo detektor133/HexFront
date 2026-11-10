@@ -6,7 +6,8 @@ import { warWith } from './war.ts';
 import { ASSAULT_GAP, ASSAULT_REACH } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
 import type { MapStatic } from '../map/types.ts';
-import { distance, hexFromId, type HexId } from '../math/hex.ts';
+import { distance, hexDistanceById, hexFromId, type HexId } from '../math/hex.ts';
+import { intDiv } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
@@ -21,14 +22,35 @@ interface Target {
 
 // Только города у своей земли: далёкая столица — не цель, а повод тянуть червя через вражескую страну.
 function targets(map: MapStatic, view: PlayerView): Target[] {
-  const mine: HexId[] = [];
-  view.hexes.owner.forEach((o, h) => {
-    if (o === view.playerId) mine.push(h);
-  });
-  const at = (hex: HexId) => hexFromId(hex, map.width);
+  // Своя земля в пределах ASSAULT_GAP от города: смотрим только окно вокруг города, а не все свои
+  // гексы (на поздней игре их тысячи, а городов десятки).
+  const ownNear = (city: HexId): boolean => {
+    const col = city % map.width;
+    const row = intDiv(city, map.width);
+    for (
+      let r = Math.max(0, row - ASSAULT_GAP);
+      r <= Math.min(map.height - 1, row + ASSAULT_GAP);
+      r += 1
+    ) {
+      for (
+        let c = Math.max(0, col - ASSAULT_GAP);
+        c <= Math.min(map.width - 1, col + ASSAULT_GAP);
+        c += 1
+      ) {
+        const h = r * map.width + c;
+        if (
+          view.hexes.owner[h] === view.playerId &&
+          hexDistanceById(h, city, map.width) <= ASSAULT_GAP
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
   return view.cities
     .filter((c) => warWith(view, c.owner))
-    .filter((c) => mine.some((h) => distance(at(h), at(c.hex)) <= ASSAULT_GAP))
+    .filter((c) => ownNear(c.hex))
     .map((c) => ({ hex: c.hex, value: c.level * (c.isCapital ? CAPITAL_VALUE_MULT : 1) }));
 }
 

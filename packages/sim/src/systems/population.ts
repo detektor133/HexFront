@@ -109,13 +109,17 @@ export function growthPerSecond(state: MatchState): Int32Array {
   const { hexes } = state;
   const best = bestCityGrowth(state);
   const levels = cityLevels(state);
-  return Int32Array.from(hexes.pop, (pop, id) => {
+  const out = new Int32Array(hexes.pop.length);
+  for (let id = 0; id < out.length; id += 1) {
+    const pop = hexes.pop[id] as number;
     const level = levels[id] ?? 0;
     const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
-    if (pop > cap) return -fpMul(pop as Fp, POP_OVERCAP_DECAY);
-    if (pop === cap || cap === 0) return 0;
-    return intDiv(fullGrowth(state, id, best[id] ?? 0) * (cap - pop), cap);
-  });
+    if (pop > cap) out[id] = -fpMul(pop as Fp, POP_OVERCAP_DECAY);
+    else if (pop !== cap && cap !== 0) {
+      out[id] = intDiv(fullGrowth(state, id, best[id] ?? 0) * (cap - pop), cap);
+    }
+  }
+  return out;
 }
 
 /**

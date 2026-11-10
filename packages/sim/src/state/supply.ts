@@ -17,9 +17,10 @@ import { supplyRevision } from './derived-cache.ts';
 import { isCityIsolated } from './network.ts';
 import { type City, type MatchState, type SupplyNetwork, type Unit } from './types.ts';
 import { allUnits } from './unit-index.ts';
+import { neighborTable, SIDES } from '../map/neighbor-table.ts';
 import { TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush } from '../math/heap.ts';
-import { hexFromId, hexId, inBounds, neighbors, spiral } from '../math/hex.ts';
+import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 
 interface LossCache {
@@ -85,6 +86,7 @@ function lossFrom(state: MatchState, owner: number, net: number, loss: Int32Arra
     if (distance) return distance;
   }
   const { width, height } = state.map;
+  const table = neighborTable(state.map);
   const dist = new Int32Array(width * height).fill(UNREACHED);
   const heap = createHeap();
   state.hexes.network.forEach((n, id) => {
@@ -96,10 +98,9 @@ function lossFrom(state: MatchState, owner: number, net: number, loss: Int32Arra
     const [d, hex] = top;
     // Потери ≥ 100 % дальше не нужны: снабжение там уже 0.
     if (d > (dist[hex] ?? 0) || d >= FP) continue;
-    for (const n of neighbors(hexFromId(hex, width))) {
-      if (!inBounds(n, width, height)) continue;
-      const id = hexId(n, width);
-      if (state.hexes.owner[id] !== owner) continue;
+    for (let side = 0; side < SIDES; side += 1) {
+      const id = table[hex * SIDES + side] as number;
+      if (id < 0 || state.hexes.owner[id] !== owner) continue;
       const nd = d + (state.hexes.network[id] === net ? 0 : (loss[id] ?? FP));
       if (nd < (dist[id] ?? 0)) {
         dist[id] = nd;
@@ -114,10 +115,11 @@ function lossFrom(state: MatchState, owner: number, net: number, loss: Int32Arra
 // Потери пути до отряда; на чужом гексе — через лучший соседний свой гекс плюс этот гекс.
 function unitLoss(state: MatchState, u: Unit, dist: Int32Array, loss: Int32Array): number {
   if (state.hexes.owner[u.hex] === u.owner) return dist[u.hex] ?? UNREACHED;
-  const { width, height } = state.map;
+  const table = neighborTable(state.map);
   let best = UNREACHED;
-  for (const n of neighbors(hexFromId(u.hex, width))) {
-    if (inBounds(n, width, height)) best = Math.min(best, dist[hexId(n, width)] ?? UNREACHED);
+  for (let d = 0; d < SIDES; d += 1) {
+    const id = table[u.hex * SIDES + d] as number;
+    if (id >= 0) best = Math.min(best, dist[id] ?? UNREACHED);
   }
   return best === UNREACHED ? UNREACHED : best + (loss[u.hex] ?? FP);
 }
@@ -139,6 +141,19 @@ function ratios(
     const d = fpMul(u.soldiers, SUPPLY_PER_SOLDIER[u.type]);
     demand.set(o.net.id, (demand.get(o.net.id) ?? 0) + d);
   }
+  // Склады считаем одним проходом по карте, а не отдельным обходом на каждую сеть.
+  const netById = new Map(nets.map((n) => [n.id, n]));
+  const depotProduced = new Map<number, number>();
+  const { building, owner, network } = state.hexes;
+  for (let hex = 0; hex < building.length; hex += 1) {
+    const level = depotLevel(building[hex] ?? 0);
+    if (level === 0) continue;
+    const net = netById.get(network[hex] ?? -1);
+    if (!net || owner[hex] !== net.owner) continue;
+    const own = DEPOT_SUPPLY[level - 1] ?? 0;
+    const add = net.isMain ? own : fpMul(own as Fp, ISOLATED_SUPPLY_MULT);
+    depotProduced.set(net.id, (depotProduced.get(net.id) ?? 0) + add);
+  }
   const result = new Map<number, Fp>();
   for (const net of nets) {
     let produced = 0;
@@ -149,13 +164,7 @@ function ratios(
     }
     // Склады производят снабжение сами: чем больше складов у фронта, тем большая армия кормится;
     // у изолированной сети — вдвое меньше, как у городов.
-    state.hexes.building.forEach((b, hex) => {
-      const level = depotLevel(b);
-      if (level === 0 || state.hexes.owner[hex] !== net.owner) return;
-      if (state.hexes.network[hex] !== net.id) return;
-      const own = DEPOT_SUPPLY[level - 1] ?? 0;
-      produced += net.isMain ? own : fpMul(own as Fp, ISOLATED_SUPPLY_MULT);
-    });
+    produced += depotProduced.get(net.id) ?? 0;
     const d = demand.get(net.id) ?? 0;
     result.set(net.id, (d === 0 ? FP : Math.min(FP, fpDiv(produced as Fp, d as Fp))) as Fp);
   }

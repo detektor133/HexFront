@@ -16,6 +16,7 @@ import {
   type UnitType,
 } from '../balance.ts';
 import { composeSeaPath, ownPortSet } from './sea-path.ts';
+import { neighborTable, SIDES } from '../map/neighbor-table.ts';
 import { FEATURE, TERRAIN, TERRAIN_NAMES } from '../map/types.ts';
 import { createHeap, heapPop, heapPush, type MinHeap } from '../math/heap.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -86,11 +87,13 @@ function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
   let mask = cache.masks.get(owner);
   if (!mask) {
     const { width, height } = state.map;
+    const table = neighborTable(state.map);
     mask = new Uint8Array(width * height);
     for (const unit of state.units) {
       if (!atWar(state, owner, unit.owner)) continue;
-      for (const n of neighbors(hexFromId(unit.hex, width))) {
-        if (inBounds(n, width, height)) mask[hexId(n, width)] = 1;
+      for (let d = 0; d < SIDES; d += 1) {
+        const n = table[unit.hex * SIDES + d] as number;
+        if (n >= 0) mask[n] = 1;
       }
     }
     cache.masks.set(owner, mask);

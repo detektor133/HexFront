@@ -1,4 +1,5 @@
-import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import { neighborTable, SIDES } from '../map/neighbor-table.ts';
+import type { HexId } from '../math/hex.ts';
 import { createPlayerViewContext, type PlayerViewContext } from '../queries/player-view.ts';
 import type { Army, ArmyPlan, City, MatchState, Unit } from '../state/types.ts';
 
@@ -22,15 +23,19 @@ function playerLists<T>(players: number): T[][] {
 function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][] } {
   const owned = playerLists<HexId>(state.players.length);
   const border = playerLists<HexId>(state.players.length);
-  state.hexes.owner.forEach((owner, hex) => {
-    if (owner < 0 || owner >= owned.length) return;
+  const table = neighborTable(state.map);
+  const ownerOf = state.hexes.owner;
+  for (let hex = 0; hex < ownerOf.length; hex += 1) {
+    const owner = ownerOf[hex] as number;
+    if (owner < 0 || owner >= owned.length) continue;
     owned[owner]?.push(hex);
-    const adjacent = neighbors(hexFromId(hex, state.map.width)).some((neighborHex) => {
-      if (!inBounds(neighborHex, state.map.width, state.map.height)) return false;
-      return state.hexes.owner[hexId(neighborHex, state.map.width)] !== owner;
-    });
+    let adjacent = false;
+    for (let d = 0; d < SIDES && !adjacent; d += 1) {
+      const n = table[hex * SIDES + d] as number;
+      adjacent = n >= 0 && ownerOf[n] !== owner;
+    }
     if (adjacent) border[owner]?.push(hex);
-  });
+  }
   return { owned, border };
 }
 

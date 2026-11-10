@@ -100,6 +100,15 @@ function without(item: Fields, names: readonly string[]): Fields {
 }
 
 function pickFields(from: Fields, to: Fields, names: readonly string[]): Fields {
+  // Чаще всего медленные поля не отличаются от базы: тогда копию не делаем.
+  let same = true;
+  for (const name of names) {
+    if (!(name in from) || !equalValue(from[name], to[name])) {
+      same = false;
+      break;
+    }
+  }
+  if (same) return to;
   const result: Fields = { ...to };
   for (const name of names) {
     if (name in from) result[name] = from[name];
@@ -114,10 +123,12 @@ function paceList(
   names: readonly string[],
 ): Fields[] | undefined {
   if (!list || !base) return list as Fields[] | undefined;
-  const known = new Map<unknown, Fields>(base.map((item) => [item.id, item]));
+  // Оба списка отсортированы по id: идём слиянием, без Map.
+  let j = 0;
   return list.map((item) => {
-    const old = known.get(item.id);
-    return old ? pickFields(old, item, names) : item;
+    while (j < base.length && (base[j]?.id as number) < (item.id as number)) j += 1;
+    const old = base[j];
+    return old !== undefined && old.id === item.id ? pickFields(old, item, names) : item;
   });
 }
 
@@ -165,15 +176,25 @@ export function equalValue(left: unknown, right: unknown): boolean {
   }
   if (Array.isArray(left) || Array.isArray(right)) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((value, index) => equalValue(value, right[index]));
+    for (let index = 0; index < left.length; index += 1) {
+      if (!equalValue(left[index], right[index])) return false;
+    }
+    return true;
   }
+  // Обход без Object.keys и замыканий: сравнение вызывается тысячи раз за тик, мусор здесь дорог.
   const a = left as Fields;
   const b = right as Fields;
-  const keys = Object.keys(a);
-  return (
-    keys.length === Object.keys(b).length &&
-    keys.every((key) => key in b && equalValue(a[key], b[key]))
-  );
+  let count = 0;
+  for (const key in a) {
+    if (!(key in b) || !equalValue(a[key], b[key])) return false;
+    count += 1;
+  }
+  // Ключей в `b` не больше, чем в `a`: иначе у `b` есть поле, которого нет в `a`.
+  for (const key in b) {
+    if (!(key in a)) return false;
+    count -= 1;
+  }
+  return count === 0;
 }
 
 /** Можно ли строить дельту: тот же игрок и та же форма слоёв гексов. */
@@ -186,41 +207,65 @@ export function canBuildViewDelta(before: PlayerView, after: PlayerView): boolea
   );
 }
 
-/** Только изменившиеся поля `after` относительно `before` и поля, которых больше нет. */
-function diffFields(before: Fields, after: Fields): { set: Fields; unset: string[] } {
-  const set: Fields = {};
-  const unset: string[] = [];
-  for (const key of Object.keys(after)) {
-    if (!equalValue(before[key], after[key])) set[key] = after[key];
+/**
+ * Патч записи: только изменившиеся поля `after` и `$unset` для исчезнувших; `undefined`, если
+ * запись не изменилась. `key` — имя ключа, он попадает в патч первым (у записи `me` ключа нет).
+ * Горячий путь (каждая запись каждый тик каждому игроку): ничего не выделяем, пока нет отличий.
+ */
+function diffFields(before: Fields, after: Fields, key: string | null): Patch | undefined {
+  if (before === after) return undefined;
+  let patch: Fields | undefined;
+  for (const field in after) {
+    if (equalValue(before[field], after[field])) continue;
+    patch ??= key === null ? {} : { [key]: after[key] };
+    patch[field] = after[field];
   }
-  for (const key of Object.keys(before)) if (!(key in after)) unset.push(key);
-  return { set, unset };
+  let unset: string[] | undefined;
+  for (const field in before) {
+    if (!(field in after)) (unset ??= []).push(field);
+  }
+  if (unset) {
+    patch ??= key === null ? {} : { [key]: after[key] };
+    patch.$unset = unset;
+  }
+  return patch;
 }
 
+/**
+ * Дельта коллекции: слияние двух списков, отсортированных по числовому ключу, за один проход и без
+ * Map/Set. Нарушенный порядок не ломает результат (запись уйдёт как удаление и добавление), но
+ * раздувает дельту — тест-предохранитель держит порядок.
+ */
 function diffKeyed(
   before: readonly Fields[],
   after: readonly Fields[],
   key: string,
 ): KeyedDelta | undefined {
-  const known = new Map<unknown, Fields>(before.map((item) => [item[key], item]));
-  const add: Fields[] = [];
-  const patch: Patch[] = [];
-  const seen = new Set<unknown>();
-  for (const item of after) {
-    seen.add(item[key]);
-    const old = known.get(item[key]);
-    if (old === undefined) {
-      add.push(item);
-      continue;
-    }
-    const { set, unset } = diffFields(old, item);
-    if (unset.length > 0 || Object.keys(set).length > 0) {
-      patch.push({ [key]: item[key], ...set, ...(unset.length > 0 ? { $unset: unset } : {}) });
+  let add: Fields[] | undefined;
+  let patch: Patch[] | undefined;
+  let removed: number[] | undefined;
+  let i = 0;
+  let j = 0;
+  while (i < before.length || j < after.length) {
+    const old = before[i];
+    const item = after[j];
+    const oldKey = old === undefined ? Infinity : (old[key] as number);
+    const newKey = item === undefined ? Infinity : (item[key] as number);
+    if (old !== undefined && item !== undefined && oldKey === newKey) {
+      const changed = diffFields(old, item, key);
+      if (changed) (patch ??= []).push(changed);
+      i += 1;
+      j += 1;
+    } else if (oldKey < newKey) {
+      (removed ??= []).push(oldKey);
+      i += 1;
+    } else {
+      (add ??= []).push(item as Fields);
+      j += 1;
     }
   }
-  const removed = before.filter((item) => !seen.has(item[key])).map((item) => item[key] as number);
-  return add.length > 0 || patch.length > 0 || removed.length > 0
-    ? { add, patch, removed }
+  return add || patch || removed
+    ? { add: add ?? [], patch: patch ?? [], removed: removed ?? [] }
     : undefined;
 }
 
@@ -287,10 +332,8 @@ export function buildViewDelta(
   }
   const records: Partial<Record<RecordName, Patch>> = {};
   for (const name of RECORDS) {
-    const { set, unset } = diffFields(before[name] as Fields, after[name] as Fields);
-    if (unset.length > 0 || Object.keys(set).length > 0) {
-      records[name] = { ...set, ...(unset.length > 0 ? { $unset: unset } : {}) };
-    }
+    const changed = diffFields(before[name] as Fields, after[name] as Fields, null);
+    if (changed) records[name] = changed;
   }
   const whole: Fields = {};
   const unset: string[] = [];
