@@ -92,16 +92,19 @@ const SLOW_FIELDS = {
   ranking: ['score', 'place'],
 } as const;
 
-/** Копия записи без перечисленных полей. */
+/** Копия записи без перечисленных полей (без `Object.fromEntries`: горячий путь, каждый тик каждому игроку). */
 function without(item: Fields, names: readonly string[]): Fields {
-  const drop = new Set(names);
-  return Object.fromEntries(Object.entries(item).filter(([key]) => !drop.has(key)));
+  const copy: Fields = { ...item };
+  for (const name of names) Reflect.deleteProperty(copy, name);
+  return copy;
 }
 
 function pickFields(from: Fields, to: Fields, names: readonly string[]): Fields {
-  const missing = names.filter((name) => !(name in from));
-  const result = without(to, missing);
-  for (const name of names) if (name in from) result[name] = from[name];
+  const result: Fields = { ...to };
+  for (const name of names) {
+    if (name in from) result[name] = from[name];
+    else Reflect.deleteProperty(result, name);
+  }
   return result;
 }
 
@@ -345,7 +348,10 @@ function applyKeyed(current: readonly Fields[], delta: KeyedDelta, key: string):
 }
 
 function applyPatch(item: Fields, patch: Patch): Fields {
-  return without({ ...item, ...patch }, ['$unset', ...(patch.$unset ?? [])]);
+  const next: Fields = { ...item, ...patch };
+  Reflect.deleteProperty(next, '$unset');
+  for (const field of patch.$unset ?? []) Reflect.deleteProperty(next, field);
+  return next;
 }
 
 /** Применяет дельту к виду и возвращает новый вид; исходный не меняется. */

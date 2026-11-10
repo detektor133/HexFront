@@ -98,6 +98,11 @@ export function attackContribution(
   hex: HexId,
   all: readonly Fighter[],
 ): number {
+  return contribution(map, f, hex, () => isSupportedByArtillery(map, all, f.owner, hex));
+}
+
+// Вклад с ленивой проверкой поддержки: attackPower считает её раз на владельца, а не на отряд.
+function contribution(map: MapStatic, f: Fighter, hex: HexId, supported: () => boolean): number {
   let base = fpMul(
     fpMul(fpMul(f.soldiers, ATK[f.type]), supplyCombatMult(f.supplyLevel)),
     starMult(f.stars),
@@ -105,9 +110,7 @@ export function attackContribution(
   const dir = hexDirection(map, f.hex, hex);
   if (dir >= 0 && ((map.rivers[f.hex] ?? 0) >> dir) & 1)
     base = fpMul(base as Fp, RIVER_ATTACK_MULT);
-  return isSupportedByArtillery(map, all, f.owner, hex)
-    ? fpMul(base as Fp, ARTY_SUPPORT_BONUS)
-    : base;
+  return supported() ? fpMul(base as Fp, ARTY_SUPPORT_BONUS) : base;
 }
 
 /**
@@ -120,7 +123,19 @@ export function attackPower(
   hex: HexId,
   all: readonly Fighter[],
 ): number {
-  const raw = attackers.reduce((sum, f) => sum + attackContribution(map, f, hex, all), 0);
+  const support = new Map<number, boolean>();
+  const supportOf = (owner: number): boolean => {
+    let value = support.get(owner);
+    if (value === undefined) {
+      value = isSupportedByArtillery(map, all, owner, hex);
+      support.set(owner, value);
+    }
+    return value;
+  };
+  const raw = attackers.reduce(
+    (sum, f) => sum + contribution(map, f, hex, () => supportOf(f.owner)),
+    0,
+  );
   const dirs = new Set(attackers.map((f) => hexDirection(map, f.hex, hex)));
   return fpMul(raw as Fp, flankMultiplier(dirs.size));
 }

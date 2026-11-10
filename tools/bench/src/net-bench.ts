@@ -1,6 +1,7 @@
 // Бенч сетевого конвейера сервера: на каждый тик матча ботов — вид, дельта и сериализация для N людей.
 // Запуск: pnpm --filter @hexfront/bench net [людей=30] [тиков=3600]
-// Печатает по минуте матча: мс на тик по стадиям и байты дельты на игрока (сырые и deflate).
+// Печатает по минуте матча: мс на тик по стадиям, байты дельты на игрока (сырые и deflate), память
+// (с `node --expose-gc` — после сборки мусора, иначе утечку от мусора не отличить), живых и отрядов.
 import { deflateRawSync } from 'node:zlib';
 
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
@@ -22,6 +23,7 @@ import {
   step,
   type PlayerView,
 } from '../../../packages/sim/src/index.ts';
+import { allUnits } from '../../../packages/sim/src/state/unit-index.ts';
 
 const PLAYERS = 30;
 const SEED = 43;
@@ -50,6 +52,14 @@ const empty = (): Window => ({
   deflated: 0,
   messages: 0,
 });
+
+/** Куча и RSS в МБ; куча — после принудительной сборки мусора, если доступна. */
+function memory(): string {
+  (globalThis as { gc?: () => void }).gc?.();
+  const usage = process.memoryUsage();
+  const mb = (bytes: number): string => (bytes / 1048576).toFixed(0);
+  return `куча ${mb(usage.heapUsed)} МБ, буферы ${mb(usage.arrayBuffers)} МБ, rss ${mb(usage.rss)} МБ`;
+}
 
 function run(humans: number, ticks: number): void {
   const loaded = loadMap(generateMap(SEED, { players: PLAYERS }));
@@ -115,6 +125,9 @@ function run(humans: number, ticks: number): void {
         `минута ${minute}: мс/тик боты ${per(window.bots)} step ${per(window.step)} виды ${per(window.view)} ` +
           `дельты ${per(window.delta)} json ${per(window.json)} = ${total.toFixed(1)} из 100 | ` +
           `байт/игрок/тик ${bytes}, deflate ${deflated} (${((deflated * 10) / 1024).toFixed(1)} КБ/с)`,
+      );
+      console.log(
+        `        память: ${memory()}, живых ${state.players.filter((p) => p.status === 'alive').length}, отрядов ${allUnits(state).length}${state.winner >= 0 ? `, ПОБЕДИТЕЛЬ ${state.winner}` : ''}`,
       );
       window = empty();
     }

@@ -73,6 +73,16 @@ export interface ArmyView {
 
 /** Отряды для снимка игрока playerId. */
 export function unitViews(state: MatchState, playerId: number, visible?: Uint8Array): UnitView[] {
+  // Поддержка артиллерии зависит только от цели атаки: сто отрядов на один гекс считают её раз.
+  const supportedTargets = new Map<number, boolean>();
+  const supported = (target: number): boolean => {
+    let value = supportedTargets.get(target);
+    if (value === undefined) {
+      value = isSupportedByArtillery(state.map, state.units, playerId, target);
+      supportedTargets.set(target, value);
+    }
+    return value;
+  };
   return allUnits(state)
     .filter((u) => u.owner === playerId || (visible?.[u.hex] ?? 1) === 1)
     .map((u) => {
@@ -99,10 +109,7 @@ export function unitViews(state: MatchState, playerId: number, visible?: Uint8Ar
         stars: u.stars ?? 0,
         gather: mine ? u.gather : -1,
         artillerySupport:
-          mine &&
-          u.type !== 'artillery' &&
-          u.order === 'attack' &&
-          isSupportedByArtillery(state.map, state.units, u.owner, u.target),
+          mine && u.type !== 'artillery' && u.order === 'attack' && supported(u.target),
         attackState: null,
       };
     });
