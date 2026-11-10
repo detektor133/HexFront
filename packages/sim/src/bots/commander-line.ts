@@ -63,7 +63,7 @@ function depthFromFront(g: Ground, front: readonly EdgeId[], isEnemy: Enemy, lim
 }
 
 /** Сколько граней у каждого конца участка отсекается: на концах волна огибает фронт, и линия загибалась бы назад. */
-const END_CAP = 2;
+const END_CAP = 1;
 /** Обрывок короче этого, граней, рядом с основной линией — случайный клочок, а не часть стены. */
 const STRAY_EDGES = 4;
 

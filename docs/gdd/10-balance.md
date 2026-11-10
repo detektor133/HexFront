@@ -14,7 +14,7 @@
 | `FRONT_ALLOC_TICKS` | 50 |
 | `FRONT_ROUTES_PER_TICK` | 16 `[ТЮНИНГ]` |
 | `OFFENSIVE_STEP_TICKS` | 20 |
-| `RETURN_LOCK_TICKS` | 300 `[ТЮНИНГ]` |
+| `RETURN_LOCK_TICKS` | 150 `[ТЮНИНГ]` |
 | `OFFENSIVE_STUCK_TICKS` | 100 |
 | `OFFENSIVE_STALL_TICKS` | 300 `[ТЮНИНГ]` |
 | `OFFENSIVE_RETRY_TICKS` | 200 `[ТЮНИНГ]` |

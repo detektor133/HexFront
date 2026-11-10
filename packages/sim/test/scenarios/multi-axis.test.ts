@@ -128,8 +128,11 @@ describe('фронт направления — сама граница', () => 
     let previous: ReadonlySet<number> | null = null;
     let exact = 0;
     let biggestJump = 0;
+    // Конец наступления перестраивает фронт целиком (дуга → вся граница) за один-два тика: это не «захват».
+    let rebuilt = 0;
     for (let t = 0; t < 1200; t += 1) {
       s.runTicks(1);
+      if (s.state.events.some((e) => e.t === 'offensiveDone')) rebuilt = 2;
       const plan = s.state.plans.find((p) => p.armyId === army?.id);
       if (plan?.kind !== 'front') break; // цель выбыла — направление снято
       const edges = new Set(plan.edges);
@@ -141,11 +144,12 @@ describe('фронт направления — сама граница', () => 
         expect([...border].every((e) => edges.has(e))).toBe(true);
         exact += 1;
       }
-      if (previous) {
+      if (previous && rebuilt === 0) {
         const changed = [...edges].filter((e) => !previous?.has(e)).length;
         biggestJump = Math.max(biggestJump, changed);
       }
       previous = edges;
+      if (rebuilt > 0) rebuilt -= 1;
     }
     expect(exact).toBeGreaterThan(30);
     // Один захват двигает несколько граней, но не весь фронт (в нём больше 80 граней).

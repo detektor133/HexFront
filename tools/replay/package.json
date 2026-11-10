@@ -11,6 +11,7 @@
     "chart": "node --experimental-strip-types src/development-chart.ts",
     "bot-match": "node --experimental-strip-types src/bot-match.ts",
     "bot-match-chart": "node --experimental-strip-types src/bot-match-chart.ts",
-    "quality": "node --experimental-strip-types src/commander-quality.ts"
+    "quality": "node --experimental-strip-types src/commander-quality.ts",
+    "scenarios": "node --experimental-strip-types src/commander-scenarios.ts"
   }
 }

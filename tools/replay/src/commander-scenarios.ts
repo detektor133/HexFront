@@ -146,10 +146,17 @@ const result: Record<string, unknown> = { label: LABEL };
   ]);
   const army = s.state.armies.find((a) => a.owner === 0);
   const samples: Record<string, unknown> = {};
+  const standSince = new Map<number, { hex: number; tick: number }>();
   const base = hexesOf(s);
   let elapsed = 0;
   for (const sec of [30, 60, 120, 180]) {
-    run(s, (sec - elapsed) * 10);
+    for (let i = 0; i < (sec - elapsed) * 10; i += 1) {
+      s.runTicks(1);
+      for (const u of s.state.units) {
+        if (standSince.get(u.id)?.hex !== u.hex)
+          standSince.set(u.id, { hex: u.hex, tick: s.state.tick });
+      }
+    }
     elapsed = sec;
     const plan = s.state.plans.find((p) => p.armyId === army?.id);
     const strike = plan?.kind === 'front' && plan.offensive?.active ? plan.offensive.hexes : [];
@@ -160,7 +167,10 @@ const result: Record<string, unknown> = { label: LABEL };
       const h = hexFromId(u.hex, width);
       return Math.min(...strike.map((x) => distance(h, hexFromId(x, width)))) > 10;
     });
-    const idleFar = far.filter((u) => u.order === 'idle').length;
+    // Простаивает: стоит на месте дольше 10 с (только что вышедший из города новобранец не в счёт).
+    const idleFar = far.filter(
+      (u) => u.order === 'idle' && s.state.tick - (standSince.get(u.id)?.tick ?? 0) >= 100,
+    ).length;
     const front = mine(s).filter((u) => u.type === 'infantry');
     const meanX =
       front.length === 0
@@ -427,6 +437,67 @@ const result: Record<string, unknown> = { label: LABEL };
     unitsLost: r1(agg.lost / agg.runs),
     soldiersLeft240: r1(agg.soldiers / agg.runs),
     backPer100UnitMin: r1((agg.back / Math.max(1, agg.unitTicks / 600)) * 100),
+  };
+}
+
+// ---------------------------------------------------------------- С6. Фронт без боя (п.6)
+{
+  // Враг без войск, рваная граница: видна чистая геометрия наступления — языки и скорость.
+  const agg = { tips20: 0, tips40: 0, tips90: 0, hexes20: 0, hexes40: 0, hexes90: 0, runs: 0 };
+  for (let variant = 0; variant < 8; variant += 1) {
+    const marks = new Map<string, string>([
+      ['0,0', 'A1'],
+      ['29,10', 'B1'],
+    ]);
+    const s = game({
+      cols: 30,
+      rows: 22,
+      border: (r) => 11 + ((r * (3 + variant)) % (3 + (variant % 3))),
+      marks,
+    });
+    let n = 0;
+    for (let c = 4; c < 11 && n < 70; c += 1) {
+      for (let r = 1; r < 21 && n < 70; r += 1) {
+        s.unit('A', 'infantry', 300, at(c, r));
+        n += 1;
+      }
+    }
+    const base = hexesOf(s);
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'launchOffensive', target: 1, soldiers: 30000 } },
+    ]);
+    const { width, height } = s.state.map;
+    const tips = (): number => {
+      let count = 0;
+      for (let h = 0; h < s.state.hexes.owner.length; h += 1) {
+        if (s.state.hexes.owner[h] !== 0 || s.state.map.terrain[h] === 0) continue;
+        let own = 0;
+        for (const q of neighbors(hexFromId(h, width))) {
+          if (q.q < 0 || q.r < 0 || q.q >= width || q.r >= height) continue;
+          if (s.state.hexes.owner[q.q + q.r * width] === 0) own += 1;
+        }
+        if (own <= 1) count += 1;
+      }
+      return count;
+    };
+    run(s, 200);
+    agg.tips20 += tips();
+    agg.hexes20 += hexesOf(s) - base;
+    run(s, 200);
+    agg.tips40 += tips();
+    agg.hexes40 += hexesOf(s) - base;
+    run(s, 500);
+    agg.tips90 += tips();
+    agg.hexes90 += hexesOf(s) - base;
+    agg.runs += 1;
+  }
+  result.s6_clean_front = {
+    tips20: r1(agg.tips20 / agg.runs),
+    tips40: r1(agg.tips40 / agg.runs),
+    tips90: r1(agg.tips90 / agg.runs),
+    hexes20: r1(agg.hexes20 / agg.runs),
+    hexes40: r1(agg.hexes40 / agg.runs),
+    hexes90: r1(agg.hexes90 / agg.runs),
   };
 }
 

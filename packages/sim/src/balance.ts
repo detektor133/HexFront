@@ -24,7 +24,7 @@ export const FRONT_ALLOC_TICKS = 50;
 export const FRONT_ROUTES_PER_TICK = 16;
 export const OFFENSIVE_STEP_TICKS = 20;
 /** Сколько тиков автоматика не возвращает отряд в гекс, который он только что покинул. */
-export const RETURN_LOCK_TICKS = 300;
+export const RETURN_LOCK_TICKS = 150;
 /** Наступление без продвижения дольше этого — значок «упёрлись» (07-controls.md, 04/T14b). */
 export const OFFENSIVE_STUCK_TICKS = 100;
 /** Наступление без шага и боя дольше этого, тиков, командир меняет: оси — на другой участок, нечем бить — оборона. */

@@ -38,35 +38,16 @@ import { allUnits } from '../state/unit-index.ts';
 
 type FrontPlan = Extract<ArmyPlan, { kind: 'front' }>;
 
-// Сколько своих (или занимаемых в этот же шаг) соседей у гекса: «сплошность» фронта после шага.
-function solidity(state: MatchState, owner: number, hex: HexId, taken: ReadonlySet<HexId>): number {
-  const { width, height } = state.map;
-  let count = 0;
-  for (const n of neighbors(hexFromId(hex, width))) {
-    if (!inBounds(n, width, height)) continue;
-    const id = hexId(n, width);
-    if (state.hexes.owner[id] === owner || taken.has(id)) count += 1;
-  }
-  return count;
-}
-
-/** Шаг вперёд должен опираться хотя бы на столько своих гексов: иначе отряд вытягивается тонким «червём». */
-const STEP_MIN_SOLIDITY = 2;
-
 // Первый из шагов к линии, куда можно войти: не выбран другим, есть место, в занятый врагом —
-// только если прогноз не «Поражение». Строгий проход берёт лишь гексы с опорой на свои (фронт идёт
-// ровно, без клиньев); если так никто не ходит, нестрогий разрешает и одиночный шаг — узкий
-// перешеек иначе остановил бы наступление навсегда.
+// только если прогноз не «Поражение»; в гекс, из которого отряд только что вышел, не возвращаем.
 function pickStep(
   state: MatchState,
   u: Unit,
   steps: readonly HexId[],
   taken: ReadonlySet<HexId>,
-  strict: boolean,
 ): HexId | null {
   for (const n of steps) {
     if (taken.has(n) || ownUnitsAt(state, u.owner, n) >= MAX_UNITS_PER_HEX) continue;
-    if (strict && solidity(state, u.owner, n, taken) < STEP_MIN_SOLIDITY) continue;
     if (recentlyLeft(state, u, n)) continue;
     if (isHostileHex(state, u.owner, n) && forecastInState(state, [u], n).outcome === 'defeat') {
       continue;
@@ -184,28 +165,22 @@ function advance(state: MatchState, plan: FrontPlan): void {
       .filter((u) => (u.id + phase) % OFFENSIVE_ECHELON_PERIOD === 0)
       .map((u) => u.id),
   );
-  const march = (strict: boolean): void => {
-    for (const u of state.units) {
-      if (u.order === 'move' && taken.has(u.path[0] as HexId)) continue;
-      const near = neighborsIn(state, u.hex, enclaves);
-      const spearhead = goNow.has(u.id);
-      if (!spearhead && !(near.length > 0 && free(u, plan.armyId))) continue;
-      if (u.order !== 'idle') continue;
-      const toward = spearhead ? stepsToward(state, owner, u.hex, dist) : [];
-      const steps = [...toward, ...near.filter((h) => !toward.includes(h))];
-      const step = pickStep(state, u, steps, taken, strict);
-      if (step === null) continue;
-      taken.add(step);
-      progress = true;
-      u.slot = -1;
-      u.path = [step];
-      u.moveTicks = 0;
-      u.moveTotal = 0;
-      u.order = 'move';
-    }
-  };
-  march(true);
-  if (taken.size === 0) march(false);
+  for (const u of state.units) {
+    const near = neighborsIn(state, u.hex, enclaves);
+    const spearhead = goNow.has(u.id);
+    if (!spearhead && !(near.length > 0 && free(u, plan.armyId))) continue;
+    const toward = spearhead ? stepsToward(state, owner, u.hex, dist) : [];
+    const steps = [...toward, ...near.filter((h) => !toward.includes(h))];
+    const step = pickStep(state, u, steps, taken);
+    if (step === null) continue;
+    taken.add(step);
+    progress = true;
+    u.slot = -1;
+    u.path = [step];
+    u.moveTicks = 0;
+    u.moveTotal = 0;
+    u.order = 'move';
+  }
   if (!progress) return;
   const all = [...new Set([...off.taken, ...taken])].sort((a, b) => a - b);
   setOffensive(state, plan.armyId, { ...off, progressTick: state.tick, taken: all });
