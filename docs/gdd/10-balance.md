@@ -14,6 +14,7 @@
 | `FRONT_ALLOC_TICKS` | 50 |
 | `FRONT_ROUTES_PER_TICK` | 16 `[ТЮНИНГ]` |
 | `OFFENSIVE_STEP_TICKS` | 20 |
+| `RETURN_LOCK_TICKS` | 300 `[ТЮНИНГ]` |
 | `OFFENSIVE_STUCK_TICKS` | 100 |
 | `OFFENSIVE_STALL_TICKS` | 300 `[ТЮНИНГ]` |
 | `OFFENSIVE_RETRY_TICKS` | 200 `[ТЮНИНГ]` |
@@ -209,7 +210,10 @@
 | `SEA_MAX_HEXES` | 40 `[ТЮНИНГ]` |
 | `SEA_MOVE_S_PER_HEX` | 0,8 с `[ТЮНИНГ]` |
 | `SEA_COST_PER_SOLDIER_HEX` | 0,02 золота `[ТЮНИНГ]` |
-| `PROCURE_BATCH` | 300 `[ТЮНИНГ]` |
+| `PROCURE_BATCH` | 1000 `[ТЮНИНГ]` |
+| `PROCURE_CITIES` | 6 `[ТЮНИНГ]` |
+| `UNIT_SPLIT_SOLDIERS` | 300 `[ТЮНИНГ]` |
+| `POCKET_MAX_LAND` | 60 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_BASE` | 3 `[ТЮНИНГ]` |
 | `EXPAND_SOLDIERS_PER_HEX` | 100 `[ТЮНИНГ]` |
 | `EXPAND_RADIUS_MAX` | 10 `[ТЮНИНГ]` |

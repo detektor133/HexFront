@@ -2,7 +2,13 @@
 // GDD: docs/gdd/05-armies.md — «Набор»
 import { replenishPct, starsOf } from './experience.ts';
 import { procure } from './procure.ts';
-import { MAX_UNITS_PER_HEX, ORG_MAX, TICKS_PER_S } from '../balance.ts';
+import {
+  MAX_UNITS_PER_HEX,
+  ORG_MAX,
+  RECRUIT_MIN,
+  TICKS_PER_S,
+  UNIT_SPLIT_SOLDIERS,
+} from '../balance.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
@@ -36,13 +42,36 @@ function spawnHex(state: MatchState, owner: number, cityHex: HexId): HexId | nul
   return best;
 }
 
+/**
+ * На какие отряды делится крупный набор, заказанный армией (закупка пачкой до PROCURE_BATCH): набор
+ * большой ради времени (база набора платится один раз), а в армию приходит нужная мелочь — по
+ * UNIT_SPLIT_SOLDIERS, остаток меньше RECRUIT_MIN добавляется к последнему. Ручной набор не делится.
+ */
+function pieces(r: Recruitment): Fp[] {
+  if (r.armyId === undefined || r.soldiers <= UNIT_SPLIT_SOLDIERS + RECRUIT_MIN)
+    return [r.soldiers];
+  const out: Fp[] = [];
+  let rest = r.soldiers as number;
+  while (rest > UNIT_SPLIT_SOLDIERS) {
+    out.push(UNIT_SPLIT_SOLDIERS);
+    rest -= UNIT_SPLIT_SOLDIERS;
+  }
+  if (rest >= RECRUIT_MIN) out.push(rest as Fp);
+  else if (out.length > 0) out[out.length - 1] = ((out[out.length - 1] as number) + rest) as Fp;
+  return out;
+}
+
 function spawn(state: MatchState, r: Recruitment, hex: HexId): void {
+  for (const soldiers of pieces(r)) spawnOne(state, r, hex, soldiers);
+}
+
+function spawnOne(state: MatchState, r: Recruitment, hex: HexId, soldiers: Fp): void {
   // Id растут монотонно, поэтому push сохраняет сортировку отрядов по id.
   const unit: Unit = {
     id: state.nextId,
     owner: r.owner,
     type: r.type,
-    soldiers: r.soldiers,
+    soldiers,
     org: ORG_MAX,
     hex,
     order: 'idle',

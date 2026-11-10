@@ -21,6 +21,7 @@ import { findPath, ownUnitsAt } from '../queries/unit-path.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
+import { recentlyLeft } from '../state/return-lock.ts';
 import type { MatchState, Unit } from '../state/types.ts';
 import { allUnits, unitIndex } from '../state/unit-index.ts';
 
@@ -126,6 +127,7 @@ export function consolidate(state: MatchState): void {
         // Мелкий идёт к крупному; из двух мелких — к меньшему id: пара не расходится.
         if (b.soldiers < a.soldiers || (b.soldiers === a.soldiers && b.id > a.id)) continue;
         if (a.soldiers + b.soldiers + (incoming.get(b.id) ?? 0) > cap) continue;
+        if (recentlyLeft(state, a, b.hex)) continue;
         const d = distance(at, hexFromId(b.hex, width));
         if (d <= MERGE_SMALL_RADIUS && d < bestD) {
           best = b;

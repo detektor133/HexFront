@@ -4,7 +4,7 @@
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
 import { dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
-import { pickAxes, type Strike } from './axis.ts';
+import { pickAxes, type Force, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
 import { OK, rejected, type Validation } from './types.ts';
@@ -90,6 +90,7 @@ function strikeFront(
   cmd: DirectionCommand,
   skip: readonly EdgeId[] = [],
   want?: number,
+  army?: Army,
 ): Strike {
   return pickAxes(
     state,
@@ -99,7 +100,21 @@ function strikeFront(
     cmd.soldiers,
     skip,
     want,
+    forcesOf(state, playerId, army),
   );
+}
+
+// Войска, которыми будет бить направление: отряды армии, а пока их нет (первый приказ) — свободные
+// и стоящие отряды игрока. Оси выбираются рядом с ними (axis.ts, TRAVEL_COST).
+function forcesOf(state: MatchState, playerId: number, army?: Army): Force[] {
+  const own = allUnits(state).filter(
+    (u) => u.owner === playerId && u.type !== 'artillery' && u.order !== 'retreat' && !u.sea,
+  );
+  const mine = army === undefined ? [] : own.filter((u) => u.armyId === army.id);
+  const pool = mine.length > 0 ? mine : own;
+  const byHex = new Map<HexId, number>();
+  for (const u of pool) byHex.set(u.hex, (byHex.get(u.hex) ?? 0) + intDiv(u.soldiers, FP));
+  return [...byHex].sort((a, b) => a[0] - b[0]).map(([hex, soldiers]) => ({ hex, soldiers }));
 }
 
 // Фронт направления: у игрока — вся граница с блоком цели (нигде нет дыр и ничего лишнего).
@@ -279,7 +294,7 @@ function prepare(
   const front = neutral ? [] : frontOf(state, playerId, cmd.target);
   const strike: Strike = neutral
     ? { edges: [], windows: [], axes: 0, depth: 0 }
-    : strikeFront(state, playerId, cmd);
+    : strikeFront(state, playerId, cmd, [], undefined, army);
   const anchors =
     neutral && cmd.hex !== undefined
       ? [cmd.hex]
@@ -405,7 +420,14 @@ export function refreshStrike(state: MatchState, army: Army): void {
   const kept = runs.filter((r) => takenShare(state, army.owner, r, hexes) < AXIS_DONE_PERCENT);
   if (kept.length === runs.length && kept.length >= strikeAxes(army)) return;
   const cmd = { target: dir.target, soldiers: army.wanted ?? 1 };
-  const strike = strikeFront(state, army.owner, cmd, kept.flat(), strikeAxes(army) - kept.length);
+  const strike = strikeFront(
+    state,
+    army.owner,
+    cmd,
+    kept.flat(),
+    strikeAxes(army) - kept.length,
+    army,
+  );
   const fresh = strikeLines(state, army, dir.target, strike);
   const lines = [...kept, ...fresh];
   if (lines.length === 0 || (fresh.length === 0 && kept.length === runs.length)) return;
@@ -426,7 +448,14 @@ const strikeAxes = (army: Army): number =>
 export function continueStrike(state: MatchState, army: Army): void {
   const dir = army.dir;
   if (!dir || dir.mode !== 'attack') return;
-  const strike = strikeFront(state, army.owner, { target: dir.target, soldiers: army.wanted ?? 1 });
+  const strike = strikeFront(
+    state,
+    army.owner,
+    { target: dir.target, soldiers: army.wanted ?? 1 },
+    [],
+    undefined,
+    army,
+  );
   if (strike.edges.length > 0 && startStrike(state, army, dir.target, strike)) return;
   // Бить пока нечем: временная оборона, через OFFENSIVE_RETRY_TICKS армия попробует снова.
   army.dir = { target: dir.target, mode: 'hold', resume: state.tick + OFFENSIVE_RETRY_TICKS };
@@ -443,7 +472,7 @@ export function reshuffleStrike(state: MatchState, army: Army): void {
   if (!dir || dir.mode !== 'attack' || plan?.kind !== 'front' || !plan.offensive) return;
   const stalled = plan.offensive.edges;
   const cmd = { target: dir.target, soldiers: army.wanted ?? 1 };
-  const strike = strikeFront(state, army.owner, cmd, stalled, strikeAxes(army));
+  const strike = strikeFront(state, army.owner, cmd, stalled, strikeAxes(army), army);
   const fresh = strikeLines(state, army, dir.target, strike);
   if (fresh.length > 0) {
     setLines(state, army, fresh);

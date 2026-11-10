@@ -95,6 +95,11 @@ function hashEntities(s: Hasher, state: MatchState): void {
     int(s, a.slot);
     // Только активный сбор: без него хэш матча прежний.
     if (a.gather >= 0) int(s, a.gather);
+    // Запрет обратного хода влияет на решения автоматики, поэтому входит в хэш.
+    if (a.came !== undefined) {
+      int(s, a.came);
+      int(s, a.cameTick ?? 0);
+    }
   }
   int(s, state.armies.length);
   for (const a of state.armies) {

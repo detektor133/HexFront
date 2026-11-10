@@ -84,6 +84,8 @@ export function moveUnit(state: MatchState, unit: Unit, to: HexId): void {
   const from = unit.hex;
   if (from === to) return;
   unit.hex = to;
+  unit.came = from;
+  unit.cameTick = state.tick;
   moveUnitInIndex(state, unit, from);
 }
 

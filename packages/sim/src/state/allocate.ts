@@ -17,10 +17,18 @@ import { isDepot } from './depot.ts';
 import { planHexes } from './front.ts';
 import { facingHexes, lineDistance } from './offensive-steps.ts';
 import { type ArmyPlan, type MatchState, type Unit } from './types.ts';
-import { allUnits } from './unit-index.ts';
+import { allUnits, unitIndex } from './unit-index.ts';
 import { TERRAIN } from '../map/types.ts';
 import { minCostAssignment } from '../math/assign.ts';
-import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
+import {
+  distance,
+  hexFromId,
+  hexId,
+  inBounds,
+  neighbors,
+  spiral,
+  type HexId,
+} from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 
 /** Дальность упреждающей угрозы, гексов: вес врага падает с расстоянием от полного (1 гекс) до 1/3. */
@@ -57,17 +65,22 @@ function around(state: MatchState, hex: HexId): HexId[] {
 function weights(state: MatchState, owner: number, line: readonly HexId[]): Map<HexId, number> {
   const out = new Map<HexId, number>();
   const capitalId = state.players[owner]?.capitalCityId;
+  const { width, height } = state.map;
+  const { unitsByHex } = unitIndex(state);
   for (const h of line) {
     const near = around(state, h);
     const here = hexFromId(h, state.map.width);
     // Угроза с упреждением: враг рядом давит в полную силу, дальше — слабее (до THREAT_REACH гексов),
     // поэтому резерв подтягивается к участку, к которому враг идёт, до первого удара.
+    // Враги рядом ищутся по индексу гексов, а не перебором всех отрядов матча на каждый гекс линии.
     let enemy = 0;
-    for (const u of state.units) {
-      if (!atWar(state, owner, u.owner)) continue;
-      const d = distance(here, hexFromId(u.hex, state.map.width));
-      if (d <= THREAT_REACH)
+    for (const hexAt of spiral(here, THREAT_REACH)) {
+      if (!inBounds(hexAt, width, height)) continue;
+      for (const u of unitsByHex[hexId(hexAt, width)] ?? []) {
+        if (!atWar(state, owner, u.owner)) continue;
+        const d = distance(here, hexAt);
         enemy += intDiv(u.soldiers * (THREAT_REACH + 1 - Math.max(1, d)), THREAT_REACH);
+      }
     }
     let weight: number = FP + intDiv(enemy, THREAT_SOLDIERS);
     const city = state.cities.find((c) => c.hex === h);

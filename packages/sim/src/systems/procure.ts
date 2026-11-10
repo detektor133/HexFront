@@ -2,13 +2,16 @@
 // берёт свободный резерв, а недостающее раз в секунду заказывает набором в ближайшем к своему
 // фронту городе с пустой очередью; отряд приходит прямо в армию и сам идёт на место по линии.
 import {
+  COST_GOLD_PER_SOLDIER,
+  COST_POP_PER_SOLDIER,
   PROCURE_BATCH,
+  PROCURE_CITIES,
   RECRUIT_MIN,
   RECRUIT_STEP,
   TICKS_PER_S,
   type UnitType,
 } from '../balance.ts';
-import { checkRecruit, startRecruit } from '../commands/recruit.ts';
+import { checkRecruit, recruitCapacity, startRecruit } from '../commands/recruit.ts';
 import { splitUnit } from '../commands/unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
@@ -147,23 +150,49 @@ export function procure(state: MatchState): void {
   }
 }
 
-// Одна закупка армии за секунду: нехватка по типу состава (без состава — пехота) в ближайшем городе.
+// Закупка армии за секунду: нехватка по типу состава (без состава — пехота) делится между городами
+// с пустой очередью — ближние к фронту берут больше всего, дальние добавляют своё параллельно, поэтому
+// с ростом числа городов армия набирается быстрее. Каждый город ставит набор до PROCURE_BATCH, сколько
+// позволяют люди и золото; фронт сам делит крупный отряд, когда нужны мелкие.
 function orderOne(state: MatchState, army: Army): void {
   const need = mixNeed(army.wanted ?? 0, army.mix);
+  const cities = cityOrder(state, army);
+  let placed = 0;
   for (const type of TYPES) {
-    const deficit =
+    if (need === undefined && type !== 'infantry') return;
+    let left =
       need === undefined
         ? (army.wanted ?? 0) * FP - strength(state, army)
         : need[type] * FP - strengthOf(state, army, type);
-    if (need === undefined && type !== 'infantry') return;
-    if (deficit < RECRUIT_MIN) continue;
-    const batch = intDiv(Math.min(deficit, PROCURE_BATCH), RECRUIT_STEP) * RECRUIT_STEP;
-    for (const city of cityOrder(state, army)) {
-      for (let amount = batch; amount >= RECRUIT_MIN; amount -= RECRUIT_STEP) {
-        if (!checkRecruit(state, army.owner, city.id, type, amount as Fp).ok) continue;
-        startRecruit(state, army.owner, city.id, type, amount as Fp, army.id);
-        return;
-      }
+    for (const city of cities) {
+      if (left < RECRUIT_MIN || placed >= PROCURE_CITIES) break;
+      if (state.recruits.some((r) => r.cityId === city.id)) continue;
+      const amount = bestAmount(state, army.owner, city, type, left);
+      if (amount < RECRUIT_MIN) continue;
+      startRecruit(state, army.owner, city.id, type, amount as Fp, army.id);
+      left -= amount;
+      placed += 1;
     }
   }
+}
+
+// Наибольший набор не больше нужного: сначала по людям и золоту города, затем проверкой правил.
+function bestAmount(
+  state: MatchState,
+  owner: number,
+  city: City,
+  type: UnitType,
+  want: number,
+): number {
+  const byPeople = intDiv(recruitCapacity(state, city.id) * FP, COST_POP_PER_SOLDIER[type]);
+  const byGold = intDiv((state.players[owner]?.gold ?? 0) * FP, COST_GOLD_PER_SOLDIER[type]);
+  const top = Math.min(want, PROCURE_BATCH, byPeople, byGold);
+  for (
+    let amount = intDiv(top, RECRUIT_STEP) * RECRUIT_STEP;
+    amount >= RECRUIT_MIN;
+    amount -= RECRUIT_STEP
+  ) {
+    if (checkRecruit(state, owner, city.id, type, amount as Fp).ok) return amount;
+  }
+  return 0;
 }

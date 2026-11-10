@@ -19,6 +19,7 @@ import { findPath } from '../queries/unit-path.ts';
 import { allocate, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
+import { recentlyLeft } from '../state/return-lock.ts';
 import type { ArmyPlan, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -214,6 +215,8 @@ function routePending(state: MatchState): void {
     const army = u.armyId;
     if (army === null || u.slot < 0 || !planned.has(army) || !planControls(u, army)) continue;
     if (!settle(u, u.slot)) continue;
+    // Место — гекс, из которого отряд только что вышел: подождать, а не гонять туда-обратно.
+    if (recentlyLeft(state, u, u.slot)) continue;
     const list = waiting.get(army) ?? [];
     list.push({ u, d: distance(hexFromId(u.hex, width), hexFromId(u.slot, width)) });
     waiting.set(army, list);
