@@ -141,7 +141,27 @@ describe('альянс', () => {
     expect(vote?.voters).toEqual([0, 1, 2, 3]);
     expect(rel(s, 1, 2)).toBe('war');
     cmd(s, 1, { t: 'castVote', voteId: vote?.id ?? -1, yes: true });
+    // Сторона врага тоже голосует отдельно: пока её второй член молчит, мира нет.
+    expect(rel(s, 0, 2)).toBe('war');
+    cmd(s, 2, { t: 'castVote', voteId: vote?.id ?? -1, yes: true });
     for (const a of [0, 1]) for (const b of [2, 3]) expect(rel(s, a, b)).toBe('peace');
+  });
+
+  it('союзник принял мир врага сам — мира без моего голоса нет, голосование ждёт меня', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    setRelation(s.state, 0, 3, 'war');
+    setRelation(s.state, 1, 3, 'war');
+    cmd(s, 3, { t: 'proposeTreaty', target: 1, kind: 'peace' });
+    cmd(s, 1, { t: 'answerTreaty', from: 3, accept: true });
+    expect(rel(s, 0, 3)).toBe('war');
+    expect(rel(s, 1, 3)).toBe('war');
+    const view = diplomacyView(s.state, 0);
+    expect(view?.votes).toHaveLength(1);
+    expect(view?.votes[0]?.mine).toBeNull();
+    cmd(s, 0, { t: 'castVote', voteId: view?.votes[0]?.id ?? -1, yes: false });
+    expect(rel(s, 0, 3)).toBe('war');
+    expect(s.state.diplomacy?.votes).toEqual([]);
   });
 
   it('голосование без решения по сроку — отказ; выход из альянса — мир со всеми и нарушение', () => {

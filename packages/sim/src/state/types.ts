@@ -401,6 +401,8 @@ export interface AllianceVote {
   readonly b: number;
   /** Избиратели: члены обеих групп (для join — без одиночного новичка). */
   readonly voters: readonly number[];
+  /** Общий мир: стороны, каждая из которых с альянсом решает большинством своих членов. */
+  readonly sides?: readonly (readonly number[])[];
   yes: number[];
   no: number[];
   readonly tick: number;

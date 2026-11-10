@@ -143,12 +143,14 @@ function conclude(state: MatchState, from: number, to: number, kind: TreatyKind)
     return;
   }
   if (kind === 'peace' && !single) {
+    // Каждая сторона с альянсом голосует за мир сама: ответ адресата не решает за его альянс.
     openVote(
       state,
       'peace',
       from,
       to,
       [...new Set([...sideFrom, ...sideTo])].sort((x, y) => x - y),
+      [sideFrom, sideTo],
     );
     return;
   }

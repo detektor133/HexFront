@@ -186,6 +186,7 @@ function hashDiplomacy(s: Hasher, state: MatchState): void {
   for (const v of d.votes ?? []) {
     for (const x of [v.id, v.kind === 'join' ? 0 : 1, v.a, v.b, v.tick]) int(s, x);
     for (const x of [...v.voters, ...v.yes, ...v.no]) int(s, x);
+    for (const side of v.sides ?? []) for (const x of [side.length, ...side]) int(s, x);
   }
 }
 

@@ -105,11 +105,19 @@ export function settle(
   vote: AllianceVote,
   expired: boolean,
 ): void {
-  const voters = vote.voters.filter((v) => alive(state, v));
-  const yes = vote.yes.filter((v) => voters.includes(v)).length;
-  const no = vote.no.filter((v) => voters.includes(v)).length;
-  const passed = yes * 2 > voters.length;
-  const lost = (voters.length - no) * 2 <= voters.length;
+  // Общий мир решает каждая сторона со своим альянсом отдельно: враг не голосует за наш мир, а
+  // двое договорившихся не перевешивают остальных членов своего альянса.
+  const groups = vote.sides ?? [vote.voters];
+  let passed = true;
+  let lost = false;
+  for (const side of groups) {
+    const voters = side.filter((v) => alive(state, v) && vote.voters.includes(v));
+    if (voters.length === 0) continue;
+    const yes = vote.yes.filter((v) => voters.includes(v)).length;
+    const no = vote.no.filter((v) => voters.includes(v)).length;
+    if (yes * 2 <= voters.length) passed = false;
+    if ((voters.length - no) * 2 <= voters.length) lost = true;
+  }
   if (!passed && !lost && !expired) return;
   d.votes = (d.votes ?? []).filter((v) => v !== vote);
   if (passed) applyVote(state, vote);
@@ -122,6 +130,7 @@ export function openVote(
   a: number,
   b: number,
   voters: readonly number[],
+  sides?: readonly (readonly number[])[],
 ): void {
   const d = state.diplomacy;
   if (!d) return;
@@ -133,6 +142,7 @@ export function openVote(
     a,
     b,
     voters: voters.filter((v) => alive(state, v)),
+    ...(sides ? { sides } : {}),
     yes: [a, b].filter((v) => voters.includes(v)),
     no: [],
     tick: state.tick,

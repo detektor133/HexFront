@@ -208,9 +208,6 @@ export function feedRows(
   return Math.min(FEED_SLOTS, total) + (total > FEED_SLOTS ? 1 : 0);
 }
 
-const PEEK_IN_MS = 140;
-const PEEK_OUT_MS = 520;
-
 function diplomacyOther(event: GameEvent, me: number): number | null {
   if (event.t === 'playerEliminated') return event.playerId;
   if (
@@ -249,20 +246,8 @@ export function EventFeed(props: {
   readonly compact?: boolean;
 }): React.JSX.Element | null {
   const [now, setNow] = useState<number>(props.now);
-  // Вся лента спрятана за вкладку у края; на ПК её раскрывает наведение (с задержкой, без рывков).
+  // Вся лента спрятана за вкладку у края; раскрывает её только нажатие на вкладку.
   const [hidden, setHidden] = useState(false);
-  const [peek, setPeek] = useState(false);
-  const peekTimer = useRef<number | null>(null);
-  const hoverFeed = (on: boolean): void => {
-    if (peekTimer.current !== null) window.clearTimeout(peekTimer.current);
-    peekTimer.current = window.setTimeout(() => setPeek(on), on ? PEEK_IN_MS : PEEK_OUT_MS);
-  };
-  useEffect(
-    () => () => {
-      if (peekTimer.current !== null) window.clearTimeout(peekTimer.current);
-    },
-    [],
-  );
   // Какие записи уже показывались: у знакомых при раскрытии ленты анимации нет.
   const seen = useRef<ReadonlySet<string>>(new Set());
   const isFresh = (key: string): boolean => !seen.current.has(key);
@@ -500,7 +485,7 @@ export function EventFeed(props: {
   }
   const shown = specs.slice(0, FEED_SLOTS);
   const more = specs.length - shown.length;
-  const open = !hidden || peek;
+  const open = !hidden;
   const HandleIcon = hidden ? IconChevronRight : IconChevronLeft;
   const pending = (props.votes ?? []).filter((v) => v.mine === null);
   // Новое голосование, на которое ждут ответа, открывается карточкой само — один раз.
@@ -513,11 +498,7 @@ export function EventFeed(props: {
   if (empty) return null;
   return (
     <div className={styles.feed} style={props.style} aria-label={t('event.feed')} data-feed>
-      <div
-        className={styles.dock}
-        onPointerEnter={(event) => event.pointerType === 'mouse' && hoverFeed(true)}
-        onPointerLeave={(event) => event.pointerType === 'mouse' && hoverFeed(false)}
-      >
+      <div className={styles.dock}>
         <button
           type="button"
           className={styles.handle}
@@ -525,10 +506,7 @@ export function EventFeed(props: {
           aria-label={t(hidden ? 'feed.show' : 'feed.hide')}
           title={t(hidden ? 'feed.show' : 'feed.hide')}
           aria-expanded={!hidden}
-          onClick={() => {
-            setHidden(!hidden);
-            setPeek(false);
-          }}
+          onClick={() => setHidden(!hidden)}
         >
           <HandleIcon size={14} aria-hidden />
           {hidden && <span className={styles.badge}>{specs.length}</span>}
