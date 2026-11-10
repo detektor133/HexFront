@@ -6,6 +6,7 @@ import { BufferImageSource, Container, Mesh, MeshGeometry, Shader, Texture } fro
 import type { MapStatic, PlayerView } from '@hexfront/sim';
 
 import { mapBounds } from './hex-geometry.ts';
+import { politicalFill, politicalLine } from './political.ts';
 import { playerFill, playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -173,6 +174,8 @@ export interface TerritoryGpu {
   /** Границы и тёмный туман — над заливкой. */
   readonly over: Container;
   setView(view: PlayerView): void;
+  /** Политическая карта: страны красятся по отношению к игроку, а не своим цветом. */
+  setPolitical(on: boolean): void;
   /** Остаток вспышки захвата гекса, 0..1 (0 — нет эффекта); загрузка в текстуру — `flush`. */
   setCapture(hex: number, fade: number): void;
   /** Загружает в GPU накопленные изменения вспышек захвата. */
@@ -210,6 +213,7 @@ function headlessTerritory(): TerritoryGpu {
     fill: new Container(),
     over: new Container(),
     setView: () => undefined,
+    setPolitical: () => undefined,
     setCapture: () => undefined,
     flush: () => undefined,
     setScale: () => undefined,
@@ -297,11 +301,17 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
     }
   };
 
+  let political = false;
+  let lastView: PlayerView | null = null;
   const writePalette = (): void => {
     const next = new Uint8Array(paletteData.length);
     for (let i = 1; i < PALETTE_SIZE; i += 1) {
-      next.set([...channels(playerFill(i - 1)), 255], i * 4);
-      next.set([...channels(playerLine(i - 1)), 255], (PALETTE_SIZE + i) * 4);
+      const view = lastView;
+      const mine = political && view !== null && i - 1 < view.players.length;
+      const fillColor = mine && view ? politicalFill(view, i - 1) : playerFill(i - 1);
+      const lineColor = mine && view ? politicalLine(view, i - 1) : playerLine(i - 1);
+      next.set([...channels(fillColor), 255], i * 4);
+      next.set([...channels(lineColor), 255], (PALETTE_SIZE + i) * 4);
     }
     if (next.every((value, index) => value === paletteData[index])) return;
     paletteData.set(next);
@@ -323,7 +333,12 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
       captureDirty = false;
       dataSource.update();
     },
+    setPolitical(on) {
+      political = on;
+      if (lastView) writePalette();
+    },
     setView(view) {
+      lastView = view;
       if (packTerritory(view, data)) dataSource.update();
       // Порядок цветов задаёт клиент (setPlayerPalette) — сверяем палитру на каждом виде.
       writePalette();

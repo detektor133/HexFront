@@ -26,9 +26,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0 6px 0 4px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px 0 6px;
   color: var(--ui-ink2);
   font: inherit;
   font-size: 12px;
@@ -46,7 +46,7 @@
 }
 
 .handle[data-alert='true'] {
-  animation: feed-wiggle 1400ms ease-in-out infinite;
+  animation: feed-pulse 1.6s ease-in-out infinite;
 }
 
 .badge {
@@ -68,7 +68,11 @@
 .slot {
   display: flex;
   pointer-events: auto;
-  animation: feed-enter 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* Анимация только у новой записи и только один раз: раскрытие ленты её не повторяет. */
+.fresh {
+  animation: feed-enter 320ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
 }
 
 .item {
@@ -94,7 +98,14 @@
   border-radius: 0 var(--radius-card) var(--radius-card) 0;
   box-shadow: var(--shadow-hard);
   transition: max-width 180ms ease-out;
-  animation: feed-flash 1100ms ease-out both;
+}
+
+.fresh .item {
+  animation: feed-flash 900ms ease-out both;
+}
+
+.fresh .important {
+  animation-name: feed-flash-danger;
 }
 
 .slot:hover .item,
@@ -121,18 +132,10 @@ div.item {
   cursor: default;
 }
 
-/* Предложение договора всегда раскрыто, с кнопками ответа, и качается, пока на него не ответили. */
+/* Запрос всегда раскрыт, с кнопками ответа; внимание привлекает цвет метки, а не тряска. */
 .offer {
   max-width: 360px;
   cursor: default;
-  animation:
-    feed-flash 1100ms ease-out both,
-    feed-wiggle 1400ms ease-in-out 1.2s infinite;
-}
-
-.slot:hover .offer,
-.slot:focus-within .offer {
-  animation: feed-flash 1100ms ease-out both;
 }
 
 .name {
@@ -156,12 +159,34 @@ div.item {
 
 @keyframes feed-flash {
   0%,
-  35% {
-    background: var(--status-danger);
+  30% {
+    background: var(--ui-surface2);
   }
 
   100% {
     background: var(--ui-panel-image) var(--ui-surface);
+  }
+}
+
+@keyframes feed-flash-danger {
+  0%,
+  30% {
+    background: var(--status-danger-bg);
+  }
+
+  100% {
+    background: var(--ui-panel-image) var(--ui-surface);
+  }
+}
+
+@keyframes feed-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
   }
 }
 
@@ -188,9 +213,10 @@ div.item {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slot,
-  .item,
-  .offer {
+  .fresh,
+  .fresh .item,
+  .handle,
+  .rows {
     animation: none;
     transition: none;
   }
@@ -271,4 +297,71 @@ button.main {
     height: 28px;
     min-height: 28px;
   }
+}
+
+/* Записи плавно сворачиваются и раскрываются: высота 0fr → 1fr, прозрачность и сдвиг. */
+.rows {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    grid-template-rows 220ms ease-out,
+    opacity 180ms ease-out,
+    transform 220ms ease-out;
+}
+
+.rows[data-open='false'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+
+.rowsInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Метка вида запроса: мир, пакт, оборонительный пакт, альянс, помощь и голосование различаются цветом и словом. */
+.tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  color: var(--ui-surface);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--ui-ink2);
+  border-radius: 3px;
+}
+
+.tag[data-kind='peace'] {
+  background: var(--status-success);
+}
+
+.tag[data-kind='defense'] {
+  background: var(--relation-ally);
+}
+
+.tag[data-kind='alliance'] {
+  background: var(--relation-own);
+}
+
+.tag[data-kind='aid'] {
+  background: var(--status-danger);
+}
+
+.tag[data-kind='vote'] {
+  background: var(--status-warning);
+}
+
+.note {
+  flex: 0 0 auto;
+  color: var(--ui-ink2);
+  font-variant-numeric: tabular-nums;
 }

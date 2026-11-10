@@ -7,6 +7,7 @@ import {
   IconListDetails,
   IconMap2,
   IconPackage,
+  IconUsersGroup,
   IconShield,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
@@ -170,6 +171,16 @@ export function MapTools({
             onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
           >
             <IconPackage size={22} stroke={1.75} />
+          </IconButton>
+          <IconButton
+            label={t('mapTools.political')}
+            className={mapMode === 'political' && !hammerOn ? styles.active : styles.button}
+            aria-pressed={mapMode === 'political'}
+            onClick={() =>
+              setMapMode(mapMode === 'political' && !hammerOn ? 'normal' : 'political')
+            }
+          >
+            <IconUsersGroup size={22} stroke={1.75} />
           </IconButton>
         </div>
       </div>

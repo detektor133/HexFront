@@ -1,0 +1,231 @@
+/* Карточка голосования альянса: рядом с лентой, на телефоне — по центру экрана. */
+.card {
+  position: fixed;
+  top: 50%;
+  left: 380px;
+  z-index: 19;
+  display: grid;
+  gap: var(--space-sm);
+  box-sizing: border-box;
+  width: 288px;
+  max-width: calc(100vw - 2 * var(--space-md));
+  max-height: calc(100dvh - 2 * var(--space-md));
+  padding: var(--space-md);
+  overflow-y: auto;
+  color: var(--ui-ink);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  pointer-events: auto;
+  translate: 0 -50%;
+  animation: vote-in 180ms ease-out both;
+}
+
+@keyframes vote-in {
+  from {
+    opacity: 0;
+    translate: -8px -50%;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 -50%;
+  }
+}
+
+@media (max-width: 760px) {
+  .card {
+    left: 50%;
+    translate: -50% -50%;
+    animation: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display-family);
+  font-size: var(--font-size-label);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--ui-ink2);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.subject {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-weight: 600;
+}
+
+.sep {
+  color: var(--ui-ink3);
+}
+
+.dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: 50%;
+}
+
+.voters {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.voter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 28px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-button);
+}
+
+.voter[data-answer='yes'] {
+  background: var(--status-success-bg);
+}
+
+.voter[data-answer='no'] {
+  background: var(--status-danger-bg);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mark {
+  display: inline-flex;
+  color: var(--ui-ink3);
+}
+
+.voter[data-answer='yes'] .mark {
+  color: var(--status-success);
+}
+
+.voter[data-answer='no'] .mark {
+  color: var(--status-danger);
+}
+
+/* Полоса голосов: зелёное «за», красное «против», чёрта — сколько «за» нужно. */
+.bar {
+  position: relative;
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  background: var(--ui-surface2);
+  border-radius: 4px;
+}
+
+.barYes {
+  background: var(--status-success);
+  transition: width 200ms ease-out;
+}
+
+.barNo {
+  background: var(--status-danger);
+  transition: width 200ms ease-out;
+}
+
+.need {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ui-ink);
+  translate: -2px 0;
+}
+
+.tally {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.left {
+  margin-left: auto;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.yes,
+.no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: var(--touch-target-min);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.yes {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: var(--ui-button-primary-bg);
+}
+
+.no {
+  color: var(--ui-ink);
+  background: var(--ui-surface2);
+}
+
+.done {
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
+  .barYes,
+  .barNo {
+    transition: none;
+  }
+}

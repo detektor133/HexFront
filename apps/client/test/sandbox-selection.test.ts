@@ -105,6 +105,7 @@ describe('песочница: выбор и приказы как в HoI4', () =
         aidCalls: [],
         votes: [],
         allies: [],
+        blocs: [],
       },
     };
     expect(isHostile(allied, ally.hex)).toBe(false);

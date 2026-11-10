@@ -99,6 +99,15 @@ describe('альянс', () => {
     expect(atWar(t.state, 3, 0)).toBe(true);
   });
 
+  it('долг альянса сильнее пакта: член с пактом против врага всё равно вступает в войну', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    treaty(s, 1, 3, 'pact');
+    cmd(s, 0, { t: 'declareWar', target: 3 });
+    expect(atWar(s.state, 1, 3)).toBe(true);
+    expect(s.state.diplomacy?.violations[1]).toBe(0);
+  });
+
   it('вход в альянс решает большинство: двое «за» из двух — вошёл, один «против» — отказ', () => {
     const s = game();
     treaty(s, 0, 1, 'alliance');

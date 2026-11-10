@@ -19,6 +19,7 @@ import { Hud } from '../dev/Hud.tsx';
 import { Leaderboard } from '../dev/Leaderboard.tsx';
 import { MatchEnd } from '../dev/MatchEnd.tsx';
 import { ObserverPanel } from '../dev/ObserverPanel.tsx';
+import { PoliticalLegend } from '../dev/PoliticalLegend.tsx';
 import { TerritoryMenu } from '../dev/TerritoryMenu.tsx';
 import { UnitCard } from '../dev/UnitCard.tsx';
 import { readSandboxMap } from '../dev/sandbox-map.ts';
@@ -183,7 +184,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   // На телефоне панель приказов уступает место окну «Постройки» и режиму строительства.
   // Чужие игроки без городов: у них идёт отсчёт до капитуляции — об этом сообщает лента.
   const capitulating = (view?.players ?? []).flatMap((p) =>
-    p.id !== view?.playerId && p.status === 'alive' && p.graceLeftS !== undefined
+    p.id !== view?.playerId &&
+    p.status === 'alive' &&
+    p.graceLeftS !== undefined &&
+    (view?.diplomacy ? view.diplomacy.relations[p.id] === 'war' : true)
       ? [{ player: p.id, seconds: p.graceLeftS }]
       : [],
   );
@@ -406,19 +410,17 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           }}
         />
       )}
-      {view && sb.celebration && (
-        <Celebration
-          cue={{
-            key: sb.celebration.key,
-            // Победа матча — плашка в итоговом экране; здесь только салют.
-            text:
-              sb.celebration.kind === 'eliminated'
-                ? `${view.players[sb.celebration.player]?.name ?? sb.celebration.player + 1} ${t('celebrate.eliminated')}`
-                : null,
-            color: tokens.players.palette[view.playerId]?.line ?? tokens.ui.ink,
-          }}
-        />
+      {view && sb.mapModes.mapMode === 'political' && (
+        <PoliticalLegend view={view} top={hudH + 12} />
       )}
+      {view &&
+        sb.celebration &&
+        // Салют: разгром врага (с кем война) и победа коалиции; текст — в ленте и в итоговом экране.
+        (sb.celebration.kind === 'won' ||
+          !view.diplomacy ||
+          view.diplomacy.relations[sb.celebration.player] === 'war') && (
+          <Celebration cue={{ key: sb.celebration.key, text: null }} />
+        )}
       {view && (
         <MatchEnd
           view={view}

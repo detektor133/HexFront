@@ -3,6 +3,10 @@
   display: grid;
   gap: var(--space-md);
   width: min(560px, 100%);
+  /* Экран настроек листается внутри и не вылезает за окно. */
+  max-height: calc(100dvh - 2 * var(--space-xl));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .head {

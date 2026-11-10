@@ -63,6 +63,8 @@ export interface EconomyLayer {
   readonly territoryLabels: Container;
   update(scale: number, level: DetailLevel): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
+  /** Политическая карта: страны красятся по отношению к игроку. */
+  setPolitical(on: boolean): void;
   cacheTelemetry(): UnitLayerCacheTelemetry & {
     readonly economy: EconomyLayerCacheTelemetry;
     readonly frontTween: FrontTweenCacheTelemetry;
@@ -526,6 +528,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       redraw();
       if (roads) drawRoads(v);
       if (typeof document !== 'undefined') unitLayer.setView(v, sel, performance.now());
+    },
+    setPolitical(on) {
+      territory.setPolitical(on);
     },
     cacheTelemetry() {
       return {

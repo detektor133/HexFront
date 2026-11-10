@@ -18,6 +18,9 @@ export function eventHex(event: GameEvent, view: PlayerView): number | null {
   if (event.t === 'unitDestroyed' || event.t === 'unitRetreated' || event.t === 'unitCapitulated') {
     return event.hex;
   }
+  if (event.t === 'playerEliminated') {
+    return null;
+  }
   if (event.t === 'cityCaptured' || event.t === 'capitalMoved') {
     return view.cities.find((city) => city.id === event.cityId)?.hex ?? null;
   }
@@ -43,6 +46,7 @@ export function isImportantEvent(event: GameEvent): boolean {
     event.t === 'unitDestroyed' ||
     event.t === 'unitCapitulated' ||
     event.t === 'cityCaptured' ||
+    event.t === 'playerEliminated' ||
     event.t === 'warDeclared'
   );
 }
@@ -68,6 +72,12 @@ function isVisibleEvent(event: GameEvent, localPlayerId: number): boolean {
   );
 }
 
+// Капитуляция врага (с кем война) видна в ленте; мир и пакты — не наше дело.
+function isEnemyFall(event: GameEvent, view: PlayerView, localPlayerId: number): boolean {
+  if (event.t !== 'playerEliminated' || event.playerId === localPlayerId) return false;
+  return view.diplomacy ? view.diplomacy.relations[event.playerId] === 'war' : true;
+}
+
 export function appendEvents(
   items: readonly EventFeedItem[],
   events: readonly GameEvent[],
@@ -76,7 +86,9 @@ export function appendEvents(
   localPlayerId: number = view.playerId ?? 0,
 ): EventFeedItem[] {
   const fresh = events
-    .filter((event) => isVisibleEvent(event, localPlayerId))
+    .filter(
+      (event) => isVisibleEvent(event, localPlayerId) || isEnemyFall(event, view, localPlayerId),
+    )
     .map((event, index) => ({
       id: `${view.tick}:${index}`,
       event,

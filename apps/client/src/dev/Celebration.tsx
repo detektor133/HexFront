@@ -8,7 +8,6 @@ export interface CelebrationCue {
   /** Новый ключ — новый праздник; тот же ключ повторно не запускается. */
   readonly key: string;
   readonly text: string | null;
-  readonly color: string;
 }
 
 const BANNER_MS = 4200;
@@ -27,10 +26,14 @@ interface Spark {
   color: string;
 }
 
-const SHADES = [tokens.ui.ink, tokens.ui.surface2, tokens.ui.surface];
+// Салют разноцветный: все цвета игроков из токенов.
+const COLORS = tokens.players.palette.map((p) => p.line);
 
 // Плоские квадратики без свечения и градиентов (стайлгайд): разлетаются из точки и падают.
-function burst(width: number, height: number, color: string): Spark[] {
+function burst(width: number, height: number): Spark[] {
+  // Один взрыв — один-два цвета палитры: вспышки пёстрые, а не одноцветные.
+  const first = COLORS[Math.floor(Math.random() * COLORS.length)] ?? tokens.ui.ink;
+  const second = COLORS[Math.floor(Math.random() * COLORS.length)] ?? first;
   const cx = width * (0.15 + Math.random() * 0.7);
   const cy = height * (0.12 + Math.random() * 0.4);
   const power = 140 + Math.random() * 160;
@@ -44,12 +47,12 @@ function burst(width: number, height: number, color: string): Spark[] {
       vy: Math.sin(angle) * speed,
       life: 1,
       size: 3 + Math.random() * 3,
-      color: i % 3 === 0 ? (SHADES[i % SHADES.length] ?? color) : color,
+      color: i % 2 === 0 ? first : second,
     };
   });
 }
 
-function Fireworks(props: { readonly color: string }): React.JSX.Element {
+function Fireworks(): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -71,7 +74,7 @@ function Fireworks(props: { readonly color: string }): React.JSX.Element {
       last = now;
       if (now - start < FIREWORKS_MS && now - lastBurst >= BURST_EVERY_MS) {
         lastBurst = now;
-        sparks.push(...burst(window.innerWidth, window.innerHeight, props.color));
+        sparks.push(...burst(window.innerWidth, window.innerHeight));
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
@@ -95,7 +98,7 @@ function Fireworks(props: { readonly color: string }): React.JSX.Element {
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
     };
-  }, [props.color]);
+  }, []);
   return <canvas ref={ref} className={styles.canvas} aria-hidden="true" />;
 }
 
@@ -120,12 +123,8 @@ export function Celebration(props: {
   const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   return (
     <div className={styles.layer} role="status">
-      {!calm && <Fireworks key={active.key} color={active.color} />}
-      {active.text !== null && (
-        <div className={styles.banner} style={{ borderColor: active.color }}>
-          {active.text}
-        </div>
-      )}
+      {!calm && <Fireworks key={active.key} />}
+      {active.text !== null && <div className={styles.banner}>{active.text}</div>}
     </div>
   );
 }

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { FP } from '@hexfront/sim';
+
 import styles from './ArmyLimit.module.css';
 import { ForceEditor } from './ForceEditor.tsx';
 import { hireEstimate } from './army-limit.ts';
 import type { Counts } from './direction-order.ts';
 import { countsFromShares, type Shares } from './force-share.ts';
 import { t } from '../i18n/dict.ts';
+import { formatSoldiers } from '../i18n/format.ts';
 
 const WIDTH = 248;
 const EDGE = 8;
@@ -78,8 +81,8 @@ function HireLine(props: {
   const hire = hireEstimate(props.have, countsFromShares(props.total, props.shares));
   if (hire.soldiers === 0) return <p className={styles.hire}>{t('army.hireNone')}</p>;
   const text = t('army.hire')
-    .replace('{soldiers}', String(hire.soldiers))
-    .replace('{gold}', String(hire.gold));
+    .replace('{soldiers}', formatSoldiers(hire.soldiers * FP))
+    .replace('{gold}', formatSoldiers(hire.gold * FP));
   return (
     <p className={`${styles.hire} ${hire.gold > props.gold ? styles.hireWarn : ''}`}>{text}</p>
   );

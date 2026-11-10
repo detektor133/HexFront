@@ -174,6 +174,7 @@ describe('дипломатия в дельте (CR-007)', () => {
         aidCalls: [],
         votes: [],
         allies: [],
+        blocs: [],
       },
     };
     const delta = buildViewDelta(before, after, []);

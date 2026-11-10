@@ -10,14 +10,20 @@ import {
   type AttackState,
   type UnitView,
 } from './unit-view.ts';
-import { NO_CITY_GRACE_S, RECRUIT_STEP, TICKS_PER_S, type UnitType } from '../balance.ts';
+import {
+  NO_CITY_GRACE_S,
+  RECRUIT_STEP,
+  TICKS_PER_S,
+  VOTE_TTL_TICKS,
+  type UnitType,
+} from '../balance.ts';
 import { foundCityCost } from '../commands/construction.ts';
 import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
-import { OFFER_TTL_TICKS, allianceOf, relationOf } from '../state/relations.ts';
+import { OFFER_TTL_TICKS, allianceOf, groupOf, relationOf } from '../state/relations.ts';
 import type { Relation, TreatyKind } from '../state/types.ts';
 import type { ConstructionKind, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
@@ -479,13 +485,21 @@ export interface DiplomacyView {
   readonly outgoing: readonly { readonly to: number; readonly kind: TreatyKind }[];
   /** Запросы помощи мне (оборонительный пакт): вступить ли в войну с агрессором за пострадавшего. */
   readonly aidCalls: readonly { readonly victim: number; readonly aggressor: number }[];
-  /** Голосования альянса, где я избиратель и ещё не ответил. */
+  /** Голосования альянса, где я избиратель: ход голосов и мой ответ (null — ещё не ответил). */
   readonly votes: readonly {
     readonly id: number;
     readonly kind: 'join' | 'peace';
     readonly a: number;
     readonly b: number;
+    readonly voters: readonly number[];
+    readonly yes: readonly number[];
+    readonly no: readonly number[];
+    /** Секунд до конца голосования (не решили — отказ). */
+    readonly leftS: number;
+    readonly mine: 'yes' | 'no' | null;
   }[];
+  /** Альянс каждого игрока по индексу: номер блока (наименьший id члена); одиночка — свой id. */
+  readonly blocs: readonly number[];
   /** Состав моего альянса (без меня). */
   readonly allies: readonly number[];
 }
@@ -509,8 +523,26 @@ export function diplomacyView(state: MatchState, playerId: number): DiplomacyVie
       .filter((c) => c.ally === playerId)
       .map((c) => ({ victim: c.victim, aggressor: c.aggressor })),
     votes: (d.votes ?? [])
-      .filter((v) => v.voters.includes(playerId) && ![...v.yes, ...v.no].includes(playerId))
-      .map((v) => ({ id: v.id, kind: v.kind, a: v.a, b: v.b })),
+      .filter((v) => v.voters.includes(playerId))
+      .map((v) => ({
+        id: v.id,
+        kind: v.kind,
+        a: v.a,
+        b: v.b,
+        voters: [...v.voters],
+        yes: [...v.yes],
+        no: [...v.no],
+        leftS: intDiv(
+          Math.max(0, VOTE_TTL_TICKS - (state.tick - v.tick)) + TICKS_PER_S - 1,
+          TICKS_PER_S,
+        ),
+        mine: v.yes.includes(playerId)
+          ? ('yes' as const)
+          : v.no.includes(playerId)
+            ? ('no' as const)
+            : null,
+      })),
+    blocs: state.players.map((p) => groupOf(state, p.id)[0] ?? p.id),
     allies: allianceOf(state, playerId),
   };
 }

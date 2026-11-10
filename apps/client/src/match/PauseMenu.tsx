@@ -4,6 +4,18 @@ import styles from './PauseMenu.module.css';
 import { t } from '../i18n/dict.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 
+/** Настройки в паузе: по центру окна, шире меню паузы и не выше окна (листаются внутри). */
+const SETTINGS_STYLE: React.CSSProperties = {
+  position: 'fixed',
+  left: '50%',
+  top: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 'min(560px, calc(100vw - 32px))',
+  height: 'auto',
+  maxHeight: 'calc(100dvh - 32px)',
+  overflowY: 'auto',
+};
+
 export function PauseMenu(props: {
   readonly onResume: () => void;
   readonly onRestart: () => void;
@@ -13,7 +25,7 @@ export function PauseMenu(props: {
   const [settings, setSettings] = useState(false);
   if (settings) {
     return (
-      <div className={styles.menu} style={props.style}>
+      <div className={styles.menu} style={SETTINGS_STYLE}>
         <SettingsScreen onBack={() => setSettings(false)} />
       </div>
     );

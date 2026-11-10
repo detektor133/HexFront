@@ -64,7 +64,7 @@ export function hireEstimate(
     soldiers += amount;
     gold += (amount * COST_GOLD_PER_SOLDIER[type]) / FP;
   }
-  return { soldiers, gold: Math.round(gold) };
+  return { soldiers: Math.round(soldiers), gold: Math.round(gold) };
 }
 
 /** Солдаты армии по типам: те, что уже стоят в отрядах. */

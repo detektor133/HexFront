@@ -12,15 +12,17 @@ const alive = (state: MatchState, id: number): boolean => state.players[id]?.sta
 const BOUND: readonly Relation[] = ['pact', 'defense', 'alliance'];
 
 /**
- * Война объявлена: члены альянса сторон автоматически воюют друг с другом (у кого с противником
- * пакт или договор — тот не вступает), по одному событию `warDeclared` на новую воюющую пару.
+
+ * Война объявлена: члены альянса сторон автоматически воюют друг с другом (пакт с противником
+ * этому не мешает), по одному событию `warDeclared` на новую воюющую пару.
  */
 export function joinWars(state: MatchState, p: number, target: number): void {
   for (const a of groupOf(state, p)) {
     for (const b of groupOf(state, target)) {
       if (a === b || !alive(state, a) || !alive(state, b)) continue;
       const rel = relationOf(state, a, b);
-      if (rel === 'war' || BOUND.includes(rel)) continue;
+      // Долг альянса сильнее пакта и оборонительного пакта с противником: они рвутся без нарушения.
+      if (rel === 'war' || rel === 'alliance') continue;
       setRelation(state, a, b, 'war');
       state.events.push({ t: 'warDeclared', playerId: a, targetId: b, kind: null });
     }

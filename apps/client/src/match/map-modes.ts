@@ -9,7 +9,7 @@ import type { EconomyLayer } from '../dev/economy-layer.ts';
 import type { LocalMatch } from '../local/local-match.ts';
 import type { MapMaskMode, MapMaskReply } from '../local/messages.ts';
 
-export type MapMode = 'normal' | 'supply';
+export type MapMode = 'normal' | 'supply' | 'political';
 export type BuildTool = 'city' | 'fort' | 'depot' | 'improve';
 
 /** Как часто обновляется маска, мс: стройка и захват гексов меняют её не чаще секунды. */
@@ -85,6 +85,11 @@ export function useMapModes(
     requestId.current += 1;
     matchRef.current?.requestMask?.(requestId.current, mode);
   }, [matchRef]);
+
+  // Политическая карта красится в слое территорий, маска воркера ей не нужна.
+  useEffect(() => {
+    layerRef.current?.setPolitical(mapMode === 'political');
+  }, [mapMode, layerRef]);
 
   useEffect(() => {
     const mode = modeOf(mapMode, build);

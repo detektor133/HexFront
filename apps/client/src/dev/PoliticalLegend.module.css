@@ -1,0 +1,60 @@
+/* Легенда политической карты: слева под верхней панелью. */
+.legend {
+  position: fixed;
+  left: var(--space-md);
+  z-index: 12;
+  box-sizing: border-box;
+  width: 220px;
+  max-width: calc(100vw - 2 * var(--space-md));
+  max-height: 40vh;
+  padding: var(--space-sm);
+  overflow-y: auto;
+  color: var(--ui-ink);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+  pointer-events: auto;
+}
+
+.title {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-display-family);
+  font-size: var(--font-size-label);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: 3px;
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+  font-size: var(--font-size-caption);
+}
+
+.members {
+  color: var(--ui-ink2);
+  overflow-wrap: anywhere;
+}
