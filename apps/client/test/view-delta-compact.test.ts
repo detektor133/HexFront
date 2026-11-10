@@ -36,7 +36,7 @@ describe('компактная дельта вида', () => {
     step(state, []);
     const after = playerView(state, 0);
     const delta = buildViewDelta(before, after, []);
-    expect(delta.d.cities?.upsert.length ?? 0).toBeLessThanOrEqual(after.cities.length);
+    expect(delta.d.keyed.cities?.add.length ?? 0).toBeLessThanOrEqual(after.cities.length);
     const applier = new ViewDeltaApplier();
     applier.applySnapshot({ t: 'snapshot', tick: before.tick, view: before });
     const applied = applier.applyDelta(delta);

@@ -67,9 +67,11 @@ describe('кодеки снимков', () => {
       baseTick: 7,
       tick: 8,
       d: {
-        hexes: [{ id: 1, owner: 0 }],
-        units: { upsert: [], removed: [11] },
-        fronts: { upsert: [], removed: [4] },
+        hexes: { owner: [1, 0] },
+        keyed: {
+          units: { add: [], patch: [], removed: [11] },
+          plans: { add: [], patch: [], removed: [4] },
+        },
         events: [{ t: 'playerEliminated', playerId: 1 }],
       },
     };
@@ -83,9 +85,8 @@ describe('кодеки снимков', () => {
       baseTick: 6,
       tick: 8,
       d: {
-        hexes: [],
-        units: { upsert: [], removed: [] },
-        fronts: { upsert: [], removed: [] },
+        hexes: {},
+        keyed: {},
         events: [],
       },
     };

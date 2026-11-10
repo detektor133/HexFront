@@ -141,15 +141,21 @@ function nearLine(
   const width = g.map.width;
   const front = hexes.map((h) => hexFromId(h, width));
   const anchors: Hex[] = [];
-  dist.forEach((d, l) => {
-    if (d !== 0) return;
+  const scratch = new Int32Array(front.length);
+  // Простой цикл: `forEach` по всей карте с замыканием здесь был одной из самых дорогих строк тика.
+  for (let l = 0; l < dist.length; l += 1) {
+    if (dist[l] !== 0) continue;
     const at = hexFromId(l, width);
-    const ds = front.map((f) => distance(f, at));
-    const min = Math.min(...ds);
-    front.forEach((f, i) => {
-      if (ds[i] === min) anchors.push(f);
-    });
-  });
+    let min = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < front.length; i += 1) {
+      const d = distance(front[i] as Hex, at);
+      scratch[i] = d;
+      if (d < min) min = d;
+    }
+    for (let i = 0; i < front.length; i += 1) {
+      if (scratch[i] === min) anchors.push(front[i] as Hex);
+    }
+  }
   return (h) => {
     const p = hexFromId(h, width);
     return anchors.some((a) => distance(a, p) <= OFFENSIVE_FACING_RANGE);

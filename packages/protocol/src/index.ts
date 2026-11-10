@@ -1,57 +1,13 @@
-import type { GameEvent, PlanView, PlayerView, UnitView } from '@hexfront/sim';
+import type { PlayerView } from '@hexfront/sim';
+
+import type { DeltaMessage } from './view-delta.ts';
+
+export * from './view-delta.ts';
 
 export interface SnapshotMessage {
   readonly t: 'snapshot';
   readonly tick: number;
   readonly view: PlayerView;
-}
-
-export interface HexChange {
-  readonly id: number;
-  readonly owner?: number;
-  readonly pop?: number;
-  readonly improvement?: number;
-  readonly building?: number;
-  readonly road?: number;
-  readonly link?: number;
-  readonly growth?: number;
-  readonly visible?: number;
-}
-
-export interface CollectionDelta<T> {
-  readonly upsert: readonly T[];
-  readonly removed: readonly number[];
-}
-
-export type ViewMetadata = Pick<
-  PlayerView,
-  | 'winner'
-  | 'playerId'
-  | 'victoryHold'
-  | 'ranking'
-  | 'armies'
-  | 'me'
-  | 'constructions'
-  | 'recruits'
-  | 'diplomacy'
->;
-
-export interface ViewDelta {
-  readonly hexes: readonly HexChange[];
-  readonly units: CollectionDelta<UnitView>;
-  readonly fronts: CollectionDelta<PlanView>;
-  /** Города и игроки идут по id: меняется поле у одного города — шлём одну запись, а не весь список. */
-  readonly cities?: CollectionDelta<PlayerView['cities'][number]>;
-  readonly players?: CollectionDelta<PlayerView['players'][number]>;
-  readonly view?: Partial<ViewMetadata>;
-  readonly events: readonly GameEvent[];
-}
-
-export interface DeltaMessage {
-  readonly t: 'delta';
-  readonly baseTick: number;
-  readonly tick: number;
-  readonly d: ViewDelta;
 }
 
 export class ProtocolError extends Error {
@@ -182,9 +138,8 @@ export function decodeDelta(text: string, expectedBaseTick?: number): DeltaMessa
     throw new ProtocolError('Неверная база дельты');
   }
   const delta = record(source.d);
-  array(delta.hexes, 'd.hexes');
-  record(delta.units);
-  record(delta.fronts);
+  record(delta.hexes);
+  record(delta.keyed);
   array(delta.events, 'd.events');
   return source as unknown as DeltaMessage;
 }

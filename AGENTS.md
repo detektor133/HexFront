@@ -52,6 +52,7 @@
 4. `sim` не импортирует ничего из `server`, `client`, `protocol`, Node API, DOM.
 5. Любая случайность (генерация карт, боты) — через seeded PRNG из `packages/sim/src/rng.ts`, сид передаётся явно.
 6. Каждая механика реализуется **системой** — функцией в `packages/sim/src/systems/`, вызываемой из `step` в порядке, описанном в `docs/architecture/sim-core.md`.
+7. **Горячий код и вид игрока.** Циклы по гексам и отрядам — обычный `for` по индексу, без `TypedArray.from(src, fn)`, `forEach`/`map` по всей карте и объекта на каждый гекс. Новое поле `PlayerView` едет по сети само (формат выводится из структуры); замедлить его можно только явно в `SLOW_*` (`packages/protocol/src/view-delta.ts`). Изменение, затрагивающее вид, дельту или тик комнаты, сопровождается замером `pnpm --filter @hexfront/bench net`; бюджеты и правила — `docs/architecture/performance.md`. Тест `view-delta-roundtrip` не ослаблять.
 
 Эти правила проверяются линтером (ESLint `no-restricted-globals`, `no-restricted-properties`) и dependency-cruiser. Не отключай правила через `eslint-disable` — это автоматический провал задачи.
 
