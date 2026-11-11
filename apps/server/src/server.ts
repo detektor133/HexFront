@@ -18,6 +18,11 @@ export interface ServerOptions {
   readonly allowedOrigins?: readonly string[];
   /** Сервер стоит за обратным прокси (Caddy): адрес клиента берётся из `X-Forwarded-For`. */
   readonly trustProxy?: boolean;
+  /**
+   * Сжатие сообщений `permessage-deflate` (браузеры договариваются сами). Повторяющиеся имена полей
+   * в дельтах сжимаются втрое; цена — процессор и ≈ 80 КБ памяти на соединение.
+   */
+  readonly compress?: boolean;
 }
 
 export interface RunningServer {
@@ -74,7 +79,19 @@ export async function startServer(
     }
     response.writeHead(404).end();
   });
-  const sockets = new WebSocketServer({ server: http, maxPayload: MAX_CLIENT_MESSAGE_BYTES });
+  const sockets = new WebSocketServer({
+    server: http,
+    maxPayload: MAX_CLIENT_MESSAGE_BYTES,
+    perMessageDeflate:
+      options.compress === true
+        ? {
+            threshold: 128,
+            zlibDeflateOptions: { level: 1, memLevel: 7 },
+            serverMaxWindowBits: 12,
+            concurrencyLimit: 4,
+          }
+        : false,
+  });
   const alive = new WeakMap<WebSocket, boolean>();
   sockets.on('connection', (socket: WebSocket, request: IncomingMessage) => {
     if (!originAllowed(request.headers.origin, allowed)) {

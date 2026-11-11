@@ -21,6 +21,7 @@ const server = await startServer(hub, port, {
   host: process.env.HOST ?? '127.0.0.1',
   allowedOrigins: origins,
   trustProxy: process.env.TRUST_PROXY === '1',
+  compress: process.env.WS_DEFLATE === '1',
 });
 hub.log('listening', { port: server.port, origins: origins.length });
 

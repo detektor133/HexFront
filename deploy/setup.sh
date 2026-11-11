@@ -45,6 +45,7 @@ HOST=127.0.0.1
 TRUST_PROXY=1
 ALLOWED_ORIGINS=${ORIGINS}
 MAX_ROOMS=6
+WS_DEFLATE=1
 EOF
 
 cat >/etc/systemd/system/hexfront.service <<'EOF'

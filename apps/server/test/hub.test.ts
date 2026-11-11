@@ -335,3 +335,47 @@ describe('нагрузка старта', () => {
     expect(received()).toBe(SIZE);
   });
 });
+
+describe('онлайн считается по живым соединениям', () => {
+  it('ушедший из лобби освобождает место, хозяином становится следующий', () => {
+    const { hub } = setup();
+    const a = new Client(hub, 'ip-a');
+    const b = new Client(hub, 'ip-b');
+    a.hello('Аня', { mode: 'private' });
+    b.hello('Борис', { room: a.of('welcome')[0]?.room ?? '' });
+    expect(b.of('lobby').at(-1)?.info.humans).toBe(2);
+    expect(b.of('lobby').at(-1)?.host).toBe(false);
+
+    a.session.onClose();
+    const last = b.of('lobby').at(-1);
+    expect(last?.info.humans).toBe(1);
+    expect(last?.host).toBe(true);
+    expect(hub.stats().humans).toBe(1);
+  });
+
+  it('пустая открытая комната забывает отсчёт: новый игрок не стартует матч мгновенно', () => {
+    const { hub, advance, tick } = setup();
+    const a = new Client(hub, 'ip-a');
+    a.hello('Аня');
+    advance((GATHER_SECONDS - 1) * 1000);
+    a.session.onClose();
+    const b = new Client(hub, 'ip-b');
+    b.hello('Борис');
+    advance(5000);
+    tick();
+    expect(b.of('start')).toHaveLength(0);
+    expect(b.of('lobby').at(-1)?.info.startsInS).toBeGreaterThan(20);
+  });
+
+  it('в матче отключившийся не считается онлайном, но место держится', () => {
+    const { hub, tick } = setup();
+    const a = new Client(hub, 'ip-a');
+    a.hello('Аня', { mode: 'private' });
+    a.send({ t: 'start' });
+    tick();
+    expect(hub.stats().humans).toBe(1);
+    a.session.onClose();
+    expect(hub.stats().humans).toBe(0);
+    expect(hub.roomById(a.of('welcome')[0]?.room ?? '')?.humans).toBe(1);
+  });
+});

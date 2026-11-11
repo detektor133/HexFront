@@ -7,6 +7,7 @@
 import { deflateRawSync } from 'node:zlib';
 
 import { Hub } from '../../../apps/server/src/hub.ts';
+import type { Room } from '../../../apps/server/src/room.ts';
 import { PROTOCOL_VERSION, encodeClientMessage } from '../../../packages/protocol/src/index.ts';
 
 const option = (name: string, fallback: string): string => {
@@ -19,6 +20,23 @@ const MINUTES = Number(option('minutes', '3'));
 const TICKS_PER_MINUTE = 600;
 /** Сжимаем каждое десятое сообщение: оценка трафика после deflate без искажения времени тика. */
 const DEFLATE_EVERY = 10;
+
+/** Состав дельты по частям (каждая 5-я, байты JSON): куда уходит трафик. */
+let parts: Record<string, number> = {};
+function sampleParts(text: string): void {
+  const message = JSON.parse(text) as { d: Record<string, unknown> };
+  const add = (key: string, value: unknown): void => {
+    parts[key] = (parts[key] ?? 0) + JSON.stringify(value).length;
+  };
+  for (const [key, value] of Object.entries(message.d)) {
+    if (key === 'keyed' || key === 'hexes' || key === 'records') {
+      for (const [name, part] of Object.entries(value as Record<string, unknown>)) {
+        add(`${key}.${name}`, part);
+      }
+    } else add(key, value);
+  }
+  parts.оболочка = (parts.оболочка ?? 0) + 40;
+}
 
 let clock = 0;
 const hub = new Hub({ now: () => clock, size: 30, maxRooms: 1000 });
@@ -40,6 +58,7 @@ for (let room = 0; room < ROOMS; room += 1) {
         send(text) {
           bot.bytes += text.length;
           bot.count += 1;
+          if (bot.count % 5 === 0 && text.startsWith('{"t":"delta"')) sampleParts(text);
           if (bot.count % DEFLATE_EVERY === 0) bot.deflated += deflateRawSync(text).length;
           // Клиент применил сообщение вида и подтверждает его.
           const head = text.slice(0, 40);
@@ -84,7 +103,20 @@ for (let minute = 1; minute <= MINUTES; minute += 1) {
     clock += 100;
     const started = performance.now();
     hub.tickAll();
-    samples.push(performance.now() - started);
+    const took = performance.now() - started;
+    samples.push(took);
+    if (took > 90) {
+      // Провал тика: какая комната и какая стадия съела время.
+      const rooms = (hub as unknown as { rooms: Map<string, Room> }).rooms;
+      for (const room of rooms.values()) {
+        const l = room.stats.last;
+        if (l.botsMs + l.stepMs + l.viewMs > 40) {
+          console.log(
+            `   ! тик ${tick} мин ${minute}: ${took.toFixed(0)} мс; комната ${room.id}: боты ${l.botsMs.toFixed(0)}, шаг ${l.stepMs.toFixed(0)}, виды ${l.viewMs.toFixed(0)} мс`,
+          );
+        }
+      }
+    }
   }
   (globalThis as { gc?: () => void }).gc?.();
   const bytes = bots.reduce((sum, b) => sum + b.bytes, 0) - bytesBefore;
@@ -99,5 +131,11 @@ for (let minute = 1; minute <= MINUTES; minute += 1) {
       `(deflate ≈ ${((deflated * DEFLATE_EVERY) / (ROOMS * HUMANS) / seconds / 1024).toFixed(2)}); ` +
       `куча ${(process.memoryUsage().heapUsed / 1048576).toFixed(0)} МБ`,
   );
+  const total = Object.values(parts).reduce((sum, value) => sum + value, 0) || 1;
+  const top = Object.entries(parts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([key, value]) => `${key} ${((value / total) * 100).toFixed(0)}%`);
+  console.log(`   состав дельты: ${top.join(', ')}`);
+  parts = {};
 }
-hub.stop();

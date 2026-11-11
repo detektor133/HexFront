@@ -107,12 +107,15 @@ const health = (await (await fetch(`http://127.0.0.1:${PORT}/healthz`)).json()) 
   cpuMs: number;
   rssMb: number;
 };
+const wire = (
+  client as unknown as { sockets: { _socket?: { bytesRead: number } }[] }
+).sockets.reduce((sum, ws) => sum + (ws._socket?.bytesRead ?? 0), 0);
 const gaps = stats.flatMap((s) => s.gaps).sort((a, b) => a - b);
 const at = (p: number): number => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))] ?? 0;
 const bytes = stats.reduce((sum, s) => sum + s.bytes, 0);
 const views = stats.reduce((sum, s) => sum + s.views, 0);
 console.log(
-  `игрок: ${(views / stats.length / SECONDS).toFixed(1)} видов/с, ${(bytes / stats.length / SECONDS / 1024).toFixed(2)} КБ/с; ` +
+  `игрок: ${(views / stats.length / SECONDS).toFixed(1)} видов/с, ${(bytes / stats.length / SECONDS / 1024).toFixed(2)} КБ/с текста, ${(wire / stats.length / SECONDS / 1024).toFixed(2)} КБ/с по проводу; ` +
     `пауза между видами p50 ${at(0.5).toFixed(0)} p99 ${at(0.99).toFixed(0)} макс ${gaps.at(-1)?.toFixed(0) ?? 0} мс`,
 );
 console.log(

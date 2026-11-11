@@ -234,7 +234,7 @@ export class Hub {
   /** Число комнат и людей, время тика хаба за последние ~минуту, процессор и память: `/healthz`. */
   public stats(): HubStats {
     let humans = 0;
-    for (const room of this.rooms.values()) humans += room.humans;
+    for (const room of this.rooms.values()) humans += room.connected;
     const used = this.tickSamples
       .slice(0, Math.min(this.tickCount, TICK_SAMPLES))
       .sort((a, b) => a - b);

@@ -92,10 +92,24 @@ export function moveUnit(state: MatchState, unit: Unit, to: HexId): void {
 /** Удаляет набор отрядов из состояния и производного индекса одной операцией. */
 export function removeUnits(state: MatchState, units: readonly Unit[]): void {
   if (units.length === 0) return;
-  const removed = new Set(units);
   for (const unit of units) removeUnitFromIndex(state, unit);
-  const survivors = state.units.filter((unit) => !removed.has(unit));
-  state.units.splice(0, state.units.length, ...survivors);
+  if (units.length <= 4) {
+    // Одиночное удаление (новый кусок отряда лежит в конце массива): без множества и полного прохода.
+    for (const unit of units) {
+      const at = state.units.lastIndexOf(unit);
+      if (at >= 0) state.units.splice(at, 1);
+    }
+    return;
+  }
+  const removed = new Set(units);
+  // Сжатие на месте с тем же порядком: без промежуточного массива и без spread тысяч аргументов.
+  const all = state.units;
+  let kept = 0;
+  for (let i = 0; i < all.length; i += 1) {
+    const unit = all[i] as Unit;
+    if (!removed.has(unit)) all[kept++] = unit;
+  }
+  all.length = kept;
 }
 
 /** Добавляет город в индекс после основания города. */

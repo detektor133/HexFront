@@ -83,7 +83,8 @@ export interface RoomOptions {
 export type Phase = 'lobby' | 'running' | 'ended';
 
 interface Seat {
-  readonly playerId: number;
+  /** В лобби номер условный (по порядку входа), окончательный задаётся при старте. */
+  playerId: number;
   readonly token: string;
   readonly nick: string;
   conn: Connection | null;
@@ -140,7 +141,15 @@ export class Room {
   private gatherEndsAt: number | null = null;
   private nextToken = 0;
   /** Метрики: сколько тиков и сколько мс ушло на шаги sim, виды и отправку. */
-  public readonly stats = { ticks: 0, stepMs: 0, viewMs: 0, bytes: 0, messages: 0 };
+  public readonly stats = {
+    ticks: 0,
+    stepMs: 0,
+    viewMs: 0,
+    bytes: 0,
+    messages: 0,
+    /** Стадии последнего тика, мс: боты и командиры, шаг sim, виды и отправка. */
+    last: { botsMs: 0, stepMs: 0, viewMs: 0 },
+  };
 
   public constructor(options: RoomOptions) {
     this.options = options;
@@ -149,6 +158,11 @@ export class Room {
   }
 
   /** Людей в комнате (включая отключившихся, чьё место ещё держится). */
+  /** Людей с живым соединением: это и есть «онлайн» комнаты. */
+  public get connected(): number {
+    return this.seats.filter((s) => s.conn !== null).length;
+  }
+
   public get humans(): number {
     return this.seats.length;
   }
@@ -238,7 +252,9 @@ export class Room {
     }
     if (seat.botControlled) this.takeBack(seat);
     this.sendWelcome(seat);
-    if (this.phase === 'lobby') this.send(seat, { t: 'lobby', info: this.lobbyInfo() });
+    if (this.phase === 'lobby') {
+      this.send(seat, { t: 'lobby', info: this.lobbyInfo(), host: this.seats[0] === seat });
+    }
     return seat.playerId;
   }
 
@@ -246,6 +262,16 @@ export class Room {
   public disconnect(conn: Connection): void {
     const seat = this.seats.find((s) => s.conn === conn);
     if (seat === undefined) return;
+    if (this.phase === 'lobby') {
+      // До старта держать место не за чем: ушедший сразу освобождает его и не считается в онлайне.
+      this.seats.splice(this.seats.indexOf(seat), 1);
+      this.seats.forEach((s, index) => {
+        s.playerId = index;
+      });
+      if (this.seats.length === 0) this.gatherEndsAt = null;
+      else this.broadcastLobby();
+      return;
+    }
     seat.conn = null;
     seat.droppedAt = this.options.now();
   }
@@ -396,12 +422,19 @@ export class Room {
     commands.push(...commanderCommands(state, botIds, levels, context));
     commands.push(...botCommands(state, botIds, levels, context));
     this.handOverDropped();
+    const decided = performance.now();
     step(state, commands);
     const stepped = performance.now();
     this.stats.stepMs += stepped - started;
     this.stats.ticks += 1;
     this.sendViews(state);
-    this.stats.viewMs += performance.now() - stepped;
+    const done = performance.now();
+    this.stats.viewMs += done - stepped;
+    this.stats.last = {
+      botsMs: decided - started,
+      stepMs: stepped - decided,
+      viewMs: done - stepped,
+    };
     if (state.winner >= 0) this.finish(state);
   }
 
@@ -498,7 +531,9 @@ export class Room {
 
   private broadcastLobby(): void {
     const info = this.lobbyInfo();
-    for (const seat of this.seats) this.send(seat, { t: 'lobby', info });
+    this.seats.forEach((seat, index) => {
+      this.send(seat, { t: 'lobby', info, host: index === 0 });
+    });
   }
 
   private send(seat: Seat, message: S2C): void {

@@ -59,7 +59,7 @@ export interface NetSession {
 export interface NetHandlers {
   onStatus?(status: NetStatus): void;
   onSession?(session: NetSession): void;
-  onLobby?(info: LobbyInfo): void;
+  onLobby?(info: LobbyInfo, host: boolean): void;
   onStart?(tick: number): void;
   /** Новый вид игрока и события тика; `full` — пришёл полный снимок. */
   onView?(view: PlayerView, events: readonly GameEvent[], full: boolean): void;
@@ -324,7 +324,7 @@ export class NetClient {
         return;
       }
       case 'lobby':
-        handlers?.onLobby?.(message.info);
+        handlers?.onLobby?.(message.info, message.host);
         return;
       case 'start':
         handlers?.onStart?.(message.tick);

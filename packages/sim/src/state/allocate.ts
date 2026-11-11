@@ -337,9 +337,14 @@ export function allocate(state: MatchState, plan: ArmyPlan, owner: number): Allo
   const lineUnits = units.filter((u) => u.type !== 'artillery');
   const arty = units.filter((u) => u.type === 'artillery');
   // Место в гексе занимают и чужие для плана свои отряды (другие армии, резерв).
-  const cap = (h: HexId): number =>
-    MAX_UNITS_PER_HEX -
-    allUnits(state).filter((u) => u.owner === owner && u.hex === h && !units.includes(u)).length;
+  // Считается один раз на план (состояние во время расстановки не меняется), а не по обходу всех
+  // отрядов на каждый вопрос «сколько мест».
+  const inPlan = new Set(units);
+  const foreign = new Map<HexId, number>();
+  for (const u of allUnits(state)) {
+    if (u.owner === owner && !inPlan.has(u)) foreign.set(u.hex, (foreign.get(u.hex) ?? 0) + 1);
+  }
+  const cap = (h: HexId): number => MAX_UNITS_PER_HEX - (foreign.get(h) ?? 0);
   // Линий у армии может быть несколько: отряд закреплён за своей и расставляется внутри неё.
   const runs = lineRuns(state, line);
   const groups = attachUnits(state, runs, w, lineUnits);

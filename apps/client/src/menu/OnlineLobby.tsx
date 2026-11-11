@@ -33,6 +33,7 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<NetSession | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isHost, setIsHost] = useState(false);
   const clientRef = useRef<NetClient | null>(null);
 
   useEffect(() => {
@@ -51,7 +52,10 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
       ...(room === null ? {} : { room }),
       handlers: {
         onSession: setSession,
-        onLobby: setInfo,
+        onLobby: (lobby, host) => {
+          setInfo(lobby);
+          setIsHost(host);
+        },
         onRefused: (reason) => setError(refusalText(reason)),
         onStart: () => {
           const current = client.session;
@@ -75,7 +79,6 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
     session !== null && mode === 'private'
       ? `${window.location.origin}/online?room=${session.room}`
       : null;
-  const isHost = session?.playerId === 0;
 
   const copy = (): void => {
     if (invite === null) return;

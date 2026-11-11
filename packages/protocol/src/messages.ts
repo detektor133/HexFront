@@ -112,7 +112,8 @@ export type S2C =
       readonly players: number;
       readonly fog: boolean;
     }
-  | { readonly t: 'lobby'; readonly info: LobbyInfo }
+  /** `host` — получатель хозяин комнаты (может начать матч раньше срока). */
+  | { readonly t: 'lobby'; readonly info: LobbyInfo; readonly host: boolean }
   | { readonly t: 'start'; readonly tick: number }
   | { readonly t: 'ack'; readonly seq: number }
   | {
