@@ -41,6 +41,38 @@ interface CpuProfile {
   timeDeltas: number[];
 }
 
+/** Самый длинный непрерывный отрезок работы (без простоя): что в нём заняло время. */
+function printLongestRun(profile: CpuProfile, byId: Map<number, CpuNode>, label: string): void {
+  let best = { total: 0, from: 0, to: 0 };
+  let runStart = 0;
+  let runTotal = 0;
+  const close = (end: number): void => {
+    if (runTotal > best.total) best = { total: runTotal, from: runStart, to: end };
+    runTotal = 0;
+  };
+  profile.samples.forEach((id, i) => {
+    const name = byId.get(id)?.callFrame.functionName ?? '';
+    if (name === '(idle)') {
+      close(i);
+      runStart = i + 1;
+      return;
+    }
+    runTotal += profile.timeDeltas[i] ?? 0;
+  });
+  close(profile.samples.length);
+  const inside = new Map<string, number>();
+  for (let i = best.from; i < best.to; i += 1) {
+    const frame = byId.get(profile.samples[i] ?? -1)?.callFrame;
+    if (!frame) continue;
+    const key = `${frame.functionName || '(анонимная)'} ${frame.url.split('/').slice(-1)[0] || '(native)'}:${frame.lineNumber}`;
+    inside.set(key, (inside.get(key) ?? 0) + (profile.timeDeltas[i] ?? 0));
+  }
+  const top = [...inside.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  console.log(`LONGEST ${label}: ${(best.total / 1000).toFixed(0)} мс подряд`);
+  for (const [key, us] of top)
+    console.log(`LONGEST ${label}   ${(us / 1000).toFixed(0)} мс ${key}`);
+}
+
 /** Печатает функции с наибольшим собственным временем главного потока. */
 function printTop(profile: CpuProfile, label: string): void {
   const byId = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -56,6 +88,7 @@ function printTop(profile: CpuProfile, label: string): void {
     self.set(key, (self.get(key) ?? 0) + dt);
     total += dt;
   });
+  printLongestRun(profile, byId, label);
   const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
   for (const [key, us] of top)
     console.log(`TOP ${label} ${((us / total) * 100).toFixed(1)}% ${key}`);
