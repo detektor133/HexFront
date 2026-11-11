@@ -9,35 +9,11 @@ import {
   UPKEEP_GOLD_PER_UNIT_S,
   UPKEEP_GOLD_PER_SOLDIER_S,
 } from '../balance.ts';
+import { cityCoverage } from './city-coverage.ts';
 import { FEATURE } from '../map/types.ts';
-import { hexFromId, hexId, inBounds, spiral } from '../math/hex.ts';
 import { fpMul, intDiv, type Fp } from '../math/int.ts';
 import { cityGold } from '../state/city-output.ts';
-import { isCityIsolated } from '../state/network.ts';
 import { NEUTRAL, type MatchState, type Player } from '../state/types.ts';
-
-/** Радиус, в котором гекс относится к городу (тот же, что у роста населения). */
-const COVERAGE_RADIUS = 2;
-
-// Налог гекса ×0,5, только если все свои города в радиусе 2 от него изолированы; хоть один
-// город основной сети рядом — налог полный. Вне радиуса городов — без штрафа (02-economy.md, «Золото»).
-function isolatedHexes(state: MatchState): Uint8Array {
-  const { width, height } = state.map;
-  const covered = new Uint8Array(width * height);
-  const connected = new Uint8Array(width * height);
-  for (const c of state.cities) {
-    if (c.owner === NEUTRAL) continue;
-    const isMain = !isCityIsolated(state, c.id);
-    for (const h of spiral(hexFromId(c.hex, width), COVERAGE_RADIUS)) {
-      if (!inBounds(h, width, height)) continue;
-      const id = hexId(h, width);
-      if (state.hexes.owner[id] !== c.owner) continue;
-      covered[id] = 1;
-      if (isMain) connected[id] = 1;
-    }
-  }
-  return covered.map((cov, id) => (cov === 1 && connected[id] === 0 ? 1 : 0));
-}
 
 export interface IncomeBase {
   pop: number;
@@ -48,6 +24,21 @@ export interface IncomeBase {
   cityGold: number;
 }
 
+// Шахты — свойство карты: список гексов считаем раз, а не проверяем признак у каждого гекса каждый тик.
+const mineLists = new WeakMap<MatchState['map'], number[]>();
+
+function mineHexes(map: MatchState['map']): readonly number[] {
+  let list = mineLists.get(map);
+  if (list === undefined) {
+    list = [];
+    for (let id = 0; id < map.features.length; id += 1) {
+      if (map.features[id] === FEATURE.mine) list.push(id);
+    }
+    mineLists.set(map, list);
+  }
+  return list;
+}
+
 export function incomeBases(state: MatchState): IncomeBase[] {
   const bases: IncomeBase[] = state.players.map(() => ({
     pop: 0,
@@ -56,16 +47,18 @@ export function incomeBases(state: MatchState): IncomeBase[] {
     isolatedMines: 0,
     cityGold: 0,
   }));
-  const cut = isolatedHexes(state);
+  const { cut } = cityCoverage(state);
   const { owner, pop } = state.hexes;
   for (let id = 0; id < owner.length; id += 1) {
     const base = bases[owner[id] ?? NEUTRAL];
     if (!base) continue;
-    const isolated = cut[id] === 1;
-    if (isolated) base.isolatedPop += pop[id] ?? 0;
+    if (cut[id] === 1) base.isolatedPop += pop[id] ?? 0;
     else base.pop += pop[id] ?? 0;
-    if (state.map.features[id] !== FEATURE.mine) continue;
-    if (isolated) base.isolatedMines += 1;
+  }
+  for (const id of mineHexes(state.map)) {
+    const base = bases[owner[id] ?? NEUTRAL];
+    if (!base) continue;
+    if (cut[id] === 1) base.isolatedMines += 1;
     else base.mines += 1;
   }
   for (const c of state.cities) {

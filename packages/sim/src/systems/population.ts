@@ -1,33 +1,25 @@
 // Рост и убыль населения по гексам.
 // GDD: docs/gdd/02-economy.md — «Население»
 import {
-  CITY_LEVEL_GROWTH_STEP,
+  BASE_POP_CAP,
+  FERTILE_CAP_MULT,
   GROWTH_BACKGROUND,
-  GROWTH_CITY_HEX,
-  GROWTH_RING1,
-  GROWTH_RING2,
+  IMPROVEMENT_CAP_STEP,
   IMPROVEMENT_GROWTH_STEP,
   ISOLATED_GROWTH_MULT,
   POP_OVERCAP_DECAY,
   TICKS_PER_S,
 } from '../balance.ts';
+import { BASE_GROWTH, cityCoverage, cityLevelMult } from './city-coverage.ts';
 import { taxGrowthMult } from './tax.ts';
-import { distance, hexFromId, hexId, inBounds, ring } from '../math/hex.ts';
+import { FEATURE, TERRAIN_NAMES } from '../map/types.ts';
+import { distance, hexFromId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { cityPopCap, hexPopCap } from '../state/pop-cap.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
 
-/** Базовый рост по кольцу от города: сам город, кольцо 1, кольцо 2 (людей/с). */
-const BASE_GROWTH: readonly Fp[] = [GROWTH_CITY_HEX, GROWTH_RING1, GROWTH_RING2];
-
-/**
- * Множитель уровня города: cityLevelMult = 1 + 0,25 × (level − 1).
- * @returns fixed-point
- */
-export function cityLevelMult(level: number): Fp {
-  return (FP + CITY_LEVEL_GROWTH_STEP * (level - 1)) as Fp;
-}
+export { cityLevelMult };
 
 // «Городская» часть роста: baseGrowth(ring) × cityLevelMult × networkMult.
 // Остальные множители одинаковы для всех городов гекса, поэтому максимум берётся по этой части.
@@ -41,29 +33,61 @@ function cityGrowthPart(
   return fpMul(BASE_GROWTH[ringIndex] ?? (0 as Fp), fpMul(cityLevelMult(level), networkMult));
 }
 
-function bestCityGrowth(state: MatchState): Int32Array {
-  const { map, hexes } = state;
-  const best = new Int32Array(map.width * map.height);
-  for (const c of state.cities) {
-    if (c.owner === NEUTRAL) continue;
-    const center = hexFromId(c.hex, map.width);
-    BASE_GROWTH.forEach((_, k) => {
-      const g = cityGrowthPart(state, c.id, c.level, k);
-      for (const h of ring(center, k)) {
-        if (!inBounds(h, map.width, map.height)) continue;
-        const id = hexId(h, map.width);
-        if (hexes.owner[id] === c.owner && g > (best[id] ?? 0)) best[id] = g;
-      }
-    });
+// Лимит населения гекса без улучшений зависит только от карты (рельеф и плодородие): считаем раз.
+const baseCaps = new WeakMap<MatchState['map'], Int32Array>();
+
+function baseCapTable(map: MatchState['map']): Int32Array {
+  const cached = baseCaps.get(map);
+  if (cached) return cached;
+  const table = new Int32Array(map.width * map.height);
+  for (let hex = 0; hex < table.length; hex += 1) {
+    const name = TERRAIN_NAMES[map.terrain[hex] ?? 0];
+    if (name === undefined || name === 'water') continue;
+    const feature = map.features[hex] === FEATURE.fertile ? FERTILE_CAP_MULT : (FP as Fp);
+    table[hex] = fpMul(BASE_POP_CAP[name], feature);
   }
-  // Свои гексы вне радиуса городов обживаются фоново — иначе основать город негде (02-economy.md).
-  hexes.owner.forEach((o, id) => {
-    if (o !== NEUTRAL && (best[id] ?? 0) === 0) best[id] = GROWTH_BACKGROUND;
-  });
-  return best;
+  baseCaps.set(map, table);
+  return table;
+}
+
+/** Таблицы одного прохода по гексам: те же формулы, что hexPopCap и fullGrowth, без вызовов на гекс. */
+interface PassTables {
+  readonly baseCap: Int32Array;
+  readonly levels: Uint8Array;
+  readonly best: Int32Array;
+  /** Множитель налога по игроку. */
+  readonly taxMult: number[];
+}
+
+function passTables(state: MatchState): PassTables {
+  const levels = new Uint8Array(state.map.width * state.map.height);
+  for (const c of state.cities) levels[c.hex] = c.level;
+  return {
+    baseCap: baseCapTable(state.map),
+    levels,
+    best: cityCoverage(state).best,
+    taxMult: state.players.map((p) => taxGrowthMult(p.taxEffective)),
+  };
+}
+
+// Лимит населения гекса: городской — по уровню, обычный — рельеф × плодородие × улучшение.
+function capAt(tables: PassTables, state: MatchState, id: number): number {
+  const level = tables.levels[id] ?? 0;
+  if (level > 0) return cityPopCap(level);
+  const improvement = (FP + IMPROVEMENT_CAP_STEP * (state.hexes.improvement[id] ?? 0)) as Fp;
+  return fpMul((tables.baseCap[id] ?? 0) as Fp, improvement);
 }
 
 // Рост до деления на время: fullGrowth × (cap − pop) / cap даёт людей/с в fixed-point.
+function growthAt(tables: PassTables, state: MatchState, id: number): number {
+  const cityPart = tables.best[id] ?? 0;
+  const taxMult = tables.taxMult[state.hexes.owner[id] ?? NEUTRAL];
+  if (cityPart === 0 || taxMult === undefined) return 0;
+  const improvement = (FP + IMPROVEMENT_GROWTH_STEP * (state.hexes.improvement[id] ?? 0)) as Fp;
+  return fpMul(fpMul(cityPart as Fp, improvement), taxMult as Fp);
+}
+
+// Рост до деления на время для одного гекса: тот же результат, но для поштучных запросов.
 function fullGrowth(state: MatchState, id: number, cityPart: number): number {
   const player = state.players[state.hexes.owner[id] ?? NEUTRAL];
   if (cityPart === 0 || !player) return 0;
@@ -94,29 +118,21 @@ export function hexGrowthPerSecond(state: MatchState, hex: number): number {
   return intDiv(fullGrowth(state, hex, best) * (cap - pop), cap);
 }
 
-function cityLevels(state: MatchState): Uint8Array {
-  const levels = new Uint8Array(state.map.width * state.map.height);
-  for (const c of state.cities) levels[c.hex] = c.level;
-  return levels;
-}
-
 /**
  * Скорость изменения населения всех гексов — то же, что hexGrowthPerSecond по каждому гексу, но
- * одним проходом по кольцам городов (снимок игрока строится каждый тик и для каждого commander).
+ * одним проходом по таблицам (снимок игрока строится каждый тик и для каждого commander).
  * @returns fixed-point людей в секунду по HexId (отрицательное — убыль)
  */
 export function growthPerSecond(state: MatchState): Int32Array {
   const { hexes } = state;
-  const best = bestCityGrowth(state);
-  const levels = cityLevels(state);
+  const tables = passTables(state);
   const out = new Int32Array(hexes.pop.length);
   for (let id = 0; id < out.length; id += 1) {
     const pop = hexes.pop[id] as number;
-    const level = levels[id] ?? 0;
-    const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
+    const cap = capAt(tables, state, id);
     if (pop > cap) out[id] = -fpMul(pop as Fp, POP_OVERCAP_DECAY);
     else if (pop !== cap && cap !== 0) {
-      out[id] = intDiv(fullGrowth(state, id, best[id] ?? 0) * (cap - pop), cap);
+      out[id] = intDiv(growthAt(tables, state, id) * (cap - pop), cap);
     }
   }
   return out;
@@ -130,18 +146,16 @@ export function growthPerSecond(state: MatchState): Int32Array {
  */
 export function populationSystem(state: MatchState): void {
   const { hexes } = state;
-  const best = bestCityGrowth(state);
-  const levels = cityLevels(state);
+  const tables = passTables(state);
   for (let id = 0; id < hexes.pop.length; id += 1) {
     const pop = hexes.pop[id] ?? 0;
-    const level = levels[id] ?? 0;
-    const cap = level > 0 ? cityPopCap(level) : hexPopCap(state, id);
+    const cap = capAt(tables, state, id);
     if (pop > cap) {
       const decay = intDiv(fpMul(pop as Fp, POP_OVERCAP_DECAY), TICKS_PER_S);
       hexes.pop[id] = Math.max(cap, pop - decay);
       continue;
     }
-    const full = fullGrowth(state, id, best[id] ?? 0);
+    const full = growthAt(tables, state, id);
     if (full === 0 || pop === cap) continue;
     // Одно деление в конце: доля (1 − pop/cap) и перевод в тики без промежуточного округления.
     const growth = intDiv(full * (cap - pop), cap * TICKS_PER_S);
