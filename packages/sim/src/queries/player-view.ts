@@ -44,6 +44,9 @@ export const LINK = { none: 0, main: 1, isolated: 2 } as const;
 
 export interface PlayerViewContext {
   readonly growth: Int32Array;
+  /** Население и рост людей в секунду по владельцам: один проход по карте на всех игроков. */
+  readonly popTotals: readonly number[];
+  readonly growthTotals: readonly number[];
   readonly incomeBases: readonly IncomeBase[];
   readonly links: Uint8Array;
   readonly scores: Int32Array;
@@ -188,13 +191,8 @@ function summary(
   playerId: number,
   context: PlayerViewContext,
 ): PlayerView['me'] {
-  let popTotal = 0;
-  let popGrowthPerS = 0;
-  state.hexes.owner.forEach((o, id) => {
-    if (o !== playerId) return;
-    popTotal += state.hexes.pop[id] ?? 0;
-    popGrowthPerS += context.growth[id] ?? 0;
-  });
+  const popTotal = context.popTotals[playerId] ?? 0;
+  const popGrowthPerS = context.growthTotals[playerId] ?? 0;
   const target = state.players[playerId]?.taxTarget ?? (0 as Fp);
   return {
     popTotal,
@@ -234,8 +232,22 @@ function graceLeft(state: MatchState, playerId: number): { readonly graceLeftS?:
 export function createPlayerViewContext(state: MatchState): PlayerViewContext {
   visionSystem(state);
   const scores = playerScores(state);
+  const growth = growthPerSecond(state);
+  // Суммы по владельцам считаются один раз на тик: раньше каждый человек проходил всю карту заново.
+  const popTotals = new Array<number>(state.players.length).fill(0);
+  const growthTotals = new Array<number>(state.players.length).fill(0);
+  const owner = state.hexes.owner;
+  const pop = state.hexes.pop;
+  for (let id = 0; id < owner.length; id += 1) {
+    const o = owner[id] as number;
+    if (o < 0 || o >= popTotals.length) continue;
+    popTotals[o] = (popTotals[o] ?? 0) + (pop[id] ?? 0);
+    growthTotals[o] = (growthTotals[o] ?? 0) + (growth[id] ?? 0);
+  }
   return {
-    growth: growthPerSecond(state),
+    growth,
+    popTotals,
+    growthTotals,
     incomeBases: incomeBases(state),
     links: links(state),
     scores,

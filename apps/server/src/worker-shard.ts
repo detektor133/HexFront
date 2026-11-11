@@ -16,6 +16,10 @@ const EMPTY: ShardStatus = {
   rooms: [],
   projectedMs: 0,
   tickMs: { p50: 0, p99: 0, max: 0 },
+  lateMs: { p50: 0, p99: 0, max: 0 },
+  utilization: 0,
+  droppedTicks: 0,
+  overloaded: false,
   humans: 0,
 };
 

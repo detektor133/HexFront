@@ -42,6 +42,10 @@ export interface ShardStats {
   readonly humans: number;
   readonly projectedMs: number;
   readonly tickMs: TickStats;
+  readonly lateMs: TickStats;
+  readonly utilization: number;
+  readonly droppedTicks: number;
+  readonly overloaded: boolean;
 }
 
 export interface HubStats {
@@ -60,6 +64,8 @@ export interface HubStats {
   readonly rssMb: number;
   /** Идёт дренаж: сервер доигрывает матчи и не берёт новых игроков. */
   readonly draining: boolean;
+  /** Хотя бы один шард перегружен: новые комнаты ему не даются, игра в его комнатах может идти медленнее. */
+  readonly overloaded: boolean;
 }
 
 export interface HubOptions {
@@ -217,6 +223,7 @@ export class Hub {
       budgetMs: this.budgetMs,
       roomEstimateMs: this.roomEstimateMs,
       lateJoinTicks: (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10,
+      seeds: QUICK_MATCH_SEEDS,
     };
     const count = Math.max(1, this.workers);
     for (let index = 0; index < count; index += 1) this.shards.push(this.makeShard(index));
@@ -243,9 +250,20 @@ export class Hub {
         this.onShardDown(index);
       },
     };
+    const settings = { ...this.settings, seeds: this.seedsOf(index) };
     return this.workers > 0
-      ? new WorkerShard(index, this.settings, events, this.heapMb)
-      : new InlineShard(index, this.settings, events, this.now, this.makeMap);
+      ? new WorkerShard(index, settings, events, this.heapMb)
+      : new InlineShard(index, settings, events, this.now, this.makeMap);
+  }
+
+  /**
+   * Сиды карт шарда: общий список делится между шардами, и каждый прогревает свою долю (меньше
+   * памяти и работы на старте); при шардах больше сидов берётся весь список.
+   */
+  private seedsOf(index: number): readonly number[] {
+    const count = Math.max(1, this.workers);
+    const own = QUICK_MATCH_SEEDS.filter((_, i) => i % count === index);
+    return own.length > 0 ? own : QUICK_MATCH_SEEDS;
   }
 
   /** Текущее время хаба, мс. */
@@ -267,6 +285,10 @@ export class Hub {
         humans: status.humans,
         projectedMs: Math.round(status.projectedMs * 10) / 10,
         tickMs: status.tickMs,
+        lateMs: status.lateMs,
+        utilization: Math.round(status.utilization * 100) / 100,
+        droppedTicks: status.droppedTicks,
+        overloaded: status.overloaded,
       };
     });
     const cpu = process.cpuUsage();
@@ -283,6 +305,7 @@ export class Hub {
       shards,
       ioLagMs: Number.isFinite(this.lag.max) ? this.lag.percentile(99) / 1e6 : 0,
       draining: this.draining,
+      overloaded: shards.some((x) => x.overloaded),
       cpuMs: Math.round((cpu.user + cpu.system) / 1000),
       rssMb: Math.round(process.memoryUsage().rss / 1048576),
     };
@@ -446,8 +469,12 @@ export class Hub {
     const total = this.shards.reduce((sum, shard) => sum + shard.status().rooms.length, 0);
     let best: { shard: Shard; projected: number } | null = null;
     for (const shard of this.shards) {
-      const projected = shard.status().projectedMs;
-      if (best === null || projected < best.projected) best = { shard, projected };
+      const status = shard.status();
+      // Перегруженный шард (сбрасывался долг по времени или занятость выше 90%) новых комнат не получает.
+      if (status.overloaded) continue;
+      if (best === null || status.projectedMs < best.projected) {
+        best = { shard, projected: status.projectedMs };
+      }
     }
     if (
       best === null ||
@@ -461,7 +488,8 @@ export class Hub {
     const roomId =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
     // Карта берётся из готовых файлов клиента (быстрый матч): сид из общего списка.
-    const seed = QUICK_MATCH_SEEDS[randomInt(0, QUICK_MATCH_SEEDS.length)] ?? 42;
+    const seeds = this.seedsOf(best.shard.index);
+    const seed = seeds[randomInt(0, seeds.length)] ?? 42;
     best.shard.create(roomId, mode, seed);
     return { shard: best.shard, roomId };
   }

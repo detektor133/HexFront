@@ -291,23 +291,29 @@ function diffHexLayer(before: HexArray, after: HexArray): number[] | undefined {
   // Слой не пересобирался (общий массив): менять нечему. Так медленные слои вне срока почти бесплатны.
   if (before === after) return undefined;
   const out: number[] = [];
-  // Основная масса гексов не меняется: сравниваем по 4 байта сразу и разбираем поэлементно только
-  // слово, где есть отличие.
-  const perWord = WORD_BYTES / after.BYTES_PER_ELEMENT;
+  const count = after.length;
   const wordsBefore = wordsOf(before);
   const wordsAfter = wordsOf(after);
-  const count = after.length;
   let last = 0;
-  for (let id = 0; id < count; id += 1) {
-    if (
-      wordsBefore &&
-      wordsAfter &&
-      id % perWord === 0 &&
-      wordsBefore[id / perWord] === wordsAfter[id / perWord]
-    ) {
-      id += perWord - 1;
-      continue;
+  // Элементы одного слова разбираем только там, где слова различаются: основная масса гексов не
+  // меняется, и сравнение идёт по 4 байта, без деления на каждый гекс.
+  let tail = 0;
+  if (wordsBefore && wordsAfter) {
+    const perWord = WORD_BYTES / after.BYTES_PER_ELEMENT;
+    const words = Math.floor(count / perWord);
+    for (let w = 0; w < words; w += 1) {
+      if (wordsBefore[w] === wordsAfter[w]) continue;
+      const end = (w + 1) * perWord;
+      for (let id = w * perWord; id < end; id += 1) {
+        const value = after[id] as number;
+        if (before[id] === value) continue;
+        out.push(id - last, value);
+        last = id;
+      }
     }
+    tail = words * perWord;
+  }
+  for (let id = tail; id < count; id += 1) {
     const value = after[id] as number;
     if (before[id] === value) continue;
     out.push(id - last, value);
@@ -319,12 +325,21 @@ function diffHexLayer(before: HexArray, after: HexArray): number[] | undefined {
 type HexArray = PlayerView['hexes'][HexLayer];
 const WORD_BYTES = 4;
 
-/** Слова по 4 байта над тем же буфером, если выравнивание позволяет; иначе `undefined`. */
+/**
+ * Слова по 4 байта над тем же буфером, если выравнивание позволяет; иначе `undefined`. Вид слоя живёт
+ * два тика (после — как «до» следующей дельты), поэтому представление кэшируется: без кэша каждый
+ * человек каждый тик выделял по 16 временных массивов.
+ */
+const wordViews = new WeakMap<object, Int32Array | null>();
 function wordsOf(array: HexArray): Int32Array | undefined {
+  const cached = wordViews.get(array);
+  if (cached !== undefined) return cached ?? undefined;
   const aligned = array.byteOffset % WORD_BYTES === 0 && array.byteLength % WORD_BYTES === 0;
-  return aligned
+  const view = aligned
     ? new Int32Array(array.buffer, array.byteOffset, array.byteLength / WORD_BYTES)
-    : undefined;
+    : null;
+  wordViews.set(array, view);
+  return view ?? undefined;
 }
 
 /** Дельта между двумя видами одного игрока; `events` — события тика. */
@@ -356,10 +371,15 @@ export function buildViewDelta(
   const unset: string[] = [];
   const beforeFields = before as unknown as Fields;
   const afterFields = after as unknown as Fields;
-  for (const key of new Set([...Object.keys(beforeFields), ...Object.keys(afterFields)])) {
+  // Два прохода без временного множества ключей; порядок ключей тот же: сначала ключи «до», затем новые.
+  for (const key in beforeFields) {
     if (SPECIAL.has(key)) continue;
     if (!(key in afterFields)) unset.push(key);
     else if (!equalValue(beforeFields[key], afterFields[key])) whole[key] = afterFields[key];
+  }
+  for (const key in afterFields) {
+    if (SPECIAL.has(key) || key in beforeFields) continue;
+    if (!equalValue(beforeFields[key], afterFields[key])) whole[key] = afterFields[key];
   }
   return {
     t: 'delta',

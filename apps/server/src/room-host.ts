@@ -10,8 +10,16 @@ import type { HostSettings, RoomStatus, ShardStatus, TickStats } from './shard-p
 /** Закрытая комната без людей живёт дольше открытой, но не вечно. */
 const ROOM_KEEP_MS = 60_000;
 const TICK_SAMPLES = 600;
-/** Сколько тиков подряд хост догоняет после задержки; дальше пропускает, чтобы не копить долг. */
-const MAX_CATCH_UP = 3;
+/**
+ * Долг комнаты по времени, мс: пока комната отстаёт меньше, её тики идут подряд без пауз (догоняют
+ * план); больше — долг сбрасывается, игра в комнате идёт медленнее реального времени. Лавина
+ * догоняющих тиков только удлинила бы перегруз.
+ */
+const MAX_DEBT_MS = 300;
+/** Сколько мс подряд хост тикает комнаты, прежде чем отдать цикл событий (acks, команды, вход). */
+const SLICE_MS = 20;
+/** Окно, в котором сброшенный долг считается признаком перегруза шарда, мс. */
+const OVERLOAD_WINDOW_MS = 30_000;
 
 /** Куда хост отдаёт результат: тексты игрокам, закрытие соединений, итог входа, журнал. */
 export interface HostIo {
@@ -36,8 +44,17 @@ export class RoomHost {
   private readonly options: HostOptions;
   private readonly samples = new Float64Array(TICK_SAMPLES);
   private count = 0;
+  /** Опоздание начала тика относительно плана: растёт, когда поток не успевает. */
+  private readonly late = new Float64Array(TICK_SAMPLES);
+  private lateCount = 0;
+  /** Срок следующего тика каждой комнаты (performance.now, мс): свой ритм и свой фазовый сдвиг. */
+  private readonly dueAt = new Map<string, number>();
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private nextAt = 0;
+  private busyMs = 0;
+  private utilFrom = performance.now();
+  private utilLast = 0;
+  private readonly drops: number[] = [];
+  private droppedTotal = 0;
 
   public constructor(options: HostOptions) {
     this.options = options;
@@ -63,6 +80,8 @@ export class RoomHost {
       lateJoinTicks,
     });
     this.rooms.set(roomId, room);
+    // Первый тик через период от создания: фазы комнат разнесены по времени, а не сходятся в один миг.
+    this.dueAt.set(roomId, performance.now() + TICK_MS);
     this.options.io.log('roomCreated', { room: roomId, mode });
   }
 
@@ -171,57 +190,111 @@ export class RoomHost {
         costMs: room.costMs,
       });
     }
-    return { rooms, projectedMs: this.projectedMs(), tickMs: this.tickStats(), humans };
+    const utilization = this.utilization();
+    return {
+      rooms,
+      projectedMs: this.projectedMs(),
+      tickMs: stats(this.samples, this.count),
+      lateMs: stats(this.late, this.lateCount),
+      utilization,
+      droppedTicks: this.droppedTotal,
+      overloaded: this.recentDrops() > 0 || utilization > 0.9,
+      humans,
+    };
   }
 
-  private tickStats(): TickStats {
-    const used = this.samples.slice(0, Math.min(this.count, TICK_SAMPLES)).sort((a, b) => a - b);
-    const pick = (p: number): number =>
-      used[Math.min(used.length - 1, Math.floor(used.length * p))] ?? 0;
-    return { p50: pick(0.5), p99: pick(0.99), max: used.at(-1) ?? 0 };
-  }
-
-  /** Один тик всех комнат хоста: набор, шаг, виды, уборка пустых и законченных. */
-  public tick(): void {
-    const startedAt = performance.now();
-    const now = this.options.now();
-    for (const [id, room] of this.rooms) {
-      room.poll();
-      room.tick();
-      if (room.phase === 'ended') {
-        room.close();
-        this.rooms.delete(id);
-        this.options.io.log('roomClosed', { room: id, ticks: room.stats.ticks });
-        continue;
-      }
-      if (room.hasConnected()) this.emptySince.delete(id);
-      else if (!this.emptySince.has(id)) this.emptySince.set(id, now);
-      else if (now - (this.emptySince.get(id) ?? now) > ROOM_KEEP_MS) {
-        room.close();
-        this.rooms.delete(id);
-        this.emptySince.delete(id);
-        this.options.io.log('roomDropped', { room: id });
-      }
+  /** Доля времени потока, занятая тиками комнат, за последние секунды. */
+  private utilization(): number {
+    const now = performance.now();
+    const span = now - this.utilFrom;
+    if (span >= 2000) {
+      this.utilLast = this.busyMs / span;
+      this.busyMs = 0;
+      this.utilFrom = now;
     }
-    this.samples[this.count % TICK_SAMPLES] = performance.now() - startedAt;
-    this.count += 1;
+    return this.utilLast;
   }
 
-  /** Запускает тики 10 Гц; следующий запуск считается от плана, а не от конца прошлого. */
-  public start(afterTick?: () => void): void {
+  private recentDrops(): number {
+    const edge = performance.now() - OVERLOAD_WINDOW_MS;
+    while (this.drops.length > 0 && (this.drops[0] ?? 0) < edge) this.drops.shift();
+    return this.drops.length;
+  }
+
+  /** Тик одной комнаты: набор, шаг, виды, уборка пустой или законченной. */
+  private tickRoom(id: string, room: Room): void {
+    const now = this.options.now();
+    room.poll();
+    room.tick();
+    if (room.phase === 'ended') {
+      room.close();
+      this.rooms.delete(id);
+      this.dueAt.delete(id);
+      this.options.io.log('roomClosed', { room: id, ticks: room.stats.ticks });
+      return;
+    }
+    if (room.hasConnected()) this.emptySince.delete(id);
+    else if (!this.emptySince.has(id)) this.emptySince.set(id, now);
+    else if (now - (this.emptySince.get(id) ?? now) > ROOM_KEEP_MS) {
+      room.close();
+      this.rooms.delete(id);
+      this.dueAt.delete(id);
+      this.emptySince.delete(id);
+      this.options.io.log('roomDropped', { room: id });
+    }
+  }
+
+  /** Один тик всех комнат сразу (тесты и стенды с виртуальным временем; без расписания). */
+  public tick(): void {
+    for (const [id, room] of this.rooms) {
+      const started = performance.now();
+      this.tickRoom(id, room);
+      this.samples[this.count % TICK_SAMPLES] = performance.now() - started;
+      this.count += 1;
+    }
+  }
+
+  /**
+   * Запускает расписание: у каждой комнаты свой срок и свой ритм 10 Гц. Самые просроченные идут первыми,
+   * поэтому при перегрузе время делится честно, а один тяжёлый тик задерживает соседей только на его длину.
+   * `flush` вызывается после каждой комнаты (исходящие уходят сразу), `afterPass` — после порции.
+   */
+  public start(flush?: () => void, afterPass?: () => void): void {
     if (this.timer !== null) return;
-    this.nextAt = performance.now() + TICK_MS;
     const loop = (): void => {
-      let ran = 0;
-      while (performance.now() >= this.nextAt && ran < MAX_CATCH_UP) {
-        this.tick();
-        afterTick?.();
-        this.nextAt += TICK_MS;
-        ran += 1;
+      this.timer = null;
+      const sliceStart = performance.now();
+      const due = [...this.rooms.entries()]
+        .filter(([id]) => (this.dueAt.get(id) ?? Infinity) <= sliceStart)
+        .sort((x, y) => (this.dueAt.get(x[0]) ?? 0) - (this.dueAt.get(y[0]) ?? 0));
+      for (const [id, room] of due) {
+        if (!this.rooms.has(id)) continue;
+        const planned = this.dueAt.get(id) ?? sliceStart;
+        const started = performance.now();
+        this.late[this.lateCount % TICK_SAMPLES] = Math.max(0, started - planned);
+        this.lateCount += 1;
+        this.tickRoom(id, room);
+        const finished = performance.now();
+        this.samples[this.count % TICK_SAMPLES] = finished - started;
+        this.count += 1;
+        this.busyMs += finished - started;
+        // Следующий срок считается от плана, а не от конца тика; слишком большой долг сбрасывается.
+        let next = planned + TICK_MS;
+        if (next < finished - MAX_DEBT_MS) {
+          next = finished;
+          this.drops.push(finished);
+          this.droppedTotal += 1;
+          this.options.io.log('ticksDropped', { room: id });
+        }
+        if (this.rooms.has(id)) this.dueAt.set(id, next);
+        flush?.();
+        if (performance.now() - sliceStart > SLICE_MS) break;
       }
-      // Долг больше догоняемого: пропускаем, чтобы комнаты не жили в прошлом.
-      if (performance.now() >= this.nextAt) this.nextAt = performance.now() + TICK_MS;
-      this.timer = setTimeout(loop, Math.max(0, this.nextAt - performance.now()));
+      afterPass?.();
+      let soonest = Infinity;
+      for (const value of this.dueAt.values()) soonest = Math.min(soonest, value);
+      const delay = Number.isFinite(soonest) ? Math.max(0, soonest - performance.now()) : TICK_MS;
+      this.timer = setTimeout(loop, delay);
     };
     this.timer = setTimeout(loop, TICK_MS);
   }
@@ -231,7 +304,16 @@ export class RoomHost {
     this.timer = null;
     for (const room of this.rooms.values()) room.close();
     this.rooms.clear();
+    this.dueAt.clear();
     this.conns.clear();
     this.where.clear();
   }
+}
+
+/** Квантили по кольцевому буферу замеров. */
+function stats(buffer: Float64Array, count: number): TickStats {
+  const used = buffer.slice(0, Math.min(count, buffer.length)).sort((x, y) => x - y);
+  const pick = (p: number): number =>
+    used[Math.min(used.length - 1, Math.floor(used.length * p))] ?? 0;
+  return { p50: pick(0.5), p99: pick(0.99), max: used.at(-1) ?? 0 };
 }

@@ -86,8 +86,7 @@ port.on('message', (batch: ToShard[]) => {
   queueFlush();
 });
 
-warmMaps(settings.size);
-host.start(() => {
-  flush();
+warmMaps(settings.size, settings.seeds);
+host.start(flush, () => {
   post({ k: 'status', status: host.status() });
 });

@@ -7,7 +7,6 @@
 import { deflateRawSync } from 'node:zlib';
 
 import { Hub } from '../../../apps/server/src/hub.ts';
-import type { Room } from '../../../apps/server/src/room.ts';
 import { PROTOCOL_VERSION, encodeClientMessage } from '../../../packages/protocol/src/index.ts';
 
 const option = (name: string, fallback: string): string => {
@@ -39,6 +38,7 @@ function sampleParts(text: string): void {
 }
 
 let clock = 0;
+const roomIds = new Set<string>();
 const hub = new Hub({ now: () => clock, size: 30, maxRooms: 1000 });
 
 interface Bot {
@@ -69,6 +69,7 @@ for (let room = 0; room < ROOMS; room += 1) {
           }
           if (i === 0 && text.includes('"t":"welcome"')) {
             code = (JSON.parse(text) as { room: string }).room;
+            roomIds.add(code);
           }
         },
         close() {},
@@ -107,8 +108,9 @@ for (let minute = 1; minute <= MINUTES; minute += 1) {
     samples.push(took);
     if (took > 90) {
       // Провал тика: какая комната и какая стадия съела время.
-      const rooms = (hub as unknown as { rooms: Map<string, Room> }).rooms;
-      for (const room of rooms.values()) {
+      for (const roomId of roomIds) {
+        const room = hub.roomById(roomId);
+        if (room === undefined) continue;
         const l = room.stats.last;
         if (l.botsMs + l.stepMs + l.viewMs > 40) {
           console.log(

@@ -47,7 +47,16 @@ export interface TickStats {
 export interface ShardStatus {
   readonly rooms: readonly RoomStatus[];
   readonly projectedMs: number;
+  /** Длительность тика одной комнаты, мс. */
   readonly tickMs: TickStats;
+  /** Опоздание начала тика относительно плана, мс: растёт, когда поток не успевает. */
+  readonly lateMs: TickStats;
+  /** Доля времени потока, занятая тиками (0..1). */
+  readonly utilization: number;
+  /** Тиков, чей долг по времени сброшен (игра в комнате шла медленнее реального времени). */
+  readonly droppedTicks: number;
+  /** Шард перегружен: недавно сбрасывался долг или занятость выше 90%; новые комнаты ему не даются. */
+  readonly overloaded: boolean;
   readonly humans: number;
 }
 
@@ -67,4 +76,6 @@ export interface HostSettings {
   readonly roomEstimateMs: number;
   /** Тиков с начала матча, пока можно подсесть на место бота. */
   readonly lateJoinTicks: number;
+  /** Сиды карт, которые прогревает этот шард: у каждого шарда свои, комнаты берут сид из его набора. */
+  readonly seeds: readonly number[];
 }

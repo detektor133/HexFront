@@ -311,14 +311,21 @@ function expand(
   const core = (h: HexId): number =>
     capital === undefined ? 0 : distance(hexOf(map, capital), hexOf(map, h));
   const empty = context.emptyNeutral;
-  const mine = Array.from(view.hexes.owner, (o, h) => (o === view.playerId ? h : -1)).filter(
-    (h) => h >= 0,
-  );
-  const borderGap = (h: HexId): number =>
-    Math.min(...mine.map((m) => distance(hexOf(map, m), hexOf(map, h))), Number.MAX_SAFE_INTEGER);
+  const table = neighborTable(map);
+  const ownerOf = view.hexes.owner;
+  // Гекс у своей границы: он сам свой или рядом свой сосед (расстояние до своей земли ≤ 1). Раньше для
+  // каждого города считалось расстояние до всех своих гексов.
+  const touchesOwn = (h: HexId): boolean => {
+    if (ownerOf[h] === view.playerId) return true;
+    for (let side = 0; side < SIDES; side += 1) {
+      const n = table[h * SIDES + side] as number;
+      if (n >= 0 && ownerOf[n] === view.playerId) return true;
+    }
+    return false;
+  };
   const cities = view.cities.filter((c) => c.owner < 0 && c.defenders > 0).map((c) => c.hex);
   // Расстояние до своей земли считается один раз на город, а не на каждый отряд.
-  const bordering = cities.filter((h) => borderGap(h) <= 1);
+  const bordering = cities.filter(touchesOwn);
   const foes = view.units.filter((x) => warWith(view, x.owner));
   const out: Command[] = [];
   const dist = (a: HexId, b: HexId): number => distance(hexOf(map, a), hexOf(map, b));
@@ -340,12 +347,14 @@ function expand(
   }
   // Ничья земля — ближайшему отряду (кольцом у ядра), отряд крупнее двух частей делится поровну
   // на соседние свободные гексы; вблизи врага не делится.
-  const ownNeighbors = (h: HexId): number =>
-    neighbors(hexOf(map, h)).filter(
-      (n) =>
-        inBounds(n, map.width, map.height) &&
-        view.hexes.owner[hexId(n, map.width)] === view.playerId,
-    ).length;
+  const ownNeighbors = (h: HexId): number => {
+    let count = 0;
+    for (let side = 0; side < SIDES; side += 1) {
+      const n = table[h * SIDES + side] as number;
+      if (n >= 0 && ownerOf[n] === view.playerId) count += 1;
+    }
+    return count;
+  };
   const cells = empty
     .filter((h) => !claimed.has(h))
     .map((h) => ({
