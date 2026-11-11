@@ -1,9 +1,19 @@
-// Бенч сетевого конвейера сервера: на каждый тик матча ботов — вид, дельта и сериализация для N людей.
-// Запуск: pnpm --filter @hexfront/bench net [людей=30] [тиков=3600]
-// Печатает по минуте матча: мс на тик по стадиям, байты дельты на игрока (сырые и deflate), память
-// (с `node --expose-gc` — после сборки мусора, иначе утечку от мусора не отличить), живых и отрядов.
+// Бенч конвейера матча по форматам игры: серверная комната и одиночная игра на клиенте.
+//
+// Запуск (из корня репозитория):
+//   node --expose-gc --experimental-strip-types tools/bench/src/net-bench.ts [опции]
+// Опции:
+//   --map=gen|europe|small   карта (gen — генерируемая 30 игроков, как «быстрый матч»); по умолчанию gen
+//   --level=easy|medium|hard уровень ботов; по умолчанию medium
+//   --humans=N               людей в комнате сервера (виды, дельты, JSON на каждого); по умолчанию 30
+//   --minutes=M              длина матча в минутах игры (ускоренно, без реального времени); по умолчанию 6
+//   --solo                   одиночная игра на реальном движке клиента (один человек, как в воркере)
+// Печатает по минуте матча: мс на тик по стадиям, байты дельты, память (после GC), отряды.
+import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 
+import { createLocalEngine } from '../../../apps/client/src/local/engine.ts';
+import { ConfirmedViewDeltaStream } from '../../../apps/client/src/local/view-delta.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   buildViewDelta,
@@ -21,77 +31,101 @@ import {
   loadMap,
   playerView,
   step,
+  type BotLevel,
+  type MatchState,
   type PlayerView,
 } from '../../../packages/sim/src/index.ts';
 import { allUnits } from '../../../packages/sim/src/state/unit-index.ts';
 
-const PLAYERS = 30;
 const SEED = 43;
 const TICKS_PER_MINUTE = 600;
 /** Сжимаем каждого шестого игрока: deflate на всех искажал бы замер времени стадий. */
 const DEFLATE_EVERY = 6;
 
+const option = (name: string, fallback: string): string => {
+  const hit = process.argv.find((arg) => arg.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : fallback;
+};
+const MAP = option('map', 'gen');
+const LEVEL = option('level', 'medium') as BotLevel;
+const HUMANS = Number(option('humans', '30'));
+const MINUTES = Number(option('minutes', '6'));
+const SOLO = process.argv.includes('--solo');
+
+/** Карта формата: JSON готовой карты или сгенерированная; игроков в матче всегда 30 (как в меню). */
+function mapJson(): unknown {
+  if (MAP === 'gen') return generateMap(SEED, { players: 30 });
+  const file = new URL(`../../../packages/mapgen/maps/${MAP}.json`, import.meta.url);
+  return JSON.parse(readFileSync(file, 'utf8')) as unknown;
+}
+
 interface Window {
-  bots: number;
-  step: number;
-  view: number;
-  delta: number;
-  json: number;
+  stages: Record<string, number>;
   bytes: number;
   deflated: number;
   messages: number;
 }
 
-const empty = (): Window => ({
-  bots: 0,
-  step: 0,
-  view: 0,
-  delta: 0,
-  json: 0,
-  bytes: 0,
-  deflated: 0,
-  messages: 0,
-});
+const empty = (): Window => ({ stages: {}, bytes: 0, deflated: 0, messages: 0 });
+const add = (window: Window, stage: string, since: number): number => {
+  const now = performance.now();
+  window.stages[stage] = (window.stages[stage] ?? 0) + (now - since);
+  return now;
+};
 
 /** Куча и RSS в МБ; куча — после принудительной сборки мусора, если доступна. */
 function memory(): string {
   (globalThis as { gc?: () => void }).gc?.();
   const usage = process.memoryUsage();
   const mb = (bytes: number): string => (bytes / 1048576).toFixed(0);
-  return `куча ${mb(usage.heapUsed)} МБ, буферы ${mb(usage.arrayBuffers)} МБ, rss ${mb(usage.rss)} МБ`;
+  return `куча ${mb(usage.heapUsed)} МБ, rss ${mb(usage.rss)} МБ`;
 }
 
-function run(humans: number, ticks: number): void {
-  const loaded = loadMap(generateMap(SEED, { players: PLAYERS }));
+function report(minute: number, window: Window, state: MatchState, hexes: number): void {
+  const per = (value: number): number => value / TICKS_PER_MINUTE;
+  const parts = Object.entries(window.stages).map(([name, ms]) => `${name} ${per(ms).toFixed(1)}`);
+  const total = Object.values(window.stages).reduce((sum, ms) => sum + per(ms), 0);
+  const bytes = Math.round(window.bytes / Math.max(1, window.messages));
+  const deflated = Math.round(window.deflated / Math.max(1, window.messages));
+  const alive = state.players.filter((p) => p.status === 'alive').length;
+  console.log(
+    `мин ${String(minute).padStart(2)}: ${parts.join(' ')} = ${total.toFixed(1)} мс/тик | ` +
+      `дельта ${bytes} Б (deflate ${deflated}, ${((deflated * 10) / 1024).toFixed(1)} КБ/с) | ` +
+      `${memory()} | живых ${alive}, отрядов ${allUnits(state).length}, гексов ${hexes}` +
+      (state.winner >= 0 ? `, ПОБЕДИТЕЛЬ ${state.winner}` : ''),
+  );
+}
+
+/** Комната сервера: боты, step, виды и дельты для `HUMANS` людей. */
+function runRoom(): void {
+  const loaded = loadMap(mapJson());
   if ('errors' in loaded) throw new Error(loaded.errors.join('\n'));
-  const bots = Array.from({ length: PLAYERS }, (_, id) => id);
+  const players = loaded.map.spawns.length;
+  const ids = Array.from({ length: players }, (_, id) => id);
+  const levels = ids.map(() => LEVEL);
   const state = createMatch(
     loaded.map,
-    bots.map((id) => ({ name: `P${id}` })),
+    ids.map((id) => ({ name: `P${id}` })),
     SEED,
     { fog: true },
   );
+  const humans = Math.min(HUMANS, players);
   const confirmed: (PlayerView | null)[] = Array(humans).fill(null);
   const syncedAt: number[] = Array(humans).fill(0);
   let window = empty();
-
-  for (let tick = 0; tick < ticks; tick += 1) {
-    let started = performance.now();
+  for (let tick = 0; tick < MINUTES * TICKS_PER_MINUTE; tick += 1) {
+    let at = performance.now();
     const context = createBotTickContext(state);
     const commands = [
-      ...commanderCommands(state, bots, context),
-      ...botCommands(state, bots, context),
+      ...commanderCommands(state, ids, levels, context),
+      ...botCommands(state, ids, levels, context),
     ];
-    window.bots += performance.now() - started;
-    started = performance.now();
+    at = add(window, 'боты', at);
     step(state, commands);
-    window.step += performance.now() - started;
-
-    started = performance.now();
+    at = add(window, 'step', at);
     const viewContext = createPlayerViewContext(state);
     const views = Array.from({ length: humans }, (_, id) => playerView(state, id, viewContext));
-    window.view += performance.now() - started;
-
+    at = add(window, 'виды', at);
     for (let id = 0; id < humans; id += 1) {
       const view = views[id] as PlayerView;
       const base = confirmed[id] ?? null;
@@ -99,39 +133,69 @@ function run(humans: number, ticks: number): void {
         confirmed[id] = view;
         continue;
       }
-      started = performance.now();
       const sync = view.tick - (syncedAt[id] as number) >= SLOW_PERIOD_TICKS;
       if (sync) syncedAt[id] = view.tick;
       const sent = paceView(base, view, sync);
       const message = buildViewDelta(base, sent, state.events);
-      window.delta += performance.now() - started;
-      started = performance.now();
+      at = add(window, 'дельты', at);
       const text = encodeDelta(message);
-      window.json += performance.now() - started;
+      at = add(window, 'json', at);
       window.bytes += text.length;
       window.messages += 1;
       if (id % DEFLATE_EVERY === 0) window.deflated += deflateRawSync(text).length * DEFLATE_EVERY;
       confirmed[id] = sent;
     }
-
     if ((tick + 1) % TICKS_PER_MINUTE === 0) {
-      const minute = (tick + 1) / TICKS_PER_MINUTE;
-      const per = (value: number): string => (value / TICKS_PER_MINUTE).toFixed(1);
-      const bytes = Math.round(window.bytes / Math.max(1, window.messages));
-      const deflated = Math.round(window.deflated / Math.max(1, window.messages));
-      const total =
-        (window.bots + window.step + window.view + window.delta + window.json) / TICKS_PER_MINUTE;
-      console.log(
-        `минута ${minute}: мс/тик боты ${per(window.bots)} step ${per(window.step)} виды ${per(window.view)} ` +
-          `дельты ${per(window.delta)} json ${per(window.json)} = ${total.toFixed(1)} из 100 | ` +
-          `байт/игрок/тик ${bytes}, deflate ${deflated} (${((deflated * 10) / 1024).toFixed(1)} КБ/с)`,
-      );
-      console.log(
-        `        память: ${memory()}, живых ${state.players.filter((p) => p.status === 'alive').length}, отрядов ${allUnits(state).length}${state.winner >= 0 ? `, ПОБЕДИТЕЛЬ ${state.winner}` : ''}`,
-      );
+      report((tick + 1) / TICKS_PER_MINUTE, window, state, state.hexes.owner.length);
       window = empty();
     }
   }
 }
 
-run(Number(process.argv[2] ?? PLAYERS), Number(process.argv[3] ?? TICKS_PER_MINUTE * 6));
+/** Одиночная игра: тот же движок и поток дельт, что в воркере клиента (один человек, 29 ботов). */
+function runSolo(): void {
+  const json = mapJson();
+  const loaded = loadMap(json);
+  if ('errors' in loaded) throw new Error(loaded.errors.join('\n'));
+  const made = createLocalEngine(
+    json,
+    SEED,
+    loaded.map.spawns.length,
+    undefined,
+    true,
+    '',
+    true,
+    false,
+    LEVEL,
+  );
+  if ('errors' in made) throw new Error(made.errors.join('\n'));
+  const stream = new ConfirmedViewDeltaStream();
+  let window = empty();
+  for (let tick = 0; tick < MINUTES * TICKS_PER_MINUTE; tick += 1) {
+    let at = performance.now();
+    made.advance();
+    at = add(window, 'боты+step', at);
+    const payload = made.snapshot();
+    at = add(window, 'вид', at);
+    const transport = stream.next(payload.view, payload.events);
+    if (transport?.kind === 'delta') {
+      at = add(window, 'дельта', at);
+      const text = encodeDelta(transport.delta);
+      add(window, 'json', at);
+      window.bytes += text.length;
+      window.messages += 1;
+      window.deflated += deflateRawSync(text).length;
+    }
+    stream.acknowledge();
+    if ((tick + 1) % TICKS_PER_MINUTE === 0) {
+      report((tick + 1) / TICKS_PER_MINUTE, window, made.state, made.state.hexes.owner.length);
+      window = empty();
+    }
+  }
+}
+
+console.log(
+  `формат: ${SOLO ? 'одиночная игра' : `комната сервера, людей ${HUMANS}`}, карта ${MAP}, боты ${LEVEL}, ${MINUTES} мин`,
+);
+if (SOLO) runSolo();
+else runRoom();
