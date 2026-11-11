@@ -65,8 +65,9 @@ export type C2S =
       readonly have?: number;
     }
   /**
-   * Команда с возрастающим номером `seq` в рамках сессии. Повтор (после обрыва) с тем же `seq`
-   * сервер не исполняет второй раз, а только подтверждает: `ack` накопительный.
+   * Команда с номером `seq`, подряд идущим в рамках сессии. Сервер принимает только следующий по
+   * порядку номер: повтор (после обрыва) он не исполняет второй раз, а подтверждает (`ack`
+   * накопительный), пропуск и превышение лимита не принимает и просит повторить (`retry`, `rateLimit`).
    */
   | { readonly t: 'cmd'; readonly seq: number; readonly cmd: Command }
   /** Клиент потерял базу дельты (ошибка применения): сервер шлёт полный снимок. */
@@ -119,7 +120,11 @@ export type S2C =
   | {
       readonly t: 'rejected';
       readonly seq: number;
-      readonly reason: RejectReason | 'rateLimit' | 'bad';
+      /**
+       * `rateLimit` и `retry` — команда не принята и не потеряна: клиент пришлёт её заново по порядку;
+       * остальное — окончательный отказ.
+       */
+      readonly reason: RejectReason | 'rateLimit' | 'retry' | 'bad';
     }
   | { readonly t: 'refused'; readonly reason: RefuseReason }
   | { readonly t: 'end'; readonly winner: number; readonly tick: number }

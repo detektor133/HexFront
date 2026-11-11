@@ -2,13 +2,10 @@
 // между ними канал с задержкой, разбросом, обрывами и молчаливой потерей пакетов.
 import { describe, expect, it } from 'vitest';
 
+import { Link, World } from './net-harness.ts';
 import type { FromWorker } from '../../../apps/client/src/local/messages.ts';
 import { ViewDeltaApplier } from '../../../apps/client/src/local/view-delta.ts';
-import {
-  NetClient,
-  type NetClock,
-  type NetSocket,
-} from '../../../apps/client/src/net/net-client.ts';
+import { NetClient } from '../../../apps/client/src/net/net-client.ts';
 import { startOnlineMatch } from '../../../apps/client/src/net/online-match.ts';
 import { Hub } from '../../../apps/server/src/hub.ts';
 import small from '../../../packages/mapgen/maps/small.json' with { type: 'json' };
@@ -18,136 +15,6 @@ import { loadMap } from '../../../packages/sim/src/index.ts';
 const loaded = loadMap(small);
 if (!loaded.ok) throw new Error(loaded.errors.join('\n'));
 const MAP: MapStatic = loaded.map;
-
-/** Виртуальное время: очередь событий по моменту срабатывания. */
-class World {
-  public time = 1_000_000;
-  private seq = 0;
-  private readonly queue: { at: number; id: number; run: () => void; live: { on: boolean } }[] = [];
-
-  public readonly clock: NetClock = {
-    now: () => this.time,
-    setTimeout: (handler, ms) => this.after(ms, handler),
-    clearTimeout: (handle) => {
-      (handle as { on: boolean }).on = false;
-    },
-  };
-
-  public after(ms: number, run: () => void): { on: boolean } {
-    const live = { on: true };
-    this.queue.push({ at: this.time + ms, id: (this.seq += 1), run, live });
-    return live;
-  }
-
-  /** Прогоняет мир до момента (включительно). */
-  public run(untilMs: number): void {
-    const end = this.time + untilMs;
-    for (;;) {
-      let best = -1;
-      for (let i = 0; i < this.queue.length; i += 1) {
-        const item = this.queue[i];
-        if (!item || item.at > end) continue;
-        const current = this.queue[best];
-        if (!current || item.at < current.at || (item.at === current.at && item.id < current.id)) {
-          best = i;
-        }
-      }
-      if (best < 0) break;
-      const [item] = this.queue.splice(best, 1);
-      if (!item) break;
-      this.time = Math.max(this.time, item.at);
-      if (item.live.on) item.run();
-    }
-    this.time = end;
-  }
-}
-
-/** Канал в стиле TCP: порядок сохраняется, есть задержка, обрыв и «чёрная дыра». */
-class Link {
-  public oneWayMs = 20;
-  public jitterMs = 0;
-  public blackhole = false;
-  private lastDown = 0;
-  private lastUp = 0;
-  private current: { cut: () => void } | null = null;
-  public connects = 0;
-
-  public constructor(
-    private readonly world: World,
-    private readonly hub: Hub,
-    private readonly random: () => number,
-  ) {}
-
-  private delay(): number {
-    return this.oneWayMs + Math.floor(this.random() * this.jitterMs);
-  }
-
-  public connect = (): NetSocket => {
-    this.connects += 1;
-    let open: () => void = () => undefined;
-    let message: (text: string) => void = () => undefined;
-    let close: () => void = () => undefined;
-    let alive = true;
-    const world = this.world;
-    const session = this.hub.connect(
-      {
-        send: (text) => {
-          if (!alive || this.blackhole) return;
-          this.lastDown = Math.max(this.lastDown, world.time + this.delay());
-          const at = this.lastDown;
-          world.after(at - world.time, () => {
-            if (alive) message(text);
-          });
-        },
-        close: () => {
-          if (!alive) return;
-          this.lastDown = Math.max(this.lastDown, world.time + this.delay());
-          world.after(this.lastDown - world.time, () => {
-            if (alive) cut();
-          });
-        },
-      },
-      'ip-1',
-    );
-    const cut = (): void => {
-      if (!alive) return;
-      alive = false;
-      close();
-      session?.onClose();
-    };
-    this.current = { cut };
-    world.after(this.delay(), () => {
-      if (alive) open();
-    });
-    return {
-      send: (text) => {
-        if (!alive || this.blackhole) return;
-        this.lastUp = Math.max(this.lastUp, world.time + this.delay());
-        world.after(this.lastUp - world.time, () => {
-          if (alive) session?.onMessage(text);
-        });
-      },
-      close: () => {
-        alive = false;
-        session?.onClose();
-      },
-      onOpen: (handler) => {
-        open = handler;
-      },
-      onMessage: (handler) => {
-        message = handler;
-      },
-      onClose: (handler) => {
-        close = handler;
-      },
-    };
-  };
-
-  /** Обрыв соединения: обе стороны узнают сразу. */
-  public drop(): void {
-    this.current?.cut();
-  }
-}
 
 function setup(seed = 1) {
   let s = seed;

@@ -17,7 +17,10 @@ const SPEEDS = [1];
 const SECONDS = 20;
 // Какие форматы гонять сейчас: 'light', 'medium', 'heavy' (локальная игра) и 'online' — матч на 30
 // игроков против настоящего сервера (запускается на время зонда), клиент без своей симуляции.
-const FORMAT_LIST = ['light', 'medium', 'heavy', 'online'];
+const FORMAT_LIST: string[] = ['light', 'medium', 'heavy', 'online'];
+// Профиль процессора V8 сам даёт провалы кадров на сотни миллисекунд (проверено сравнением), поэтому
+// кадры меряются без него; профиль включается отдельным прогоном для поиска горячих функций.
+const PROFILE_CPU = false;
 const SERVER_PORT = 18_090;
 const SERVER_URL = `ws://127.0.0.1:${SERVER_PORT}`;
 
@@ -130,7 +133,7 @@ for (const format of FORMAT_LIST) {
       test(`телефон ${format}: CPU x${throttle}, скорость ${speed}`, async ({ page, context }) => {
         const cdp = await context.newCDPSession(page);
         await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
-        await cdp.send('Profiler.enable');
+        if (PROFILE_CPU) await cdp.send('Profiler.enable');
         page.on('pageerror', (e) => console.log('pageerror', e.message));
         await page.addInitScript(() => {
           const w = window as unknown as Probe;
@@ -170,10 +173,14 @@ for (const format of FORMAT_LIST) {
           w.__long.length = 0;
           w.__stages = {};
         });
-        await cdp.send('Profiler.start');
+        if (PROFILE_CPU) await cdp.send('Profiler.start');
         await page.waitForTimeout(SECONDS * 1000);
-        const { profile } = (await cdp.send('Profiler.stop')) as unknown as { profile: CpuProfile };
-        printTop(profile, `${format} x${throttle}`);
+        if (PROFILE_CPU) {
+          const { profile } = (await cdp.send('Profiler.stop')) as unknown as {
+            profile: CpuProfile;
+          };
+          printTop(profile, `${format} x${throttle}`);
+        }
         const r = await page.evaluate(() => {
           const w = window as unknown as Probe;
           const f = [...w.__frames].sort((a, b) => a - b);

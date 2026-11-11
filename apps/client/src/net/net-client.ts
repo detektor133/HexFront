@@ -104,6 +104,14 @@ export const RETRY_MAX_MS = 5000;
 /** Сколько всего пытаемся вернуться, прежде чем сдаться (сервер держит место 30 с, затем бот). */
 export const GIVE_UP_MS = 5 * 60_000;
 
+/** Команд за одну порцию досылки (лимит сервера 20 в секунду) и пауза между порциями, мс. */
+const RESEND_BATCH = 8;
+const RESEND_GAP_MS = 120;
+/** Пауза перед повтором после `retry`/`rateLimit`, мс. */
+const RETRY_AFTER_MS = 300;
+/** Команда без подтверждения дольше этого — досылка заново, мс. */
+const STUCK_AFTER_MS = 3500;
+
 /** Причины отказа, при которых повторять бессмысленно. */
 const FINAL_REFUSALS: ReadonlySet<RefuseReason> = new Set([
   'versionMismatch',
@@ -130,6 +138,10 @@ export class NetClient {
   private lastRx = 0;
   private nextSeq = 1;
   private outbox: { seq: number; cmd: Command }[] = [];
+  /** Номер последней команды, отправленной в текущем соединении (досылка идёт порциями по порядку). */
+  private sentSeq = 0;
+  private flushHandle: unknown = null;
+  private ackedAt = 0;
   private tickHandle: unknown = null;
   private retryHandle: unknown = null;
   private stopped = false;
@@ -204,9 +216,43 @@ export class NetClient {
   public command(cmd: Command): number {
     const seq = this.nextSeq;
     this.nextSeq += 1;
+    if (this.outbox.length === 0) this.ackedAt = this.clock.now();
     this.outbox.push({ seq, cmd });
-    if (this.status === 'online') this.send({ t: 'cmd', seq, cmd });
+    if (this.status === 'online') {
+      // Сразу, если очередь не отстаёт; иначе команда уйдёт в порядке очереди с досылкой.
+      if (this.flushHandle === null && this.sentSeq === seq - 1) {
+        this.send({ t: 'cmd', seq, cmd });
+        this.sentSeq = seq;
+      } else this.scheduleFlush(0);
+    }
     return seq;
+  }
+
+  /** Начинает досылку неподтверждённых команд с самой старой, порциями, чтобы не упереться в лимит. */
+  private restartFlush(delay: number): void {
+    this.sentSeq = 0;
+    this.scheduleFlush(delay);
+  }
+
+  private scheduleFlush(delay: number): void {
+    if (this.flushHandle !== null) return;
+    this.flushHandle = this.clock.setTimeout(() => {
+      this.flushHandle = null;
+      this.flush();
+    }, delay);
+  }
+
+  private flush(): void {
+    if (this.status !== 'online') return;
+    let sent = 0;
+    for (const item of this.outbox) {
+      if (item.seq <= this.sentSeq) continue;
+      if (sent >= RESEND_BATCH) break;
+      this.send({ t: 'cmd', seq: item.seq, cmd: item.cmd });
+      this.sentSeq = item.seq;
+      sent += 1;
+    }
+    if (this.outbox.some((item) => item.seq > this.sentSeq)) this.scheduleFlush(RESEND_GAP_MS);
   }
 
   /** Хозяин закрытой комнаты запускает матч. */
@@ -307,6 +353,8 @@ export class NetClient {
     const handlers = this.options.handlers;
     switch (message.t) {
       case 'welcome': {
+        // Другое место (старое пропало): команды прежнего места не нужны, номера продолжаются.
+        if (this.token !== undefined && this.token !== message.token) this.outbox = [];
         this.token = message.token;
         this.session = {
           token: message.token,
@@ -321,8 +369,9 @@ export class NetClient {
         this.lostAt = null;
         this.setStatus('online');
         handlers?.onSession?.(this.session);
-        // Всё, что сервер не успел подтвердить, уходит заново в том же порядке.
-        for (const item of this.outbox) this.send({ t: 'cmd', seq: item.seq, cmd: item.cmd });
+        // Всё, что сервер не успел подтвердить, уходит заново в том же порядке, порциями.
+        this.ackedAt = this.clock.now();
+        this.restartFlush(0);
         return;
       }
       case 'lobby':
@@ -333,8 +382,14 @@ export class NetClient {
         return;
       case 'ack':
         this.outbox = this.outbox.filter((item) => item.seq > message.seq);
+        this.ackedAt = this.clock.now();
         return;
       case 'rejected':
+        // Лимит и пропуск номера — не отказ: команда осталась в очереди, повторим по порядку.
+        if (message.reason === 'rateLimit' || message.reason === 'retry') {
+          this.restartFlush(RETRY_AFTER_MS);
+          return;
+        }
         this.outbox = this.outbox.filter((item) => item.seq !== message.seq);
         handlers?.onRejected?.(message.seq, message.reason);
         return;
@@ -378,6 +433,15 @@ export class NetClient {
         return;
       }
       if (this.status === 'online') this.send({ t: 'ping', at: this.clock.now() });
+      // Команда висит без подтверждения слишком долго: досылаем заново.
+      if (
+        this.status === 'online' &&
+        this.outbox.length > 0 &&
+        this.clock.now() - this.ackedAt > STUCK_AFTER_MS
+      ) {
+        this.ackedAt = this.clock.now();
+        this.restartFlush(0);
+      }
       this.schedulePulse();
     }, PING_MS);
   }

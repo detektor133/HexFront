@@ -336,17 +336,24 @@ export class Room {
       this.send(seat, { t: 'ack', seq: seat.lastSeq });
       return;
     }
-    seat.lastSeq = seq;
+    // Принимаем только следующий по порядку номер (первая команда места задаёт начало): пропуск значит,
+    // что предыдущую не приняли, и клиент пришлёт всё заново. Иначе отказ по лимиту молча терял бы команды.
+    if (seat.lastSeq > 0 && seq > seat.lastSeq + 1) {
+      this.send(seat, { t: 'rejected', seq, reason: 'retry' });
+      return;
+    }
     const now = this.options.now();
     if (now - seat.windowStart >= 1000) {
       seat.windowStart = now;
       seat.windowCount = 0;
     }
-    seat.windowCount += 1;
-    if (seat.windowCount > MAX_COMMANDS_PER_SECOND || seat.pending.length >= MAX_PENDING) {
+    if (seat.windowCount >= MAX_COMMANDS_PER_SECOND || seat.pending.length >= MAX_PENDING) {
+      // Номер не засчитан: клиент повторит эту и следующие команды позже.
       this.send(seat, { t: 'rejected', seq, reason: 'rateLimit' });
       return;
     }
+    seat.windowCount += 1;
+    seat.lastSeq = seq;
     seat.pending.push(cmd);
     this.send(seat, { t: 'ack', seq });
   }
