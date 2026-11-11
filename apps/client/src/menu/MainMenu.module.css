@@ -1,13 +1,10 @@
+/* Меню занимает ровно экран и не листается: карта-меню сама вписывается в оставшуюся высоту. */
 .page {
-  position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  justify-items: center;
-  align-items: center;
-  min-height: 100%;
-  box-sizing: border-box;
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--map-background);
 }
 
@@ -21,20 +18,20 @@
   position: relative;
   z-index: 1;
   display: flex;
-  width: 100%;
   box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  padding: var(--space-md) var(--space-md) 0;
+  padding: max(var(--space-md), env(safe-area-inset-top)) var(--space-md) 0;
 }
 
 .plate {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  justify-content: center;
   min-height: var(--touch-target-min);
   box-sizing: border-box;
+  margin: 0;
   padding: 0 var(--space-md);
   color: var(--ui-ink);
   font: inherit;
@@ -45,11 +42,11 @@
 }
 
 button.plate {
+  min-width: var(--touch-target-min);
   cursor: pointer;
 }
 
 .wordmark {
-  margin: 0;
   font-family: var(--font-display-family);
   text-transform: var(--ui-display-transform);
   letter-spacing: var(--ui-display-spacing);
@@ -57,68 +54,15 @@ button.plate {
   font-size: var(--font-size-title);
 }
 
-.icon {
-  width: 20px;
-  height: 20px;
-  flex: none;
-}
-
-/* Соты: большая «Играть» и три плитки вокруг неё. Координаты в долях --s (ширина малой плитки). */
-.stage {
-  --s: clamp(88px, min(36vw, 21vh), 150px);
+.mapArea {
   position: relative;
   z-index: 1;
-  width: calc(var(--s) * 2.3);
-  height: calc(var(--s) * 3.35);
-  margin: var(--space-md) 0;
-}
-
-.stage .tile {
-  position: absolute;
-  width: calc(var(--w) * var(--s));
-  left: calc(50% + (var(--cx) - var(--w) / 2) * var(--s));
-  top: calc((0.866 + var(--cy) - var(--w) * 0.57735) * var(--s));
-  gap: 2px;
-  font-size: clamp(12px, calc(var(--s) * 0.125), 17px);
-  font-weight: 600;
-  line-height: 1.15;
-}
-
-.tile small {
-  max-width: 78%;
-  color: var(--sub, var(--ui-ink2));
-  font-size: clamp(11px, calc(var(--s) * 0.09), 13px);
-  font-weight: 400;
-}
-
-.tile.big {
-  font-size: clamp(18px, calc(var(--s) * 0.2), 28px);
-}
-
-.tile.big small {
-  font-size: clamp(11px, calc(var(--s) * 0.095), 14px);
-}
-
-.profile {
-  position: relative;
-  z-index: 1;
-  margin-bottom: max(var(--space-md), env(safe-area-inset-bottom));
-}
-
-.dot {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  border-radius: 50%;
-  border: 2px solid var(--ui-ink);
+  min-height: 0;
   box-sizing: border-box;
+  padding: var(--space-sm) var(--space-sm) max(var(--space-sm), env(safe-area-inset-bottom));
 }
 
-.sub {
-  color: var(--ui-ink2);
-}
-
-/* Окно настроек: шторка снизу на телефоне, карточка по центру на широком экране. */
+/* Окно выбора: шторка снизу на телефоне, карточка по центру на широком экране. */
 .backdrop {
   position: fixed;
   inset: 0;
@@ -153,6 +97,21 @@ button.plate {
   }
 }
 
+/* Настройки игры на весь экран: свой экран, а не кусок шторки. */
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: max(var(--space-lg), env(safe-area-inset-top)) var(--space-lg)
+    max(var(--space-lg), env(safe-area-inset-bottom));
+  background: var(--ui-surface);
+}
+
 .title {
   margin: 0;
   font-family: var(--font-display-family);
@@ -167,26 +126,10 @@ button.plate {
   color: var(--ui-ink2);
 }
 
-.identityRow {
-  display: flex;
-  align-items: end;
-  gap: var(--space-sm);
-  margin-top: var(--space-lg);
-}
-
-.colorPicker {
-  position: relative;
-  flex: 0 0 28px;
-  height: var(--touch-target-min);
-  display: flex;
-  align-items: center;
-}
-
 .nickname {
   display: grid;
   gap: var(--space-sm);
   min-width: 0;
-  flex: 1;
 }
 
 .nickname > span {
@@ -203,25 +146,15 @@ button.plate {
   font: inherit;
 }
 
-.palette {
-  position: absolute;
-  z-index: 2;
-  bottom: calc(100% + var(--space-sm));
-  left: 0;
+.swatches {
   display: grid;
-  grid-template-columns: repeat(6, 28px);
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-sm);
-  padding: var(--space-sm);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-card);
-  corner-shape: var(--ui-corner);
-  background: var(--ui-panel-image) var(--ui-surface);
-  box-shadow: var(--shadow-hard);
 }
 
-.color {
-  width: 28px;
-  height: 28px;
+.swatch {
+  aspect-ratio: 1;
+  min-height: 36px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;
@@ -229,16 +162,16 @@ button.plate {
   transition: border-color 150ms var(--motion-easing);
 }
 
-.color:hover {
+.swatch:hover {
   border-color: var(--ui-border-strong);
 }
 
-.color:focus-visible {
+.swatch:focus-visible {
   outline: 2px solid var(--selection-color);
   outline-offset: 2px;
 }
 
-.color.selected {
+.swatch.selected {
   border-color: var(--selection-color);
   box-shadow: inset 0 0 0 3px var(--ui-surface);
 }
@@ -252,6 +185,7 @@ button.plate {
   justify-content: center;
   padding: 0 var(--space-xl);
   box-sizing: border-box;
+  border: 0;
   border-radius: var(--radius-button);
   background: var(--ui-button-primary-bg);
   color: var(--ui-button-primary-ink);
@@ -279,6 +213,12 @@ button.plate {
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+.levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-sm);
 }
 
@@ -324,24 +264,4 @@ button.plate {
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-}
-
-/* Низкий экран (телефон в ландшафте): соты меньше, чтобы всё помещалось без прокрутки. */
-@media (max-height: 520px) {
-  .stage {
-    --s: clamp(60px, 19vh, 110px);
-    margin: var(--space-xs) 0;
-  }
-
-  .top {
-    padding-top: var(--space-sm);
-  }
-
-  .plate {
-    min-height: 40px;
-  }
-
-  .profile {
-    margin-bottom: var(--space-sm);
-  }
 }

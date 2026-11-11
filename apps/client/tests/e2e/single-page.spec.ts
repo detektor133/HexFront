@@ -35,9 +35,13 @@ test('@layout «Играть» открывает матч на месте, «н
   await page.goto('/');
   await expect(page.locator('canvas')).toHaveCount(1, { timeout: 20_000 });
   const mark = await navMark(page);
+  // «Против ботов» — вторая страна на карте; «Играть» появляется в её окне выбора.
+  const bots = page.locator('svg [role="button"]').nth(1);
   const play = page.locator('a[role="button"]').first();
 
   for (let round = 0; round < 3; round += 1) {
+    await bots.click();
+    await expect(play).toBeVisible();
     await play.click();
     // Меню ушло (его кнопки нет), остались один холст и один воркер — матча.
     await expect(play).toHaveCount(0);
@@ -46,7 +50,7 @@ test('@layout «Играть» открывает матч на месте, «н
     expect(new URL(page.url()).pathname).toBe('/');
 
     await page.goBack();
-    await expect(play).toBeVisible();
+    await expect(bots).toBeVisible();
     // Снова один фоновый матч меню: матч игры освобождён.
     await expect.poll(() => liveWorkers(page), { timeout: 20_000 }).toBe(1);
     await expect(page.locator('canvas')).toHaveCount(1, { timeout: 20_000 });

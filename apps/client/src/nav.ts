@@ -57,7 +57,7 @@ export function navigate(url: string): void {
 }
 
 /** Обработчик нажатия по ссылке: обычное нажатие идёт внутри приложения, с Ctrl/⌘ и средней кнопкой — как у браузера. */
-export function followInApp(event: React.MouseEvent<HTMLAnchorElement>, url: string): boolean {
+export function followInApp(event: React.MouseEvent<Element>, url: string): boolean {
   if (event.defaultPrevented || event.button !== 0) return false;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   event.preventDefault();

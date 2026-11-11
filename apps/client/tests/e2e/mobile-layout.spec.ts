@@ -214,7 +214,7 @@ for (const size of SIZES) {
 }
 
 for (const size of SIZES) {
-  test(`@layout телефон ${size.name} ${size.width}×${size.height}: главное меню помещается и листается`, async ({
+  test(`@layout телефон ${size.name} ${size.width}×${size.height}: главное меню помещается без прокрутки`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -226,25 +226,27 @@ for (const size of SIZES) {
     await page.goto('/');
     await page.waitForTimeout(1200);
     const result = await page.evaluate(() => {
-      const card = document.querySelector<HTMLElement>('section');
-      const r = card?.getBoundingClientRect();
       const out: string[] = [];
-      if (!r) return ['нет карточки меню'];
-      if (r.left < -0.5 || r.right > window.innerWidth + 0.5) out.push('карточка шире экрана');
-      if (document.documentElement.scrollWidth > window.innerWidth)
-        out.push('горизонтальная прокрутка');
-      // Если карточка выше экрана, страница должна прокручиваться, а не обрезать кнопку «Играть».
-      const play = document.querySelector<HTMLElement>('a[role="button"]');
-      if (play) {
-        const p = play.getBoundingClientRect();
-        if (p.width < 44 || p.height < 44) out.push('кнопка меньше 44 px');
-      }
-      // Карточка выше экрана: страница листается, и кнопка «Играть» достаётся пальцем.
-      if (play) {
-        play.scrollIntoView({ block: 'end' });
-        const p = play.getBoundingClientRect();
-        if (p.bottom > window.innerHeight + 0.5 || p.top < 0)
-          out.push('кнопка «Играть» недоступна');
+      const area = document.querySelector<HTMLElement>('section');
+      const r = area?.getBoundingClientRect();
+      if (!r) return ['нет карты-меню'];
+      if (r.left < -0.5 || r.right > window.innerWidth + 0.5) out.push('карта шире экрана');
+      // Меню занимает ровно экран: ни горизонтальной, ни вертикальной прокрутки.
+      const page = document.scrollingElement ?? document.documentElement;
+      if (page.scrollWidth > window.innerWidth) out.push('горизонтальная прокрутка');
+      if (page.scrollHeight > window.innerHeight + 1) out.push('вертикальная прокрутка');
+      const countries = Array.from(document.querySelectorAll<SVGGElement>('svg [role="button"]'));
+      if (countries.length < 5) out.push(`стран на карте ${countries.length}, нужно 5`);
+      for (const country of countries) {
+        const p = country.getBoundingClientRect();
+        if (p.width < 44 || p.height < 44) out.push('страна меньше 44 px');
+        if (
+          p.left < -0.5 ||
+          p.right > window.innerWidth + 0.5 ||
+          p.top < -0.5 ||
+          p.bottom > window.innerHeight + 0.5
+        )
+          out.push('страна вылезает за экран');
       }
       return out;
     });
