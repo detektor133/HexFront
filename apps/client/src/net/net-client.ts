@@ -26,6 +26,7 @@ import {
 } from '@hexfront/protocol';
 import type { Command, GameEvent, PathPreview, PlayerView, Selection } from '@hexfront/sim';
 
+import { probed } from './probe-hook.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 
 /** Сокет, каким его видит клиент: тонкая обёртка над WebSocket. */
@@ -256,8 +257,9 @@ export class NetClient {
 
   private receive(text: string): void {
     try {
-      if (text.startsWith('{"t":"delta"')) this.onDelta(text);
-      else if (text.startsWith('{"t":"snapshot"')) this.onSnapshot(text);
+      if (text.startsWith('{"t":"delta"')) probed('разбор дельты', () => this.onDelta(text));
+      else if (text.startsWith('{"t":"snapshot"'))
+        probed('разбор снимка', () => this.onSnapshot(text));
       else this.onControl(JSON.parse(text) as S2C);
     } catch (error) {
       if (!(error instanceof ProtocolError || error instanceof SyntaxError)) throw error;

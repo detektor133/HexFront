@@ -86,6 +86,7 @@ test.afterAll(() => {
 });
 
 interface Probe {
+  __stages: Record<string, number[]>;
   __frames: number[];
   __long: number[];
 }
@@ -100,6 +101,12 @@ for (const format of FORMAT_LIST) {
         page.on('pageerror', (e) => console.log('pageerror', e.message));
         await page.addInitScript(() => {
           const w = window as unknown as Probe;
+          w.__stages = {};
+          (
+            globalThis as unknown as { __hexfrontProbe: (k: string, ms: number) => void }
+          ).__hexfrontProbe = (kind, ms) => {
+            (w.__stages[kind] ??= []).push(ms);
+          };
           w.__frames = [];
           w.__long = [];
           new PerformanceObserver((list) => {
@@ -128,6 +135,7 @@ for (const format of FORMAT_LIST) {
           const w = window as unknown as Probe;
           w.__frames.length = 0;
           w.__long.length = 0;
+          w.__stages = {};
         });
         await cdp.send('Profiler.start');
         await page.waitForTimeout(SECONDS * 1000);
@@ -151,6 +159,16 @@ for (const format of FORMAT_LIST) {
           };
         });
         console.log(`PROBE ${format} CPU x${throttle} скорость ${speed}:`, JSON.stringify(r));
+        const stages = await page.evaluate(() => {
+          const w = window as unknown as Probe;
+          return Object.entries(w.__stages).map(([kind, values]) => {
+            const s = [...values].sort((a, b) => a - b);
+            const at = (p: number): number =>
+              s[Math.min(s.length - 1, Math.floor(s.length * p))] ?? 0;
+            return `${kind}: ${s.length} шт, p50 ${at(0.5).toFixed(1)}, p99 ${at(0.99).toFixed(1)}, макс ${(s.at(-1) ?? 0).toFixed(1)} мс`;
+          });
+        });
+        for (const line of stages) console.log(`STAGE ${format} x${throttle} ${line}`);
       });
     }
   }

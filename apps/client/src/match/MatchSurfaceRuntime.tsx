@@ -55,6 +55,7 @@ import { appSearch } from '../nav.ts';
 import { webSocketTransport, type NetStatus } from '../net/net-client.ts';
 import { startOnlineMatch, type OnlineMatch } from '../net/online-match.ts';
 import { loadOnlineSession } from '../net/online-session.ts';
+import { probed } from '../net/probe-hook.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
@@ -481,7 +482,9 @@ export function useSandbox(
       });
     };
     /** `light` — промежуточное сообщение очереди: вид применяется к базе, но не рисуется и не ставится в state. */
-    const applyMessage = (m: WorkerViewMessage, light = false): void => {
+    const applyMessage = (m: WorkerViewMessage, light = false): void =>
+      probed(light ? 'применение (промежуточное)' : 'применение', () => applyMessageNow(m, light));
+    const applyMessageNow = (m: WorkerViewMessage, light: boolean): void => {
       let receivedView: PlayerView;
       try {
         receivedView =
