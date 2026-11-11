@@ -129,6 +129,8 @@ export function growthPerSecond(state: MatchState): Int32Array {
   const out = new Int32Array(hexes.pop.length);
   for (let id = 0; id < out.length; id += 1) {
     const pop = hexes.pop[id] as number;
+    // Пустой гекс без городского роста не растёт и не убывает: пропускаем до расчёта лимита.
+    if (pop === 0 && (tables.best[id] ?? 0) === 0) continue;
     const cap = capAt(tables, state, id);
     if (pop > cap) out[id] = -fpMul(pop as Fp, POP_OVERCAP_DECAY);
     else if (pop !== cap && cap !== 0) {
@@ -149,6 +151,7 @@ export function populationSystem(state: MatchState): void {
   const tables = passTables(state);
   for (let id = 0; id < hexes.pop.length; id += 1) {
     const pop = hexes.pop[id] ?? 0;
+    if (pop === 0 && (tables.best[id] ?? 0) === 0) continue;
     const cap = capAt(tables, state, id);
     if (pop > cap) {
       const decay = intDiv(fpMul(pop as Fp, POP_OVERCAP_DECAY), TICKS_PER_S);

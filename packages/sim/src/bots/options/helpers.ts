@@ -100,12 +100,11 @@ export function relativeEffects(
     defense: metrics.defense,
     supply: metrics.supply,
   };
-  return Object.fromEntries(
-    Object.entries(effects).map(([key, value]) => [
-      key,
-      key in denominators ? valueRatio(value, denominators[key] ?? ZERO) : value,
-    ]),
-  );
+  const out: Record<string, Fp> = {};
+  for (const [key, value] of Object.entries(effects)) {
+    out[key] = key in denominators ? valueRatio(value, denominators[key] ?? ZERO) : value;
+  }
+  return out;
 }
 
 export function hasOptionState(state: MatchState, context: BotTickContext): boolean {

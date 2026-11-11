@@ -35,7 +35,22 @@ export function resolveBotWeights(
   return weights as BotWeights;
 }
 
-function scoreOption(
+const CONTEXT_NAMES = ['threat', 'goldShare', 'neutralBorderShare'] as const;
+
+// Имена перекрёстных признаков «эффект*контекст» строятся раз на эффект, а не на каждую оценку.
+const crossKeys = new Map<string, readonly [string, string, string]>();
+
+function crossKeysOf(effect: string): readonly [string, string, string] {
+  let keys = crossKeys.get(effect);
+  if (keys === undefined) {
+    keys = [`${effect}*threat`, `${effect}*goldShare`, `${effect}*neutralBorderShare`];
+    crossKeys.set(effect, keys);
+  }
+  return keys;
+}
+
+/** Оценка по словарю признаков: эталон для быстрого пути (тест сверяет их до последнего бита). */
+export function scoreOptionByFeatures(
   option: CommandOption,
   context: ActionFeatureContext,
   weights: BotWeights,
@@ -44,6 +59,35 @@ function scoreOption(
   let score = 0;
   for (const [name, value] of Object.entries(features)) {
     score += (weights[name] ?? 0) * value;
+  }
+  return score;
+}
+
+/**
+ * Оценка варианта: сумма вес × признак в том же порядке, что у actionFeatures (сначала три
+ * контекста, затем по эффектам: сам эффект и его произведения с контекстами), поэтому результат
+ * совпадает с эталоном до последнего бита, но без словаря признаков и строк на каждый вызов.
+ */
+export function scoreOption(
+  option: CommandOption,
+  context: ActionFeatureContext,
+  weights: BotWeights,
+): number {
+  const contexts = [context.threat, context.goldShare, context.neutralBorderShare] as const;
+  let score = 0;
+  score += (weights.threat ?? 0) * context.threat;
+  score += (weights.goldShare ?? 0) * context.goldShare;
+  score += (weights.neutralBorderShare ?? 0) * context.neutralBorderShare;
+  for (const [effect, value] of Object.entries(option.effects)) {
+    // Эффект с именем контекста перезаписал бы его признак на месте: такой редкий случай — прежним путём.
+    if ((CONTEXT_NAMES as readonly string[]).includes(effect)) {
+      return scoreOptionByFeatures(option, context, weights);
+    }
+    score += (weights[effect] ?? 0) * value;
+    const keys = crossKeysOf(effect);
+    score += (weights[keys[0]] ?? 0) * fpMul(value, contexts[0]);
+    score += (weights[keys[1]] ?? 0) * fpMul(value, contexts[1]);
+    score += (weights[keys[2]] ?? 0) * fpMul(value, contexts[2]);
   }
   return score;
 }

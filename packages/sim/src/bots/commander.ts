@@ -17,6 +17,7 @@ import {
   SWARM_SAFE,
 } from '../balance.ts';
 import type { Command } from '../commands/types.ts';
+import { neighborTable, SIDES } from '../map/neighbor-table.ts';
 import type { MapStatic } from '../map/types.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -78,20 +79,25 @@ function enemyPieces(
 ): Piece[] {
   const out: Piece[] = [];
   const seen = new Set<EdgeId>();
-  const borders =
-    ownedHexes === undefined
-      ? borderEdges(g, me)
-      : ownedHexes.flatMap((h) =>
-          Array.from({ length: 6 }, (_, direction) => edgeOf(h, direction)).filter((e) =>
-            isBorderEdge(g, me, e),
-          ),
-        );
+  const borders = ownedHexes === undefined ? borderEdges(g, me) : borderEdgesOf(g, me, ownedHexes);
   for (const e of borders) {
     const enemy = g.hexes.owner[edgeOther(g, e)] ?? -1;
     if (!isEnemy(enemy) || seen.has(e)) continue;
     const edges = borderSegmentEdges(g, me, enemy, e);
     for (const x of edges) seen.add(x);
     if (edges.length > 0) out.push({ enemy, edges });
+  }
+  return out;
+}
+
+// Грани границы игрока среди его гексов: порядок гексов и направлений как у прежнего flatMap.
+function borderEdgesOf(g: Ground, me: number, ownedHexes: readonly HexId[]): EdgeId[] {
+  const out: EdgeId[] = [];
+  for (const h of ownedHexes) {
+    for (let direction = 0; direction < SIDES; direction += 1) {
+      const e = edgeOf(h, direction);
+      if (isBorderEdge(g, me, e)) out.push(e);
+    }
   }
   return out;
 }
@@ -262,15 +268,17 @@ function emptyNeutral(map: MapStatic, view: PlayerView, ownedHexes?: readonly He
       (h) => near[h] === 1,
     );
   } else {
-    candidates = [
-      ...new Set(
-        ownedHexes.flatMap((h) =>
-          neighbors(hexOf(map, h))
-            .filter((n) => inBounds(n, map.width, map.height))
-            .map((n) => hexId(n, map.width)),
-        ),
-      ),
-    ].sort((a, b) => a - b);
+    // Соседи своих гексов по возрастанию id: отметки в маске вместо Set и сортировки.
+    const table = neighborTable(map);
+    const mark = new Uint8Array(owner.length);
+    for (const h of ownedHexes) {
+      for (let side = 0; side < SIDES; side += 1) {
+        const n = table[h * SIDES + side] as number;
+        if (n >= 0) mark[n] = 1;
+      }
+    }
+    candidates = [];
+    for (let h = 0; h < mark.length; h += 1) if (mark[h] === 1) candidates.push(h);
   }
   const busy = new Set(view.units.map((u) => u.hex));
   const cities = new Set(view.cities.map((c) => c.hex));
