@@ -7,6 +7,16 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node --experimental-strip-types src/main.ts"
+  },
+  "dependencies": {
+    "@hexfront/mapgen": "workspace:*",
+    "@hexfront/protocol": "workspace:*",
+    "@hexfront/sim": "workspace:*",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }

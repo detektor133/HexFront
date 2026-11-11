@@ -11,13 +11,16 @@
 
 ```ts
 type C2S =
-  | { t: 'hello'; v: number; token?: string; nick: string; color?: string }
+  | { t: 'hello'; v: number; nick: string; token?: string; room?: string; mode?: 'open' | 'private' }
   | { t: 'cmd'; seq: number; cmd: Command }          // seq — для подтверждений
-  | { t: 'viewAck'; tick: number }                    // подтверждение применённого снимка
-  | { t: 'ping'; at: number };
+  | { t: 'viewAck'; tick: number }                    // подтверждение применённого снимка или дельты
+  | { t: 'ping'; at: number }
+  | { t: 'start' };                                   // хозяин закрытой комнаты запускает матч
 ```
 
-Команды — `Command` из `sim` (`architecture/sim-core.md`), в том числе `setArmyAuto` и `setAutoCommand` (CR-006); `source: 'auto'` клиент не отправляет — его ставит только сервер для команд commander.
+Кодек и проверки — `packages/protocol/src/messages.ts`. Вход: `mode: 'open'` (по умолчанию) — комната «Играть онлайн», сбор 30 с, свободные места занимают боты; `mode: 'private'` создаёт закрытую комнату, её код приходит в `welcome.room`, друзья входят с `room`; `token` возвращает игрока на прежнее место (реконнект).
+
+Команды — `Command` из `sim` (`architecture/sim-core.md`), в том числе `setArmyAuto` и `setAutoCommand` (CR-006). Сервер принимает только известные типы с простыми полями (целые, булевы, строки до 40 символов, массивы до 512), сообщение больше 8 КБ отбрасывается; `source: 'auto'` клиент не отправляет — его ставит только сервер для команд commander.
 
 Rate limit: ≤ 20 команд/с на игрока; превышение — команды отбрасываются с `rejected: rateLimit`.
 
@@ -25,14 +28,19 @@ Rate limit: ≤ 20 команд/с на игрока; превышение — �
 
 ```ts
 type S2C =
-  | { t: 'welcome'; playerId: number; map: MapStatic; tickMs: number }
+  | { t: 'welcome'; playerId: number; token: string; room: string; tickMs: number;
+      map: string; seed: number; players: number; fog: boolean }    // карту клиент собирает по map+seed
+  | { t: 'lobby'; info: { room; humans; max; startsInS: number | null; open: boolean } }
+  | { t: 'start'; tick: number }
   | { t: 'snapshot'; tick: number; view: PlayerViewFull }        // при входе/реконнекте
   | { t: 'delta'; tick: number; baseTick: number; d: ViewDelta }   // после подтверждения baseTick
   | { t: 'ack'; seq: number } | { t: 'rejected'; seq: number; reason: string }
-  | { t: 'event'; e: GameEvent }                                   // для ленты
-  | { t: 'end'; results: MatchResult }
+  | { t: 'refused'; reason: 'versionMismatch' | 'badNick' | 'roomFull' | 'noRoom' | 'badHello' }
+  | { t: 'end'; winner: number; tick: number }
   | { t: 'pong'; at: number };
 ```
+
+События для ленты едут внутри `delta.d.events`; игроку уходят только его события и политические (захват города, выбывание, победа, дипломатия с его участием). Поток дельт один на клиент и сервер (`ConfirmedViewDeltaStream` в `packages/protocol`, ADR-0017).
 
 ## Дельта-снимки
 

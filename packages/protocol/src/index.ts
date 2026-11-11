@@ -1,14 +1,12 @@
 import type { PlayerView } from '@hexfront/sim';
 
+import type { SnapshotMessage } from './snapshot-message.ts';
 import type { DeltaMessage } from './view-delta.ts';
 
+export * from './snapshot-message.ts';
 export * from './view-delta.ts';
-
-export interface SnapshotMessage {
-  readonly t: 'snapshot';
-  readonly tick: number;
-  readonly view: PlayerView;
-}
+export * from './delta-stream.ts';
+export * from './messages.ts';
 
 export class ProtocolError extends Error {
   public constructor(message: string) {
