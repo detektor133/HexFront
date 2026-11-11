@@ -13,7 +13,7 @@ HOST="${HEXFRONT_VPS_HOST:?не задан HEXFRONT_VPS_HOST (см. deploy/READM
 USER_NAME="${HEXFRONT_VPS_USER:-root}"
 KEY="${HEXFRONT_SSH_KEY:?не задан HEXFRONT_SSH_KEY (см. deploy/README.md)}"
 DOMAIN="${HEXFRONT_DOMAIN:-${HOST//./-}.sslip.io}"
-ORIGINS="${HEXFRONT_ORIGINS:-https://hexfront.pages.dev,https://*.hexfront.pages.dev}"
+ORIGINS="${HEXFRONT_ORIGINS:-https://hexfront-5d5.pages.dev,https://*.hexfront-5d5.pages.dev}"
 APP=/opt/hexfront
 
 SSH=(ssh -i "$KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 "$USER_NAME@$HOST")
