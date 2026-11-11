@@ -71,7 +71,8 @@ export type PlayerStatus = 'alive' | 'eliminated';
 
 export interface Player {
   readonly id: number;
-  readonly name?: string;
+  /** Ник; сервер меняет его, когда человек подсаживается на место бота. */
+  name?: string;
   /** fixed-point золота. */
   gold: Fp;
   /** Доля 0..0,4 в fixed-point. */

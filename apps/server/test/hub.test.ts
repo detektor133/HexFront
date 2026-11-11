@@ -379,3 +379,89 @@ describe('онлайн считается по живым соединениям
     expect(hub.roomById(a.of('welcome')[0]?.room ?? '')?.humans).toBe(1);
   });
 });
+
+describe('упаковка комнат', () => {
+  function packing(options: { budgetMs?: number; lateJoinSeconds?: number } = {}) {
+    let now = 1_000_000;
+    const hub = new Hub({
+      now: () => now,
+      size: SIZE,
+      makeMap: () => MAP,
+      lateJoinSeconds: 30,
+      ...options,
+    });
+    return {
+      hub,
+      advance: (ms: number) => {
+        now += ms;
+      },
+      tick: (n = 1) => {
+        for (let i = 0; i < n; i += 1) hub.tickAll();
+      },
+    };
+  }
+
+  it('новый игрок подсаживается на место бота в идущей открытой игре, а не создаёт комнату', () => {
+    const { hub, advance, tick } = packing();
+    const a = new Client(hub, 'ip-a');
+    a.hello('Аня');
+    advance((GATHER_SECONDS + 1) * 1000);
+    tick(5);
+    const roomId = a.of('welcome')[0]?.room ?? '';
+
+    const b = new Client(hub, 'ip-b');
+    b.hello('Борис');
+    const welcome = b.of('welcome')[0];
+    expect(welcome?.room).toBe(roomId);
+    expect(b.of('start')).toHaveLength(1);
+    expect(hub.stats().rooms).toBe(1);
+
+    const state = hub.roomById(roomId)?.state;
+    const player = state?.players[welcome?.playerId ?? -1];
+    expect(player?.name).toBe('Борис');
+    expect(welcome?.playerId).not.toBe(0);
+    // Страна человека не под автокомандованием, у бота она была под ним.
+    expect(player?.autoCommand).toBe(false);
+    expect(
+      state?.armies.filter((army) => army.owner === welcome?.playerId).every((x) => !x.auto),
+    ).toBe(true);
+    tick(3);
+    expect(b.count('snapshot')).toBeGreaterThan(0);
+  });
+
+  it('после окна подсадки новые игроки получают новую комнату, места бота не заняты дважды', () => {
+    const { hub, advance, tick } = packing({ lateJoinSeconds: 5 });
+    const first = new Client(hub, 'ip-0');
+    first.hello('Игрок0');
+    advance((GATHER_SECONDS + 1) * 1000);
+    tick(3);
+    const ids = new Set<number>([first.of('welcome')[0]?.playerId ?? -1]);
+    for (let i = 1; i < 4; i += 1) {
+      const c = new Client(hub, `ip-${i}`);
+      c.hello(`Игрок${i}`);
+      ids.add(c.of('welcome')[0]?.playerId ?? -1);
+    }
+    expect(ids.size).toBe(4);
+    expect(hub.stats().rooms).toBe(1);
+
+    tick(60);
+    const late = new Client(hub, 'ip-late');
+    late.hello('Поздний');
+    expect(late.of('welcome')[0]?.room).not.toBe(first.of('welcome')[0]?.room);
+    expect(hub.stats().rooms).toBe(2);
+  });
+
+  it('допуск по цене: комнаты сверх бюджета тика не создаются, идущие матчи не страдают', () => {
+    const { hub } = packing({ budgetMs: 20 });
+    const refusals: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const c = new Client(hub, `ip-${i}`);
+      c.hello(`Игрок${i}`, { mode: 'private' });
+      if (c.of('refused')[0]) refusals.push(c.of('refused')[0]?.reason ?? '');
+    }
+    expect(hub.stats().rooms).toBe(2);
+    expect(refusals).toEqual(['busy', 'busy']);
+    expect(hub.stats().budgetMs).toBe(20);
+    expect(hub.stats().projectedMs).toBeGreaterThan(0);
+  });
+});

@@ -14,7 +14,7 @@ import {
 import { loadMap, TICK_MS, type MapStatic } from '@hexfront/sim';
 
 import { sanitizeNick } from './nick.ts';
-import { Room, type Connection } from './room.ts';
+import { LATE_JOIN_TICKS, Room, type Connection } from './room.ts';
 
 /** Игроков в матче «быстрого матча»: люди и боты вместе (docs/stages/stage-09-analysis.md). */
 export const MATCH_SIZE = 30;
@@ -34,6 +34,9 @@ export const MAX_HELLOS_PER_MINUTE = 30;
 export interface HubStats {
   readonly rooms: number;
   readonly humans: number;
+  /** Прогноз суммы цен комнат, мс на тик, и бюджет: запас = бюджет − прогноз. */
+  readonly projectedMs: number;
+  readonly budgetMs: number;
   /** Время одного тика всех комнат, мс (по последним ~минуте). */
   readonly tickMs: { readonly p50: number; readonly p99: number; readonly max: number };
   /** Процессорное время процесса с запуска, мс. */
@@ -50,8 +53,17 @@ export interface HubOptions {
   /** Подмена карты в тестах; по умолчанию генерация по сиду комнаты. */
   readonly makeMap?: (seed: number, size: number) => MapStatic;
   readonly log?: (event: string, data?: Record<string, unknown>) => void;
-  /** Предел комнат процесса: дальше новые входы получают `busy`. */
+  /** Жёсткий предел комнат процесса: дальше новые входы получают `busy`. */
   readonly maxRooms?: number;
+  /**
+   * Бюджет тика, мс: сумма сглаженных цен комнат плюс цена новой не должна его превышать (на тик
+   * отведено 100 мс, остальное — сеть, сборка мусора, запас на поздние стадии).
+   */
+  readonly budgetMs?: number;
+  /** Цена комнаты до первых замеров, мс (поздние стадии дороже ранних, поэтому с запасом). */
+  readonly roomEstimateMs?: number;
+  /** Секунд с начала матча, пока можно подсесть на место бота; 0 — выключено. */
+  readonly lateJoinSeconds?: number;
 }
 
 /** Карта комнаты: та же, что клиент берёт готовым файлом `gen-<сид>-30.json` (размер общий). */
@@ -207,6 +219,9 @@ export class Hub {
   private nextAt = 0;
   private logger: NonNullable<HubOptions['log']>;
   private readonly maxRooms: number;
+  private readonly budgetMs: number;
+  private readonly roomEstimateMs: number;
+  private readonly lateJoinTicks: number;
   private readonly tickSamples = new Float64Array(TICK_SAMPLES);
   private tickCount = 0;
   private readonly sessions = new Set<Session>();
@@ -219,7 +234,10 @@ export class Hub {
     this.fog = options.fog ?? true;
     this.makeMap = options.makeMap ?? cachedMap;
     this.logger = options.log ?? (() => undefined);
-    this.maxRooms = options.maxRooms ?? 12;
+    this.maxRooms = options.maxRooms ?? 24;
+    this.budgetMs = options.budgetMs ?? 65;
+    this.roomEstimateMs = options.roomEstimateMs ?? 8;
+    this.lateJoinTicks = (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10;
   }
 
   /** Текущее время хаба, мс. */
@@ -244,6 +262,8 @@ export class Hub {
     return {
       rooms: this.rooms.size,
       humans,
+      projectedMs: Math.round(this.projectedMs() * 10) / 10,
+      budgetMs: this.budgetMs,
       tickMs: { p50: pick(0.5), p99: pick(0.99), max: used.at(-1) ?? 0 },
       cpuMs: Math.round((cpu.user + cpu.system) / 1000),
       rssMb: Math.round(process.memoryUsage().rss / 1048576),
@@ -318,10 +338,34 @@ export class Hub {
       return room;
     }
     if (message.mode === 'private') return this.createOrRefuse(session, 'private');
+    // 1) открытый набор; 2) подсадка на место бота в самой заполненной идущей игре; 3) новая комната.
     for (const room of this.rooms.values()) {
       if (room.mode === 'open' && room.hasFreeSeat) return room;
     }
-    return this.createOrRefuse(session, 'open');
+    let fullest: Room | null = null;
+    for (const room of this.rooms.values()) {
+      if (room.canLateJoin && (fullest === null || room.connected > fullest.connected)) {
+        fullest = room;
+      }
+    }
+    return fullest ?? this.createOrRefuse(session, 'open');
+  }
+
+  /** Сколько мс на тик займут комнаты сейчас: идущие — по замеру, наборы — по средней оценке. */
+  public projectedMs(): number {
+    const measured = [...this.rooms.values()].filter((r) => r.phase === 'running' && r.costMs > 0);
+    const average =
+      measured.length === 0
+        ? this.roomEstimateMs
+        : Math.max(
+            this.roomEstimateMs,
+            measured.reduce((s, r) => s + r.costMs, 0) / measured.length,
+          );
+    let sum = 0;
+    for (const room of this.rooms.values()) {
+      sum += room.phase === 'running' && room.costMs > 0 ? room.costMs : average;
+    }
+    return sum;
   }
 
   private createOrRefuse(session: Session, mode: 'open' | 'private'): Room | null {
@@ -332,6 +376,15 @@ export class Hub {
 
   private createRoom(mode: 'open' | 'private'): Room | null {
     if (this.rooms.size >= this.maxRooms) return null;
+    // Допуск по реальной цене: новая комната пускается, только если вместе с ней сумма цен укладывается
+    // в бюджет тика; идущие матчи при этом не страдают, новый игрок получает «сервер занят».
+    if (this.projectedMs() + this.roomEstimateMs > this.budgetMs) {
+      this.log('admissionRefused', {
+        rooms: this.rooms.size,
+        projectedMs: Math.round(this.projectedMs()),
+      });
+      return null;
+    }
     const id =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
     // Карта берётся из готовых файлов клиента (быстрый матч): сид из общего списка.
@@ -345,6 +398,7 @@ export class Hub {
       size: this.size,
       fog: this.fog,
       now: this.now,
+      lateJoinTicks: this.lateJoinTicks,
     });
     this.rooms.set(id, room);
     this.log('roomCreated', { room: id, mode });

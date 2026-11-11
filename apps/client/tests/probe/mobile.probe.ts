@@ -17,7 +17,7 @@ const SPEEDS = [1];
 const SECONDS = 20;
 // Какие форматы гонять сейчас: 'light', 'medium', 'heavy' (локальная игра) и 'online' — матч на 30
 // игроков против настоящего сервера (запускается на время зонда), клиент без своей симуляции.
-const FORMAT_LIST = ['online'];
+const FORMAT_LIST = ['light', 'medium', 'heavy', 'online'];
 const SERVER_PORT = 18_090;
 const SERVER_URL = `ws://127.0.0.1:${SERVER_PORT}`;
 

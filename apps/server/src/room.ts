@@ -40,6 +40,12 @@ import {
 
 /** Сколько секунд комната ждёт людей в открытом наборе, потом боты занимают свободные места. */
 export const GATHER_SECONDS = 30;
+/**
+ * До какого тика в идущую открытую игру можно подсесть на место бота (4 минуты): война ботов
+ * начинается на 5-й минуте, до неё у бота ещё мало отвоёвано. Так комнаты наполняются людьми
+ * вместо десятков полупустых комнат с ботами (цена комнаты почти не зависит от числа людей).
+ */
+export const LATE_JOIN_TICKS = 2400;
 /** Сколько секунд игрок может быть вне связи, пока его армиями не займётся бот. */
 export const RECONNECT_SECONDS = 30;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
@@ -68,6 +74,8 @@ export interface Connection {
 }
 
 export interface RoomOptions {
+  /** Тиков с начала матча, пока можно подсесть на место бота; 0 — подсадка выключена. */
+  readonly lateJoinTicks?: number;
   readonly id: string;
   readonly mode: JoinMode;
   readonly map: MapStatic;
@@ -163,6 +171,9 @@ export class Room {
     return this.seats.filter((s) => s.conn !== null).length;
   }
 
+  /** Сглаженная цена тика комнаты, мс; 0 — ещё не измерена. */
+  public costMs = 0;
+
   public get humans(): number {
     return this.seats.length;
   }
@@ -197,10 +208,53 @@ export class Room {
    * @returns токен сессии и id игрока либо `null`, если мест нет или матч идёт
    */
   public join(conn: Connection, nick: string): { token: string; playerId: number } | null {
+    if (this.phase === 'running') return this.lateJoin(conn, nick);
     if (!this.hasFreeSeat) return null;
     const playerId = this.seats.length;
     const token = `${this.id}-${playerId}-${(this.nextToken += 1)}-${randomPart()}`;
-    this.seats.push({
+    this.seats.push(this.newSeat(playerId, token, nick, conn));
+    if (this.mode === 'open' && this.gatherEndsAt === null) {
+      this.gatherEndsAt = this.options.now() + GATHER_SECONDS * 1000;
+    }
+    this.sendWelcome(this.seats[playerId] as Seat);
+    if (this.seats.length >= this.options.size) this.start();
+    else this.broadcastLobby();
+    return { token, playerId };
+  }
+
+  /** Можно ли сейчас подсесть на место бота в идущей открытой игре. */
+  public get canLateJoin(): boolean {
+    return this.freeBotSlot() !== null;
+  }
+
+  private freeBotSlot(): { id: number } | null {
+    const state = this.state;
+    const limit = this.options.lateJoinTicks ?? LATE_JOIN_TICKS;
+    if (this.mode !== 'open' || this.phase !== 'running' || state === null) return null;
+    if (state.tick >= limit) return null;
+    const taken = new Set(this.seats.map((s) => s.playerId));
+    return state.players.find((p) => !taken.has(p.id) && p.status === 'alive') ?? null;
+  }
+
+  /** Человек занимает место бота в идущей игре: его страна, армии и город с этого тика его. */
+  private lateJoin(conn: Connection, nick: string): { token: string; playerId: number } | null {
+    const slot = this.freeBotSlot();
+    const state = this.state;
+    if (slot === null || state === null) return null;
+    const playerId = slot.id;
+    const token = `${this.id}-${playerId}-${(this.nextToken += 1)}-${randomPart()}`;
+    const seat = this.newSeat(playerId, token, nick, conn);
+    this.seats.push(seat);
+    const player = state.players[playerId];
+    if (player !== undefined) player.name = nick;
+    this.takeBack(seat);
+    this.sendWelcome(seat);
+    this.send(seat, { t: 'start', tick: state.tick });
+    return { token, playerId };
+  }
+
+  private newSeat(playerId: number, token: string, nick: string, conn: Connection): Seat {
+    return {
       playerId,
       token,
       nick,
@@ -218,14 +272,7 @@ export class Room {
       botControlled: false,
       windowStart: 0,
       windowCount: 0,
-    });
-    if (this.mode === 'open' && this.gatherEndsAt === null) {
-      this.gatherEndsAt = this.options.now() + GATHER_SECONDS * 1000;
-    }
-    this.sendWelcome(this.seats[playerId] as Seat);
-    if (this.seats.length >= this.options.size) this.start();
-    else this.broadcastLobby();
-    return { token, playerId };
+    };
   }
 
   /**
@@ -435,6 +482,9 @@ export class Room {
       stepMs: stepped - decided,
       viewMs: done - stepped,
     };
+    // Сглаженная цена тика комнаты (≈ 5 с памяти): по ней хаб решает, пускать ли новые комнаты.
+    const total = done - started;
+    this.costMs = this.costMs === 0 ? total : this.costMs * 0.98 + total * 0.02;
     if (state.winner >= 0) this.finish(state);
   }
 

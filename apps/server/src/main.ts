@@ -1,6 +1,7 @@
 // Запуск сервера. Настройки — переменные окружения:
 //   PORT (8080), HOST (127.0.0.1: наружу смотрит только Caddy), ALLOWED_ORIGINS (через запятую),
-//   TRUST_PROXY=1 (адрес клиента из X-Forwarded-For), MAX_ROOMS (12).
+//   TRUST_PROXY=1 (адрес клиента из X-Forwarded-For), MAX_ROOMS (24), TICK_BUDGET_MS (65),
+//   LATE_JOIN_SECONDS (240; 0 — не подсаживать в идущие игры).
 // Логи — JSON-строки в stdout.
 import { Hub, MATCH_SIZE, warmMaps } from './hub.ts';
 import { startServer } from './server.ts';
@@ -11,7 +12,9 @@ const origins = (process.env.ALLOWED_ORIGINS ?? '')
   .map((origin) => origin.trim())
   .filter((origin) => origin !== '');
 const hub = new Hub({
-  maxRooms: Number(process.env.MAX_ROOMS ?? 12),
+  maxRooms: Number(process.env.MAX_ROOMS ?? 24),
+  budgetMs: Number(process.env.TICK_BUDGET_MS ?? 65),
+  lateJoinSeconds: Number(process.env.LATE_JOIN_SECONDS ?? 240),
   log(event, data) {
     process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), event, ...data })}\n`);
   },
