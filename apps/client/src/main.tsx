@@ -7,7 +7,7 @@ import { DevUnitsPage } from './dev/DevUnitsPage.tsx';
 import { messages, t } from './i18n/dict.ts';
 import { applyDocumentLang } from './i18n/document-lang.ts';
 import { MatchPage } from './match/MatchPage.tsx';
-import { MainMenu } from './menu/MainMenu.tsx';
+import { MenuHost } from './menu/MenuHost.tsx';
 import { OnlineLobby } from './menu/OnlineLobby.tsx';
 import { useLocation } from './nav.ts';
 import { isDevPath, isMatchPath } from './routes.ts';
@@ -19,7 +19,7 @@ import './theme/global.css';
 
 export function App(): React.JSX.Element {
   const { pathname: path, search } = useLocation();
-  if (path === '/' || path === '/menu') return <MainMenu />;
+  if (path === '/' || path === '/menu') return <MenuHost />;
   // Ключ по строке запроса: переход к другому матчу собирает экран заново.
   if (isMatchPath(path)) return <MatchPage key={search} />;
   if (path === '/online') return <OnlineLobby key={search} search={search} />;

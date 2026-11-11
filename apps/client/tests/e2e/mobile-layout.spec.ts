@@ -223,6 +223,7 @@ for (const size of SIZES) {
       isMobile: true,
     });
     const page = await context.newPage();
+    await page.addInitScript(() => localStorage.setItem('hexfront.menuVariant', 'classic'));
     await page.goto('/');
     await page.waitForTimeout(1200);
     const result = await page.evaluate(() => {

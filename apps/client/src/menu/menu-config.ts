@@ -1,0 +1,114 @@
+// Общие настройки меню: ник, цвет и параметры матча против ботов. Хранятся в localStorage, чтобы
+// все виды меню и онлайн-лобби видели одно и то же.
+import { useCallback, useState } from 'react';
+
+import { quickMatchUrl } from '../routes.ts';
+import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
+import { tokens } from '../theme/tokens.ts';
+
+const MAP_KEY = 'hexfront.map';
+const PLAYERS_KEY = 'hexfront.players';
+const LEVEL_KEY = 'hexfront.botLevel';
+
+/** Карты меню: id, размер в гексах и можно ли выбирать число игроков. */
+export const MAPS = [
+  { id: 'europe', size: '76×64', choosePlayers: true },
+  { id: 'gen', size: '80×60', choosePlayers: false },
+  { id: 'small', size: '40×30', choosePlayers: false },
+  { id: 'tiny', size: '20×15', choosePlayers: false },
+] as const;
+export type MenuMapId = (typeof MAPS)[number]['id'];
+
+export const LEVELS = ['easy', 'normal', 'hard'] as const;
+export type MenuLevel = (typeof LEVELS)[number];
+
+export const PLAYERS_MIN = 2;
+export const PLAYERS_MAX = 30;
+export const PLAYERS_STEP = 2;
+const PLAYERS_DEFAULT = 12;
+const LEVEL_DEFAULT: MenuLevel = 'normal';
+
+/** Ник короче этого в игру не берётся (сервер отклонит), поэтому меню не даёт его оставить. */
+export const NICK_MIN = 2;
+export const NICK_MAX = 16;
+
+export interface MenuSettings {
+  readonly nickname: string;
+  readonly color: string;
+  readonly map: MenuMapId;
+  readonly players: number;
+  readonly level: MenuLevel;
+}
+
+function read(key: string, fallback: string): string {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function write(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Хранилище закрыто: настройки живут до закрытия вкладки.
+  }
+}
+
+export function loadSettings(): MenuSettings {
+  const players = Number(read(PLAYERS_KEY, String(PLAYERS_DEFAULT)));
+  return {
+    nickname: read(NICKNAME_KEY, ''),
+    color: read(COLOR_KEY, tokens.players.palette[0]?.id ?? 'teal'),
+    map: MAPS.find((m) => m.id === read(MAP_KEY, 'europe'))?.id ?? 'europe',
+    players: Number.isInteger(players)
+      ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, players))
+      : PLAYERS_DEFAULT,
+    level: LEVELS.find((l) => l === read(LEVEL_KEY, LEVEL_DEFAULT)) ?? LEVEL_DEFAULT,
+  };
+}
+
+function saveSettings(s: MenuSettings): void {
+  write(NICKNAME_KEY, s.nickname);
+  write(COLOR_KEY, s.color);
+  write(MAP_KEY, s.map);
+  write(PLAYERS_KEY, String(s.players));
+  write(LEVEL_KEY, s.level);
+}
+
+/** Настройки с немедленным сохранением: «Играть» и лобби читают их из хранилища. */
+export function useMenuSettings(): readonly [MenuSettings, (patch: Partial<MenuSettings>) => void] {
+  const [settings, setSettings] = useState<MenuSettings>(loadSettings);
+  const update = useCallback((patch: Partial<MenuSettings>): void => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+  return [settings, update];
+}
+
+/** Ник годится для входа: пустой допустим (подставится имя по умолчанию), один символ — нет. */
+export function nickProblem(nickname: string): boolean {
+  return nickname.length > 0 && nickname.length < NICK_MIN;
+}
+
+/** Случайное зерно матча на Европе: стартовые позиции и порядок игроков каждый раз другие. */
+function randomSeed(): number {
+  return Math.floor(Math.random() * 1_000_000_000);
+}
+
+/** Ссылка на матч против ботов по настройкам меню. */
+export function matchUrl(s: MenuSettings): string {
+  const start =
+    s.map === 'gen'
+      ? quickMatchUrl()
+      : `/match?map=${s.map}&seed=${s.map === 'europe' ? randomSeed() : 42}&players=${s.map === 'europe' ? s.players : 2}`;
+  const url = new URL(start, window.location.origin);
+  if (s.nickname !== '') url.searchParams.set('name', s.nickname);
+  url.searchParams.set('color', s.color);
+  url.searchParams.set('difficulty', s.level);
+  return `${url.pathname}?${url.searchParams.toString()}`;
+}

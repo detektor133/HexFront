@@ -32,6 +32,7 @@ test('@layout «Играть» открывает матч на месте, «н
   page,
 }) => {
   await trackWorkers(page);
+  await page.addInitScript(() => localStorage.setItem('hexfront.menuVariant', 'classic'));
   await page.goto('/');
   await expect(page.locator('canvas')).toHaveCount(1, { timeout: 20_000 });
   const mark = await navMark(page);
