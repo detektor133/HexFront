@@ -22,6 +22,8 @@ import { rebuildSupplyPlan } from '../commands/rebuild-supply.ts';
 import { recruitCapacity } from '../commands/recruit.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, intDiv, type Fp } from '../math/int.ts';
+import { memo } from '../state/derived.ts';
+import { memoryRevision } from '../state/layers.ts';
 import { isCityIsolated } from '../state/network.ts';
 import { OFFER_TTL_TICKS, allianceOf, groupOf, relationOf } from '../state/relations.ts';
 import type { Relation, TreatyKind } from '../state/types.ts';
@@ -269,14 +271,58 @@ function memoryCopy(memory: Uint8Array | undefined, length: number): Uint8Array 
   return memory ? memory.slice() : new Uint8Array(length);
 }
 
+// Слои вида, общие для всех игроков, делятся между видами и тиками, пока не меняется их слой
+// состояния (версии — state/layers.ts): вместо копии на игрока на тик. Слои вида только для чтения.
+function sharedOwner(state: MatchState): Int16Array {
+  return memo(state, 'view.owner', ['owner'], () => state.hexes.owner.slice());
+}
+
+function openLayers(state: MatchState): {
+  readonly improvement: Uint8Array;
+  readonly building: Uint8Array;
+  readonly road: Uint8Array;
+} {
+  return memo(state, 'view.open', ['improvement', 'building', 'road'], () => ({
+    improvement: state.hexes.improvement.slice(),
+    building: state.hexes.building.slice(),
+    road: state.hexes.road.slice(),
+  }));
+}
+
+// Память тумана игрока: копии дорог, улучшений и построек, пока игрок не увидел ничего нового.
+function memoryLayers(
+  state: MatchState,
+  playerId: number,
+): { readonly improvement: Uint8Array; readonly building: Uint8Array; readonly road: Uint8Array } {
+  const vision = state.vision;
+  const length = state.hexes.owner.length;
+  return memo(
+    state,
+    `view.memory.${playerId}`,
+    [],
+    () => ({
+      improvement: memoryCopy(vision?.improvement[playerId], length),
+      building: memoryCopy(vision?.building[playerId], length),
+      road: memoryCopy(vision?.road[playerId], length),
+    }),
+    [memoryRevision(state, playerId)],
+  );
+}
+
+/** Слои вида, которые вызывающий уже имеет и не хочет считать заново (например, медленные). */
+export type PlayerViewReuse = Partial<Pick<PlayerView['hexes'], 'pop' | 'growth'>>;
+
 /**
- * Снимок для игрока. Массивы — копии: клиент может их менять, состояние не пострадает.
+ * Снимок для игрока. Слои гексов — отдельные от состояния копии (изменение вида состояние не
+ * затрагивает), но общие между видами и тиками, пока не менялся их слой: менять их нельзя.
+ * `reuse` — слои, которые не нужно считать (вызывающий передаёт прежние для медленных слоёв).
  * @returns данные для отрисовки и интерфейса
  */
 export function playerView(
   state: MatchState,
   playerId: number,
   context?: PlayerViewContext,
+  reuse?: PlayerViewReuse,
 ): PlayerView {
   // Контекст уже пересчитал обзор на этот тик; без контекста — как раньше.
   const viewContext = context ?? createPlayerViewContext(state);
@@ -285,9 +331,7 @@ export function playerView(
   const visible = state.fog
     ? (vision?.visible[playerId] ?? new Uint8Array(hexes.owner.length).fill(1))
     : new Uint8Array(hexes.owner.length).fill(1);
-  const memoryRoad = vision?.road[playerId];
-  const memoryImprovement = vision?.improvement[playerId];
-  const memoryBuilding = vision?.building[playerId];
+  const layers = state.fog ? memoryLayers(state, playerId) : openLayers(state);
   const diplomacy = diplomacyView(state, playerId);
   const ranking = Array.from(viewContext.scores, (score, id) => ({
     id,
@@ -303,18 +347,16 @@ export function playerView(
     ranking,
     ...(diplomacy ? { diplomacy } : {}),
     hexes: {
-      // slice копирует типизированный массив целиком, без поэлементного обхода итератора.
-      owner: hexes.owner.slice(),
-      pop: state.fog ? ownedOnly(hexes.pop, hexes.owner, playerId) : hexes.pop.slice(),
-      improvement: state.fog
-        ? memoryCopy(memoryImprovement, hexes.improvement.length)
-        : hexes.improvement.slice(),
-      building: state.fog
-        ? memoryCopy(memoryBuilding, hexes.building.length)
-        : hexes.building.slice(),
-      road: state.fog ? memoryCopy(memoryRoad, hexes.road.length) : hexes.road.slice(),
+      owner: sharedOwner(state),
+      pop:
+        reuse?.pop ?? (state.fog ? ownedOnly(hexes.pop, hexes.owner, playerId) : hexes.pop.slice()),
+      improvement: layers.improvement,
+      building: layers.building,
+      road: layers.road,
       link: visibleOnly(viewContext.links, visible),
-      growth: state.fog ? ownedOnly(viewContext.growth, hexes.owner, playerId) : viewContext.growth,
+      growth:
+        reuse?.growth ??
+        (state.fog ? ownedOnly(viewContext.growth, hexes.owner, playerId) : viewContext.growth),
       visible: visible.slice(),
     },
     cities: state.cities.map((c) => ({

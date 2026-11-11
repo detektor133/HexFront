@@ -12,6 +12,7 @@ import {
   encodeDelta,
   equalValue,
   paceView,
+  slowLayerReuse,
   SLOW_PERIOD_TICKS,
 } from '../../../packages/protocol/src/index.ts';
 import {
@@ -62,10 +63,11 @@ describe('дельта вида восстанавливает вид по ре�
         ]);
         const viewContext = createPlayerViewContext(state);
         for (const id of WATCHED) {
-          const view = playerView(state, id, viewContext);
           const mirror = mirrors.get(id);
+          // Как сервер: вне срока синхронизации медленные слои берутся из базы, а не считаются.
+          const sync = state.tick - (syncedAt.get(id) ?? 0) >= SLOW_PERIOD_TICKS;
+          const view = playerView(state, id, viewContext, slowLayerReuse(mirror ?? null, sync));
           if (mirror && canBuildViewDelta(mirror, view)) {
-            const sync = view.tick - (syncedAt.get(id) ?? 0) >= SLOW_PERIOD_TICKS;
             const sent = paceView(mirror, view, sync);
             const wire = decodeDelta(encodeDelta(buildViewDelta(mirror, sent, [])), mirror.tick);
             const restored = applyViewDelta(mirror, wire);

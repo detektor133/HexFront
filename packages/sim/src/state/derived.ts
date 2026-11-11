@@ -86,13 +86,14 @@ export function memo<T>(
   key: string,
   layers: readonly Layer[],
   compute: () => T,
+  extra: readonly number[] = [],
 ): T {
   let byKey = entries.get(state);
   if (byKey === undefined) {
     byKey = new Map();
     entries.set(state, byKey);
   }
-  const current = layers.map((layer) => layerRevision(state, layer));
+  const current = [...layers.map((layer) => layerRevision(state, layer)), ...extra];
   const cached = byKey.get(key);
   const counters = statsOf(state, key);
   if (cached !== undefined && cached.revisions.every((r, i) => r === current[i])) {

@@ -20,6 +20,7 @@ import {
   canBuildViewDelta,
   encodeDelta,
   paceView,
+  slowLayerReuse,
   SLOW_PERIOD_TICKS,
 } from '../../../packages/protocol/src/index.ts';
 import {
@@ -124,7 +125,18 @@ function runRoom(): void {
     step(state, commands);
     at = add(window, 'step', at);
     const viewContext = createPlayerViewContext(state);
-    const views = Array.from({ length: humans }, (_, id) => playerView(state, id, viewContext));
+    const syncs = Array.from(
+      { length: humans },
+      (_, id) => state.tick - (syncedAt[id] as number) >= SLOW_PERIOD_TICKS,
+    );
+    const views = Array.from({ length: humans }, (_, id) =>
+      playerView(
+        state,
+        id,
+        viewContext,
+        slowLayerReuse(confirmed[id] ?? null, syncs[id] as boolean),
+      ),
+    );
     at = add(window, 'виды', at);
     for (let id = 0; id < humans; id += 1) {
       const view = views[id] as PlayerView;
@@ -133,7 +145,7 @@ function runRoom(): void {
         confirmed[id] = view;
         continue;
       }
-      const sync = view.tick - (syncedAt[id] as number) >= SLOW_PERIOD_TICKS;
+      const sync = syncs[id] as boolean;
       if (sync) syncedAt[id] = view.tick;
       const sent = paceView(base, view, sync);
       const message = buildViewDelta(base, sent, state.events);

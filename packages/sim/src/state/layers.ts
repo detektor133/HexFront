@@ -35,6 +35,24 @@ export function touchLayer(state: MatchState, layer: Layer): void {
   revisionsOf(state)[layer] += 1;
 }
 
+// Память тумана игрока (последние виденные дороги, улучшения, постройки): у каждого своя версия.
+const memoryRevisions = new WeakMap<MatchState, number[]>();
+
+/** Версия памяти тумана игрока; растёт, когда игрок увидел изменение в памяти. */
+export function memoryRevision(state: MatchState, playerId: number): number {
+  return memoryRevisions.get(state)?.[playerId] ?? 0;
+}
+
+/** Отмечает, что память тумана игрока изменилась. */
+export function touchMemory(state: MatchState, playerId: number): void {
+  let current = memoryRevisions.get(state);
+  if (current === undefined) {
+    current = [];
+    memoryRevisions.set(state, current);
+  }
+  current[playerId] = (current[playerId] ?? 0) + 1;
+}
+
 /** Задаёт уровень улучшения гекса. */
 export function setImprovement(state: MatchState, hex: HexId, level: number): void {
   if (state.hexes.improvement[hex] === level) return;

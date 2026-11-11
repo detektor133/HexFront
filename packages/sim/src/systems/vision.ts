@@ -3,6 +3,7 @@
 import { VISION_CITY, VISION_RECALC_TICKS, VISION_TERRITORY, VISION_UNIT } from '../balance.ts';
 import { hexFromId, hexId, spiral, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
+import { touchMemory } from '../state/layers.ts';
 import { sharesWar } from '../state/relations.ts';
 import type { MatchState, VisionSource, VisionState } from '../state/types.ts';
 
@@ -102,6 +103,27 @@ function replaceSource(
   }
 }
 
+// Запоминает дорогу, улучшение и постройку виденного гекса; true, если память изменилась (версия
+// памяти игрока повышается только тогда, а общие копии слоёв вида остаются в кэше).
+function remember(
+  state: MatchState,
+  roads: Uint8Array,
+  improvements: Uint8Array,
+  buildings: Uint8Array,
+  id: number,
+): boolean {
+  const road = state.hexes.road[id] ?? 0;
+  const improvement = state.hexes.improvement[id] ?? 0;
+  const building = state.hexes.building[id] ?? 0;
+  if (roads[id] === road && improvements[id] === improvement && buildings[id] === building) {
+    return false;
+  }
+  roads[id] = road;
+  improvements[id] = improvement;
+  buildings[id] = building;
+  return true;
+}
+
 function flushDirty(state: MatchState, vision: VisionState): void {
   for (let player = 0; player < state.players.length; player += 1) {
     const dirty = vision.dirty[player];
@@ -112,15 +134,15 @@ function flushDirty(state: MatchState, vision: VisionState): void {
     const buildings = vision.building[player];
     if (!dirty || !visible || !explored || !roads || !improvements || !buildings) continue;
     const group = [player, ...alliesOf(state, player)];
+    let remembered = false;
     for (const id of dirty) {
       const isVisible = group.some((member) => vision.coverage[member]?.[id] !== 0);
       visible[id] = isVisible ? 1 : 0;
       if (!isVisible) continue;
       explored[id] = 1;
-      roads[id] = state.hexes.road[id] ?? 0;
-      improvements[id] = state.hexes.improvement[id] ?? 0;
-      buildings[id] = state.hexes.building[id] ?? 0;
+      remembered = remember(state, roads, improvements, buildings, id) || remembered;
     }
+    if (remembered) touchMemory(state, player);
     dirty.clear();
   }
 }
@@ -230,16 +252,18 @@ export function recalculateVision(state: MatchState, vision: VisionState): void 
       if (!theirs) continue;
       for (let id = 0; id < theirs.length; id += 1) if (theirs[id] === 1) visible[id] = 1;
     }
+    const roads = vision.road[player];
+    const improvements = vision.improvement[player];
+    const buildings = vision.building[player];
+    let remembered = false;
     for (let id = 0; id < state.hexes.owner.length; id += 1) {
       if (visible[id] !== 1) continue;
       explored[id] = 1;
-      const roads = vision.road[player];
-      const improvements = vision.improvement[player];
-      const buildings = vision.building[player];
-      if (roads) roads[id] = state.hexes.road[id] ?? 0;
-      if (improvements) improvements[id] = state.hexes.improvement[id] ?? 0;
-      if (buildings) buildings[id] = state.hexes.building[id] ?? 0;
+      if (roads && improvements && buildings) {
+        remembered = remember(state, roads, improvements, buildings, id) || remembered;
+      }
     }
+    if (remembered) touchMemory(state, player);
   }
 }
 

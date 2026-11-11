@@ -8,7 +8,7 @@
 //  3. Слои гексов — колонками «зазор по id, значение»: нет объекта на гекс, числа короткие.
 //  4. Корректность держат тесты-предохранители (view-delta-roundtrip): дельта по реальному матчу
 //     обязана восстановить вид побитово.
-import type { GameEvent, PlayerView } from '@hexfront/sim';
+import type { GameEvent, PlayerView, PlayerViewReuse } from '@hexfront/sim';
 
 type HexLayer = keyof PlayerView['hexes'];
 type Fields = Record<string, unknown>;
@@ -75,7 +75,9 @@ export interface DeltaMessage {
 /** Как часто (в тиках) обновляются медленные поля. */
 export const SLOW_PERIOD_TICKS = 10;
 
-const SLOW_LAYERS: readonly HexLayer[] = ['pop', 'growth'];
+// Медленные слои должны уметь повторно использоваться при сборке вида (PlayerViewReuse): тип проверяет это.
+const SLOW_LAYERS = ['pop', 'growth'] as const satisfies readonly (HexLayer &
+  keyof PlayerViewReuse)[];
 const SLOW_FIELDS = {
   me: [
     'popTotal',
@@ -156,6 +158,21 @@ export function paceView(base: PlayerView, view: PlayerView, sync: boolean): Pla
     if (list) next[name] = list;
   }
   return next as unknown as PlayerView;
+}
+
+/**
+ * Слои, которые не нужно пересчитывать при сборке вида вне срока синхронизации: сервер передаёт их
+ * в `playerView` четвёртым аргументом, а `paceView` всё равно оставил бы базовые.
+ * @returns прежние медленные слои из базы клиента или `undefined`, если пришёл срок или базы нет
+ */
+export function slowLayerReuse(
+  base: PlayerView | null,
+  sync: boolean,
+): PlayerViewReuse | undefined {
+  if (sync || base === null) return undefined;
+  const reuse: Record<string, unknown> = {};
+  for (const layer of SLOW_LAYERS) reuse[layer] = base.hexes[layer];
+  return reuse as PlayerViewReuse;
 }
 
 /** Глубокое равенство значений вида, включая типизированные массивы. */
