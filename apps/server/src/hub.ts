@@ -1,7 +1,7 @@
 // Хаб: сопоставляет подключения с комнатами, ведёт тики всех комнат с компенсацией дрейфа.
 import { randomBytes, randomInt } from 'node:crypto';
 
-import { generateMap } from '@hexfront/mapgen';
+import { generateMap, QUICK_MATCH_MAP_SIZE } from '@hexfront/mapgen';
 import {
   decodeClientMessage,
   encodeServerMessage,
@@ -54,8 +54,9 @@ export interface HubOptions {
   readonly maxRooms?: number;
 }
 
-function defaultMap(seed: number, size: number): MapStatic {
-  const loaded = loadMap(generateMap(seed, { players: size }));
+/** Карта комнаты: та же, что клиент берёт готовым файлом `gen-<сид>-30.json` (размер общий). */
+export function quickMatchMap(seed: number, size: number): MapStatic {
+  const loaded = loadMap(generateMap(seed, { ...QUICK_MATCH_MAP_SIZE, players: size }));
   if (!loaded.ok) throw new Error(loaded.errors.join('; '));
   return loaded.map;
 }
@@ -187,7 +188,7 @@ export class Hub {
     this.now = options.now ?? Date.now;
     this.size = options.size ?? MATCH_SIZE;
     this.fog = options.fog ?? true;
-    this.makeMap = options.makeMap ?? defaultMap;
+    this.makeMap = options.makeMap ?? quickMatchMap;
     this.logger = options.log ?? (() => undefined);
     this.maxRooms = options.maxRooms ?? 12;
   }

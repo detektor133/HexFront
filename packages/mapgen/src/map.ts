@@ -46,6 +46,12 @@ const cityName = (id: number): string => {
   return cycle === 0 ? base : `${base}-${cycle + 1}`;
 };
 
+/**
+ * Размер готовых карт «быстрого матча»: клиент берёт файл, собранный с этими размерами, а сервер
+ * обязан генерировать ту же карту (иначе номера гексов указывают на разные места).
+ */
+export const QUICK_MATCH_MAP_SIZE = { width: 80, height: 60 } as const;
+
 function mapDimensions(players: number): { width: number; height: number } {
   const area = Math.ceil((players * PASSABLE_HEXES_PER_PLAYER * 100) / (100 - MAPGEN_WATER_SHARE));
   const width = Math.ceil(Math.sqrt((area * 4) / 3));
