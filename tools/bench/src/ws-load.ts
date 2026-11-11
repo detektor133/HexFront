@@ -106,6 +106,10 @@ const health = (await (await fetch(`http://127.0.0.1:${PORT}/healthz`)).json()) 
   tickMs: { p50: number; p99: number; max: number };
   cpuMs: number;
   rssMb: number;
+  ioLagMs?: number;
+  projectedMs?: number;
+  budgetMs?: number;
+  shards?: { rooms: number; humans: number; tickMs: { p99: number } }[];
 };
 const wire = (
   client as unknown as { sockets: { _socket?: { bytesRead: number } }[] }
@@ -120,8 +124,14 @@ console.log(
 );
 console.log(
   `сервер: комнат ${health.rooms}, людей ${health.humans}; тик хаба p50 ${health.tickMs.p50.toFixed(1)} p99 ${health.tickMs.p99.toFixed(1)} макс ${health.tickMs.max.toFixed(1)} мс; ` +
-    `процессор ${((health.cpuMs / 1000 / SECONDS) * 100).toFixed(0)}% одного ядра за прогон; память ${health.rssMb} МБ`,
+    `процессор ${((health.cpuMs / 1000 / SECONDS) * 100).toFixed(0)}% одного ядра за прогон; память ${health.rssMb} МБ; ` +
+    `лаг I/O-потока p99 ${(health.ioLagMs ?? 0).toFixed(1)} мс; прогноз цены ${health.projectedMs ?? 0} из ${health.budgetMs ?? 0} мс`,
 );
+if (health.shards !== undefined) {
+  console.log(
+    `шарды: ${health.shards.map((s, i) => `#${i} комнат ${s.rooms} людей ${s.humans} p99 ${s.tickMs.p99.toFixed(1)} мс`).join('; ')}`,
+  );
+}
 for (const ws of (client as unknown as { sockets: WebSocket[] }).sockets) ws.close();
 server.kill();
 process.exit(0);

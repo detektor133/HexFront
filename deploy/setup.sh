@@ -60,14 +60,16 @@ User=hexfront
 WorkingDirectory=/opt/hexfront/current
 EnvironmentFile=/etc/hexfront.env
 # Лимиты памяти V8 под 512 МБ: комната ≈ 3 МБ, запас большой (docs/architecture/performance.md).
-ExecStart=/usr/bin/node --max-semi-space-size=2 --max-old-space-size=160 apps/server/src/main.ts
+# Главный поток — только сокеты (куча небольшая); комнаты живут в воркерах (SHARDS, по умолчанию число ядер),
+# куча воркера задаётся SHARD_HEAP_MB.
+ExecStart=/usr/bin/node --max-semi-space-size=2 --max-old-space-size=128 apps/server/src/main.ts
 Restart=always
 RestartSec=2
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-MemoryMax=300M
+MemoryMax=1200M
 
 [Install]
 WantedBy=multi-user.target

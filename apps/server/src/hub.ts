@@ -1,7 +1,9 @@
-// Хаб: сопоставляет подключения с комнатами, ведёт тики всех комнат с компенсацией дрейфа.
+// Шлюз (хаб): I/O-поток. Сокеты, лимиты, проверка сообщений, допуск и размещение комнат по шардам.
+// Комнаты и их тики живут в шардах (`shard.ts`): встроенном потоке или воркерах (`worker-shard.ts`);
+// шлюз не считает игру и не блокируется её тиками, поэтому пинги и отправка идут ровно даже под нагрузкой.
 import { randomBytes, randomInt } from 'node:crypto';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 
-import { generateMap, QUICK_MATCH_MAP_SIZE } from '@hexfront/mapgen';
 import {
   decodeClientMessage,
   encodeServerMessage,
@@ -9,19 +11,22 @@ import {
   PROTOCOL_VERSION,
   QUICK_MATCH_SEEDS,
   type C2S,
+  type JoinMode,
   type RefuseReason,
 } from '@hexfront/protocol';
-import { loadMap, TICK_MS, type MapStatic } from '@hexfront/sim';
+import type { MapStatic } from '@hexfront/sim';
 
+import { cachedMap } from './maps.ts';
 import { sanitizeNick } from './nick.ts';
-import { LATE_JOIN_TICKS, Room, type Connection } from './room.ts';
+import { LATE_JOIN_TICKS, type Connection, type Room } from './room.ts';
+import type { HostSettings, RoomStatus, TickStats } from './shard-protocol.ts';
+import { InlineShard, type Shard, type ShardEvents } from './shard.ts';
+import { WorkerShard } from './worker-shard.ts';
+
+export { quickMatchMap, warmMaps } from './maps.ts';
 
 /** Игроков в матче «быстрого матча»: люди и боты вместе (docs/stages/stage-09-analysis.md). */
 export const MATCH_SIZE = 30;
-/** Сколько тиков подряд хаб догоняет после задержки; дальше пропускает, чтобы не копить долг. */
-const MAX_CATCH_UP = 3;
-/** Закрытая комната без людей живёт дольше открытой, но не вечно. */
-const ROOM_KEEP_MS = 60_000;
 /** Сколько мс даётся соединению на `hello`; молчуны занимают сокеты и закрываются. */
 export const HELLO_TIMEOUT_MS = 5000;
 /** Сообщений в секунду от одного соединения (команды, ack, ping вместе); больше — разрыв. */
@@ -31,99 +36,86 @@ export const MAX_CONNECTIONS_PER_IP = 10;
 /** Попыток `hello` в минуту с одного адреса (включая подбор токенов и кодов комнат). */
 export const MAX_HELLOS_PER_MINUTE = 30;
 
+export interface ShardStats {
+  readonly index: number;
+  readonly rooms: number;
+  readonly humans: number;
+  readonly projectedMs: number;
+  readonly tickMs: TickStats;
+}
+
 export interface HubStats {
   readonly rooms: number;
   readonly humans: number;
-  /** Прогноз суммы цен комнат, мс на тик, и бюджет: запас = бюджет − прогноз. */
+  /** Прогноз суммы цен комнат по всем шардам, мс на тик, и общий бюджет (бюджет шарда × шарды). */
   readonly projectedMs: number;
   readonly budgetMs: number;
-  /** Время одного тика всех комнат, мс (по последним ~минуте). */
-  readonly tickMs: { readonly p50: number; readonly p99: number; readonly max: number };
-  /** Процессорное время процесса с запуска, мс. */
+  /** Время тика самого нагруженного шарда, мс (по последним ~минуте). */
+  readonly tickMs: TickStats;
+  readonly shards: readonly ShardStats[];
+  /** Задержка цикла событий I/O-потока (p99, мс): растёт, если шлюз не успевает. */
+  readonly ioLagMs: number;
+  /** Процессорное время всего процесса (все потоки) с запуска, мс. */
   readonly cpuMs: number;
   readonly rssMb: number;
+  /** Идёт дренаж: сервер доигрывает матчи и не берёт новых игроков. */
+  readonly draining: boolean;
 }
-
-const TICK_SAMPLES = 600;
 
 export interface HubOptions {
   readonly now?: () => number;
   readonly size?: number;
   readonly fog?: boolean;
-  /** Подмена карты в тестах; по умолчанию генерация по сиду комнаты. */
+  /** Подмена карты во встроенном шарде (тесты); воркеры генерируют сами. */
   readonly makeMap?: (seed: number, size: number) => MapStatic;
   readonly log?: (event: string, data?: Record<string, unknown>) => void;
   /** Жёсткий предел комнат процесса: дальше новые входы получают `busy`. */
   readonly maxRooms?: number;
   /**
-   * Бюджет тика, мс: сумма сглаженных цен комнат плюс цена новой не должна его превышать (на тик
-   * отведено 100 мс, остальное — сеть, сборка мусора, запас на поздние стадии).
+   * Бюджет тика каждого шарда, мс: сумма сглаженных цен его комнат плюс цена новой не должна его
+   * превышать (на тик отведено 100 мс, остальное — сборка мусора и запас на поздние стадии).
    */
   readonly budgetMs?: number;
   /** Цена комнаты до первых замеров, мс (поздние стадии дороже ранних, поэтому с запасом). */
   readonly roomEstimateMs?: number;
   /** Секунд с начала матча, пока можно подсесть на место бота; 0 — выключено. */
   readonly lateJoinSeconds?: number;
+  /** Число воркеров-шардов; 0 или не задано — один встроенный шард в потоке шлюза. */
+  readonly workers?: number;
+  /** Предел кучи одного воркера, МБ. */
+  readonly shardHeapMb?: number;
 }
 
-/** Карта комнаты: та же, что клиент берёт готовым файлом `gen-<сид>-30.json` (размер общий). */
-export function quickMatchMap(seed: number, size: number): MapStatic {
-  const loaded = loadMap(generateMap(seed, { ...QUICK_MATCH_MAP_SIZE, players: size }));
-  if (!loaded.ok) throw new Error(loaded.errors.join('; '));
-  return loaded.map;
+interface PendingJoin {
+  readonly stage: 'reconnect' | 'join';
+  readonly message: Extract<C2S, { t: 'hello' }>;
+  readonly nick: string;
+  readonly retried: boolean;
 }
 
-/** Готовые карты процесса: sim карту не меняет, комнаты делят её. */
-const mapCache = new Map<string, MapStatic>();
-
-function cachedMap(seed: number, size: number): MapStatic {
-  const key = `${seed}:${size}`;
-  let map = mapCache.get(key);
-  if (map === undefined) {
-    map = quickMatchMap(seed, size);
-    mapCache.set(key, map);
-  }
-  return map;
-}
-
-/**
- * Прогревает карты быстрого матча по одной между тиками (генерация 30–60 мс, холодная — дольше), чтобы
- * создание комнаты не останавливало игроков других комнат.
- */
-export function warmMaps(size: number, seeds: readonly number[] = QUICK_MATCH_SEEDS): void {
-  let index = 0;
-  const next = (): void => {
-    const seed = seeds[index];
-    if (seed === undefined) return;
-    index += 1;
-    cachedMap(seed, size);
-    setTimeout(next, 50);
-  };
-  setTimeout(next, 1000);
-}
-
-/** Одно соединение: разбор сообщений и привязка к месту в комнате. */
+/** Одно соединение: разбор сообщений, лимиты и привязка к шарду. */
 export class Session implements Connection {
-  private room: Room | null = null;
-  private readonly hub: Hub;
-  private readonly out: Connection;
-  /** Адрес для лимитов; закрытый ключ учёта в хабе. */
+  public readonly id: number;
+  /** Адрес для лимитов; ключ учёта в хабе. */
   public readonly ip: string;
   public readonly createdAt: number;
+  /** Шард, куда отправлен вход или где сидит игрок. */
+  public shard: Shard | null = null;
+  public pending: PendingJoin | null = null;
+  public routed = false;
+  public helloSeen = false;
+  private readonly hub: Hub;
+  private readonly out: Connection;
   private windowStart = 0;
   private windowCount = 0;
   private closed = false;
 
-  public constructor(hub: Hub, out: Connection, ip: string, createdAt: number) {
+  public constructor(hub: Hub, out: Connection, ip: string, createdAt: number, id: number) {
     this.hub = hub;
     this.out = out;
     this.ip = ip;
     this.createdAt = createdAt;
-  }
-
-  /** Вошло ли соединение в комнату (после `hello`). */
-  public get joined(): boolean {
-    return this.room !== null;
+    this.id = id;
   }
 
   /** Учёт частоты сообщений: превышение — разрыв, а не молчаливая обработка. */
@@ -170,74 +162,90 @@ export class Session implements Connection {
       throw error;
     }
     if (message.t === 'hello') {
-      if (this.room === null) this.room = this.hub.hello(this, message);
+      if (!this.helloSeen) this.hub.hello(this, message);
       return;
     }
-    const room = this.room;
-    if (room === null) return;
-    switch (message.t) {
-      case 'cmd':
-        room.command(this, message.seq, message.cmd);
-        break;
-      case 'resync':
-        room.resync(this);
-        break;
-      case 'select':
-        room.select(this, message.hex);
-        break;
-      case 'query':
-        room.query(this, message.id, message.q);
-        break;
-      case 'viewAck':
-        room.viewAck(this, message.tick);
-        break;
-      case 'start':
-        room.startEarly(this);
-        break;
-      case 'ping':
-        this.send(encodeServerMessage({ t: 'pong', at: message.at }));
-        break;
+    if (message.t === 'ping') {
+      this.send(encodeServerMessage({ t: 'pong', at: message.at }));
+      return;
     }
+    if (this.routed && this.shard !== null) this.shard.message(this.id, message);
   }
 
   public onClose(): void {
     if (this.closed) return;
     this.closed = true;
-    this.room?.disconnect(this);
+    this.shard?.closed(this.id);
     this.hub.release(this);
   }
 }
 
 export class Hub {
-  private readonly rooms = new Map<string, Room>();
+  private shards: Shard[] = [];
+  private readonly byId = new Map<number, Session>();
+  private nextConn = 1;
   private readonly now: () => number;
   private readonly size: number;
-  private readonly fog: boolean;
-  private readonly makeMap: (seed: number, size: number) => MapStatic;
-  private readonly emptySince = new Map<string, number>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private nextAt = 0;
-  private logger: NonNullable<HubOptions['log']>;
+  private readonly settings: HostSettings;
+  private readonly logger: NonNullable<HubOptions['log']>;
   private readonly maxRooms: number;
   private readonly budgetMs: number;
   private readonly roomEstimateMs: number;
-  private readonly lateJoinTicks: number;
-  private readonly tickSamples = new Float64Array(TICK_SAMPLES);
-  private tickCount = 0;
-  private readonly sessions = new Set<Session>();
+  private readonly makeMap: (seed: number, size: number) => MapStatic;
+  private readonly workers: number;
+  private readonly heapMb: number;
   private readonly perIp = new Map<string, number>();
   private readonly hellos = new Map<string, { start: number; count: number }>();
+  private readonly lag = monitorEventLoopDelay({ resolution: 10 });
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
+  /** Дренаж перед выкладкой: новых людей и комнат не берём, идущие матчи доигрываются. */
+  private draining = false;
 
   public constructor(options: HubOptions = {}) {
     this.now = options.now ?? Date.now;
     this.size = options.size ?? MATCH_SIZE;
-    this.fog = options.fog ?? true;
     this.makeMap = options.makeMap ?? cachedMap;
     this.logger = options.log ?? (() => undefined);
-    this.maxRooms = options.maxRooms ?? 24;
+    this.maxRooms = options.maxRooms ?? 24 * Math.max(1, options.workers ?? 0);
     this.budgetMs = options.budgetMs ?? 65;
     this.roomEstimateMs = options.roomEstimateMs ?? 8;
-    this.lateJoinTicks = (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10;
+    this.workers = options.workers ?? 0;
+    this.heapMb = options.shardHeapMb ?? 192;
+    this.settings = {
+      size: this.size,
+      fog: options.fog ?? true,
+      budgetMs: this.budgetMs,
+      roomEstimateMs: this.roomEstimateMs,
+      lateJoinTicks: (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10,
+    };
+    const count = Math.max(1, this.workers);
+    for (let index = 0; index < count; index += 1) this.shards.push(this.makeShard(index));
+  }
+
+  private makeShard(index: number): Shard {
+    const events: ShardEvents = {
+      out: (conn, text) => {
+        this.byId.get(conn)?.send(text);
+      },
+      close: (conn) => {
+        const session = this.byId.get(conn);
+        if (session === undefined) return;
+        session.close();
+        session.onClose();
+      },
+      joined: (conn, _roomId, ok) => {
+        this.onJoined(index, conn, ok);
+      },
+      log: (event, data) => {
+        this.log(event, data);
+      },
+      down: () => {
+        this.onShardDown(index);
+      },
+    };
+    return this.workers > 0
+      ? new WorkerShard(index, this.settings, events, this.heapMb)
+      : new InlineShard(index, this.settings, events, this.now, this.makeMap);
   }
 
   /** Текущее время хаба, мс. */
@@ -249,29 +257,46 @@ export class Hub {
     this.logger(event, data);
   }
 
-  /** Число комнат и людей, время тика хаба за последние ~минуту, процессор и память: `/healthz`. */
+  /** Сводка для `/healthz`: комнаты, люди, цена тика, шарды, лаг I/O-потока, процессор и память. */
   public stats(): HubStats {
-    let humans = 0;
-    for (const room of this.rooms.values()) humans += room.connected;
-    const used = this.tickSamples
-      .slice(0, Math.min(this.tickCount, TICK_SAMPLES))
-      .sort((a, b) => a - b);
-    const pick = (p: number): number =>
-      used[Math.min(used.length - 1, Math.floor(used.length * p))] ?? 0;
+    const shards: ShardStats[] = this.shards.map((shard) => {
+      const status = shard.status();
+      return {
+        index: shard.index,
+        rooms: status.rooms.length,
+        humans: status.humans,
+        projectedMs: Math.round(status.projectedMs * 10) / 10,
+        tickMs: status.tickMs,
+      };
+    });
     const cpu = process.cpuUsage();
     return {
-      rooms: this.rooms.size,
-      humans,
-      projectedMs: Math.round(this.projectedMs() * 10) / 10,
-      budgetMs: this.budgetMs,
-      tickMs: { p50: pick(0.5), p99: pick(0.99), max: used.at(-1) ?? 0 },
+      rooms: shards.reduce((s, x) => s + x.rooms, 0),
+      humans: shards.reduce((s, x) => s + x.humans, 0),
+      projectedMs: Math.round(shards.reduce((s, x) => s + x.projectedMs, 0) * 10) / 10,
+      budgetMs: this.budgetMs * this.shards.length,
+      tickMs: {
+        p50: Math.max(...shards.map((x) => x.tickMs.p50)),
+        p99: Math.max(...shards.map((x) => x.tickMs.p99)),
+        max: Math.max(...shards.map((x) => x.tickMs.max)),
+      },
+      shards,
+      ioLagMs: Number.isFinite(this.lag.max) ? this.lag.percentile(99) / 1e6 : 0,
+      draining: this.draining,
       cpuMs: Math.round((cpu.user + cpu.system) / 1000),
       rssMb: Math.round(process.memoryUsage().rss / 1048576),
     };
   }
 
+  /** Комната по id во встроенном шарде (тесты и отладка). */
   public roomById(id: string): Room | undefined {
-    return this.rooms.get(id);
+    for (const shard of this.shards) {
+      if (shard instanceof InlineShard) {
+        const room = shard.room(id);
+        if (room !== undefined) return room;
+      }
+    }
+    return undefined;
   }
 
   /** Новое соединение. */
@@ -284,14 +309,15 @@ export class Hub {
       return null;
     }
     this.perIp.set(ip, count + 1);
-    const session = new Session(this, out, ip, this.now());
-    this.sessions.add(session);
+    const session = new Session(this, out, ip, this.now(), this.nextConn);
+    this.nextConn += 1;
+    this.byId.set(session.id, session);
     return session;
   }
 
   /** Соединение закрылось: снимаем с учёта. */
   public release(session: Session): void {
-    this.sessions.delete(session);
+    this.byId.delete(session.id);
     const left = (this.perIp.get(session.ip) ?? 1) - 1;
     if (left <= 0) this.perIp.delete(session.ip);
     else this.perIp.set(session.ip, left);
@@ -309,168 +335,195 @@ export class Hub {
     return entry.count <= MAX_HELLOS_PER_MINUTE;
   }
 
-  /** Обрабатывает `hello`: вход в открытую комнату, приглашение, создание закрытой, реконнект. */
-  public hello(session: Session, message: Extract<C2S, { t: 'hello' }>): Room | null {
+  /** Все комнаты всех шардов по последним сводкам. */
+  private directory(): { shard: Shard; room: RoomStatus }[] {
+    const all: { shard: Shard; room: RoomStatus }[] = [];
+    for (const shard of this.shards) {
+      for (const room of shard.status().rooms) all.push({ shard, room });
+    }
+    return all;
+  }
+
+  private findRoom(id: string): { shard: Shard; room: RoomStatus } | undefined {
+    return this.directory().find((entry) => entry.room.id === id);
+  }
+
+  /** Обрабатывает `hello`: реконнект, приглашение, открытая комната, подсадка, закрытая комната. */
+  public hello(session: Session, message: Extract<C2S, { t: 'hello' }>): void {
+    session.helloSeen = true;
     if (!this.helloAllowed(session.ip)) return this.refuse(session, 'busy');
     if (message.v !== PROTOCOL_VERSION) return this.refuse(session, 'versionMismatch');
     const nick = sanitizeNick(message.nick);
     if (nick === null) return this.refuse(session, 'badNick');
     if (message.token !== undefined) {
-      const room = this.rooms.get(roomOfToken(message.token));
-      if (room !== undefined && room.reconnect(session, message.token, message.have) !== null) {
-        return room;
+      const found = this.findRoom(roomOfToken(message.token));
+      if (found !== undefined) {
+        session.shard = found.shard;
+        session.pending = { stage: 'reconnect', message, nick, retried: false };
+        found.shard.reconnect(session.id, found.room.id, message.token, message.have);
+        return;
       }
     }
-    const room = this.pickRoom(session, message);
-    if (room === null) return null;
-    if (room.join(session, nick) === null) {
+    // Дренаж: вернуться в свою игру можно, начать новую или подсесть — нет.
+    if (this.draining) return this.refuse(session, 'busy');
+    this.joinNew(session, message, nick, false);
+  }
+
+  private joinNew(
+    session: Session,
+    message: Extract<C2S, { t: 'hello' }>,
+    nick: string,
+    retried: boolean,
+  ): void {
+    const target = this.pickRoom(session, message);
+    if (target === null) return;
+    session.shard = target.shard;
+    session.pending = { stage: 'join', message, nick, retried };
+    target.shard.join(session.id, target.roomId, nick);
+  }
+
+  /** Итог входа от шарда: привязка к комнате, либо повтор по свежей сводке, либо отказ. */
+  private onJoined(shardIndex: number, conn: number, ok: boolean): void {
+    const session = this.byId.get(conn);
+    if (session === undefined) {
+      // Игрок успел уйти: освобождаем только что занятое место.
+      if (ok) this.shards[shardIndex]?.closed(conn);
+      return;
+    }
+    const pending = session.pending;
+    session.pending = null;
+    if (ok) {
+      session.routed = true;
+      return;
+    }
+    session.shard = null;
+    if (pending === null) return;
+    if (pending.stage === 'reconnect') {
+      this.joinNew(session, pending.message, pending.nick, false);
+    } else if (!pending.retried && pending.message.room === undefined) {
+      // Сводка комнат могла устареть (место заняли только что): один повтор по новой.
+      this.joinNew(session, pending.message, pending.nick, true);
+    } else {
       this.refuse(session, 'roomFull');
-      return null;
     }
-    this.log('join', { room: room.id, humans: room.humans });
-    return room;
   }
 
-  private pickRoom(session: Session, message: Extract<C2S, { t: 'hello' }>): Room | null {
+  private pickRoom(
+    session: Session,
+    message: Extract<C2S, { t: 'hello' }>,
+  ): { shard: Shard; roomId: string } | null {
     if (message.room !== undefined) {
-      const room = this.rooms.get(message.room);
-      if (room === undefined) return this.refuseNull(session, 'noRoom');
-      return room;
+      const found = this.findRoom(message.room);
+      if (found === undefined) return this.refuseNull(session, 'noRoom');
+      return { shard: found.shard, roomId: found.room.id };
     }
-    if (message.mode === 'private') return this.createOrRefuse(session, 'private');
+    if (message.mode === 'private') return this.place(session, 'private');
     // 1) открытый набор; 2) подсадка на место бота в самой заполненной идущей игре; 3) новая комната.
-    for (const room of this.rooms.values()) {
-      if (room.mode === 'open' && room.hasFreeSeat) return room;
-    }
-    let fullest: Room | null = null;
-    for (const room of this.rooms.values()) {
-      if (room.canLateJoin && (fullest === null || room.connected > fullest.connected)) {
-        fullest = room;
+    const rooms = this.directory();
+    for (const { shard, room } of rooms) {
+      if (room.mode === 'open' && room.phase === 'lobby' && room.freeSeat) {
+        return { shard, roomId: room.id };
       }
     }
-    return fullest ?? this.createOrRefuse(session, 'open');
-  }
-
-  /** Сколько мс на тик займут комнаты сейчас: идущие — по замеру, наборы — по средней оценке. */
-  public projectedMs(): number {
-    const measured = [...this.rooms.values()].filter((r) => r.phase === 'running' && r.costMs > 0);
-    const average =
-      measured.length === 0
-        ? this.roomEstimateMs
-        : Math.max(
-            this.roomEstimateMs,
-            measured.reduce((s, r) => s + r.costMs, 0) / measured.length,
-          );
-    let sum = 0;
-    for (const room of this.rooms.values()) {
-      sum += room.phase === 'running' && room.costMs > 0 ? room.costMs : average;
+    let fullest: { shard: Shard; room: RoomStatus } | null = null;
+    for (const entry of rooms) {
+      if (
+        entry.room.canLateJoin &&
+        (fullest === null || entry.room.connected > fullest.room.connected)
+      ) {
+        fullest = entry;
+      }
     }
-    return sum;
+    if (fullest !== null) return { shard: fullest.shard, roomId: fullest.room.id };
+    return this.place(session, 'open');
   }
 
-  private createOrRefuse(session: Session, mode: 'open' | 'private'): Room | null {
-    const room = this.createRoom(mode);
-    if (room === null) this.refuse(session, 'busy');
-    return room;
-  }
-
-  private createRoom(mode: 'open' | 'private'): Room | null {
-    if (this.rooms.size >= this.maxRooms) return null;
-    // Допуск по реальной цене: новая комната пускается, только если вместе с ней сумма цен укладывается
-    // в бюджет тика; идущие матчи при этом не страдают, новый игрок получает «сервер занят».
-    if (this.projectedMs() + this.roomEstimateMs > this.budgetMs) {
-      this.log('admissionRefused', {
-        rooms: this.rooms.size,
-        projectedMs: Math.round(this.projectedMs()),
-      });
+  /**
+   * Размещение новой комнаты: шард с наименьшей прогнозной ценой, если вместе с комнатой она
+   * укладывается в бюджет тика шарда. Иначе игрок получает «сервер занят», идущие матчи не страдают.
+   */
+  private place(session: Session, mode: JoinMode): { shard: Shard; roomId: string } | null {
+    const total = this.shards.reduce((sum, shard) => sum + shard.status().rooms.length, 0);
+    let best: { shard: Shard; projected: number } | null = null;
+    for (const shard of this.shards) {
+      const projected = shard.status().projectedMs;
+      if (best === null || projected < best.projected) best = { shard, projected };
+    }
+    if (
+      best === null ||
+      total >= this.maxRooms ||
+      best.projected + this.roomEstimateMs > this.budgetMs
+    ) {
+      this.log('admissionRefused', { rooms: total, projectedMs: Math.round(best?.projected ?? 0) });
+      this.refuse(session, 'busy');
       return null;
     }
-    const id =
+    const roomId =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
     // Карта берётся из готовых файлов клиента (быстрый матч): сид из общего списка.
     const seed = QUICK_MATCH_SEEDS[randomInt(0, QUICK_MATCH_SEEDS.length)] ?? 42;
-    const room = new Room({
-      id,
-      mode,
-      map: this.makeMap(seed, this.size),
-      mapName: 'gen',
-      seed,
-      size: this.size,
-      fog: this.fog,
-      now: this.now,
-      lateJoinTicks: this.lateJoinTicks,
-    });
-    this.rooms.set(id, room);
-    this.log('roomCreated', { room: id, mode });
-    return room;
+    best.shard.create(roomId, mode, seed);
+    return { shard: best.shard, roomId };
   }
 
-  private refuse(session: Session, reason: RefuseReason): null {
+  private refuse(session: Session, reason: RefuseReason): void {
     session.send(encodeServerMessage({ t: 'refused', reason }));
     session.close();
-    return null;
   }
 
   private refuseNull(session: Session, reason: RefuseReason): null {
-    return this.refuse(session, reason);
+    this.refuse(session, reason);
+    return null;
   }
 
-  /** Один шаг планировщика: набор, тики комнат, уборка пустых и законченных. */
-  public tickAll(): void {
-    const startedAt = performance.now();
-    this.tickRooms();
-    this.tickSamples[this.tickCount % TICK_SAMPLES] = performance.now() - startedAt;
-    this.tickCount += 1;
+  /** Воркер шарда упал: игроков его комнат отключаем (они вернутся и получат новый вход), шард заводим заново. */
+  private onShardDown(index: number): void {
+    const dead = this.shards[index];
+    if (dead === undefined) return;
+    for (const session of [...this.byId.values()]) {
+      if (session.shard === dead) session.kick('shardDown');
+    }
+    const replacement = this.makeShard(index);
+    this.shards[index] = replacement;
+    replacement.start();
   }
 
-  private tickRooms(): void {
+  /** Уборка шлюза: соединения без `hello` дольше срока закрываются. */
+  public sweep(): void {
     const now = this.now();
-    for (const session of this.sessions) {
-      if (!session.joined && now - session.createdAt > HELLO_TIMEOUT_MS) session.kick('noHello');
-    }
-    for (const [id, room] of this.rooms) {
-      room.poll();
-      room.tick();
-      if (room.phase === 'ended') {
-        room.close();
-        this.rooms.delete(id);
-        this.log('roomClosed', { room: id, ticks: room.stats.ticks });
-        continue;
-      }
-      if (room.hasConnected()) this.emptySince.delete(id);
-      else if (!this.emptySince.has(id)) this.emptySince.set(id, now);
-      else if (now - (this.emptySince.get(id) ?? now) > ROOM_KEEP_MS) {
-        room.close();
-        this.rooms.delete(id);
-        this.emptySince.delete(id);
-        this.log('roomDropped', { room: id });
-      }
+    for (const session of [...this.byId.values()]) {
+      if (!session.helloSeen && now - session.createdAt > HELLO_TIMEOUT_MS) session.kick('noHello');
     }
   }
 
-  /** Запускает тики 10 Гц; следующий запуск считается от плана, а не от конца прошлого. */
+  /** Один тик встроенных шардов и уборка (тесты и стенды с виртуальным временем). */
+  public tickAll(): void {
+    for (const shard of this.shards) if (shard instanceof InlineShard) shard.tick();
+    this.sweep();
+  }
+
+  /** Запускает шарды и уборку шлюза. */
   public start(): void {
-    if (this.timer !== null) return;
-    this.nextAt = performance.now() + TICK_MS;
-    const loop = (): void => {
-      let ran = 0;
-      while (performance.now() >= this.nextAt && ran < MAX_CATCH_UP) {
-        this.tickAll();
-        this.nextAt += TICK_MS;
-        ran += 1;
-      }
-      // Долг больше догоняемого: пропускаем, чтобы комнаты не жили в прошлом.
-      if (performance.now() >= this.nextAt) this.nextAt = performance.now() + TICK_MS;
-      this.timer = setTimeout(loop, Math.max(0, this.nextAt - performance.now()));
-    };
-    this.timer = setTimeout(loop, TICK_MS);
+    if (this.sweepTimer !== null) return;
+    this.lag.enable();
+    for (const shard of this.shards) shard.start();
+    this.sweepTimer = setInterval(() => {
+      this.sweep();
+    }, 1000);
+    this.sweepTimer.unref();
+  }
+
+  /** Включает дренаж (сигнал SIGUSR2): выкладка ждёт, пока идущие матчи закончатся. */
+  public drain(): void {
+    this.draining = true;
+    this.log('draining');
   }
 
   public stop(): void {
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
-    for (const room of this.rooms.values()) room.close();
-    this.rooms.clear();
+    if (this.sweepTimer !== null) clearInterval(this.sweepTimer);
+    this.sweepTimer = null;
+    this.lag.disable();
+    for (const shard of this.shards) shard.stop();
   }
 }
 

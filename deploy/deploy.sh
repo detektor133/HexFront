@@ -2,6 +2,7 @@
 # Выкладка сервера на VPS по ключу SSH. Запускать из корня репозитория в Git Bash:
 #   bash deploy/deploy.sh setup   — разовая подготовка сервера (setup.sh)
 #   bash deploy/deploy.sh         — выкатить текущий коммит и перезапустить сервис
+#   bash deploy/deploy.sh drain [минут] — не брать новых игроков и ждать конца идущих матчей
 #   bash deploy/deploy.sh rollback — вернуть предыдущий релиз
 # Секреты берутся из переменных окружения пользователя и в вывод не попадают:
 #   HEXFRONT_VPS_HOST  — IP сервера          HEXFRONT_VPS_USER — пользователь (по умолчанию root)
@@ -22,6 +23,18 @@ remote() { "${SSH[@]}" "$@"; }
 case "${1:-deploy}" in
   setup)
     "${SSH[@]}" "bash -s -- '$DOMAIN' '$ORIGINS'" <deploy/setup.sh
+    ;;
+  drain)
+    # Дренаж: сервер перестаёт брать новых игроков и ждёт, пока идущие матчи закончатся (до N минут).
+    WAIT_MIN="${2:-20}"
+    remote "systemctl kill -s SIGUSR2 hexfront"
+    for i in $(seq 1 $((WAIT_MIN * 6))); do
+      rooms=$(remote "curl -fsS http://127.0.0.1:8080/healthz" | grep -o '"rooms":[0-9]*' | head -1 | cut -d: -f2)
+      [ "${rooms:-0}" = "0" ] && { echo "комнат нет, можно выкладывать"; exit 0; }
+      sleep 10
+    done
+    echo "за ${WAIT_MIN} мин комнаты не закончились (осталось ${rooms}); выкладывайте, если готовы их прервать"
+    exit 1
     ;;
   rollback)
     remote "set -e; cd $APP; prev=\$(ls -1dt releases/* | sed -n 2p); [ -n \"\$prev\" ]; ln -sfn \"$APP/\$prev\" current; systemctl restart hexfront; echo \"откат на \$prev\""
@@ -50,7 +63,7 @@ case "${1:-deploy}" in
     exit 1
     ;;
   *)
-    echo "команды: setup | deploy | rollback"
+    echo "команды: setup | deploy | drain [минут] | rollback"
     exit 2
     ;;
 esac

@@ -465,3 +465,31 @@ describe('упаковка комнат', () => {
     expect(hub.stats().projectedMs).toBeGreaterThan(0);
   });
 });
+
+describe('дренаж перед выкладкой', () => {
+  it('идущие матчи доигрываются и реконнект работает, новых игроков сервер не берёт', () => {
+    const { hub, tick } = setup();
+    const a = new Client(hub, 'ip-a');
+    a.hello('Аня', { mode: 'private' });
+    const token = a.of('welcome')[0]?.token ?? '';
+    a.send({ t: 'start' });
+    tick(3);
+
+    hub.drain();
+    expect(hub.stats().draining).toBe(true);
+
+    const fresh = new Client(hub, 'ip-b');
+    fresh.hello('Борис');
+    expect(fresh.of('refused')[0]?.reason).toBe('busy');
+    const room = new Client(hub, 'ip-c');
+    room.hello('Вика', { mode: 'private' });
+    expect(room.of('refused')[0]?.reason).toBe('busy');
+
+    a.session.onClose();
+    const back = new Client(hub, 'ip-a2');
+    back.hello('Аня', { token });
+    expect(back.of('welcome')).toHaveLength(1);
+    tick(2);
+    expect(back.count('snapshot')).toBeGreaterThan(0);
+  });
+});
