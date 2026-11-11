@@ -1,31 +1,10 @@
 // Страница ↔ Web Worker: запуск локального матча и отправка команд.
-import type { BotLevel, Command } from '@hexfront/sim';
+import type { BotLevel } from '@hexfront/sim';
 
-import type { FromWorker, MapMaskMode, ToWorker } from './messages.ts';
+import type { LocalMatch } from './match-api.ts';
+import type { FromWorker, ToWorker } from './messages.ts';
 
-export interface LocalMatch {
-  send(cmd: Command): void;
-  setFog(on: boolean): void;
-  /** Шаг матча-урока для режиссёра соперника. */
-  setTutorialStage?(stage: string): void;
-  setPaused(on: boolean): void;
-  step(): void;
-  setSpeed(value: number): void;
-  setObserver(playerId: number | null): void;
-  setView(playerId: number | null, fog: boolean): void;
-  select(hex: number | null): void;
-  /** Ответ придёт в onMessage сообщением `pathPreview` с тем же requestId. */
-  previewPath?(
-    requestId: number,
-    unitIds: readonly number[],
-    to: number,
-    via: readonly number[],
-  ): void;
-  /** Ответ придёт в onMessage сообщением mapMask с тем же requestId. */
-  requestMask?(requestId: number, mode: MapMaskMode): void;
-  ack(seq: number): void;
-  dispose(): void;
-}
+export type { LocalMatch };
 
 /** Запускает sim в Web Worker; onMessage получает снимок каждые 100 мс. */
 export function startLocalMatch(

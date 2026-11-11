@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decodeDelta,
+  decodeMaskRle,
   decodeSnapshot,
   encodeClientMessage,
   PROTOCOL_VERSION,
@@ -148,19 +149,22 @@ describe('вход и набор', () => {
 });
 
 describe('матч: снимок, дельты и туман', () => {
-  it('снимок, затем дельты после viewAck; без viewAck новые сообщения не шлются', () => {
+  it('снимок, затем дельты в пределах окна; без viewAck поток останавливается', () => {
     const { hub, tick } = setup();
     const a = new Client(hub);
     a.hello('Аня', { mode: 'private' });
     a.send({ t: 'start' });
     tick();
     expect(a.count('snapshot')).toBe(1);
+    // Окно отправки — 12 сообщений без подтверждения (снимок и 11 дельт), дальше сервер ждёт viewAck.
+    tick(11);
+    expect(a.count('delta')).toBe(11);
     tick(3);
-    expect(a.count('delta')).toBe(0);
+    expect(a.count('delta')).toBe(11);
 
     ackAll(a);
     tick();
-    expect(a.count('delta')).toBe(1);
+    expect(a.count('delta')).toBe(12);
     const snapshot = decodeSnapshot(a.raw.find((t) => t.includes('"t":"snapshot"')) ?? '');
     const delta = decodeDelta(a.raw.find((t) => t.includes('"t":"delta"')) ?? '');
     expect(delta.baseTick).toBe(snapshot.tick);
@@ -260,5 +264,58 @@ describe('реконнект и передача боту', () => {
     const back = new Client(hub);
     back.hello('Аня', { token });
     expect(state?.players[0]?.autoCommand).toBe(false);
+  });
+});
+
+describe('запросы по полному состоянию', () => {
+  function started() {
+    const env = setup();
+    const a = new Client(env.hub);
+    a.hello('Аня', { mode: 'private' });
+    a.send({ t: 'start' });
+    env.tick(3);
+    const room = env.hub.roomById(a.of('welcome')[0]?.room ?? '');
+    return { ...env, a, state: room?.state };
+  }
+
+  it('карточка своего города приходит сразу, чужой скрытый город — пустая карточка', () => {
+    const { a, state, tick } = started();
+    const own = state?.cities.find((c) => c.owner === 0);
+    const hidden = state?.cities.find(
+      (c) => c.owner !== 0 && state.vision?.visible[0]?.[c.hex] !== 1,
+    );
+    expect(own && hidden).toBeTruthy();
+    a.send({ t: 'select', hex: own?.hex ?? 0 });
+    expect(a.of('selection').at(-1)?.sel?.hex).toBe(own?.hex);
+    expect(a.of('selection').at(-1)?.sel?.city).toBeTruthy();
+    a.send({ t: 'select', hex: hidden?.hex ?? 0 });
+    expect(a.of('selection').at(-1)?.sel).toBeNull();
+    tick();
+    // Строка не должна нести сведений о скрытом городе.
+    expect(a.raw.at(-1)).not.toContain(`"hex":${hidden?.hex}`);
+  });
+
+  it('маска снабжения разворачивается в размер карты, запросы ограничены по частоте', () => {
+    const { a, state } = started();
+    const size = (state?.map.width ?? 0) * (state?.map.height ?? 0);
+    for (let id = 1; id <= 40; id += 1)
+      a.send({ t: 'query', id, q: { kind: 'mask', mode: 'supply' } });
+    const masks = a.of('mapMask');
+    expect(masks).toHaveLength(30);
+    expect(decodeMaskRle(masks[0]?.rle ?? [], size)).toHaveLength(size);
+  });
+
+  it('прогноз пути за пределы карты и чужие отряды не раскрывает ничего', () => {
+    const { a, state } = started();
+    a.send({ t: 'query', id: 1, q: { kind: 'path', unitIds: [1], to: 99_999_999, via: [] } });
+    expect(a.of('pathPreview')).toHaveLength(0);
+    const foreign = state?.units.find((u) => u.owner !== 0);
+    a.send({
+      t: 'query',
+      id: 2,
+      q: { kind: 'path', unitIds: [foreign?.id ?? -1], to: 0, via: [] },
+    });
+    const reply = a.of('pathPreview')[0];
+    expect(reply === undefined || reply.preview === null).toBe(true);
   });
 });

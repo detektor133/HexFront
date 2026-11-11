@@ -52,6 +52,9 @@ import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { appSearch } from '../nav.ts';
+import { webSocketTransport, type NetStatus } from '../net/net-client.ts';
+import { startOnlineMatch, type OnlineMatch } from '../net/online-match.ts';
+import { loadOnlineSession } from '../net/online-session.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
@@ -80,6 +83,12 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
   }, [request]);
   return state;
 }
+
+/**
+ * Задержка показа в сетевом матче: виды приходят с разбросом сети, а показываются ровным шагом
+ * (интерполяция по прогрессу перехода между тиками, protocol.md).
+ */
+const RENDER_DELAY_MS = 100;
 
 type WorkerViewMessage = Extract<FromWorker, { t: 'view' }>;
 type ViewMessage = WorkerViewMessage & { readonly view: PlayerView };
@@ -193,6 +202,10 @@ export interface TerritoryMenuState {
 interface Sandbox {
   readonly msg: ViewMessage | null;
   readonly error: string | null;
+  /** Состояние сетевого соединения (в локальном матче всегда `online`). */
+  readonly netStatus: NetStatus;
+  /** Сглаженный пинг, мс; `null` вне сетевого матча. */
+  readonly pingMs: number | null;
   readonly picked: Picked;
   readonly menu: TerritoryMenuState | null;
   closeMenu(): void;
@@ -305,6 +318,8 @@ export function useSandbox(
   const [army, setArmyState] = useState<number | null>(null);
   const [msg, setMsg] = useState<ViewMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [netStatus, setNetStatus] = useState<NetStatus>('online');
+  const [pingMs, setPingMs] = useState<number | null>(null);
   const [picked, setPicked] = useState<Picked>(NOTHING_PICKED);
   const [menu, setMenu] = useState<TerritoryMenuState | null>(null);
   const [lastReject, setLastReject] = useState<string | null>(null);
@@ -442,7 +457,8 @@ export function useSandbox(
     const { map, json } = loaded;
     let view: MapView | null = null;
     let cancelled = false;
-    let pendingMessage: WorkerViewMessage | null = null;
+    // Очередь видов: в сетевом матче в пути бывает несколько дельт подряд, терять их нельзя.
+    const pending: { readonly m: WorkerViewMessage; readonly due: number }[] = [];
     let frameRequest = 0;
     let appliedMessage = false;
     let startCameraApplied = false;
@@ -464,20 +480,31 @@ export function useSandbox(
         nearbyHexes: neighbors(playerCity),
       });
     };
-    const applyMessage = (m: WorkerViewMessage): void => {
-      const receivedView =
-        m.kind === 'snapshot'
-          ? deltaApplier.applySnapshot(m.snapshot)
-          : deltaApplier.applyDelta(m.delta);
+    /** `light` — промежуточное сообщение очереди: вид применяется к базе, но не рисуется и не ставится в state. */
+    const applyMessage = (m: WorkerViewMessage, light = false): void => {
+      let receivedView: PlayerView;
+      try {
+        receivedView =
+          m.kind === 'snapshot'
+            ? deltaApplier.applySnapshot(m.snapshot)
+            : deltaApplier.applyDelta(m.delta);
+      } catch (error) {
+        // Сетевой матч: потеряна база дельты — просим полный снимок, не роняя экран.
+        if (matchRef.current?.resync === undefined) throw error;
+        matchRef.current.resync();
+        return;
+      }
       const view = applyHudPreview(receivedView, hudPreview);
       const applied = { ...m, view } as ViewMessage;
       snapshotTelemetryRef.current?.track(applied);
       viewRef.current = view;
       applyStartCameraToView(view);
       workerTelemetryRef.current = m.telemetry ?? null;
-      layerRef.current?.setView(view, pickedRef.current);
-      syncQueueMarks();
-      setMsg(applied);
+      if (!light) {
+        layerRef.current?.setView(view, pickedRef.current);
+        syncQueueMarks();
+        setMsg(applied);
+      }
       const nextEvents = appendEvents(
         eventsRef.current,
         m.events,
@@ -505,50 +532,79 @@ export function useSandbox(
       if (last) setLastReject(reasonText(last.reason));
       matchRef.current?.ack(m.seq);
     };
+    /** Применяет готовые сообщения очереди по порядку; рисуется только последнее. */
+    const applyReady = (limit: number): void => {
+      const ready: WorkerViewMessage[] = [];
+      while (pending.length > 0 && (pending[0]?.due ?? Infinity) <= limit) {
+        const item = pending.shift();
+        if (item) ready.push(item.m);
+      }
+      ready.forEach((m, index) => {
+        appliedMessage = true;
+        applyMessage(m, index < ready.length - 1);
+      });
+    };
+    const drain = (): void => {
+      frameRequest = 0;
+      if (cancelled || !layerRef.current) return;
+      applyReady(performance.now());
+      if (pending.length > 0) frameRequest = requestAnimationFrame(drain);
+    };
     const scheduleMessage = (m: WorkerViewMessage): void => {
-      if (!appliedMessage && layerRef.current) {
+      if (!appliedMessage && layerRef.current && pending.length === 0 && !renderDelay) {
         appliedMessage = true;
         applyMessage(m);
         return;
       }
-      pendingMessage = m;
+      pending.push({ m, due: performance.now() + (renderDelay ? RENDER_DELAY_MS : 0) });
       if (frameRequest !== 0) return;
-      frameRequest = requestAnimationFrame(() => {
-        frameRequest = 0;
-        const next = pendingMessage;
-        pendingMessage = null;
-        if (!next || cancelled) return;
-        appliedMessage = true;
-        applyMessage(next);
-      });
+      frameRequest = requestAnimationFrame(drain);
     };
-    const match = startLocalMatch(
-      json,
-      mapRequest.seed,
-      readLocalMatchSetup(appSearch()),
-      (m) => {
-        if (m.t === 'error') return setError(m.errors.join('; '));
-        // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
-        if (m.t === 'pathPreview') return;
-        if (m.t === 'mapMask') return mapModesRef.current.handleReply(m);
-        scheduleMessage(m);
-      },
-      {
-        telemetry: debug,
-        initialGold: setup.initialGold,
-        tutorial: setup.tutorial !== null,
-        botLevel: setup.botLevel,
-        playerName:
-          setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
-        playerColors: matchPlayerColors(
-          setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
-        ),
-      },
-    );
+    const renderDelay = new URLSearchParams(appSearch()).get('online') === '1';
+    const onWorkerMessage = (m: FromWorker): void => {
+      if (m.t === 'error') return setError(m.errors.join('; '));
+      // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
+      if (m.t === 'pathPreview') return;
+      if (m.t === 'mapMask') return mapModesRef.current.handleReply(m);
+      scheduleMessage(m);
+    };
+    // Сетевой матч (`online=1`): вид и расчёты приходят с сервера по токену места из лобби.
+    const online =
+      new URLSearchParams(appSearch()).get('online') === '1' ? loadOnlineSession() : null;
+    if (new URLSearchParams(appSearch()).get('online') === '1' && online === null) {
+      setError(t('online.refused.badHello'));
+      return;
+    }
+    const match: LocalMatch = online
+      ? startOnlineMatch({
+          connect: webSocketTransport(online.server),
+          token: online.token,
+          nick: online.nick,
+          mapSize: map.width * map.height,
+          onMessage: onWorkerMessage,
+          onStatus: setNetStatus,
+        })
+      : startLocalMatch(json, mapRequest.seed, readLocalMatchSetup(appSearch()), onWorkerMessage, {
+          telemetry: debug,
+          initialGold: setup.initialGold,
+          tutorial: setup.tutorial !== null,
+          botLevel: setup.botLevel,
+          playerName:
+            setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
+          playerColors: matchPlayerColors(
+            setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
+          ),
+        });
     setPlayerPalette(
       matchPlayerColors(setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal'),
     );
     matchRef.current = match;
+    const pingTimer = online
+      ? window.setInterval(() => {
+          const rtt = (match as OnlineMatch).client.rtt;
+          setPingMs(rtt === null ? null : Math.round(rtt));
+        }, 2000)
+      : 0;
     match.setView(null, !debug);
     setFogState(!debug);
     // Параметры для скриншотов и отладки: сразу выбранный гекс и масштаб.
@@ -781,12 +837,7 @@ export function useSandbox(
       if (initialScale > 0) v.setScale(initialScale);
       const hex = pickedRef.current.hex;
       if (hex !== null) v.centerOn(hexFromId(hex, map.width));
-      if (pendingMessage) {
-        const next = pendingMessage;
-        pendingMessage = null;
-        appliedMessage = true;
-        applyMessage(next);
-      }
+      applyReady(Infinity);
     });
     const onKey = createHotkeyHandler({
       latestEventHex: () => eventsRef.current.at(-1)?.hex ?? null,
@@ -814,6 +865,7 @@ export function useSandbox(
       cancelled = true;
       if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       window.removeEventListener('keydown', onKey);
+      if (pingTimer !== 0) window.clearInterval(pingTimer);
       match.dispose();
       view?.destroy();
       matchRef.current = null;
@@ -849,6 +901,8 @@ export function useSandbox(
     observerId,
     events,
     celebration,
+    netStatus,
+    pingMs,
     workerTelemetry: workerTelemetryRef.current,
     snapshotTelemetry: () =>
       snapshotTelemetryRef.current?.counts() ?? { received: 0, collected: 0, live: 0 },

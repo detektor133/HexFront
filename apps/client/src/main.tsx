@@ -8,6 +8,7 @@ import { messages, t } from './i18n/dict.ts';
 import { applyDocumentLang } from './i18n/document-lang.ts';
 import { MatchPage } from './match/MatchPage.tsx';
 import { MainMenu } from './menu/MainMenu.tsx';
+import { OnlineLobby } from './menu/OnlineLobby.tsx';
 import { useLocation } from './nav.ts';
 import { isDevPath, isMatchPath } from './routes.ts';
 import { applyTheme, currentTheme } from './theme/theme.ts';
@@ -21,6 +22,7 @@ export function App(): React.JSX.Element {
   if (path === '/' || path === '/menu') return <MainMenu />;
   // Ключ по строке запроса: переход к другому матчу собирает экран заново.
   if (isMatchPath(path)) return <MatchPage key={search} />;
+  if (path === '/online') return <OnlineLobby key={search} search={search} />;
   if (import.meta.env.PROD && isDevPath(path)) return <p>{messages.ru['dev.notFound']}</p>;
   if (path === '/dev/map') return <DevMapPage />;
   if (path === '/dev/units') return <DevUnitsPage />;

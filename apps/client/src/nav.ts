@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 const EVENT = 'hexfront:navigate';
 
 /** Экраны, которые открываются на месте, без смены адреса. */
-const IN_PLACE_PATHS: ReadonlySet<string> = new Set(['/', '/menu', '/match']);
+const IN_PLACE_PATHS: ReadonlySet<string> = new Set(['/', '/menu', '/match', '/online']);
 
 export interface AppLocation {
   readonly pathname: string;

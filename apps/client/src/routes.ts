@@ -1,8 +1,8 @@
 const QUICK_MATCH_PLAYERS = 30;
 
-export const QUICK_MATCH_SEEDS = [
-  42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
-] as const;
+import { QUICK_MATCH_SEEDS } from '@hexfront/protocol';
+
+export { QUICK_MATCH_SEEDS };
 
 /** Ссылка на быстрый локальный матч из главного меню. */
 export function quickMatchUrl(): string {

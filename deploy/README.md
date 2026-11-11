@@ -47,3 +47,10 @@ bash deploy/deploy.sh rollback   # вручную вернуть прошлый 
 - Работает от пользователя без прав, с `ProtectSystem=strict`, лимитом памяти 300 МБ и автоперезапуском.
 - Настройки — `/etc/hexfront.env`: `ALLOWED_ORIGINS`, `MAX_ROOMS`, `TRUST_PROXY`. Логи — `journalctl -u hexfront`.
 - Проверка: `https://<домен>/healthz`.
+
+## Клиент и сервер вместе
+
+1. После `setup` и первого `deploy` проверьте `https://<домен>/healthz`.
+2. Создайте переменную репозитория GitHub `VITE_SERVER_URL` = `wss://<домен>` (Settings → Secrets and variables → Actions → Variables). Это не секрет. Следующая сборка Pages встроит адрес в клиент; кнопки «Играть онлайн» и «Пригласить друзей» работают с этим адресом.
+3. `ALLOWED_ORIGINS` на сервере по умолчанию пускает `hexfront.pages.dev` и его поддомены (ветки). Свой домен клиента — через `HEXFRONT_ORIGINS` при `setup`.
+4. Предел комнат на 1 vCPU — 6 (`MAX_ROOMS` в `/etc/hexfront.env`): 8 комнат занимают тик на 60–85 мс из 100 (`tools/bench/src/ws-load.ts`). Нужно больше людей — берите больше ядер.

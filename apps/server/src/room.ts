@@ -4,10 +4,13 @@ import { randomBytes } from 'node:crypto';
 
 import {
   encodeDelta,
+  encodeMaskRle,
   encodeServerMessage,
   encodeSnapshot,
   ConfirmedViewDeltaStream,
   MAX_COMMANDS_PER_SECOND,
+  MAX_QUERIES_PER_SECOND,
+  type Query,
   slowLayerReuse,
   type JoinMode,
   type LobbyInfo,
@@ -15,12 +18,17 @@ import {
 } from '@hexfront/protocol';
 import {
   botCommands,
+  buildMask,
+  type BuildMaskKind,
   commanderCommands,
   createBotTickContext,
   createMatch,
   createPlayerViewContext,
   playerView,
+  previewPath,
+  selectionFor,
   step,
+  supplyLevels,
   TICK_MS,
   type BotLevel,
   type Command,
@@ -39,6 +47,11 @@ const ACK_STALE_TICKS = 100;
 const BOT_LEVEL: BotLevel = 'medium';
 /** Команд в очереди на тик от одного игрока; больше — отклоняются как `rateLimit`. */
 const MAX_PENDING = 64;
+/**
+ * Сообщений вида в пути без подтверждения. Больше 1, чтобы при пинге в сотни миллисекунд вид шёл на
+ * каждом тике, а не раз в круговую задержку; неподтверждённое окно держит память ограниченной.
+ */
+const SEND_WINDOW = 12;
 /** События, копящиеся, пока игрок вне связи; старые вытесняются. */
 const MAX_QUEUED_EVENTS = 256;
 
@@ -71,9 +84,11 @@ interface Seat {
   readonly stream: ConfirmedViewDeltaStream;
   pending: Command[];
   events: GameEvent[];
-  sentTick: number;
-  /** События в последнем неподтверждённом сообщении: вернутся в очередь, если оно не дошло. */
-  inflight: GameEvent[];
+  /** Выбранный гекс и последняя отправленная карточка (JSON): шлём только изменения. */
+  selected: number | null;
+  lastSel: string | null;
+  queryStart: number;
+  queryCount: number;
   /** Последний исполненный `seq` команды: повторы после обрыва не исполняются второй раз. */
   lastSeq: number;
   waitingTicks: number;
@@ -170,11 +185,13 @@ export class Room {
       token,
       nick,
       conn,
-      stream: new ConfirmedViewDeltaStream(),
+      stream: new ConfirmedViewDeltaStream(SEND_WINDOW),
       pending: [],
       events: [],
-      sentTick: -1,
-      inflight: [],
+      selected: null,
+      lastSel: null,
+      queryStart: 0,
+      queryCount: 0,
       lastSeq: 0,
       waitingTicks: 0,
       droppedAt: null,
@@ -203,15 +220,16 @@ export class Room {
     seat.droppedAt = null;
     seat.waitingTicks = 0;
     // Клиент помнит базу — продолжаем дельтами (экономит полный снимок на слабой связи).
+    seat.lastSel = null;
     const resumed =
       have === undefined || this.phase !== 'running' ? null : seat.stream.resume(have);
     if (resumed === null) {
       seat.stream.reset();
       seat.events = [];
-    } else if (resumed === 'confirmed') {
-      seat.events = [...seat.inflight, ...seat.events];
+    } else {
+      // События сообщений, которые клиент не применил, возвращаются в очередь.
+      seat.events = [...resumed.events, ...seat.events];
     }
-    seat.inflight = [];
     if (seat.botControlled) this.takeBack(seat);
     this.sendWelcome(seat);
     if (this.phase === 'lobby') this.send(seat, { t: 'lobby', info: this.lobbyInfo() });
@@ -257,10 +275,65 @@ export class Room {
   /** Клиент применил сообщение с этим тиком: оно становится базой следующей дельты. */
   public viewAck(conn: Connection, tick: number): void {
     const seat = this.seats.find((s) => s.conn === conn);
-    if (seat === undefined || tick !== seat.sentTick) return;
-    seat.stream.acknowledge();
-    seat.inflight = [];
+    if (seat === undefined) return;
+    seat.stream.acknowledge(tick);
     seat.waitingTicks = 0;
+  }
+
+  /** Игрок выбрал гекс: карточка придёт сразу и затем при каждом изменении. */
+  public select(conn: Connection, hex: number | null): void {
+    const seat = this.seats.find((s) => s.conn === conn);
+    const state = this.state;
+    if (seat === undefined || state === null || this.phase !== 'running') return;
+    const size = state.map.width * state.map.height;
+    seat.selected = hex !== null && hex >= 0 && hex < size ? hex : null;
+    seat.lastSel = null;
+    this.pushSelection(seat, state);
+  }
+
+  /**
+   * Расчёт по полному состоянию: прогноз пути и маски карты. Лимит запросов на игрока; ответ — с тем же `id`.
+   */
+  public query(conn: Connection, id: number, q: Query): void {
+    const seat = this.seats.find((s) => s.conn === conn);
+    const state = this.state;
+    if (seat === undefined || state === null || this.phase !== 'running') return;
+    const now = this.options.now();
+    if (now - seat.queryStart >= 1000) {
+      seat.queryStart = now;
+      seat.queryCount = 0;
+    }
+    seat.queryCount += 1;
+    if (seat.queryCount > MAX_QUERIES_PER_SECOND) return;
+    if (q.kind === 'path') {
+      const size = state.map.width * state.map.height;
+      const points = [q.to, ...q.via];
+      if (points.some((hex) => hex < 0 || hex >= size) || q.unitIds.length > 512) return;
+      this.send(seat, {
+        t: 'pathPreview',
+        id,
+        preview: previewPath(state, seat.playerId, q.unitIds, q.to, q.via),
+      });
+      return;
+    }
+    const mask =
+      q.mode === 'supply'
+        ? supplyLevels(state, seat.playerId)
+        : buildMask(state, seat.playerId, q.mode.slice('build:'.length) as BuildMaskKind);
+    this.send(seat, { t: 'mapMask', id, mode: q.mode, rle: encodeMaskRle(mask) });
+  }
+
+  /** Карточка гекса уходит, если гекс виден игроку и карточка изменилась с прошлой отправки. */
+  private pushSelection(seat: Seat, state: MatchState): void {
+    if (seat.conn === null) return;
+    const hex = seat.selected;
+    const visible =
+      hex !== null && (!state.fog || state.vision?.visible[seat.playerId]?.[hex] === 1);
+    const sel = hex !== null && visible ? selectionFor(state, seat.playerId, hex) : null;
+    const json = JSON.stringify(sel);
+    if (json === seat.lastSel) return;
+    seat.lastSel = json;
+    this.send(seat, { t: 'selection', sel });
   }
 
   /** Клиент потерял базу: следующим уйдёт полный снимок. */
@@ -268,7 +341,6 @@ export class Room {
     const seat = this.seats.find((s) => s.conn === conn);
     if (seat === undefined) return;
     seat.stream.reset();
-    seat.inflight = [];
     seat.waitingTicks = 0;
   }
 
@@ -380,13 +452,12 @@ export class Room {
         seat.waitingTicks = 0;
         seat.events = [];
       }
-      const reuse = slowLayerReuse(seat.stream.confirmedView, seat.stream.isSlowSync(state.tick));
+      if (seat.selected !== null || seat.lastSel !== null) this.pushSelection(seat, state);
+      const reuse = slowLayerReuse(seat.stream.baseView, seat.stream.isSlowSync(state.tick));
       const view = playerView(state, seat.playerId, context, reuse);
       const transport = seat.stream.next(view, seat.events);
       if (transport === null) continue;
-      seat.inflight = seat.events;
       seat.events = [];
-      seat.sentTick = state.tick;
       const text =
         transport.kind === 'snapshot'
           ? encodeSnapshot(transport.snapshot)

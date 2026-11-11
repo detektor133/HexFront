@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decodeClientMessage,
+  decodeMaskRle,
+  encodeMaskRle,
   encodeClientMessage,
   MAX_CLIENT_MESSAGE_BYTES,
   MessageError,
@@ -80,5 +82,43 @@ describe('проверка формы команды', () => {
     expect(validateCommand(JSON.parse('{"t":"setTax","__proto__":1,"rate":1}'))).toBeNull();
     expect(validateCommand(null)).toBeNull();
     expect(validateCommand([])).toBeNull();
+  });
+});
+
+describe('запросы, возобновление и маски', () => {
+  it('разбирает select, query, resync и have', () => {
+    expect(decodeClientMessage('{"t":"select","hex":null}')).toEqual({ t: 'select', hex: null });
+    expect(decodeClientMessage('{"t":"select","hex":5}')).toEqual({ t: 'select', hex: 5 });
+    expect(decodeClientMessage('{"t":"resync"}')).toEqual({ t: 'resync' });
+    expect(
+      decodeClientMessage('{"t":"query","id":3,"q":{"kind":"mask","mode":"supply"}}'),
+    ).toMatchObject({ t: 'query', id: 3 });
+    expect(
+      decodeClientMessage(
+        '{"t":"query","id":4,"q":{"kind":"path","unitIds":[1],"to":9,"via":[2]}}',
+      ),
+    ).toMatchObject({ t: 'query', q: { kind: 'path', to: 9 } });
+    expect(decodeClientMessage('{"t":"hello","v":1,"nick":"Аня","have":42}')).toMatchObject({
+      have: 42,
+    });
+  });
+
+  it.each([
+    '{"t":"select","hex":"5"}',
+    '{"t":"query","id":1,"q":{"kind":"mask","mode":"hack"}}',
+    '{"t":"query","id":1,"q":{"kind":"path","unitIds":"x","to":1,"via":[]}}',
+    '{"t":"query","id":1,"q":{"kind":"path","unitIds":[1],"to":1,"via":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]}}',
+    '{"t":"query","id":1,"q":{"kind":"other"}}',
+    '{"t":"hello","v":1,"nick":"Аня","have":-1}',
+  ])('отклоняет %s', (text) => {
+    expect(() => decodeClientMessage(text)).toThrow(MessageError);
+  });
+
+  it('маска сжимается повторами и разворачивается без потерь', () => {
+    const mask = Uint8Array.from([0, 0, 0, 2, 2, 1, 0, 0, 3]);
+    expect(decodeMaskRle(encodeMaskRle(mask), mask.length)).toEqual(mask);
+    expect(encodeMaskRle(new Uint8Array(1000))).toEqual([0, 1000]);
+    // Чужой размер не раздувает память и не пишет за пределы.
+    expect(decodeMaskRle([1, 1_000_000], 10)).toEqual(new Uint8Array(10).fill(1));
   });
 });

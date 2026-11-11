@@ -2,41 +2,28 @@
 // Живёт в Web Worker (sim-worker.ts); отдельно — чтобы тестироваться без браузера.
 import type { SnapshotMessage } from '@hexfront/protocol';
 import {
-  canFoundCity,
   previewPath,
   buildMask,
   supplyLevels,
   type BotLevel,
   type BuildMaskKind,
   type PathPreview,
-  checkConstruction,
-  checkRecruit,
-  COST_POP_PER_SOLDIER,
-  RECRUIT_MIN,
-  RECRUIT_STEP,
-  fpDiv,
   FP,
-  recruitCapacity,
-  cityPopCap,
   hexPopCap,
   botCommands,
-  cityInfo,
-  rebuildSupplyPlan,
-  isDepot,
   commanderCommands,
   createMatch,
   createBotTickContext,
   loadMap,
   playerView,
+  selectionFor,
   step,
   type Command,
-  type Fp,
   type MatchState,
-  type UnitType,
   type RejectReason,
 } from '@hexfront/sim';
 
-import type { MapMaskMode, RecruitOption, Selection, ViewPayload } from './messages.ts';
+import type { MapMaskMode, ViewPayload } from './messages.ts';
 import { createDirector, directorCommands } from './tutorial-director.ts';
 
 /**
@@ -78,45 +65,6 @@ export interface LocalEngine {
   snapshot(): ViewPayload;
   /** Продвигает один тик без построения снимка. */
   advance(): void;
-}
-
-const RECRUIT_TYPES: readonly UnitType[] = ['infantry', 'armor', 'artillery'];
-
-function recruitOptions(state: MatchState, cityId: number): RecruitOption[] {
-  return RECRUIT_TYPES.map((type) => {
-    const capacity = recruitCapacity(state, cityId);
-    const rawMax = fpDiv(capacity, COST_POP_PER_SOLDIER[type]);
-    const maxSoldiers = (Math.floor(rawMax / RECRUIT_STEP) * RECRUIT_STEP) as Fp;
-    const amounts: RecruitOption['amounts'] = [];
-    for (let amount = RECRUIT_MIN; amount <= maxSoldiers; amount = (amount + RECRUIT_STEP) as Fp) {
-      amounts.push({
-        soldiers: amount,
-        check: checkRecruit(state, HUMAN_ID, cityId, type, amount),
-      });
-    }
-    return { type, amounts };
-  });
-}
-
-function selectionOf(state: MatchState, hex: number): Selection {
-  const city = state.cities.find((c) => c.hex === hex);
-  const info = city ? cityInfo(state, city.id) : null;
-  return {
-    hex,
-    popCap: city ? cityPopCap(city.level) : hexPopCap(state, hex),
-    city: info,
-    foundCity: canFoundCity(state, HUMAN_ID, hex),
-    improve: checkConstruction(state, HUMAN_ID, { t: 'improve', hex }),
-    fort: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'fort' }),
-    depot: checkConstruction(state, HUMAN_ID, { t: 'build', hex, kind: 'depot' }),
-    building: state.hexes.building[hex] ?? 0,
-    rebuild:
-      info?.rebuild ??
-      (isDepot(state.hexes.building[hex] ?? 0)
-        ? rebuildSupplyPlan(state, HUMAN_ID, { hex })
-        : null),
-    recruit: city?.owner === HUMAN_ID ? recruitOptions(state, city.id) : [],
-  };
 }
 
 /**
@@ -205,7 +153,7 @@ export function createLocalEngine(
       view,
       kind: 'snapshot',
       snapshot,
-      selection: selected === null ? null : selectionOf(state, selected),
+      selection: selected === null ? null : selectionFor(state, HUMAN_ID, selected),
       rejected,
       events,
     };

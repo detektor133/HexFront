@@ -525,6 +525,18 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           })()}
         />
       )}
+      {sb.netStatus !== 'online' ? (
+        <p className={styles.error} role="status">
+          {t('net.reconnecting')}
+        </p>
+      ) : (
+        sb.pingMs !== null &&
+        sb.pingMs > 200 && (
+          <p className={styles.error} role="status">
+            {`${sb.pingMs} ${t('net.ping')}`}
+          </p>
+        )
+      )}
       {(loaded === 'error' || sb.error) && (
         <p className={styles.error}>{sb.error ?? t('dev.map.error')}</p>
       )}

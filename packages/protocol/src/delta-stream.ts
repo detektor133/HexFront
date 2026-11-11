@@ -15,12 +15,27 @@ export type ViewTransport =
   | { readonly kind: 'snapshot'; readonly snapshot: SnapshotMessage }
   | { readonly kind: 'delta'; readonly delta: DeltaMessage };
 
+interface InFlight {
+  readonly view: PlayerView;
+  readonly events: readonly GameEvent[];
+}
+
+/**
+ * Поток дельт получателя с окном: до `window` сообщений в пути без ожидания подтверждения.
+ * Окно 1 — локальный воркер (отправка после `ack`); сервер ставит окно больше, чтобы при пинге
+ * сотни миллисекунд вид шёл на каждом тике, а не раз в круговую задержку. Канал упорядочен (TCP),
+ * поэтому следующая дельта строится от последнего отправленного вида, а не от подтверждённого.
+ */
 export class ConfirmedViewDeltaStream {
   private confirmed: PlayerView | null = null;
-  private sent: PlayerView | null = null;
-  private waiting = false;
+  private flight: InFlight[] = [];
   private forceFull = true;
   private slowSyncedAt = 0;
+  private readonly window: number;
+
+  public constructor(window = 1) {
+    this.window = Math.max(1, window);
+  }
 
   /** Следующее сообщение будет полным снимком (вход, реконнект, смена вида или тумана). */
   public requestFull(): void {
@@ -30,82 +45,86 @@ export class ConfirmedViewDeltaStream {
   /** Забывает базу: после этого первым уйдёт полный снимок. */
   public reset(): void {
     this.confirmed = null;
-    this.sent = null;
-    this.waiting = false;
+    this.flight = [];
     this.forceFull = true;
   }
 
   /**
    * Продолжает поток после обрыва связи: клиент назвал тик последнего применённого вида.
-   * @returns `'sent'` — клиент применил и последнее отправленное (потерялся только `viewAck`),
-   * `'confirmed'` — последнее отправленное не дошло, события из него надо отправить заново,
-   * `null` — такой базы нет, нужен полный снимок (поток сброшен)
+   * @returns `how`: `'sent'` — клиент применил что-то из отправленного (потерялись только `viewAck`),
+   * `'confirmed'` — отправленное не дошло; `events` — события неприменённых сообщений, их надо
+   * отправить заново; `null` — такой базы нет, нужен полный снимок (поток сброшен)
    */
-  public resume(have: number): 'sent' | 'confirmed' | null {
-    let how: 'sent' | 'confirmed' | null = null;
-    if (this.sent !== null && this.sent.tick === have) {
-      this.confirmed = this.sent;
-      how = 'sent';
-    } else if (this.confirmed !== null && this.confirmed.tick === have) {
-      how = 'confirmed';
+  public resume(have: number): { how: 'sent' | 'confirmed'; events: GameEvent[] } | null {
+    if (this.confirmed !== null && this.confirmed.tick === have) {
+      const events = this.flight.flatMap((item) => [...item.events]);
+      this.flight = [];
+      this.forceFull = false;
+      return { how: 'confirmed', events };
     }
-    if (how === null) {
+    const index = this.flight.findIndex((item) => item.view.tick === have);
+    if (index < 0) {
       this.reset();
       return null;
     }
-    this.sent = null;
-    this.waiting = false;
+    const events = this.flight.slice(index + 1).flatMap((item) => [...item.events]);
+    this.confirmed = (this.flight[index] as InFlight).view;
+    this.flight = [];
     this.forceFull = false;
-    return how;
+    return { how: 'sent', events };
   }
 
-  /** Ждём `viewAck` на уже отправленное сообщение. */
+  /** Окно отправки заполнено: ждём `viewAck`. */
   public get isWaiting(): boolean {
-    return this.waiting;
+    return this.flight.length >= this.window;
   }
 
-  /** Подтверждённый клиентом вид; по нему сервер строит `slowLayerReuse`. */
-  public get confirmedView(): PlayerView | null {
-    return this.confirmed;
+  /** Вид, от которого строится следующая дельта (последний отправленный); по нему `slowLayerReuse`. */
+  public get baseView(): PlayerView | null {
+    return this.flight.at(-1)?.view ?? this.confirmed;
   }
 
   /** Нужен ли на этом тике срок синхронизации медленных слоёв (для `slowLayerReuse`). */
   public isSlowSync(tick: number): boolean {
-    return this.confirmed === null || tick - this.slowSyncedAt >= SLOW_PERIOD_TICKS;
+    return this.baseView === null || tick - this.slowSyncedAt >= SLOW_PERIOD_TICKS;
   }
 
   /**
    * Следующее сообщение получателю.
-   * @returns снимок или дельта; `null`, если предыдущее ещё не подтверждено
+   * @returns снимок или дельта; `null`, если окно отправки заполнено
    */
   public next(view: PlayerView, events: readonly GameEvent[]): ViewTransport | null {
-    if (this.waiting) return null;
-    const full =
-      this.forceFull || this.confirmed === null || !canBuildViewDelta(this.confirmed, view);
+    if (this.isWaiting) return null;
+    const base = this.baseView;
+    const full = this.forceFull || base === null || !canBuildViewDelta(base, view);
     let transport: ViewTransport;
-    let sent: PlayerView;
-    if (full || this.confirmed === null) {
+    if (full || base === null) {
       transport = { kind: 'snapshot', snapshot: { t: 'snapshot', tick: view.tick, view } };
-      sent = view;
+      this.flight = [{ view, events: [] }];
       this.slowSyncedAt = view.tick;
     } else {
       // Медленные поля обновляются раз в SLOW_PERIOD_TICKS; базой дальше станет именно «клиентский» вид.
       const sync = view.tick - this.slowSyncedAt >= SLOW_PERIOD_TICKS;
       if (sync) this.slowSyncedAt = view.tick;
-      sent = paceView(this.confirmed, view, sync);
-      transport = { kind: 'delta', delta: buildViewDelta(this.confirmed, sent, events) };
+      const sent = paceView(base, view, sync);
+      transport = { kind: 'delta', delta: buildViewDelta(base, sent, events) };
+      this.flight.push({ view: sent, events });
     }
     this.forceFull = false;
-    this.sent = sent;
-    this.waiting = true;
     return transport;
   }
 
-  /** Клиент применил последнее сообщение: оно становится базой. */
-  public acknowledge(): void {
-    if (this.sent === null) return;
-    this.confirmed = this.sent;
-    this.sent = null;
-    this.waiting = false;
+  /**
+   * Клиент применил сообщение: оно и всё до него становятся подтверждённой базой.
+   * Без аргумента подтверждается последнее отправленное (окно 1, локальный воркер).
+   */
+  public acknowledge(tick?: number): void {
+    const last = this.flight.at(-1);
+    if (last === undefined) return;
+    const target = tick ?? last.view.tick;
+    const index = this.flight.findIndex((item) => item.view.tick === target);
+    if (index < 0) return;
+    this.confirmed = (this.flight[index] as InFlight).view;
+    this.flight.splice(0, index + 1);
   }
 }

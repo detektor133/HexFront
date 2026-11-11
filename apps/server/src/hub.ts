@@ -7,6 +7,7 @@ import {
   encodeServerMessage,
   MessageError,
   PROTOCOL_VERSION,
+  QUICK_MATCH_SEEDS,
   type C2S,
   type RefuseReason,
 } from '@hexfront/protocol';
@@ -29,6 +30,18 @@ export const MAX_MESSAGES_PER_SECOND = 100;
 export const MAX_CONNECTIONS_PER_IP = 10;
 /** Попыток `hello` в минуту с одного адреса (включая подбор токенов и кодов комнат). */
 export const MAX_HELLOS_PER_MINUTE = 30;
+
+export interface HubStats {
+  readonly rooms: number;
+  readonly humans: number;
+  /** Время одного тика всех комнат, мс (по последним ~минуте). */
+  readonly tickMs: { readonly p50: number; readonly p99: number; readonly max: number };
+  /** Процессорное время процесса с запуска, мс. */
+  readonly cpuMs: number;
+  readonly rssMb: number;
+}
+
+const TICK_SAMPLES = 600;
 
 export interface HubOptions {
   readonly now?: () => number;
@@ -127,6 +140,12 @@ export class Session implements Connection {
       case 'resync':
         room.resync(this);
         break;
+      case 'select':
+        room.select(this, message.hex);
+        break;
+      case 'query':
+        room.query(this, message.id, message.q);
+        break;
       case 'viewAck':
         room.viewAck(this, message.tick);
         break;
@@ -158,6 +177,8 @@ export class Hub {
   private nextAt = 0;
   private logger: NonNullable<HubOptions['log']>;
   private readonly maxRooms: number;
+  private readonly tickSamples = new Float64Array(TICK_SAMPLES);
+  private tickCount = 0;
   private readonly sessions = new Set<Session>();
   private readonly perIp = new Map<string, number>();
   private readonly hellos = new Map<string, { start: number; count: number }>();
@@ -180,11 +201,23 @@ export class Hub {
     this.logger(event, data);
   }
 
-  /** Число комнат и людей: `/healthz` и метрики. */
-  public stats(): { rooms: number; humans: number } {
+  /** Число комнат и людей, время тика хаба за последние ~минуту, процессор и память: `/healthz`. */
+  public stats(): HubStats {
     let humans = 0;
     for (const room of this.rooms.values()) humans += room.humans;
-    return { rooms: this.rooms.size, humans };
+    const used = this.tickSamples
+      .slice(0, Math.min(this.tickCount, TICK_SAMPLES))
+      .sort((a, b) => a - b);
+    const pick = (p: number): number =>
+      used[Math.min(used.length - 1, Math.floor(used.length * p))] ?? 0;
+    const cpu = process.cpuUsage();
+    return {
+      rooms: this.rooms.size,
+      humans,
+      tickMs: { p50: pick(0.5), p99: pick(0.99), max: used.at(-1) ?? 0 },
+      cpuMs: Math.round((cpu.user + cpu.system) / 1000),
+      rssMb: Math.round(process.memoryUsage().rss / 1048576),
+    };
   }
 
   public roomById(id: string): Room | undefined {
@@ -271,7 +304,8 @@ export class Hub {
     if (this.rooms.size >= this.maxRooms) return null;
     const id =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
-    const seed = randomInt(1, 2 ** 31 - 1);
+    // Карта берётся из готовых файлов клиента (быстрый матч): сид из общего списка.
+    const seed = QUICK_MATCH_SEEDS[randomInt(0, QUICK_MATCH_SEEDS.length)] ?? 42;
     const room = new Room({
       id,
       mode,
@@ -299,6 +333,13 @@ export class Hub {
 
   /** Один шаг планировщика: набор, тики комнат, уборка пустых и законченных. */
   public tickAll(): void {
+    const startedAt = performance.now();
+    this.tickRooms();
+    this.tickSamples[this.tickCount % TICK_SAMPLES] = performance.now() - startedAt;
+    this.tickCount += 1;
+  }
+
+  private tickRooms(): void {
     const now = this.now();
     for (const session of this.sessions) {
       if (!session.joined && now - session.createdAt > HELLO_TIMEOUT_MS) session.kick('noHello');

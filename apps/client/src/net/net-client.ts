@@ -15,12 +15,16 @@ import {
   PROTOCOL_VERSION,
   ProtocolError,
   type C2S,
+  type DeltaMessage,
   type JoinMode,
+  type MapMaskMode,
+  type Query,
+  type SnapshotMessage,
   type LobbyInfo,
   type RefuseReason,
   type S2C,
 } from '@hexfront/protocol';
-import type { Command, GameEvent, PlayerView } from '@hexfront/sim';
+import type { Command, GameEvent, PathPreview, PlayerView, Selection } from '@hexfront/sim';
 
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 
@@ -59,6 +63,12 @@ export interface NetHandlers {
   onStart?(tick: number): void;
   /** Новый вид игрока и события тика; `full` — пришёл полный снимок. */
   onView?(view: PlayerView, events: readonly GameEvent[], full: boolean): void;
+  /** Режим `external`: вид применяет потребитель и подтверждает `ack(tick)`; клиент только декодирует. */
+  onSnapshot?(message: SnapshotMessage): void;
+  onDelta?(message: DeltaMessage): void;
+  onSelection?(sel: Selection | null): void;
+  onPath?(id: number, preview: PathPreview | null): void;
+  onMask?(id: number, mode: MapMaskMode, rle: readonly number[]): void;
   onRejected?(seq: number, reason: string): void;
   onRefused?(reason: RefuseReason): void;
   onEnd?(winner: number, tick: number): void;
@@ -74,6 +84,11 @@ export interface NetOptions {
   /** Токен сохранённой сессии (после перезагрузки страницы). */
   readonly token?: string;
   readonly handlers?: NetHandlers;
+  /**
+   * Вид применяет и подтверждает потребитель (экран игры применяет в своём кадре): клиент отдаёт
+   * `onSnapshot`/`onDelta`, а `viewAck` уходит по `ack(tick)`. Так база сервера — то, что реально применено.
+   */
+  readonly external?: boolean;
   /** Случайность для разброса повторов; в тестах подменяется. */
   readonly random?: () => number;
 }
@@ -118,6 +133,8 @@ export class NetClient {
   private retryHandle: unknown = null;
   private stopped = false;
   private fullPending = true;
+  /** Тик последнего применённого и подтверждённого вида: база для `have` при реконнекте. */
+  private appliedTick: number | null = null;
 
   public constructor(options: NetOptions) {
     this.options = options;
@@ -134,6 +151,29 @@ export class NetClient {
   /** Последний применённый вид. */
   public get view(): PlayerView | null {
     return this.applier.view;
+  }
+
+  /** Подтверждает серверу, что вид этого тика применён (режим `external`). */
+  public ack(tick: number): void {
+    this.appliedTick = tick;
+    this.send({ t: 'viewAck', tick });
+  }
+
+  /** База дельты потеряна на стороне потребителя: просим полный снимок. */
+  public resync(): void {
+    this.fullPending = true;
+    this.appliedTick = null;
+    this.send({ t: 'resync' });
+  }
+
+  /** Выбранный гекс: сервер пришлёт карточку. */
+  public select(hex: number | null): void {
+    this.send({ t: 'select', hex });
+  }
+
+  /** Запрос к серверу по полному состоянию (путь, маска карты). */
+  public query(id: number, q: Query): void {
+    this.send({ t: 'query', id, q });
   }
 
   /** Команд, ещё не подтверждённых сервером. */
@@ -198,7 +238,6 @@ export class NetClient {
   }
 
   private hello(): void {
-    const view = this.applier.view;
     this.send({
       t: 'hello',
       v: PROTOCOL_VERSION,
@@ -211,7 +250,7 @@ export class NetClient {
         ? { mode: this.options.mode }
         : {}),
       // Базу называем только если уверены, что она применена и не просит замены.
-      ...(view !== null && !this.fullPending ? { have: view.tick } : {}),
+      ...(this.appliedTick !== null && !this.fullPending ? { have: this.appliedTick } : {}),
     });
   }
 
@@ -223,14 +262,21 @@ export class NetClient {
     } catch (error) {
       if (!(error instanceof ProtocolError || error instanceof SyntaxError)) throw error;
       // Испорченное или несогласованное сообщение: просим полный снимок и идём дальше.
-      this.applier.requestViewChange();
+      if (this.options.external === true) this.resync();
+      else this.applier.requestViewChange();
     }
   }
 
   private onSnapshot(text: string): void {
     const message = decodeSnapshot(text);
+    if (this.options.external === true) {
+      this.fullPending = false;
+      this.options.handlers?.onSnapshot?.(message);
+      return;
+    }
     const view = this.applier.applySnapshot(message);
     this.fullPending = false;
+    this.appliedTick = message.tick;
     this.send({ t: 'viewAck', tick: message.tick });
     this.deliver(view, [], true);
   }
@@ -238,8 +284,13 @@ export class NetClient {
   private onDelta(text: string): void {
     const message = decodeDelta(text);
     if (this.fullPending) return;
+    if (this.options.external === true) {
+      this.options.handlers?.onDelta?.(message);
+      return;
+    }
     const before = this.applier.view?.tick ?? -1;
     const view = this.applier.applyDelta(message);
+    this.appliedTick = message.tick;
     this.send({ t: 'viewAck', tick: message.tick });
     if (view.tick === before) return;
     // События берём из самого сообщения: накопитель applier растёт весь матч.
@@ -288,6 +339,15 @@ export class NetClient {
       case 'refused':
         handlers?.onRefused?.(message.reason);
         if (FINAL_REFUSALS.has(message.reason)) this.stop();
+        return;
+      case 'selection':
+        handlers?.onSelection?.(message.sel);
+        return;
+      case 'pathPreview':
+        handlers?.onPath?.(message.id, message.preview);
+        return;
+      case 'mapMask':
+        handlers?.onMask?.(message.id, message.mode, message.rle);
         return;
       case 'end':
         handlers?.onEnd?.(message.winner, message.tick);

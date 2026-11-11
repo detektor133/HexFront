@@ -1,6 +1,34 @@
 // Сообщения клиент ↔ сервер (docs/architecture/protocol.md). Снимок и дельта кодируются в index.ts.
 // Входящее от клиента проверяется вручную и считается недоверенным: форма, типы, длины, лимиты.
-import type { Command, RejectReason } from '@hexfront/sim';
+import type { Command, PathPreview, RejectReason, Selection } from '@hexfront/sim';
+
+/** Сиды готовых карт «быстрого матча» на 30 игроков: сервер выбирает из них, клиент берёт файл карты. */
+export const QUICK_MATCH_SEEDS = [
+  42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+] as const;
+
+/** Режим карты: снабжение или стройка (build:city, build:fort, build:depot, build:improve). */
+export type MapMaskMode = 'supply' | 'build:city' | 'build:fort' | 'build:depot' | 'build:improve';
+export const MAP_MASK_MODES: readonly MapMaskMode[] = [
+  'supply',
+  'build:city',
+  'build:fort',
+  'build:depot',
+  'build:improve',
+];
+
+/** Запрос к серверу, на который нужно полное состояние матча (у клиента сети его нет). */
+export type Query =
+  | {
+      readonly kind: 'path';
+      readonly unitIds: readonly number[];
+      readonly to: number;
+      readonly via: readonly number[];
+    }
+  | { readonly kind: 'mask'; readonly mode: MapMaskMode };
+
+/** Запросов в секунду от одного игрока (прогноз пути при протяжке, маски карты). */
+export const MAX_QUERIES_PER_SECOND = 30;
 
 /** Версия протокола: несовпадение — `versionMismatch` и закрытие соединения. */
 export const PROTOCOL_VERSION = 1;
@@ -45,6 +73,10 @@ export type C2S =
   | { readonly t: 'resync' }
   | { readonly t: 'viewAck'; readonly tick: number }
   | { readonly t: 'ping'; readonly at: number }
+  /** Выбранный гекс: сервер присылает карточку (`selection`) сразу и при каждом её изменении. */
+  | { readonly t: 'select'; readonly hex: number | null }
+  /** Расчёт по полному состоянию; ответ приходит с тем же `id`. */
+  | { readonly t: 'query'; readonly id: number; readonly q: Query }
   /** Хозяин закрытой комнаты запускает матч раньше срока (остальные места займут боты). */
   | { readonly t: 'start' };
 
@@ -90,7 +122,17 @@ export type S2C =
     }
   | { readonly t: 'refused'; readonly reason: RefuseReason }
   | { readonly t: 'end'; readonly winner: number; readonly tick: number }
-  | { readonly t: 'pong'; readonly at: number };
+  | { readonly t: 'pong'; readonly at: number }
+  /** Карточка выбранного гекса: приходит сразу при выборе и затем при каждом изменении. */
+  | { readonly t: 'selection'; readonly sel: Selection | null }
+  | { readonly t: 'pathPreview'; readonly id: number; readonly preview: PathPreview | null }
+  /** Маска карты, сжатая подряд идущими повторами: [значение, сколько, значение, сколько, …]. */
+  | {
+      readonly t: 'mapMask';
+      readonly id: number;
+      readonly mode: MapMaskMode;
+      readonly rle: number[];
+    };
 
 /** Ошибка разбора входящего сообщения; сервер закрывает соединение или отбрасывает сообщение. */
 export class MessageError extends Error {
@@ -199,6 +241,52 @@ function parseObject(text: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function decodeQuery(value: unknown): Query {
+  if (typeof value !== 'object' || value === null) throw new MessageError('Некорректный запрос');
+  const q = value as Record<string, unknown>;
+  if (q.kind === 'mask') {
+    const mode = MAP_MASK_MODES.find((item) => item === q.mode);
+    if (mode === undefined) throw new MessageError('Некорректный режим карты');
+    return { kind: 'mask', mode };
+  }
+  if (q.kind === 'path') {
+    if (!isInt(q.to) || !intArray(q.unitIds) || !intArray(q.via)) {
+      throw new MessageError('Некорректный запрос пути');
+    }
+    if ((q.via as number[]).length > LINES_MAX) throw new MessageError('Слишком много точек');
+    return { kind: 'path', unitIds: q.unitIds as number[], to: q.to, via: q.via as number[] };
+  }
+  throw new MessageError('Неизвестный запрос');
+}
+
+/** Сжимает маску карты повторами значений: [значение, сколько, …]. */
+export function encodeMaskRle(mask: Uint8Array): number[] {
+  const out: number[] = [];
+  let i = 0;
+  while (i < mask.length) {
+    const value = mask[i] ?? 0;
+    let end = i + 1;
+    while (end < mask.length && mask[end] === value) end += 1;
+    out.push(value, end - i);
+    i = end;
+  }
+  return out;
+}
+
+/** Разворачивает маску из повторов; `size` — число гексов карты (защита от чужого размера). */
+export function decodeMaskRle(rle: readonly number[], size: number): Uint8Array {
+  const mask = new Uint8Array(size);
+  let at = 0;
+  for (let i = 0; i + 1 < rle.length; i += 2) {
+    const value = rle[i] ?? 0;
+    const count = Math.min(rle[i + 1] ?? 0, size - at);
+    if (count <= 0) break;
+    mask.fill(value, at, at + count);
+    at += count;
+  }
+  return mask;
+}
+
 function haveTick(value: unknown): number {
   if (!isInt(value) || value < 0) throw new MessageError('Поле have');
   return value;
@@ -251,6 +339,14 @@ export function decodeClientMessage(text: string): C2S {
       return { t: 'start' };
     case 'resync':
       return { t: 'resync' };
+    case 'select': {
+      if (source.hex !== null && !isInt(source.hex)) throw new MessageError('Некорректный select');
+      return { t: 'select', hex: source.hex };
+    }
+    case 'query': {
+      if (!isInt(source.id)) throw new MessageError('Некорректный query');
+      return { t: 'query', id: source.id, q: decodeQuery(source.q) };
+    }
     default:
       throw new MessageError('Неизвестный тип сообщения');
   }

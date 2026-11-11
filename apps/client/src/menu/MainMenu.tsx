@@ -13,6 +13,7 @@ import styles from './MainMenu.module.css';
 import { TutorialAsk } from './TutorialMenu.tsx';
 import { isCoarsePointer } from '../input/touch-tap.ts';
 import { followInApp } from '../nav.ts';
+import { NICKNAME_KEY } from './storage-keys.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
 import { playerColorIds } from '../theme/colors.ts';
@@ -22,7 +23,6 @@ import { tutorialUrl } from '../tutorial/links.ts';
 
 const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
-const NICKNAME_KEY = 'hexfront.nickname';
 const MAP_KEY = 'hexfront.map';
 const PLAYERS_KEY = 'hexfront.players';
 
@@ -335,6 +335,22 @@ export function MainMenu(): React.JSX.Element {
               onClick={(event) => enter(event, tutorialUrl(nickname, color), false)}
             >
               {t('tutorial.menuButton')}
+            </a>
+            <a
+              className={styles.tutorialButton}
+              role="button"
+              href="/online"
+              onClick={(event) => enter(event, '/online', true)}
+            >
+              {t('online.play')}
+            </a>
+            <a
+              className={styles.tutorialButton}
+              role="button"
+              href="/online?mode=private"
+              onClick={(event) => enter(event, '/online?mode=private', true)}
+            >
+              {t('online.invite')}
             </a>
             <button
               type="button"

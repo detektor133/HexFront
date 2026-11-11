@@ -11,5 +11,9 @@
     "full-match": "node --experimental-strip-types src/full-match-bench.ts",
     "net": "node --experimental-strip-types src/net-bench.ts",
     "europe": "node --experimental-strip-types src/europe-bench.ts"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2",
+    "ws": "^8.22.2"
   }
 }

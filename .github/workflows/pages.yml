@@ -31,8 +31,11 @@ jobs:
       - name: Проверить проект
         run: pnpm lint
 
+      # Адрес сервера матчей (wss://…) — переменная репозитория VITE_SERVER_URL, не секрет.
       - name: Собрать клиент
         run: pnpm --filter @hexfront/client build
+        env:
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
 
       - name: Проверить размер начальной загрузки
         run: pnpm --filter @hexfront/client check-bundle-size

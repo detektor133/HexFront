@@ -2,11 +2,14 @@
 // между ними канал с задержкой, разбросом, обрывами и молчаливой потерей пакетов.
 import { describe, expect, it } from 'vitest';
 
+import type { FromWorker } from '../../../apps/client/src/local/messages.ts';
+import { ViewDeltaApplier } from '../../../apps/client/src/local/view-delta.ts';
 import {
   NetClient,
   type NetClock,
   type NetSocket,
 } from '../../../apps/client/src/net/net-client.ts';
+import { startOnlineMatch } from '../../../apps/client/src/net/online-match.ts';
 import { Hub } from '../../../apps/server/src/hub.ts';
 import small from '../../../packages/mapgen/maps/small.json' with { type: 'json' };
 import type { Command, MapStatic } from '../../../packages/sim/src/index.ts';
@@ -162,6 +165,7 @@ function setup(seed = 1) {
   world.after(100, tickLoop);
   const events: string[] = [];
   const snapshots: number[] = [];
+  let views = 0;
   const client = new NetClient({
     connect: link.connect,
     clock: world.clock,
@@ -170,19 +174,20 @@ function setup(seed = 1) {
     random,
     handlers: {
       onView: (view, ev, full) => {
+        views += 1;
         if (full) snapshots.push(view.tick);
         for (const e of ev) events.push(e.t === 'commandRejected' ? `rejected:${e.reason}` : e.t);
       },
     },
   });
-  return { world, hub, link, client, random, events, snapshots };
+  return { world, hub, link, client, random, events, snapshots, views: () => views };
 }
 
 const roomOf = (hub: Hub, client: NetClient) => hub.roomById(client.session?.room ?? '');
 
 describe('сеть: высокий пинг и потери', () => {
   it('при пинге 600 мс и разбросе клиент держится рядом с сервером и получает дельты', () => {
-    const { world, hub, link, client, snapshots } = setup();
+    const { world, hub, link, client, snapshots, views } = setup();
     link.oneWayMs = 300;
     link.jitterMs = 100;
     client.start();
@@ -196,6 +201,8 @@ describe('сеть: высокий пинг и потери', () => {
     // Отставание ограничено: кругового пинга хватает на 2–3 тика на сообщение, не копится.
     expect((state?.tick ?? 0) - (client.view?.tick ?? 0)).toBeLessThan(40);
     expect(snapshots).toHaveLength(1);
+    // Окно отправки держит вид на каждом тике (≈10 Гц) даже при круговой задержке 600 мс.
+    expect(views()).toBeGreaterThan(250);
     expect(client.rtt ?? 0).toBeGreaterThan(550);
   });
 
@@ -348,5 +355,50 @@ describe('сеть: защита сервера', () => {
       if (session === null) continue;
     }
     expect(refused).toBe(4);
+  });
+});
+
+describe('сеть: экран игры поверх NetClient', () => {
+  it('онлайн-матч отдаёт экрану виды, карточку гекса и маски; применение и ack работают как в воркере', () => {
+    const { world, hub, link, client } = setup(13);
+    client.start();
+    world.run(1500);
+    const token = client.session?.token ?? '';
+    client.startMatch();
+    world.run(1000);
+    client.stop();
+
+    const messages: FromWorker[] = [];
+    const applier = new ViewDeltaApplier();
+    const match = startOnlineMatch({
+      connect: link.connect,
+      token,
+      nick: 'Тест',
+      mapSize: MAP.width * MAP.height,
+      clock: world.clock,
+      onMessage: (m) => {
+        messages.push(m);
+        if (m.t !== 'view') return;
+        // Как экран игры: применить вид и подтвердить его номером сообщения.
+        if (m.kind === 'snapshot') applier.applySnapshot(m.snapshot);
+        else applier.applyDelta(m.delta);
+        match.ack(m.seq);
+      },
+    });
+    world.run(5000);
+    const state = hub.roomById(client.session?.room ?? '')?.state;
+    const city = state?.cities.find((c) => c.owner === 0);
+    match.select(city?.hex ?? 0);
+    match.requestMask?.(5, 'supply');
+    world.run(1000);
+
+    const views = messages.filter((m) => m.t === 'view');
+    expect(views.length).toBeGreaterThan(30);
+    expect((state?.tick ?? 0) - (applier.view?.tick ?? 0)).toBeLessThan(5);
+    const last = views.at(-1);
+    expect(last?.t === 'view' && last.selection?.hex).toBe(city?.hex);
+    const mask = messages.find((m) => m.t === 'mapMask');
+    expect(mask?.t === 'mapMask' && mask.mask.length).toBe(MAP.width * MAP.height);
+    match.dispose();
   });
 });

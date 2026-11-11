@@ -1,51 +1,20 @@
 // Сообщения между страницей и Web Worker локального режима (overview.md, «Локальный режим»).
 import type { DeltaMessage, SnapshotMessage } from '@hexfront/protocol';
 import type {
+  RecruitAmount,
+  RecruitOption,
+  Selection,
   PathPreview,
   Command,
-  ConstructionCheck,
   BotLevel,
-  CityInfo,
-  Fp,
   PlayerView,
-  RebuildPlan,
-  RecruitCheck,
   RejectReason,
-  UnitType,
   GameEvent,
 } from '@hexfront/sim';
 
+export type { RecruitAmount, RecruitOption, Selection };
+
 import type { WorkerTelemetry } from '../dev/telemetry.ts';
-
-/** Один размер набора в своём городе: число солдат, цена, время и причина отказа. */
-export interface RecruitAmount {
-  readonly soldiers: Fp;
-  readonly check: RecruitCheck;
-}
-
-/** Варианты набора в своём городе для карточки города. */
-export interface RecruitOption {
-  readonly type: UnitType;
-  readonly amounts: RecruitAmount[];
-}
-
-/** Что можно сделать с выбранным гексом: цены и причины отказа для кнопок. */
-export interface Selection {
-  readonly hex: number;
-  /** Лимит населения гекса, fixed-point людей. */
-  readonly popCap: number;
-  readonly city: CityInfo | null;
-  readonly foundCity: ConstructionCheck;
-  readonly improve: ConstructionCheck;
-  readonly fort: ConstructionCheck;
-  readonly depot: ConstructionCheck;
-  /** Код постройки на гексе (`BUILDING`): склад любого уровня — улучшение вместо постройки. */
-  readonly building: number;
-  /** План дороги для изолированного склада; для города используется `city.rebuild`. */
-  readonly rebuild: RebuildPlan | null;
-  /** Набор — только в своём городе; иначе пусто. */
-  readonly recruit: readonly RecruitOption[];
-}
 
 /** Режим карты: снабжение или стройка (build:city, build:fort, build:depot, build:improve). */
 export type MapMaskMode = 'supply' | 'build:city' | 'build:fort' | 'build:depot' | 'build:improve';
