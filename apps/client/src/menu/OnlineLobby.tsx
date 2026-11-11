@@ -6,9 +6,15 @@ import type { LobbyInfo, RefuseReason } from '@hexfront/protocol';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { navigate } from '../nav.ts';
 import styles from './OnlineLobby.module.css';
-import { NICKNAME_KEY } from './storage-keys.ts';
+import hex from './hex.module.css';
+import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
+import { useMenuBackground } from './use-menu-background.ts';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
 import { saveOnlineSession, serverUrl } from '../net/online-session.ts';
+import { tokens } from '../theme/tokens.ts';
+
+/** Сколько мест в ряду сот на экране лобби. */
+const SEATS_PER_ROW = 6;
 
 function refusalText(reason: RefuseReason): string {
   return t(`online.refused.${reason}` as MessageKey);
@@ -35,6 +41,11 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
   const [copied, setCopied] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const clientRef = useRef<NetClient | null>(null);
+  const backgroundRef = useRef<HTMLDivElement>(null);
+  const [color] = useState<string>(() => localStorage.getItem(COLOR_KEY) ?? 'teal');
+  const colorLine =
+    tokens.players.palette.find((p) => p.id === color)?.line ?? 'var(--selection-color)';
+  useMenuBackground(backgroundRef, color);
 
   useEffect(() => {
     const url = serverUrl(search);
@@ -85,28 +96,77 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
     void navigator.clipboard.writeText(invite).then(() => setCopied(true));
   };
 
+  const friends = mode === 'private' || room !== null;
+  const seatCount = info?.max ?? 30;
+  const rows = Array.from({ length: Math.ceil(seatCount / SEATS_PER_ROW) }, (_, row) =>
+    Array.from(
+      { length: Math.min(SEATS_PER_ROW, seatCount - row * SEATS_PER_ROW) },
+      (_, column) => row * SEATS_PER_ROW + column,
+    ),
+  );
+  const palette = tokens.players.palette;
+
   return (
     <main className={styles.page}>
-      <section className={styles.card} aria-labelledby="online-title">
-        <h1 id="online-title" className={styles.title}>
-          {t(mode === 'private' || room !== null ? 'online.privateTitle' : 'online.title')}
-        </h1>
+      <div ref={backgroundRef} className={styles.background} aria-hidden="true" />
+      <header className={styles.top}>
+        <h1 className={styles.plate}>{t(friends ? 'online.privateTitle' : 'online.searching')}</h1>
+      </header>
+
+      <section className={styles.center} aria-label={t('online.title')}>
         {error !== null ? (
           <p className={styles.error} role="alert">
             {error}
           </p>
-        ) : info === null ? (
-          <p className={styles.status}>{t('online.connecting')}</p>
         ) : (
           <>
-            <p className={styles.count}>
-              {info.humans} / {info.max}
-            </p>
-            <p className={styles.status}>
-              {info.startsInS === null
-                ? t('online.waitHost')
-                : `${t('online.startsIn')} ${info.startsInS} ${t('online.sec')}`}
-            </p>
+            <div
+              className={`${hex.hex} ${styles.timer} ${info === null || info.startsInS === null ? styles.waiting : ''}`}
+              style={{ '--edge': colorLine } as React.CSSProperties}
+              role="timer"
+              aria-live="polite"
+            >
+              {info === null ? (
+                <span>{t('online.connecting')}</span>
+              ) : info.startsInS === null ? (
+                <span>{t('online.waitHost')}</span>
+              ) : (
+                <>
+                  <span>{info.startsInS}</span>
+                  <small>{`${t('online.sec')} ${t('online.untilStart')}`}</small>
+                </>
+              )}
+            </div>
+            {info !== null && (
+              <>
+                <div className={styles.seats} aria-hidden="true">
+                  {rows.map((row) => (
+                    <div key={row[0]} className={styles.seatRow}>
+                      {row.map((index) => {
+                        const taken = index < info.humans;
+                        const line = palette[index % palette.length]?.line ?? colorLine;
+                        return (
+                          <span
+                            key={index}
+                            className={`${hex.hex} ${styles.seat}`}
+                            style={
+                              {
+                                '--edge': taken ? line : 'var(--ui-border-strong)',
+                                '--fill': taken ? line : 'var(--ui-surface2)',
+                              } as React.CSSProperties
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <p className={styles.count}>
+                  {`${info.humans} ${t('online.people')}`}
+                  <span>{` · ${info.max - info.humans} ${t('online.botsFill')}`}</span>
+                </p>
+              </>
+            )}
             {invite !== null && (
               <div className={styles.invite}>
                 <input
@@ -131,10 +191,11 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
             )}
           </>
         )}
-        <button type="button" className={styles.back} onClick={() => navigate('/')}>
-          {t('online.back')}
-        </button>
       </section>
+
+      <button type="button" className={styles.back} onClick={() => navigate('/')}>
+        {t(error !== null ? 'online.back' : 'online.cancel')}
+      </button>
     </main>
   );
 }

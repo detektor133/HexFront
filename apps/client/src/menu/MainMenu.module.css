@@ -3,10 +3,10 @@
   overflow-x: hidden;
   overflow-y: auto;
   display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  align-items: center;
   min-height: 100%;
-  /* safe: высокая карточка не уезжает верхом за экран, а листается. */
-  place-items: safe center;
-  padding: var(--space-lg);
   box-sizing: border-box;
   background: var(--map-background);
 }
@@ -17,28 +17,140 @@
   pointer-events: none;
 }
 
-.card {
+.top {
   position: relative;
   z-index: 1;
-  width: min(100%, 420px);
+  display: flex;
+  width: 100%;
   box-sizing: border-box;
-  padding: var(--space-xl);
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-card);
-  corner-shape: var(--ui-corner);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-md) 0;
+}
+
+.plate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target-min);
+  box-sizing: border-box;
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
   box-shadow: var(--shadow-hard);
-  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
+}
+
+button.plate {
+  cursor: pointer;
 }
 
 .wordmark {
-  margin: 0 0 var(--space-md);
-  color: var(--ui-ink);
+  margin: 0;
   font-family: var(--font-display-family);
   text-transform: var(--ui-display-transform);
   letter-spacing: var(--ui-display-spacing);
   font-weight: var(--font-display-weight);
   font-size: var(--font-size-title);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+/* Соты: большая «Играть» и три плитки вокруг неё. Координаты в долях --s (ширина малой плитки). */
+.stage {
+  --s: clamp(88px, min(36vw, 21vh), 150px);
+  position: relative;
+  z-index: 1;
+  width: calc(var(--s) * 2.3);
+  height: calc(var(--s) * 3.35);
+  margin: var(--space-md) 0;
+}
+
+.stage .tile {
+  position: absolute;
+  width: calc(var(--w) * var(--s));
+  left: calc(50% + (var(--cx) - var(--w) / 2) * var(--s));
+  top: calc((0.866 + var(--cy) - var(--w) * 0.57735) * var(--s));
+  gap: 2px;
+  font-size: clamp(12px, calc(var(--s) * 0.125), 17px);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.tile small {
+  max-width: 78%;
+  color: var(--sub, var(--ui-ink2));
+  font-size: clamp(11px, calc(var(--s) * 0.09), 13px);
+  font-weight: 400;
+}
+
+.tile.big {
+  font-size: clamp(18px, calc(var(--s) * 0.2), 28px);
+}
+
+.tile.big small {
+  font-size: clamp(11px, calc(var(--s) * 0.095), 14px);
+}
+
+.profile {
+  position: relative;
+  z-index: 1;
+  margin-bottom: max(var(--space-md), env(safe-area-inset-bottom));
+}
+
+.dot {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--ui-ink);
+  box-sizing: border-box;
+}
+
+.sub {
+  color: var(--ui-ink2);
+}
+
+/* Окно настроек: шторка снизу на телефоне, карточка по центру на широком экране. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ui-ink) 45%, transparent);
+}
+
+.sheet {
+  width: min(100%, 460px);
+  max-height: 92%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--space-xl);
+  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+}
+
+@media (min-width: 600px) {
+  .backdrop {
+    align-items: center;
+  }
+
+  .sheet {
+    border-radius: var(--radius-card);
+  }
 }
 
 .title {
@@ -94,7 +206,7 @@
 .palette {
   position: absolute;
   z-index: 2;
-  top: calc(100% + var(--space-sm));
+  bottom: calc(100% + var(--space-sm));
   left: 0;
   display: grid;
   grid-template-columns: repeat(6, 28px);
@@ -129,18 +241,6 @@
 .color.selected {
   border-color: var(--selection-color);
   box-shadow: inset 0 0 0 3px var(--ui-surface);
-}
-
-.tutorial p {
-  margin-top: var(--space-xs);
-  color: var(--ui-ink2);
-}
-
-.checkbox {
-  display: flex;
-  gap: var(--space-sm);
-  align-items: center;
-  min-height: var(--touch-target-min);
 }
 
 .play {
@@ -226,68 +326,22 @@
   border-radius: var(--radius-button);
 }
 
-.chapters {
-  display: grid;
-  gap: var(--space-sm);
-  margin-top: var(--space-lg);
-}
-
-.chapter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-  min-height: var(--touch-target-min);
-  padding: 0 var(--space-md);
-  color: var(--ui-ink);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: none;
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-}
-
-.chapter small {
-  color: var(--ui-ink2);
-  font-weight: 400;
-}
-
-.settingsButton {
-  display: inline-flex;
-  width: 100%;
-  margin-top: var(--space-sm);
-  min-height: var(--touch-target-min);
-  align-items: center;
-  justify-content: center;
-  color: var(--ui-ink);
-  font: inherit;
-  cursor: pointer;
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-}
-
-/* Низкий экран (телефон в ландшафте): карточка плотнее, чтобы почти помещаться без прокрутки. */
-@media (max-height: 500px) {
-  .page {
-    place-items: start center;
-    padding: var(--space-sm);
+/* Низкий экран (телефон в ландшафте): соты меньше, чтобы всё помещалось без прокрутки. */
+@media (max-height: 520px) {
+  .stage {
+    --s: clamp(60px, 19vh, 110px);
+    margin: var(--space-xs) 0;
   }
 
-  .card {
-    padding: var(--space-md);
+  .top {
+    padding-top: var(--space-sm);
   }
 
-  .subtitle {
-    margin: var(--space-xs) 0 var(--space-sm);
+  .plate {
+    min-height: 40px;
   }
 
-  .field {
-    margin-top: var(--space-sm);
-  }
-
-  .play {
-    margin-top: var(--space-md);
+  .profile {
+    margin-bottom: var(--space-sm);
   }
 }
