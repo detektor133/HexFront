@@ -1,6 +1,7 @@
 import { neighborTable, SIDES } from '../map/neighbor-table.ts';
 import type { HexId } from '../math/hex.ts';
 import { createPlayerViewContext, type PlayerViewContext } from '../queries/player-view.ts';
+import { memo } from '../state/derived.ts';
 import type { Army, ArmyPlan, City, MatchState, Unit } from '../state/types.ts';
 
 export interface BotTickContext {
@@ -20,7 +21,7 @@ function playerLists<T>(players: number): T[][] {
   return Array.from({ length: players }, () => [] as T[]);
 }
 
-function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][] } {
+function computeOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][] } {
   const owned = playerLists<HexId>(state.players.length);
   const border = playerLists<HexId>(state.players.length);
   const table = neighborTable(state.map);
@@ -37,6 +38,11 @@ function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][]
     if (adjacent) border[owner]?.push(hex);
   }
   return { owned, border };
+}
+
+// Участки игроков зависят только от слоя владельцев: пересобираем при захвате, а не каждый тик.
+function mapOwnedHexes(state: MatchState): { owned: HexId[][]; border: HexId[][] } {
+  return memo(state, 'ownedHexes', ['owner'], () => computeOwnedHexes(state));
 }
 
 /**

@@ -7,6 +7,7 @@ import { withDepot, withFort } from '../state/building.ts';
 import { depotLevel } from '../state/depot.ts';
 import { markNetworkDirty, markSupplyDirty } from '../state/derived-cache.ts';
 import { fortLevel } from '../state/fort.ts';
+import { addCity, setBuilding, setCityLevel, setImprovement } from '../state/layers.ts';
 import { type Construction, type MatchState } from '../state/types.ts';
 import { addCityToIndex } from '../state/unit-index.ts';
 
@@ -27,7 +28,7 @@ function complete(state: MatchState, c: Construction): void {
         inBattle: false,
         captureTicks: 0,
       };
-      state.cities.push(city);
+      addCity(state, city);
       addCityToIndex(state, city);
       markNetworkDirty(state, c.owner);
       state.nextId += 1;
@@ -36,25 +37,26 @@ function complete(state: MatchState, c: Construction): void {
     }
     case 'upgradeCity': {
       const city = state.cities.find((x) => x.hex === c.hex);
-      if (city) city.level += 1;
+      if (city) setCityLevel(state, city, city.level + 1);
       return;
     }
     case 'improve':
-      hexes.improvement[c.hex] = (hexes.improvement[c.hex] ?? 0) + 1;
+      setImprovement(state, c.hex, (hexes.improvement[c.hex] ?? 0) + 1);
       return;
     case 'fort':
-      hexes.building[c.hex] = withFort(hexes.building[c.hex] ?? 0, 1);
+      setBuilding(state, c.hex, withFort(hexes.building[c.hex] ?? 0, 1));
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       return;
     case 'upgradeFort':
-      hexes.building[c.hex] = withFort(
-        hexes.building[c.hex] ?? 0,
-        fortLevel(hexes.building[c.hex] ?? 0) + 1,
+      setBuilding(
+        state,
+        c.hex,
+        withFort(hexes.building[c.hex] ?? 0, fortLevel(hexes.building[c.hex] ?? 0) + 1),
       );
       return;
     case 'depot':
-      hexes.building[c.hex] = withDepot(hexes.building[c.hex] ?? 0, 1);
+      setBuilding(state, c.hex, withDepot(hexes.building[c.hex] ?? 0, 1));
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);
       markNetworkDirty(state, c.owner);
@@ -62,9 +64,10 @@ function complete(state: MatchState, c: Construction): void {
       queueAutoRoad(state, c.owner, c.hex, true);
       return;
     case 'upgradeDepot':
-      hexes.building[c.hex] = withDepot(
-        hexes.building[c.hex] ?? 0,
-        depotLevel(hexes.building[c.hex] ?? 0) + 1,
+      setBuilding(
+        state,
+        c.hex,
+        withDepot(hexes.building[c.hex] ?? 0, depotLevel(hexes.building[c.hex] ?? 0) + 1),
       );
       state.supplyRevision += 1;
       markSupplyDirty(state, c.owner);

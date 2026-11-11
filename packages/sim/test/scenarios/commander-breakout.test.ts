@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { decide } from '../../src/bots/commander.ts';
 import { playerView } from '../../src/queries/player-view.ts';
+import { touchLayer } from '../../src/state/layers.ts';
 import { at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
 
 // Отряд A зашёл вглубь земли B и отрезан от своей земли: вокруг вражеские гексы.
@@ -41,6 +42,7 @@ describe('commander: прорыв из окружения', () => {
   it('без врага рядом отряд без снабжения не прорывается: это не окружение', () => {
     const { s, army } = setup(false);
     s.state.hexes.owner.fill(0);
+    touchLayer(s.state, 'owner');
     const out = decide(s.state.map, playerView(s.state, 0), army.id);
     expect(out.some((c) => c.t === 'attack')).toBe(false);
   });

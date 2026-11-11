@@ -7,6 +7,7 @@ import { canFoundCity } from '../../src/queries/city.ts';
 import { depotLevel } from '../../src/state/depot.ts';
 import { fortLevel } from '../../src/state/fort.ts';
 import { hashState } from '../../src/state/hash.ts';
+import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { BUILDING } from '../../src/state/types.ts';
 import {
   at,
@@ -131,7 +132,7 @@ describe('основание города', () => {
     s.cmd('A', foundCity(hex));
     s.runSeconds(5);
     const goldBefore = s.player('A').gold;
-    s.state.hexes.owner[hex.col + hex.row * s.state.map.width] = -1;
+    setHexOwner(s.state, hex.col + hex.row * s.state.map.width, -1);
     s.runSeconds(30);
     expect(s.cityAt(hex)).toBeUndefined();
     expect(s.state.constructions).toHaveLength(0);

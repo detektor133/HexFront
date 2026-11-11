@@ -4,6 +4,7 @@ import { NETWORK_RECALC_TICKS, SUPPLY_REBUILD_COST_PER_HEX } from '../../src/bal
 import { rebuildSupplyPlan } from '../../src/commands/rebuild-supply.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { hashState } from '../../src/state/hash.ts';
+import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { isCityIsolated } from '../../src/state/network.ts';
 import { BUILDING } from '../../src/state/types.ts';
 import { ROAD_TICKS_PER_HEX } from '../../src/systems/road-construction.ts';
@@ -149,7 +150,7 @@ describe('перестройка снабжения', () => {
     const path = job(s)?.path ?? [];
     const gold = s.player('A').gold;
     const last = path.at(-1) ?? -1;
-    s.state.hexes.owner[last] = -1;
+    setHexOwner(s.state, last, -1);
     s.runTicks(1);
     expect(job(s)).toBeUndefined();
     expect(s.player('A').gold).toBeLessThan(gold + 1000);
@@ -173,10 +174,10 @@ describe('перестройка снабжения', () => {
     s.cmd('A', rebuildSupply(A2));
     s.runTicks(1);
     const last = job(s)?.path?.at(-1) ?? -1;
-    s.state.hexes.owner[last] = -1;
+    setHexOwner(s.state, last, -1);
     s.runTicks(1);
     expect(job(s)).toBeUndefined();
-    s.state.hexes.owner[last] = 0;
+    setHexOwner(s.state, last, 0);
     s.cmd('A', rebuildSupply(A2));
     s.runTicks(1);
     expect(s.rejections()).toEqual([]);

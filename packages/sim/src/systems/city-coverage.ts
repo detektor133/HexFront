@@ -13,6 +13,7 @@ import {
 } from '../balance.ts';
 import { hexDistanceById } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
+import { memo } from '../state/derived.ts';
 import { NEUTRAL, type MatchState } from '../state/types.ts';
 
 /** Радиус, в котором гекс относится к городу (кольца 0–2). */
@@ -37,15 +38,6 @@ export interface CityCoverage {
   readonly cut: Uint8Array;
 }
 
-interface Entry {
-  readonly owner: Int16Array;
-  readonly sig: Int32Array;
-  readonly value: CityCoverage;
-}
-
-const SIG_FIELDS = 5;
-const entries = new WeakMap<MatchState, Entry>();
-
 // Город изолирован, если его сеть не основная; нет сети — не изолирован (как isCityIsolated).
 function isolatedCities(state: MatchState): boolean[] {
   const main = new Set<number>();
@@ -54,25 +46,6 @@ function isolatedCities(state: MatchState): boolean[] {
     const id = state.hexes.network[c.hex] ?? -1;
     return id >= 0 && !main.has(id);
   });
-}
-
-function signature(state: MatchState, isolated: readonly boolean[]): Int32Array {
-  const sig = new Int32Array(state.cities.length * SIG_FIELDS);
-  state.cities.forEach((c, i) => {
-    const at = i * SIG_FIELDS;
-    sig[at] = c.id;
-    sig[at + 1] = c.hex;
-    sig[at + 2] = c.level;
-    sig[at + 3] = c.owner;
-    sig[at + 4] = isolated[i] ? 1 : 0;
-  });
-  return sig;
-}
-
-function sameInts(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
-  return true;
 }
 
 function compute(state: MatchState, isolated: readonly boolean[]): CityCoverage {
@@ -122,18 +95,12 @@ function compute(state: MatchState, isolated: readonly boolean[]): CityCoverage 
 }
 
 /**
- * Покрытие городов для текущего состояния; повторные вызовы в пределах неизменного состояния
- * (система населения, вид игрока, доход) возвращают тот же результат без пересчёта.
+ * Покрытие городов для текущего состояния; пересчитывается только при смене владельцев гексов,
+ * состава или уровня городов, сетей снабжения (state/derived.ts), иначе общий результат из кэша.
  * @returns рост по гексам и признак отрезанности; массивы менять нельзя
  */
 export function cityCoverage(state: MatchState): CityCoverage {
-  const isolated = isolatedCities(state);
-  const sig = signature(state, isolated);
-  const cached = entries.get(state);
-  if (cached && sameInts(cached.owner, state.hexes.owner) && sameInts(cached.sig, sig)) {
-    return cached.value;
-  }
-  const value = compute(state, isolated);
-  entries.set(state, { owner: state.hexes.owner.slice(), sig, value });
-  return value;
+  return memo(state, 'cityCoverage', ['owner', 'cities', 'networks'], () =>
+    compute(state, isolatedCities(state)),
+  );
 }

@@ -82,6 +82,12 @@ const simRestrictedSyntax = [
     message: 'Фильтрация state.units выполняется через accessor из state/unit-index.ts.',
   },
   {
+    selector:
+      "AssignmentExpression[left.type='MemberExpression'][left.computed=true][left.object.type='MemberExpression'][left.object.object.property.name='hexes'][left.object.property.name=/^(owner|improvement|building|road)$/]",
+    message:
+      'Слои гексов меняются только через state/layers.ts и setHexOwner: иначе кэши производных данных устареют.',
+  },
+  {
     selector: "BinaryExpression[operator='/']",
     message: 'Деление только через intDiv/fpDiv из src/math.',
   },
@@ -190,6 +196,17 @@ export default tseslint.config(
     },
   },
   {
+    // Воронка записи в слои гексов: здесь версии слоёв повышаются вместе с записью.
+    files: ['packages/sim/src/state/layers.ts', 'packages/sim/src/state/hex-owner.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ExportDefaultDeclaration', message: 'Только именованные экспорты.' },
+        ...simRestrictedSyntax.filter((rule) => !rule.selector.includes("name='hexes'")),
+      ],
+    },
+  },
+  {
     files: ['packages/sim/src/state/unit-index.ts'],
     rules: {
       'no-restricted-syntax': [
@@ -217,6 +234,7 @@ export default tseslint.config(
           (r) =>
             !r.selector.includes("'/'") &&
             !r.selector.includes("property.name='units'") &&
+            !r.selector.includes("name='hexes'") &&
             !r.selector.includes("property.name='hex'"),
         ),
       ],

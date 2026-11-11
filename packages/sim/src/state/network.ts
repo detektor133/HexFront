@@ -9,6 +9,7 @@ import {
   networkNeedsRecompute,
   storeSeaLinks,
 } from './derived-cache.ts';
+import { touchLayer } from './layers.ts';
 import { isPortOf, waterNeighbors } from './port.ts';
 import type { MatchState } from './types.ts';
 import { hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
@@ -142,6 +143,7 @@ export function recomputeNetworks(state: MatchState, playerId: number, force = f
   state.networks = [...state.networks.filter((n) => n.owner !== playerId), ...fresh].sort(
     (a, b) => a.id - b.id,
   );
+  touchLayer(state, 'networks');
   markSupplyDirty(state, playerId);
   markNetworkClean(state, playerId);
 }

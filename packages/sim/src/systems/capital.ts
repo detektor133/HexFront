@@ -4,6 +4,7 @@ import { CAPITAL_MOVE_CHAOS_S, NO_CITY_GRACE_S, TICKS_PER_S } from '../balance.t
 import { FP, intDiv } from '../math/int.ts';
 import { markNetworkDirty } from '../state/derived-cache.ts';
 import { setHexOwner } from '../state/hex-owner.ts';
+import { touchLayer } from '../state/layers.ts';
 import { recomputeNetworks } from '../state/network.ts';
 import { NEUTRAL, type City, type MatchState, type Player } from '../state/types.ts';
 import { allUnits, removeUnits } from '../state/unit-index.ts';
@@ -55,6 +56,7 @@ function eliminate(state: MatchState, p: Player): void {
   keep(state.constructions);
   keep(state.recruits);
   state.networks = state.networks.filter((n) => n.owner !== p.id);
+  touchLayer(state, 'networks');
   state.events.push({ t: 'playerEliminated', playerId: p.id });
 }
 

@@ -14,6 +14,7 @@ import {
   TAX_DEFAULT,
 } from '../balance.ts';
 import { setHexOwner } from './hex-owner.ts';
+import { addCity } from './layers.ts';
 import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
@@ -120,7 +121,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
   const capital = hexId(spawn, state.map.width);
   const cityId = state.nextId;
   state.nextId += 1;
-  state.cities.push({
+  addCity(state, {
     id: cityId,
     hex: capital,
     owner: playerId,

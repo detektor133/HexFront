@@ -4,6 +4,7 @@ import { TICKS_PER_S } from '../../src/balance.ts';
 import { TERRAIN } from '../../src/map/types.ts';
 import type { Fp } from '../../src/math/int.ts';
 import { findRoadPath } from '../../src/queries/road-path.ts';
+import { setHexOwner } from '../../src/state/hex-owner.ts';
 import { mainNetworkMask } from '../../src/state/network.ts';
 import { ROAD_TICKS_PER_HEX } from '../../src/systems/road-construction.ts';
 import { at, city, foundCity, own, scenario, type At } from '../scenario/dsl.ts';
@@ -88,7 +89,7 @@ describe('авто-дорога после основания города', () 
     const path = roadJob(s)?.path ?? [];
     s.runTicks(ROAD_TICKS_PER_HEX);
     const last = path.at(-1) ?? -1;
-    s.state.hexes.owner[last] = -1;
+    setHexOwner(s.state, last, -1);
     s.runTicks(1);
     expect(roadJob(s)).toBeUndefined();
     expect(s.lastEvent('constructionCancelled')).toMatchObject({ kind: 'road' });

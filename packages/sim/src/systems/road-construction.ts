@@ -6,6 +6,7 @@ import { FP, intDiv } from '../math/int.ts';
 import { findRoadPath } from '../queries/road-path.ts';
 import { isDepot } from '../state/depot.ts';
 import { markNetworkDirty } from '../state/derived-cache.ts';
+import { setRoad } from '../state/layers.ts';
 import { mainNetworkMask } from '../state/network.ts';
 import { type Construction, type MatchState } from '../state/types.ts';
 
@@ -72,7 +73,7 @@ export function advanceRoad(state: MatchState, c: Construction): void {
   if (c.progressTicks % ROAD_TICKS_PER_HEX !== 0) return;
   const hex = c.path?.[intDiv(c.progressTicks, ROAD_TICKS_PER_HEX) - 1];
   if (hex !== undefined) {
-    state.hexes.road[hex] = 1;
+    setRoad(state, hex, 1);
     state.supplyRevision += 1;
     markNetworkDirty(state, c.owner);
   }

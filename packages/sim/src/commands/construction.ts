@@ -25,6 +25,7 @@ import { OK, rejected, type Command, type RejectReason, type Validation } from '
 import { distance, hexDistanceById, hexFromId, hexId, inBounds, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { depotLevel, isDepot } from '../state/depot.ts';
+import { memo } from '../state/derived.ts';
 import { fortLevel } from '../state/fort.ts';
 import { hexPopCap } from '../state/pop-cap.ts';
 import { type ConstructionKind, type MatchState } from '../state/types.ts';
@@ -68,33 +69,24 @@ function ownFreeHex(state: MatchState, playerId: number, hex: HexId): RejectReas
 }
 
 // Маска гексов ближе CITY_MIN_DISTANCE к какому-либо городу. Боты проверяют тысячи гексов-кандидатов
-// за тик, поэтому города учитываем маской, а не перебором. Города только добавляются и не переезжают,
-// поэтому маска пересчитывается, когда изменилось их число или последний город.
-const cityMasks = new WeakMap<
-  MatchState,
-  { readonly count: number; readonly lastHex: number; readonly mask: Uint8Array }
->();
-
+// за тик, поэтому города учитываем маской (кэш по версии слоя городов), а не перебором.
 function nearCityMask(state: MatchState): Uint8Array {
-  const { width, height } = state.map;
-  const count = state.cities.length;
-  const lastHex = state.cities[count - 1]?.hex ?? -1;
-  const cached = cityMasks.get(state);
-  if (cached && cached.count === count && cached.lastHex === lastHex) return cached.mask;
-  const mask = new Uint8Array(width * height);
-  const reach = CITY_MIN_DISTANCE - 1;
-  for (const c of state.cities) {
-    const col = c.hex % width;
-    const row = intDiv(c.hex, width);
-    for (let r = Math.max(0, row - reach); r <= Math.min(height - 1, row + reach); r += 1) {
-      for (let q = Math.max(0, col - reach); q <= Math.min(width - 1, col + reach); q += 1) {
-        const id = r * width + q;
-        if (hexDistanceById(c.hex, id, width) <= reach) mask[id] = 1;
+  return memo(state, 'nearCityMask', ['cities'], () => {
+    const { width, height } = state.map;
+    const mask = new Uint8Array(width * height);
+    const reach = CITY_MIN_DISTANCE - 1;
+    for (const c of state.cities) {
+      const col = c.hex % width;
+      const row = intDiv(c.hex, width);
+      for (let r = Math.max(0, row - reach); r <= Math.min(height - 1, row + reach); r += 1) {
+        for (let q = Math.max(0, col - reach); q <= Math.min(width - 1, col + reach); q += 1) {
+          const id = r * width + q;
+          if (hexDistanceById(c.hex, id, width) <= reach) mask[id] = 1;
+        }
       }
     }
-  }
-  cityMasks.set(state, { count, lastHex, mask });
-  return mask;
+    return mask;
+  });
 }
 
 /**
