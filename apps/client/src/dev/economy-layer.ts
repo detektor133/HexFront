@@ -382,21 +382,49 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   }
 
   // Знаки строений — только у гексов, где что-то построено, а не по объекту на каждый гекс карты.
+  // Слои гексов пересоздаются только при изменении, поэтому неизменные ссылки на массивы значат
+  // «ничего не поменялось»: обход всей карты на каждый вид не нужен.
+  let builtCache: {
+    readonly building: PlayerView['hexes']['building'];
+    readonly improvement: PlayerView['hexes']['improvement'];
+    readonly owner: PlayerView['hexes']['owner'];
+    readonly cities: PlayerView['cities'];
+    readonly out: ConstructionGlyph[];
+  } | null = null;
+
   function builtHexes(v: PlayerView): ConstructionGlyph[] {
+    const { building: buildings, improvement: improvements, owner: owners } = v.hexes;
+    if (
+      builtCache !== null &&
+      builtCache.building === buildings &&
+      builtCache.improvement === improvements &&
+      builtCache.owner === owners &&
+      builtCache.cities === v.cities
+    ) {
+      return builtCache.out;
+    }
     const out: ConstructionGlyph[] = [];
     const cityHexes = new Set(v.cities.map((c) => c.hex));
-    v.hexes.building.forEach((building, hex) => {
-      const improvement = v.hexes.improvement[hex] ?? 0;
-      if (building === 0 && improvement <= 0) return;
+    for (let hex = 0; hex < buildings.length; hex += 1) {
+      const building = buildings[hex] ?? 0;
+      const improvement = improvements[hex] ?? 0;
+      if (building === 0 && improvement <= 0) continue;
       out.push({
         at: center(hex),
-        color: playerLine(v.hexes.owner[hex] ?? -1),
+        color: playerLine(owners[hex] ?? -1),
         building,
         improvement,
         city: cityHexes.has(hex),
         port: isDepot(building) && waterNeighbors(map, hex).length > 0,
       });
-    });
+    }
+    builtCache = {
+      building: buildings,
+      improvement: improvements,
+      owner: owners,
+      cities: v.cities,
+      out,
+    };
     return out;
   }
 

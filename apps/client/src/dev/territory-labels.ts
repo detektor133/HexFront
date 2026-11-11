@@ -18,18 +18,31 @@ export interface TerritoryLabel {
   readonly offer: TreatyKind | null;
 }
 
-/** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
-export function buildTerritoryLabels(
-  view: Pick<PlayerView, 'hexes' | 'players' | 'diplomacy' | 'playerId'>,
+interface OwnerSum {
+  x: number;
+  y: number;
+  count: number;
+  minX: number;
+  maxX: number;
+}
+
+// Суммы по владельцам зависят только от слоя владельцев; слой пересоздаётся лишь при захвате гекса,
+// поэтому обход всей карты с объектом на гекс делаем один раз на его версию, а не на каждый вид.
+const sumsCache = new WeakMap<
+  PlayerView['hexes']['owner'],
+  { readonly mapWidth: number; readonly hexRadius: number; readonly sums: Map<number, OwnerSum> }
+>();
+
+function ownerSums(
+  owners: PlayerView['hexes']['owner'],
   mapWidth: number,
   hexRadius: number,
-): readonly TerritoryLabel[] {
-  const sums = new Map<
-    number,
-    { x: number; y: number; count: number; minX: number; maxX: number }
-  >();
-  for (let id = 0; id < view.hexes.owner.length; id += 1) {
-    const owner = view.hexes.owner[id] ?? -1;
+): Map<number, OwnerSum> {
+  const cached = sumsCache.get(owners);
+  if (cached && cached.mapWidth === mapWidth && cached.hexRadius === hexRadius) return cached.sums;
+  const sums = new Map<number, OwnerSum>();
+  for (let id = 0; id < owners.length; id += 1) {
+    const owner = owners[id] ?? -1;
     if (owner < 0) continue;
     const at = hexCenter(hexFromId(id, mapWidth), hexRadius);
     const sum = sums.get(owner) ?? {
@@ -46,7 +59,17 @@ export function buildTerritoryLabels(
     sum.maxX = Math.max(sum.maxX, at.x + hexRadius);
     sums.set(owner, sum);
   }
+  sumsCache.set(owners, { mapWidth, hexRadius, sums });
+  return sums;
+}
 
+/** Возвращает по одной подписи на владельца, расположенной в центре его гексов. */
+export function buildTerritoryLabels(
+  view: Pick<PlayerView, 'hexes' | 'players' | 'diplomacy' | 'playerId'>,
+  mapWidth: number,
+  hexRadius: number,
+): readonly TerritoryLabel[] {
+  const sums = ownerSums(view.hexes.owner, mapWidth, hexRadius);
   return view.players.flatMap((player) => {
     const sum = sums.get(player.id);
     const name = player.name ?? '';

@@ -4,12 +4,25 @@ import { lang, t } from './dict.ts';
 const FP = 1000;
 const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
 
+// Intl.NumberFormat дорог в создании (на телефоне — сотни микросекунд), а числа форматируются
+// на каждую фишку и строку HUD: форматтеры создаются раз на число знаков.
+const fixedFormats = new Map<number, Intl.NumberFormat>();
+
+function fixedFormat(digits: number): Intl.NumberFormat {
+  let format = fixedFormats.get(digits);
+  if (format === undefined) {
+    format = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    fixedFormats.set(digits, format);
+  }
+  return format;
+}
+
 /** Fixed-point → число с заданным числом знаков после запятой. */
 export function formatFp(fp: number, digits = 0): string {
-  return new Intl.NumberFormat(locale, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  })
+  return fixedFormat(digits)
     .formatToParts(fp / FP)
     .map((part) => (part.type === 'group' ? ' ' : part.value))
     .join('');
@@ -26,19 +39,13 @@ export function formatCompact(fp: number): string {
   }
   if (n < TEN_THOUSAND) {
     const tenths = Math.floor(n / (THOUSAND / 10)) / 10;
-    return `${new Intl.NumberFormat(locale, {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    }).format(tenths)}${thousand}`;
+    return `${fixedFormat(1).format(tenths)}${thousand}`;
   }
   if (n < MILLION) {
     return `${Math.floor(n / THOUSAND)}${thousand}`;
   }
   const tenths = Math.round((n / MILLION) * 10) / 10;
-  return `${new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(tenths)}${million}`;
+  return `${fixedFormat(1).format(tenths)}${million}`;
 }
 
 /** Скорость со знаком: «+1,2/с», «−0,6/с». */
