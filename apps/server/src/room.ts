@@ -52,6 +52,12 @@ const MAX_PENDING = 64;
  * каждом тике, а не раз в круговую задержку; неподтверждённое окно держит память ограниченной.
  */
 const SEND_WINDOW = 12;
+/**
+ * Полных снимков за тик на комнату. Старт матча и массовый реконнект иначе посылают снимок всем
+ * людям на одном тике (десятки КБ на человека): тик комнаты, а с ним и остальных комнат, подвисает.
+ * Остальные получают снимок в следующие тики, задержка — доли секунды.
+ */
+export const MAX_SNAPSHOTS_PER_TICK = 4;
 /** События, копящиеся, пока игрок вне связи; старые вытесняются. */
 const MAX_QUEUED_EVENTS = 256;
 
@@ -438,6 +444,7 @@ export class Room {
 
   private sendViews(state: MatchState): void {
     const context = createPlayerViewContext(state);
+    let snapshots = 0;
     for (const seat of this.seats) {
       if (seat.botControlled) continue;
       seat.events.push(...eventsFor(state.events, seat.playerId));
@@ -452,11 +459,13 @@ export class Room {
         seat.waitingTicks = 0;
         seat.events = [];
       }
+      if (seat.stream.willSendSnapshot && snapshots >= MAX_SNAPSHOTS_PER_TICK) continue;
       if (seat.selected !== null || seat.lastSel !== null) this.pushSelection(seat, state);
       const reuse = slowLayerReuse(seat.stream.baseView, seat.stream.isSlowSync(state.tick));
       const view = playerView(state, seat.playerId, context, reuse);
       const transport = seat.stream.next(view, seat.events);
       if (transport === null) continue;
+      if (transport.kind === 'snapshot') snapshots += 1;
       seat.events = [];
       const text =
         transport.kind === 'snapshot'

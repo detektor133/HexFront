@@ -74,6 +74,11 @@ export class ConfirmedViewDeltaStream {
     return { how: 'sent', events };
   }
 
+  /** Следующим уйдёт полный снимок (вход, реконнект, сброс базы): он в разы тяжелее дельты. */
+  public get willSendSnapshot(): boolean {
+    return this.forceFull || this.baseView === null;
+  }
+
   /** Окно отправки заполнено: ждём `viewAck`. */
   public get isWaiting(): boolean {
     return this.flight.length >= this.window;

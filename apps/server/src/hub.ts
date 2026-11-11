@@ -61,6 +61,35 @@ export function quickMatchMap(seed: number, size: number): MapStatic {
   return loaded.map;
 }
 
+/** Готовые карты процесса: sim карту не меняет, комнаты делят её. */
+const mapCache = new Map<string, MapStatic>();
+
+function cachedMap(seed: number, size: number): MapStatic {
+  const key = `${seed}:${size}`;
+  let map = mapCache.get(key);
+  if (map === undefined) {
+    map = quickMatchMap(seed, size);
+    mapCache.set(key, map);
+  }
+  return map;
+}
+
+/**
+ * Прогревает карты быстрого матча по одной между тиками (генерация 30–60 мс, холодная — дольше), чтобы
+ * создание комнаты не останавливало игроков других комнат.
+ */
+export function warmMaps(size: number, seeds: readonly number[] = QUICK_MATCH_SEEDS): void {
+  let index = 0;
+  const next = (): void => {
+    const seed = seeds[index];
+    if (seed === undefined) return;
+    index += 1;
+    cachedMap(seed, size);
+    setTimeout(next, 50);
+  };
+  setTimeout(next, 1000);
+}
+
 /** Одно соединение: разбор сообщений и привязка к месту в комнате. */
 export class Session implements Connection {
   private room: Room | null = null;
@@ -188,7 +217,7 @@ export class Hub {
     this.now = options.now ?? Date.now;
     this.size = options.size ?? MATCH_SIZE;
     this.fog = options.fog ?? true;
-    this.makeMap = options.makeMap ?? quickMatchMap;
+    this.makeMap = options.makeMap ?? cachedMap;
     this.logger = options.log ?? (() => undefined);
     this.maxRooms = options.maxRooms ?? 12;
   }

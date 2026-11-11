@@ -2,7 +2,7 @@
 //   PORT (8080), HOST (127.0.0.1: наружу смотрит только Caddy), ALLOWED_ORIGINS (через запятую),
 //   TRUST_PROXY=1 (адрес клиента из X-Forwarded-For), MAX_ROOMS (12).
 // Логи — JSON-строки в stdout.
-import { Hub } from './hub.ts';
+import { Hub, MATCH_SIZE, warmMaps } from './hub.ts';
 import { startServer } from './server.ts';
 
 const port = Number(process.env.PORT ?? 8080);
@@ -16,6 +16,7 @@ const hub = new Hub({
     process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), event, ...data })}\n`);
   },
 });
+warmMaps(MATCH_SIZE);
 const server = await startServer(hub, port, {
   host: process.env.HOST ?? '127.0.0.1',
   allowedOrigins: origins,

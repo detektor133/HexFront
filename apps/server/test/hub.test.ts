@@ -319,3 +319,19 @@ describe('запросы по полному состоянию', () => {
     expect(reply === undefined || reply.preview === null).toBe(true);
   });
 });
+
+describe('нагрузка старта', () => {
+  it('стартовые снимки раздаются порциями, а не всем на одном тике', () => {
+    const { hub, tick } = setup();
+    const clients = Array.from({ length: SIZE }, (_, i) => new Client(hub, `ip-${i}`));
+    clients[0]?.hello('Игрок0', { mode: 'private' });
+    const room = clients[0]?.of('welcome')[0]?.room ?? '';
+    clients.slice(1).forEach((c, i) => c.hello(`Игрок${i + 1}`, { room }));
+    clients[0]?.send({ t: 'start' });
+    tick();
+    const received = (): number => clients.filter((c) => c.count('snapshot') > 0).length;
+    expect(received()).toBe(4);
+    tick();
+    expect(received()).toBe(SIZE);
+  });
+});
