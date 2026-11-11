@@ -206,7 +206,33 @@ describe('матч: снимок, дельты и туман', () => {
     for (let seq = 1; seq <= 25; seq += 1)
       a.send({ t: 'cmd', seq, cmd: { t: 'setTax', rate: 300 as Fp } });
     expect(a.of('ack')).toHaveLength(20);
-    expect(a.of('rejected').filter((m) => m.reason === 'rateLimit')).toHaveLength(5);
+    // Лимит не теряет команды: 21-я не засчитана (rateLimit), следующие просят повтор по порядку (retry).
+    expect(a.of('rejected').filter((m) => m.reason === 'rateLimit')).toHaveLength(1);
+    expect(a.of('rejected').filter((m) => m.reason === 'retry')).toHaveLength(4);
+  });
+
+  it('после паузы команды, не принятые по лимиту, принимаются повтором по порядку', () => {
+    const { hub, tick, advance } = setup();
+    const a = new Client(hub);
+    a.hello('Аня', { mode: 'private' });
+    a.send({ t: 'start' });
+    tick();
+    for (let seq = 1; seq <= 25; seq += 1)
+      a.send({ t: 'cmd', seq, cmd: { t: 'setTax', rate: 300 as Fp } });
+    advance(1100);
+    for (let seq = 21; seq <= 25; seq += 1)
+      a.send({ t: 'cmd', seq, cmd: { t: 'setTax', rate: 300 as Fp } });
+    expect(a.of('ack').map((m) => m.seq)).toEqual([
+      ...Array.from({ length: 20 }, (_, i) => i + 1),
+      21,
+      22,
+      23,
+      24,
+      25,
+    ]);
+    // Повтор уже принятой команды только подтверждается, второй раз не исполняется.
+    a.send({ t: 'cmd', seq: 25, cmd: { t: 'setTax', rate: 300 as Fp } });
+    expect(a.of('ack').at(-1)?.seq).toBe(25);
   });
 
   it('команда с чужим полем source и неизвестным типом отбрасывается до sim', () => {
