@@ -80,7 +80,10 @@ describe('сервер по сети', () => {
 
     send(a, { t: 'viewAck', tick: viewA.tick });
     const delta = await waitFor(a, (t) => t.includes('"t":"delta"'));
-    expect(JSON.parse(delta).baseTick).toBe(viewA.tick);
+    // Окно отправки: к моменту чтения могла уйти не первая дельта, но база не раньше снимка.
+    const parsed = JSON.parse(delta) as { baseTick: number; tick: number };
+    expect(parsed.baseTick).toBeGreaterThanOrEqual(viewA.tick);
+    expect(parsed.tick).toBeGreaterThan(parsed.baseTick);
 
     send(a, { t: 'ping', at: 7 });
     expect(JSON.parse(await waitFor(a, (t) => t.includes('"pong"'))).at).toBe(7);
