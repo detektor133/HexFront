@@ -2,6 +2,9 @@
 // Меряет кадры главного потока и длинные задачи для трёх форматов игры (лёгкий, средний, тяжёлый
 // на большой карте Europe), при замедлении CPU ×4 и ×6, в обычной и ускоренной (имитация поздней
 // игры) скорости. Параметры зашиты в файл, чтобы запуск был одной голой командой.
+import { spawn, type ChildProcess } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
 import { test } from '@playwright/test';
 
 const FORMATS: Record<string, string> = {
@@ -12,7 +15,11 @@ const FORMATS: Record<string, string> = {
 const THROTTLES = [1, 4, 6];
 const SPEEDS = [1];
 const SECONDS = 20;
-const FORMAT_LIST = ['light', 'medium', 'heavy'];
+// Какие форматы гонять сейчас: 'light', 'medium', 'heavy' (локальная игра) и 'online' — матч на 30
+// игроков против настоящего сервера (запускается на время зонда), клиент без своей симуляции.
+const FORMAT_LIST = ['online'];
+const SERVER_PORT = 18_090;
+const SERVER_URL = `ws://127.0.0.1:${SERVER_PORT}`;
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -54,6 +61,30 @@ function printTop(profile: CpuProfile, label: string): void {
     console.log(`TOP ${label} ${((us / total) * 100).toFixed(1)}% ${key}`);
 }
 
+let server: ChildProcess | null = null;
+
+test.beforeAll(async () => {
+  if (!FORMAT_LIST.includes('online')) return;
+  const main = fileURLToPath(new URL('../../../server/src/main.ts', import.meta.url));
+  server = spawn(process.execPath, ['--experimental-strip-types', main], {
+    env: { ...process.env, PORT: String(SERVER_PORT), HOST: '127.0.0.1' },
+    stdio: 'ignore',
+  });
+  for (let i = 0; i < 100; i += 1) {
+    try {
+      if ((await fetch(`http://127.0.0.1:${SERVER_PORT}/healthz`)).ok) return;
+    } catch {
+      // сервер ещё поднимается
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('сервер зонда не запустился');
+});
+
+test.afterAll(() => {
+  server?.kill();
+});
+
 interface Probe {
   __frames: number[];
   __long: number[];
@@ -82,7 +113,15 @@ for (const format of FORMAT_LIST) {
           };
           requestAnimationFrame(tick);
         });
-        await page.goto(`/match?${FORMATS[format]}&speed=${speed}`);
+        if (format === 'online') {
+          // Лобби закрытой комнаты → «Начать сейчас»: 1 человек и 29 ботов, как в быстром матче.
+          await page.goto(`/online?mode=private&server=${SERVER_URL}`);
+          await page
+            .getByRole('button', { name: /Начать сейчас|Start now/ })
+            .click({ timeout: 30_000 });
+        } else {
+          await page.goto(`/match?${FORMATS[format]}&speed=${speed}`);
+        }
         await page.waitForSelector('canvas', { timeout: 90_000 });
         await page.waitForTimeout(8000);
         await page.evaluate(() => {

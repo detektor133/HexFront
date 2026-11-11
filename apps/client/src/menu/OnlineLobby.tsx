@@ -37,7 +37,7 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
   const clientRef = useRef<NetClient | null>(null);
 
   useEffect(() => {
-    const url = serverUrl();
+    const url = serverUrl(search);
     if (url === null) {
       setError(t('online.noServer'));
       return;
@@ -73,7 +73,7 @@ export function OnlineLobby({ search }: { readonly search: string }): React.JSX.
       // Ушли с экрана, не дождавшись матча: освобождаем место.
       if (!handedOver) client.stop();
     };
-  }, [mode, room]);
+  }, [mode, room, search]);
 
   const invite =
     session !== null && mode === 'private'

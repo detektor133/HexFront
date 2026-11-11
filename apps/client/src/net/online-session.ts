@@ -7,11 +7,16 @@ export interface OnlineSessionInfo {
   readonly nick: string;
 }
 
+/** Параметр `server` в ссылке принимается только для локального сервера (проверки и разработка). */
+const LOCAL_SERVER = /^ws:\/\/(127\.0\.0\.1|localhost)(:\d{2,5})?$/;
+
 /**
  * Адрес сервера матчей. В сборке задаётся `VITE_SERVER_URL` (wss://…); при разработке сервер
- * запускается рядом на порту 8080.
+ * запускается рядом на порту 8080; в ссылке можно передать только локальный `server=ws://127.0.0.1:порт`.
  */
-export function serverUrl(): string | null {
+export function serverUrl(search = ''): string | null {
+  const override = new URLSearchParams(search).get('server');
+  if (override !== null && LOCAL_SERVER.test(override)) return override;
   const configured = import.meta.env.VITE_SERVER_URL as string | undefined;
   if (configured !== undefined && configured !== '') return configured;
   if (import.meta.env.DEV) return `ws://${window.location.hostname}:8080`;
