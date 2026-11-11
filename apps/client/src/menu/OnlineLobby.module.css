@@ -3,136 +3,53 @@
   overflow-x: hidden;
   overflow-y: auto;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  justify-items: center;
-  align-items: center;
   min-height: 100%;
+  place-items: safe center;
+  padding: var(--space-lg);
   box-sizing: border-box;
   background: var(--map-background);
 }
 
-.background {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.card {
+  width: min(100%, 420px);
+  box-sizing: border-box;
+  padding: var(--space-xl);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
 }
 
-.top {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  box-sizing: border-box;
-  padding: var(--space-md) var(--space-md) 0;
-}
-
-.plate {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-target-min);
-  box-sizing: border-box;
-  padding: 0 var(--space-md);
-  margin: 0;
-  color: var(--ui-ink);
+.title {
+  margin: 0 0 var(--space-md);
   font-family: var(--font-display-family);
   text-transform: var(--ui-display-transform);
   letter-spacing: var(--ui-display-spacing);
   font-weight: var(--font-display-weight);
-  font-size: var(--font-size-title);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  box-shadow: var(--shadow-hard);
-}
-
-.center {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  justify-items: center;
-  gap: var(--space-md);
-  width: min(100%, 420px);
-  box-sizing: border-box;
-  padding: var(--space-md);
-}
-
-/* Шестиугольник с отсчётом: число секунд до старта или ожидание хозяина. */
-.timer {
-  --size: clamp(150px, min(52vw, 26vh), 230px);
-  width: var(--size);
-  gap: 2px;
-  font-family: var(--font-display-family);
-  font-size: calc(var(--size) * 0.3);
-  line-height: 1;
-  cursor: default;
-}
-
-.timer small {
-  max-width: 80%;
-  color: var(--ui-ink2);
-  font-family: inherit;
-  font-size: clamp(12px, calc(var(--size) * 0.085), 15px);
-}
-
-.timer.waiting {
-  font-size: calc(var(--size) * 0.14);
-  line-height: 1.15;
-}
-
-/* Места: ряды сот, занятые людьми окрашены, свободные займут боты. */
-.seats {
-  display: grid;
-  justify-items: start;
-  --seat: clamp(26px, 8.4vw, 36px);
-}
-
-.seatRow {
-  display: flex;
-}
-
-.seatRow:nth-child(even) {
-  margin-left: calc(var(--seat) / 2 + 1px);
-}
-
-.seatRow + .seatRow {
-  margin-top: calc(var(--seat) * -0.2887 + 1px);
-}
-
-.seat {
-  width: var(--seat);
-  margin: 0 1px;
-  --edge-width: 2px;
-  cursor: default;
+  font-size: var(--font-size-display);
 }
 
 .count {
   margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  text-align: center;
-  color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
+  font-family: var(--font-display-family);
+  font-size: var(--font-size-display);
 }
 
-.count span {
+.status {
+  margin: var(--space-sm) 0 var(--space-md);
   color: var(--ui-ink2);
 }
 
 .error {
-  margin: 0;
-  padding: var(--space-md);
+  margin: 0 0 var(--space-md);
   color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  text-align: center;
 }
 
 .invite {
   display: flex;
-  width: 100%;
   gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .invite input {
@@ -143,7 +60,7 @@
   color: var(--ui-ink);
   font: inherit;
   background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
 }
 
@@ -151,41 +68,20 @@
 .primary,
 .back {
   min-height: var(--touch-target-min);
-  padding: 0 var(--space-lg);
+  padding: 0 var(--space-md);
   color: var(--ui-ink);
   font: inherit;
   cursor: pointer;
-  background: var(--ui-surface);
+  background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
 }
 
 .primary {
   width: 100%;
-  font-weight: 600;
-  color: var(--ui-button-primary-ink);
-  background: var(--ui-button-primary-bg);
-  border-color: transparent;
+  margin-bottom: var(--space-sm);
 }
 
 .back {
-  position: relative;
-  z-index: 1;
-  margin-bottom: max(var(--space-md), env(safe-area-inset-bottom));
-  box-shadow: var(--shadow-hard);
-}
-
-@media (max-height: 560px) {
-  .timer {
-    --size: clamp(100px, 34vh, 150px);
-  }
-
-  .seats {
-    --seat: clamp(18px, 5vh, 26px);
-  }
-
-  .center {
-    gap: var(--space-sm);
-    padding: var(--space-xs) var(--space-md);
-  }
+  width: 100%;
 }

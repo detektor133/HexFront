@@ -1,10 +1,13 @@
-/* Меню занимает ровно экран и не листается: карта-меню сама вписывается в оставшуюся высоту. */
 .page {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100%;
+  /* safe: высокая карточка не уезжает верхом за экран, а листается. */
+  place-items: safe center;
+  padding: var(--space-lg);
+  box-sizing: border-box;
   background: var(--map-background);
 }
 
@@ -14,102 +17,28 @@
   pointer-events: none;
 }
 
-.top {
+.card {
   position: relative;
   z-index: 1;
-  display: flex;
+  width: min(100%, 420px);
   box-sizing: border-box;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  padding: max(var(--space-md), env(safe-area-inset-top)) var(--space-md) 0;
-}
-
-.plate {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target-min);
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0 var(--space-md);
-  color: var(--ui-ink);
-  font: inherit;
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
+  padding: var(--space-xl);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
-}
-
-button.plate {
-  min-width: var(--touch-target-min);
-  cursor: pointer;
+  background: color-mix(in srgb, var(--ui-surface) 92%, transparent);
 }
 
 .wordmark {
+  margin: 0 0 var(--space-md);
+  color: var(--ui-ink);
   font-family: var(--font-display-family);
   text-transform: var(--ui-display-transform);
   letter-spacing: var(--ui-display-spacing);
   font-weight: var(--font-display-weight);
   font-size: var(--font-size-title);
-}
-
-.mapArea {
-  position: relative;
-  z-index: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  padding: var(--space-sm) var(--space-sm) max(var(--space-sm), env(safe-area-inset-bottom));
-}
-
-/* Окно выбора: шторка снизу на телефоне, карточка по центру на широком экране. */
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: color-mix(in srgb, var(--ui-ink) 45%, transparent);
-}
-
-.sheet {
-  width: min(100%, 460px);
-  max-height: 92%;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: var(--space-xl);
-  padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
-  background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
-  corner-shape: var(--ui-corner);
-  box-shadow: var(--shadow-hard);
-}
-
-@media (min-width: 600px) {
-  .backdrop {
-    align-items: center;
-  }
-
-  .sheet {
-    border-radius: var(--radius-card);
-  }
-}
-
-/* Настройки игры на весь экран: свой экран, а не кусок шторки. */
-.fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 6;
-  display: grid;
-  justify-items: center;
-  align-items: start;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: max(var(--space-lg), env(safe-area-inset-top)) var(--space-lg)
-    max(var(--space-lg), env(safe-area-inset-bottom));
-  background: var(--ui-surface);
 }
 
 .title {
@@ -126,10 +55,26 @@ button.plate {
   color: var(--ui-ink2);
 }
 
+.identityRow {
+  display: flex;
+  align-items: end;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.colorPicker {
+  position: relative;
+  flex: 0 0 28px;
+  height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+}
+
 .nickname {
   display: grid;
   gap: var(--space-sm);
   min-width: 0;
+  flex: 1;
 }
 
 .nickname > span {
@@ -146,15 +91,25 @@ button.plate {
   font: inherit;
 }
 
-.swatches {
+.palette {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + var(--space-sm));
+  left: 0;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, 28px);
   gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  background: var(--ui-panel-image) var(--ui-surface);
+  box-shadow: var(--shadow-hard);
 }
 
-.swatch {
-  aspect-ratio: 1;
-  min-height: 36px;
+.color {
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;
@@ -162,18 +117,30 @@ button.plate {
   transition: border-color 150ms var(--motion-easing);
 }
 
-.swatch:hover {
+.color:hover {
   border-color: var(--ui-border-strong);
 }
 
-.swatch:focus-visible {
+.color:focus-visible {
   outline: 2px solid var(--selection-color);
   outline-offset: 2px;
 }
 
-.swatch.selected {
+.color.selected {
   border-color: var(--selection-color);
   box-shadow: inset 0 0 0 3px var(--ui-surface);
+}
+
+.tutorial p {
+  margin-top: var(--space-xs);
+  color: var(--ui-ink2);
+}
+
+.checkbox {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  min-height: var(--touch-target-min);
 }
 
 .play {
@@ -185,7 +152,6 @@ button.plate {
   justify-content: center;
   padding: 0 var(--space-xl);
   box-sizing: border-box;
-  border: 0;
   border-radius: var(--radius-button);
   background: var(--ui-button-primary-bg);
   color: var(--ui-button-primary-ink);
@@ -213,12 +179,6 @@ button.plate {
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-sm);
-}
-
-.levels {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-sm);
 }
 
@@ -264,4 +224,126 @@ button.plate {
   background: var(--ui-panel-image) var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
+}
+
+.chapters {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.chapter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.chapter small {
+  color: var(--ui-ink2);
+  font-weight: 400;
+}
+
+.settingsButton {
+  display: inline-flex;
+  width: 100%;
+  margin-top: var(--space-sm);
+  min-height: var(--touch-target-min);
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+/* Низкий экран (телефон в ландшафте): карточка плотнее, чтобы почти помещаться без прокрутки. */
+@media (max-height: 500px) {
+  .page {
+    place-items: start center;
+    padding: var(--space-sm);
+  }
+
+  .card {
+    padding: var(--space-md);
+  }
+
+  .subtitle {
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .field {
+    margin-top: var(--space-sm);
+  }
+
+  .play {
+    margin-top: var(--space-md);
+  }
+}
+
+/* Меню целиком на экране без прокрутки: карты и сложность в один ряд, второстепенные кнопки по две. */
+.segmented.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.segmented.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.segmented.four .segment,
+.segmented.three .segment {
+  padding: var(--space-sm);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.actions > * {
+  margin-top: 0;
+  padding: 0 var(--space-sm);
+}
+
+.page {
+  padding: clamp(var(--space-sm), 2vh, var(--space-lg));
+}
+
+.card {
+  padding: clamp(var(--space-md), 3vh, var(--space-xl));
+}
+
+.field,
+.identityRow,
+.play {
+  margin-top: clamp(var(--space-sm), 1.8vh, var(--space-lg));
+}
+
+/* Холст фона не должен добавлять строку под собой и растягивать страницу. */
+.background {
+  overflow: hidden;
+}
+
+.background canvas {
+  display: block;
+}
+
+.actions > * {
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  text-decoration: none;
 }

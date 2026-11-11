@@ -1,20 +1,27 @@
-import { IconSettings } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { loadMap } from '@hexfront/sim';
+
+import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
-import { isCoarsePointer } from '../input/touch-tap.ts';
-import { followInApp, navigate } from '../nav.ts';
+import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
+import type { FromWorker } from '../local/messages.ts';
+import { ViewDeltaApplier } from '../local/view-delta.ts';
+import { createMapView, type MapView } from '../render/map-view.ts';
 import { quickMatchUrl } from '../routes.ts';
 import styles from './MainMenu.module.css';
-import { MenuMap, type MenuTerritory } from './MenuMap.tsx';
 import { TutorialAsk } from './TutorialMenu.tsx';
-import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
-import { useMenuBackground } from './use-menu-background.ts';
+import { isCoarsePointer } from '../input/touch-tap.ts';
+import { followInApp } from '../nav.ts';
+import { NICKNAME_KEY } from './storage-keys.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
+import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
 import { tutorialUrl } from '../tutorial/links.ts';
+
+const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 
 const MAP_KEY = 'hexfront.map';
 const PLAYERS_KEY = 'hexfront.players';
@@ -31,6 +38,7 @@ type MenuMap = (typeof MAPS)[number]['id'];
 const PLAYERS_MIN = 2;
 const PLAYERS_MAX = 30;
 const PLAYERS_DEFAULT = 12;
+const COLOR_KEY = 'hexfront.color';
 const LEVEL_KEY = 'hexfront.botLevel';
 const LEVELS = ['easy', 'normal', 'hard'] as const;
 type MenuLevel = (typeof LEVELS)[number];
@@ -40,12 +48,12 @@ function readStorage(key: string, fallback: string): string {
   return localStorage.getItem(key) ?? fallback;
 }
 
+// Ссылка на матч: случайная карта — как раньше (готовые зёрна), остальные — по id карты.
 /** Случайное зерно матча на Европе: стартовые позиции и порядок игроков каждый раз другие. */
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
-// Ссылка на матч: случайная карта — как раньше (готовые зёрна), остальные — по id карты.
 function matchUrl(
   nickname: string,
   color: string,
@@ -64,22 +72,14 @@ function matchUrl(
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
-/** Тёмный или светлый текст на заливке `background`: что контрастнее по яркости. */
-function inkOn(background: string): string {
-  const value = Number.parseInt(background.slice(1), 16);
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-  return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? 'var(--ui-ink)' : 'var(--ui-surface)';
-}
-
-type Panel = 'none' | 'bots' | 'profile' | 'settings';
-
-/** Главное меню: живая карта на весь экран, режимы — страны на ней. */
+/** Главное меню быстрого локального матча. */
 export function MainMenu(): React.JSX.Element {
   const backgroundHostRef = useRef<HTMLDivElement>(null);
+  const colorsRef = useRef<HTMLDivElement>(null);
+  const backgroundRef = useRef<LocalMatch | null>(null);
   const [nickname, setNickname] = useState<string>(() => readStorage(NICKNAME_KEY, ''));
   const [color, setColor] = useState<string>(() => readStorage(COLOR_KEY, 'teal'));
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState<boolean>(false);
   const [map, setMap] = useState<MenuMap>(() => {
     const saved = readStorage(MAP_KEY, 'europe');
     return MAPS.find((m) => m.id === saved)?.id ?? 'europe';
@@ -95,243 +95,283 @@ export function MainMenu(): React.JSX.Element {
     return LEVELS.find((l) => l === saved) ?? LEVEL_DEFAULT;
   });
   const chooser = MAPS.find((m) => m.id === map);
-  const [panel, setPanel] = useState<Panel>('none');
-  // Новичку один раз предлагают обучение; позже оно открывается страной на карте.
+  // Новичку один раз предлагают обучение; позже оно открывается кнопкой в меню.
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
-  const palette = tokens.players.palette;
-  const colorLine = palette.find((p) => p.id === color)?.line ?? palette[0]?.line ?? '';
-  const others = palette.filter((p) => p.id !== color);
-
-  useMenuBackground(backgroundHostRef, color);
 
   useEffect(() => {
-    if (panel === 'none') return;
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setPanel('none');
+    let disposed = false;
+    let mapView: MapView | null = null;
+    let layer: EconomyLayer | null = null;
+    let pendingMessage: Extract<FromWorker, { t: 'view' }> | null = null;
+    const deltaApplier = new ViewDeltaApplier();
+    const applyMessage = (message: Extract<FromWorker, { t: 'view' }>): void => {
+      if (layer === null) {
+        pendingMessage = message;
+        return;
+      }
+      const view =
+        message.kind === 'snapshot'
+          ? deltaApplier.applySnapshot(message.snapshot)
+          : deltaApplier.applyDelta(message.delta);
+      layer.setView(view, EMPTY_SELECTION);
+      layer.frame(performance.now());
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [panel]);
+    backgroundRef.current = startLocalMatch(
+      'small',
+      1,
+      { count: 6, bots: [0, 1, 2, 3, 4, 5], speed: 1 },
+      (message: FromWorker): void => {
+        if (message.t === 'view') applyMessage(message);
+      },
+      { fog: false, playerColors: playerColorIds(color).slice(0, 2) },
+    );
+    const startBackground = async (): Promise<void> => {
+      const response = await fetch('/maps/small.json');
+      const json: unknown = await response.json();
+      const loaded = loadMap(json);
+      if (disposed || !loaded.ok || backgroundHostRef.current === null) return;
+      const created = await createMapView(
+        backgroundHostRef.current,
+        loaded.map,
+        {
+          radius: tokens.map.hexRadius,
+          midLayer: (map, radius) => {
+            layer = createEconomyLayer(map, radius);
+            return layer;
+          },
+        },
+        () => undefined,
+      );
+      // Меню закрыли, пока холст готовился (быстрое «Играть»): отдать его сразу, иначе он останется
+      // в памяти вместе с контекстом WebGL.
+      if (disposed) {
+        created.destroy();
+        return;
+      }
+      mapView = created;
+      if (pendingMessage !== null) applyMessage(pendingMessage);
+    };
+    void startBackground();
+    return () => {
+      disposed = true;
+      backgroundRef.current?.dispose();
+      layer?.destroy();
+      mapView?.destroy();
+      backgroundRef.current = null;
+    };
+  }, [color]);
 
-  // Ник, цвет и настройки матча запоминаются сразу: лобби и матч читают их из хранилища.
-  const save = (): void => {
+  useEffect(() => {
+    const closeColorPicker = (event: MouseEvent): void => {
+      if (!colorsRef.current?.contains(event.target as Node)) {
+        setIsColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeColorPicker);
+    return () => document.removeEventListener('mousedown', closeColorPicker);
+  }, []);
+
+  const handleColor = (next: string): void => {
+    setColor(next);
+    localStorage.setItem(COLOR_KEY, next);
+  };
+
+  // «Играть» и «Обучение» на телефоне сразу включают полный экран (нужен жест, это он) и ведут в
+  // матч внутри страницы: перезагрузка вывела бы браузер из полного экрана.
+  const enter = (event: React.MouseEvent<HTMLAnchorElement>, url: string, save: boolean): void => {
+    if (save) handlePlay();
+    if (isCoarsePointer() && fullscreenWanted()) void setFullscreen(true);
+    followInApp(event, url);
+  };
+
+  const handlePlay = (): void => {
     localStorage.setItem(NICKNAME_KEY, nickname);
-    localStorage.setItem(COLOR_KEY, color);
     localStorage.setItem(MAP_KEY, map);
     localStorage.setItem(PLAYERS_KEY, String(players));
     localStorage.setItem(LEVEL_KEY, level);
   };
 
-  // Режимы на телефоне сразу включают полный экран (нужен жест, это он) и ведут в матч внутри
-  // страницы: перезагрузка вывела бы браузер из полного экрана.
-  const go = (url: string, store: boolean): void => {
-    if (store) save();
-    if (isCoarsePointer() && fullscreenWanted()) void setFullscreen(true);
-    navigate(url);
-  };
-
-  const playUrl = matchUrl(nickname, color, map, players, level);
-  const sheetOpen = askOpen || panel === 'bots' || panel === 'profile';
-  const closePanel = (): void => {
-    save();
-    setPanel('none');
-  };
-
-  const territories: readonly MenuTerritory[] = [
-    {
-      id: 'online',
-      label: t('menu.online'),
-      sub: t('menu.subOnline'),
-      fill: colorLine,
-      ink: inkOn(colorLine),
-      onActivate: () => go('/online', true),
-    },
-    {
-      id: 'bots',
-      label: t('menu.bots'),
-      sub: t('menu.subBots'),
-      fill: others[2]?.line ?? colorLine,
-      ink: inkOn(others[2]?.line ?? colorLine),
-      onActivate: () => setPanel('bots'),
-    },
-    {
-      id: 'friends',
-      label: t('menu.friends'),
-      sub: t('menu.subFriends'),
-      fill: others[5]?.line ?? colorLine,
-      ink: inkOn(others[5]?.line ?? colorLine),
-      onActivate: () => go('/online?mode=private', true),
-    },
-    {
-      id: 'tutorial',
-      label: t('tutorial.menuButton'),
-      sub: t('menu.subTutorial'),
-      fill: 'var(--ui-surface)',
-      ink: 'var(--ui-ink)',
-      onActivate: () => go(tutorialUrl(nickname, color), false),
-    },
-    {
-      id: 'profile',
-      label: (nickname === '' ? t('menu.defaultNick') : nickname).slice(0, 10),
-      sub: t('menu.subProfile'),
-      fill: `color-mix(in srgb, ${colorLine} 40%, var(--ui-surface))`,
-      ink: 'var(--ui-ink)',
-      onActivate: () => setPanel('profile'),
-    },
-  ];
-
   return (
     <main className={styles.page}>
       <div ref={backgroundHostRef} className={styles.background} aria-hidden="true" />
-      <header className={styles.top}>
-        <p className={`${styles.plate} ${styles.wordmark}`}>Hexfront</p>
-        <button
-          type="button"
-          className={styles.plate}
-          aria-label={t('settings.title')}
-          onClick={() => setPanel('settings')}
-        >
-          <IconSettings size={22} aria-hidden="true" />
-        </button>
-      </header>
-
-      <section className={styles.mapArea} aria-label="Hexfront">
-        <MenuMap territories={territories} />
-      </section>
-
-      {sheetOpen && (
-        <div
-          className={styles.backdrop}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !askOpen) closePanel();
-          }}
-        >
-          <div
-            className={styles.sheet}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('menu.setup')}
-          >
-            {askOpen ? (
-              <TutorialAsk
-                name={nickname}
-                color={color}
-                onNo={() => {
-                  markAsked();
-                  setAskOpen(false);
-                }}
-              />
-            ) : panel === 'profile' ? (
-              <>
-                <h1 className={styles.title}>{t('menu.profile')}</h1>
-                <label className={`${styles.field} ${styles.nickname}`}>
-                  <span>{t('menu.nickname')}</span>
-                  <input
-                    value={nickname}
-                    maxLength={16}
-                    autoFocus
-                    placeholder={t('menu.defaultNick')}
-                    onChange={(event) => setNickname(event.target.value.slice(0, 16))}
-                  />
-                </label>
-                <div className={styles.field}>
-                  <span className={styles.label}>{t('menu.color')}</span>
-                  <div className={styles.swatches} role="radiogroup" aria-label={t('menu.color')}>
-                    {palette.map((playerColor) => (
+      <section className={styles.card} aria-labelledby="main-menu-title">
+        <p className={styles.wordmark}>Hexfront</p>
+        {askOpen ? (
+          <TutorialAsk
+            name={nickname}
+            color={color}
+            onNo={() => {
+              markAsked();
+              setAskOpen(false);
+            }}
+          />
+        ) : settingsOpen ? (
+          <SettingsScreen onBack={() => setSettingsOpen(false)} />
+        ) : (
+          <>
+            <h1 id="main-menu-title" className={styles.title}>
+              {t('menu.title')}
+            </h1>
+            <p className={styles.subtitle}>{t('menu.subtitle')}</p>
+            <div className={styles.field}>
+              <span className={styles.label}>{t('menu.map')}</span>
+              <div
+                className={`${styles.segmented} ${styles.four}`}
+                role="radiogroup"
+                aria-label={t('menu.map')}
+              >
+                {MAPS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={m.id === map}
+                    className={`${styles.segment} ${m.id === map ? styles.chosen : ''}`}
+                    onClick={() => setMap(m.id)}
+                  >
+                    <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
+                    <small>{m.size}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {chooser?.choosePlayers && (
+              <label className={styles.field}>
+                <span className={styles.label}>{`${t('menu.players')}: ${players}`}</span>
+                <input
+                  type="range"
+                  min={PLAYERS_MIN}
+                  max={PLAYERS_MAX}
+                  value={players}
+                  onChange={(event) => setPlayers(Number(event.target.value))}
+                />
+              </label>
+            )}
+            <div className={styles.field}>
+              <span className={styles.label}>{t('menu.difficulty')}</span>
+              <div
+                className={`${styles.segmented} ${styles.three}`}
+                role="radiogroup"
+                aria-label={t('menu.difficulty')}
+              >
+                {LEVELS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={l === level}
+                    className={`${styles.segment} ${l === level ? styles.chosen : ''}`}
+                    onClick={() => setLevel(l)}
+                  >
+                    <span>{t(`menu.difficulty.${l}` as MessageKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.identityRow}>
+              <div ref={colorsRef} className={styles.colorPicker}>
+                {!isColorPickerOpen &&
+                  tokens.players.palette
+                    .filter((playerColor) => playerColor.id === color)
+                    .map((playerColor) => (
                       <button
                         key={playerColor.id}
                         type="button"
-                        role="radio"
-                        aria-checked={playerColor.id === color}
+                        className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
                         aria-label={`${t('menu.color')} ${playerColor.id}`}
-                        className={`${styles.swatch} ${playerColor.id === color ? styles.selected : ''}`}
-                        style={{ backgroundColor: playerColor.line }}
-                        onClick={() => setColor(playerColor.id)}
+                        aria-expanded={isColorPickerOpen}
+                        aria-haspopup="listbox"
+                        style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                        onClick={() => {
+                          if (!isColorPickerOpen) {
+                            setIsColorPickerOpen(true);
+                            return;
+                          }
+                          handleColor(playerColor.id);
+                          setIsColorPickerOpen(false);
+                        }}
+                      />
+                    ))}
+                {isColorPickerOpen && (
+                  <div
+                    className={styles.palette}
+                    role="listbox"
+                    aria-label={t('menu.color')}
+                    style={{ gridTemplateColumns: '28px 28px 28px 28px 28px 28px' }}
+                  >
+                    {tokens.players.palette.map((playerColor) => (
+                      <button
+                        key={playerColor.id}
+                        type="button"
+                        aria-label={`${t('menu.color')} ${playerColor.id}`}
+                        aria-selected={playerColor.id === color}
+                        className={`${styles.color} ${playerColor.id === color ? styles.selected : ''}`}
+                        style={{ backgroundColor: playerColor.line, width: '28px', height: '28px' }}
+                        onClick={() => {
+                          handleColor(playerColor.id);
+                          setIsColorPickerOpen(false);
+                        }}
                       />
                     ))}
                   </div>
-                </div>
-                <button type="button" className={styles.play} onClick={closePanel}>
-                  {t('menu.done')}
-                </button>
-              </>
-            ) : (
-              <>
-                <h1 className={styles.title}>{t('menu.bots')}</h1>
-                <div className={styles.field}>
-                  <span className={styles.label}>{t('menu.map')}</span>
-                  <div className={styles.segmented} role="radiogroup" aria-label={t('menu.map')}>
-                    {MAPS.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={m.id === map}
-                        className={`${styles.segment} ${m.id === map ? styles.chosen : ''}`}
-                        onClick={() => setMap(m.id)}
-                      >
-                        <span>{t(`menu.map.${m.id}` as MessageKey)}</span>
-                        <small>{m.size}</small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {chooser?.choosePlayers && (
-                  <label className={styles.field}>
-                    <span className={styles.label}>{`${t('menu.players')}: ${players}`}</span>
-                    <input
-                      type="range"
-                      min={PLAYERS_MIN}
-                      max={PLAYERS_MAX}
-                      value={players}
-                      onChange={(event) => setPlayers(Number(event.target.value))}
-                    />
-                  </label>
                 )}
-                <div className={styles.field}>
-                  <span className={styles.label}>{t('menu.difficulty')}</span>
-                  <div
-                    className={styles.levels}
-                    role="radiogroup"
-                    aria-label={t('menu.difficulty')}
-                  >
-                    {LEVELS.map((l) => (
-                      <button
-                        key={l}
-                        type="button"
-                        role="radio"
-                        aria-checked={l === level}
-                        className={`${styles.segment} ${l === level ? styles.chosen : ''}`}
-                        onClick={() => setLevel(l)}
-                      >
-                        <span>{t(`menu.difficulty.${l}` as MessageKey)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <a
-                  className={styles.play}
-                  role="button"
-                  href={playUrl}
-                  onClick={(event) => {
-                    save();
-                    if (isCoarsePointer() && fullscreenWanted()) void setFullscreen(true);
-                    followInApp(event, playUrl);
-                  }}
-                >
-                  {t('menu.play')}
-                </a>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {panel === 'settings' && (
-        <div className={styles.fullscreen}>
-          <SettingsScreen onBack={closePanel} />
-        </div>
-      )}
+              </div>
+              <label className={styles.nickname}>
+                <span>{t('menu.nickname')}</span>
+                <input
+                  value={nickname}
+                  maxLength={16}
+                  onChange={(event) => setNickname(event.target.value.slice(0, 16))}
+                />
+              </label>
+            </div>
+            <a
+              className={styles.play}
+              role="button"
+              href={matchUrl(nickname, color, map, players, level)}
+              onClick={(event) =>
+                enter(event, matchUrl(nickname, color, map, players, level), true)
+              }
+            >
+              {t('menu.play')}
+            </a>
+            <div className={styles.actions}>
+              <a
+                className={styles.tutorialButton}
+                role="button"
+                href={tutorialUrl(nickname, color)}
+                onClick={(event) => enter(event, tutorialUrl(nickname, color), false)}
+              >
+                {t('tutorial.menuButton')}
+              </a>
+              <a
+                className={styles.tutorialButton}
+                role="button"
+                href="/online"
+                onClick={(event) => enter(event, '/online', true)}
+              >
+                {t('online.play')}
+              </a>
+              <a
+                className={styles.tutorialButton}
+                role="button"
+                href="/online?mode=private"
+                onClick={(event) => enter(event, '/online?mode=private', true)}
+              >
+                {t('online.invite')}
+              </a>
+              <button
+                type="button"
+                className={styles.settingsButton}
+                onClick={() => setSettingsOpen(true)}
+              >
+                {t('settings.title')}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
     </main>
   );
 }
