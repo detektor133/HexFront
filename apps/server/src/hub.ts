@@ -21,6 +21,14 @@ export const MATCH_SIZE = 30;
 const MAX_CATCH_UP = 3;
 /** Закрытая комната без людей живёт дольше открытой, но не вечно. */
 const ROOM_KEEP_MS = 60_000;
+/** Сколько мс даётся соединению на `hello`; молчуны занимают сокеты и закрываются. */
+export const HELLO_TIMEOUT_MS = 5000;
+/** Сообщений в секунду от одного соединения (команды, ack, ping вместе); больше — разрыв. */
+export const MAX_MESSAGES_PER_SECOND = 100;
+/** Одновременных соединений с одного адреса. */
+export const MAX_CONNECTIONS_PER_IP = 10;
+/** Попыток `hello` в минуту с одного адреса (включая подбор токенов и кодов комнат). */
+export const MAX_HELLOS_PER_MINUTE = 30;
 
 export interface HubOptions {
   readonly now?: () => number;
@@ -29,6 +37,8 @@ export interface HubOptions {
   /** Подмена карты в тестах; по умолчанию генерация по сиду комнаты. */
   readonly makeMap?: (seed: number, size: number) => MapStatic;
   readonly log?: (event: string, data?: Record<string, unknown>) => void;
+  /** Предел комнат процесса: дальше новые входы получают `busy`. */
+  readonly maxRooms?: number;
 }
 
 function defaultMap(seed: number, size: number): MapStatic {
@@ -42,10 +52,34 @@ export class Session implements Connection {
   private room: Room | null = null;
   private readonly hub: Hub;
   private readonly out: Connection;
+  /** Адрес для лимитов; закрытый ключ учёта в хабе. */
+  public readonly ip: string;
+  public readonly createdAt: number;
+  private windowStart = 0;
+  private windowCount = 0;
+  private closed = false;
 
-  public constructor(hub: Hub, out: Connection) {
+  public constructor(hub: Hub, out: Connection, ip: string, createdAt: number) {
     this.hub = hub;
     this.out = out;
+    this.ip = ip;
+    this.createdAt = createdAt;
+  }
+
+  /** Вошло ли соединение в комнату (после `hello`). */
+  public get joined(): boolean {
+    return this.room !== null;
+  }
+
+  /** Учёт частоты сообщений: превышение — разрыв, а не молчаливая обработка. */
+  private overBudget(): boolean {
+    const now = this.hub.clock();
+    if (now - this.windowStart >= 1000) {
+      this.windowStart = now;
+      this.windowCount = 0;
+    }
+    this.windowCount += 1;
+    return this.windowCount > MAX_MESSAGES_PER_SECOND;
   }
 
   public send(text: string): void {
@@ -56,8 +90,20 @@ export class Session implements Connection {
     this.out.close();
   }
 
+  /** Закрывает по требованию хаба (молчун, флуд). */
+  public kick(reason: string): void {
+    this.hub.log('kick', { reason, ip: this.ip });
+    this.out.close();
+    this.onClose();
+  }
+
   /** Сообщение от клиента; невалидное отбрасывается, а не роняет комнату. */
   public onMessage(text: string): void {
+    if (this.closed) return;
+    if (this.overBudget()) {
+      this.kick('flood');
+      return;
+    }
     let message: C2S;
     try {
       message = decodeClientMessage(text);
@@ -78,6 +124,9 @@ export class Session implements Connection {
       case 'cmd':
         room.command(this, message.seq, message.cmd);
         break;
+      case 'resync':
+        room.resync(this);
+        break;
       case 'viewAck':
         room.viewAck(this, message.tick);
         break;
@@ -91,7 +140,10 @@ export class Session implements Connection {
   }
 
   public onClose(): void {
+    if (this.closed) return;
+    this.closed = true;
     this.room?.disconnect(this);
+    this.hub.release(this);
   }
 }
 
@@ -105,6 +157,10 @@ export class Hub {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private nextAt = 0;
   private logger: NonNullable<HubOptions['log']>;
+  private readonly maxRooms: number;
+  private readonly sessions = new Set<Session>();
+  private readonly perIp = new Map<string, number>();
+  private readonly hellos = new Map<string, { start: number; count: number }>();
 
   public constructor(options: HubOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -112,6 +168,12 @@ export class Hub {
     this.fog = options.fog ?? true;
     this.makeMap = options.makeMap ?? defaultMap;
     this.logger = options.log ?? (() => undefined);
+    this.maxRooms = options.maxRooms ?? 12;
+  }
+
+  /** Текущее время хаба, мс. */
+  public clock(): number {
+    return this.now();
   }
 
   public log(event: string, data?: Record<string, unknown>): void {
@@ -130,18 +192,51 @@ export class Hub {
   }
 
   /** Новое соединение. */
-  public connect(out: Connection): Session {
-    return new Session(this, out);
+  public connect(out: Connection, ip = 'local'): Session | null {
+    const count = this.perIp.get(ip) ?? 0;
+    if (count >= MAX_CONNECTIONS_PER_IP) {
+      this.log('tooManyConnections', { ip });
+      out.send(encodeServerMessage({ t: 'refused', reason: 'busy' }));
+      out.close();
+      return null;
+    }
+    this.perIp.set(ip, count + 1);
+    const session = new Session(this, out, ip, this.now());
+    this.sessions.add(session);
+    return session;
+  }
+
+  /** Соединение закрылось: снимаем с учёта. */
+  public release(session: Session): void {
+    this.sessions.delete(session);
+    const left = (this.perIp.get(session.ip) ?? 1) - 1;
+    if (left <= 0) this.perIp.delete(session.ip);
+    else this.perIp.set(session.ip, left);
+  }
+
+  /** Лимит `hello` с адреса: подбор токенов и кодов комнат упирается в него. */
+  private helloAllowed(ip: string): boolean {
+    const now = this.now();
+    const entry = this.hellos.get(ip);
+    if (entry === undefined || now - entry.start >= 60_000) {
+      this.hellos.set(ip, { start: now, count: 1 });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= MAX_HELLOS_PER_MINUTE;
   }
 
   /** Обрабатывает `hello`: вход в открытую комнату, приглашение, создание закрытой, реконнект. */
   public hello(session: Session, message: Extract<C2S, { t: 'hello' }>): Room | null {
+    if (!this.helloAllowed(session.ip)) return this.refuse(session, 'busy');
     if (message.v !== PROTOCOL_VERSION) return this.refuse(session, 'versionMismatch');
     const nick = sanitizeNick(message.nick);
     if (nick === null) return this.refuse(session, 'badNick');
     if (message.token !== undefined) {
       const room = this.rooms.get(roomOfToken(message.token));
-      if (room !== undefined && room.reconnect(session, message.token) !== null) return room;
+      if (room !== undefined && room.reconnect(session, message.token, message.have) !== null) {
+        return room;
+      }
     }
     const room = this.pickRoom(session, message);
     if (room === null) return null;
@@ -159,14 +254,21 @@ export class Hub {
       if (room === undefined) return this.refuseNull(session, 'noRoom');
       return room;
     }
-    if (message.mode === 'private') return this.createRoom('private');
+    if (message.mode === 'private') return this.createOrRefuse(session, 'private');
     for (const room of this.rooms.values()) {
       if (room.mode === 'open' && room.hasFreeSeat) return room;
     }
-    return this.createRoom('open');
+    return this.createOrRefuse(session, 'open');
   }
 
-  private createRoom(mode: 'open' | 'private'): Room {
+  private createOrRefuse(session: Session, mode: 'open' | 'private'): Room | null {
+    const room = this.createRoom(mode);
+    if (room === null) this.refuse(session, 'busy');
+    return room;
+  }
+
+  private createRoom(mode: 'open' | 'private'): Room | null {
+    if (this.rooms.size >= this.maxRooms) return null;
     const id =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
     const seed = randomInt(1, 2 ** 31 - 1);
@@ -198,6 +300,9 @@ export class Hub {
   /** Один шаг планировщика: набор, тики комнат, уборка пустых и законченных. */
   public tickAll(): void {
     const now = this.now();
+    for (const session of this.sessions) {
+      if (!session.joined && now - session.createdAt > HELLO_TIMEOUT_MS) session.kick('noHello');
+    }
     for (const [id, room] of this.rooms) {
       room.poll();
       room.tick();

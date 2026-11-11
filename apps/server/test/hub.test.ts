@@ -25,13 +25,18 @@ class Client {
   public closed = false;
   public session: Session;
 
-  public constructor(hub: Hub) {
-    this.session = hub.connect({
-      send: (text) => this.raw.push(text),
-      close: () => {
-        this.closed = true;
+  public constructor(hub: Hub, ip = 'local') {
+    const session = hub.connect(
+      {
+        send: (text) => this.raw.push(text),
+        close: () => {
+          this.closed = true;
+        },
       },
-    });
+      ip,
+    );
+    if (session === null) throw new Error('соединение отклонено');
+    this.session = session;
   }
 
   public send(message: C2S): void {

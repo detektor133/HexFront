@@ -30,15 +30,33 @@ export type C2S =
       readonly room?: string;
       /** `private` создаёт закрытую комнату для друзей. */
       readonly mode?: JoinMode;
+      /**
+       * Тик последнего применённого вида при реконнекте: если сервер помнит эту базу, он продолжит
+       * дельтами, а не полным снимком (восстановление после обрыва при слабой связи).
+       */
+      readonly have?: number;
     }
+  /**
+   * Команда с возрастающим номером `seq` в рамках сессии. Повтор (после обрыва) с тем же `seq`
+   * сервер не исполняет второй раз, а только подтверждает: `ack` накопительный.
+   */
   | { readonly t: 'cmd'; readonly seq: number; readonly cmd: Command }
+  /** Клиент потерял базу дельты (ошибка применения): сервер шлёт полный снимок. */
+  | { readonly t: 'resync' }
   | { readonly t: 'viewAck'; readonly tick: number }
   | { readonly t: 'ping'; readonly at: number }
   /** Хозяин закрытой комнаты запускает матч раньше срока (остальные места займут боты). */
   | { readonly t: 'start' };
 
 /** Причины, по которым сервер закрывает вход. */
-export type RefuseReason = 'versionMismatch' | 'badNick' | 'roomFull' | 'noRoom' | 'badHello';
+export type RefuseReason =
+  | 'versionMismatch'
+  | 'badNick'
+  | 'roomFull'
+  | 'noRoom'
+  | 'badHello'
+  /** Сервер перегружен (лимит комнат) или слишком много входов с адреса. */
+  | 'busy';
 
 export interface LobbyInfo {
   readonly room: string;
@@ -181,6 +199,11 @@ function parseObject(text: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function haveTick(value: unknown): number {
+  if (!isInt(value) || value < 0) throw new MessageError('Поле have');
+  return value;
+}
+
 function optionalString(value: unknown, max: number, name: string): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || value.length > max) throw new MessageError(`Поле ${name}`);
@@ -210,6 +233,7 @@ export function decodeClientMessage(text: string): C2S {
         ...(token === undefined ? {} : { token }),
         ...(room === undefined ? {} : { room }),
         ...(source.mode === undefined ? {} : { mode: source.mode }),
+        ...(source.have === undefined ? {} : { have: haveTick(source.have) }),
       };
     }
     case 'cmd': {
@@ -225,6 +249,8 @@ export function decodeClientMessage(text: string): C2S {
       return { t: 'ping', at: source.at };
     case 'start':
       return { t: 'start' };
+    case 'resync':
+      return { t: 'resync' };
     default:
       throw new MessageError('Неизвестный тип сообщения');
   }

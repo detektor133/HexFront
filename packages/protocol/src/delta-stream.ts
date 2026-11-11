@@ -35,6 +35,30 @@ export class ConfirmedViewDeltaStream {
     this.forceFull = true;
   }
 
+  /**
+   * Продолжает поток после обрыва связи: клиент назвал тик последнего применённого вида.
+   * @returns `'sent'` — клиент применил и последнее отправленное (потерялся только `viewAck`),
+   * `'confirmed'` — последнее отправленное не дошло, события из него надо отправить заново,
+   * `null` — такой базы нет, нужен полный снимок (поток сброшен)
+   */
+  public resume(have: number): 'sent' | 'confirmed' | null {
+    let how: 'sent' | 'confirmed' | null = null;
+    if (this.sent !== null && this.sent.tick === have) {
+      this.confirmed = this.sent;
+      how = 'sent';
+    } else if (this.confirmed !== null && this.confirmed.tick === have) {
+      how = 'confirmed';
+    }
+    if (how === null) {
+      this.reset();
+      return null;
+    }
+    this.sent = null;
+    this.waiting = false;
+    this.forceFull = false;
+    return how;
+  }
+
   /** Ждём `viewAck` на уже отправленное сообщение. */
   public get isWaiting(): boolean {
     return this.waiting;

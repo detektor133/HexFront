@@ -21,10 +21,10 @@ const TICKS_PER_MINUTE = 600;
 const DEFLATE_EVERY = 10;
 
 let clock = 0;
-const hub = new Hub({ now: () => clock, size: 30 });
+const hub = new Hub({ now: () => clock, size: 30, maxRooms: 1000 });
 
 interface Bot {
-  session: ReturnType<Hub['connect']>;
+  session: NonNullable<ReturnType<Hub['connect']>>;
   bytes: number;
   deflated: number;
   count: number;
@@ -35,24 +35,27 @@ for (let room = 0; room < ROOMS; room += 1) {
   let code = '';
   for (let i = 0; i < HUMANS; i += 1) {
     const bot: Bot = { session: null as never, bytes: 0, deflated: 0, count: 0 };
-    bot.session = hub.connect({
-      send(text) {
-        bot.bytes += text.length;
-        bot.count += 1;
-        if (bot.count % DEFLATE_EVERY === 0) bot.deflated += deflateRawSync(text).length;
-        // Клиент применил сообщение вида и подтверждает его.
-        const head = text.slice(0, 40);
-        if (head.includes('"t":"snapshot"') || head.includes('"t":"delta"')) {
-          const tick = /"tick":(\d+)/.exec(text.slice(0, 200));
-          if (tick)
-            bot.session.onMessage(encodeClientMessage({ t: 'viewAck', tick: Number(tick[1]) }));
-        }
-        if (i === 0 && text.includes('"t":"welcome"')) {
-          code = (JSON.parse(text) as { room: string }).room;
-        }
+    bot.session = hub.connect(
+      {
+        send(text) {
+          bot.bytes += text.length;
+          bot.count += 1;
+          if (bot.count % DEFLATE_EVERY === 0) bot.deflated += deflateRawSync(text).length;
+          // Клиент применил сообщение вида и подтверждает его.
+          const head = text.slice(0, 40);
+          if (head.includes('"t":"snapshot"') || head.includes('"t":"delta"')) {
+            const tick = /"tick":(\d+)/.exec(text.slice(0, 200));
+            if (tick)
+              bot.session.onMessage(encodeClientMessage({ t: 'viewAck', tick: Number(tick[1]) }));
+          }
+          if (i === 0 && text.includes('"t":"welcome"')) {
+            code = (JSON.parse(text) as { room: string }).room;
+          }
+        },
+        close() {},
       },
-      close() {},
-    });
+      `ip${room}_${i}`,
+    ) as Bot['session'];
     bot.session.onMessage(
       encodeClientMessage({
         t: 'hello',

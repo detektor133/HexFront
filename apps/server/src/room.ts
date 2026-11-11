@@ -37,6 +37,10 @@ export const RECONNECT_SECONDS = 30;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
 const ACK_STALE_TICKS = 100;
 const BOT_LEVEL: BotLevel = 'medium';
+/** Команд в очереди на тик от одного игрока; больше — отклоняются как `rateLimit`. */
+const MAX_PENDING = 64;
+/** События, копящиеся, пока игрок вне связи; старые вытесняются. */
+const MAX_QUEUED_EVENTS = 256;
 
 /** Сторона сети: комната шлёт текст и может закрыть соединение. */
 export interface Connection {
@@ -68,6 +72,10 @@ interface Seat {
   pending: Command[];
   events: GameEvent[];
   sentTick: number;
+  /** События в последнем неподтверждённом сообщении: вернутся в очередь, если оно не дошло. */
+  inflight: GameEvent[];
+  /** Последний исполненный `seq` команды: повторы после обрыва не исполняются второй раз. */
+  lastSeq: number;
   waitingTicks: number;
   droppedAt: number | null;
   botControlled: boolean;
@@ -166,6 +174,8 @@ export class Room {
       pending: [],
       events: [],
       sentTick: -1,
+      inflight: [],
+      lastSeq: 0,
       waitingTicks: 0,
       droppedAt: null,
       botControlled: false,
@@ -185,14 +195,23 @@ export class Room {
    * Возвращает игрока на его место по токену (реконнект). Старое соединение закрывается.
    * @returns id игрока или `null`, если токена в этой комнате нет
    */
-  public reconnect(conn: Connection, token: string): number | null {
+  public reconnect(conn: Connection, token: string, have?: number): number | null {
     const seat = this.seats.find((s) => s.token === token);
     if (seat === undefined) return null;
     seat.conn?.close();
     seat.conn = conn;
     seat.droppedAt = null;
-    seat.stream.reset();
     seat.waitingTicks = 0;
+    // Клиент помнит базу — продолжаем дельтами (экономит полный снимок на слабой связи).
+    const resumed =
+      have === undefined || this.phase !== 'running' ? null : seat.stream.resume(have);
+    if (resumed === null) {
+      seat.stream.reset();
+      seat.events = [];
+    } else if (resumed === 'confirmed') {
+      seat.events = [...seat.inflight, ...seat.events];
+    }
+    seat.inflight = [];
     if (seat.botControlled) this.takeBack(seat);
     this.sendWelcome(seat);
     if (this.phase === 'lobby') this.send(seat, { t: 'lobby', info: this.lobbyInfo() });
@@ -215,13 +234,19 @@ export class Room {
       this.send(seat, { t: 'rejected', seq, reason: 'bad' });
       return;
     }
+    // Повтор после обрыва: уже исполнено или стоит в очереди — только подтверждаем.
+    if (seq <= seat.lastSeq) {
+      this.send(seat, { t: 'ack', seq: seat.lastSeq });
+      return;
+    }
+    seat.lastSeq = seq;
     const now = this.options.now();
     if (now - seat.windowStart >= 1000) {
       seat.windowStart = now;
       seat.windowCount = 0;
     }
     seat.windowCount += 1;
-    if (seat.windowCount > MAX_COMMANDS_PER_SECOND) {
+    if (seat.windowCount > MAX_COMMANDS_PER_SECOND || seat.pending.length >= MAX_PENDING) {
       this.send(seat, { t: 'rejected', seq, reason: 'rateLimit' });
       return;
     }
@@ -234,6 +259,16 @@ export class Room {
     const seat = this.seats.find((s) => s.conn === conn);
     if (seat === undefined || tick !== seat.sentTick) return;
     seat.stream.acknowledge();
+    seat.inflight = [];
+    seat.waitingTicks = 0;
+  }
+
+  /** Клиент потерял базу: следующим уйдёт полный снимок. */
+  public resync(conn: Connection): void {
+    const seat = this.seats.find((s) => s.conn === conn);
+    if (seat === undefined) return;
+    seat.stream.reset();
+    seat.inflight = [];
     seat.waitingTicks = 0;
   }
 
@@ -332,8 +367,11 @@ export class Room {
   private sendViews(state: MatchState): void {
     const context = createPlayerViewContext(state);
     for (const seat of this.seats) {
-      if (seat.conn === null || seat.botControlled) continue;
+      if (seat.botControlled) continue;
       seat.events.push(...eventsFor(state.events, seat.playerId));
+      if (seat.events.length > MAX_QUEUED_EVENTS)
+        seat.events.splice(0, seat.events.length - MAX_QUEUED_EVENTS);
+      if (seat.conn === null) continue;
       if (seat.stream.isWaiting) {
         seat.waitingTicks += 1;
         if (seat.waitingTicks < ACK_STALE_TICKS) continue;
@@ -346,6 +384,7 @@ export class Room {
       const view = playerView(state, seat.playerId, context, reuse);
       const transport = seat.stream.next(view, seat.events);
       if (transport === null) continue;
+      seat.inflight = seat.events;
       seat.events = [];
       seat.sentTick = state.tick;
       const text =
@@ -395,5 +434,5 @@ export class Room {
 }
 
 function randomPart(): string {
-  return randomBytes(9).toString('base64url');
+  return randomBytes(18).toString('base64url');
 }
