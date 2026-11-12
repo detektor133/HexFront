@@ -1,49 +1,59 @@
-// Вид «Док»: чистая живая карта, внизу панель режимов и большая кнопка «В бой».
-import { IconRobot, IconSchool, IconSwords, IconUsers, IconWorld } from '@tabler/icons-react';
-import { useState } from 'react';
+// Док: «Онлайн» и «Против ботов» по краям, посередине «Быстрый бой». Панель режима открывается над
+// доком окном-«телевизором».
+import { useRef } from 'react';
 
-import { ModePanel } from './MenuParts.tsx';
-import styles from './menu-variants.module.css';
-import { modeName, type ModeId } from './mode-items.ts';
-import type { VariantProps } from './variant-props.ts';
+import { GlobeIcon, RobotIcon, SwordsIcon } from './DockIcons.tsx';
+import { ModePanel, modeName, type ModeId } from './MenuParts.tsx';
+import type { MenuSettings } from './menu-config.ts';
+import styles from './menu-dock.module.css';
+import ui from './menu-ui.module.css';
 import { t } from '../i18n/dict.ts';
+import { useTvPresence } from '../ui/use-tv-presence.ts';
 
-export function MenuDock(props: VariantProps): React.JSX.Element {
-  const [mode, setMode] = useState<ModeId | null>(null);
-  const tab = (id: ModeId, label: string, icon: React.ReactNode): React.JSX.Element => (
+export function MenuDock(props: {
+  readonly settings: MenuSettings;
+  readonly update: (patch: Partial<MenuSettings>) => void;
+  readonly go: (url: string) => void;
+  readonly mode: ModeId | null;
+  readonly onMode: (mode: ModeId | null) => void;
+}): React.JSX.Element {
+  const presence = useTvPresence(props.mode !== null);
+  // Пока панель закрывается, режим уже сброшен: рисуем последний, чтобы не мигало пустым окном.
+  const shown = useRef<ModeId>('online');
+  if (props.mode !== null) shown.current = props.mode;
+  const tab = (id: ModeId, icon: React.ReactNode): React.JSX.Element => (
     <button
       type="button"
-      className={`${styles.dockTab} ${mode === id ? styles.on : ''}`}
-      aria-pressed={mode === id}
-      onClick={() => setMode(mode === id ? null : id)}
+      className={`${styles.tab} ${props.mode === id ? styles.on : ''}`}
+      aria-pressed={props.mode === id}
+      onClick={() => props.onMode(props.mode === id ? null : id)}
     >
       {icon}
-      {label}
+      {modeName(id)}
     </button>
   );
   return (
     <>
-      {mode !== null && (
-        <div className={styles.dockPanel}>
+      {presence.mounted && (
+        <div className={ui.panelSlot}>
           <ModePanel
-            mode={mode}
+            mode={shown.current}
             settings={props.settings}
             update={props.update}
             go={props.go}
-            onBack={() => setMode(null)}
+            onBack={() => props.onMode(null)}
+            className={presence.className}
           />
         </div>
       )}
       <div className={styles.dock}>
-        <div className={styles.dockBar}>
-          {tab('online', modeName('online'), <IconWorld size={24} aria-hidden="true" />)}
-          {tab('bots', modeName('bots'), <IconRobot size={24} aria-hidden="true" />)}
+        <div className={styles.bar}>
+          {tab('online', <GlobeIcon />)}
           <button type="button" className={styles.go} onClick={() => props.go('/online')}>
-            <IconSwords size={30} aria-hidden="true" />
+            <SwordsIcon size={46} />
             {t('menu.quick')}
           </button>
-          {tab('tutorial', modeName('tutorial'), <IconSchool size={24} aria-hidden="true" />)}
-          {tab('online', t('menu.friends'), <IconUsers size={24} aria-hidden="true" />)}
+          {tab('bots', <RobotIcon />)}
         </div>
       </div>
     </>

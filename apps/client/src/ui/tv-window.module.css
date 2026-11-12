@@ -1,0 +1,63 @@
+/* Появление и исчезновение окна: полоска → ширина → высота и обратно. Только transform и opacity:
+   на слабом телефоне это дёшево. Раскрывается из центра окна. */
+.on {
+  transform-origin: center;
+  animation: tv-on 360ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+.off {
+  transform-origin: center;
+  pointer-events: none;
+  animation: tv-off 320ms cubic-bezier(0.55, 0, 0.8, 0.35) both;
+}
+
+@keyframes tv-on {
+  0% {
+    opacity: 0;
+    transform: scale(0.04, 0.004);
+  }
+
+  18% {
+    opacity: 1;
+    transform: scale(0.04, 0.004);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1, 0.006);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes tv-off {
+  0% {
+    opacity: 1;
+    transform: scale(1, 1);
+  }
+
+  45% {
+    opacity: 1;
+    transform: scale(1, 0.006);
+  }
+
+  80% {
+    opacity: 1;
+    transform: scale(0.04, 0.004);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .on,
+  .off {
+    animation-duration: 1ms;
+  }
+}

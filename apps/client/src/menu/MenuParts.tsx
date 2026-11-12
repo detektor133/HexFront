@@ -1,31 +1,49 @@
-// Общие части новых видов меню: плашка ника и панель режима.
+// Части меню: плашка ника с цветом и панели режимов. Все варианты показаны сразу: сложность и карту
+// не нужно перебирать нажатиями по кругу.
 import { IconArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import { NICK_MAX, nickProblem, type MenuSettings } from './menu-config.ts';
+import {
+  LEVELS,
+  MAPS,
+  NICK_MAX,
+  PLAYERS_MAX,
+  PLAYERS_MIN,
+  PLAYERS_STEP,
+  matchUrl,
+  nickProblem,
+  type MenuSettings,
+} from './menu-config.ts';
 import styles from './menu-ui.module.css';
-import { modeItems, modeName, type ModeId } from './mode-items.ts';
-import { t } from '../i18n/dict.ts';
+import { t, type MessageKey } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
+import { tutorialUrl } from '../tutorial/links.ts';
+
+export type ModeId = 'online' | 'bots';
+
+export function modeName(mode: ModeId): string {
+  return t(mode === 'online' ? 'menu.online' : 'menu.bots');
+}
 
 export function colorLine(id: string): string {
   return tokens.players.palette.find((p) => p.id === id)?.line ?? 'var(--selection-color)';
 }
 
-/** Ник и цвет: ввод всегда на виду, один символ не принимается. `shake` встряхивает плашку. */
+/** Ник и цвет: ввод всегда на виду, один символ не принимается. */
 export function NickPlate(props: {
   readonly settings: MenuSettings;
   readonly update: (patch: Partial<MenuSettings>) => void;
+  /** Растёт на единицу, когда меню отказало в переходе из-за ника: плашка встряхивается. */
   readonly shake: number;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const bad = nickProblem(props.settings.nickname);
   return (
-    <div className={styles.nickWrap}>
-      <div
-        key={props.shake}
-        className={`${styles.nick} ${bad ? styles.bad : ''} ${props.shake > 0 ? styles.shake : ''}`}
-      >
+    <div
+      key={props.shake}
+      className={`${styles.nickWrap} ${bad ? styles.bad : ''} ${props.shake > 0 ? styles.shake : ''}`}
+    >
+      <div className={styles.nick}>
         <button
           type="button"
           className={styles.dot}
@@ -46,7 +64,7 @@ export function NickPlate(props: {
       </div>
       {open && (
         <div className={styles.swatches} role="radiogroup" aria-label={t('menu.color')}>
-          {tokens.players.palette.slice(0, 12).map((c) => (
+          {tokens.players.palette.map((c) => (
             <button
               key={c.id}
               type="button"
@@ -67,18 +85,150 @@ export function NickPlate(props: {
   );
 }
 
-/** Панель режима: пункты крупными кнопками, сверху стрелка назад. */
+function Chips<T extends string>(props: {
+  readonly label: string;
+  readonly options: readonly { readonly id: T; readonly text: string }[];
+  readonly value: T;
+  readonly onPick: (id: T) => void;
+}): React.JSX.Element {
+  return (
+    <div className={styles.group}>
+      <div className={styles.groupLabel}>{props.label}</div>
+      <div className={styles.chips} role="radiogroup" aria-label={props.label}>
+        {props.options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={o.id === props.value}
+            className={`${styles.chip} ${o.id === props.value ? styles.chosen : ''}`}
+            onClick={() => props.onPick(o.id)}
+          >
+            {o.text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Action(props: {
+  readonly label: string;
+  readonly hint?: string;
+  readonly primary?: boolean;
+  readonly onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`${styles.action} ${props.primary === true ? styles.primary : ''}`}
+      onClick={props.onPress}
+    >
+      <span>
+        {props.label}
+        {props.hint !== undefined && <small>{props.hint}</small>}
+      </span>
+    </button>
+  );
+}
+
+function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.Element {
+  const [code, setCode] = useState('');
+  const join = (): void => {
+    const room = code.trim().toUpperCase();
+    if (room !== '') props.go(`/online?room=${encodeURIComponent(room)}`);
+  };
+  return (
+    <>
+      <Action
+        primary
+        label={t('menu.quick')}
+        hint={t('menu.subOnline')}
+        onPress={() => props.go('/online')}
+      />
+      <Action
+        label={t('menu.lobby')}
+        hint={t('menu.lobbyHint')}
+        onPress={() => props.go('/online?mode=private')}
+      />
+      <div className={styles.codeRow}>
+        <input
+          value={code}
+          maxLength={12}
+          placeholder={t('menu.codePlaceholder')}
+          aria-label={t('menu.joinCode')}
+          onChange={(event) => setCode(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') join();
+          }}
+        />
+        <button type="button" onClick={join}>
+          {t('menu.join')}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function BotsBody(props: {
+  readonly settings: MenuSettings;
+  readonly update: (patch: Partial<MenuSettings>) => void;
+  readonly go: (url: string) => void;
+}): React.JSX.Element {
+  const s = props.settings;
+  const chooser = MAPS.find((m) => m.id === s.map);
+  return (
+    <>
+      <Action primary label={t('menu.play')} onPress={() => props.go(matchUrl(s))} />
+      <Chips
+        label={t('menu.map')}
+        options={MAPS.map((m) => ({ id: m.id, text: t(`menu.map.${m.id}` as MessageKey) }))}
+        value={s.map}
+        onPick={(map) => props.update({ map })}
+      />
+      <Chips
+        label={t('menu.difficulty')}
+        options={LEVELS.map((l) => ({ id: l, text: t(`menu.difficulty.${l}` as MessageKey) }))}
+        value={s.level}
+        onPick={(level) => props.update({ level })}
+      />
+      {chooser?.choosePlayers && (
+        <div className={styles.group}>
+          <div className={styles.groupLabel}>
+            {t('menu.players')}
+            <span>{s.players}</span>
+          </div>
+          <input
+            type="range"
+            className={styles.range}
+            min={PLAYERS_MIN}
+            max={PLAYERS_MAX}
+            step={PLAYERS_STEP}
+            value={s.players}
+            aria-label={t('menu.players')}
+            onChange={(event) => props.update({ players: Number(event.target.value) })}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Панель режима: заголовок со стрелкой назад и всё содержимое режима. */
 export function ModePanel(props: {
   readonly mode: ModeId;
   readonly settings: MenuSettings;
   readonly update: (patch: Partial<MenuSettings>) => void;
   readonly go: (url: string) => void;
   readonly onBack: () => void;
+  readonly className: string;
 }): React.JSX.Element {
-  const [code, setCode] = useState('');
-  const items = modeItems(props.mode, props.settings, props.update, props.go);
   return (
-    <div className={styles.panel} role="group" aria-label={modeName(props.mode)}>
+    <div
+      className={`${styles.panel} ${props.className}`}
+      role="group"
+      aria-label={modeName(props.mode)}
+    >
       <div className={styles.panelHead}>
         <button
           type="button"
@@ -90,38 +240,16 @@ export function ModePanel(props: {
         </button>
         <h2 className={styles.panelTitle}>{modeName(props.mode)}</h2>
       </div>
-      {items.map((item) =>
-        item.kind === 'code' ? (
-          <div key={item.id} className={styles.codeRow}>
-            <input
-              value={code}
-              maxLength={12}
-              placeholder={t('menu.codePlaceholder')}
-              aria-label={item.label}
-              onChange={(event) => setCode(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') item.run(code);
-              }}
-            />
-            <button type="button" onClick={() => item.run(code)}>
-              {t('menu.join')}
-            </button>
-          </div>
-        ) : (
-          <button
-            key={item.id}
-            type="button"
-            className={`${styles.item} ${item.primary === true ? styles.primary : ''}`}
-            onClick={() => item.run()}
-          >
-            <span>
-              <b>{item.label}</b>
-              {item.hint !== undefined && <small>{item.hint}</small>}
-            </span>
-            {item.value !== undefined && <span className={styles.value}>{item.value}</span>}
-          </button>
-        ),
+      {props.mode === 'online' ? (
+        <OnlineBody go={props.go} />
+      ) : (
+        <BotsBody settings={props.settings} update={props.update} go={props.go} />
       )}
     </div>
   );
+}
+
+/** Ссылка на обучение: понадобится вопросу про обучение при первом входе. */
+export function tutorialLink(settings: MenuSettings): string {
+  return tutorialUrl(settings.nickname, settings.color);
 }

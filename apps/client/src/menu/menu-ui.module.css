@@ -1,4 +1,4 @@
-/* Общие части новых видов меню: оболочка, плашка ника, панель режима. Цвета и размеры — токены темы. */
+/* Оболочка главного меню: фон-партия, верхняя полоса, ник, панель режима, окна. Токены темы. */
 .page {
   position: fixed;
   inset: 0;
@@ -16,17 +16,6 @@
   display: block;
 }
 
-.layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.layer > * {
-  pointer-events: auto;
-}
-
-/* Верхняя полоса: переключатель вида слева, название по центру, шестерёнка справа. */
 .top {
   position: absolute;
   top: 0;
@@ -45,6 +34,7 @@
 }
 
 .brand {
+  grid-column: 2;
   margin: 0;
   padding: var(--space-xs) var(--space-md);
   color: var(--ui-ink);
@@ -59,66 +49,87 @@
   box-shadow: var(--shadow-hard);
 }
 
-.switcher {
-  display: flex;
-  gap: var(--space-xs);
-  justify-self: start;
-}
-
-.variant,
 .gear {
+  grid-column: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0 var(--space-sm);
+  justify-self: end;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
   color: var(--ui-ink);
-  font: inherit;
-  font-size: var(--font-size-label);
   cursor: pointer;
   background: var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
-}
-
-.variant.on {
-  color: var(--ui-button-primary-ink);
-  background: var(--ui-button-primary-bg);
-  border-color: transparent;
-}
-
-.gear {
-  justify-self: end;
-  min-width: var(--touch-target-min);
-  min-height: var(--touch-target-min);
   box-shadow: var(--shadow-hard);
 }
 
-/* Плашка ника: ввод имени и выбор цвета всегда на виду. */
+.gear svg {
+  transition: rotate 500ms var(--motion-easing);
+}
+
+.gear:hover svg {
+  rotate: 90deg;
+}
+
+/* Ник над доком (на низком экране — слева вверху), панель режима над ником. */
+.nickSlot {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: calc(max(var(--space-md), env(safe-area-inset-bottom)) + 134px);
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-md);
+  pointer-events: none;
+}
+
+.nickSlot > * {
+  pointer-events: auto;
+}
+
+.panelSlot {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: calc(max(var(--space-md), env(safe-area-inset-bottom)) + 214px);
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-md);
+  pointer-events: none;
+}
+
+.panelSlot > * {
+  pointer-events: auto;
+}
+
 .nickWrap {
-  position: relative;
-  width: min(100%, 280px);
+  width: min(100%, 320px);
+  box-sizing: border-box;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-hard);
+}
+
+.nickWrap.bad {
+  border-color: var(--status-danger);
 }
 
 .nick {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  box-shadow: var(--shadow-hard);
-}
-
-.nick.bad {
-  border-color: var(--status-danger);
+  padding: 0 var(--space-sm);
 }
 
 .dot {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: none;
   padding: 0;
   cursor: pointer;
@@ -150,25 +161,18 @@
   white-space: nowrap;
 }
 
+/* Цвета раскрываются внутри плашки ника: за экран и за своё окно выйти нечему. */
 .swatches {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  left: 0;
-  right: 0;
-  z-index: 4;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
   gap: var(--space-sm);
   padding: var(--space-sm);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-hard);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
 .swatch {
   aspect-ratio: 1;
-  min-height: 32px;
+  min-height: 34px;
   padding: 0;
   cursor: pointer;
   border: 2px solid transparent;
@@ -191,33 +195,27 @@
 
 @keyframes shake {
   20% {
-    transform: translateX(-5px);
+    transform: translateX(-6px);
   }
 
   60% {
-    transform: translateX(5px);
+    transform: translateX(6px);
   }
 }
 
-/* Панель режима: заголовок со стрелкой назад и пункты крупными кнопками. */
+/* Панель режима: все варианты на виду, без перебора по кругу. */
 .panel {
   display: grid;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   width: min(100%, 360px);
+  max-height: calc(100dvh - 300px);
+  overflow-y: auto;
   box-sizing: border-box;
   padding: var(--space-lg);
   background: var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
-  animation: rise 220ms var(--motion-easing);
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.97);
-  }
 }
 
 .panelHead {
@@ -249,7 +247,66 @@
   font-size: var(--font-size-title);
 }
 
-.item {
+.group {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.groupLabel {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.groupLabel span {
+  color: var(--ui-ink2);
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.chip {
+  flex: 1 1 auto;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+  transition:
+    background-color 120ms var(--motion-easing),
+    color 120ms var(--motion-easing);
+}
+
+.chip:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.chip.chosen {
+  color: var(--ui-button-primary-ink);
+  font-weight: 600;
+  background: var(--ui-button-primary-bg);
+  border-color: transparent;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
+.range {
+  width: 100%;
+  min-height: var(--touch-target-min);
+  accent-color: var(--ui-button-primary-bg);
+}
+
+.action {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -259,6 +316,7 @@
   padding: var(--space-sm) var(--space-md);
   color: var(--ui-ink);
   font: inherit;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
   background: var(--ui-surface2);
@@ -266,39 +324,25 @@
   border-radius: var(--radius-button);
 }
 
-.item:hover {
-  border-color: var(--ui-border-strong);
-}
-
-.item small {
+.action small {
   display: block;
   color: var(--ui-ink2);
   font-weight: 400;
 }
 
-.item b {
-  font-weight: 600;
-}
-
-.item .value {
-  color: var(--ui-ink2);
-  font-weight: 600;
-}
-
-.item.primary {
+.action.primary {
   min-height: 52px;
   color: var(--ui-button-primary-ink);
-  font-weight: 600;
   background: var(--ui-button-primary-bg);
   border-color: transparent;
 }
 
-.item.primary small {
+.action.primary small {
   color: var(--ui-button-primary-ink);
   opacity: 0.85;
 }
 
-.item:focus-visible {
+.action:focus-visible {
   outline: 2px solid var(--selection-color);
   outline-offset: 2px;
 }
@@ -344,25 +388,59 @@
 }
 
 .modal {
-  width: min(100%, 420px);
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 2 * var(--space-lg));
+  overflow-y: auto;
   box-sizing: border-box;
-  padding: var(--space-xl);
+  padding: var(--space-lg);
   background: var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-hard);
 }
 
-.fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 6;
+.askTitle {
+  margin: 0;
+  font-family: var(--font-display-family);
+  text-transform: var(--ui-display-transform);
+  letter-spacing: var(--ui-display-spacing);
+  font-weight: var(--font-display-weight);
+  font-size: var(--font-size-display);
+}
+
+.askText {
+  margin: var(--space-sm) 0 var(--space-lg);
+  color: var(--ui-ink2);
+}
+
+.askActions {
   display: grid;
-  justify-items: center;
-  align-items: start;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: max(var(--space-lg), env(safe-area-inset-top)) var(--space-lg)
-    max(var(--space-lg), env(safe-area-inset-bottom));
-  background: var(--ui-surface);
+  gap: var(--space-sm);
+}
+
+/* Низкий экран (телефон в ландшафте): ник слева вверху, панель режима по центру поверх дока. */
+@media (max-height: 520px) {
+  .nickSlot {
+    top: max(var(--space-sm), env(safe-area-inset-top));
+    right: auto;
+    bottom: auto;
+    left: 0;
+    padding: 0 var(--space-sm);
+  }
+
+  .nickWrap {
+    width: 230px;
+  }
+
+  .panelSlot {
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    z-index: 4;
+  }
+
+  .panel {
+    max-height: calc(100dvh - 2 * var(--space-sm));
+  }
 }

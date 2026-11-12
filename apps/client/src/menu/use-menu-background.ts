@@ -1,81 +1,83 @@
-// Живая карта за меню: боты играют на малой карте, камера закрывает весь экран (на телефоне
-// вписанная карта — узкая полоса). Меню получает управление камерой для «провала» в город.
-import { useEffect, useRef, useState, type RefObject } from 'react';
+// Живая карта за меню: полноценная партия шести ботов идёт на настоящей карте, а камера
+// не стоит на месте, а плывёт от города к городу, чтобы было за чем следить.
+import { useEffect, type RefObject } from 'react';
 
-import { loadMap, type MapStatic } from '@hexfront/sim';
+import { loadMap } from '@hexfront/sim';
 
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { startLocalMatch } from '../local/local-match.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import { hexCenter, mapBounds } from '../render/hex-geometry.ts';
+import { mapBounds } from '../render/hex-geometry.ts';
 import { createMapView, type MapView } from '../render/map-view.ts';
 import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
+/** Партия на фоне идёт вдвое быстрее обычной: сражения видны, а слабому телефону не тяжело. */
 const BACKGROUND_SPEED = 2;
+/** Первые секунды партия идёт в ускоренной перемотке: к показу меню армии уже сошлись в бою. */
+const TIMELAPSE_SPEED = 40;
+const TIMELAPSE_MS = 12_000;
+/** Малая карта на шесть армий: стартовые земли рядом, поэтому границы сходятся и войны идут быстро. */
+const BOTS = 6;
+/** Партия на фоне перезапускается с новой картой расстановки: победитель всё закончил бы и застыл. */
+const RESTART_MS = 180_000;
+/** Масштаб кадра: на этом уровне уже видны отряды и границы, а в кадр попадает много земель. */
+const WATCH_SCALE = 0.8;
+/** Как часто камера выбирает новое место и сколько летит к нему, мс. */
+const GLIDE_EVERY_MS = 9000;
+const GLIDE_MS = 8000;
 
-export interface MenuMapApi {
-  readonly map: MapStatic;
-  /** Экранная точка (px от левого верха холста) города карты; `null` — вне экрана. */
-  screenOf(q: number, r: number): { readonly x: number; readonly y: number } | null;
-  /** Плавно приближает камеру к гексу; `bottomInset` смещает центр кадра вверх. */
-  flyTo(q: number, r: number, zoom: number, bottomInset: number): void;
-  /** Возвращает камеру на весь экран. */
-  home(): void;
-  /** Подписка на сдвиг камеры (плашки идут за картой). */
-  onCamera(listener: () => void): () => void;
-}
-
-function ease(x: number): number {
-  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
-}
-
-/** Запускает фоновый матч и рисует его в `hostRef`; возвращает API камеры, когда карта готова. */
-export function useMenuBackground(
-  hostRef: RefObject<HTMLDivElement | null>,
-  color: string,
-): MenuMapApi | null {
-  const [api, setApi] = useState<MenuMapApi | null>(null);
-  const colorRef = useRef(color);
-  colorRef.current = color;
-
+/** Запускает фоновую партию в `hostRef`; `color` — цвет игрока, которым красится одна из армий. */
+export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>, color: string): void {
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
     let layer: EconomyLayer | null = null;
     let stopResize: (() => void) | null = null;
-    let raf = 0;
-    let pendingMessage: Extract<FromWorker, { t: 'view' }> | null = null;
-    const deltaApplier = new ViewDeltaApplier();
+    let glide: ReturnType<typeof setInterval> | null = null;
+    let slowDown: ReturnType<typeof setTimeout> | null = null;
+    // Последний вид: сообщения применяются сразу, а не ждут холст. Иначе дельты, пришедшие до готовности
+    // карты, терялись бы, и партия на экране застывала на первом кадре.
+    let latest: ReturnType<ViewDeltaApplier['applySnapshot']> | null = null;
+    let match: ReturnType<typeof startLocalMatch> | null = null;
+    let deltaApplier = new ViewDeltaApplier();
+    let restart: ReturnType<typeof setInterval> | null = null;
     const applyMessage = (message: Extract<FromWorker, { t: 'view' }>): void => {
-      if (layer === null) {
-        pendingMessage = message;
-        return;
-      }
-      const view =
+      // Без подтверждения воркер перестаёт слать виды (защита от перегруза): партия замирала на первом кадре.
+      match?.ack(message.seq);
+      latest =
         message.kind === 'snapshot'
           ? deltaApplier.applySnapshot(message.snapshot)
           : deltaApplier.applyDelta(message.delta);
-      layer.setView(view, EMPTY_SELECTION);
+      if (layer === null) return;
+      layer.setView(latest, EMPTY_SELECTION);
       layer.frame(performance.now());
     };
-    const match = startLocalMatch(
-      'small',
-      1,
-      { count: 6, bots: [0, 1, 2, 3, 4, 5], speed: BACKGROUND_SPEED },
-      (message: FromWorker): void => {
-        if (message.t === 'view') applyMessage(message);
-      },
-      { fog: false, playerColors: playerColorIds(colorRef.current).slice(0, 2) },
-    );
     const start = async (): Promise<void> => {
       const response = await fetch('/maps/small.json');
       const json: unknown = await response.json();
       const loaded = loadMap(json);
       const host = hostRef.current;
       if (disposed || !loaded.ok || host === null) return;
+      const launch = (): void => {
+        match?.dispose();
+        if (slowDown !== null) clearTimeout(slowDown);
+        deltaApplier = new ViewDeltaApplier();
+        match = startLocalMatch(
+          json,
+          1 + Math.floor(Math.random() * 1_000_000),
+          { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: TIMELAPSE_SPEED },
+          (message: FromWorker): void => {
+            if (message.t === 'view') applyMessage(message);
+          },
+          { fog: false, playerColors: playerColorIds(color).slice(0, 2) },
+        );
+        slowDown = setTimeout(() => match?.setSpeed(BACKGROUND_SPEED), TIMELAPSE_MS);
+      };
+      launch();
+      restart = setInterval(launch, RESTART_MS);
       const created = await createMapView(
         host,
         loaded.map,
@@ -83,6 +85,8 @@ export function useMenuBackground(
           radius: tokens.map.hexRadius,
           midLayer: (map, radius) => {
             layer = createEconomyLayer(map, radius);
+            // Подписи государств на фоне не нужны: «Игрок 1» поверх земли только мешает.
+            layer.territoryLabels.visible = false;
             return layer;
           },
         },
@@ -94,71 +98,36 @@ export function useMenuBackground(
       }
       mapView = created;
       const bounds = mapBounds(loaded.map.width, loaded.map.height, tokens.map.hexRadius);
-      let coverScale = 1;
-      let scale = 1;
-      const cover = (): void => {
-        coverScale = Math.max(host.clientWidth / bounds.width, host.clientHeight / bounds.height);
-        if (!flying) {
-          scale = coverScale;
-          created.setScale(coverScale);
-        }
+      const frame = (): void => {
+        const cover = Math.max(host.clientWidth / bounds.width, host.clientHeight / bounds.height);
+        created.setScale(Math.max(cover, WATCH_SCALE));
       };
-      let flying = false;
-      cover();
-      const observer = new ResizeObserver(cover);
+      frame();
+      const observer = new ResizeObserver(frame);
       observer.observe(host);
       stopResize = () => observer.disconnect();
-      const animateScale = (to: number, ms: number): void => {
-        cancelAnimationFrame(raf);
-        const from = scale;
-        const began = performance.now();
-        flying = true;
-        const step = (now: number): void => {
-          const k = Math.min(1, (now - began) / ms);
-          scale = from + (to - from) * ease(k);
-          created.setScale(scale);
-          if (k < 1) raf = requestAnimationFrame(step);
-          else flying = false;
-        };
-        raf = requestAnimationFrame(step);
+      const cities = loaded.map.cities;
+      const glideTo = (ms: number): void => {
+        const city = cities[Math.floor(Math.random() * cities.length)];
+        if (city !== undefined) created.centerOn({ q: city.q, r: city.r }, ms);
       };
-      setApi({
-        map: loaded.map,
-        screenOf(q, r) {
-          const rect = created.visibleWorldRect?.();
-          if (rect === undefined) return null;
-          const world = hexCenter({ q, r }, tokens.map.hexRadius);
-          const w = rect.to.x - rect.from.x;
-          const h = rect.to.y - rect.from.y;
-          return {
-            x: ((world.x - rect.from.x) / w) * host.clientWidth,
-            y: ((world.y - rect.from.y) / h) * host.clientHeight,
-          };
-        },
-        flyTo(q, r, zoom, bottomInset) {
-          created.setBottomInset(bottomInset);
-          created.centerOn({ q, r }, 700);
-          animateScale(coverScale * zoom, 700);
-        },
-        home() {
-          created.setBottomInset(0);
-          animateScale(coverScale, 600);
-        },
-        onCamera: (listener) => created.onCamera(listener),
-      });
-      if (pendingMessage !== null) applyMessage(pendingMessage);
+      glideTo(0);
+      glide = setInterval(() => glideTo(GLIDE_MS), GLIDE_EVERY_MS);
+      if (latest !== null && layer !== null) {
+        (layer as EconomyLayer).setView(latest, EMPTY_SELECTION);
+        (layer as EconomyLayer).frame(performance.now());
+      }
     };
     void start();
     return () => {
       disposed = true;
-      cancelAnimationFrame(raf);
+      if (glide !== null) clearInterval(glide);
+      if (restart !== null) clearInterval(restart);
+      if (slowDown !== null) clearTimeout(slowDown);
       stopResize?.();
-      match.dispose();
+      match?.dispose();
       layer?.destroy();
       mapView?.destroy();
-      setApi(null);
     };
   }, [hostRef, color]);
-
-  return api;
 }

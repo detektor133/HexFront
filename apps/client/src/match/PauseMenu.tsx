@@ -9,7 +9,8 @@ const SETTINGS_STYLE: React.CSSProperties = {
   position: 'fixed',
   left: '50%',
   top: '50%',
-  transform: 'translate(-50%, -50%)',
+  // Отдельное свойство translate: анимация окна занимает transform.
+  translate: '-50% -50%',
   width: 'min(560px, calc(100vw - 32px))',
   height: 'auto',
   maxHeight: 'calc(100dvh - 32px)',
@@ -21,17 +22,24 @@ export function PauseMenu(props: {
   readonly onRestart: () => void;
   readonly onMenu: () => void;
   readonly style?: React.CSSProperties | undefined;
+  /** Класс анимации появления и закрытия (ui/use-tv-presence.ts). */
+  readonly className?: string | undefined;
 }): React.JSX.Element {
   const [settings, setSettings] = useState(false);
   if (settings) {
     return (
-      <div className={styles.menu} style={SETTINGS_STYLE}>
+      <div className={`${styles.menu} ${props.className ?? ''}`} style={SETTINGS_STYLE}>
         <SettingsScreen onBack={() => setSettings(false)} />
       </div>
     );
   }
   return (
-    <div className={styles.menu} style={props.style} role="dialog" aria-label={t('pause.title')}>
+    <div
+      className={`${styles.menu} ${props.className ?? ''}`}
+      style={props.style}
+      role="dialog"
+      aria-label={t('pause.title')}
+    >
       <h2 className={styles.title}>{t('pause.title')}</h2>
       <button type="button" className={styles.primary} onClick={props.onResume}>
         {t('pause.resume')}

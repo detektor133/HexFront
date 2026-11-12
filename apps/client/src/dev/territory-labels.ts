@@ -121,6 +121,8 @@ const FONT_STEP = 2;
 
 interface LabelState {
   readonly texts: Map<string, Text>;
+  /** Ширина текста без масштаба: `text.width` растёт и сжимается вместе с `scale`, и подпись прыгала. */
+  readonly rawWidths: WeakMap<Text, number>;
   glyphs: Graphics[];
 }
 
@@ -137,7 +139,11 @@ export function drawTerritoryLabels(
   scale: number,
   detail: 1 | 2 | 3,
 ): void {
-  const state = labelStates.get(container) ?? { texts: new Map<string, Text>(), glyphs: [] };
+  const state = labelStates.get(container) ?? {
+    texts: new Map<string, Text>(),
+    rawWidths: new WeakMap<Text, number>(),
+    glyphs: [],
+  };
   labelStates.set(container, state);
   for (const g of state.glyphs) g.destroy();
   state.glyphs = [];
@@ -160,12 +166,14 @@ export function drawTerritoryLabels(
       });
       text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
       text.anchor.set(0.5);
+      state.rawWidths.set(text, measuredTextWidth(text));
       state.texts.set(key, text);
       container.addChild(text);
     }
     const extra = label.fontSize / size;
     text.scale.set(
-      (territoryLabelWidthScale(measuredTextWidth(text) * extra, label.maxWidth) * extra) / scale,
+      (territoryLabelWidthScale((state.rawWidths.get(text) ?? 1) * extra, label.maxWidth) * extra) /
+        scale,
       extra / scale,
     );
     text.position.set(label.at.x, label.at.y);

@@ -31,6 +31,7 @@ import { enterFullscreenOnFirstTap } from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
 import type { ChapterId, TutorialCtx } from '../tutorial/script.ts';
+import { useTvPresence } from '../ui/use-tv-presence.ts';
 import { useViewport } from '../ui/viewport.ts';
 
 /** Экран локального матча игрока с отдельной отладочной панелью. */
@@ -73,6 +74,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
+  const lastPauseStyle = useRef<React.CSSProperties | undefined>(undefined);
+  const pausePresence = useTvPresence(!debug && pauseState.menuOpen);
   const [popupOpen, setPopupOpen] = useState(false);
   const [buildingsOpen, setBuildingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(
@@ -311,6 +314,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
     }
     return style;
   };
+  // Окно паузы закрывается анимацией уже после того, как раскладка его убрала: держим последнее место.
+  const pauseNow = styleFor('pause-menu');
+  if (pauseNow !== undefined) lastPauseStyle.current = pauseNow;
+  const pauseLayoutStyle = pauseNow ?? lastPauseStyle.current;
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
@@ -434,12 +441,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           })()}
         />
       )}
-      {!debug && pauseState.menuOpen && (
+      {pausePresence.mounted && (
         <PauseMenu
+          className={pausePresence.className}
           onResume={pauseController.resume}
           onRestart={pauseController.restart}
           onMenu={pauseController.goToMenu}
-          style={styleFor('pause-menu')}
+          style={pauseLayoutStyle}
         />
       )}
       {view && styleFor('bottom-panel') && (

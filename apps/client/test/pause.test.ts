@@ -98,6 +98,13 @@ function findNode(node: unknown, name: string): ElementNode | undefined {
   return findNode(children, name);
 }
 
+/** После «Продолжить» окно паузы ещё играет анимацию закрытия: оно в дереве, но с классом закрытия. */
+function expectPauseMenuGone(tree: unknown): void {
+  const menu = findNode(tree, 'PauseMenu');
+  if (menu === undefined) return;
+  expect(String(menu.props?.className)).toContain('off');
+}
+
 function findNodeByIcon(node: unknown): ElementNode | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const element = node as ElementNode;
@@ -250,7 +257,7 @@ describe('пауза локального матча', () => {
     expect(setPaused).toHaveBeenLastCalledWith(false);
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const resumedTree = MatchSurface({});
-    expect(findNode(resumedTree, 'PauseMenu')).toBeUndefined();
+    expectPauseMenuGone(resumedTree);
 
     const resumedHud = findNode(resumedTree, 'Hud');
     (resumedHud?.props?.onPause as (() => void) | undefined)?.();
@@ -296,7 +303,7 @@ describe('пауза локального матча', () => {
     expect(setPaused).toHaveBeenCalledWith(false);
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const resumedTree = MatchSurface({});
-    expect(findNode(resumedTree, 'PauseMenu')).toBeUndefined();
+    expectPauseMenuGone(resumedTree);
 
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const resumedHud = findNode(resumedTree, 'Hud');
