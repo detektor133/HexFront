@@ -483,6 +483,8 @@ export async function createMapView(
         graphicsInstructions,
         graphicsDetails,
         textures: renderer.texture.managedTextures.length,
+        // Все ключи, а не только живые: Pixi обнуляет освобождённые записи, но не стирает ключи,
+        // и рост этого числа показывает, что тексты создаются заново вместо переиспользования.
         canvasTextTextures: renderer.canvasText?._activeTextures
           ? Object.keys(renderer.canvasText._activeTextures).length
           : null,

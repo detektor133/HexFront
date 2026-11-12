@@ -455,7 +455,6 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     );
     if (nextLabelsKey !== labelsKey) {
       labelsKey = nextLabelsKey;
-      labels.removeChildren().forEach((child) => child.destroy());
       drawCityLabels(
         labels,
         v.cities.map((c) => ({

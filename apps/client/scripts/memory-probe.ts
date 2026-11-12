@@ -66,6 +66,8 @@ export async function runMemoryProbe(): Promise<void> {
             pixi: { canvasTextTextures: number | null };
           },
       );
+    // Последний замер целиком: сколько текстов, текстур и объектов живёт в сцене.
+    console.log(JSON.stringify(samples.at(-1)?.pixi ?? null));
     const lastMinute = Math.floor(Math.max(...samples.map((sample) => sample.matchSeconds)) / 60);
     const step = lastMinute > 20 ? 10 : 1;
     for (let minute = 0; minute <= lastMinute; minute += step) {

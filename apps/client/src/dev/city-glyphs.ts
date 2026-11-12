@@ -89,7 +89,14 @@ export function drawCities(
   return icons;
 }
 
-/** Рисует подписи городов с жёстким ореолом цвета поверхности карты. */
+const cityTexts = new WeakMap<Container, Map<string, Text>>();
+
+/**
+ * Рисует подписи городов с жёстким ореолом цвета поверхности карты. Тексты переиспользуются между
+ * перерисовками (ключ: имя и размер): подписи пересобираются при каждом изменении масштаба камеры,
+ * а каждый новый `Text` оставляет в Pixi запись текстуры (`canvasText._activeTextures`), которая
+ * после удаления текста обнуляется, но сам ключ не стирается никогда.
+ */
 export function drawCityLabels(
   container: Container,
   cities: readonly CityLabel[],
@@ -97,26 +104,44 @@ export function drawCityLabels(
   detail: 1 | 2 | 3,
   hexRadius: number,
 ): void {
+  const texts = cityTexts.get(container) ?? new Map<string, Text>();
+  cityTexts.set(container, texts);
+  const fontSize =
+    tokens.city.labelSize[detail - 1] ??
+    tokens.city.labelSize[tokens.city.labelSize.length - 1] ??
+    0;
+  const keep = new Set<string>();
   for (const city of cities) {
     if (city.name === '' || !cityLabelVisible(city.level, city.isCapital, detail)) continue;
-    const fontSize =
-      tokens.city.labelSize[detail - 1] ??
-      tokens.city.labelSize[tokens.city.labelSize.length - 1] ??
-      0;
-    const text = new Text({
-      text: city.name,
-      style: {
-        fontFamily: tokens.font.ui.family,
-        fontWeight: '400',
-        fontSize,
-        fill: tokens.ui.ink,
-        stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
-      },
-    });
-    text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
-    text.anchor.set(0.5, 0);
+    const key = `${city.name}|${fontSize}`;
+    // Города с одним именем не делят один текст: ключ получает номер повтора.
+    let unique = key;
+    for (let n = 1; keep.has(unique); n += 1) unique = `${key}#${n}`;
+    keep.add(unique);
+    let text = texts.get(unique);
+    if (!text) {
+      text = new Text({
+        text: city.name,
+        style: {
+          fontFamily: tokens.font.ui.family,
+          fontWeight: '400',
+          fontSize,
+          fill: tokens.ui.ink,
+          stroke: { color: tokens.ui.surface, width: tokens.city.labelHalo },
+        },
+      });
+      text.resolution = (globalThis.window?.devicePixelRatio ?? 1) * 2;
+      text.anchor.set(0.5, 0);
+      texts.set(unique, text);
+      container.addChild(text);
+    }
     text.scale.set(1 / scale);
     text.position.set(city.at.x, city.at.y + hexRadius * 0.68);
-    container.addChild(text);
+  }
+  for (const [key, text] of texts) {
+    if (keep.has(key)) continue;
+    container.removeChild(text);
+    text.destroy();
+    texts.delete(key);
   }
 }
