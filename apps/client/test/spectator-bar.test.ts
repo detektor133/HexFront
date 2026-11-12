@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlayerView } from '@hexfront/sim';
 
+import { t } from '../src/i18n/dict.ts';
 import { SpectatorBar, neighbour, watchOrder } from '../src/match/SpectatorBar.tsx';
 
 function viewOf(
@@ -52,7 +53,7 @@ describe('разметка панели наблюдателя', () => {
     } as unknown as PlayerView;
     const html = renderToStaticMarkup(createElement(SpectatorBar, { view, onWatch: () => {} }));
     expect(html).toContain('Борис');
-    expect(html).toContain('Предыдущий игрок');
-    expect(html).toContain('Следующий игрок');
+    expect(html).toContain(t('spectator.prev'));
+    expect(html).toContain(t('spectator.next'));
   });
 });
