@@ -1,9 +1,15 @@
 // Сроки дипломатии: запросы помощи без ответа аннулируют пакт, голосования решаются по истечении
 // срока, война помощника заканчивается вместе с войной — отряды идут домой.
 // GDD: docs/gdd/08-match.md — «Оборонительный пакт и альянс».
-import { AID_RETURN_TICKS, AID_TTL_TICKS, RESULT_TTL_TICKS, VOTE_TTL_TICKS } from '../balance.ts';
+import {
+  AID_RETURN_TICKS,
+  AID_TTL_TICKS,
+  ATT_PERIOD_TICKS,
+  RESULT_TTL_TICKS,
+  VOTE_TTL_TICKS,
+} from '../balance.ts';
 import { annulAid, returnHome, settle } from '../commands/alliance.ts';
-import { relationOf } from '../state/relations.ts';
+import { driftAttitudes, relationOf } from '../state/relations.ts';
 import type { MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -12,6 +18,7 @@ const alive = (state: MatchState, id: number): boolean => state.players[id]?.sta
 export function diplomacySystem(state: MatchState): void {
   const d = state.diplomacy;
   if (!d) return;
+  if (state.tick % ATT_PERIOD_TICKS === 0) driftAttitudes(state);
   for (const call of [...(d.calls ?? [])]) {
     const stale =
       !alive(state, call.ally) ||

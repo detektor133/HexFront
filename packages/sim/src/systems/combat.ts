@@ -2,6 +2,7 @@
 // GDD: docs/gdd/06-combat.md — «Сила сторон», «Потери и организованность», «Исход».
 import {
   ARTY_FLEE_LOSS,
+  ATT_CITY_LOST,
   CASUALTY_RATE,
   RETREAT_DAMAGE_TAKEN_MULT,
   TICKS_PER_S,
@@ -18,7 +19,7 @@ import {
   type Ground,
 } from '../queries/battle-math.ts';
 import { captureHex } from '../state/capture.ts';
-import { atWar } from '../state/relations.ts';
+import { atWar, shiftAttitude } from '../state/relations.ts';
 import { retreatOrCapitulate } from '../state/retreat.ts';
 import type { City, MatchState, Unit } from '../state/types.ts';
 import { allUnits, moveUnit, removeUnits } from '../state/unit-index.ts';
@@ -202,6 +203,7 @@ function occupy(state: MatchState, hex: HexId): void {
       previousOwnerId,
       newOwnerId: winner.owner,
     });
+    shiftAttitude(state, previousOwnerId, winner.owner, -ATT_CITY_LOST);
   }
   for (const u of attackersOf(state, hex).concat(winner)) {
     u.order = 'idle';

@@ -9,6 +9,9 @@ import {
   OFFER_TTL_TICKS,
   allianceOf,
   groupOf,
+  recordBreach,
+  recordTreaty,
+  recordWar,
   relationOf,
   setRelation,
 } from '../state/relations.ts';
@@ -121,6 +124,7 @@ function dropOffers(state: MatchState, a: number, b: number): void {
 function betray(state: MatchState, traitor: number): void {
   for (const member of allianceOf(state, traitor)) {
     setRelation(state, traitor, member, 'war');
+    recordWar(state, traitor, member);
     state.events.push({ t: 'warDeclared', playerId: traitor, targetId: member, kind: 'alliance' });
   }
 }
@@ -130,13 +134,17 @@ function declareWar(state: MatchState, playerId: number, target: number): void {
   if (!d) return;
   const now = relationOf(state, playerId, target);
   const breach = now === 'pact' || now === 'defense' || now === 'alliance';
-  if (breach) d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
+  if (breach) {
+    d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
+    recordBreach(state, playerId);
+  }
   dropOffers(state, playerId, target);
   if (now === 'alliance') {
     betray(state, playerId);
     return;
   }
   setRelation(state, playerId, target, 'war');
+  recordWar(state, playerId, target);
   state.events.push({
     t: 'warDeclared',
     playerId,
@@ -174,6 +182,7 @@ function conclude(state: MatchState, from: number, to: number, kind: TreatyKind)
     return;
   }
   setRelation(state, from, to, kind);
+  recordTreaty(state, from, to, kind);
   cancelAttacks(state, from, to);
   state.events.push({ t: 'treatyMade', playerId: to, targetId: from, kind });
 }
@@ -211,6 +220,7 @@ export function executeDiplomacy(state: MatchState, playerId: number, cmd: Diplo
     case 'breakTreaty': {
       const now = relationOf(state, playerId, cmd.target);
       d.violations[playerId] = (d.violations[playerId] ?? 0) + 1;
+      recordBreach(state, playerId);
       if (now === 'alliance') leaveAlliance(state, playerId);
       else setRelation(state, playerId, cmd.target, 'peace');
       state.events.push({

@@ -6,11 +6,15 @@
 import { breakout } from './commander-breakout.ts';
 import { commanderLine } from './commander-line.ts';
 import { strike } from './commander-strike.ts';
+import { frontForces, needsLine, stance } from './commander-war.ts';
 import { warWith } from './war.ts';
 import {
   AXIS_DONE_PERCENT,
   AXIS_MAX,
   BOT_AXIS_EDGES,
+  BOT_PROFILES,
+  COMMANDER_TICKS,
+  type BotProfile,
   EXPAND_COMPACT_WEIGHT,
   FRONT_SPLIT_MIN,
   MAX_UNITS_PER_HEX,
@@ -23,6 +27,7 @@ import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { fp, intDiv, type Fp } from '../math/int.ts';
 import { forecastBattle } from '../queries/forecast.ts';
+import type { PlanView } from '../queries/plan-view.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
 import {
@@ -67,6 +72,9 @@ export interface CommanderContext {
 
 /** Вес кольца вокруг столицы при выборе гекса: ядро растёт ровно, а не вытягивается за отрядом. */
 const RING_WEIGHT = 5;
+
+/** Как часто армия бота без линии наступления ищет её заново, тиков. */
+const LINE_RETRY_TICKS = 50;
 
 const hexOf = (map: MapStatic, h: HexId) => hexFromId(h, map.width);
 
@@ -391,6 +399,7 @@ export function decide(
   bot = false,
   mergeBelow: Fp = fp(25),
   mergeRadius = 3,
+  profile: BotProfile = BOT_PROFILES.medium,
 ): Command[] {
   const army = view.armies.find((a) => a.id === armyId);
   if (!army) return [];
@@ -442,6 +451,10 @@ export function decide(
     const finished =
       plan.offensive?.active === true &&
       ownedShare(view, plan.offensive.hexes) >= AXIS_DONE_PERCENT;
+    if (bot) {
+      out.push(...botWar(map, view, armyId, plan, piece, units, finished, lineDepth, profile));
+      return out;
+    }
     if ((plan.startWanted && !plan.offensive) || finished) {
       const lines = strikeAxes(map, view, plan.edges, piece.enemy, lineDepth);
       if (lines.length > 0) {
@@ -463,6 +476,39 @@ export function decide(
     ),
   );
   return out;
+}
+
+// Война бота на своём участке фронта: наступает, когда сильнее врага у фронта, держится, когда слабее,
+// и не стоит: нет линии, она выполнена или застряла — строит новую и сразу начинает.
+function botWar(
+  map: MapStatic,
+  view: PlayerView,
+  armyId: number,
+  plan: Extract<PlanView, { kind: 'front' }>,
+  piece: Piece,
+  units: readonly UnitView[],
+  finished: boolean,
+  lineDepth: number | undefined,
+  profile: BotProfile,
+): Command[] {
+  const active = plan.offensive?.active === true;
+  const forces = frontForces(view, map.width, units, plan.edges, { map, hexes: view.hexes });
+  if (stance(forces, active, profile) === 'hold') {
+    return active ? [{ t: 'stopOffensive', armyId }] : [];
+  }
+  if (needsLine(plan, finished)) {
+    // Линию, которую не удалось построить, повторно ищем не чаще раза в LINE_RETRY_TICKS на армию:
+    // поиск по земле врага дорог, а команда была бы пустой каждый раз.
+    if (plan.offensive === null && (view.tick + armyId) % LINE_RETRY_TICKS >= COMMANDER_TICKS)
+      return [];
+    const lines = strikeAxes(map, view, plan.edges, piece.enemy, lineDepth);
+    if (lines.length === 0) return [];
+    return [
+      { t: 'setOffensiveLine', armyId, edges: lines.flat(), lines },
+      { t: 'startOffensive', armyId },
+    ];
+  }
+  return active ? [] : [{ t: 'startOffensive', armyId }];
 }
 
 // Доля гексов линии, уже взятых игроком, процентов.

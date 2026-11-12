@@ -173,6 +173,14 @@ function hashDiplomacy(s: Hasher, state: MatchState): void {
   const codes = { peace: 0, war: 1, pact: 2, alliance: 3, defense: 4 } as const;
   for (const r of d.relation) int(s, codes[r]);
   for (const v of d.violations) int(s, v);
+  // Отношения хэшируются только ненулевые (индекс и значение): нулевая матрица не меняет хэш.
+  for (const matrix of [d.attitude, d.changedAt]) {
+    matrix?.forEach((value, index) => {
+      if (value === 0) return;
+      int(s, index);
+      int(s, value);
+    });
+  }
   for (const o of d.offers) {
     int(s, o.from);
     int(s, o.to);

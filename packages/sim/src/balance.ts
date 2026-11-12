@@ -44,10 +44,100 @@ export const BOT_NORMAL_THINK_TICKS = 20;
 /** Слабые боты командуют армиями реже: commander ходит раз в столько своих очередей. */
 export const BOT_EASY_COMMANDER_EVERY = 3;
 export const BOT_NORMAL_COMMANDER_EVERY = 2;
+/** Война живёт не меньше стольких тиков (90 с), прежде чем бот согласится на мир, если не проигрывает. */
+export const BOT_WAR_MIN_TICKS = 900;
+/** Победитель в войне устаёт и соглашается на мир, когда война идёт дольше стольких тиков (10 мин). */
+export const BOT_WAR_WEARY_TICKS = 6000;
+/** Бот не нападает на того, с кем только что помирился: столько тиков (5 мин) мира должно пройти. */
+export const BOT_PEACE_LOCK_TICKS = 3000;
+/** Пакт или союз бот не рвёт ради добычи, пока ему нет столько тиков (3 мин). */
+export const BOT_PACT_MIN_TICKS = 1800;
 /** Первые 5 минут матча боты не объявляют войну: игрок успевает расти, а не отбиваться на старте. */
 export const BOT_WAR_GRACE_TICKS = 3000;
 
+// Отношения игроков (дипломатия; 08-match.md, «Отношения») [ДИЗАЙН-РЕШЕНИЕ 2026-11-12]
+
+/** Предел отношения a → b в обе стороны: −ATTITUDE_MAX — заклятый враг, +ATTITUDE_MAX — верный друг. */
+export const ATTITUDE_MAX = 1000;
+/** Объявил войну мне: моё отношение к нему падает на столько. */
+export const ATT_WAR_ON_ME = 400;
+/** Объявил войну моему союзнику или партнёру по оборонительному пакту. */
+export const ATT_WAR_ON_FRIEND = 150;
+/** Нарушил договор: на столько падает отношение к нему у всех остальных (предатель известен всем). */
+export const ATT_BREACH_PUBLIC = 100;
+/** Отнял мой город. */
+export const ATT_CITY_LOST = 150;
+/** Договор заключён: отношение обеих сторон растёт на столько по ступеням (мир, пакт, оборонительный, альянс). */
+export const ATT_TREATY_GAIN = { peace: 40, pact: 120, defense: 200, alliance: 300 } as const;
+/** Раз в столько тиков отношения «остывают» к нулю на 1, а у партнёров по договору растут. */
+export const ATT_PERIOD_TICKS = 50;
+/** Прирост отношения партнёров за период и его потолок. */
+export const ATT_PARTNER_GROWTH = 2;
+export const ATT_PARTNER_CAP = 600;
+
 // Боты (09-bots.md, «Utility AI»; 04/T23) [ТЮНИНГ]
+
+/**
+ * Профиль сложности бота: решения в дипломатии и на войне (09-bots.md, «Уровни»). Все отношения —
+ * fixed-point (FP = 1,0): «сила к силе», «армия к видимому врагу».
+ */
+export interface BotProfile {
+  /** Во сколько раз армия должна превосходить видимого врага у фронта, чтобы начать наступление. */
+  readonly attackRatio: Fp;
+  /** Ниже этого перевеса идущее, но застрявшее наступление останавливается, силы копятся. */
+  readonly holdRatio: Fp;
+  /** Сколько войн бот ведёт одновременно. */
+  readonly maxWars: number;
+  /** Перевес сил над целью (очки матча), нужный для объявления войны. */
+  readonly warEdge: Fp;
+  /** Как часто бот предлагает договоры, тиков. */
+  readonly proposeEvery: number;
+  /** Доля очков лидера в сумме очков живых, процентов, с которой бот видит в нём угрозу; 0 — не замечает. */
+  readonly alarmPercent: number;
+  /** Строит коалиции: предлагает оборонительные пакты и альянсы, зовёт на общего врага. */
+  readonly coalitions: boolean;
+  /** Готов нарушить договор ради выгодной цели (цена — нарушение, которое видят все). */
+  readonly opportunist: boolean;
+  /** Насколько обида влияет на выбор цели войны (очков отношения на единицу перевеса). */
+  readonly grudge: number;
+}
+
+/** Профили по уровням: лёгкий осторожен и пассивен, сложный — инициативен, строит коалиции и рвёт их. */
+export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProfile>> = {
+  easy: {
+    attackRatio: fp(1.8),
+    holdRatio: fp(1.2),
+    maxWars: 1,
+    warEdge: fp(1.6),
+    proposeEvery: 1200,
+    alarmPercent: 0,
+    coalitions: false,
+    opportunist: false,
+    grudge: 0,
+  },
+  normal: {
+    attackRatio: fp(1.2),
+    holdRatio: fp(0.8),
+    maxWars: 2,
+    warEdge: fp(1.2),
+    proposeEvery: 600,
+    alarmPercent: 40,
+    coalitions: true,
+    opportunist: false,
+    grudge: 150,
+  },
+  medium: {
+    attackRatio: fp(1),
+    holdRatio: fp(0.7),
+    maxWars: 2,
+    warEdge: fp(1),
+    proposeEvery: 300,
+    alarmPercent: 28,
+    coalitions: true,
+    opportunist: true,
+    grudge: 250,
+  },
+};
 
 /** Максимальная глубина линии наступления бота, гексов. */
 export const BOT_LINE_MAX_DEPTH = 6;

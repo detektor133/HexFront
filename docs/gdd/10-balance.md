@@ -34,6 +34,38 @@
 | `BOT_NORMAL_COMMANDER_EVERY` | 2 `[ТЮНИНГ]`            |
 | `BOT_WAR_GRACE_TICKS`        | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_LINE_MAX_DEPTH`         | 6                       |
+| `BOT_WAR_MIN_TICKS`          | 900 (90 с) `[ТЮНИНГ]`   |
+| `BOT_WAR_WEARY_TICKS`        | 6000 (10 мин) `[ТЮНИНГ]` |
+| `BOT_PEACE_LOCK_TICKS`       | 3000 (5 мин) `[ТЮНИНГ]` |
+| `BOT_PACT_MIN_TICKS`         | 1800 (3 мин) `[ТЮНИНГ]` |
+
+Профили сложности `BOT_PROFILES` `[ТЮНИНГ]` (09-bots.md, «Правки 2026-11-12»):
+
+| Поле           | easy | normal | medium (сложный) |
+| -------------- | ---- | ------ | ---------------- |
+| `attackRatio`  | 1,8  | 1,2    | 1,0              |
+| `holdRatio`    | 1,2  | 0,8    | 0,7              |
+| `maxWars`      | 1    | 2      | 2                |
+| `warEdge`      | 1,6  | 1,2    | 1,0              |
+| `proposeEvery` | 1200 | 600    | 300              |
+| `alarmPercent` | 0    | 40     | 28               |
+| `coalitions`   | нет  | да     | да               |
+| `opportunist`  | нет  | нет    | да               |
+| `grudge`       | 0    | 150    | 250              |
+
+## Отношения игроков
+
+| Константа            | Значение                                   |
+| -------------------- | ------------------------------------------ |
+| `ATTITUDE_MAX`       | 1000                                       |
+| `ATT_WAR_ON_ME`      | 400                                        |
+| `ATT_WAR_ON_FRIEND`  | 150                                        |
+| `ATT_BREACH_PUBLIC`  | 100                                        |
+| `ATT_CITY_LOST`      | 150                                        |
+| `ATT_TREATY_GAIN`    | мир 40, пакт 120, оборона 200, альянс 300  |
+| `ATT_PERIOD_TICKS`   | 50                                         |
+| `ATT_PARTNER_GROWTH` | 2                                          |
+| `ATT_PARTNER_CAP`    | 600                                        |
 
 ## Местность
 

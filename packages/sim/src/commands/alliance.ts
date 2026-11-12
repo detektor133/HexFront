@@ -2,7 +2,14 @@
 // большинством, запросы помощи, автоматическое вступление в войну, возврат отрядов домой.
 import { executeUnitCommand } from './unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
-import { allianceOf, groupOf, relationOf, setRelation } from '../state/relations.ts';
+import {
+  allianceOf,
+  groupOf,
+  recordTreaty,
+  recordWar,
+  relationOf,
+  setRelation,
+} from '../state/relations.ts';
 import type { AidCall, AllianceVote, Diplomacy, MatchState, Relation } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -27,6 +34,7 @@ export function joinWars(state: MatchState, p: number, target: number): void {
       // Долг альянса сильнее пакта и оборонительного пакта с противником: они рвутся без нарушения.
       if (rel === 'war' || rel === 'alliance') continue;
       setRelation(state, a, b, 'war');
+      recordWar(state, a, b);
       state.events.push({ t: 'warDeclared', playerId: a, targetId: b, kind: null });
     }
   }
@@ -71,6 +79,8 @@ export function joinAid(state: MatchState, call: AidCall): void {
   d.aid.push({ ally: call.ally, victim: call.victim, aggressor: call.aggressor });
   if (relationOf(state, call.ally, call.aggressor) !== 'war') {
     setRelation(state, call.ally, call.aggressor, 'war');
+    recordWar(state, call.ally, call.aggressor);
+    recordTreaty(state, call.ally, call.victim, 'defense');
     state.events.push({
       t: 'warDeclared',
       playerId: call.ally,
@@ -92,13 +102,21 @@ function applyVote(state: MatchState, vote: AllianceVote): void {
   }
   if (vote.kind === 'join') {
     const all = [...new Set([...sideA, ...sideB])];
-    for (const x of all) for (const y of all) if (x < y) setRelation(state, x, y, 'alliance');
+    for (const x of all) {
+      for (const y of all) {
+        if (x >= y) continue;
+        setRelation(state, x, y, 'alliance');
+        recordTreaty(state, x, y, 'alliance');
+      }
+    }
     state.events.push({ t: 'treatyMade', playerId: vote.b, targetId: vote.a, kind: 'alliance' });
     return;
   }
   for (const x of sideA) {
     for (const y of sideB) {
-      if (relationOf(state, x, y) === 'war') setRelation(state, x, y, 'peace');
+      if (relationOf(state, x, y) !== 'war') continue;
+      setRelation(state, x, y, 'peace');
+      recordTreaty(state, x, y, 'peace');
     }
   }
   state.events.push({ t: 'treatyMade', playerId: vote.b, targetId: vote.a, kind: 'peace' });

@@ -56,11 +56,16 @@ export const COMMAND_OPTIONS: readonly CommandOptionEntry[] = [
   { kind: 'stopOffensive', options: stopOffensiveOptions },
 ];
 
+/** Войной ведает commander (commander-war.ts): ▶/■ по выученным весам оставляли армию стоять. */
+const COMMANDER_KINDS: ReadonlySet<string> = new Set(['startOffensive', 'stopOffensive']);
+
 export function commandOptions(
   state: Parameters<CommandOptionEntry['options']>[0],
   playerId: number,
   context: Parameters<CommandOptionEntry['options']>[2],
   definitions: BotOptionDefinitions = DEFAULT_BOT_OPTION_DEFINITIONS,
 ): readonly ReturnType<CommandOptionEntry['options']>[number][] {
-  return COMMAND_OPTIONS.flatMap((entry) => entry.options(state, playerId, context, definitions));
+  return COMMAND_OPTIONS.filter((entry) => !COMMANDER_KINDS.has(entry.kind)).flatMap((entry) =>
+    entry.options(state, playerId, context, definitions),
+  );
 }

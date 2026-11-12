@@ -9,6 +9,7 @@ import { diplomacyCommands } from './diplomacy.ts';
 import { seaCommands } from './sea.ts';
 import {
   BOT_EASY_COMMANDER_EVERY,
+  BOT_PROFILES,
   BOT_EASY_THINK_TICKS,
   BOT_LINE_MAX_DEPTH,
   BOT_NORMAL_COMMANDER_EVERY,
@@ -116,6 +117,7 @@ export function commanderCommands(
         botIds.has(p.id),
         mergeBelow,
         mergeRadius,
+        BOT_PROFILES[levels[p.id] ?? 'medium'],
       )) {
         out.push({ playerId: p.id, cmd, source: 'auto' });
       }
@@ -148,7 +150,7 @@ export function botCommands(
     for (const cmd of commands) {
       out.push({ playerId: p.id, cmd });
     }
-    for (const cmd of diplomacyCommands(state, p.id, tickContext)) {
+    for (const cmd of diplomacyCommands(state, p.id, tickContext, level)) {
       out.push({ playerId: p.id, cmd });
     }
     for (const cmd of seaCommands(state, p.id, tickContext)) {
