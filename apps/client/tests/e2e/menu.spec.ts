@@ -106,7 +106,14 @@ test('@layout лобби открывается окном поверх меню
       );
     });
   });
+  await page.route('http://127.0.0.1:9999/healthz', (route) =>
+    route.fulfill({
+      json: { ok: true, humans: 1234 },
+      headers: { 'access-control-allow-origin': '*' },
+    }),
+  );
   await page.goto('/?server=ws://127.0.0.1:9999', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('status')).toContainText('1,2');
   await page.getByRole('button', { name: /Быстрый бой|Quick match/ }).click();
   const timer = page.getByRole('timer');
   await expect(timer).toContainText('19', { timeout: 10_000 });
@@ -116,4 +123,51 @@ test('@layout лобби открывается окном поверх меню
   await page.getByRole('button', { name: /Отмена|Cancel/ }).click();
   await expect(timer).toHaveCount(0);
   await context.close();
+});
+
+test('@layout без сервера онлайн заблокирован, а быстрый бой открывает бой с ботами', async ({
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('hexfront.tutorialAsked', '1');
+  });
+  let alive = false;
+  await page.route('http://127.0.0.1:9998/healthz', (route) =>
+    alive
+      ? route.fulfill({
+          json: { ok: true, humans: 842 },
+          headers: { 'access-control-allow-origin': '*' },
+        })
+      : route.abort(),
+  );
+  await page.goto('/?server=ws://127.0.0.1:9998', { waitUntil: 'domcontentloaded' });
+  const online = page.getByRole('button', { name: /Онлайн|Online/ });
+  await expect(page.getByRole('status')).toContainText(/Офлайн|Offline/);
+  await expect(online).toBeDisabled();
+  // Быстрый бой без сервера — панель «Против ботов».
+  await page.getByRole('button', { name: /Быстрый бой|Quick match/ }).click();
+  await expect(page.getByRole('group', { name: /Против ботов|Versus bots/ })).toBeVisible();
+  // Связь появилась: онлайн разблокируется сам, без перезагрузки.
+  alive = true;
+  await expect(page.getByRole('status')).toContainText('842', { timeout: 15_000 });
+  await expect(online).toBeEnabled();
+  await context.close();
+});
+
+test('@layout смена карты не двигает панель против ботов', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('hexfront.tutorialAsked', '1');
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
+  const panel = page.getByRole('group', { name: /Против ботов|Versus bots/ });
+  const before = await panel.boundingBox();
+  await page.getByRole('radio', { name: /Малая|Small/ }).click();
+  const after = await panel.boundingBox();
+  expect(after?.height).toBe(before?.height);
+  expect(after?.y).toBe(before?.y);
 });

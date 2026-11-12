@@ -12,6 +12,7 @@ import { navigate } from '../nav.ts';
 import { guestNick, nickProblem, useMenuSettings } from './menu-config.ts';
 import styles from './menu-ui.module.css';
 import { useMenuBackground } from './use-menu-background.ts';
+import { shortCount, useServerStatus } from './use-server-status.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
@@ -34,6 +35,12 @@ export function MainMenu(props: {
   const settingsWindow = useTvPresence(settingsOpen);
   const askWindow = useTvPresence(askOpen);
   useMenuBackground(hostRef);
+  const server = useServerStatus();
+  const offline = server.state === 'offline';
+  // Связь пропала при открытой панели «Онлайн» — панель закрывается, вернётся она сама не должна.
+  useEffect(() => {
+    if (offline) setMode((current) => (current === 'online' ? null : current));
+  }, [offline]);
 
   // Переход в режим: сначала проверяем ник, на телефоне включаем полный экран (нужен жест).
   const go = useCallback(
@@ -78,6 +85,17 @@ export function MainMenu(props: {
     <main className={styles.page}>
       <div ref={hostRef} className={styles.background} aria-hidden="true" />
       <div className={styles.top}>
+        <p
+          className={`${styles.status} ${server.state === 'online' ? styles.live : ''} ${server.state === 'offline' ? styles.down : ''}`}
+          role="status"
+        >
+          <span className={styles.statusDot} aria-hidden="true" />
+          {server.state === 'online'
+            ? `${shortCount(server.humans, t('menu.thousand'))} ${t('menu.inNet')}`
+            : server.state === 'offline'
+              ? t('menu.offline')
+              : t('menu.checking')}
+        </p>
         <p className={styles.brand}>Hexfront</p>
         <button
           type="button"
@@ -91,7 +109,14 @@ export function MainMenu(props: {
       <div className={styles.nickSlot}>
         <NickPlate settings={settings} update={update} shake={shake} />
       </div>
-      <MenuDock settings={settings} update={update} go={go} mode={mode} onMode={setMode} />
+      <MenuDock
+        settings={settings}
+        update={update}
+        go={go}
+        mode={mode}
+        onMode={setMode}
+        offline={offline}
+      />
       {lobbyWindow.mounted && lastLobby.current !== null && (
         <div className={styles.panelSlot}>
           <LobbyPanel

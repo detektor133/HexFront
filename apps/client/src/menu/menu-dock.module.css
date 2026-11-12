@@ -63,6 +63,24 @@
   color: var(--ui-button-primary-bg);
 }
 
+/* Сервера нет: вкладка «Онлайн» приглушена и не нажимается, пока связь не вернётся. */
+.tab.blocked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tab.blocked:hover {
+  color: var(--ui-ink2);
+}
+
+.tab.blocked:hover svg {
+  color: inherit;
+}
+
+.tabNote {
+  font-size: var(--font-size-caption);
+}
+
 .tab:focus-visible,
 .go:focus-visible {
   outline: 2px solid var(--selection-color);

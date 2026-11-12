@@ -49,6 +49,40 @@
   box-shadow: var(--shadow-hard);
 }
 
+/* Плашка связи слева вверху: сколько игроков в сети или что игра в офлайне. */
+.status {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--ui-ink);
+  font-size: var(--font-size-label);
+  line-height: 1.2;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-hard);
+}
+
+.statusDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--ui-ink2);
+  border-radius: 50%;
+}
+
+.status.live .statusDot {
+  background: var(--ui-button-primary-bg);
+}
+
+.status.down .statusDot {
+  background: var(--selection-color);
+}
+
 .gear {
   grid-column: 3;
   display: inline-flex;
@@ -252,6 +286,10 @@
   gap: var(--space-sm);
 }
 
+.reserved {
+  visibility: hidden;
+}
+
 .groupLabel {
   display: flex;
   justify-content: space-between;
@@ -420,6 +458,11 @@
 
 /* Низкий экран (телефон в ландшафте): ник слева вверху, панель режима по центру поверх дока. */
 @media (max-height: 520px) {
+  .status {
+    align-self: start;
+    margin-top: 52px;
+  }
+
   .nickSlot {
     top: max(var(--space-sm), env(safe-area-inset-top));
     right: auto;

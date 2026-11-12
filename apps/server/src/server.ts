@@ -73,7 +73,12 @@ export async function startServer(
   const allowed = options.allowedOrigins ?? [];
   const http = createServer((request, response) => {
     if (request.url === '/healthz') {
-      response.writeHead(200, { 'content-type': 'application/json' });
+      // Меню игры опрашивает этот адрес с другого домена: показывает «в сети N» или «офлайн».
+      response.writeHead(200, {
+        'content-type': 'application/json',
+        'access-control-allow-origin': '*',
+        'cache-control': 'no-store',
+      });
       response.end(JSON.stringify({ ok: true, ...hub.stats() }));
       return;
     }

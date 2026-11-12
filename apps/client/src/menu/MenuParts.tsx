@@ -197,24 +197,27 @@ function BotsBody(props: {
         value={s.level}
         onPick={(level) => props.update({ level })}
       />
-      {chooser?.choosePlayers && (
-        <div className={styles.group}>
-          <div className={styles.groupLabel}>
-            {t('menu.players')}
-            <span>{s.players}</span>
-          </div>
-          <input
-            type="range"
-            className={styles.range}
-            min={PLAYERS_MIN}
-            max={PLAYERS_MAX}
-            step={PLAYERS_STEP}
-            value={s.players}
-            aria-label={t('menu.players')}
-            onChange={(event) => props.update({ players: Number(event.target.value) })}
-          />
+      {/* Место под число игроков занято всегда: смена карты не должна двигать панель. */}
+      <div
+        className={`${styles.group} ${chooser?.choosePlayers === true ? '' : styles.reserved}`}
+        aria-hidden={chooser?.choosePlayers === true ? undefined : true}
+        inert={chooser?.choosePlayers === true ? undefined : true}
+      >
+        <div className={styles.groupLabel}>
+          {t('menu.players')}
+          <span>{s.players}</span>
         </div>
-      )}
+        <input
+          type="range"
+          className={styles.range}
+          min={PLAYERS_MIN}
+          max={PLAYERS_MAX}
+          step={PLAYERS_STEP}
+          value={s.players}
+          aria-label={t('menu.players')}
+          onChange={(event) => props.update({ players: Number(event.target.value) })}
+        />
+      </div>
     </>
   );
 }
