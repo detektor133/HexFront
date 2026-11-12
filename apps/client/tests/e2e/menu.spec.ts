@@ -106,7 +106,7 @@ test('@layout лобби открывается окном поверх меню
       );
     });
   });
-  await page.route('http://127.0.0.1:9999/healthz', (route) =>
+  await page.route('http://127.0.0.1:9999/healthz*', (route) =>
     route.fulfill({
       json: { ok: true, humans: 1234 },
       headers: { 'access-control-allow-origin': '*' },
@@ -135,7 +135,7 @@ test('@layout без сервера онлайн заблокирован, а б
     localStorage.setItem('hexfront.tutorialAsked', '1');
   });
   let alive = false;
-  await page.route('http://127.0.0.1:9998/healthz', (route) =>
+  await page.route('http://127.0.0.1:9998/healthz*', (route) =>
     alive
       ? route.fulfill({
           json: { ok: true, humans: 842 },

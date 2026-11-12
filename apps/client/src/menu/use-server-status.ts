@@ -54,13 +54,15 @@ async function probe(socketUrl: string): Promise<ServerStatus> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(healthUrl(socketUrl), {
+    const response = await fetch(`${healthUrl(socketUrl)}?visitor=1`, {
       signal: controller.signal,
       cache: 'no-store',
     });
     if (response.ok) {
-      const body = (await response.json()) as { humans?: unknown };
-      return { state: 'online', humans: typeof body.humans === 'number' ? body.humans : 0 };
+      // `online` — меню и игроки по различным адресам; у старого сервера его нет, берём игроков в комнатах.
+      const body = (await response.json()) as { online?: unknown; humans?: unknown };
+      const count = typeof body.online === 'number' ? body.online : body.humans;
+      return { state: 'online', humans: typeof count === 'number' ? count : null };
     }
   } catch {
     // Нет ответа или сайту нельзя читать /healthz (старый сервер без CORS): пробуем сокет.

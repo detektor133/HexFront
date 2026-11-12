@@ -6,6 +6,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { MAX_CLIENT_MESSAGE_BYTES } from '@hexfront/protocol';
 
 import type { Hub } from './hub.ts';
+import { Presence } from './presence.ts';
 
 /** Соединение, у которого накопилось больше этого в очереди отправки, байт, обрывается как медленное. */
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
@@ -71,15 +72,22 @@ export async function startServer(
   options: ServerOptions = {},
 ): Promise<RunningServer> {
   const allowed = options.allowedOrigins ?? [];
+  const presence = new Presence();
   const http = createServer((request, response) => {
-    if (request.url === '/healthz') {
+    if (request.url === '/healthz' || request.url === '/healthz?visitor=1') {
+      // Опрос из меню игры (`visitor=1`) считается присутствием; проверки деплоя и мониторинга — нет.
+      if (request.url.endsWith('visitor=1')) {
+        presence.visit(clientIp(request, options.trustProxy ?? false), Date.now());
+      }
       // Меню игры опрашивает этот адрес с другого домена: показывает «в сети N» или «офлайн».
       response.writeHead(200, {
         'content-type': 'application/json',
         'access-control-allow-origin': '*',
         'cache-control': 'no-store',
       });
-      response.end(JSON.stringify({ ok: true, ...hub.stats() }));
+      response.end(
+        JSON.stringify({ ok: true, ...hub.stats(), online: presence.count(Date.now()) }),
+      );
       return;
     }
     response.writeHead(404).end();
@@ -103,6 +111,15 @@ export async function startServer(
       socket.close(1008, 'origin');
       return;
     }
+    const ip = clientIp(request, options.trustProxy ?? false);
+    presence.socketOpened(ip);
+    let counted = true;
+    const uncount = (): void => {
+      if (!counted) return;
+      counted = false;
+      presence.socketClosed(ip);
+    };
+    socket.on('close', uncount);
     const session = hub.connect(
       {
         send(text) {
@@ -117,7 +134,7 @@ export async function startServer(
           socket.close();
         },
       },
-      clientIp(request, options.trustProxy ?? false),
+      ip,
     );
     if (session === null) return;
     alive.set(socket, true);
