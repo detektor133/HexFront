@@ -63,11 +63,24 @@ export async function runMemoryProbe(): Promise<void> {
           JSON.parse(line) as {
             matchSeconds: number;
             heap: { used: number | null };
-            pixi: { canvasTextTextures: number | null };
+            pixi: {
+              canvasTextTextures: number | null;
+              graphicsDetails?: {
+                id: number;
+                instructions: number;
+                vertices: number;
+                rebuildsPerSecond: number;
+              }[];
+            };
           },
       );
     // Последний замер целиком: сколько текстов, текстур и объектов живёт в сцене.
-    console.log(JSON.stringify(samples.at(-1)?.pixi ?? null));
+    const lastPixi = samples.at(-1)?.pixi;
+    console.log(JSON.stringify({ ...lastPixi, graphicsDetails: undefined }));
+    const hottest = [...(lastPixi?.graphicsDetails ?? [])]
+      .sort((a, b) => b.rebuildsPerSecond - a.rebuildsPerSecond)
+      .slice(0, 5);
+    console.log(`самые частые перестроения Graphics: ${JSON.stringify(hottest)}`);
     const lastMinute = Math.floor(Math.max(...samples.map((sample) => sample.matchSeconds)) / 60);
     const step = lastMinute > 20 ? 10 : 1;
     for (let minute = 0; minute <= lastMinute; minute += step) {

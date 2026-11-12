@@ -29,8 +29,16 @@ export function graphicsTelemetry(graphics: Graphics, nowMs: number): GraphicsTe
   let counter = graphicsRebuildCounters.get(context);
   if (!counter) {
     const current: GraphicsRebuildCounter = { count: 0, sampledCount: 0, sampledAt: nowMs };
+    // Pixi шлёт `update` на каждую фигуру, поэтому одна перерисовка в тысячи гексов давала бы тысячи
+    // событий: подряд идущие в одном синхронном проходе считаются одним перестроением.
+    let batching = false;
     context.on('update', () => {
+      if (batching) return;
+      batching = true;
       current.count += 1;
+      queueMicrotask(() => {
+        batching = false;
+      });
     });
     graphicsRebuildCounters.set(context, current);
     counter = current;
