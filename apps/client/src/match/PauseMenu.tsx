@@ -20,7 +20,8 @@ const SETTINGS_STYLE: React.CSSProperties = {
 
 export function PauseMenu(props: {
   readonly onResume: () => void;
-  readonly onRestart: () => void;
+  /** Нет в сетевом матче: «заново» там только переподключило бы к тому же матчу. */
+  readonly onRestart?: (() => void) | undefined;
   readonly onMenu: () => void;
   readonly style?: React.CSSProperties | undefined;
   /** Класс анимации появления и закрытия (ui/use-tv-presence.ts). */
@@ -56,11 +57,16 @@ export function PauseMenu(props: {
         <IconPlayerPlay size={22} aria-hidden="true" />
         {t('pause.resume')}
       </button>
-      <div className={styles.row}>
-        <button type="button" className={styles.button} onClick={props.onRestart}>
-          <IconRefresh size={20} aria-hidden="true" />
-          {t('pause.restart')}
-        </button>
+      <div
+        className={styles.row}
+        style={props.onRestart === undefined ? { gridTemplateColumns: '1fr' } : undefined}
+      >
+        {props.onRestart !== undefined && (
+          <button type="button" className={styles.button} onClick={props.onRestart}>
+            <IconRefresh size={20} aria-hidden="true" />
+            {t('pause.restart')}
+          </button>
+        )}
         <button type="button" className={styles.button} onClick={props.onMenu}>
           <IconHome size={20} aria-hidden="true" />
           {t('pause.menu')}

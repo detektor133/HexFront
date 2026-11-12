@@ -445,7 +445,11 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <PauseMenu
           className={pausePresence.className}
           onResume={pauseController.resume}
-          onRestart={pauseController.restart}
+          onRestart={
+            new URLSearchParams(appSearch()).get('online') === '1'
+              ? undefined
+              : pauseController.restart
+          }
           onMenu={pauseController.goToMenu}
           style={pauseLayoutStyle}
         />

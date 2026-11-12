@@ -82,7 +82,7 @@ test('@layout лобби открывается окном поверх меню
     localStorage.setItem('hexfront.tutorialAsked', '1');
     localStorage.setItem('hexfront.nickname', 'Danil');
   });
-  await page.routeWebSocket('ws://127.0.0.1:9999', (ws) => {
+  await page.routeWebSocket('ws://127.0.0.1:9999/**', (ws) => {
     ws.onMessage(() => {
       ws.send(
         JSON.stringify({

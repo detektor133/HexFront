@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 
 import { serverUrl } from '../net/online-session.ts';
+import { tabId } from '../net/tab-id.ts';
 
 export type ServerStatus =
   | { readonly state: 'checking' }
@@ -54,7 +55,7 @@ async function probe(socketUrl: string): Promise<ServerStatus> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(`${healthUrl(socketUrl)}?visitor=1`, {
+    const response = await fetch(`${healthUrl(socketUrl)}?visitor=${tabId()}`, {
       signal: controller.signal,
       cache: 'no-store',
     });

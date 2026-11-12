@@ -74,11 +74,12 @@ export async function startServer(
   const allowed = options.allowedOrigins ?? [];
   const presence = new Presence();
   const http = createServer((request, response) => {
-    if (request.url === '/healthz' || request.url === '/healthz?visitor=1') {
-      // Опрос из меню игры (`visitor=1`) считается присутствием; проверки деплоя и мониторинга — нет.
-      if (request.url.endsWith('visitor=1')) {
-        presence.visit(clientIp(request, options.trustProxy ?? false), Date.now());
-      }
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    if (url.pathname === '/healthz') {
+      // Опрос из меню игры называет вкладку (`visitor=<случайный id>`) и считается присутствием;
+      // проверки деплоя и мониторинга без него не считаются.
+      const visitor = url.searchParams.get('visitor');
+      if (visitor !== null && /^[a-z0-9]{6,32}$/.test(visitor)) presence.visit(visitor, Date.now());
       // Меню игры опрашивает этот адрес с другого домена: показывает «в сети N» или «офлайн».
       response.writeHead(200, {
         'content-type': 'application/json',
@@ -112,12 +113,15 @@ export async function startServer(
       return;
     }
     const ip = clientIp(request, options.trustProxy ?? false);
-    presence.socketOpened(ip);
+    // Сокет игры называет вкладку параметром `visitor`, как и опрос меню: вкладка не считается дважды.
+    const tab = new URL(request.url ?? '/', 'http://localhost').searchParams.get('visitor');
+    const who = tab !== null && /^[a-z0-9]{6,32}$/.test(tab) ? tab : ip;
+    presence.socketOpened(who);
     let counted = true;
     const uncount = (): void => {
       if (!counted) return;
       counted = false;
-      presence.socketClosed(ip);
+      presence.socketClosed(who);
     };
     socket.on('close', uncount);
     const session = hub.connect(

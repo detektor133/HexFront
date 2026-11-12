@@ -27,6 +27,7 @@ import {
 import type { Command, GameEvent, PathPreview, PlayerView, Selection } from '@hexfront/sim';
 
 import { probed } from './probe-hook.ts';
+import { tabId } from './tab-id.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 
 /** Сокет, каким его видит клиент: тонкая обёртка над WebSocket. */
@@ -492,7 +493,8 @@ export const realClock: NetClock = {
 /** Сокет поверх `WebSocket` браузера. */
 export function webSocketTransport(url: string): () => NetSocket {
   return () => {
-    const ws = new WebSocket(url);
+    // Вкладка называет себя серверу: «в сети» считает вкладки, а не адреса.
+    const ws = new WebSocket(`${url}${url.includes('?') ? '&' : '/?'}visitor=${tabId()}`);
     return {
       send: (text) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(text);
