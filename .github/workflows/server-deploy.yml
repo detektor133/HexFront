@@ -1,0 +1,93 @@
+name: server-deploy
+
+# Автовыкладка сервера матчей на VPS. Клиент на Cloudflare Pages выкладывает pages.yml, а сервер
+# выкладывался только руками (deploy/deploy.sh), поэтому клиент и сервер расходились.
+# Запускается, когда меняется код, который попадает на сервер, и вручную (workflow_dispatch).
+# Перед выкладкой те же проверки, что в CI: сломанный код на VPS не уйдёт.
+# Секреты репозитория: VPS_HOST, VPS_SSH_KEY (приватный ключ деплоя), необязательно VPS_USER.
+on:
+  push:
+    branches: [main, 'stage-*']
+    paths:
+      - 'apps/server/**'
+      - 'packages/sim/**'
+      - 'packages/protocol/**'
+      - 'packages/mapgen/**'
+      - 'pnpm-lock.yaml'
+      - 'deploy/**'
+      - '.github/workflows/server-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Одна выкладка за раз и без отмены посреди работы: новая ждёт, пока закончится идущая.
+concurrency:
+  group: server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HEXFRONT_VPS_HOST: ${{ secrets.VPS_HOST }}
+      HEXFRONT_VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+    steps:
+      - name: Проверить секреты
+        id: secrets
+        run: |
+          if [ -z "$HEXFRONT_VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
+            echo "::warning::Выкладка пропущена: не заданы секреты VPS_HOST и VPS_SSH_KEY (см. deploy/README.md)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          version: 10.21.0
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Установить зависимости
+        if: steps.secrets.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Проверить проект
+        if: steps.secrets.outputs.ready == 'true'
+        run: pnpm check
+
+      - name: Положить ключ деплоя
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # Сервер перестаёт брать новых игроков и ждёт конца идущих матчей (до 10 минут).
+      # Не дождались — выкладываем всё равно: клиенты переподключатся к новому процессу.
+      - name: Дождаться конца идущих матчей
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          HEXFRONT_SSH_KEY: /home/runner/.ssh/deploy_key
+        run: bash deploy/deploy.sh drain 10 || echo "матчи не закончились за 10 минут, выкладываем"
+
+      - name: Выложить сервер
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          HEXFRONT_SSH_KEY: /home/runner/.ssh/deploy_key
+        run: bash deploy/deploy.sh
+
+      - name: Убрать ключ
+        if: always() && steps.secrets.outputs.ready == 'true'
+        run: rm -f ~/.ssh/deploy_key

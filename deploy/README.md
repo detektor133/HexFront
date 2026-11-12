@@ -54,3 +54,15 @@ bash deploy/deploy.sh rollback   # вручную вернуть прошлый 
 2. Создайте переменную репозитория GitHub `VITE_SERVER_URL` = `wss://<домен>` (Settings → Secrets and variables → Actions → Variables). Это не секрет. Следующая сборка Pages встроит адрес в клиент; кнопки «Играть онлайн» и «Пригласить друзей» работают с этим адресом.
 3. `ALLOWED_ORIGINS` на сервере по умолчанию пускает `hexfront.pages.dev` и его поддомены (ветки). Свой домен клиента — через `HEXFRONT_ORIGINS` при `setup`.
 4. Новые комнаты пускаются по реальной цене тика: сумма сглаженных цен комнат не больше `TICK_BUDGET_MS` (65 мс из 100); `/healthz` показывает `projectedMs` и `budgetMs`. Игроки подсаживаются на места ботов в идущих открытых играх первые `LATE_JOIN_SECONDS` (240), поэтому комнат нужно мало. Нужно больше людей — берите больше ядер.
+
+## Автовыкладка из GitHub
+
+Workflow `server-deploy.yml` сам выкладывает сервер при пуше в `main` и `stage-*`, если изменился код сервера (`apps/server`, `sim`, `protocol`, `mapgen`, `pnpm-lock.yaml`, `deploy/`). Сначала идёт `pnpm check`, затем ожидание конца идущих матчей (до 10 минут) и `deploy.sh` с автоматическим откатом, если сервер не поднялся. Вручную: вкладка Actions → server-deploy → Run workflow.
+
+Один раз добавьте секреты репозитория (Settings → Secrets and variables → Actions → Secrets):
+
+- `VPS_HOST` — IP сервера;
+- `VPS_SSH_KEY` — содержимое **приватного** файла `hexfront_deploy` целиком, со строками `BEGIN`/`END` (в PowerShell: `Get-Content "$env:USERPROFILE\.ssh\hexfront_deploy" -Raw | Set-Clipboard`);
+- `VPS_USER` — только если логин не `root`.
+
+Без секретов workflow пропускает выкладку с предупреждением и не падает. Сервер один, поэтому он следует за последним пушем в `main` или `stage-*`; клиент с другой версией протокола получит отказ `versionMismatch`.
