@@ -3,6 +3,7 @@
 import { IconSettings } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { LobbyPanel, lobbyFromUrl, type LobbyRequest } from './LobbyPanel.tsx';
 import { MenuDock } from './MenuDock.tsx';
 import { NickPlate, tutorialLink, type ModeId } from './MenuParts.tsx';
 import { t } from '../i18n/dict.ts';
@@ -16,16 +17,23 @@ import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
 import { useTvPresence } from '../ui/use-tv-presence.ts';
 
-export function MainMenu(): React.JSX.Element {
+export function MainMenu(props: {
+  readonly initialLobby?: LobbyRequest | null;
+}): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const [settings, update] = useMenuSettings();
   const [mode, setMode] = useState<ModeId | null>(null);
   const [shake, setShake] = useState(0);
+  const [lobby, setLobby] = useState<LobbyRequest | null>(props.initialLobby ?? null);
+  // Пока лобби закрывается, показываем последнее: окно доигрывает анимацию.
+  const lastLobby = useRef<LobbyRequest | null>(props.initialLobby ?? null);
+  if (lobby !== null) lastLobby.current = lobby;
+  const lobbyWindow = useTvPresence(lobby !== null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
   const settingsWindow = useTvPresence(settingsOpen);
   const askWindow = useTvPresence(askOpen);
-  useMenuBackground(hostRef, settings.color);
+  useMenuBackground(hostRef);
 
   // Переход в режим: сначала проверяем ник, на телефоне включаем полный экран (нужен жест).
   const go = useCallback(
@@ -35,21 +43,29 @@ export function MainMenu(): React.JSX.Element {
         return;
       }
       if (isCoarsePointer() && fullscreenWanted()) void setFullscreen(true);
+      // Онлайн открывается окном поверх меню, а не отдельной страницей.
+      const request = lobbyFromUrl(url);
+      if (request !== null) {
+        setMode(null);
+        setLobby(request);
+        return;
+      }
       navigate(url);
     },
     [settings.nickname],
   );
 
   useEffect(() => {
-    if (!settingsOpen && mode === null) return;
+    if (!settingsOpen && mode === null && lobby === null) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
       if (settingsOpen) setSettingsOpen(false);
+      else if (lobby !== null) setLobby(null);
       else setMode(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [settingsOpen, mode]);
+  }, [settingsOpen, mode, lobby]);
 
   const closeAsk = (): void => {
     markAsked();
@@ -74,6 +90,16 @@ export function MainMenu(): React.JSX.Element {
         <NickPlate settings={settings} update={update} shake={shake} />
       </div>
       <MenuDock settings={settings} update={update} go={go} mode={mode} onMode={setMode} />
+      {lobbyWindow.mounted && lastLobby.current !== null && (
+        <div className={styles.panelSlot}>
+          <LobbyPanel
+            request={lastLobby.current}
+            nick={settings.nickname}
+            onClose={() => setLobby(null)}
+            className={lobbyWindow.className}
+          />
+        </div>
+      )}
       {askWindow.mounted && (
         <div className={styles.backdrop}>
           <div

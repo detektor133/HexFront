@@ -69,3 +69,51 @@ for (const size of SIZES) {
     await context.close();
   });
 }
+
+test('@layout лобби открывается окном поверх меню без смены страницы', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('hexfront.tutorialAsked', '1');
+    localStorage.setItem('hexfront.nickname', 'Danil');
+  });
+  await page.routeWebSocket('ws://127.0.0.1:9999', (ws) => {
+    ws.onMessage(() => {
+      ws.send(
+        JSON.stringify({
+          t: 'welcome',
+          playerId: 0,
+          token: 'abc',
+          room: 'K7QF',
+          tickMs: 100,
+          map: 'gen',
+          seed: 42,
+          players: 30,
+          fog: true,
+        }),
+      );
+      ws.send(
+        JSON.stringify({
+          t: 'lobby',
+          info: { room: 'K7QF', humans: 7, max: 30, startsInS: 19, open: true },
+          host: false,
+        }),
+      );
+    });
+  });
+  await page.goto('/?server=ws://127.0.0.1:9999', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Быстрый бой|Quick match/ }).click();
+  const timer = page.getByRole('timer');
+  await expect(timer).toContainText('19', { timeout: 10_000 });
+  // Меню осталось на месте: фон, док и ник, а страница не перезагружалась.
+  await expect(page.locator('main input')).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/');
+  await page.getByRole('button', { name: /Отмена|Cancel/ }).click();
+  await expect(timer).toHaveCount(0);
+  await context.close();
+});

@@ -105,6 +105,32 @@ function expectPauseMenuGone(tree: unknown): void {
   expect(String(menu.props?.className)).toContain('off');
 }
 
+/** Кнопка по подписи: окно паузы устроено рядами, номер кнопки в разметке для теста случаен. */
+function buttonByLabel(markup: unknown, label: string): ElementNode | undefined {
+  const texts = (node: unknown): string => {
+    if (typeof node === 'string') return node;
+    if (Array.isArray(node)) return node.map(texts).join('');
+    if (node && typeof node === 'object' && typeof (node as ElementNode).type === 'string') {
+      return texts((node as ElementNode).props?.children);
+    }
+    return '';
+  };
+  const walk = (node: unknown): ElementNode | undefined => {
+    if (!node || typeof node !== 'object') return undefined;
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = walk(child);
+        if (found) return found;
+      }
+      return undefined;
+    }
+    const element = node as ElementNode;
+    if (element.type === 'button' && texts(element.props?.children).includes(label)) return element;
+    return walk(element.props?.children);
+  };
+  return walk(markup);
+}
+
 function findNodeByIcon(node: unknown): ElementNode | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const element = node as ElementNode;
@@ -252,8 +278,7 @@ describe('пауза локального матча', () => {
     const { PauseMenu } = await import('../src/match/PauseMenu.tsx');
     const pauseMarkup = PauseMenu(pauseMenu?.props as never);
     expect(renderToStaticMarkup(pauseMarkup)).toContain('Продолжить');
-    const pauseButtons = (pauseMarkup.props.children as unknown as ElementNode[]).slice(1);
-    (pauseButtons[0]?.props?.onClick as (() => void) | undefined)?.();
+    (buttonByLabel(pauseMarkup, 'Продолжить')?.props?.onClick as (() => void) | undefined)?.();
     expect(setPaused).toHaveBeenLastCalledWith(false);
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const resumedTree = MatchSurface({});
@@ -266,8 +291,7 @@ describe('пауза локального матча', () => {
     const menuAgain = findNode(pausedAgainTree, 'PauseMenu');
     expect(menuAgain).toBeDefined();
     const pauseAgainMarkup = PauseMenu(menuAgain?.props as never);
-    const menuAgainButtons = (pauseAgainMarkup.props.children as unknown as ElementNode[]).slice(1);
-    (menuAgainButtons[2]?.props?.onClick as (() => void) | undefined)?.();
+    (buttonByLabel(pauseAgainMarkup, 'В меню')?.props?.onClick as (() => void) | undefined)?.();
     expect(window.history.pushState).toHaveBeenCalledWith(
       { hexfront: { pathname: '/', search: '' } },
       '',
@@ -298,8 +322,7 @@ describe('пауза локального матча', () => {
     expect(markup).toContain('Продолжить');
     expect(markup).toContain('Заново');
     expect(markup).toContain('В меню');
-    const menuButtons = (pauseMenu.props?.children as unknown as ElementNode[]).slice(1);
-    (menuButtons[0]?.props?.onClick as (() => void) | undefined)?.();
+    (buttonByLabel(pauseMenu, 'Продолжить')?.props?.onClick as (() => void) | undefined)?.();
     expect(setPaused).toHaveBeenCalledWith(false);
     (globalThis as unknown as { __resetPauseHooks: () => void }).__resetPauseHooks();
     const resumedTree = MatchSurface({});
@@ -315,8 +338,7 @@ describe('пауза локального матча', () => {
     const pausedAgain = (pausedAgainMenu?.type as (props: Record<string, unknown>) => ElementNode)(
       pausedAgainMenu?.props ?? {},
     );
-    const pausedAgainButtons = (pausedAgain.props?.children as unknown as ElementNode[]).slice(1);
-    (pausedAgainButtons[1]?.props?.onClick as (() => void) | undefined)?.();
+    (buttonByLabel(pausedAgain, 'Заново')?.props?.onClick as (() => void) | undefined)?.();
     expect(window.history.pushState).toHaveBeenCalledWith(
       {
         hexfront: {
@@ -335,8 +357,7 @@ describe('пауза локального матча', () => {
     const pausedThird = (pausedThirdMenu?.type as (props: Record<string, unknown>) => ElementNode)(
       pausedThirdMenu?.props ?? {},
     );
-    const pausedThirdButtons = (pausedThird.props?.children as unknown as ElementNode[]).slice(1);
-    (pausedThirdButtons[2]?.props?.onClick as (() => void) | undefined)?.();
+    (buttonByLabel(pausedThird, 'В меню')?.props?.onClick as (() => void) | undefined)?.();
     expect(window.history.pushState).toHaveBeenCalledWith(
       { hexfront: { pathname: '/', search: '' } },
       '',

@@ -1,3 +1,4 @@
+import { IconHome, IconPlayerPlay, IconRefresh, IconSettings } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import styles from './PauseMenu.module.css';
@@ -40,19 +41,31 @@ export function PauseMenu(props: {
       role="dialog"
       aria-label={t('pause.title')}
     >
-      <h2 className={styles.title}>{t('pause.title')}</h2>
+      <div className={styles.head}>
+        <h2 className={styles.title}>{t('pause.title')}</h2>
+        <button
+          type="button"
+          className={styles.gear}
+          aria-label={t('settings.title')}
+          onClick={() => setSettings(true)}
+        >
+          <IconSettings size={22} aria-hidden="true" />
+        </button>
+      </div>
       <button type="button" className={styles.primary} onClick={props.onResume}>
+        <IconPlayerPlay size={22} aria-hidden="true" />
         {t('pause.resume')}
       </button>
-      <button type="button" className={styles.button} onClick={props.onRestart}>
-        {t('pause.restart')}
-      </button>
-      <button type="button" className={styles.button} onClick={props.onMenu}>
-        {t('pause.menu')}
-      </button>
-      <button type="button" className={styles.button} onClick={() => setSettings(true)}>
-        {t('settings.title')}
-      </button>
+      <div className={styles.row}>
+        <button type="button" className={styles.button} onClick={props.onRestart}>
+          <IconRefresh size={20} aria-hidden="true" />
+          {t('pause.restart')}
+        </button>
+        <button type="button" className={styles.button} onClick={props.onMenu}>
+          <IconHome size={20} aria-hidden="true" />
+          {t('pause.menu')}
+        </button>
+      </div>
     </div>
   );
 }

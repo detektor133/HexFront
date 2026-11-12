@@ -1,5 +1,6 @@
-// Живая карта за меню: полноценная партия шести ботов идёт на настоящей карте, а камера
-// не стоит на месте, а плывёт от города к городу, чтобы было за чем следить.
+// Живая карта за меню: партия шести ботов идёт в обычном темпе, камера плывёт от города к городу,
+// ни за кем конкретно не следя. Партия начинается за кадром и показывается, когда армии уже
+// сошлись; когда остаётся один, она заканчивается, и начинается новая.
 import { useEffect, type RefObject } from 'react';
 
 import { loadMap } from '@hexfront/sim';
@@ -10,74 +11,101 @@ import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { mapBounds } from '../render/hex-geometry.ts';
 import { createMapView, type MapView } from '../render/map-view.ts';
-import { playerColorIds } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
-/** Партия на фоне идёт вдвое быстрее обычной: сражения видны, а слабому телефону не тяжело. */
-const BACKGROUND_SPEED = 2;
-/** Первые секунды партия идёт в ускоренной перемотке: к показу меню армии уже сошлись в бою. */
-const TIMELAPSE_SPEED = 40;
-const TIMELAPSE_MS = 12_000;
 /** Малая карта на шесть армий: стартовые земли рядом, поэтому границы сходятся и войны идут быстро. */
 const BOTS = 6;
-/** Партия на фоне перезапускается с новой картой расстановки: победитель всё закончил бы и застыл. */
-const RESTART_MS = 180_000;
 /** Масштаб кадра: на этом уровне уже видны отряды и границы, а в кадр попадает много земель. */
 const WATCH_SCALE = 0.8;
+/** Подготовка за кадром: партия считается быстро, пока не пройдёт столько тиков или миллисекунд. */
+const WARM_SPEED = 60;
+const WARM_TICKS = 3000;
+const WARM_MAX_MS = 7000;
 /** Как часто камера выбирает новое место и сколько летит к нему, мс. */
-const GLIDE_EVERY_MS = 9000;
-const GLIDE_MS = 8000;
+const GLIDE_EVERY_MS = 12_000;
+const GLIDE_MS = 10_000;
+/** Пауза после победителя, прежде чем начать новую партию, и длительность проявления, мс. */
+const AFTER_WIN_MS = 9000;
+const FADE_MS = 800;
 
-/** Запускает фоновую партию в `hostRef`; `color` — цвет игрока, которым красится одна из армий. */
-export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>, color: string): void {
+/** Запускает фоновую партию в `hostRef`. */
+export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): void {
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
     let layer: EconomyLayer | null = null;
     let stopResize: (() => void) | null = null;
     let glide: ReturnType<typeof setInterval> | null = null;
-    let slowDown: ReturnType<typeof setTimeout> | null = null;
-    // Последний вид: сообщения применяются сразу, а не ждут холст. Иначе дельты, пришедшие до готовности
-    // карты, терялись бы, и партия на экране застывала на первом кадре.
-    let latest: ReturnType<ViewDeltaApplier['applySnapshot']> | null = null;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
     let match: ReturnType<typeof startLocalMatch> | null = null;
     let deltaApplier = new ViewDeltaApplier();
-    let restart: ReturnType<typeof setInterval> | null = null;
-    const applyMessage = (message: Extract<FromWorker, { t: 'view' }>): void => {
-      // Без подтверждения воркер перестаёт слать виды (защита от перегруза): партия замирала на первом кадре.
+    let json: unknown = null;
+    let warming = true;
+    let finished = false;
+
+    const later = (ms: number, action: () => void): void => {
+      const id = setTimeout(() => {
+        timers.delete(id);
+        action();
+      }, ms);
+      timers.add(id);
+    };
+    const show = (visible: boolean): void => {
+      const host = hostRef.current;
+      if (host === null) return;
+      host.style.transition = `opacity ${FADE_MS}ms ease`;
+      host.style.opacity = visible ? '1' : '0';
+    };
+    const endWarmUp = (): void => {
+      if (!warming) return;
+      warming = false;
+      match?.setSpeed(1);
+      show(true);
+    };
+    const launch = (): void => {
+      if (disposed || json === null) return;
+      match?.dispose();
+      deltaApplier = new ViewDeltaApplier();
+      warming = true;
+      finished = false;
+      match = startLocalMatch(
+        json,
+        1 + Math.floor(Math.random() * 1_000_000),
+        { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: WARM_SPEED },
+        (message: FromWorker): void => {
+          if (message.t === 'view') applyMessage(message);
+        },
+        { fog: false },
+      );
+      later(WARM_MAX_MS, endWarmUp);
+    };
+    function applyMessage(message: Extract<FromWorker, { t: 'view' }>): void {
+      // Без подтверждения воркер перестаёт слать виды (защита от перегруза).
       match?.ack(message.seq);
-      latest =
+      const view =
         message.kind === 'snapshot'
           ? deltaApplier.applySnapshot(message.snapshot)
           : deltaApplier.applyDelta(message.delta);
-      if (layer === null) return;
-      layer.setView(latest, EMPTY_SELECTION);
-      layer.frame(performance.now());
-    };
+      layer?.setView(view, EMPTY_SELECTION);
+      layer?.frame(performance.now());
+      if (warming && view.tick >= WARM_TICKS) endWarmUp();
+      if (!finished && message.events.some((event) => event.t === 'matchWon')) {
+        finished = true;
+        later(AFTER_WIN_MS, () => {
+          show(false);
+          later(FADE_MS, launch);
+        });
+      }
+    }
+
     const start = async (): Promise<void> => {
       const response = await fetch('/maps/small.json');
-      const json: unknown = await response.json();
+      json = (await response.json()) as unknown;
       const loaded = loadMap(json);
       const host = hostRef.current;
       if (disposed || !loaded.ok || host === null) return;
-      const launch = (): void => {
-        match?.dispose();
-        if (slowDown !== null) clearTimeout(slowDown);
-        deltaApplier = new ViewDeltaApplier();
-        match = startLocalMatch(
-          json,
-          1 + Math.floor(Math.random() * 1_000_000),
-          { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: TIMELAPSE_SPEED },
-          (message: FromWorker): void => {
-            if (message.t === 'view') applyMessage(message);
-          },
-          { fog: false, playerColors: playerColorIds(color).slice(0, 2) },
-        );
-        slowDown = setTimeout(() => match?.setSpeed(BACKGROUND_SPEED), TIMELAPSE_MS);
-      };
-      launch();
-      restart = setInterval(launch, RESTART_MS);
+      host.style.opacity = '0';
       const created = await createMapView(
         host,
         loaded.map,
@@ -113,21 +141,17 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>, col
       };
       glideTo(0);
       glide = setInterval(() => glideTo(GLIDE_MS), GLIDE_EVERY_MS);
-      if (latest !== null && layer !== null) {
-        (layer as EconomyLayer).setView(latest, EMPTY_SELECTION);
-        (layer as EconomyLayer).frame(performance.now());
-      }
+      launch();
     };
     void start();
     return () => {
       disposed = true;
       if (glide !== null) clearInterval(glide);
-      if (restart !== null) clearInterval(restart);
-      if (slowDown !== null) clearTimeout(slowDown);
+      for (const id of timers) clearTimeout(id);
       stopResize?.();
       match?.dispose();
       layer?.destroy();
       mapView?.destroy();
     };
-  }, [hostRef, color]);
+  }, [hostRef]);
 }

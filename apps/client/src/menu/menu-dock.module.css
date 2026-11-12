@@ -101,130 +101,169 @@
   scale: 0.96;
 }
 
-/* ===== Мечи ===== */
+/* ===== Мечи: одно движение при наведении (компьютер) или нажатии (телефон) ===== */
 .swords {
   overflow: visible;
 }
 
 .swordA,
 .swordB,
+.spark,
 .meridianA,
 .meridianB,
-.spark,
 .robotHead,
 .antennaBall,
-.eye,
-.antenna {
+.antenna,
+.eye {
   transform-box: view-box;
   transform-origin: 24px 24px;
 }
 
 .swordA {
-  transform: rotate(48deg);
-  animation: clash-a 2.8s ease-in-out infinite;
+  transform: rotate(45deg);
 }
 
 .swordB {
-  transform: rotate(-48deg);
-  animation: clash-b 2.8s ease-in-out infinite;
-}
-
-.go:hover .swordA,
-.go:hover .swordB,
-.go:hover .spark {
-  animation-duration: 1.2s;
-}
-
-@keyframes clash-a {
-  0%,
-  45% {
-    transform: rotate(84deg);
-  }
-
-  56% {
-    transform: rotate(40deg);
-  }
-
-  60% {
-    transform: rotate(46deg);
-  }
-
-  64% {
-    transform: rotate(40deg);
-  }
-
-  100% {
-    transform: rotate(84deg);
-  }
-}
-
-@keyframes clash-b {
-  0%,
-  45% {
-    transform: rotate(-84deg);
-  }
-
-  56% {
-    transform: rotate(-40deg);
-  }
-
-  60% {
-    transform: rotate(-46deg);
-  }
-
-  64% {
-    transform: rotate(-40deg);
-  }
-
-  100% {
-    transform: rotate(-84deg);
-  }
+  transform: rotate(-45deg);
 }
 
 .spark {
   opacity: 0;
   transform: scale(0);
-  animation: spark 2.8s ease-out infinite;
+}
+
+.swords {
+  transform-origin: center;
+}
+
+@media (hover: hover) {
+  .go:hover .swordA {
+    animation: clash-a 700ms cubic-bezier(0.3, 0, 0.2, 1) 1;
+  }
+
+  .go:hover .swordB {
+    animation: clash-b 700ms cubic-bezier(0.3, 0, 0.2, 1) 1;
+  }
+
+  .go:hover .spark {
+    animation: spark 700ms ease-out 1;
+  }
+
+  .go:hover .swords {
+    animation: jolt 700ms ease-out 1;
+  }
+}
+
+.go.clash .swordA {
+  animation: clash-a 700ms cubic-bezier(0.3, 0, 0.2, 1) 1;
+}
+
+.go.clash .swordB {
+  animation: clash-b 700ms cubic-bezier(0.3, 0, 0.2, 1) 1;
+}
+
+.go.clash .spark {
+  animation: spark 700ms ease-out 1;
+}
+
+.go.clash .swords {
+  animation: jolt 700ms ease-out 1;
+}
+
+/* Мечи вскидываются вверх, затем сходятся ударом и чуть отскакивают. */
+@keyframes clash-a {
+  0% {
+    transform: rotate(45deg);
+  }
+
+  35% {
+    transform: rotate(14deg);
+  }
+
+  55% {
+    transform: rotate(58deg);
+  }
+
+  70% {
+    transform: rotate(40deg);
+  }
+
+  100% {
+    transform: rotate(45deg);
+  }
+}
+
+@keyframes clash-b {
+  0% {
+    transform: rotate(-45deg);
+  }
+
+  35% {
+    transform: rotate(-14deg);
+  }
+
+  55% {
+    transform: rotate(-58deg);
+  }
+
+  70% {
+    transform: rotate(-40deg);
+  }
+
+  100% {
+    transform: rotate(-45deg);
+  }
 }
 
 @keyframes spark {
   0%,
-  54% {
+  50% {
     opacity: 0;
     transform: scale(0) rotate(0deg);
   }
 
   58% {
     opacity: 1;
-    transform: scale(1.15) rotate(20deg);
+    transform: scale(1.1) rotate(15deg);
   }
 
-  75% {
+  85%,
+  100% {
     opacity: 0;
-    transform: scale(0.4) rotate(45deg);
+    transform: scale(0.3) rotate(40deg);
+  }
+}
+
+@keyframes jolt {
+  0%,
+  50% {
+    transform: scale(1);
+  }
+
+  56% {
+    transform: scale(1.14);
   }
 
   100% {
-    opacity: 0;
-    transform: scale(0);
+    transform: scale(1);
   }
 }
 
-/* ===== Глобус ===== */
-.meridianA {
-  animation: spin 3.2s linear infinite;
+/* ===== Глобус: вращается, пока на нём курсор или открыта вкладка ===== */
+.meridianA,
+.meridianB {
+  animation: spin 2.6s linear infinite paused;
 }
 
 .meridianB {
-  animation: spin 3.2s linear infinite;
-  animation-delay: -1.6s;
+  animation-delay: -1.3s;
 }
 
 .tab:hover .meridianA,
 .tab:hover .meridianB,
 .tab.on .meridianA,
 .tab.on .meridianB {
-  animation-duration: 1.6s;
+  animation-play-state: running;
 }
 
 @keyframes spin {
@@ -245,11 +284,18 @@
 .blipB {
   transform-box: fill-box;
   transform-origin: center;
-  animation: blip 2.4s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+.tab:hover .blipA,
+.tab:hover .blipB,
+.tab.on .blipA,
+.tab.on .blipB {
+  animation: blip 1.6s ease-in-out infinite;
 }
 
 .blipB {
-  animation-delay: -1.2s;
+  animation-delay: -0.8s;
 }
 
 @keyframes blip {
@@ -265,7 +311,7 @@
   }
 }
 
-/* ===== Робот ===== */
+/* ===== Робот: изредка моргает, при наведении наклоняет голову и качает антенну ===== */
 .robotHead {
   transform-origin: 24px 40px;
   transition: transform 220ms var(--motion-easing);
@@ -276,14 +322,10 @@
   transform: rotate(-7deg);
 }
 
-.antennaBall {
+.tab:hover .antennaBall,
+.tab.on .antennaBall {
   transform-origin: 24px 10px;
-  animation: antenna 1.8s ease-in-out infinite;
-}
-
-.antenna {
-  transform-origin: 24px 17px;
-  animation: antenna-stem 1.8s ease-in-out infinite;
+  animation: antenna 900ms ease-in-out infinite;
 }
 
 @keyframes antenna {
@@ -297,50 +339,39 @@
   }
 }
 
-@keyframes antenna-stem {
-  0%,
-  100% {
-    transform: rotate(-8deg);
-  }
-
-  50% {
-    transform: rotate(8deg);
-  }
-}
-
 .eye {
   transform-origin: center;
   transform-box: fill-box;
-  animation: blink 3.6s infinite;
+  animation: blink 5s infinite;
 }
 
 @keyframes blink {
   0%,
-  90%,
+  93%,
   100% {
     transform: scaleY(1);
   }
 
-  94% {
+  96% {
     transform: scaleY(0.1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .swordA,
-  .swordB,
-  .spark,
+  .go:hover .swordA,
+  .go:hover .swordB,
+  .go:hover .spark,
+  .go:hover .swords,
+  .go.clash .swordA,
+  .go.clash .swordB,
+  .go.clash .spark,
+  .go.clash .swords,
   .meridianA,
   .meridianB,
   .blipA,
   .blipB,
-  .antenna,
   .antennaBall,
   .eye {
     animation: none;
-  }
-
-  .spark {
-    opacity: 0;
   }
 }
