@@ -161,7 +161,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   const view = sb.msg?.view;
   // Выбывший онлайн-игрок смотрит чужими глазами: интерфейс тот же, но приказов нет.
   const online = new URLSearchParams(appSearch()).get('online') === '1';
-  const spectating = online && sb.observerId !== null;
+  const spectator = new URLSearchParams(appSearch()).get('spectate') === '1';
+  const spectating = online && (spectator || sb.observerId !== null);
   const send = spectating ? noSend : sb.send;
   const groupedCardFixture = new URLSearchParams(appSearch()).get('unitCard') === 'groups';
   const fixtureSourceUnit = view?.units.find(
@@ -439,6 +440,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <MatchEnd
           view={view}
           fog={sb.fog}
+          spectating={spectating}
           onWatch={(message) => {
             // Онлайн «Смотреть» открывает вид лучшего живого игрока; локально снимает туман.
             const first = online ? watchOrder(view)[0] : undefined;

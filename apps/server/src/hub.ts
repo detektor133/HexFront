@@ -389,6 +389,9 @@ export class Hub {
     }
     // Дренаж: вернуться в свою игру можно, начать новую или подсесть — нет.
     if (this.draining) return this.refuse(session, 'busy');
+    if (message.spectate === true && message.room === undefined) {
+      return this.refuse(session, 'badHello');
+    }
     this.joinNew(session, message, nick, false);
   }
 
@@ -402,7 +405,7 @@ export class Hub {
     if (target === null) return;
     session.shard = target.shard;
     session.pending = { stage: 'join', message, nick, retried };
-    target.shard.join(session.id, target.roomId, nick);
+    target.shard.join(session.id, target.roomId, nick, message.spectate === true);
   }
 
   /** Итог входа от шарда: привязка к комнате, либо повтор по свежей сводке, либо отказ. */
@@ -423,6 +426,8 @@ export class Hub {
     if (pending === null) return;
     if (pending.stage === 'reconnect') {
       this.joinNew(session, pending.message, pending.nick, false);
+    } else if (pending.message.spectate === true) {
+      this.refuse(session, 'notRunning');
     } else if (!pending.retried && pending.message.room === undefined) {
       // Сводка комнат могла устареть (место заняли только что): один повтор по новой.
       this.joinNew(session, pending.message, pending.nick, true);

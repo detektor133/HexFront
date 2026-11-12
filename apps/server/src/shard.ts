@@ -21,7 +21,7 @@ export interface ShardEvents {
 export interface Shard {
   readonly index: number;
   create(roomId: string, mode: JoinMode, seed: number): void;
-  join(conn: number, roomId: string, nick: string): void;
+  join(conn: number, roomId: string, nick: string, spectate?: boolean): void;
   reconnect(conn: number, roomId: string, token: string, have?: number): void;
   message(conn: number, message: C2S): void;
   closed(conn: number): void;
@@ -68,8 +68,8 @@ export class InlineShard implements Shard {
     this.host.create(roomId, mode, seed);
   }
 
-  public join(conn: number, roomId: string, nick: string): void {
-    this.host.join(conn, roomId, nick);
+  public join(conn: number, roomId: string, nick: string, spectate = false): void {
+    this.host.join(conn, roomId, nick, spectate);
   }
 
   public reconnect(conn: number, roomId: string, token: string, have?: number): void {

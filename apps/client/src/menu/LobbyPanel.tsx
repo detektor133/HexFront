@@ -21,6 +21,8 @@ export interface LobbyRequest {
   readonly mode: 'open' | 'private';
   /** Код комнаты по приглашению. */
   readonly room: string | null;
+  /** Смотреть идущий матч этой комнаты, не занимая места. */
+  readonly spectate?: boolean;
 }
 
 /** Разбирает адрес вида `/online?mode=private` или `/online?room=КОД`. */
@@ -30,6 +32,7 @@ export function lobbyFromUrl(url: string): LobbyRequest | null {
   return {
     mode: target.searchParams.get('mode') === 'private' ? 'private' : 'open',
     room: target.searchParams.get('room'),
+    ...(target.searchParams.get('spectate') === '1' ? { spectate: true } : {}),
   };
 }
 
@@ -43,6 +46,7 @@ function matchLink(session: NetSession): string {
     seed: String(session.seed),
     players: String(session.players),
     online: '1',
+    ...(session.spectator ? { spectate: '1' } : {}),
   });
   return `/match?${params.toString()}`;
 }
@@ -123,6 +127,7 @@ export function LobbyPanel(props: {
   readonly className: string;
 }): React.JSX.Element {
   const { mode, room } = props.request;
+  const spectate = props.request.spectate === true;
   const [info, setInfo] = useState<LobbyInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<NetSession | null>(null);
@@ -148,6 +153,7 @@ export function LobbyPanel(props: {
       nick,
       mode,
       ...(room === null ? {} : { room }),
+      ...(spectate ? { spectate: true } : {}),
       handlers: {
         onSession: setSession,
         onLobby: (lobby, host) => {
@@ -171,7 +177,7 @@ export function LobbyPanel(props: {
       // Закрыли окно, не дождавшись матча: освобождаем место.
       if (!handedOver) client.stop();
     };
-  }, [mode, room, nick, attempt]);
+  }, [mode, room, spectate, nick, attempt]);
 
   const invite =
     session !== null && mode === 'private'
@@ -182,13 +188,16 @@ export function LobbyPanel(props: {
     void navigator.clipboard.writeText(invite).then(() => setCopied(true));
   };
   const friends = mode === 'private' || room !== null;
+  const title = t(
+    spectate ? 'online.spectateTitle' : friends ? 'online.privateTitle' : 'online.searching',
+  );
   const max = info?.max ?? SEATS_FALLBACK;
 
   return (
     <div
       className={`${ui.panel} ${styles.lobby} ${props.className}`}
       role="group"
-      aria-label={t(friends ? 'online.privateTitle' : 'online.searching')}
+      aria-label={title}
     >
       <div className={ui.panelHead}>
         <button
@@ -199,7 +208,7 @@ export function LobbyPanel(props: {
         >
           <IconArrowLeft size={22} aria-hidden="true" />
         </button>
-        <h2 className={ui.panelTitle}>{t(friends ? 'online.privateTitle' : 'online.searching')}</h2>
+        <h2 className={ui.panelTitle}>{title}</h2>
       </div>
 
       {error !== null ? (

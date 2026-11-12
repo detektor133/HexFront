@@ -6,6 +6,8 @@ import { MatchEndScreen } from '../match/MatchEndScreen.tsx';
 export function MatchEnd(props: {
   readonly view: PlayerView;
   readonly fog?: boolean;
+  /** Зритель или выбывший, смотрящий чужой вид: нейтральный итог матча. */
+  readonly spectating?: boolean;
   readonly onWatch?: (message: { readonly type: 'setFog'; readonly enabled: boolean }) => void;
   readonly onMenu?: (path: string) => void;
   readonly replay?: readonly PlayerView[];
@@ -14,7 +16,7 @@ export function MatchEnd(props: {
   readonly allies?: readonly number[];
 }): React.JSX.Element | null {
   const player = props.view.players[props.view.playerId];
-  const eliminated = player?.status !== 'alive';
+  const eliminated = props.spectating !== true && player?.status !== 'alive';
   if (props.view.winner < 0 && !eliminated) return null;
   const names = new Map(props.view.players.map((p) => [p.id, p.name]));
   const nameOf = (id: number): string => names.get(id) ?? '#' + String(id + 1);
@@ -37,6 +39,7 @@ export function MatchEnd(props: {
     place: props.view.me.place,
     eliminated,
     fog: props.fog ?? true,
+    ...(props.spectating ? { spectating: true } : {}),
     ...(props.reason ? { reason: props.reason } : {}),
     ...(props.allies ? { allies: props.allies } : {}),
     victoryHold: props.view.victoryHold ?? null,

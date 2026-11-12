@@ -37,6 +37,8 @@ export interface MatchEndScreenProps {
   readonly place: number;
   readonly eliminated: boolean;
   readonly fog: boolean;
+  /** Зритель или выбывший, который смотрит чужой вид: итог без «вы выиграли/проиграли» и личной статистики. */
+  readonly spectating?: boolean;
   readonly reason?: WinReason;
   /** Союзники победителя при победе коалиции. */
   readonly allies?: readonly number[];
@@ -56,6 +58,17 @@ function victoryReason(reason: WinReason | undefined): string {
 
 // Заголовок и пояснение: победа, поражение (победил другой) или выбывание.
 function heading(props: MatchEndScreenProps): React.JSX.Element[] {
+  if (props.spectating) {
+    const who = props.winnerName ?? `${t('observer.player')} ${props.winner + 1}`;
+    return [
+      <h2 key="title" className={styles.title}>
+        {t('match.end')}
+      </h2>,
+      <p key="reason" className={styles.reason}>
+        {`${t('match.winnerIs')}: ${who} · ${victoryReason(props.reason)}`}
+      </p>,
+    ];
+  }
   if (props.eliminated) {
     return [
       <h2 key="title" className={styles.title}>
@@ -127,8 +140,8 @@ export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | 
     <section className={`${styles.card} ${tv.on}`} role="dialog" aria-label={t('match.end')}>
       {[
         ...(ended ? heading(props) : []),
-        ...(ended ? [standings(props), statistics(props)] : []),
-        ...(props.eliminated
+        ...(ended ? [standings(props), ...(props.spectating ? [] : [statistics(props)])] : []),
+        ...(props.eliminated && !props.spectating
           ? [
               <button
                 key="watch"

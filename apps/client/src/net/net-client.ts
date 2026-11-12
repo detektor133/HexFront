@@ -56,6 +56,8 @@ export interface NetSession {
   readonly seed: number;
   readonly players: number;
   readonly fog: boolean;
+  /** Место зрителя: матч смотрят без участия. */
+  readonly spectator: boolean;
 }
 
 export interface NetHandlers {
@@ -83,6 +85,8 @@ export interface NetOptions {
   readonly mode?: JoinMode;
   /** Код комнаты из приглашения. */
   readonly room?: string;
+  /** Смотреть идущий матч комнаты `room` без участия. */
+  readonly spectate?: boolean;
   /** Токен сохранённой сессии (после перезагрузки страницы). */
   readonly token?: string;
   readonly handlers?: NetHandlers;
@@ -301,6 +305,7 @@ export class NetClient {
       ...(this.options.room !== undefined && this.token === undefined
         ? { room: this.options.room }
         : {}),
+      ...(this.options.spectate === true && this.token === undefined ? { spectate: true } : {}),
       ...(this.options.mode !== undefined && this.token === undefined
         ? { mode: this.options.mode }
         : {}),
@@ -372,6 +377,7 @@ export class NetClient {
           seed: message.seed,
           players: message.players,
           fog: message.fog,
+          spectator: message.spectator === true,
         };
         this.attempt = 0;
         this.lostAt = null;

@@ -63,6 +63,8 @@ export type C2S =
        * дельтами, а не полным снимком (восстановление после обрыва при слабой связи).
        */
       readonly have?: number;
+      /** Смотреть идущий матч комнаты `room` без участия: вид игрока, приказов нет. */
+      readonly spectate?: boolean;
     }
   /**
    * Команда с номером `seq`, подряд идущим в рамках сессии. Сервер принимает только следующий по
@@ -94,7 +96,9 @@ export type RefuseReason =
   | 'noRoom'
   | 'badHello'
   /** Сервер перегружен (лимит комнат) или слишком много входов с адреса. */
-  | 'busy';
+  | 'busy'
+  /** Смотреть можно только идущий матч. */
+  | 'notRunning';
 
 export interface LobbyInfo {
   readonly room: string;
@@ -117,6 +121,8 @@ export type S2C =
       readonly seed: number;
       readonly players: number;
       readonly fog: boolean;
+      /** Место зрителя: `playerId` — игрок, чьими глазами идёт просмотр на старте. */
+      readonly spectator?: boolean;
     }
   /** `host` — получатель хозяин комнаты (может начать матч раньше срока). */
   | { readonly t: 'lobby'; readonly info: LobbyInfo; readonly host: boolean }
@@ -333,6 +339,7 @@ export function decodeClientMessage(text: string): C2S {
         ...(room === undefined ? {} : { room }),
         ...(source.mode === undefined ? {} : { mode: source.mode }),
         ...(source.have === undefined ? {} : { have: haveTick(source.have) }),
+        ...(source.spectate === true ? { spectate: true } : {}),
       };
     }
     case 'cmd': {

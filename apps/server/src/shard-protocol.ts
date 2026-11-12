@@ -11,7 +11,13 @@ export type ToShard =
       readonly mode: JoinMode;
       readonly seed: number;
     }
-  | { readonly k: 'join'; readonly conn: number; readonly roomId: string; readonly nick: string }
+  | {
+      readonly k: 'join';
+      readonly conn: number;
+      readonly roomId: string;
+      readonly nick: string;
+      readonly spectate?: boolean;
+    }
   | {
       readonly k: 'reconnect';
       readonly conn: number;

@@ -67,7 +67,7 @@ port.on('message', (batch: ToShard[]) => {
         host.create(message.roomId, message.mode, message.seed);
         break;
       case 'join':
-        host.join(message.conn, message.roomId, message.nick);
+        host.join(message.conn, message.roomId, message.nick, message.spectate === true);
         break;
       case 'reconnect':
         host.reconnect(message.conn, message.roomId, message.token, message.have);

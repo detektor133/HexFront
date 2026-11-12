@@ -103,9 +103,13 @@ export class RoomHost {
   }
 
   /** Сажает игрока в комнату; итог — `io.joined`. */
-  public join(conn: number, roomId: string, nick: string): void {
+  public join(conn: number, roomId: string, nick: string, spectate = false): void {
     const room = this.rooms.get(roomId);
-    const ok = room !== undefined && room.join(this.connection(conn), nick) !== null;
+    const ok =
+      room !== undefined &&
+      (spectate
+        ? room.spectate(this.connection(conn), nick)
+        : room.join(this.connection(conn), nick)) !== null;
     if (ok && room !== undefined) {
       this.where.set(conn, room);
       this.options.io.log('join', { room: roomId, humans: room.humans });

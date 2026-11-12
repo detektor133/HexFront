@@ -113,8 +113,8 @@ export class WorkerShard implements Shard {
     this.post({ k: 'create', roomId, mode, seed });
   }
 
-  public join(conn: number, roomId: string, nick: string): void {
-    this.post({ k: 'join', conn, roomId, nick });
+  public join(conn: number, roomId: string, nick: string, spectate = false): void {
+    this.post({ k: 'join', conn, roomId, nick, spectate });
   }
 
   public reconnect(conn: number, roomId: string, token: string, have?: number): void {

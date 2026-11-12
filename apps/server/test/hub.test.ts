@@ -572,3 +572,80 @@ describe('наблюдение выбывшего', () => {
     expect(lastViewPlayer(a)).toBe(0);
   });
 });
+
+describe('зритель по коду комнаты', () => {
+  it('зритель входит в идущий матч, получает вид игрока и не командует', () => {
+    const { hub, tick } = setup();
+    const host = new Client(hub, 'ip-a');
+    host.hello('Аня', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+    host.send({ t: 'start' });
+    tick(3);
+
+    const viewer = new Client(hub, 'ip-v');
+    viewer.hello('Зритель', { room: code, spectate: true });
+    const welcome = viewer.of('welcome')[0];
+    expect(welcome?.spectator).toBe(true);
+    expect(welcome?.playerId).toBe(0);
+    expect(viewer.of('start')).toHaveLength(1);
+    tick(2);
+    expect(viewer.count('snapshot')).toBeGreaterThan(0);
+
+    viewer.send({ t: 'cmd', seq: 1, cmd: { t: 'setTax', rate: 10 } as never });
+    expect(viewer.of('rejected')[0]?.reason).toBe('bad');
+
+    // Зритель смотрит любого игрока, в том числе живого.
+    ackAll(viewer);
+    viewer.raw.length = 0;
+    viewer.send({ t: 'watch', player: 3 });
+    tick(2);
+    const last = [...viewer.raw].reverse().find((text) => text.includes('"t":"snapshot"'));
+    expect(last === undefined ? undefined : decodeSnapshot(last).view.playerId).toBe(3);
+
+    // Зритель не занимает место и не считается игроком комнаты.
+    expect(hub.roomById(code)?.humans).toBe(1);
+    expect(hub.roomById(code)?.connected).toBe(1);
+  });
+
+  it('в наборе смотреть нельзя, без кода и в несуществующую комнату — отказ', () => {
+    const { hub } = setup();
+    const host = new Client(hub, 'ip-a');
+    host.hello('Аня', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+
+    const early = new Client(hub, 'ip-v1');
+    early.hello('Зритель', { room: code, spectate: true });
+    expect(early.of('refused')[0]?.reason).toBe('notRunning');
+
+    const blind = new Client(hub, 'ip-v2');
+    blind.hello('Зритель', { spectate: true });
+    expect(blind.of('refused')[0]?.reason).toBe('badHello');
+
+    const lost = new Client(hub, 'ip-v3');
+    lost.hello('Зритель', { room: 'NOPE', spectate: true });
+    expect(lost.of('refused')[0]?.reason).toBe('noRoom');
+  });
+
+  it('зритель возвращается по токену и получает конец матча', () => {
+    const { hub, tick } = setup();
+    const host = new Client(hub, 'ip-a');
+    host.hello('Аня', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+    host.send({ t: 'start' });
+    tick(3);
+    const viewer = new Client(hub, 'ip-v');
+    viewer.hello('Зритель', { room: code, spectate: true });
+    const token = viewer.of('welcome')[0]?.token ?? '';
+    viewer.session.onClose();
+
+    const back = new Client(hub, 'ip-v2');
+    back.hello('Зритель', { token });
+    expect(back.of('welcome')[0]?.spectator).toBe(true);
+
+    const state = hub.roomById(code)?.state;
+    if (state == null) throw new Error('нет матча');
+    state.winner = 0;
+    tick(1);
+    expect(back.of('end')).toHaveLength(1);
+  });
+});

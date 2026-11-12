@@ -48,6 +48,10 @@ export const GATHER_SECONDS = 30;
 export const LATE_JOIN_TICKS = 2400;
 /** Сколько секунд игрок может быть вне связи, пока его армиями не займётся бот. */
 export const RECONNECT_SECONDS = 30;
+/** Зрителей в одной комнате; больше — отказ `roomFull`. */
+export const MAX_SPECTATORS = 20;
+/** Сколько секунд зритель без связи держит место, потом оно освобождается. */
+const SPECTATOR_KEEP_SECONDS = 120;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
 const ACK_STALE_TICKS = 100;
 const BOT_LEVEL: BotLevel = 'medium';
@@ -109,6 +113,8 @@ interface Seat {
   waitingTicks: number;
   droppedAt: number | null;
   botControlled: boolean;
+  /** Зритель: сидит вне игроков, всегда смотрит чужими глазами. */
+  spectator: boolean;
   /** Чьими глазами смотрит выбывший игрок; `null` — своими (обычная игра). */
   watching: number | null;
   windowStart: number;
@@ -148,6 +154,8 @@ export class Room {
   public state: MatchState | null = null;
   private readonly options: RoomOptions;
   private readonly seats: Seat[] = [];
+  private readonly spectators: Seat[] = [];
+  private snapshotsThisTick = 0;
   private gatherEndsAt: number | null = null;
   private nextToken = 0;
   /** Метрики: сколько тиков и сколько мс ушло на шаги sim, виды и отправку. */
@@ -224,6 +232,30 @@ export class Room {
     return { token, playerId };
   }
 
+  private seatOf(conn: Connection): Seat | undefined {
+    return this.seats.find((s) => s.conn === conn) ?? this.spectators.find((s) => s.conn === conn);
+  }
+
+  /**
+   * Сажает зрителя в идущий матч: вид игрока (сначала живого человека), приказов нет.
+   * @returns токен и id игрока, с которого начат просмотр; `null`, если матч не идёт или зрителей много
+   */
+  public spectate(conn: Connection, nick: string): { token: string; playerId: number } | null {
+    const state = this.state;
+    if (this.phase !== 'running' || state === null) return null;
+    if (this.spectators.length >= MAX_SPECTATORS) return null;
+    const human = this.seats.find((s) => state.players[s.playerId]?.status === 'alive');
+    const target = human?.playerId ?? state.players.find((p) => p.status === 'alive')?.id ?? 0;
+    const token = `${this.id}-w${(this.nextToken += 1)}-${randomPart()}`;
+    const seat = this.newSeat(target, token, nick, conn);
+    seat.spectator = true;
+    seat.watching = target;
+    this.spectators.push(seat);
+    this.sendWelcome(seat);
+    this.send(seat, { t: 'start', tick: state.tick });
+    return { token, playerId: target };
+  }
+
   /** Можно ли сейчас подсесть на место бота в идущей открытой игре. */
   public get canLateJoin(): boolean {
     return this.freeBotSlot() !== null;
@@ -272,6 +304,7 @@ export class Room {
       waitingTicks: 0,
       droppedAt: null,
       botControlled: false,
+      spectator: false,
       watching: null,
       windowStart: 0,
       windowCount: 0,
@@ -283,7 +316,8 @@ export class Room {
    * @returns id игрока или `null`, если токена в этой комнате нет
    */
   public reconnect(conn: Connection, token: string, have?: number): number | null {
-    const seat = this.seats.find((s) => s.token === token);
+    const seat =
+      this.seats.find((s) => s.token === token) ?? this.spectators.find((s) => s.token === token);
     if (seat === undefined) return null;
     seat.conn?.close();
     seat.conn = conn;
@@ -302,7 +336,7 @@ export class Room {
     }
     if (seat.botControlled) this.takeBack(seat);
     this.sendWelcome(seat);
-    if (this.phase === 'lobby') {
+    if (this.phase === 'lobby' && !seat.spectator) {
       this.send(seat, { t: 'lobby', info: this.lobbyInfo(), host: this.seats[0] === seat });
     }
     return seat.playerId;
@@ -310,8 +344,13 @@ export class Room {
 
   /** Соединение игрока оборвалось: место держится RECONNECT_SECONDS. */
   public disconnect(conn: Connection): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     if (seat === undefined) return;
+    if (seat.spectator) {
+      seat.conn = null;
+      seat.droppedAt = this.options.now();
+      return;
+    }
     if (this.phase === 'lobby') {
       // До старта держать место не за чем: ушедший сразу освобождает его и не считается в онлайне.
       this.seats.splice(this.seats.indexOf(seat), 1);
@@ -328,7 +367,7 @@ export class Room {
 
   /** Принимает команду игрока: ограничение частоты, очередь до ближайшего тика. */
   public command(conn: Connection, seq: number, cmd: Command): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     if (seat === undefined) return;
     if (this.phase !== 'running') {
       this.send(seat, { t: 'rejected', seq, reason: 'bad' });
@@ -368,7 +407,7 @@ export class Room {
 
   /** Клиент применил сообщение с этим тиком: оно становится базой следующей дельты. */
   public viewAck(conn: Connection, tick: number): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     if (seat === undefined) return;
     seat.stream.acknowledge(tick);
     seat.waitingTicks = 0;
@@ -384,12 +423,12 @@ export class Room {
    * вид соперника с его туманом — чужая информация. Следующий вид уходит полным снимком.
    */
   public watch(conn: Connection, player: number): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     const state = this.state;
     if (seat === undefined || state === null || this.phase !== 'running') return;
-    if (state.players[seat.playerId]?.status === 'alive') return;
+    if (!seat.spectator && state.players[seat.playerId]?.status === 'alive') return;
     if (state.players[player] === undefined) return;
-    seat.watching = player === seat.playerId ? null : player;
+    seat.watching = !seat.spectator && player === seat.playerId ? null : player;
     seat.stream.reset();
     seat.waitingTicks = 0;
     seat.events = [];
@@ -400,7 +439,7 @@ export class Room {
 
   /** Игрок выбрал гекс: карточка придёт сразу и затем при каждом изменении. */
   public select(conn: Connection, hex: number | null): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     const state = this.state;
     if (seat === undefined || state === null || this.phase !== 'running') return;
     const size = state.map.width * state.map.height;
@@ -413,7 +452,7 @@ export class Room {
    * Расчёт по полному состоянию: прогноз пути и маски карты. Лимит запросов на игрока; ответ — с тем же `id`.
    */
   public query(conn: Connection, id: number, q: Query): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     const state = this.state;
     if (seat === undefined || state === null || this.phase !== 'running') return;
     const now = this.options.now();
@@ -456,7 +495,7 @@ export class Room {
 
   /** Клиент потерял базу: следующим уйдёт полный снимок. */
   public resync(conn: Connection): void {
-    const seat = this.seats.find((s) => s.conn === conn);
+    const seat = this.seatOf(conn);
     if (seat === undefined) return;
     seat.stream.reset();
     seat.waitingTicks = 0;
@@ -530,7 +569,7 @@ export class Room {
   /** Закрывает соединения и помечает комнату завершённой. */
   public close(): void {
     this.phase = 'ended';
-    for (const seat of this.seats) seat.conn?.close();
+    for (const seat of [...this.seats, ...this.spectators]) seat.conn?.close();
   }
 
   private botIds(): number[] {
@@ -566,40 +605,61 @@ export class Room {
 
   private sendViews(state: MatchState): void {
     const context = createPlayerViewContext(state);
-    let snapshots = 0;
+    this.snapshotsThisTick = 0;
     for (const seat of this.seats) {
       if (seat.botControlled) continue;
-      seat.events.push(...eventsFor(state.events, this.viewOf(seat)));
-      if (seat.events.length > MAX_QUEUED_EVENTS)
-        seat.events.splice(0, seat.events.length - MAX_QUEUED_EVENTS);
-      if (seat.conn === null) continue;
-      if (seat.stream.isWaiting) {
-        seat.waitingTicks += 1;
-        if (seat.waitingTicks < ACK_STALE_TICKS) continue;
-        // Подтверждение потерялось: начинаем с полного снимка.
-        seat.stream.reset();
-        seat.waitingTicks = 0;
-        seat.events = [];
-      }
-      if (seat.stream.willSendSnapshot && snapshots >= MAX_SNAPSHOTS_PER_TICK) continue;
-      if (seat.selected !== null || seat.lastSel !== null) this.pushSelection(seat, state);
-      const reuse = slowLayerReuse(seat.stream.baseView, seat.stream.isSlowSync(state.tick));
-      const view = playerView(state, this.viewOf(seat), context, reuse);
-      const transport = seat.stream.next(view, seat.events);
-      if (transport === null) continue;
-      if (transport.kind === 'snapshot') snapshots += 1;
-      seat.events = [];
-      const text =
-        transport.kind === 'snapshot'
-          ? encodeSnapshot(transport.snapshot)
-          : encodeDelta(transport.delta);
-      this.sendText(seat, text);
+      this.sendSeatView(seat, state, context);
     }
+    this.dropStaleSpectators();
+    for (const seat of this.spectators) this.sendSeatView(seat, state, context);
+  }
+
+  /** Зритель без связи дольше SPECTATOR_KEEP_SECONDS освобождает место. */
+  private dropStaleSpectators(): void {
+    const now = this.options.now();
+    for (let i = this.spectators.length - 1; i >= 0; i -= 1) {
+      const seat = this.spectators[i];
+      if (seat?.droppedAt != null && now - seat.droppedAt >= SPECTATOR_KEEP_SECONDS * 1000) {
+        this.spectators.splice(i, 1);
+      }
+    }
+  }
+
+  private sendSeatView(
+    seat: Seat,
+    state: MatchState,
+    context: ReturnType<typeof createPlayerViewContext>,
+  ): void {
+    seat.events.push(...eventsFor(state.events, this.viewOf(seat)));
+    if (seat.events.length > MAX_QUEUED_EVENTS)
+      seat.events.splice(0, seat.events.length - MAX_QUEUED_EVENTS);
+    if (seat.conn === null) return;
+    if (seat.stream.isWaiting) {
+      seat.waitingTicks += 1;
+      if (seat.waitingTicks < ACK_STALE_TICKS) return;
+      // Подтверждение потерялось: начинаем с полного снимка.
+      seat.stream.reset();
+      seat.waitingTicks = 0;
+      seat.events = [];
+    }
+    if (seat.stream.willSendSnapshot && this.snapshotsThisTick >= MAX_SNAPSHOTS_PER_TICK) return;
+    if (seat.selected !== null || seat.lastSel !== null) this.pushSelection(seat, state);
+    const reuse = slowLayerReuse(seat.stream.baseView, seat.stream.isSlowSync(state.tick));
+    const view = playerView(state, this.viewOf(seat), context, reuse);
+    const transport = seat.stream.next(view, seat.events);
+    if (transport === null) return;
+    if (transport.kind === 'snapshot') this.snapshotsThisTick += 1;
+    seat.events = [];
+    const text =
+      transport.kind === 'snapshot'
+        ? encodeSnapshot(transport.snapshot)
+        : encodeDelta(transport.delta);
+    this.sendText(seat, text);
   }
 
   private finish(state: MatchState): void {
     this.phase = 'ended';
-    for (const seat of this.seats) {
+    for (const seat of [...this.seats, ...this.spectators]) {
       this.send(seat, { t: 'end', winner: state.winner, tick: state.tick });
     }
   }
@@ -615,6 +675,7 @@ export class Room {
       seed: this.options.seed,
       players: this.options.size,
       fog: this.options.fog,
+      ...(seat.spectator ? { spectator: true } : {}),
     });
   }
 

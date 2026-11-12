@@ -139,9 +139,10 @@ function Action(props: {
 
 function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.Element {
   const [code, setCode] = useState('');
-  const join = (): void => {
+  const join = (spectate = false): void => {
     const room = code.trim().toUpperCase();
-    if (room !== '') props.go(`/online?room=${encodeURIComponent(room)}`);
+    if (room === '') return;
+    props.go(`/online?room=${encodeURIComponent(room)}${spectate ? '&spectate=1' : ''}`);
   };
   return (
     <>
@@ -167,8 +168,11 @@ function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.El
             if (event.key === 'Enter') join();
           }}
         />
-        <button type="button" onClick={join}>
+        <button type="button" onClick={() => join()}>
           {t('menu.join')}
+        </button>
+        <button type="button" onClick={() => join(true)}>
+          {t('menu.watch')}
         </button>
       </div>
     </>
