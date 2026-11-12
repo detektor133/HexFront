@@ -128,6 +128,34 @@
   color: var(--ui-ink2);
 }
 
+.invite {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.inviteLabel {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.inviteCode {
+  font-family: var(--font-display-family);
+  font-size: 32px;
+  font-weight: var(--font-display-weight);
+  letter-spacing: 0.16em;
+  user-select: all;
+}
+
+.inviteCopy {
+  justify-content: center;
+  width: 100%;
+}
+
 .error {
   margin: 0;
   padding: var(--space-md);

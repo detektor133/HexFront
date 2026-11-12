@@ -574,6 +574,18 @@ describe('наблюдение выбывшего', () => {
 });
 
 describe('зритель по коду комнаты', () => {
+  it('код комнаты можно ввести в любом регистре', () => {
+    const { hub, tick } = setup();
+    const host = new Client(hub, 'ip-a');
+    host.hello('Аня', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+    host.send({ t: 'start' });
+    tick(3);
+    const viewer = new Client(hub, 'ip-v');
+    viewer.hello('Зритель', { room: code.toUpperCase(), spectate: true });
+    expect(viewer.of('welcome')[0]?.room).toBe(code);
+  });
+
   it('зритель входит в идущий матч, получает вид игрока и не командует', () => {
     const { hub, tick } = setup();
     const host = new Client(hub, 'ip-a');

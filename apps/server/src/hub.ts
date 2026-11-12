@@ -368,7 +368,9 @@ export class Hub {
   }
 
   private findRoom(id: string): { shard: Shard; room: RoomStatus } | undefined {
-    return this.directory().find((entry) => entry.room.id === id);
+    // Код вводят руками: регистр не важен (id комнат — строчные).
+    const wanted = id.toLowerCase();
+    return this.directory().find((entry) => entry.room.id === wanted);
   }
 
   /** Обрабатывает `hello`: реконнект, приглашение, открытая комната, подсадка, закрытая комната. */

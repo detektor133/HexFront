@@ -137,13 +137,10 @@ function Action(props: {
   );
 }
 
-function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.Element {
-  const [code, setCode] = useState('');
-  const join = (spectate = false): void => {
-    const room = code.trim().toUpperCase();
-    if (room === '') return;
-    props.go(`/online?room=${encodeURIComponent(room)}${spectate ? '&spectate=1' : ''}`);
-  };
+function OnlineBody(props: {
+  readonly go: (url: string) => void;
+  readonly onCode: () => void;
+}): React.JSX.Element {
   return (
     <>
       <Action
@@ -157,24 +154,7 @@ function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.El
         hint={t('menu.lobbyHint')}
         onPress={() => props.go('/online?mode=private')}
       />
-      <div className={styles.codeRow}>
-        <input
-          value={code}
-          maxLength={12}
-          placeholder={t('menu.codePlaceholder')}
-          aria-label={t('menu.joinCode')}
-          onChange={(event) => setCode(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') join();
-          }}
-        />
-        <button type="button" onClick={() => join()}>
-          {t('menu.join')}
-        </button>
-        <button type="button" onClick={() => join(true)}>
-          {t('menu.watch')}
-        </button>
-      </div>
+      <Action label={t('menu.joinCode')} hint={t('menu.codeHint')} onPress={props.onCode} />
     </>
   );
 }
@@ -232,6 +212,7 @@ export function ModePanel(props: {
   readonly settings: MenuSettings;
   readonly update: (patch: Partial<MenuSettings>) => void;
   readonly go: (url: string) => void;
+  readonly onCode: () => void;
   readonly onBack: () => void;
   readonly className: string;
 }): React.JSX.Element {
@@ -253,7 +234,7 @@ export function ModePanel(props: {
         <h2 className={styles.panelTitle}>{modeName(props.mode)}</h2>
       </div>
       {props.mode === 'online' ? (
-        <OnlineBody go={props.go} />
+        <OnlineBody go={props.go} onCode={props.onCode} />
       ) : (
         <BotsBody settings={props.settings} update={props.update} go={props.go} />
       )}

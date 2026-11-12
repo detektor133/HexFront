@@ -240,16 +240,14 @@ export function LobbyPanel(props: {
             <b>{`${info.humans} ${t('online.people')}`}</b>
             <span>{` · ${Math.max(0, max - info.humans)} ${t('online.botsFill')}`}</span>
           </p>
-          {invite !== null && (
-            <div className={ui.codeRow}>
-              <input
-                readOnly
-                value={invite}
-                aria-label={t('online.link')}
-                onFocus={(event) => event.target.select()}
-              />
-              <button type="button" onClick={copy}>
-                {copied ? t('online.copied') : t('online.copy')}
+          {invite !== null && session !== null && (
+            <div className={styles.invite}>
+              <span className={styles.inviteLabel}>{t('online.roomCode')}</span>
+              <b className={styles.inviteCode} aria-label={t('online.roomCode')}>
+                {session.room.toUpperCase()}
+              </b>
+              <button type="button" className={`${ui.action} ${styles.inviteCopy}`} onClick={copy}>
+                {copied ? t('online.copied') : t('online.copyLink')}
               </button>
             </div>
           )}

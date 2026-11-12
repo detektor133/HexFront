@@ -219,8 +219,16 @@ test('@layout «Смотреть» по коду комнаты ведёт в м
   );
   await page.goto('/?server=ws://127.0.0.1:9997', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Онлайн|Online/ }).click();
-  await page.getByRole('textbox', { name: /Войти по коду|Join by code/ }).fill('k7qf');
-  await page.getByRole('button', { name: /Смотреть|Watch/ }).click();
+  await page.getByRole('button', { name: /Войти по коду|Join by code/ }).click();
+  const dialog = page.getByRole('dialog', { name: /Войти по коду|Join by code/ });
+  await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box?.x).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
+  // Можно вставить ссылку-приглашение целиком: код достаётся из неё.
+  await dialog.getByRole('textbox').fill('https://hexfront.example/online?room=K7QF');
+  await dialog.getByRole('button', { name: /Смотреть|Watch/ }).click();
   await expect
     .poll(
       () =>
@@ -232,6 +240,6 @@ test('@layout «Смотреть» по коду комнаты ведёт в м
       { timeout: 15_000 },
     )
     .toBe(true);
-  expect(hellos[0]).toMatchObject({ room: 'K7QF', spectate: true });
+  expect(hellos[0]).toMatchObject({ room: 'k7qf', spectate: true });
   await context.close();
 });
