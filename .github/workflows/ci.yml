@@ -91,7 +91,7 @@ jobs:
         run: pnpm --filter @hexfront/client exec playwright install --with-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm --filter @hexfront/client exec playwright install-deps chromium
-      - run: pnpm test:e2e:layout
+      - run: pnpm test:e2e:layout --reporter=github,line
 
   commit-messages:
     if: github.event_name == 'pull_request'
