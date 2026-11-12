@@ -2,6 +2,7 @@
 // все виды меню и онлайн-лобби видели одно и то же.
 import { useCallback, useState } from 'react';
 
+import { t } from '../i18n/dict.ts';
 import { quickMatchUrl } from '../routes.ts';
 import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -56,11 +57,36 @@ function write(key: string, value: string): void {
   }
 }
 
+const GUEST_KEY = 'hexfront.guestNumber';
+
+/**
+ * Имя по умолчанию «Игрок 4821»: номер создаётся один раз и хранится в браузере, поэтому у одного
+ * игрока оно не меняется от входа к входу, а у разных людей почти не совпадает.
+ */
+export function guestNick(): string {
+  let number = Number(read(GUEST_KEY, ''));
+  if (!Number.isInteger(number) || number < 1000) {
+    number = 1000 + Math.floor(Math.random() * 9000);
+    write(GUEST_KEY, String(number));
+  }
+  return `${t('menu.defaultNick')} ${number}`;
+}
+
+/** Цвет при первом входе выбирается случайно и запоминается: все новички не бирюзовые. */
+function firstColor(): string {
+  const saved = read(COLOR_KEY, '');
+  if (tokens.players.palette.some((p) => p.id === saved)) return saved;
+  const pick = tokens.players.palette[Math.floor(Math.random() * tokens.players.palette.length)];
+  const id = pick?.id ?? 'teal';
+  write(COLOR_KEY, id);
+  return id;
+}
+
 export function loadSettings(): MenuSettings {
   const players = Number(read(PLAYERS_KEY, String(PLAYERS_DEFAULT)));
   return {
-    nickname: read(NICKNAME_KEY, ''),
-    color: read(COLOR_KEY, tokens.players.palette[0]?.id ?? 'teal'),
+    nickname: read(NICKNAME_KEY, '') || guestNick(),
+    color: firstColor(),
     map: MAPS.find((m) => m.id === read(MAP_KEY, 'europe'))?.id ?? 'europe',
     players: Number.isInteger(players)
       ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, players))

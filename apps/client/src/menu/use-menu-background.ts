@@ -1,6 +1,5 @@
 // Живая карта за меню: партия шести ботов идёт в обычном темпе, камера плывёт от города к городу,
-// ни за кем конкретно не следя. Партия начинается за кадром и показывается, когда армии уже
-// сошлись; когда остаётся один, она заканчивается, и начинается новая.
+// ни за кем конкретно не следя. Партия начинается сразу с первого тика; когда остаётся один, она заканчивается, и начинается новая.
 import { useEffect, type RefObject } from 'react';
 
 import { loadMap } from '@hexfront/sim';
@@ -18,10 +17,8 @@ const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
 const BOTS = 6;
 /** Масштаб кадра: на этом уровне уже видны отряды и границы, а в кадр попадает много земель. */
 const WATCH_SCALE = 0.8;
-/** Подготовка за кадром: партия считается быстро, пока не пройдёт столько тиков или миллисекунд. */
-const WARM_SPEED = 60;
-const WARM_TICKS = 3000;
-const WARM_MAX_MS = 7000;
+/** Пока зритель сам двигает карту, камера не уплывает: столько мс после последнего касания. */
+const USER_HOLD_MS = 25_000;
 /** Как часто камера выбирает новое место и сколько летит к нему, мс. */
 const GLIDE_EVERY_MS = 12_000;
 const GLIDE_MS = 10_000;
@@ -36,12 +33,12 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
     let mapView: MapView | null = null;
     let layer: EconomyLayer | null = null;
     let stopResize: (() => void) | null = null;
+    let stopInput: (() => void) | null = null;
     let glide: ReturnType<typeof setInterval> | null = null;
     const timers = new Set<ReturnType<typeof setTimeout>>();
     let match: ReturnType<typeof startLocalMatch> | null = null;
     let deltaApplier = new ViewDeltaApplier();
     let json: unknown = null;
-    let warming = true;
     let finished = false;
 
     const later = (ms: number, action: () => void): void => {
@@ -57,28 +54,21 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
       host.style.transition = `opacity ${FADE_MS}ms ease`;
       host.style.opacity = visible ? '1' : '0';
     };
-    const endWarmUp = (): void => {
-      if (!warming) return;
-      warming = false;
-      match?.setSpeed(1);
-      show(true);
-    };
     const launch = (): void => {
       if (disposed || json === null) return;
       match?.dispose();
       deltaApplier = new ViewDeltaApplier();
-      warming = true;
       finished = false;
       match = startLocalMatch(
         json,
         1 + Math.floor(Math.random() * 1_000_000),
-        { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: WARM_SPEED },
+        { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: 1 },
         (message: FromWorker): void => {
           if (message.t === 'view') applyMessage(message);
         },
         { fog: false },
       );
-      later(WARM_MAX_MS, endWarmUp);
+      show(true);
     };
     function applyMessage(message: Extract<FromWorker, { t: 'view' }>): void {
       // Без подтверждения воркер перестаёт слать виды (защита от перегруза).
@@ -87,9 +77,9 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
         message.kind === 'snapshot'
           ? deltaApplier.applySnapshot(message.snapshot)
           : deltaApplier.applyDelta(message.delta);
-      layer?.setView(view, EMPTY_SELECTION);
+      // Зритель: ни одна армия не «своя», все отряды показываются одинаково.
+      layer?.setView({ ...view, armies: [] }, EMPTY_SELECTION);
       layer?.frame(performance.now());
-      if (warming && view.tick >= WARM_TICKS) endWarmUp();
       if (!finished && message.events.some((event) => event.t === 'matchWon')) {
         finished = true;
         later(AFTER_WIN_MS, () => {
@@ -134,13 +124,32 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
       const observer = new ResizeObserver(frame);
       observer.observe(host);
       stopResize = () => observer.disconnect();
+      // Колесо и жесты пальцев карта разбирает сама; левой кнопкой мыши её тянем здесь.
+      let touchedAt = -Infinity;
+      const onMove = (event: PointerEvent): void => {
+        touchedAt = performance.now();
+        if (event.pointerType === 'mouse' && (event.buttons & 1) === 1) {
+          created.pan(event.movementX, event.movementY);
+        }
+      };
+      host.addEventListener('pointermove', onMove);
+      const onWheel = (): void => {
+        touchedAt = performance.now();
+      };
+      host.addEventListener('wheel', onWheel, { passive: true });
+      stopInput = () => {
+        host.removeEventListener('pointermove', onMove);
+        host.removeEventListener('wheel', onWheel);
+      };
       const cities = loaded.map.cities;
       const glideTo = (ms: number): void => {
         const city = cities[Math.floor(Math.random() * cities.length)];
         if (city !== undefined) created.centerOn({ q: city.q, r: city.r }, ms);
       };
       glideTo(0);
-      glide = setInterval(() => glideTo(GLIDE_MS), GLIDE_EVERY_MS);
+      glide = setInterval(() => {
+        if (performance.now() - touchedAt > USER_HOLD_MS) glideTo(GLIDE_MS);
+      }, GLIDE_EVERY_MS);
       launch();
     };
     void start();
@@ -149,6 +158,7 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
       if (glide !== null) clearInterval(glide);
       for (const id of timers) clearTimeout(id);
       stopResize?.();
+      stopInput?.();
       match?.dispose();
       layer?.destroy();
       mapView?.destroy();

@@ -7,6 +7,7 @@ import {
   LEVELS,
   MAPS,
   NICK_MAX,
+  guestNick,
   PLAYERS_MAX,
   PLAYERS_MIN,
   PLAYERS_STEP,
@@ -59,6 +60,10 @@ export function NickPlate(props: {
           aria-label={t('menu.nickname')}
           autoComplete="nickname"
           onChange={(event) => props.update({ nickname: event.target.value.slice(0, NICK_MAX) })}
+          // Поле не остаётся пустым: ушли из него — вернулось имя по умолчанию.
+          onBlur={() => {
+            if (props.settings.nickname.trim() === '') props.update({ nickname: guestNick() });
+          }}
         />
         {bad && <span className={styles.problem}>{t('menu.nickShort')}</span>}
       </div>

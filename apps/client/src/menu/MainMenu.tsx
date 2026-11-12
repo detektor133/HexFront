@@ -9,7 +9,7 @@ import { NickPlate, tutorialLink, type ModeId } from './MenuParts.tsx';
 import { t } from '../i18n/dict.ts';
 import { isCoarsePointer } from '../input/touch-tap.ts';
 import { navigate } from '../nav.ts';
-import { nickProblem, useMenuSettings } from './menu-config.ts';
+import { guestNick, nickProblem, useMenuSettings } from './menu-config.ts';
 import styles from './menu-ui.module.css';
 import { useMenuBackground } from './use-menu-background.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
@@ -38,6 +38,8 @@ export function MainMenu(props: {
   // Переход в режим: сначала проверяем ник, на телефоне включаем полный экран (нужен жест).
   const go = useCallback(
     (url: string): void => {
+      // Пустой ник заменяется именем по умолчанию, чтобы войти в игру без лишних шагов.
+      if (settings.nickname.trim() === '') update({ nickname: guestNick() });
       if (nickProblem(settings.nickname)) {
         setShake((n) => n + 1);
         return;
@@ -52,7 +54,7 @@ export function MainMenu(props: {
       }
       navigate(url);
     },
-    [settings.nickname],
+    [settings.nickname, update],
   );
 
   useEffect(() => {

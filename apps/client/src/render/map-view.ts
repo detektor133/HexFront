@@ -87,6 +87,8 @@ export interface MapView {
   configure(options: MapViewOptions): void;
   /** Масштаб с центром экрана; для скриншотов и отладки. */
   setScale(scale: number): void;
+  /** Сдвигает камеру на экранный вектор (меню тянет карту левой кнопкой мыши). */
+  pan(dx: number, dy: number): void;
   /** Оставляет нижнюю панель вне области, к которой привязаны границы камеры. */
   setBottomInset(px: number): void;
   /** Оставляет HUD вне области, к которой привязаны границы камеры. */
@@ -332,6 +334,7 @@ export async function createMapView(
     (e) => {
       if (e.t === 'pan') {
         pinned = null;
+        centerAnimation = null;
         cam = panBy(cam, e.dx, e.dy, cameraView(), bounds);
         const now = performance.now();
         const dt = Math.max(1, now - lastPanMs);
@@ -342,6 +345,7 @@ export async function createMapView(
         lastPanMs = now;
       } else if (e.t === 'zoom') {
         pinned = null;
+        centerAnimation = null;
         cam = zoomAt(cam, e.factor, e.at.x, e.at.y, cameraView(), bounds);
       } else if (e.t === 'tap') {
         const world = toWorld(e.at);
@@ -377,6 +381,8 @@ export async function createMapView(
   const detach = attachInput(app.canvas, gesture, {
     zoom: (factor, at) => {
       pinned = null;
+      // Плавный перелёт камеры к цели иначе возвращал бы масштаб и положение каждый кадр.
+      centerAnimation = null;
       cam = zoomAt(cam, factor, at.x, at.y, cameraView(), bounds);
     },
     pressed: (n) => {
@@ -491,6 +497,11 @@ export async function createMapView(
       selectionHandler = handler;
       clearSelectionFrame();
     },
+    pan(dx, dy) {
+      centerAnimation = null;
+      cam = panBy(cam, dx, dy, cameraView(), bounds);
+      apply();
+    },
     setScale(scale) {
       const v = cameraView();
       cam = zoomAt(cam, scale / cam.scale, v.width / 2, v.height / 2, v, bounds);
@@ -533,7 +544,10 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   let count = 0;
+  /** Нажатые указатели: отпускание считается один раз, как бы оно ни пришло (pointerup, потеря захвата). */
+  const pressed = new Set<number>();
   const down = (e: PointerEvent): void => {
+    pressed.add(e.pointerId);
     canvas.setPointerCapture(e.pointerId);
     count += 1;
     h.pressed(count);
@@ -548,9 +562,14 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   };
   const move = (e: PointerEvent): void => {
     if (count === 0) return g.hover(local(e));
+    if (e.pointerType === 'mouse' && e.buttons === 0) return up(e);
     g.move(e.pointerId, local(e), performance.now());
   };
+  // Кнопку могли отпустить мимо холста или так, что браузер (Opera при правой кнопке с меню) не прислал
+  // pointerup: без этого жест тянул бы карту дальше. Движение без нажатых кнопок и потеря захвата —
+  // это тоже отпускание.
   const up = (e: PointerEvent): void => {
+    if (!pressed.delete(e.pointerId)) return;
     count = Math.max(0, count - 1);
     g.up(e.pointerId, local(e), performance.now());
     h.pressed(count);
@@ -569,6 +588,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('lostpointercapture', up);
   canvas.addEventListener('pointerleave', leave);
   canvas.addEventListener('wheel', wheel, { passive: false });
   // Правая кнопка — приказ, контекстное меню браузера над картой не нужно.
@@ -580,6 +600,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', up);
     canvas.removeEventListener('pointercancel', up);
+    canvas.removeEventListener('lostpointercapture', up);
     canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('wheel', wheel);
   };
