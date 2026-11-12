@@ -328,36 +328,34 @@ button.main {
 }
 
 /* Метка вида запроса: мир, пакт, оборонительный пакт, альянс, помощь и голосование различаются цветом и словом. */
-.tag {
-  flex: 0 0 auto;
-  padding: 1px 6px;
-  color: var(--ui-surface);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: var(--ui-ink2);
-  border-radius: 3px;
+/* Вид запроса: значок и приписка после имени окрашены в цвет вида. */
+.suffix {
+  margin-left: var(--space-xs);
+  color: var(--ui-ink2);
+  font-weight: 600;
 }
 
-.tag[data-kind='peace'] {
-  background: var(--status-success);
+.icon[data-kind='peace'],
+.suffix[data-kind='peace'] {
+  color: var(--status-success);
 }
 
-.tag[data-kind='defense'] {
-  background: var(--relation-ally);
+.icon[data-kind='defense'],
+.suffix[data-kind='defense'] {
+  color: var(--relation-ally);
 }
 
-.tag[data-kind='alliance'] {
-  background: var(--relation-own);
+.icon[data-kind='alliance'],
+.suffix[data-kind='alliance'] {
+  color: var(--relation-own);
 }
 
-.tag[data-kind='aid'] {
-  background: var(--status-danger);
+.icon[data-kind='aid'] {
+  color: var(--status-danger);
 }
 
-.tag[data-kind='vote'] {
-  background: var(--status-warning);
+.icon[data-kind='vote'] {
+  color: var(--status-warning);
 }
 
 .note {

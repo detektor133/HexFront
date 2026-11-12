@@ -104,8 +104,12 @@ function Row(props: {
   readonly open?: boolean;
   readonly offer?: boolean;
   readonly role?: string;
-  /** Вид запроса: цветная метка перед текстом, чтобы мир, пакт и альянс не путались. */
+  /** Вид запроса: цвет значка и короткая приписка после имени («Имя · пакт»), без повтора в тексте. */
   readonly kind?: FeedKind;
+  /** Приписка после текста (вид договора). */
+  readonly suffix?: string;
+  /** Полная подпись для чтения с экрана, если она длиннее видимого текста. */
+  readonly aria?: string;
   /** Запись только что появилась: въезжает и вспыхивает один раз; при раскрытии ленты не повторяется. */
   readonly fresh?: boolean;
   /** Короткая приписка справа от текста (ход голосования). */
@@ -123,13 +127,17 @@ function Row(props: {
   const slotClass = `${styles.slot} ${props.fresh ? styles.fresh : ''}`;
   const body = (
     <>
-      <span className={styles.icon}>{props.icon}</span>
-      {props.kind && (
-        <span className={styles.tag} data-kind={props.kind}>
-          {t(`feed.kind.${props.kind}` as MessageKey)}
-        </span>
-      )}
-      <span className={styles.name}>{props.text}</span>
+      <span className={styles.icon} data-kind={props.kind}>
+        {props.icon}
+      </span>
+      <span className={styles.name}>
+        {props.text}
+        {props.suffix && (
+          <span className={styles.suffix} data-kind={props.kind}>
+            {props.suffix}
+          </span>
+        )}
+      </span>
       {props.note && <span className={styles.note}>{props.note}</span>}
     </>
   );
@@ -144,13 +152,13 @@ function Row(props: {
           <button
             type="button"
             className={styles.main}
-            aria-label={props.text}
+            aria-label={props.aria ?? props.text}
             onClick={props.onMain}
           >
             {body}
           </button>
         ) : (
-          <span className={styles.main} aria-label={props.text} role="img">
+          <span className={styles.main} aria-label={props.aria ?? props.text} role="img">
             {body}
           </span>
         )}
@@ -318,7 +326,9 @@ export function EventFeed(props: {
           id={key}
           fresh={isFresh(key)}
           icon={<OfferIcon kind={offer.kind} />}
-          text={`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}
+          text={nameOf(offer.from)}
+          suffix={`· ${t(`feed.kind.${offer.kind}` as MessageKey)}`}
+          aria={`${t(offerKey(offer.kind))}: ${nameOf(offer.from)}`}
           kind={offer.kind}
           accent={ownerColor(offer.from)}
           offer
