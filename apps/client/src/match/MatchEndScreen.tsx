@@ -5,6 +5,7 @@ import type { WinReason } from '@hexfront/sim';
 import styles from './MatchEndScreen.module.css';
 import { t } from '../i18n/dict.ts';
 import { formatFp, formatSoldiers } from '../i18n/format.ts';
+import tv from '../ui/tv-window.module.css';
 
 interface VictoryHoldView {
   readonly player: number;
@@ -123,7 +124,7 @@ export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | 
   if (watching || (props.winner < 0 && !props.eliminated)) return null;
   const ended = props.eliminated || props.winner >= 0;
   return (
-    <section className={styles.card} role="dialog" aria-label={t('match.end')}>
+    <section className={`${styles.card} ${tv.on}`} role="dialog" aria-label={t('match.end')}>
       {[
         ...(ended ? heading(props) : []),
         ...(ended ? [standings(props), statistics(props)] : []),

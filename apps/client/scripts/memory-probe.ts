@@ -45,7 +45,9 @@ export async function runMemoryProbe(): Promise<void> {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.goto('http://localhost:4173/match?debug=1&speed=5&map=gen&seed=42&players=30');
     await page.waitForSelector('canvas');
-    await page.waitForTimeout(120_000);
+    // Секунд реального времени: по умолчанию 120 (10 минут матча на скорости 5); PROBE_WAIT_S=1440 даёт 2 часа матча.
+    const waitSeconds = Number(process.env.PROBE_WAIT_S ?? 120);
+    await page.waitForTimeout(waitSeconds * 1000);
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Скачать телеметрию' }).click();
     const download = await downloadPromise;
@@ -64,9 +66,12 @@ export async function runMemoryProbe(): Promise<void> {
             pixi: { canvasTextTextures: number | null };
           },
       );
-    for (let minute = 0; minute <= 10; minute += 1) {
+    const lastMinute = Math.floor(Math.max(...samples.map((sample) => sample.matchSeconds)) / 60);
+    const step = lastMinute > 20 ? 10 : 1;
+    for (let minute = 0; minute <= lastMinute; minute += step) {
       const windowSamples = samples.filter(
-        (sample) => sample.matchSeconds >= minute * 60 && sample.matchSeconds < (minute + 1) * 60,
+        (sample) =>
+          sample.matchSeconds >= minute * 60 && sample.matchSeconds < (minute + step) * 60,
       );
       const heaps = windowSamples
         .map((sample) => sample.heap.used)
