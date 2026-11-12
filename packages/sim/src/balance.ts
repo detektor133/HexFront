@@ -46,6 +46,8 @@ export const BOT_EASY_COMMANDER_EVERY = 3;
 export const BOT_NORMAL_COMMANDER_EVERY = 2;
 /** Война живёт не меньше стольких тиков (90 с), прежде чем бот согласится на мир, если не проигрывает. */
 export const BOT_WAR_MIN_TICKS = 900;
+/** Армию бота делят под новый фронт, только если в ней не меньше стольких солдат: мелкие половины не воюют. */
+export const BOT_SPLIT_MIN_SOLDIERS = fp(600);
 /** Победитель в войне устаёт и соглашается на мир, когда война идёт дольше стольких тиков (10 мин). */
 export const BOT_WAR_WEARY_TICKS = 6000;
 /** Бот не нападает на того, с кем только что помирился: столько тиков (5 мин) мира должно пройти. */
@@ -100,6 +102,8 @@ export interface BotProfile {
   readonly opportunist: boolean;
   /** Насколько обида влияет на выбор цели войны (очков отношения на единицу перевеса). */
   readonly grudge: number;
+  /** Сколько армий бот держит под фронты: делит большую армию, когда кусков границы больше. */
+  readonly maxArmies: number;
 }
 
 /** Профили по уровням: лёгкий осторожен и пассивен, сложный — инициативен, строит коалиции и рвёт их. */
@@ -114,6 +118,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     coalitions: false,
     opportunist: false,
     grudge: 0,
+    maxArmies: 2,
   },
   normal: {
     attackRatio: fp(1.2),
@@ -125,6 +130,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     coalitions: true,
     opportunist: false,
     grudge: 150,
+    maxArmies: 3,
   },
   medium: {
     attackRatio: fp(1),
@@ -136,6 +142,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     coalitions: true,
     opportunist: true,
     grudge: 250,
+    maxArmies: 4,
   },
 };
 

@@ -38,6 +38,7 @@
 | `BOT_WAR_WEARY_TICKS`        | 6000 (10 мин) `[ТЮНИНГ]` |
 | `BOT_PEACE_LOCK_TICKS`       | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_PACT_MIN_TICKS`         | 1800 (3 мин) `[ТЮНИНГ]` |
+| `BOT_SPLIT_MIN_SOLDIERS`     | 600 `[ТЮНИНГ]`          |
 
 Профили сложности `BOT_PROFILES` `[ТЮНИНГ]` (09-bots.md, «Правки 2026-11-12»):
 
@@ -52,6 +53,7 @@
 | `coalitions`   | нет  | да     | да               |
 | `opportunist`  | нет  | нет    | да               |
 | `grudge`       | 0    | 150    | 250              |
+| `maxArmies`    | 2    | 3      | 4                |
 
 ## Отношения игроков
 

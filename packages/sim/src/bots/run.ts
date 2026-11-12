@@ -3,6 +3,7 @@
 // игроки распределены по тикам: тик игрока — id mod COMMANDER_TICKS. Команды уходят в следующий тик
 // с source 'auto' — они не выключают auto. Вызывают локальный движок, комната сервера и golden.
 import { brainDecide, resolveBotWeights, type BotWeightsByPlayer } from './brain.ts';
+import { frontSplit } from './commander-split.ts';
 import { createCommanderContext, decide } from './commander.ts';
 import { createBotTickContext, type BotTickContext } from './context.ts';
 import { diplomacyCommands } from './diplomacy.ts';
@@ -98,6 +99,16 @@ export function commanderCommands(
     if (armies.length === 0) continue;
     const view = commanderView(state, p.id, viewContext, cities);
     const commanderContext = createCommanderContext(state.map, view, tickContext.ownedHexes[p.id]);
+    if (botIds.has(p.id)) {
+      const reserved = commanderContext.emptyNeutral.length > 0 && view.armies.length > 1;
+      const split = frontSplit(
+        view,
+        commanderContext.enemyPieces.length,
+        reserved,
+        BOT_PROFILES[levels[p.id] ?? 'medium'],
+      );
+      for (const cmd of split) out.push({ playerId: p.id, cmd, source: 'auto' });
+    }
     for (const armyId of armies) {
       const depth = botIds.has(p.id) ? BOT_LINE_MAX_DEPTH : undefined;
       const botWeights = botIds.has(p.id)
