@@ -7,7 +7,7 @@ import { serverUrl } from '../net/online-session.ts';
 
 export type ServerStatus =
   | { readonly state: 'checking' }
-  | { readonly state: 'online'; readonly humans: number }
+  | { readonly state: 'online'; readonly humans: number | null }
   | { readonly state: 'offline' };
 
 /** Как часто спрашиваем сервер, пока он жив, и пока его нет, мс. */
@@ -27,19 +27,48 @@ export function shortCount(n: number, thousand: string): string {
   return `${k < 10 ? k.toFixed(1).replace('.', ',') : Math.round(k)}${thousand}`;
 }
 
-async function probe(url: string): Promise<ServerStatus> {
+/** Запасная проверка: сокет открылся — сервер жив (работает и там, где /healthz закрыт для сайта). */
+function socketOpens(socketUrl: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(socketUrl);
+    } catch {
+      resolve(false);
+      return;
+    }
+    const timer = setTimeout(() => finish(false), TIMEOUT_MS);
+    function finish(ok: boolean): void {
+      clearTimeout(timer);
+      ws.onopen = null;
+      ws.onerror = null;
+      ws.close();
+      resolve(ok);
+    }
+    ws.onopen = () => finish(true);
+    ws.onerror = () => finish(false);
+  });
+}
+
+async function probe(socketUrl: string): Promise<ServerStatus> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-    if (!response.ok) return { state: 'offline' };
-    const body = (await response.json()) as { humans?: unknown };
-    return { state: 'online', humans: typeof body.humans === 'number' ? body.humans : 0 };
+    const response = await fetch(healthUrl(socketUrl), {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { humans?: unknown };
+      return { state: 'online', humans: typeof body.humans === 'number' ? body.humans : 0 };
+    }
   } catch {
-    return { state: 'offline' };
+    // Нет ответа или сайту нельзя читать /healthz (старый сервер без CORS): пробуем сокет.
   } finally {
     clearTimeout(timer);
   }
+  // Сервер жив, но число игроков неизвестно: плашка покажет просто «в сети».
+  return (await socketOpens(socketUrl)) ? { state: 'online', humans: null } : { state: 'offline' };
 }
 
 /** Состояние сервера: проверка при открытии, редкий опрос при связи, частый без неё. */
@@ -51,12 +80,11 @@ export function useServerStatus(): ServerStatus {
       setStatus({ state: 'offline' });
       return;
     }
-    const url = healthUrl(socketUrl);
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const check = async (): Promise<void> => {
       if (timer !== null) clearTimeout(timer);
-      const next = await probe(url);
+      const next = await probe(socketUrl);
       if (disposed) return;
       setStatus(next);
       timer = setTimeout(

@@ -91,7 +91,9 @@ export function MainMenu(props: {
         >
           <span className={styles.statusDot} aria-hidden="true" />
           {server.state === 'online'
-            ? `${shortCount(server.humans, t('menu.thousand'))} ${t('menu.inNet')}`
+            ? server.humans === null
+              ? t('menu.serverUp')
+              : `${shortCount(server.humans, t('menu.thousand'))} ${t('menu.inNet')}`
             : server.state === 'offline'
               ? t('menu.offline')
               : t('menu.checking')}
