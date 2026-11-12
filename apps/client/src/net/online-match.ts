@@ -105,6 +105,14 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
   client.start();
 
   const noop = (): void => undefined;
+  // Чей вид сейчас запрошен; запрос повторять не нужно (экран зовёт setView при каждом старте).
+  let watching: number | null = null;
+  const watch = (playerId: number | null): void => {
+    if (playerId === watching) return;
+    watching = playerId;
+    const target = playerId ?? client.session?.playerId;
+    if (target !== undefined) client.watch(target);
+  };
   return {
     client,
     send: (cmd) => {
@@ -115,8 +123,13 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
     setPaused: noop,
     step: noop,
     setSpeed: noop,
-    setObserver: noop,
-    setView: noop,
+    // Выбывший смотрит чужими глазами: `null` — вернуться к себе. Живому сервер не ответит.
+    setObserver: (playerId) => {
+      watch(playerId);
+    },
+    setView: (playerId) => {
+      watch(playerId);
+    },
     select: (hex) => {
       client.select(hex);
     },

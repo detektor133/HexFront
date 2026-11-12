@@ -109,6 +109,8 @@ interface Seat {
   waitingTicks: number;
   droppedAt: number | null;
   botControlled: boolean;
+  /** Чьими глазами смотрит выбывший игрок; `null` — своими (обычная игра). */
+  watching: number | null;
   windowStart: number;
   windowCount: number;
 }
@@ -270,6 +272,7 @@ export class Room {
       waitingTicks: 0,
       droppedAt: null,
       botControlled: false,
+      watching: null,
       windowStart: 0,
       windowCount: 0,
     };
@@ -342,6 +345,11 @@ export class Room {
       this.send(seat, { t: 'rejected', seq, reason: 'retry' });
       return;
     }
+    // Наблюдатель только смотрит: команды из чужого интерфейса не исполняются.
+    if (seat.watching !== null) {
+      this.send(seat, { t: 'rejected', seq, reason: 'bad' });
+      return;
+    }
     const now = this.options.now();
     if (now - seat.windowStart >= 1000) {
       seat.windowStart = now;
@@ -364,6 +372,30 @@ export class Room {
     if (seat === undefined) return;
     seat.stream.acknowledge(tick);
     seat.waitingTicks = 0;
+  }
+
+  /** Чей вид получает место: наблюдаемого игрока или свой. */
+  private viewOf(seat: Seat): number {
+    return seat.watching ?? seat.playerId;
+  }
+
+  /**
+   * Выбывший игрок переключает наблюдение на другого игрока (или назад на себя). Живому отказ:
+   * вид соперника с его туманом — чужая информация. Следующий вид уходит полным снимком.
+   */
+  public watch(conn: Connection, player: number): void {
+    const seat = this.seats.find((s) => s.conn === conn);
+    const state = this.state;
+    if (seat === undefined || state === null || this.phase !== 'running') return;
+    if (state.players[seat.playerId]?.status === 'alive') return;
+    if (state.players[player] === undefined) return;
+    seat.watching = player === seat.playerId ? null : player;
+    seat.stream.reset();
+    seat.waitingTicks = 0;
+    seat.events = [];
+    seat.selected = null;
+    seat.lastSel = null;
+    this.send(seat, { t: 'selection', sel: null });
   }
 
   /** Игрок выбрал гекс: карточка придёт сразу и затем при каждом изменении. */
@@ -398,14 +430,14 @@ export class Room {
       this.send(seat, {
         t: 'pathPreview',
         id,
-        preview: previewPath(state, seat.playerId, q.unitIds, q.to, q.via),
+        preview: previewPath(state, this.viewOf(seat), q.unitIds, q.to, q.via),
       });
       return;
     }
     const mask =
       q.mode === 'supply'
-        ? supplyLevels(state, seat.playerId)
-        : buildMask(state, seat.playerId, q.mode.slice('build:'.length) as BuildMaskKind);
+        ? supplyLevels(state, this.viewOf(seat))
+        : buildMask(state, this.viewOf(seat), q.mode.slice('build:'.length) as BuildMaskKind);
     this.send(seat, { t: 'mapMask', id, mode: q.mode, rle: encodeMaskRle(mask) });
   }
 
@@ -413,9 +445,9 @@ export class Room {
   private pushSelection(seat: Seat, state: MatchState): void {
     if (seat.conn === null) return;
     const hex = seat.selected;
-    const visible =
-      hex !== null && (!state.fog || state.vision?.visible[seat.playerId]?.[hex] === 1);
-    const sel = hex !== null && visible ? selectionFor(state, seat.playerId, hex) : null;
+    const viewer = this.viewOf(seat);
+    const visible = hex !== null && (!state.fog || state.vision?.visible[viewer]?.[hex] === 1);
+    const sel = hex !== null && visible ? selectionFor(state, viewer, hex) : null;
     const json = JSON.stringify(sel);
     if (json === seat.lastSel) return;
     seat.lastSel = json;
@@ -537,7 +569,7 @@ export class Room {
     let snapshots = 0;
     for (const seat of this.seats) {
       if (seat.botControlled) continue;
-      seat.events.push(...eventsFor(state.events, seat.playerId));
+      seat.events.push(...eventsFor(state.events, this.viewOf(seat)));
       if (seat.events.length > MAX_QUEUED_EVENTS)
         seat.events.splice(0, seat.events.length - MAX_QUEUED_EVENTS);
       if (seat.conn === null) continue;
@@ -552,7 +584,7 @@ export class Room {
       if (seat.stream.willSendSnapshot && snapshots >= MAX_SNAPSHOTS_PER_TICK) continue;
       if (seat.selected !== null || seat.lastSel !== null) this.pushSelection(seat, state);
       const reuse = slowLayerReuse(seat.stream.baseView, seat.stream.isSlowSync(state.tick));
-      const view = playerView(state, seat.playerId, context, reuse);
+      const view = playerView(state, this.viewOf(seat), context, reuse);
       const transport = seat.stream.next(view, seat.events);
       if (transport === null) continue;
       if (transport.kind === 'snapshot') snapshots += 1;

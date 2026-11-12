@@ -1,0 +1,50 @@
+.bar {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: calc(100% - 2 * var(--space-md));
+  padding: var(--space-xs);
+  box-sizing: border-box;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+  color: var(--ui-ink);
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface2);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+
+.name {
+  display: grid;
+  min-width: 120px;
+  margin: 0;
+  padding: 0 var(--space-sm);
+  text-align: center;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label {
+  color: var(--ui-ink3);
+  font-size: 12px;
+  font-weight: 400;
+}

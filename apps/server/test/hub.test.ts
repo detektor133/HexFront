@@ -519,3 +519,56 @@ describe('дренаж перед выкладкой', () => {
     expect(back.count('snapshot')).toBeGreaterThan(0);
   });
 });
+
+describe('наблюдение выбывшего', () => {
+  function runningRoom() {
+    const ctx = setup();
+    const a = new Client(ctx.hub, 'ip-a');
+    a.hello('Аня', { mode: 'private' });
+    const code = a.of('welcome')[0]?.room ?? '';
+    const b = new Client(ctx.hub, 'ip-b');
+    b.hello('Борис', { room: code });
+    a.send({ t: 'start' });
+    ctx.tick(3);
+    const room = ctx.hub.roomById(code);
+    if (room?.state == null) throw new Error('матч не запущен');
+    return { ...ctx, a, b, state: room.state };
+  }
+
+  function lastViewPlayer(client: Client): number | undefined {
+    const text = [...client.raw]
+      .reverse()
+      .find((raw) => raw.startsWith('{"t":"snapshot"') || raw.includes('"t":"snapshot"'));
+    return text === undefined ? undefined : decodeSnapshot(text).view.playerId;
+  }
+
+  it('живой игрок не может смотреть чужими глазами', () => {
+    const { a, tick } = runningRoom();
+    a.raw.length = 0;
+    a.send({ t: 'watch', player: 1 });
+    tick(2);
+    expect(a.count('snapshot')).toBe(0);
+  });
+
+  it('выбывший получает вид выбранного игрока, и его команды не исполняются', () => {
+    const { a, state, tick } = runningRoom();
+    const me = state.players[0];
+    if (me === undefined) throw new Error('нет игрока');
+    me.status = 'eliminated';
+    ackAll(a);
+    a.raw.length = 0;
+
+    a.send({ t: 'watch', player: 1 });
+    tick(2);
+    expect(lastViewPlayer(a)).toBe(1);
+
+    a.send({ t: 'cmd', seq: 1, cmd: { t: 'setTax', rate: 10 } as never });
+    expect(a.of('rejected')[0]?.reason).toBe('bad');
+
+    ackAll(a);
+    a.raw.length = 0;
+    a.send({ t: 'watch', player: 0 });
+    tick(2);
+    expect(lastViewPlayer(a)).toBe(0);
+  });
+});

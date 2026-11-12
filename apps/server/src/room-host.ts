@@ -146,6 +146,9 @@ export class RoomHost {
       case 'start':
         room.startEarly(connection);
         break;
+      case 'watch':
+        room.watch(connection, message.player);
+        break;
       default:
         break;
     }

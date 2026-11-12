@@ -79,7 +79,12 @@ export type C2S =
   /** Расчёт по полному состоянию; ответ приходит с тем же `id`. */
   | { readonly t: 'query'; readonly id: number; readonly q: Query }
   /** Хозяин закрытой комнаты запускает матч раньше срока (остальные места займут боты). */
-  | { readonly t: 'start' };
+  | { readonly t: 'start' }
+  /**
+   * Выбывший игрок смотрит матч глазами другого игрока (вид, карточки, прогнозы — его), но не
+   * командует. Живому игроку сервер отказывает молча: иначе можно подсматривать чужой туман.
+   */
+  | { readonly t: 'watch'; readonly player: number };
 
 /** Причины, по которым сервер закрывает вход. */
 export type RefuseReason =
@@ -345,6 +350,11 @@ export function decodeClientMessage(text: string): C2S {
       return { t: 'start' };
     case 'resync':
       return { t: 'resync' };
+    case 'watch':
+      if (!isInt(source.player) || source.player < 0 || source.player > 1000) {
+        throw new MessageError('Некорректный watch');
+      }
+      return { t: 'watch', player: source.player };
     case 'select': {
       if (source.hex !== null && !isInt(source.hex)) throw new MessageError('Некорректный select');
       return { t: 'select', hex: source.hex };

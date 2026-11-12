@@ -185,6 +185,13 @@ export class NetClient {
     this.send({ t: 'select', hex });
   }
 
+  /** Выбывший игрок просит вид другого игрока: сервер пришлёт полный снимок. */
+  public watch(player: number): void {
+    this.fullPending = true;
+    this.appliedTick = null;
+    this.send({ t: 'watch', player });
+  }
+
   /** Запрос к серверу по полному состоянию (путь, маска карты). */
   public query(id: number, q: Query): void {
     this.send({ t: 'query', id, q });

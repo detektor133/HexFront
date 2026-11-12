@@ -7,6 +7,7 @@ import { BuildingsPanel } from './BuildingsPanel.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
+import { SpectatorBar, watchOrder } from './SpectatorBar.tsx';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
 import { ArmyBar } from '../dev/ArmyBar.tsx';
@@ -57,6 +58,8 @@ function unitCardStyle(
     '--top-inset': `${topInset}px`,
   } as React.CSSProperties;
 }
+
+const noSend = (): void => undefined;
 
 /** Время затухания окна отрядов, мс (как в UnitCard.module.css). */
 const CARD_FADE_MS = 160;
@@ -156,6 +159,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   );
   const { army } = sb;
   const view = sb.msg?.view;
+  // Выбывший онлайн-игрок смотрит чужими глазами: интерфейс тот же, но приказов нет.
+  const online = new URLSearchParams(appSearch()).get('online') === '1';
+  const spectating = online && sb.observerId !== null;
+  const send = spectating ? noSend : sb.send;
   const groupedCardFixture = new URLSearchParams(appSearch()).get('unitCard') === 'groups';
   const fixtureSourceUnit = view?.units.find(
     (unit) => unit.owner === view.playerId && unit.order !== 'retreat' && unit.armyId !== null,
@@ -176,7 +183,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       : sb.picked;
   // Окно отрядов закрывается плавно: после снятия выбора его ещё показывают на время затухания.
   const unitCard = useLingering(
-    cardView && cardPicked.units.length > 0 && !sb.tool
+    cardView && cardPicked.units.length > 0 && !sb.tool && !spectating
       ? { view: cardView, picked: cardPicked }
       : null,
     CARD_FADE_MS,
@@ -343,7 +350,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       {view && (
         <Hud
           view={view}
-          send={sb.send}
+          send={send}
           fog={sb.fog}
           setFog={sb.setFog}
           showFog={debug}
@@ -395,7 +402,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           events={sb.events}
         />
       )}
-      {view && map && sb.menu && !pauseState.menuOpen && (
+      {view && map && sb.menu && !pauseState.menuOpen && !spectating && (
         <TerritoryMenu
           view={view}
           map={map}
@@ -432,7 +439,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         <MatchEnd
           view={view}
           fog={sb.fog}
-          onWatch={(message) => sb.setFog(message.enabled)}
+          onWatch={(message) => {
+            // Онлайн «Смотреть» открывает вид лучшего живого игрока; локально снимает туман.
+            const first = online ? watchOrder(view)[0] : undefined;
+            if (first !== undefined) sb.setObserver(first);
+            else sb.setFog(message.enabled);
+          }}
           onMenu={pauseController.goToMenu}
           {...(() => {
             const won = sb.msg?.events.find((event) => event.t === 'matchWon');
@@ -454,7 +466,8 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           style={pauseLayoutStyle}
         />
       )}
-      {view && styleFor('bottom-panel') && (
+      {view && spectating && <SpectatorBar view={view} onWatch={sb.setObserver} />}
+      {view && styleFor('bottom-panel') && !spectating && (
         <ArmyBar
           view={view}
           selected={view.armies.some((a) => a.id === army) ? army : null}
@@ -496,7 +509,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         </button>
       )}
       <BuildFeedbackMark feedback={sb.mapModes.feedback} />
-      {view && !debug && !pauseState.menuOpen && (
+      {view && !debug && !pauseState.menuOpen && !spectating && (
         <MapTools
           mapMode={sb.mapModes.mapMode}
           build={sb.mapModes.build}
@@ -523,7 +536,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
         />
       )}
-      {view && !debug && buildingsOpen && (
+      {view && !debug && buildingsOpen && !spectating && (
         <BuildingsPanel
           view={view}
           send={sb.send}
@@ -578,7 +591,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             s={sb.msg.selection}
             view={view}
             map={map}
-            send={sb.send}
+            send={send}
             onClose={() => sb.pick(NOTHING_PICKED)}
             onRoadPreview={sb.setRoadPreview}
             onHeight={setCardH}
