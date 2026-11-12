@@ -6,7 +6,7 @@
 import { breakout } from './commander-breakout.ts';
 import { commanderLine } from './commander-line.ts';
 import { strike } from './commander-strike.ts';
-import { frontForces, needsLine, stance } from './commander-war.ts';
+import { armyCard, frontForces, needsLine, stance } from './commander-war.ts';
 import { warWith } from './war.ts';
 import {
   AXIS_DONE_PERCENT,
@@ -493,22 +493,25 @@ function botWar(
 ): Command[] {
   const active = plan.offensive?.active === true;
   const forces = frontForces(view, map.width, units, plan.edges, { map, hexes: view.hexes });
+  // Карточка армии: тот же лимит и состав, что у игрока; добирает общая закупка.
+  const card = armyCard(view, armyId, forces, profile);
   if (stance(forces, active, profile) === 'hold') {
-    return active ? [{ t: 'stopOffensive', armyId }] : [];
+    return active ? [...card, { t: 'stopOffensive', armyId }] : card;
   }
   if (needsLine(plan, finished)) {
     // Линию, которую не удалось построить, повторно ищем не чаще раза в LINE_RETRY_TICKS на армию:
     // поиск по земле врага дорог, а команда была бы пустой каждый раз.
     if (plan.offensive === null && (view.tick + armyId) % LINE_RETRY_TICKS >= COMMANDER_TICKS)
-      return [];
+      return card;
     const lines = strikeAxes(map, view, plan.edges, piece.enemy, lineDepth);
-    if (lines.length === 0) return [];
+    if (lines.length === 0) return card;
     return [
+      ...card,
       { t: 'setOffensiveLine', armyId, edges: lines.flat(), lines },
       { t: 'startOffensive', armyId },
     ];
   }
-  return active ? [] : [{ t: 'startOffensive', armyId }];
+  return active ? card : [...card, { t: 'startOffensive', armyId }];
 }
 
 // Доля гексов линии, уже взятых игроком, процентов.

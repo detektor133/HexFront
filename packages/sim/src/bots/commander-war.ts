@@ -4,8 +4,9 @@
 // выученным весам, и армия могла стоять вечно; теперь война — дело commander, а не весов.
 import { warWith } from './war.ts';
 import type { BotProfile } from '../balance.ts';
+import type { Command } from '../commands/types.ts';
 import { hexDistanceById, type HexId } from '../math/hex.ts';
-import { FP, intDiv } from '../math/int.ts';
+import { FP, intDiv, type Fp } from '../math/int.ts';
 import type { PlanView } from '../queries/plan-view.ts';
 import type { PlayerView } from '../queries/player-view.ts';
 import type { UnitView } from '../queries/unit-view.ts';
@@ -82,4 +83,43 @@ export function stance(
 /** Линию наступления пора строить заново: её нет, она выполнена или армия на ней застряла. */
 export function needsLine(plan: Extract<PlanView, { kind: 'front' }>, finished: boolean): boolean {
   return plan.offensive === null || plan.offensive === undefined || finished || plan.stuck;
+}
+
+/** Шаг лимита карточки: меньшее изменение заказа не отдаётся командой (закупка идёт по 50 солдат). */
+const CARD_STEP = 50;
+/** Запас над перевесом, при котором армия начинает наступать: заказ на четверть больше. */
+const CARD_MARGIN: Fp = 1250 as Fp;
+
+/**
+ * Карточка армии бота — тот же лимит и состав, что игрок задаёт на карточке армии (`setArmyLimit`):
+ * армию добирает общая закупка (`systems/procure.ts`), потери восполняются сами. Лимит растёт до
+ * силы, с которой по профилю можно наступать на видимого врага у фронта, не больше доли людей и
+ * армии государства, и никогда не падает ниже нынешней численности (иначе закупка отпускала бы
+ * войска в резерв). Танки и артиллерия — доли заказа из профиля.
+ * @returns команда нового заказа или пусто, если заказ не изменился
+ */
+export function armyCard(
+  view: PlayerView,
+  armyId: number,
+  forces: { mine: number; theirs: number },
+  profile: BotProfile,
+): Command[] {
+  const army = view.armies.find((a) => a.id === armyId);
+  if (!army) return [];
+  const have = intDiv(forces.mine, FP);
+  const wanted = army.wanted ?? 0;
+  const mineAll = view.units
+    .filter((u) => u.owner === view.playerId)
+    .reduce((sum, u) => sum + u.soldiers, 0);
+  const cap = intDiv(intDiv(mineAll + view.me.popTotal, 2 * FP) * profile.armyCapPercent, 100);
+  const enemy = intDiv(forces.theirs, FP);
+  const need = intDiv(enemy * profile.attackRatio * CARD_MARGIN, FP * FP);
+  const next = Math.max(wanted, have, Math.min(need, cap));
+  const rounded = intDiv(next + CARD_STEP - 1, CARD_STEP) * CARD_STEP;
+  const target = wanted === 0 ? Math.max(rounded, CARD_STEP) : rounded;
+  if (wanted !== 0 && target - wanted < CARD_STEP) return [];
+  const armor = intDiv(target * profile.armorPercent, 100);
+  const artillery = intDiv(target * profile.artilleryPercent, 100);
+  const mix = armor + artillery > 0 ? { mix: { armor, artillery } } : {};
+  return [{ t: 'setArmyLimit', armyId, soldiers: target, ...mix }];
 }

@@ -4,8 +4,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOT_PROFILES } from '../../src/balance.ts';
-import { frontForces, stance } from '../../src/bots/commander-war.ts';
+import { armyCard, frontForces, stance } from '../../src/bots/commander-war.ts';
 import { commanderCommands } from '../../src/bots/run.ts';
+import { FP } from '../../src/math/int.ts';
 import { playerView } from '../../src/queries/player-view.ts';
 import { step } from '../../src/step.ts';
 import { assignUnits, at, city, createArmy, own, scenario } from '../scenario/dsl.ts';
@@ -103,5 +104,36 @@ describe('commander-war: бот наступает сам', () => {
       hexes: view.hexes,
     });
     expect(forces.mine).toBeGreaterThan(0);
+  });
+});
+
+describe('commander-war: карточка армии бота', () => {
+  const view = (): { view: ReturnType<typeof playerView>; army: number } => {
+    const s = scenario(FIELD, { legend });
+    const army = armyOf(s, 3, 200);
+    return { view: playerView(s.state, 0), army };
+  };
+
+  it('впервые задаёт заказ не меньше нынешней численности, с долей танков и артиллерии по профилю', () => {
+    const { view: v, army } = view();
+    const forces = { mine: 600 * FP, theirs: 0 };
+    const [cmd] = armyCard(v, army, forces, BOT_PROFILES.medium);
+    expect(cmd?.t).toBe('setArmyLimit');
+    if (cmd?.t !== 'setArmyLimit') return;
+    expect(cmd.soldiers).toBeGreaterThanOrEqual(600);
+    expect(cmd.mix?.artillery).toBeGreaterThan(0);
+    // Лёгкий бот заказывает только пехоту.
+    const [easy] = armyCard(v, army, forces, BOT_PROFILES.easy);
+    expect(easy?.t === 'setArmyLimit' && easy.mix).toBeFalsy();
+  });
+
+  it('растёт вслед за видимым врагом, но не выше предела, и не падает ниже нынешнего заказа', () => {
+    const { view: v, army } = view();
+    const cap = armyCard(v, army, { mine: 600 * FP, theirs: 10_000_000 * FP }, BOT_PROFILES.normal);
+    const small = armyCard(v, army, { mine: 600 * FP, theirs: 0 }, BOT_PROFILES.normal);
+    const top = cap[0]?.t === 'setArmyLimit' ? cap[0].soldiers : 0;
+    const base = small[0]?.t === 'setArmyLimit' ? small[0].soldiers : 0;
+    expect(top).toBeGreaterThanOrEqual(base);
+    expect(top).toBeLessThan(10_000_000);
   });
 });

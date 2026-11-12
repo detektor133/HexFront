@@ -104,6 +104,11 @@ export interface BotProfile {
   readonly grudge: number;
   /** Сколько армий бот держит под фронты: делит большую армию, когда кусков границы больше. */
   readonly maxArmies: number;
+  /** Доля от предела государства (половина людей и армии), до которой бот растит заказ одной армии, процентов. */
+  readonly armyCapPercent: number;
+  /** Доля танков и артиллерии в заказе армии, процентов (состав карточки армии). */
+  readonly armorPercent: number;
+  readonly artilleryPercent: number;
 }
 
 /** Профили по уровням: лёгкий осторожен и пассивен, сложный — инициативен, строит коалиции и рвёт их. */
@@ -119,6 +124,9 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     opportunist: false,
     grudge: 0,
     maxArmies: 2,
+    armyCapPercent: 30,
+    armorPercent: 0,
+    artilleryPercent: 0,
   },
   normal: {
     attackRatio: fp(1.2),
@@ -131,6 +139,9 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     opportunist: false,
     grudge: 150,
     maxArmies: 3,
+    armyCapPercent: 40,
+    armorPercent: 10,
+    artilleryPercent: 10,
   },
   medium: {
     attackRatio: fp(1),
@@ -143,6 +154,9 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     opportunist: true,
     grudge: 250,
     maxArmies: 4,
+    armyCapPercent: 50,
+    armorPercent: 15,
+    artilleryPercent: 15,
   },
 };
 
