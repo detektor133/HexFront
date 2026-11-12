@@ -41,6 +41,17 @@ const COLORS = {
 /** Считает пиксели снимка, близкие к заданным цветам фишки (допуск ±8 на канал). */
 async function chipPixels(page: Page): Promise<Record<string, number>> {
   const shot = await page.locator('canvas').first().screenshot();
+  // Разбор снимка идёт в пустой вкладке: главный поток страницы игры занят отрисовкой WebGL
+  // (в CI — программной) и не отвечал на evaluate дольше таймаута теста.
+  const scratch = await page.context().newPage();
+  try {
+    return await decodeChipPixels(scratch, shot);
+  } finally {
+    await scratch.close();
+  }
+}
+
+async function decodeChipPixels(page: Page, shot: Buffer): Promise<Record<string, number>> {
   return page.evaluate(
     async ({ b64, colors }) => {
       const bitmap = await createImageBitmap(
@@ -74,6 +85,7 @@ async function chipPixels(page: Page): Promise<Record<string, number>> {
 test('@layout фишки на GPU: цвета фишек на экране близки к рисованию на процессоре', async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   const counts: Record<string, Record<string, number>> = {};
   for (const mode of ['gpu', 'legacy']) {
     await page.goto(
