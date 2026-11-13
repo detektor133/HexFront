@@ -1,5 +1,5 @@
-// Чат онлайн-матча: кнопка в колонке инструментов карты и панель сообщений. Быстрые реакции — значки,
-// личное сообщение — выбор адресата или кнопка «Написать» в окне соседа.
+// Чат онлайн-матча: кнопка в колонке инструментов и лента внизу слева. Быстрые реакции — значки,
+// личное сообщение — кнопка «Написать» в окне соседа.
 import {
   IconAlertTriangle,
   IconHeartHandshake,
@@ -69,7 +69,11 @@ export function ChatToggle(): React.JSX.Element | null {
   );
 }
 
-/** Панель чата слева от колонки инструментов. */
+/** Сколько последних сообщений видно в ленте и сколько мс висит новое при свёрнутом чате. */
+const SHOWN = 6;
+const TOAST_MS = 6000;
+
+/** Лента, ввод и быстрые реакции внизу слева, над нижней панелью. */
 export function ChatPanel(props: {
   readonly players: readonly { readonly id: number; readonly name: string }[];
   readonly bottom: number;
@@ -80,44 +84,34 @@ export function ChatPanel(props: {
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
   }, [chat.lines.length, chat.open]);
-  if (chat.sender === null || !chat.open) return null;
+  // Свёрнутый чат не молчит: новое сообщение появляется строкой на несколько секунд.
+  const last = chat.lines.at(-1);
+  const [toastId, setToastId] = useState<number | null>(null);
+  useEffect(() => {
+    if (chat.open || last === undefined) return;
+    setToastId(last.id);
+    const timer = setTimeout(() => setToastId(null), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [last?.id, chat.open]);
+  if (chat.sender === null) return null;
   const me = chat.sender.me;
+  if (!chat.open) {
+    return last !== undefined && toastId === last.id ? (
+      <ul className={styles.toast} style={{ bottom: props.bottom }} aria-live="polite">
+        <Line line={last} me={me} />
+      </ul>
+    ) : null;
+  }
+  const target = props.players.find((player) => player.id === chat.target);
   const submit = (): void => {
     chatStore.sendText(text);
     setText('');
   };
   return (
     <section className={styles.panel} style={{ bottom: props.bottom }} aria-label={t('chat.title')}>
-      <header className={styles.head}>
-        <b>{t('chat.title')}</b>
-        <select
-          className={styles.to}
-          aria-label={t('chat.to')}
-          value={chat.target ?? ''}
-          onChange={(event) =>
-            chatStore.setTarget(event.target.value === '' ? null : Number(event.target.value))
-          }
-        >
-          <option value="">{t('chat.all')}</option>
-          {props.players
-            .filter((player) => player.id !== me)
-            .map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.name}
-              </option>
-            ))}
-        </select>
-        <button
-          type="button"
-          className={styles.close}
-          aria-label={t('chat.close')}
-          onClick={chatStore.toggle}
-        >
-          <IconX size={18} aria-hidden="true" />
-        </button>
-      </header>
       <ul className={styles.log}>
-        {chat.lines.map((line) => (
+        {chat.lines.length === 0 && <li className={styles.empty}>{t('chat.empty')}</li>}
+        {chat.lines.slice(-SHOWN).map((line) => (
           <Line key={line.id} line={line} me={me} />
         ))}
         <li ref={end} aria-hidden="true" />
@@ -130,7 +124,7 @@ export function ChatPanel(props: {
             className={styles.reaction}
             onClick={() => chatStore.sendEmoji(index)}
           >
-            <Icon size={18} aria-hidden="true" />
+            <Icon size={20} aria-hidden="true" />
           </button>
         ))}
       </div>
@@ -141,6 +135,17 @@ export function ChatPanel(props: {
           submit();
         }}
       >
+        {target !== undefined && (
+          <button
+            type="button"
+            className={styles.target}
+            title={t('chat.all')}
+            onClick={() => chatStore.setTarget(null)}
+          >
+            <span>{target.name}</span>
+            <IconX size={16} aria-hidden="true" />
+          </button>
+        )}
         <input
           className={styles.input}
           value={text}
@@ -151,7 +156,7 @@ export function ChatPanel(props: {
           onKeyDown={(event) => event.stopPropagation()}
         />
         <button type="submit" className={styles.send} aria-label={t('chat.send')}>
-          <IconSend size={18} aria-hidden="true" />
+          <IconSend size={20} aria-hidden="true" />
         </button>
       </form>
     </section>

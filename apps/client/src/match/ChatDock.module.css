@@ -1,4 +1,4 @@
-/* Чат матча: кнопка в колонке инструментов и панель слева от неё. */
+/* Чат матча: кнопка-пузырь в колонке инструментов, лента и строка ввода внизу слева, над панелью. */
 .toggle,
 .toggleOn {
   position: relative;
@@ -11,107 +11,125 @@
   min-width: 16px;
   padding: 0 3px;
   color: var(--ui-button-primary-ink);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   line-height: 16px;
   text-align: center;
   background: var(--status-danger);
-  border-radius: 8px;
+  border-radius: var(--radius-button);
 }
 
-.panel {
+/* Панель и всплывающая строка: тот же материал, что у панели армий и карточек. */
+.panel,
+.toast {
   position: fixed;
-  right: 72px;
+  left: var(--space-lg);
   z-index: 25;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  gap: var(--space-xs);
   box-sizing: border-box;
-  width: min(300px, calc(100vw - 88px));
-  height: min(320px, 50vh);
-  padding: var(--space-sm);
+  width: min(360px, calc(100vw - 2 * var(--space-lg)));
   color: var(--ui-ink);
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
 }
 
-.head {
-  display: flex;
-  align-items: center;
+.panel {
+  display: grid;
   gap: var(--space-xs);
+  padding: var(--space-sm);
 }
 
-.head b {
-  flex: 1 1 auto;
-}
-
-.to {
-  max-width: 120px;
-  min-height: 32px;
-  color: var(--ui-ink);
-  font: inherit;
-  background: var(--ui-surface2);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-button);
-}
-
-.close,
-.send,
-.reaction {
-  display: inline-grid;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0;
-  place-items: center;
-  color: var(--ui-ink);
-  cursor: pointer;
-  background: var(--ui-surface2);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-  border-radius: var(--radius-button);
+.toast {
+  padding: var(--space-xs) var(--space-sm);
+  pointer-events: none;
 }
 
 .log {
   display: grid;
-  align-content: start;
+  align-content: end;
   gap: 2px;
+  max-height: 132px;
   margin: 0;
   padding: 0;
   overflow-y: auto;
   list-style: none;
 }
 
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .line small {
   color: var(--ui-ink2);
 }
 
-.body {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-left: var(--space-xs);
-  overflow-wrap: anywhere;
+.empty {
+  margin: 0;
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
 }
 
 .reactions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
+}
+
+.reaction,
+.send,
+.target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-xs);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-button);
+}
+
+.reaction:hover,
+.reaction:focus-visible,
+.send:hover,
+.send:focus-visible,
+.target:hover,
+.target:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.target {
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink2);
 }
 
 .form {
   display: flex;
+  align-items: center;
   gap: var(--space-xs);
 }
 
 .input {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 32px;
+  min-height: var(--touch-target-min);
   padding: 0 var(--space-sm);
   color: var(--ui-ink);
   font: inherit;
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
+}
+
+.input:focus-visible {
+  border-color: var(--selection-color);
+  outline: none;
 }

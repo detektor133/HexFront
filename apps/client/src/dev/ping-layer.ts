@@ -27,6 +27,8 @@ export interface PingLayer {
   readonly container: Container;
   /** Новая метка; `nowMs` — время кадра (performance.now()). */
   add(hex: number, kind: MarkKind, owner: number, nowMs: number): void;
+  /** Постоянный маркер выбранного старта в меню; null — убрать. */
+  setMarker(hex: number | null): void;
   /** Покадровая отрисовка; `scale` — масштаб карты, чтобы знак не менял экранный размер. */
   frame(nowMs: number, scale: number): void;
   destroy(): void;
@@ -74,6 +76,7 @@ export function createPingLayer(center: (hex: number) => Point): PingLayer {
   const graphics = new Graphics();
   container.addChild(graphics);
   let pings: Ping[] = [];
+  let marker: number | null = null;
 
   return {
     container,
@@ -83,10 +86,21 @@ export function createPingLayer(center: (hex: number) => Point): PingLayer {
         -MAX_ACTIVE,
       );
     },
+    setMarker(hex) {
+      marker = hex;
+    },
     frame(nowMs, scale) {
       pings = pings.filter((p) => nowMs - p.started < LIFE_MS);
       graphics.clear();
       const k = 1 / scale;
+      if (marker !== null) {
+        const at = center(marker);
+        graphics
+          .circle(at.x, at.y, (GLYPH_PX + 7) * k)
+          .fill({ color: tokens.ui.surface, alpha: 0.92 })
+          .stroke({ color: tokens.ui.ink, width: 2.5 * k });
+        graphics.circle(at.x, at.y, (GLYPH_PX - 4) * k).fill({ color: tokens.ui.ink });
+      }
       for (const ping of pings) {
         const at = center(ping.hex);
         const age = nowMs - ping.started;

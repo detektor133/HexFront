@@ -2,7 +2,6 @@
 // кнопка «Другая карта». Один вид и для «Против ботов», и для лобби.
 import { IconChevronLeft, IconChevronRight, IconDice3 } from '@tabler/icons-react';
 
-import { MapPreview } from './MapPreview.tsx';
 import styles from './map-picker.module.css';
 import { GEN_SIZES, MAPS, maxPlayersOf, type GenSize, type MenuMapId } from './menu-config.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
@@ -17,10 +16,8 @@ export interface MapPickerProps {
   /** Размер случайной карты и его смена (только у того, кто выбирает карту). */
   readonly genSize: number;
   readonly onGenSize: (size: GenSize) => void;
-  readonly players: number;
+  /** Выбран ли старт тапом по фону (иначе — случайный). */
   readonly spawn: number | null;
-  readonly taken: ReadonlyMap<number, string>;
-  readonly onSpawn: (spawn: number | null) => void;
 }
 
 /** Карта рядом в списке по кругу: `step` = 1 вперёд, −1 назад. */
@@ -91,17 +88,8 @@ export function MapPicker(props: MapPickerProps): React.JSX.Element {
           <IconChevronRight size={20} aria-hidden="true" />
         </button>
       </div>
-      <MapPreview
-        request={{ id: map, seed: props.seed, players: props.players, size: props.genSize }}
-        selected={props.spawn}
-        taken={props.taken}
-        onPick={props.onSpawn}
-        label={t('menu.spawn')}
-      />
       <p className={styles.hint}>
-        {props.spawn === null
-          ? `${t('menu.spawn')}: ${t('menu.spawnRandom')}. ${t('menu.spawnHint')}`
-          : `${t('menu.spawn')}: ${props.spawn + 1}`}
+        {props.spawn === null ? t('menu.spawnHint') : t('menu.spawnChosen')}
       </p>
     </div>
   );

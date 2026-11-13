@@ -24,8 +24,6 @@ import { tutorialUrl } from '../tutorial/links.ts';
 
 export type ModeId = 'online' | 'bots';
 
-const NO_TAKEN: ReadonlyMap<number, string> = new Map();
-
 export function modeName(mode: ModeId): string {
   return t(mode === 'online' ? 'menu.online' : 'menu.bots');
 }
@@ -203,10 +201,7 @@ function BotsBody(props: {
         onGenSize={(genSize) =>
           props.update({ genSize, players: Math.min(s.players, genSize), spawn: null })
         }
-        players={players}
         spawn={s.spawn}
-        taken={NO_TAKEN}
-        onSpawn={(spawn) => props.update({ spawn })}
       />
       <div className={`${styles.group} ${styles.dense}`}>
         <div className={styles.groupLabel}>{t('menu.botsCount')}</div>

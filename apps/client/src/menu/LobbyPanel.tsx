@@ -13,6 +13,7 @@ import { Stepper } from './Stepper.tsx';
 import styles from './lobby.module.css';
 import { GEN_SIZE_DEFAULT, maxPlayersOf, randomGenSeed, type MenuMapId } from './menu-config.ts';
 import ui from './menu-ui.module.css';
+import type { StartPicker } from './use-menu-background.ts';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
 import {
   clearOnlineSession,
@@ -183,6 +184,8 @@ export function LobbyPanel(props: {
   readonly onClose: () => void;
   /** Карта и зерно комнаты: фон меню показывает её. */
   readonly onRoomMap?: (map: MenuMapId, seed: number, size: number) => void;
+  /** Выбор старта по фону для этой комнаты (null — выбирать нельзя). */
+  readonly onRoomPick?: (picker: StartPicker | null) => void;
   readonly className: string;
 }): React.JSX.Element {
   const { mode, room } = props.request;
@@ -273,14 +276,14 @@ export function LobbyPanel(props: {
   }, [roomMap, roomSeed, roomSize, onRoomMap]);
   const mySeat = (info?.seats ?? []).find((seat) => seat.id === session?.playerId);
   const mySpawn = mySeat?.spawn ?? null;
-  const takenSpawns = new Map<number, string>();
-  for (const seat of info?.seats ?? []) {
-    if (seat.id === session?.playerId || seat.spawn === null) continue;
-    takenSpawns.set(
-      seat.spawn,
-      tokens.players.palette[seat.id % tokens.players.palette.length]?.line ?? tokens.ui.ink,
+  // Тап по фону выбирает старт, пока открыта закрытая комната; сама точка на карте не показана.
+  const { onRoomPick } = props;
+  const privateRoom = mode === 'private';
+  useEffect(() => {
+    onRoomPick?.(
+      privateRoom ? { spawn: mySpawn, onPick: (spawn) => clientRef.current?.pick(spawn) } : null,
     );
-  }
+  }, [privateRoom, mySpawn, onRoomPick]);
 
   return (
     <div
@@ -389,10 +392,7 @@ export function LobbyPanel(props: {
                 }
                 genSize={session?.genSpawns ?? GEN_SIZE_DEFAULT}
                 onGenSize={(genSpawns) => clientRef.current?.configure({ genSpawns })}
-                players={info.max}
                 spawn={mySpawn}
-                taken={takenSpawns}
-                onSpawn={(spawn) => clientRef.current?.pick(spawn)}
               />
               {isHost && (
                 <>

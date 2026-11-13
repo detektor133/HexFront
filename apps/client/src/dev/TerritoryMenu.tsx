@@ -16,7 +16,7 @@ import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import splitStyles from './OrderSplit.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
-import { SocialRow } from './SocialRow.tsx';
+import { MarkMenu, SocialRow, WriteButton } from './SocialRow.tsx';
 import styles from './TerritoryMenu.module.css';
 import {
   DrawerMenu,
@@ -237,12 +237,12 @@ export function TerritoryMenu(props: {
         >
           1/5
         </button>
+        {!neutral && <WriteButton other={other} />}
         <IconButton label={t('menu.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} aria-hidden="true" />
         </IconButton>
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
-      {!neutral && <SocialRow other={other} hex={hex} />}
       {!neutral && onSelectArmy && holders.length > 0 && (
         <div className={styles.holders}>
           {holders.map((army) => (
@@ -359,6 +359,7 @@ export function TerritoryMenu(props: {
               <IconSwords size={20} aria-hidden="true" />
               <span>{t('menu.attack')}</span>
             </button>
+            <MarkMenu other={other} hex={hex} />
           </>
         )}
       </div>
