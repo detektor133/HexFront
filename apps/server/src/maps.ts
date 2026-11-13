@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 
 import { generateMap, QUICK_MATCH_MAP_SIZE } from '@hexfront/mapgen';
-import { QUICK_MATCH_SEEDS } from '@hexfront/protocol';
+import { QUICK_MATCH_SEEDS, type LobbyMap } from '@hexfront/protocol';
 import { loadMap, type MapStatic } from '@hexfront/sim';
 
 /** Карта комнаты: та же, что клиент берёт готовым файлом `gen-<сид>-30.json` (размер общий). */
@@ -41,10 +41,10 @@ export function warmMaps(size: number, seeds: readonly number[] = QUICK_MATCH_SE
   setTimeout(next, 1000);
 }
 
-/** Готовые карты меню (Европа, малая, крошечная): те же файлы, что у клиента. */
+/** Готовые карты меню (Европа, регионы мира, процедурные, малая, крошечная): те же файлы, что у клиента. */
 const staticMaps = new Map<string, MapStatic>();
 
-export function staticMap(name: 'europe' | 'small' | 'tiny'): MapStatic {
+export function staticMap(name: Exclude<LobbyMap, 'gen'>): MapStatic {
   let map = staticMaps.get(name);
   if (map === undefined) {
     const file = new URL(`../../../packages/mapgen/maps/${name}.json`, import.meta.url);

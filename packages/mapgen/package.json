@@ -8,8 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "europe": "node --experimental-strip-types import/europe.ts",
+    "natural-earth": "node --experimental-strip-types import/natural-earth.ts",
     "maps": "node --experimental-strip-types scripts/hand-maps.ts",
+    "procedural": "node --experimental-strip-types scripts/procedural-maps.ts",
     "gallery": "node --experimental-strip-types scripts/generated-gallery.ts"
   },
   "dependencies": {

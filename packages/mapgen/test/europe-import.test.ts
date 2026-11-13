@@ -26,7 +26,7 @@ describe('импорт карты Европы', () => {
   });
 
   it('скрипт импорта не хранит исходные Natural Earth в репозитории', async () => {
-    const script = await readFile(new URL('../import/europe.ts', import.meta.url), 'utf8');
+    const script = await readFile(new URL('../import/natural-earth.ts', import.meta.url), 'utf8');
     expect(script).toContain('mkdtemp');
     expect(script).toContain('naciscdn.org/naturalearth/10m/physical');
     expect(script).toContain('EPSG:3035');

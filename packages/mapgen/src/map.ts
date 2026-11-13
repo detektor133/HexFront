@@ -17,7 +17,7 @@ import {
 
 import { MAPGEN_MAX_PLAYERS, PASSABLE_HEXES_PER_PLAYER, MAPGEN_WATER_SHARE } from './params.ts';
 import { generateRoads } from './roads.ts';
-import { generateTerrain, type MapOptions } from './terrain.ts';
+import { generateTerrain, type MapOptions, type TerrainResult } from './terrain.ts';
 
 type MapInputOptions = Omit<MapOptions, 'width' | 'height'> &
   Partial<Pick<MapOptions, 'width' | 'height'>>;
@@ -207,34 +207,51 @@ export function chooseCities(
   throw new Error(`генератор карты: не удалось разместить ${target} городов`);
 }
 
-export function generateMap(seed: number, options: MapInputOptions): MapJson {
-  const resolvedOptions = resolveOptions(options);
-  validateOptions(resolvedOptions);
-  const result = generateTerrain(seed, resolvedOptions);
-  const terrain = result.terrain;
-  const features = result.features.slice();
-  const land = largestRoadableLand(terrain, features, resolvedOptions);
-  const spawns = chooseSpawns(seed, terrain, land, resolvedOptions);
-  clearSpawnFeatures(features, spawns, resolvedOptions);
-  const cities = chooseCities(seed, terrain, features, spawns, land, resolvedOptions);
+/**
+ * Собирает карту из готового рельефа: спавны, города и дороги на самой большой связной суше.
+ * @param id идентификатор карты в JSON
+ */
+export function assembleMap(
+  seed: number,
+  id: string,
+  base: Pick<TerrainResult, 'terrain' | 'features' | 'riverEdges'>,
+  options: MapOptions,
+): MapJson {
+  const terrain = base.terrain;
+  const features = base.features.slice();
+  const land = largestRoadableLand(terrain, features, options);
+  const spawns = chooseSpawns(seed, terrain, land, options);
+  clearSpawnFeatures(features, spawns, options);
+  const cities = chooseCities(seed, terrain, features, spawns, land, options);
   const nodes = [...cities, ...spawns];
-  const roads = generateRoads(terrain, features, nodes, resolvedOptions);
+  const roads = generateRoads(terrain, features, nodes, options);
   return {
     version: 1,
-    id: `proc-${(seed >>> 0).toString(16)}`,
-    width: resolvedOptions.width,
-    height: resolvedOptions.height,
+    id,
+    width: options.width,
+    height: options.height,
     terrain: encodeBase64(terrain),
-    features: Array.from(features).flatMap((feature, id) => {
+    features: Array.from(features).flatMap((feature, hexIndex) => {
       if (feature === FEATURE.none) return [];
-      const hex = hexFromId(id, resolvedOptions.width);
+      const hex = hexFromId(hexIndex, options.width);
       const type =
         feature === FEATURE.fertile ? 'fertile' : feature === FEATURE.mine ? 'mine' : 'pass';
       return [{ q: hex.q, r: hex.r, type }];
     }),
-    riverEdges: result.riverEdges.map(([q, r, dir]) => [q, r, dir]),
+    riverEdges: base.riverEdges.map(([q, r, dir]) => [q, r, dir]),
     roads: encodeBase64(packBits(roads)),
     cities,
     spawns,
   };
+}
+
+export function generateMap(seed: number, options: MapInputOptions): MapJson {
+  const resolvedOptions = resolveOptions(options);
+  validateOptions(resolvedOptions);
+  return assembleMap(
+    seed,
+    `proc-${(seed >>> 0).toString(16)}`,
+    generateTerrain(seed, resolvedOptions),
+    resolvedOptions,
+  );
 }
