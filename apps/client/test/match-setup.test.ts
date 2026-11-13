@@ -14,6 +14,6 @@ describe('настройка локального матча', () => {
   it('сохраняет заданный сид и процедурную карту для запуска worker', () => {
     const setup = readLocalMatchSetup('?map=gen&seed=73&players=30');
 
-    expect(setup.map).toEqual({ id: 'gen', seed: 73, players: 30 });
+    expect(setup.map).toEqual({ id: 'gen', seed: 73, players: 30, size: 30 });
   });
 });

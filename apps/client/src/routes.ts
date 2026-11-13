@@ -1,12 +1,8 @@
 const QUICK_MATCH_PLAYERS = 30;
 
-import { QUICK_MATCH_SEEDS } from '@hexfront/protocol';
-
-export { QUICK_MATCH_SEEDS };
-
 /** Ссылка на быстрый локальный матч из главного меню. */
 export function quickMatchUrl(): string {
-  const seed = QUICK_MATCH_SEEDS[Math.floor(Math.random() * QUICK_MATCH_SEEDS.length)];
+  const seed = Math.floor(Math.random() * 1_000_000_000);
   const params = new URLSearchParams({
     map: 'gen',
     seed: String(seed),

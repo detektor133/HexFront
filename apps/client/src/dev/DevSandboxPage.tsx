@@ -25,7 +25,7 @@ import { appendEvents, type EventFeedItem } from './event-feed.ts';
 import { createOrderHooks } from './order-hooks.ts';
 import type { Draft, DraftContext } from './plan-draft.ts';
 import { createPlanInput, type ToolState } from './plan-tools.ts';
-import { readSandboxMap, sandboxMapUrl, type SandboxMapRequest } from './sandbox-map.ts';
+import { readSandboxMap, sandboxLoadMap, type SandboxMapRequest } from './sandbox-map.ts';
 import {
   armySelection,
   NOTHING_PICKED,
@@ -61,8 +61,7 @@ function useMapJson(request: SandboxMapRequest): Loaded {
   const [state, setState] = useState<Loaded>('loading');
   useEffect(() => {
     let alive = true;
-    fetch(sandboxMapUrl(request))
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    sandboxLoadMap(request)
       .then((json: unknown) => {
         const result = loadMap(json);
         if (!result.ok) throw new Error(result.errors.join('; '));

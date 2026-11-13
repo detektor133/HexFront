@@ -182,7 +182,7 @@ function BotsBody(props: {
   readonly go: (url: string) => void;
 }): React.JSX.Element {
   const s = props.settings;
-  const max = maxPlayersOf(s.map);
+  const max = maxPlayersOf(s.map, s.genSize);
   const players = Math.min(s.players, max);
   return (
     <>
@@ -191,10 +191,18 @@ function BotsBody(props: {
         map={s.map}
         editable
         onMap={(map) =>
-          props.update({ map, players: Math.min(s.players, maxPlayersOf(map)), spawn: null })
+          props.update({
+            map,
+            players: Math.min(s.players, maxPlayersOf(map, s.genSize)),
+            spawn: null,
+          })
         }
         seed={s.seed}
         onOtherMap={() => props.update({ seed: randomGenSeed(s.seed), spawn: null })}
+        genSize={s.genSize}
+        onGenSize={(genSize) =>
+          props.update({ genSize, players: Math.min(s.players, genSize), spawn: null })
+        }
         players={players}
         spawn={s.spawn}
         taken={NO_TAKEN}

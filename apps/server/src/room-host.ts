@@ -157,6 +157,7 @@ export class RoomHost {
           ...(message.map === undefined ? {} : { map: message.map }),
           ...(message.players === undefined ? {} : { players: message.players }),
           ...(message.seed === undefined ? {} : { seed: message.seed }),
+          ...(message.genSpawns === undefined ? {} : { genSpawns: message.genSpawns }),
         });
         break;
       case 'ready':

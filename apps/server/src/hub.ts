@@ -9,7 +9,6 @@ import {
   encodeServerMessage,
   MessageError,
   PROTOCOL_VERSION,
-  QUICK_MATCH_SEEDS,
   type C2S,
   type JoinMode,
   type RefuseReason,
@@ -23,9 +22,12 @@ import type { HostSettings, RoomStatus, TickStats } from './shard-protocol.ts';
 import { InlineShard, type Shard, type ShardEvents } from './shard.ts';
 import { WorkerShard } from './worker-shard.ts';
 
-export { quickMatchMap, warmMaps } from './maps.ts';
+export { quickMatchMap } from './maps.ts';
 
 /** Игроков в матче «быстрого матча»: люди и боты вместе (docs/stages/stage-09-analysis.md). */
+/** Диапазон зерна карты комнаты (в протоколе зерно — до 2 млрд). */
+const SEED_RANGE = 2_000_000_000;
+
 export const MATCH_SIZE = 30;
 /** Сколько мс даётся соединению на `hello`; молчуны занимают сокеты и закрываются. */
 export const HELLO_TIMEOUT_MS = 5000;
@@ -223,7 +225,6 @@ export class Hub {
       budgetMs: this.budgetMs,
       roomEstimateMs: this.roomEstimateMs,
       lateJoinTicks: (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10,
-      seeds: QUICK_MATCH_SEEDS,
     };
     const count = Math.max(1, this.workers);
     for (let index = 0; index < count; index += 1) this.shards.push(this.makeShard(index));
@@ -250,20 +251,10 @@ export class Hub {
         this.onShardDown(index);
       },
     };
-    const settings = { ...this.settings, seeds: this.seedsOf(index) };
+    const settings = this.settings;
     return this.workers > 0
       ? new WorkerShard(index, settings, events, this.heapMb)
       : new InlineShard(index, settings, events, this.now, this.makeMap);
-  }
-
-  /**
-   * Сиды карт шарда: общий список делится между шардами, и каждый прогревает свою долю (меньше
-   * памяти и работы на старте); при шардах больше сидов берётся весь список.
-   */
-  private seedsOf(index: number): readonly number[] {
-    const count = Math.max(1, this.workers);
-    const own = QUICK_MATCH_SEEDS.filter((_, i) => i % count === index);
-    return own.length > 0 ? own : QUICK_MATCH_SEEDS;
   }
 
   /** Текущее время хаба, мс. */
@@ -497,9 +488,8 @@ export class Hub {
     }
     const roomId =
       mode === 'private' ? randomBytes(3).toString('hex') : `o${randomBytes(3).toString('hex')}`;
-    // Карта берётся из готовых файлов клиента (быстрый матч): сид из общего списка.
-    const seeds = this.seedsOf(best.shard.index);
-    const seed = seeds[randomInt(0, seeds.length)] ?? 42;
+    // Каждая комната получает новую карту: зерно любое, клиент строит её сам.
+    const seed = randomInt(0, SEED_RANGE);
     best.shard.create(roomId, mode, seed);
     return { shard: best.shard, roomId };
   }

@@ -6,7 +6,7 @@ import { loadMap } from '@hexfront/sim';
 
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { startLocalMatch } from '../local/local-match.ts';
-import { mapUrl, type MapRequest } from '../local/map-request.ts';
+import { loadMapJson, type MapRequest } from '../local/map-request.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { mapBounds } from '../render/hex-geometry.ts';
@@ -32,7 +32,7 @@ export function useMenuBackground(
   hostRef: RefObject<HTMLDivElement | null>,
   request: MapRequest,
 ): void {
-  const { id, seed } = request;
+  const { id, seed, size } = request;
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
@@ -96,8 +96,7 @@ export function useMenuBackground(
     }
 
     const start = async (): Promise<void> => {
-      const response = await fetch(mapUrl({ id, seed, players: BOTS }));
-      json = (await response.json()) as unknown;
+      json = await loadMapJson({ id, seed, size, players: BOTS });
       const loaded = loadMap(json);
       const host = hostRef.current;
       if (disposed || !loaded.ok || host === null) return;
@@ -170,5 +169,5 @@ export function useMenuBackground(
       layer?.destroy();
       mapView?.destroy();
     };
-  }, [hostRef, id, seed]);
+  }, [hostRef, id, seed, size]);
 }

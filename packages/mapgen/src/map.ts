@@ -52,6 +52,29 @@ const cityName = (id: number): string => {
  */
 export const QUICK_MATCH_MAP_SIZE = { width: 80, height: 60 } as const;
 
+/**
+ * Параметры случайной карты на `spawns` стартовых точек: плотность та же, что у средней
+ * (80×60 на 30), размеры растут с корнем из числа точек. sqrt точен по IEEE, поэтому сервер и
+ * браузер получают одну карту.
+ */
+export function genMapOptions(spawns: number): {
+  width: number;
+  height: number;
+  players: number;
+} {
+  const scale = Math.sqrt(spawns / 30);
+  return {
+    width: Math.round(QUICK_MATCH_MAP_SIZE.width * scale),
+    height: Math.round(QUICK_MATCH_MAP_SIZE.height * scale),
+    players: spawns,
+  };
+}
+
+/** Случайная карта по зерну и числу стартовых точек (сервер и клиент строят её сами). */
+export function generateGenMap(seed: number, spawns: number): MapJson {
+  return generateMap(seed, genMapOptions(spawns));
+}
+
 function mapDimensions(players: number): { width: number; height: number } {
   const area = Math.ceil((players * PASSABLE_HEXES_PER_PLAYER * 100) / (100 - MAPGEN_WATER_SHARE));
   const width = Math.ceil(Math.sqrt((area * 4) / 3));

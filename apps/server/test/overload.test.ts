@@ -18,7 +18,6 @@ const settings = {
   budgetMs: 65,
   roomEstimateMs: 8,
   lateJoinTicks: 0,
-  seeds: [] as number[],
 };
 
 const burn = (ms: number): void => {

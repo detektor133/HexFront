@@ -127,3 +127,50 @@ describe('«ещё раз»', () => {
     expect(friend.of('lobby').at(-1)?.info.humans).toBe(2);
   });
 });
+
+describe('случайная карта комнаты', () => {
+  function genRoom() {
+    const requested: [number, number][] = [];
+    const hub = new Hub({
+      now: () => 1_000_000,
+      size: 6,
+      makeMap: (seed, spawns) => {
+        requested.push([seed, spawns]);
+        return MAP;
+      },
+    });
+    const host = new Client(hub);
+    host.hello('Хозяин', { mode: 'private' });
+    return { hub, host, requested, code: host.of('welcome')[0]?.room ?? '' };
+  }
+
+  it('любое зерно и размер от хозяина: карта строится заново, клиент узнаёт оба', () => {
+    const { host, requested } = genRoom();
+    host.send({ t: 'configure', seed: 1_234_567_890 });
+    host.send({ t: 'configure', genSpawns: 60 });
+    expect(requested.at(-2)).toEqual([1_234_567_890, 6]);
+    expect(requested.at(-1)).toEqual([1_234_567_890, 60]);
+    const welcome = host.of('welcome').at(-1);
+    expect(welcome).toMatchObject({ seed: 1_234_567_890, genSpawns: 60 });
+  });
+
+  it('размер вне набора протокол отклоняет', () => {
+    const { host } = genRoom();
+    const before = host.of('welcome').length;
+    host.send({ t: 'configure', genSpawns: 17 });
+    expect(host.of('welcome')).toHaveLength(before);
+  });
+
+  it('«ещё раз» на случайной карте даёт новое зерно', () => {
+    const { hub, host, code } = genRoom();
+    host.send({ t: 'configure', seed: 5 });
+    host.send({ t: 'start' });
+    hub.tickAll();
+    const room = hub.roomById(code);
+    if (room?.state) room.state.winner = 0;
+    hub.tickAll();
+    hub.tickAll();
+    host.send({ t: 'rematch' });
+    expect(host.of('welcome').at(-1)?.seed).not.toBe(5);
+  });
+});

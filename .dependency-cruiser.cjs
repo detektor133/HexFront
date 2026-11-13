@@ -47,7 +47,11 @@ module.exports = {
       name: 'client-boundaries',
       severity: 'error',
       from: { path: '^apps/client/' },
-      to: { path: '^(packages|apps|tools)/', pathNot: '^(apps/client|packages/(sim|protocol))/' },
+      // mapgen нужен клиенту: случайные карты строятся на устройстве (хостинг статический).
+      to: {
+        path: '^(packages|apps|tools)/',
+        pathNot: '^(apps/client|packages/(sim|protocol|mapgen))/',
+      },
     },
     {
       name: 'no-circular',

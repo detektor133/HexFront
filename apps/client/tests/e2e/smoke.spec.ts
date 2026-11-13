@@ -30,3 +30,16 @@ test('@layout smoke: карточка закрывается', async ({ page }) 
   await close.click();
   await expect(close).toBeHidden();
 });
+
+for (const size of [12, 30, 60]) {
+  test(`@layout smoke: случайная карта размера ${size} строится на устройстве и матч открывается`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`/match?map=gen&seed=${1_000_000 + size}&players=4&size=${size}`);
+    await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('canvas')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}

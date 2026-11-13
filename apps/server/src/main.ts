@@ -7,7 +7,7 @@
 // Логи — JSON-строки в stdout.
 import { availableParallelism } from 'node:os';
 
-import { Hub, MATCH_SIZE, warmMaps } from './hub.ts';
+import { Hub } from './hub.ts';
 import { startServer } from './server.ts';
 
 const port = Number(process.env.PORT ?? 8080);
@@ -26,8 +26,6 @@ const hub = new Hub({
     process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), event, ...data })}\n`);
   },
 });
-// Без воркеров карты готовит сам поток шлюза; воркеры прогревают свои.
-if (workers === 0) warmMaps(MATCH_SIZE);
 const server = await startServer(hub, port, {
   host: process.env.HOST ?? '127.0.0.1',
   allowedOrigins: origins,

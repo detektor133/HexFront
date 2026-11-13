@@ -2,7 +2,7 @@
 // Сокеты сюда не попадают: шлюз в I/O-потоке присылает проверенные сообщения по числовому `conn`.
 import { parentPort, workerData } from 'node:worker_threads';
 
-import { cachedMap, warmMaps } from './maps.ts';
+import { cachedMap } from './maps.ts';
 import { RoomHost } from './room-host.ts';
 import type { FromShard, HostSettings, ToShard } from './shard-protocol.ts';
 
@@ -86,7 +86,6 @@ port.on('message', (batch: ToShard[]) => {
   queueFlush();
 });
 
-warmMaps(settings.size, settings.seeds);
 host.start(flush, () => {
   post({ k: 'status', status: host.status() });
 });

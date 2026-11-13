@@ -3,6 +3,7 @@
 // (style-guide, слои).
 import { Container, Graphics, Text } from 'pixi.js';
 
+import type { MarkKind } from '@hexfront/protocol';
 import {
   LINK,
   isDepot,
@@ -26,6 +27,7 @@ import { cityLabelsKey, citySize, drawCities, drawCityLabels } from './city-glyp
 import { drawConstructions, type ConstructionGlyph } from './construction-glyphs.ts';
 import { drawForecastPlate, type ForecastBadge } from './forecast-plate.ts';
 import { createMapIconLayer } from './map-icons.ts';
+import { createPingLayer } from './ping-layer.ts';
 import type { Draft } from './plan-draft.ts';
 import { createPlanLayer } from './plan-layer.ts';
 import {
@@ -80,6 +82,8 @@ export interface EconomyLayer {
   setMapMask(kind: MaskKind | null, mask: Uint8Array | null): void;
   /** Номера точек цепочки приказов Shift+ПКМ на карте (пусто — убрать). */
   setQueueMarks(hexes: readonly number[]): void;
+  /** Метка союзника на карте (чат): гекс, вид и игрок, поставивший её. */
+  addPing(hex: number, kind: MarkKind, owner: number): void;
   /** Подписи на гексах (цена вторжения): текст по центру гекса; пусто — убрать. */
   setHexLabels(labels: readonly { readonly hex: number; readonly text: string }[]): void;
   /**
@@ -211,6 +215,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   const center = (id: number): Point => hexCenter(hexFromId(id, map.width), radius);
   const unitLayer = createUnitLayer(map.width, radius, center);
   const planLayer = createPlanLayer(map, radius, center);
+  const pingLayer = createPingLayer(center);
   // Плашка прогноза — поверх фишек.
   const plates = new Container();
   const territoryLabels = new Container();
@@ -227,6 +232,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     labels,
     territoryLabels,
     plates,
+    pingLayer.container,
   );
   let view: PlayerView | null = null;
   let selected: SandboxSelection = NOTHING;
@@ -666,6 +672,9 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       draft = d;
       redraw();
     },
+    addPing(hex, kind, owner) {
+      pingLayer.add(hex, kind, owner, frameMs);
+    },
     frame(nowMs) {
       const changed = frameMs !== nowMs;
       frameMs = nowMs;
@@ -678,11 +687,13 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       }
       unitLayer.frame(nowMs);
       planLayer.frame(nowMs);
+      pingLayer.frame(nowMs, scale);
     },
     destroy() {
       territory.destroy();
       maskGpu.destroy();
       mapIcons.destroy();
+      pingLayer.destroy();
       container.destroy({ children: true, context: true });
       top.destroy({ children: true, context: true });
     },

@@ -25,7 +25,7 @@ import { createOrderHooks } from '../dev/order-hooks.ts';
 import { EMPTY_QUEUE, queueOrder, remainingPoints, type OrderQueue } from '../dev/order-queue.ts';
 import type { Draft, DraftContext } from '../dev/plan-draft.ts';
 import { createPlanInput, type ToolState } from '../dev/plan-tools.ts';
-import { sandboxMapUrl, type SandboxMapRequest } from '../dev/sandbox-map.ts';
+import { sandboxLoadMap, type SandboxMapRequest } from '../dev/sandbox-map.ts';
 import {
   armySelection,
   NOTHING_PICKED,
@@ -52,6 +52,7 @@ import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { appSearch, navigate } from '../nav.ts';
+import { chatStore } from '../net/chat-store.ts';
 import { webSocketTransport, type NetStatus } from '../net/net-client.ts';
 import { startOnlineMatch, type OnlineMatch } from '../net/online-match.ts';
 import { loadOnlineSession } from '../net/online-session.ts';
@@ -67,8 +68,7 @@ export function useMapJson(request: SandboxMapRequest): Loaded {
   const [state, setState] = useState<Loaded>('loading');
   useEffect(() => {
     let alive = true;
-    fetch(sandboxMapUrl(request))
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    sandboxLoadMap(request)
       .then((json: unknown) => {
         const result = loadMap(json);
         if (!result.ok) throw new Error(result.errors.join('; '));
@@ -284,6 +284,11 @@ export function useSandbox(
   const armyRef = useRef<number | null>(null);
   const [tool, setToolState] = useState<ToolState | null>(null);
   const cameraListenersRef = useRef(new Set<() => void>());
+  // Метки союзников из онлайн-чата рисуются на карте.
+  useEffect(
+    () => chatStore.onMark((mark) => layerRef.current?.addPing(mark.hex, mark.kind, mark.from)),
+    [],
+  );
   const holdPickRef = useRef<number | null>(null);
   const coastStartRef = useRef<number | null>(null);
   const [holdPick, setHoldPickState] = useState<number | null>(null);

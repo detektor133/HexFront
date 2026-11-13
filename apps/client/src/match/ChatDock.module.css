@@ -93,11 +93,6 @@
   overflow-wrap: anywhere;
 }
 
-.body em {
-  font-style: normal;
-  font-weight: 600;
-}
-
 .reactions {
   display: flex;
   flex-wrap: wrap;

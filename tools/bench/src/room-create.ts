@@ -3,7 +3,6 @@
 // Запуск (из корня репозитория):
 //   node --experimental-strip-types tools/bench/src/room-create.ts
 import { generateMap, QUICK_MATCH_MAP_SIZE } from '../../../packages/mapgen/src/index.ts';
-import { QUICK_MATCH_SEEDS } from '../../../packages/protocol/src/index.ts';
 import { createMatch, loadMap, step } from '../../../packages/sim/src/index.ts';
 
 const lap = <T>(label: string, run: () => T, results: Record<string, number[]>): T => {
@@ -14,7 +13,7 @@ const lap = <T>(label: string, run: () => T, results: Record<string, number[]>):
 };
 
 const results: Record<string, number[]> = {};
-for (const seed of QUICK_MATCH_SEEDS.slice(0, 8)) {
+for (const seed of [42, 43, 44, 45, 46, 47, 48, 49]) {
   const json = lap(
     'generateMap',
     () => generateMap(seed, { ...QUICK_MATCH_MAP_SIZE, players: 30 }),

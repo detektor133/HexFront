@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isDevPath, isMatchPath, QUICK_MATCH_SEEDS, quickMatchUrl } from '../src/routes.ts';
+import { isDevPath, isMatchPath, quickMatchUrl } from '../src/routes.ts';
 
 describe('маршруты главного меню', () => {
   it('ведёт кнопку «Играть» на матч с 30 участниками и процедурной картой', () => {
@@ -9,7 +9,7 @@ describe('маршруты главного меню', () => {
     expect(url.pathname).toBe('/match');
     expect(url.searchParams.get('map')).toBe('gen');
     expect(url.searchParams.get('players')).toBe('30');
-    expect(QUICK_MATCH_SEEDS).toContain(Number(url.searchParams.get('seed')));
+    expect(Number.isSafeInteger(Number(url.searchParams.get('seed')))).toBe(true);
   });
 
   it('сохраняет dev-маршруты отдельно от обычного меню', () => {

@@ -13,6 +13,7 @@
     "check-bundle-size": "node --experimental-strip-types scripts/check-bundle-size.ts"
   },
   "dependencies": {
+    "@hexfront/mapgen": "workspace:*",
     "@hexfront/protocol": "workspace:*",
     "@hexfront/sim": "workspace:*",
     "@tabler/icons-react": "^3.50.0",

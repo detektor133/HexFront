@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { hexFromId, loadMap, TERRAIN, type MapStatic } from '@hexfront/sim';
 
 import styles from './map-preview.module.css';
-import { mapUrl, type MapRequest } from '../local/map-request.ts';
+import { loadMapJson, type MapRequest } from '../local/map-request.ts';
 import { hexCenter } from '../render/hex-geometry.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -69,15 +69,14 @@ export interface MapPreviewProps {
 /** Рисует сушу и точки старта; загрузка карты — по её адресу, при смене карты рисуется заново. */
 export function MapPreview(props: MapPreviewProps): React.JSX.Element {
   const { request } = props;
+  const { id, seed, size } = request;
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const [map, setMap] = useState<MapStatic | null>(null);
-  const url = mapUrl(request);
 
   useEffect(() => {
     let live = true;
     setMap(null);
-    void fetch(url)
-      .then((response) => response.json() as Promise<unknown>)
+    void loadMapJson({ id, seed, size, players: 0 })
       .then((json) => {
         const loaded = loadMap(json);
         if (live && loaded.ok) setMap(loaded.map);
@@ -86,7 +85,7 @@ export function MapPreview(props: MapPreviewProps): React.JSX.Element {
     return () => {
       live = false;
     };
-  }, [url]);
+  }, [id, seed, size]);
 
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d');

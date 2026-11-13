@@ -55,7 +55,7 @@ tools/
 | `protocol` | `sim` (только типы) |
 | `mapgen` | `sim` |
 | `server` | `sim`, `protocol`, `mapgen` |
-| `client` | `sim` (queries, типы, local-режим), `protocol` |
+| `client` | `sim` (queries, типы, local-режим), `protocol`, `mapgen` (только случайные карты, динамическим импортом) |
 | `tools/*` | всё |
 
 ## Ключевые решения

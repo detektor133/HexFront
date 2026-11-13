@@ -38,7 +38,6 @@ const color = (id: number): string => tokens.players.palette[id]?.line ?? tokens
 function Line(props: { readonly line: ChatLine; readonly me: number }): React.JSX.Element {
   const { line } = props;
   const Reaction = line.emoji === undefined ? null : REACTIONS[line.emoji];
-  const mark = line.mark === undefined ? null : t(`mark.${line.mark.kind}`);
   return (
     <li className={styles.line}>
       <b style={{ color: color(line.from) }}>
@@ -47,7 +46,6 @@ function Line(props: { readonly line: ChatLine; readonly me: number }): React.JS
       {line.to !== undefined && <small>{` · ${t('chat.private')}`}</small>}
       <span className={styles.body}>
         {Reaction !== null && Reaction !== undefined && <Reaction size={18} aria-hidden="true" />}
-        {mark !== null && <em>{mark}</em>}
         {line.text}
       </span>
     </li>

@@ -11,8 +11,6 @@ export interface ChatLine {
   readonly emoji?: number;
   /** Адресат личного сообщения. */
   readonly to?: number;
-  /** Метка на карте вместо текста. */
-  readonly mark?: { readonly hex: number; readonly kind: MarkKind };
 }
 
 /** Что умеет отправлять сеть; `null` — матч не онлайн, чата нет. */
@@ -36,6 +34,14 @@ export interface ChatState {
 /** Сколько последних сообщений хранится. */
 const KEEP = 60;
 const listeners = new Set<() => void>();
+
+/** Метка союзника: рисуется на карте, в чат не попадает. */
+export interface MarkEvent {
+  readonly from: number;
+  readonly hex: number;
+  readonly kind: MarkKind;
+}
+const markListeners = new Set<(mark: MarkEvent) => void>();
 let nextId = 1;
 let state: ChatState = { sender: null, lines: [], unread: 0, open: false, target: null };
 
@@ -62,6 +68,16 @@ export const chatStore = {
     set({ sender, lines: [], unread: 0, open: false, target: null });
   },
   receive: (line: Omit<ChatLine, 'id'>): void => push(line),
+  /** Пришла метка: слой карты подписан и рисует её. */
+  receiveMark: (mark: MarkEvent): void => {
+    for (const listener of markListeners) listener(mark);
+  },
+  onMark: (listener: (mark: MarkEvent) => void): (() => void) => {
+    markListeners.add(listener);
+    return () => {
+      markListeners.delete(listener);
+    };
+  },
   toggle: (): void => set({ open: !state.open, unread: 0 }),
   /** Открыть чат с адресатом (кнопка «Написать» в окне соседа). */
   openTo: (target: number | null): void => set({ open: true, unread: 0, target }),

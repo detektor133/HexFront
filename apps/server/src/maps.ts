@@ -1,18 +1,19 @@
-// Карты быстрого матча: генерация, кэш процесса и прогрев между тиками.
+// Карты комнат: генерация случайных по зерну, кэш процесса и готовые карты меню.
 import { readFileSync } from 'node:fs';
 
-import { generateMap, QUICK_MATCH_MAP_SIZE } from '@hexfront/mapgen';
-import { QUICK_MATCH_SEEDS, type LobbyMap } from '@hexfront/protocol';
+import { generateGenMap } from '@hexfront/mapgen';
+import type { LobbyMap } from '@hexfront/protocol';
 import { loadMap, type MapStatic } from '@hexfront/sim';
 
-/** Карта комнаты: та же, что клиент берёт готовым файлом `gen-<сид>-30.json` (размер общий). */
-export function quickMatchMap(seed: number, size: number): MapStatic {
-  const loaded = loadMap(generateMap(seed, { ...QUICK_MATCH_MAP_SIZE, players: size }));
+/** Случайная карта комнаты: клиент строит ровно такую же по зерну и числу стартовых точек. */
+export function quickMatchMap(seed: number, spawns: number): MapStatic {
+  const loaded = loadMap(generateGenMap(seed, spawns));
   if (!loaded.ok) throw new Error(loaded.errors.join('; '));
   return loaded.map;
 }
 
-/** Готовые карты потока: sim карту не меняет, комнаты делят её. */
+/** Недавние карты потока: sim карту не меняет, комнаты делят её; старые вытесняются. */
+const MAP_CACHE_LIMIT = 48;
 const mapCache = new Map<string, MapStatic>();
 
 export function cachedMap(seed: number, size: number): MapStatic {
@@ -21,24 +22,10 @@ export function cachedMap(seed: number, size: number): MapStatic {
   if (map === undefined) {
     map = quickMatchMap(seed, size);
     mapCache.set(key, map);
+    const oldest = mapCache.keys().next().value;
+    if (mapCache.size > MAP_CACHE_LIMIT && oldest !== undefined) mapCache.delete(oldest);
   }
   return map;
-}
-
-/**
- * Прогревает карты быстрого матча по одной между тиками (генерация 30–60 мс, холодная — дольше), чтобы
- * создание комнаты не останавливало игроков других комнат потока.
- */
-export function warmMaps(size: number, seeds: readonly number[] = QUICK_MATCH_SEEDS): void {
-  let index = 0;
-  const next = (): void => {
-    const seed = seeds[index];
-    if (seed === undefined) return;
-    index += 1;
-    cachedMap(seed, size);
-    setTimeout(next, 50);
-  };
-  setTimeout(next, 1000);
 }
 
 /** Готовые карты меню (Европа, регионы мира, процедурные, малая, крошечная): те же файлы, что у клиента. */

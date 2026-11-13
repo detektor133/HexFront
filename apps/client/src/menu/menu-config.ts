@@ -2,19 +2,24 @@
 // все виды меню и онлайн-лобби видели одно и то же.
 import { useCallback, useState } from 'react';
 
-import { t } from '../i18n/dict.ts';
-import { QUICK_MATCH_SEEDS } from '../routes.ts';
 import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
+import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 
 const MAP_KEY = 'hexfront.map';
 const PLAYERS_KEY = 'hexfront.players';
 const LEVEL_KEY = 'hexfront.botLevel';
+const GEN_SIZE_KEY = 'hexfront.genSize';
+
+/** Размеры случайной карты: число стартовых точек (малая, средняя, большая). */
+export const GEN_SIZES = [12, 30, 60] as const;
+export type GenSize = (typeof GEN_SIZES)[number];
+export const GEN_SIZE_DEFAULT: GenSize = 30;
 
 /** Карты меню: id, размер в гексах и предел числа игроков (точек старта на карте). */
 export const MAPS = [
   { id: 'europe', size: '115×92', choosePlayers: true, maxPlayers: 30 },
-  { id: 'gen', size: '80×60', choosePlayers: false, maxPlayers: 30 },
+  { id: 'gen', size: '', choosePlayers: false, maxPlayers: 30 },
   { id: 'small', size: '40×30', choosePlayers: false, maxPlayers: 6 },
   { id: 'tiny', size: '20×15', choosePlayers: false, maxPlayers: 2 },
   { id: 'mediterranean', size: '144×56', choosePlayers: true, maxPlayers: 16 },
@@ -48,6 +53,8 @@ export interface MenuSettings {
   /** Зерно случайной карты (из готовых) и выбранная точка старта; не хранятся между сеансами. */
   readonly seed: number;
   readonly spawn: number | null;
+  /** Размер случайной карты (число стартовых точек). */
+  readonly genSize: GenSize;
 }
 
 function read(key: string, fallback: string): string {
@@ -103,6 +110,7 @@ export function loadSettings(): MenuSettings {
     level: LEVELS.find((l) => l === read(LEVEL_KEY, LEVEL_DEFAULT)) ?? LEVEL_DEFAULT,
     seed: randomGenSeed(),
     spawn: null,
+    genSize: GEN_SIZES.find((n) => n === Number(read(GEN_SIZE_KEY, ''))) ?? GEN_SIZE_DEFAULT,
   };
 }
 
@@ -112,6 +120,7 @@ function saveSettings(s: MenuSettings): void {
   write(MAP_KEY, s.map);
   write(PLAYERS_KEY, String(s.players));
   write(LEVEL_KEY, s.level);
+  write(GEN_SIZE_KEY, String(s.genSize));
 }
 
 /** Настройки с немедленным сохранением: «Играть» и лобби читают их из хранилища. */
@@ -138,24 +147,26 @@ function randomSeed(): number {
 }
 
 /** Предел игроков карты меню. */
-export function maxPlayersOf(map: MenuMapId): number {
+export function maxPlayersOf(map: MenuMapId, genSize: number = GEN_SIZE_DEFAULT): number {
+  if (map === 'gen') return genSize;
   return MAPS.find((m) => m.id === map)?.maxPlayers ?? PLAYERS_MAX;
 }
 
-/** Другое зерно случайной карты из готовых (кнопка «Сгенерировать»). */
+/** Новое зерно случайной карты (кнопка «Сгенерировать»): любое, карта строится по нему на месте. */
 export function randomGenSeed(except?: number): number {
-  const pool = QUICK_MATCH_SEEDS.filter((seed) => seed !== except);
-  return pool[Math.floor(Math.random() * pool.length)] ?? QUICK_MATCH_SEEDS[0];
+  const seed = randomSeed();
+  return seed === except ? randomSeed() : seed;
 }
 
 /** Ссылка на матч против ботов по настройкам меню. */
 export function matchUrl(s: MenuSettings): string {
-  const players = Math.min(s.players, maxPlayersOf(s.map));
+  const players = Math.min(s.players, maxPlayersOf(s.map, s.genSize));
   const seed = s.map === 'gen' ? s.seed : s.map === 'europe' ? randomSeed() : 42;
   const url = new URL(
     `/match?map=${s.map}&seed=${seed}&players=${players}`,
     window.location.origin,
   );
+  if (s.map === 'gen') url.searchParams.set('size', String(s.genSize));
   if (s.spawn !== null) url.searchParams.set('spawn', String(s.spawn));
   if (s.nickname !== '') url.searchParams.set('name', s.nickname);
   url.searchParams.set('color', s.color);

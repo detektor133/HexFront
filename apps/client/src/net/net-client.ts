@@ -12,6 +12,7 @@ import {
   decodeDelta,
   decodeSnapshot,
   encodeClientMessage,
+  GEN_SPAWNS_DEFAULT,
   PROTOCOL_VERSION,
   ProtocolError,
   type C2S,
@@ -58,6 +59,8 @@ export interface NetSession {
   readonly map: string;
   readonly seed: number;
   readonly players: number;
+  /** Стартовых точек случайной карты (размер карты). */
+  readonly genSpawns: number;
   readonly fog: boolean;
   /** Место зрителя: матч смотрят без участия. */
   readonly spectator: boolean;
@@ -292,6 +295,7 @@ export class NetClient {
     map?: LobbyMap;
     players?: number;
     seed?: number;
+    genSpawns?: number;
   }): void {
     this.send({ t: 'configure', ...patch });
   }
@@ -435,6 +439,7 @@ export class NetClient {
           map: message.map,
           seed: message.seed,
           players: message.players,
+          genSpawns: message.genSpawns ?? GEN_SPAWNS_DEFAULT,
           fog: message.fog,
           spectator: message.spectator === true,
         };

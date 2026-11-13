@@ -1,32 +1,11 @@
-import { execFile, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
-import { QUICK_MATCH_SEEDS } from './src/routes.ts';
-
-// Карты лежат в packages/mapgen/maps; клиенту импортировать mapgen нельзя (overview.md, «Границы»),
-// поэтому они отдаются как статика по /maps/<id>.json.
+// Готовые карты лежат в packages/mapgen/maps и отдаются как статика по /maps/<id>.json;
+// случайные клиент строит сам по зерну (mapgen подгружается отдельным куском).
 const MAPS_DIR = new URL('../../packages/mapgen/maps/', import.meta.url);
-const MAPGEN_SCRIPT = fileURLToPath(
-  new URL('../../packages/mapgen/scripts/generate-json.ts', import.meta.url),
-);
-
-const QUICK_MATCH_PLAYERS = 30;
-
-function generateQuickMatchMaps(): readonly [string, Buffer][] {
-  return QUICK_MATCH_SEEDS.map((seed) => [
-    `maps/gen-${seed}-${QUICK_MATCH_PLAYERS}.json`,
-    execFileSync(process.execPath, [
-      '--experimental-strip-types',
-      MAPGEN_SCRIPT,
-      String(seed),
-      String(QUICK_MATCH_PLAYERS),
-    ]),
-  ]);
-}
 
 function mapsPlugin(): Plugin {
   return {
@@ -36,34 +15,6 @@ function mapsPlugin(): Plugin {
         const url = new URL(req.url ?? '/', 'http://localhost');
         const id = /^\/([a-z0-9-]+)\.json$/.exec(url.pathname)?.[1];
         if (!id) return next();
-        if (id === 'gen') {
-          const seed = Number(url.searchParams.get('seed'));
-          const players = Number(url.searchParams.get('players'));
-          if (
-            !Number.isSafeInteger(seed) ||
-            !Number.isInteger(players) ||
-            players < 2 ||
-            players > 30
-          ) {
-            res.statusCode = 400;
-            res.end('Некорректные параметры процедурной карты');
-            return;
-          }
-          execFile(
-            process.execPath,
-            ['--experimental-strip-types', MAPGEN_SCRIPT, String(seed), String(players)],
-            (error, stdout) => {
-              if (error) {
-                res.statusCode = 500;
-                res.end('Не удалось сгенерировать карту');
-                return;
-              }
-              res.setHeader('Content-Type', 'application/json');
-              res.end(stdout);
-            },
-          );
-          return;
-        }
         try {
           const body = readFileSync(new URL(`${id}.json`, MAPS_DIR));
           res.setHeader('Content-Type', 'application/json');
@@ -82,9 +33,6 @@ function mapsPlugin(): Plugin {
           fileName: `maps/${file}`,
           source: readFileSync(new URL(file, MAPS_DIR)),
         });
-      }
-      for (const [fileName, source] of generateQuickMatchMaps()) {
-        this.emitFile({ type: 'asset', fileName, source });
       }
     },
   };

@@ -82,6 +82,4 @@ export interface HostSettings {
   readonly roomEstimateMs: number;
   /** Тиков с начала матча, пока можно подсесть на место бота. */
   readonly lateJoinTicks: number;
-  /** Сиды карт, которые прогревает этот шард: у каждого шарда свои, комнаты берут сид из его набора. */
-  readonly seeds: readonly number[];
 }

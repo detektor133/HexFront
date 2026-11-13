@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { BitmapText, Container } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
+import { generateGenMap } from '@hexfront/mapgen';
+
 import { drawForecastPlate } from '../src/dev/forecast-plate.ts';
 import { createPlanLayer } from '../src/dev/plan-layer.ts';
 import { createChip, type ChipState } from '../src/dev/unit-chips.ts';
@@ -19,7 +21,6 @@ const launchMock = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({ spawn: spawnMock }));
 vi.mock('@playwright/test', () => ({ chromium: { launch: launchMock } }));
 
-const GEN_MAP_PATH = join(process.cwd(), 'apps/client/dist/maps/gen-42-30.json');
 const SOURCE_ROOT = join(process.cwd(), 'apps/client/src');
 
 function installCanvasStub(): void {
@@ -69,7 +70,7 @@ const chipState = (soldiers: number): ChipState => ({
 
 describe('дельты вида и текст карты (07/T15)', () => {
   it('критерий 1: на 1 200 тиках не меньше 95 % сообщений после первого являются дельтами и применение после каждого сообщения равно полному виду', () => {
-    const map = JSON.parse(readFileSync(GEN_MAP_PATH, 'utf8')) as unknown;
+    const map: unknown = generateGenMap(42, 30);
     const created = createLocalEngine(map, 42, 30, undefined, true);
     if ('errors' in created) throw new Error(created.errors.join('\n'));
 

@@ -33,7 +33,6 @@ const host = new RoomHost({
   budgetMs: 65,
   roomEstimateMs: 8,
   lateJoinTicks: 0,
-  seeds: [],
   now: () => clock,
   makeMap: cachedMap,
   io: {

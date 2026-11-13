@@ -98,7 +98,7 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
         });
       },
       onChat: (message) => chatStore.receive(message),
-      onMark: (from, hex, kind) => chatStore.receive({ from, nick: '', mark: { hex, kind } }),
+      onMark: (from, hex, kind) => chatStore.receiveMark({ from, hex, kind }),
       onRematch: () => options.onRematch?.(),
       onSelection: (sel) => {
         selection = sel;

@@ -10,7 +10,6 @@ import {
   ConfirmedViewDeltaStream,
   MAX_COMMANDS_PER_SECOND,
   MAX_QUERIES_PER_SECOND,
-  QUICK_MATCH_SEEDS,
   LOBBY_PLAYER_MAPS,
   type Query,
   slowLayerReuse,
@@ -61,9 +60,10 @@ export const RECONNECT_SECONDS = 30;
 /** Зрителей в одной комнате; больше — отказ `roomFull`. */
 export const MAX_SPECTATORS = 20;
 /** Чат: не больше CHAT_BURST сообщений и меток за CHAT_WINDOW_MS; верхний предел игроков в комнате. */
+/** Диапазон зерна новой случайной карты (в протоколе зерно — до 2 млрд). */
+const REMATCH_SEED_RANGE = 2_000_000_000;
 const CHAT_WINDOW_MS = 4000;
 const CHAT_BURST = 4;
-const SIZE_MAX = 30;
 /** Сколько секунд зритель без связи держит место, потом оно освобождается. */
 const SPECTATOR_KEEP_SECONDS = 120;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
@@ -186,6 +186,8 @@ export class Room {
   private seed: number;
   private mapName: LobbyMap;
   private size: number;
+  /** Стартовых точек случайной карты (размер карты, выбирает хозяин). */
+  private genSpawns: number;
   private level: LobbyLevel = 'hard';
   private readonly seats: Seat[] = [];
   private readonly spectators: Seat[] = [];
@@ -209,6 +211,7 @@ export class Room {
     this.seed = options.seed;
     this.mapName = 'gen';
     this.size = options.size;
+    this.genSpawns = options.size;
     this.id = options.id;
     this.mode = options.mode;
   }
@@ -266,7 +269,13 @@ export class Room {
    */
   public configure(
     conn: Connection,
-    patch: { level?: LobbyLevel; map?: LobbyMap; players?: number; seed?: number },
+    patch: {
+      level?: LobbyLevel;
+      map?: LobbyMap;
+      players?: number;
+      seed?: number;
+      genSpawns?: number;
+    },
   ): void {
     if (this.phase !== 'lobby' || this.mode !== 'private' || this.seats[0]?.conn !== conn) return;
     if (patch.level !== undefined) this.level = patch.level;
@@ -281,16 +290,20 @@ export class Room {
             : 2;
     }
     if (patch.players !== undefined) size = patch.players;
-    const wanted =
-      patch.seed !== undefined && QUICK_MATCH_SEEDS.some((known) => known === patch.seed);
-    const seed = mapName === 'gen' && wanted ? (patch.seed as number) : this.seed;
-    if (mapName === 'gen' && seed !== this.seed) this.seed = seed;
+    const regenerate =
+      mapName === 'gen' &&
+      ((patch.seed !== undefined && patch.seed !== this.seed) ||
+        (patch.genSpawns !== undefined && patch.genSpawns !== this.genSpawns));
+    if (mapName === 'gen') {
+      this.seed = patch.seed ?? this.seed;
+      this.genSpawns = patch.genSpawns ?? this.genSpawns;
+    }
     const known = mapName === 'gen' ? undefined : staticMap(mapName);
-    const cap = known === undefined ? SIZE_MAX : known.spawns.length;
+    const cap = known === undefined ? this.genSpawns : known.spawns.length;
     size = Math.min(cap, Math.max(size, this.seats.length, 2));
-    if (mapName !== this.mapName || size !== this.size || (wanted && mapName === 'gen')) {
+    if (mapName !== this.mapName || size !== this.size || regenerate) {
       const next =
-        mapName === 'gen' ? this.options.makeMap?.(this.seed, SIZE_MAX) : staticMap(mapName);
+        mapName === 'gen' ? this.options.makeMap?.(this.seed, this.genSpawns) : staticMap(mapName);
       if (next === undefined) return;
       this.map = next;
       if (mapName !== this.mapName) for (const seat of this.seats) seat.spawn = null;
@@ -667,11 +680,11 @@ export class Room {
     });
     this.state = null;
     this.phase = 'lobby';
-    // Случайная карта идёт по кругу готовых сидов (клиент берёт файл карты по сиду).
-    const at = QUICK_MATCH_SEEDS.findIndex((known) => known === this.seed);
-    if (this.mapName === 'gen')
-      this.seed = QUICK_MATCH_SEEDS[(at + 1) % QUICK_MATCH_SEEDS.length] ?? this.seed;
-    if (this.mapName === 'gen') this.map = this.options.makeMap?.(this.seed, SIZE_MAX) ?? this.map;
+    // Случайная карта после матча — новая: клиенты строят её по новому зерну сами.
+    if (this.mapName === 'gen') {
+      this.seed = Math.floor(Math.random() * REMATCH_SEED_RANGE);
+      this.map = this.options.makeMap?.(this.seed, this.genSpawns) ?? this.map;
+    }
     for (const seat of this.seats) {
       this.send(seat, { t: 'rematch' });
       this.sendWelcome(seat);
@@ -915,6 +928,7 @@ export class Room {
       map: this.mapName,
       seed: this.seed,
       players: this.size,
+      genSpawns: this.genSpawns,
       fog: this.options.fog,
       ...(seat.spectator ? { spectator: true } : {}),
     });

@@ -2,10 +2,9 @@
 // Входящее от клиента проверяется вручную и считается недоверенным: форма, типы, длины, лимиты.
 import type { Command, PathPreview, RejectReason, Selection } from '@hexfront/sim';
 
-/** Сиды готовых карт «быстрого матча» на 30 игроков: сервер выбирает из них, клиент берёт файл карты. */
-export const QUICK_MATCH_SEEDS = [
-  42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
-] as const;
+/** Число стартовых точек случайной карты: малая, средняя (по умолчанию), большая. */
+export const GEN_SPAWNS = [12, 30, 60] as const;
+export const GEN_SPAWNS_DEFAULT = 30;
 
 /** Режим карты: снабжение или стройка (build:city, build:fort, build:depot, build:improve). */
 export type MapMaskMode = 'supply' | 'build:city' | 'build:fort' | 'build:depot' | 'build:improve';
@@ -144,6 +143,8 @@ export type C2S =
       readonly players?: number;
       /** Новое зерно случайной карты (кнопка «Сгенерировать»). */
       readonly seed?: number;
+      /** Размер случайной карты: число стартовых точек из GEN_SPAWNS. */
+      readonly genSpawns?: number;
     }
   /** Готовность к старту (закрытая комната): видна всем в списке мест. */
   | { readonly t: 'ready'; readonly ready: boolean }
@@ -216,6 +217,8 @@ export type S2C =
       readonly map: string;
       readonly seed: number;
       readonly players: number;
+      /** Стартовых точек случайной карты (на других картах не используется). */
+      readonly genSpawns?: number;
       readonly fog: boolean;
       /** Место зрителя: `playerId` — игрок, чьими глазами идёт просмотр на старте. */
       readonly spectator?: boolean;
@@ -472,8 +475,12 @@ export function decodeClientMessage(text: string): C2S {
       if (seed !== undefined && (!isInt(seed) || seed < 0 || seed > 2_000_000_000)) {
         throw new MessageError('Поле seed');
       }
+      const genSpawns = GEN_SPAWNS.find((n) => n === source.genSpawns);
+      if (source.genSpawns !== undefined && genSpawns === undefined) {
+        throw new MessageError('Поле genSpawns');
+      }
       const players = source.players;
-      if (players !== undefined && (!isInt(players) || players < 2 || players > 30)) {
+      if (players !== undefined && (!isInt(players) || players < 2 || players > 60)) {
         throw new MessageError('Поле players');
       }
       return {
@@ -482,6 +489,7 @@ export function decodeClientMessage(text: string): C2S {
         ...(map === undefined ? {} : { map }),
         ...(players === undefined ? {} : { players }),
         ...(seed === undefined ? {} : { seed }),
+        ...(genSpawns === undefined ? {} : { genSpawns }),
       };
     }
     case 'ready':

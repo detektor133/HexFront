@@ -35,10 +35,11 @@ export function MainMenu(props: {
   const settingsWindow = useTvPresence(settingsOpen);
   const askWindow = useTvPresence(askOpen);
   // Карта комнаты, пока открыто лобби: фон показывает её, а не выбор в меню «Против ботов».
-  const [room, setRoom] = useState<{ id: MenuMapId; seed: number } | null>(null);
+  const [room, setRoom] = useState<{ id: MenuMapId; seed: number; size: number } | null>(null);
   useMenuBackground(hostRef, {
     id: room?.id ?? settings.map,
     seed: room?.seed ?? settings.seed,
+    size: room?.size ?? settings.genSize,
     players: 6,
   });
   const server = useServerStatus();
@@ -138,8 +139,12 @@ export function MainMenu(props: {
               setRoom(null);
               setLobby(null);
             }}
-            onRoomMap={(id, seed) =>
-              setRoom((prev) => (prev?.id === id && prev.seed === seed ? prev : { id, seed }))
+            onRoomMap={(id, seed, size) =>
+              setRoom((prev) =>
+                prev?.id === id && prev.seed === seed && prev.size === size
+                  ? prev
+                  : { id, seed, size },
+              )
             }
             className={lobbyWindow.className}
           />

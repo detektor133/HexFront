@@ -3,6 +3,8 @@
 // друга, — река «распадается»; здесь путь по гексам превращается в непрерывную цепочку граней.
 import { neighbor, type Direction, type Hex } from '@hexfront/sim';
 
+const squared = (x: number): number => x * x;
+
 /** Угол — три попарно соседних гекса. */
 type Corner = readonly [Hex, Hex, Hex];
 
@@ -134,8 +136,10 @@ export function riverFromHexPath(
     let chosen = c1;
     if (previous) {
       const p = position(previous);
-      const d1 = Math.hypot(position(c1).x - p.x, position(c1).y - p.y);
-      const d2 = Math.hypot(position(c2).x - p.x, position(c2).y - p.y);
+      // sqrt от суммы квадратов, а не hypot: hypot в разных движках округляется по-разному, а карту
+      // сервер и браузер обязаны построить одинаково.
+      const d1 = Math.sqrt(squared(position(c1).x - p.x) + squared(position(c1).y - p.y));
+      const d2 = Math.sqrt(squared(position(c2).x - p.x) + squared(position(c2).y - p.y));
       chosen = d1 < d2 - 1e-9 ? c1 : d2 < d1 - 1e-9 ? c2 : crossOf(c1) * side >= 0 ? c1 : c2;
     }
     side = crossOf(chosen) >= 0 ? 1 : -1;

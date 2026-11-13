@@ -11,7 +11,7 @@ import { MapPicker } from './MapPicker.tsx';
 import { Chips } from './MenuParts.tsx';
 import { Stepper } from './Stepper.tsx';
 import styles from './lobby.module.css';
-import { maxPlayersOf, randomGenSeed, type MenuMapId } from './menu-config.ts';
+import { GEN_SIZE_DEFAULT, maxPlayersOf, randomGenSeed, type MenuMapId } from './menu-config.ts';
 import ui from './menu-ui.module.css';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
 import {
@@ -57,6 +57,7 @@ function matchLink(session: NetSession): string {
     map: session.map,
     seed: String(session.seed),
     players: String(session.players),
+    size: String(session.genSpawns),
     online: '1',
     ...(session.spectator ? { spectate: '1' } : {}),
   });
@@ -181,7 +182,7 @@ export function LobbyPanel(props: {
   readonly nick: string;
   readonly onClose: () => void;
   /** Карта и зерно комнаты: фон меню показывает её. */
-  readonly onRoomMap?: (map: MenuMapId, seed: number) => void;
+  readonly onRoomMap?: (map: MenuMapId, seed: number, size: number) => void;
   readonly className: string;
 }): React.JSX.Element {
   const { mode, room } = props.request;
@@ -264,9 +265,12 @@ export function LobbyPanel(props: {
   const { onRoomMap } = props;
   const roomMap = info?.map;
   const roomSeed = session?.seed;
+  const roomSize = session?.genSpawns;
   useEffect(() => {
-    if (roomMap !== undefined && roomSeed !== undefined) onRoomMap?.(roomMap, roomSeed);
-  }, [roomMap, roomSeed, onRoomMap]);
+    if (roomMap !== undefined && roomSeed !== undefined && roomSize !== undefined) {
+      onRoomMap?.(roomMap, roomSeed, roomSize);
+    }
+  }, [roomMap, roomSeed, roomSize, onRoomMap]);
   const mySeat = (info?.seats ?? []).find((seat) => seat.id === session?.playerId);
   const mySpawn = mySeat?.spawn ?? null;
   const takenSpawns = new Map<number, string>();
@@ -383,6 +387,8 @@ export function LobbyPanel(props: {
                     seed: randomGenSeed(session?.seed),
                   })
                 }
+                genSize={session?.genSpawns ?? GEN_SIZE_DEFAULT}
+                onGenSize={(genSpawns) => clientRef.current?.configure({ genSpawns })}
                 players={info.max}
                 spawn={mySpawn}
                 taken={takenSpawns}
@@ -395,7 +401,7 @@ export function LobbyPanel(props: {
                     <Stepper
                       label={t('menu.botsCount')}
                       min={0}
-                      max={Math.max(0, maxPlayersOf(info.map) - info.humans)}
+                      max={Math.max(0, maxPlayersOf(info.map, session?.genSpawns) - info.humans)}
                       value={Math.max(0, info.max - info.humans)}
                       onChange={(bots) =>
                         clientRef.current?.configure({ players: info.humans + bots })

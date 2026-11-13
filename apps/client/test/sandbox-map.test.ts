@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { readSandboxMap, sandboxMapUrl } from '../src/dev/sandbox-map.ts';
+import { readSandboxMap } from '../src/dev/sandbox-map.ts';
+import { mapUrl } from '../src/local/map-request.ts';
 
 describe('параметры карты песочницы', () => {
-  it('передаёт сид и число игроков для процедурной карты', () => {
-    const request = readSandboxMap('?map=gen&seed=17&players=30');
+  it('передаёт сид, число игроков и размер для случайной карты', () => {
+    const request = readSandboxMap('?map=gen&seed=17&players=30&size=60');
 
-    expect(request).toEqual({ id: 'gen', seed: 17, players: 30 });
-    expect(sandboxMapUrl(request)).toBe('/maps/gen.json?seed=17&players=30');
+    expect(request).toEqual({ id: 'gen', seed: 17, players: 30, size: 60 });
   });
 
-  it('ограничивает число игроков диапазоном генератора', () => {
+  it('ограничивает число игроков и размер диапазоном генератора', () => {
     expect(readSandboxMap('?map=gen&players=1').players).toBe(2);
-    expect(readSandboxMap('?map=gen&players=31').players).toBe(30);
+    expect(readSandboxMap('?map=gen&players=99').players).toBe(60);
+    expect(readSandboxMap('?map=gen&size=1').size).toBe(4);
+    expect(readSandboxMap('?map=gen').size).toBe(30);
   });
 
   it('сохраняет small без параметра map', () => {
     const request = readSandboxMap('');
 
     expect(request.id).toBe('small');
-    expect(sandboxMapUrl(request)).toBe('/maps/small.json');
+    expect(mapUrl(request)).toBe('/maps/small.json');
   });
 });
