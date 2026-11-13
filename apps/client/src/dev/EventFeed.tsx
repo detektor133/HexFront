@@ -256,7 +256,7 @@ export function EventFeed(props: {
   readonly now: number;
   readonly onFocus: (item: EventFeedItem) => void;
   readonly style?: React.CSSProperties | undefined;
-  /** Телефон: нажатие в любом другом месте убирает записи ленты (новые появляются снова). */
+  /** Телефон: компактная лента. Записи уходят сами по таймеру; нажатия по карте их не убирают. */
   readonly compact?: boolean;
 }): React.JSX.Element | null {
   const [now, setNow] = useState<number>(props.now);
@@ -266,8 +266,6 @@ export function EventFeed(props: {
   const seen = useRef<ReadonlySet<string>>(new Set());
   const isFresh = (key: string): boolean => !seen.current.has(key);
   const [voteOpen, setVoteOpen] = useState<number | null>(null);
-  // Убранные нажатием в другом месте: до появления новой записи с другим ключом.
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
     setNow(props.now);
   }, [props.now]);
@@ -276,32 +274,11 @@ export function EventFeed(props: {
     return () => window.clearInterval(timer);
   }, []);
   // Предложения показываются из состояния (с кнопками ответа), а не одноразовой записью.
-  const items = visibleEvents(props.items, now).filter(
-    (item) => item.event.t !== 'treatyOffered' && !dismissed.has(`event:${item.id}`),
-  );
+  const items = visibleEvents(props.items, now).filter((item) => item.event.t !== 'treatyOffered');
   const offers = props.offers ?? [];
-  const grace = dismissed.has('grace') ? undefined : props.graceLeftS;
-  const signals = (props.signals ?? []).filter(({ other }) => !dismissed.has(`signal:${other}`));
-  const hold = dismissed.has('hold') ? null : (props.hold ?? null);
-  // Ключи строк, которые можно убрать нажатием в стороне; предложения договоров остаются.
-  const dismissible = useRef<string[]>([]);
-  dismissible.current = [
-    ...items.map((item) => `event:${item.id}`),
-    ...signals.map(({ other }) => `signal:${other}`),
-    ...(grace === undefined ? [] : ['grace']),
-    ...(hold === null ? [] : ['hold']),
-  ];
-  const compact = props.compact ?? false;
-  useEffect(() => {
-    if (!compact) return;
-    const onDown = (event: PointerEvent): void => {
-      if ((event.target as Element | null)?.closest('[data-feed]')) return;
-      if (dismissible.current.length === 0) return;
-      setDismissed((current) => new Set([...current, ...dismissible.current]));
-    };
-    document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
-  }, [compact]);
+  const grace = props.graceLeftS;
+  const signals = props.signals ?? [];
+  const hold = props.hold ?? null;
   const empty =
     items.length === 0 &&
     offers.length === 0 &&

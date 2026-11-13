@@ -460,8 +460,18 @@
 }
 
 .askActions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Кнопки вопроса по ширине текста, а не на всю строку. */
+.askActions .action {
+  flex: 0 1 auto;
+  width: auto;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-lg);
 }
 
 /* Низкий экран (телефон в ландшафте): ник слева вверху, панель режима по центру поверх дока. */

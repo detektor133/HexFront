@@ -175,7 +175,7 @@ test('@layout смена карты не двигает панель проти�
       return same && (now?.height ?? 0) > 100;
     })
     .toBe(true);
-  await page.getByRole('button', { name: /Предыдущая карта|Previous map/ }).click();
+  await page.getByRole('button', { name: /Следующая карта|Next map/ }).click();
   // Окно проявляется анимацией: ждём, пока размер и место установятся.
   await expect
     .poll(async () => {

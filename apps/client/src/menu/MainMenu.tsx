@@ -24,7 +24,11 @@ import { useMenuBackground } from './use-menu-background.ts';
 import { shortCount, useServerStatus } from './use-server-status.ts';
 import { isCoarsePointer } from '../input/touch-tap.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
-import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
+import {
+  enterFullscreenOnFirstTap,
+  fullscreenWanted,
+  setFullscreen,
+} from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { markAsked, wasAsked } from '../tutorial/engine.ts';
 import { useTvPresence } from '../ui/use-tv-presence.ts';
@@ -92,6 +96,8 @@ export function MainMenu(props: {
     { markers, onPick },
   );
   useEffect(() => setBackground(loadedMap), [loadedMap]);
+  // Браузер даёт полный экран только по жесту: первое касание в меню на телефоне разворачивает игру.
+  useEffect(() => enterFullscreenOnFirstTap(), []);
   const server = useServerStatus();
   const offline = server.state === 'offline';
   // Связь пропала при открытой панели «Онлайн» — панель закрывается, вернётся она сама не должна.

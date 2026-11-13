@@ -6,7 +6,7 @@ import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
 import { t } from '../i18n/dict.ts';
 import { tokens } from '../theme/tokens.ts';
 
-const MAP_KEY = 'hexfront.map';
+const MAP_KEY = 'hexfront.map.v2';
 const PLAYERS_KEY = 'hexfront.players';
 const LEVEL_KEY = 'hexfront.botLevel';
 const GEN_SIZE_KEY = 'hexfront.genSize';
@@ -104,7 +104,7 @@ export function loadSettings(): MenuSettings {
   return {
     nickname: read(NICKNAME_KEY, '') || guestNick(),
     color: firstColor(),
-    map: MAPS.find((m) => m.id === read(MAP_KEY, 'europe'))?.id ?? 'europe',
+    map: MAPS.find((m) => m.id === read(MAP_KEY, 'small'))?.id ?? 'small',
     players: Number.isInteger(players)
       ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, players))
       : PLAYERS_DEFAULT,

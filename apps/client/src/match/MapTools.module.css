@@ -161,3 +161,31 @@
     transition: none;
   }
 }
+
+/* Телефон: пока включён режим карты или стройка, рядом с ручкой есть кнопка «выйти из режима» одним нажатием. */
+.exitMode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--ui-button-primary-ink);
+  cursor: pointer;
+  pointer-events: auto;
+  background: var(--ui-button-primary-bg);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+}
+
+/* Без тёмного квадрата от касания: система подсвечивает нажатую кнопку, а у нас своё состояние. */
+.root button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root button:focus:not(:focus-visible) {
+  outline: none;
+}

@@ -66,7 +66,7 @@ export interface Step {
 }
 
 /** Размер армии, которого урок просит добиться кнопкой «+», солдат. */
-export const ARMY_GOAL = 400;
+export const ARMY_GOAL = 2000;
 
 /** Золото в начале матча-урока, монет: хватает на город, склад, дорогу и армию. */
 export const START_GOLD = 1500;
@@ -101,17 +101,24 @@ export function neutralNear(ctx: TutorialCtx): number | null {
   return best;
 }
 
+/** Последний выбранный гекс «снять выбор»: подсказка не прыгает, пока он остаётся подходящим. */
+let lockedEmpty: number | null = null;
+
 /** Своя суша без фишек и городов рядом с отрядом: куда нажать, чтобы снять выбор. */
 export function ownEmptyNear(ctx: TutorialCtx): number | null {
   const at = unitHex(ctx);
   if (at === null) return null;
   const busy = new Set([...ctx.view.units.map((u) => u.hex), ...ctx.view.cities.map((c) => c.hex)]);
+  const fits = (h: number): boolean =>
+    ctx.view.hexes.owner[h] === me(ctx) && !busy.has(h) && ctx.map.terrain[h] !== TERRAIN.water;
+  // Прежний гекс годится, пока он свой и свободен: отряд идёт, а рамка стоит на месте.
+  if (lockedEmpty !== null && fits(lockedEmpty)) return lockedEmpty;
   let best: number | null = null;
   for (let h = 0; h < ctx.view.hexes.owner.length; h += 1) {
-    if (ctx.view.hexes.owner[h] !== me(ctx) || busy.has(h) || ctx.map.terrain[h] === TERRAIN.water)
-      continue;
+    if (!fits(h)) continue;
     if (best === null || dist(ctx, h, at) < dist(ctx, best, at)) best = h;
   }
+  lockedEmpty = best;
   return best;
 }
 
@@ -182,11 +189,21 @@ export function depotSite(ctx: TutorialCtx): number | null {
   for (let h = 0; h < owner.length; h += 1) {
     if (owner[h] === me(ctx) && isDepot(ctx.view.hexes.building[h] ?? 0)) depots.push(h);
   }
+  // Склад нельзя ближе DEPOT_MIN_DISTANCE к своему городу, складу и их стройкам, на занятом гексе.
+  const near = [
+    ...ctx.view.cities.filter((c) => c.owner === me(ctx)).map((c) => c.hex),
+    ...ctx.view.constructions
+      .filter((c) => c.kind === 'foundCity' || c.kind === 'depot')
+      .map((c) => c.hex),
+    ...depots,
+  ];
   const cities = new Set(ctx.view.cities.map((c) => c.hex));
+  const building = new Set(ctx.view.constructions.map((c) => c.hex));
   let best: number | null = null;
   for (let h = 0; h < owner.length; h += 1) {
-    if (owner[h] !== me(ctx) || cities.has(h) || ctx.map.terrain[h] === TERRAIN.water) continue;
-    if (depots.some((d) => dist(ctx, d, h) < DEPOT_MIN_DISTANCE)) continue;
+    if (owner[h] !== me(ctx) || cities.has(h) || building.has(h)) continue;
+    if (ctx.map.terrain[h] === TERRAIN.water || (ctx.view.hexes.building[h] ?? 0) !== 0) continue;
+    if (near.some((d) => dist(ctx, d, h) < DEPOT_MIN_DISTANCE)) continue;
     if (best === null || dist(ctx, h, border) < dist(ctx, best, border)) best = h;
   }
   return best;
@@ -296,6 +313,7 @@ const CORE: readonly Step[] = [
   { id: 'depot', target: { hex: depotSite }, base: depotCount, done: (c, b) => depotCount(c) > b },
   { id: 'armyPick', target: { ui: 'army-card' }, done: (c) => c.army !== null },
   { id: 'armyPlus', target: { ui: 'army-stronger' }, done: (c) => armyOrder(c) >= ARMY_GOAL },
+  { id: 'armyMix', manual: true, target: { ui: 'army-limit' } },
   {
     id: 'recruit',
     progress: (c) => Math.min(1, soldiersOwn(c) / (ARMY_GOAL * 0.9)),

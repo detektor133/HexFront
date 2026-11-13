@@ -3,8 +3,7 @@ import { useState } from 'react';
 
 import { SettingsPanel } from './SettingsPanel.tsx';
 import styles from './SettingsScreen.module.css';
-import { useArmyStep } from './army-step.ts';
-import { STEP_CHOICES } from '../dev/army-limit.ts';
+import { PREF_TERRITORY_LABELS, useBoolPref } from './bool-pref.ts';
 import { t } from '../i18n/dict.ts';
 
 type Tab = 'screen' | 'game';
@@ -49,27 +48,20 @@ export function SettingsScreen(props: { readonly onBack: () => void }): React.JS
 }
 
 function GameTab(): React.JSX.Element {
-  const [step, setStep] = useArmyStep();
+  const [labels, setLabels] = useBoolPref(PREF_TERRITORY_LABELS, true);
   return (
-    <>
-      <div className={styles.group}>
-        <span className={styles.groupLabel}>{t('settings.armyStep')}</span>
-        <div className={styles.segmented} role="radiogroup" aria-label={t('settings.armyStep')}>
-          {STEP_CHOICES.map((pct) => (
-            <button
-              key={pct}
-              type="button"
-              role="radio"
-              aria-checked={pct === step}
-              className={`${styles.segment} ${pct === step ? styles.segmentOn : ''}`}
-              onClick={() => setStep(pct)}
-            >
-              {pct}%
-            </button>
-          ))}
-        </div>
-        <p className={styles.hint}>{t('settings.armyStepHint')}</p>
-      </div>
-    </>
+    <div className={styles.group}>
+      <label className={styles.toggle}>
+        <input
+          type="checkbox"
+          checked={labels}
+          onChange={(event) => setLabels(event.target.checked)}
+        />
+        <span>
+          {t('settings.labels')}
+          <small className={styles.hint}>{t('settings.labelsHint')}</small>
+        </span>
+      </label>
+    </div>
   );
 }

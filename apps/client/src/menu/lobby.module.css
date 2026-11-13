@@ -302,3 +302,12 @@
     max-height: 64px;
   }
 }
+
+/* Свой статус «готов»: нажимается, поэтому у него есть рамка и курсор. */
+.tagButton {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-sm);
+  font: inherit;
+  cursor: pointer;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+}

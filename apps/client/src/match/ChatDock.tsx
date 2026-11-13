@@ -57,6 +57,8 @@ const TOAST_MS = 6000;
 /** Лента, ввод и быстрые реакции: окно слева от колонки инструментов, внутри её контейнера. */
 export function ChatPanel(props: {
   readonly players: readonly { readonly id: number; readonly name: string }[];
+  /** Отступ от нижнего края экрана, px: на уровне нижней кромки колонки инструментов. */
+  readonly bottom?: number;
 }): React.JSX.Element | null {
   const chat = useChat();
   const [text, setText] = useState('');
@@ -74,12 +76,15 @@ export function ChatPanel(props: {
     return () => clearTimeout(timer);
   }, [last?.id, chat.open]);
   if (chat.sender === null) return null;
+  const dockStyle = { '--chat-bottom': `${props.bottom ?? 16}px` } as React.CSSProperties;
   const me = chat.sender.me;
   if (!chat.open) {
     return last !== undefined && toastId === last.id ? (
-      <ul className={styles.toast} aria-live="polite">
-        <Line line={last} me={me} />
-      </ul>
+      <div className={styles.dock} style={dockStyle}>
+        <ul className={styles.toast} aria-live="polite">
+          <Line line={last} me={me} />
+        </ul>
+      </div>
     ) : null;
   }
   const target = props.players.find((player) => player.id === chat.target);
@@ -88,57 +93,70 @@ export function ChatPanel(props: {
     setText('');
   };
   return (
-    <section className={styles.panel} aria-label={t('chat.title')}>
-      <ul className={styles.log}>
-        {chat.lines.length === 0 && <li className={styles.empty}>{t('chat.empty')}</li>}
-        {chat.lines.slice(-SHOWN).map((line) => (
-          <Line key={line.id} line={line} me={me} />
-        ))}
-        <li ref={end} aria-hidden="true" />
-      </ul>
-      <div className={styles.reactions} role="group" aria-label={t('chat.emoji')}>
-        {REACTIONS.map((Icon, index) => (
-          <button
-            key={index}
-            type="button"
-            className={styles.reaction}
-            onClick={() => chatStore.sendEmoji(index)}
-          >
-            <Icon size={20} aria-hidden="true" />
-          </button>
-        ))}
-      </div>
-      <form
-        className={styles.form}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        {target !== undefined && (
+    <div className={styles.dock} style={dockStyle}>
+      <section className={styles.panel} aria-label={t('chat.title')}>
+        <header className={styles.head}>
+          <h2 className={styles.title}>{t('chat.title')}</h2>
           <button
             type="button"
-            className={styles.target}
-            title={t('chat.all')}
-            onClick={() => chatStore.setTarget(null)}
+            className={styles.close}
+            aria-label={t('menu.close')}
+            onClick={() => chatStore.toggle()}
           >
-            <span>{target.name}</span>
-            <IconX size={16} aria-hidden="true" />
+            <IconX size={18} aria-hidden="true" />
           </button>
-        )}
-        <input
-          className={styles.input}
-          value={text}
-          maxLength={140}
-          placeholder={t('chat.placeholder')}
-          aria-label={t('chat.placeholder')}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => event.stopPropagation()}
-        />
-        <button type="submit" className={styles.send} aria-label={t('chat.send')}>
-          <IconSend size={20} aria-hidden="true" />
-        </button>
-      </form>
-    </section>
+        </header>
+        <ul className={styles.log}>
+          {chat.lines.length === 0 && <li className={styles.empty}>{t('chat.empty')}</li>}
+          {chat.lines.slice(-SHOWN).map((line) => (
+            <Line key={line.id} line={line} me={me} />
+          ))}
+          <li ref={end} aria-hidden="true" />
+        </ul>
+        <div className={styles.reactions} role="group" aria-label={t('chat.emoji')}>
+          {REACTIONS.map((Icon, index) => (
+            <button
+              key={index}
+              type="button"
+              className={styles.reaction}
+              onClick={() => chatStore.sendEmoji(index)}
+            >
+              <Icon size={20} aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+        <form
+          className={styles.form}
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          {target !== undefined && (
+            <button
+              type="button"
+              className={styles.target}
+              title={t('chat.all')}
+              onClick={() => chatStore.setTarget(null)}
+            >
+              <span>{target.name}</span>
+              <IconX size={16} aria-hidden="true" />
+            </button>
+          )}
+          <input
+            className={styles.input}
+            value={text}
+            maxLength={140}
+            placeholder={t('chat.placeholder')}
+            aria-label={t('chat.placeholder')}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => event.stopPropagation()}
+          />
+          <button type="submit" className={styles.send} aria-label={t('chat.send')}>
+            <IconSend size={20} aria-hidden="true" />
+          </button>
+        </form>
+      </section>
+    </div>
   );
 }

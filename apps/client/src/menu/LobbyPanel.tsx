@@ -146,6 +146,8 @@ function Roster(props: {
   readonly me: number;
   readonly isHost: boolean;
   readonly onTransfer: (id: number) => void;
+  /** Свой статус «готов» переключается нажатием на него. */
+  readonly onReady: (ready: boolean) => void;
 }): React.JSX.Element {
   const palette = tokens.players.palette;
   return (
@@ -162,6 +164,15 @@ function Roster(props: {
           </span>
           {seat.host ? (
             <span className={styles.tag}>{t('lobby.host')}</span>
+          ) : seat.id === props.me ? (
+            <button
+              type="button"
+              className={`${styles.tag} ${styles.tagButton} ${seat.ready ? styles.ready : ''}`}
+              aria-pressed={seat.ready}
+              onClick={() => props.onReady(!seat.ready)}
+            >
+              {seat.ready ? t('lobby.ready') : t('lobby.notReady')}
+            </button>
           ) : (
             <span className={`${styles.tag} ${seat.ready ? styles.ready : ''}`}>
               {seat.ready ? t('lobby.ready') : t('lobby.notReady')}
@@ -362,6 +373,7 @@ export function LobbyPanel(props: {
                 me={session.playerId}
                 isHost={isHost}
                 onTransfer={(id) => clientRef.current?.transfer(id)}
+                onReady={(ready) => clientRef.current?.setReady(ready)}
               />
             )}
             {mode === 'private' && (

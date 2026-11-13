@@ -220,11 +220,21 @@ const TEXTS: Readonly<Record<string, Both>> = {
   'core.armyPlus': {
     ru: {
       title: 'Усили армию',
-      text: 'Кнопка «+» увеличивает армию на выбранную долю, под ней — цена докупки солдат. Стрелка рядом меняет шаг. Доведи армию примерно до 400 солдат: нажимай «+» или выбери шаг побольше.',
+      text: 'Кнопка «+» увеличивает армию на выбранную долю, под ней — цена докупки солдат. Стрелка рядом меняет шаг. Доведи армию примерно до 2000 солдат: нажимай «+» или выбери шаг побольше — для войны нужна большая армия.',
     },
     en: {
       title: 'Strengthen the army',
-      text: 'The + button grows the army by the chosen share; the price of the extra soldiers is under it. The arrow next to it changes the step. Bring the army to about 400 soldiers: press + or pick a bigger step.',
+      text: 'The + button grows the army by the chosen share; the price of the extra soldiers is under it. The arrow next to it changes the step. Bring the army to about 2000 soldiers: press + or pick a bigger step — a war needs a big army.',
+    },
+  },
+  'core.armyMix': {
+    ru: {
+      title: 'Состав армии',
+      text: 'Кнопка с ползунками рядом открывает состав армии: сколько в ней пехоты, танков и артиллерии. Пехота дёшева, танки бьют сильнее, артиллерия стреляет издалека, но сама слаба. Попробуй сменить состав, потом нажми «Понятно».',
+    },
+    en: {
+      title: 'Army composition',
+      text: 'The sliders button next to it opens the army composition: how much infantry, armor and artillery it has. Infantry is cheap, armor hits harder, artillery shoots from afar but is weak itself. Try changing the mix, then press Got it.',
     },
   },
   'core.recruit': {

@@ -131,3 +131,23 @@
     border-left: 0;
   }
 }
+
+/* Строка-переключатель: флажок и подпись с пояснением. */
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  min-height: var(--touch-target-min);
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--ui-button-primary-bg);
+}
+
+.toggle small {
+  display: block;
+}

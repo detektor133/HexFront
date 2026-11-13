@@ -7,6 +7,7 @@ import {
   IconListDetails,
   IconMap2,
   IconMessage,
+  IconX,
   IconPackage,
   IconUsersGroup,
   IconShield,
@@ -98,115 +99,131 @@ export function MapTools({
   }, [drawer, open]);
   const prices = buildPrices(cityCost);
   return (
-    <div
-      ref={rootRef}
-      className={[
-        styles.root,
-        top === undefined ? '' : styles.fromTop,
-        drawer ? styles.drawer : '',
-      ].join(' ')}
-      style={
-        top === undefined
-          ? ({ bottom, '--tools-bottom': `${bottom}px` } as React.CSSProperties)
-          : { top }
-      }
-      data-testid="map-tools"
-    >
-      {hammerOn && (
-        <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
-          {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => {
-            const cost = prices[tool];
-            return (
-              <IconButton
-                key={tool}
-                data-tutorial={`build-${tool}`}
-                label={t(label)}
-                className={tool === build ? styles.toolActive : styles.tool}
-                aria-pressed={tool === build}
-                onClick={() => setBuild(tool)}
-              >
-                <Icon size={22} stroke={1.75} />
-                <span className={gold < cost.fp ? styles.costBad : styles.cost}>
-                  {formatCompact(cost.fp)}
-                  {cost.more ? '+' : ''}
-                </span>
-              </IconButton>
-            );
-          })}
-        </div>
-      )}
-      <ChatPanel players={chatPlayers} />
-      <div className={styles.group} data-open={!drawer || open}>
-        {drawer && (
-          <button
-            type="button"
-            className={styles.handle}
-            aria-label={t('mapTools.drawer')}
-            aria-expanded={open}
-            onClick={() => setOpen((now) => !now)}
-          >
-            {open ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
-          </button>
+    <>
+      <ChatPanel players={chatPlayers} bottom={bottom} />
+      <div
+        ref={rootRef}
+        className={[
+          styles.root,
+          top === undefined ? '' : styles.fromTop,
+          drawer ? styles.drawer : '',
+        ].join(' ')}
+        style={
+          top === undefined
+            ? ({ bottom, '--tools-bottom': `${bottom}px` } as React.CSSProperties)
+            : { top }
+        }
+        data-testid="map-tools"
+      >
+        {hammerOn && (
+          <div className={styles.row} role="toolbar" aria-label={t('mapTools.build')}>
+            {BUILD_TOOLS.map(({ tool, icon: Icon, label }) => {
+              const cost = prices[tool];
+              return (
+                <IconButton
+                  key={tool}
+                  data-tutorial={`build-${tool}`}
+                  label={t(label)}
+                  className={tool === build ? styles.toolActive : styles.tool}
+                  aria-pressed={tool === build}
+                  onClick={() => setBuild(tool)}
+                >
+                  <Icon size={22} stroke={1.75} />
+                  <span className={gold < cost.fp ? styles.costBad : styles.cost}>
+                    {formatCompact(cost.fp)}
+                    {cost.more ? '+' : ''}
+                  </span>
+                </IconButton>
+              );
+            })}
+          </div>
         )}
-        <div className={styles.column} onClickCapture={() => drawer && setOpen(false)}>
+        {drawer && !open && (hammerOn || mapMode !== 'normal') && (
           <IconButton
-            data-tutorial="buildings"
-            label={t('buildings.title')}
-            className={buildingsOpen ? styles.active : styles.button}
-            aria-pressed={buildingsOpen}
-            onClick={onToggleBuildings}
+            label={t('mapTools.exitMode')}
+            className={styles.exitMode}
+            onClick={() => {
+              setBuild(null);
+              setMapMode('normal');
+            }}
           >
-            <IconListDetails size={22} stroke={1.75} />
+            <IconX size={22} stroke={1.75} />
           </IconButton>
-          <IconButton
-            data-tutorial="hammer"
-            label={t('mapTools.build')}
-            className={hammerOn ? styles.active : styles.button}
-            aria-pressed={hammerOn}
-            onClick={() => setBuild(hammerOn ? null : 'city')}
-          >
-            <IconHammer size={22} stroke={1.75} />
-          </IconButton>
-          <IconButton
-            label={t('mapTools.normal')}
-            className={mapMode === 'normal' && !hammerOn ? styles.active : styles.button}
-            aria-pressed={mapMode === 'normal'}
-            onClick={() => setMapMode('normal')}
-          >
-            <IconMap2 size={22} stroke={1.75} />
-          </IconButton>
-          <IconButton
-            data-tutorial="supply-mode"
-            label={t('mapTools.supply')}
-            className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
-            aria-pressed={mapMode === 'supply'}
-            onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
-          >
-            <IconPackage size={22} stroke={1.75} />
-          </IconButton>
-          <IconButton
-            label={t('mapTools.political')}
-            className={mapMode === 'political' && !hammerOn ? styles.active : styles.button}
-            aria-pressed={mapMode === 'political'}
-            onClick={() =>
-              setMapMode(mapMode === 'political' && !hammerOn ? 'normal' : 'political')
-            }
-          >
-            <IconUsersGroup size={22} stroke={1.75} />
-          </IconButton>
-          {chat.sender !== null && (
-            <IconButton
-              label={chat.open ? t('chat.close') : t('chat.open')}
-              className={chat.open ? styles.active : styles.button}
-              aria-pressed={chat.open}
-              onClick={chatStore.toggle}
+        )}
+        <div className={styles.group} data-open={!drawer || open}>
+          {drawer && (
+            <button
+              type="button"
+              className={styles.handle}
+              aria-label={t('mapTools.drawer')}
+              aria-expanded={open}
+              onClick={() => setOpen((now) => !now)}
             >
-              <IconMessage size={22} stroke={1.75} />
-              {chat.unread > 0 && <span className={styles.badge}>{Math.min(chat.unread, 9)}</span>}
-            </IconButton>
+              {open ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
+            </button>
           )}
+          <div className={styles.column} onClickCapture={() => drawer && setOpen(false)}>
+            <IconButton
+              data-tutorial="buildings"
+              label={t('buildings.title')}
+              className={buildingsOpen ? styles.active : styles.button}
+              aria-pressed={buildingsOpen}
+              onClick={onToggleBuildings}
+            >
+              <IconListDetails size={22} stroke={1.75} />
+            </IconButton>
+            <IconButton
+              data-tutorial="hammer"
+              label={t('mapTools.build')}
+              className={hammerOn ? styles.active : styles.button}
+              aria-pressed={hammerOn}
+              onClick={() => setBuild(hammerOn ? null : 'city')}
+            >
+              <IconHammer size={22} stroke={1.75} />
+            </IconButton>
+            <IconButton
+              label={t('mapTools.normal')}
+              className={mapMode === 'normal' && !hammerOn ? styles.active : styles.button}
+              aria-pressed={mapMode === 'normal'}
+              onClick={() => setMapMode('normal')}
+            >
+              <IconMap2 size={22} stroke={1.75} />
+            </IconButton>
+            <IconButton
+              data-tutorial="supply-mode"
+              label={t('mapTools.supply')}
+              className={mapMode === 'supply' && !hammerOn ? styles.active : styles.button}
+              aria-pressed={mapMode === 'supply'}
+              onClick={() => setMapMode(mapMode === 'supply' && !hammerOn ? 'normal' : 'supply')}
+            >
+              <IconPackage size={22} stroke={1.75} />
+            </IconButton>
+            <IconButton
+              label={t('mapTools.political')}
+              className={mapMode === 'political' && !hammerOn ? styles.active : styles.button}
+              aria-pressed={mapMode === 'political'}
+              onClick={() =>
+                setMapMode(mapMode === 'political' && !hammerOn ? 'normal' : 'political')
+              }
+            >
+              <IconUsersGroup size={22} stroke={1.75} />
+            </IconButton>
+            {chat.sender !== null && (
+              <IconButton
+                label={chat.open ? t('chat.close') : t('chat.open')}
+                className={chat.open ? styles.active : styles.button}
+                aria-pressed={chat.open}
+                onClick={chatStore.toggle}
+              >
+                <IconMessage size={22} stroke={1.75} />
+                {chat.unread > 0 && (
+                  <span className={styles.badge}>{Math.min(chat.unread, 9)}</span>
+                )}
+              </IconButton>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

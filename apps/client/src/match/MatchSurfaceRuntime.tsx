@@ -60,6 +60,7 @@ import { loadOnlineSession } from '../net/online-session.ts';
 import { probed } from '../net/probe-hook.ts';
 import { hexCenter, pixelToHex, type Point } from '../render/hex-geometry.ts';
 import { createMapView, type MapView, type TapKind } from '../render/map-view.ts';
+import { onBoolPrefChange, PREF_TERRITORY_LABELS, readBoolPref } from '../settings/bool-pref.ts';
 import { playerColorIds, setPlayerPalette } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -851,10 +852,15 @@ export function useSandbox(
       midLayer: (m: MapStatic, radius: number) => {
         const layer = createEconomyLayer(m, radius);
         layer.setSelectedArmy(armyRef.current);
+        layer.territoryLabels.visible = readBoolPref(PREF_TERRITORY_LABELS, true);
         layerRef.current = layer;
         return layer;
       },
     };
+    const stopLabelPref = onBoolPrefChange(() => {
+      const layer = layerRef.current;
+      if (layer) layer.territoryLabels.visible = readBoolPref(PREF_TERRITORY_LABELS, true);
+    });
     void createMapView(host, map, options, () => {}, onTap, onDoubleTap).then((v) => {
       if (cancelled) return v.destroy();
       view = v;
@@ -912,6 +918,7 @@ export function useSandbox(
     window.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
+      stopLabelPref();
       if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       window.removeEventListener('keydown', onKey);
       if (pingTimer !== 0) window.clearInterval(pingTimer);
