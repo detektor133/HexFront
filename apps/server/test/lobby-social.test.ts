@@ -72,22 +72,22 @@ describe('лобби: готовность и владелец', () => {
     expect(host.of('welcome').at(-1)?.playerId).toBe(1);
   });
 
-  it('стартовая точка: занятую другим заменяют ближайшей свободной; на старте игрок получает свою', () => {
+  it('столица: любой гекс; занятый другим сдвигается, на старте игрок получает показанное место', () => {
     const { hub, host, friend, code } = pair();
-    host.send({ t: 'pick', spawn: 3 });
-    friend.send({ t: 'pick', spawn: 3 });
-    const friendSpawn = friend.of('lobby').at(-1)?.info.seats[1]?.spawn;
-    expect(friendSpawn).not.toBe(3);
-    friend.send({ t: 'pick', spawn: 4 });
+    const middle = Math.floor(MAP.width / 2) + Math.floor(MAP.height / 2) * MAP.width;
+    host.send({ t: 'pick', spawn: middle });
+    friend.send({ t: 'pick', spawn: middle });
+    const starts = friend.of('lobby').at(-1)?.info.starts ?? [];
+    expect(starts).toHaveLength(6);
+    expect(new Set(starts).size).toBe(6);
     host.send({ t: 'start' });
     hub.tickAll();
     const state = hub.roomById(code)?.state;
-    const spawns = MAP.spawns;
-    const home = (player: number): unknown =>
-      state?.cities.find((c) => c.owner === player && c.hex !== undefined)?.hex;
-    expect(home(0)).toBeDefined();
-    expect(spawns[3]).toBeDefined();
-    expect(state?.players).toHaveLength(6);
+    const capital = (player: number): number | undefined =>
+      state?.cities.find((c) => c.id === state.players[player]?.capitalCityId)?.hex;
+    expect(capital(0)).toBe(starts[0]);
+    expect(capital(1)).toBe(starts[1]);
+    expect(capital(5)).toBe(starts[5]);
   });
 });
 
@@ -201,14 +201,14 @@ describe('выбор места старта перед матчем', () => {
     expect(host.of('humans').at(-1)?.ids).toEqual([0, 1]);
   });
 
-  it('занятую точку игрок получает не пустой, а ближайшую свободную', () => {
-    const { host, friend } = placingPair();
+  it('один и тот же гекс у двух игроков: на старте столицы разные', () => {
+    const { hub, host, friend, code } = placingPair();
     host.send({ t: 'start' });
     host.send({ t: 'pick', spawn: 2 });
     friend.send({ t: 'pick', spawn: 2 });
-    const mine = friend.of('placing').at(-1)?.spawn;
-    expect(mine).not.toBeNull();
-    expect(mine).not.toBe(2);
+    const state = hub.roomById(code)?.state;
+    const hexes = state?.cities.filter((c) => c.owner >= 0).map((c) => c.hex) ?? [];
+    expect(new Set(hexes).size).toBe(hexes.length);
   });
 
   it('время вышло — матч начинается с тем, что успели выбрать', () => {

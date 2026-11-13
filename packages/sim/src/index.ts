@@ -11,6 +11,7 @@ export * from './state/fort.ts';
 export * from './state/types.ts';
 export * from './state/pop-cap.ts';
 export * from './state/create-match.ts';
+export * from './state/starts.ts';
 export * from './state/hash.ts';
 export { indexMatchesUnits, rebuildUnitIndex } from './state/unit-index.ts';
 export * from './commands/types.ts';

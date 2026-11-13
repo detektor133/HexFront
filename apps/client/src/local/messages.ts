@@ -38,8 +38,10 @@ export type ToWorker =
       readonly tutorial?: boolean;
       /** Сложность ботов матча; нет поля — полная сила. */
       readonly botLevel?: BotLevel;
-      /** Стартовая точка человека (индекс в карте); нет поля — случайная. */
+      /** Столица человека (id гекса); нет поля — случайная. */
       readonly spawn?: number;
+      /** Столицы на любых сухопутных гексах, а не на спавнах карты. */
+      readonly freeStarts?: boolean;
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }

@@ -21,7 +21,6 @@ import {
   type S2C,
 } from '@hexfront/protocol';
 import {
-  distance,
   botCommands,
   buildMask,
   type BuildMaskKind,
@@ -30,8 +29,10 @@ import {
   createMatch,
   createPlayerViewContext,
   FP,
+  hexId,
   intDiv,
   isAllied,
+  planStarts,
   playerView,
   previewPath,
   selectionFor,
@@ -266,6 +267,7 @@ export class Room {
         host: index === 0,
         spawn: seat.spawn,
       })),
+      starts: this.plannedStarts(),
     };
   }
 
@@ -312,7 +314,7 @@ export class Room {
         mapName === 'gen' ? this.options.makeMap?.(this.seed, this.genSpawns) : staticMap(mapName);
       if (next === undefined) return;
       this.map = next;
-      if (mapName !== this.mapName) for (const seat of this.seats) seat.spawn = null;
+      if (mapName !== this.mapName || regenerate) for (const seat of this.seats) seat.spawn = null;
       this.mapName = mapName;
       this.size = size;
     }
@@ -647,14 +649,16 @@ export class Room {
     this.broadcastLobby();
   }
 
-  /** Стартовая точка человека: занятая другим игроком не выдаётся; `null` — случайная. */
+  /**
+   * Желаемая столица человека — любой гекс карты (id); `null` — случайная. Сервер сдвигает её к
+   * ближайшему подходящему гексу (суша, не вплотную к другим), результат виден всем в `starts`.
+   */
   public pick(conn: Connection, spawn: number | null): void {
     const seat = this.seatOf(conn);
     const placing = this.phase === 'placing';
     if ((this.phase !== 'lobby' && !placing) || seat === undefined || seat.spectator) return;
-    if (spawn !== null && (spawn < 0 || spawn >= this.map.spawns.length)) return;
-    // Занятую точку игрок получает не «никакую», а ближайшую свободную к выбранной.
-    seat.spawn = spawn === null ? null : this.nearestFreeSpawn(spawn, seat);
+    if (spawn !== null && (spawn < 0 || spawn >= this.map.width * this.map.height)) return;
+    seat.spawn = spawn;
     if (!placing) {
       this.broadcastLobby();
       return;
@@ -664,24 +668,10 @@ export class Room {
     if (this.seats.every((other) => other.placed)) this.launch();
   }
 
-  /** Ближайшая к `wanted` точка старта, не занятая другими игроками; `null`, если свободных нет. */
-  private nearestFreeSpawn(wanted: number, seat: Seat): number | null {
-    const taken = new Set(
-      this.seats.filter((o) => o !== seat && o.spawn !== null).map((o) => o.spawn),
-    );
-    const target = this.map.spawns[wanted];
-    if (target === undefined) return null;
-    let best: number | null = null;
-    let bestSteps = Infinity;
-    this.map.spawns.forEach((spawn, index) => {
-      if (taken.has(index)) return;
-      const steps = distance(spawn, target);
-      if (steps < bestSteps) {
-        best = index;
-        bestSteps = steps;
-      }
-    });
-    return best;
+  /** Столицы всех мест комнаты: желания людей сдвинуты к подходящим гексам, остальные случайны. */
+  private plannedStarts(): number[] {
+    const wanted = Array.from({ length: this.size }, (_, i) => this.seats[i]?.spawn ?? null);
+    return planStarts(this.map, this.seed, wanted).map((hex) => hexId(hex, this.map.width));
   }
 
   private sendPlacing(seat: Seat): void {
@@ -827,10 +817,10 @@ export class Room {
       const seat = this.seats[i];
       return {
         name: seat?.nick ?? `Бот ${i - this.seats.length + 1}`,
-        ...(seat?.spawn === null || seat === undefined ? {} : { spawn: seat.spawn }),
+        ...(seat?.spawn === null || seat === undefined ? {} : { start: seat.spawn }),
       };
     });
-    const state = createMatch(map, setup, seed, { fog, diplomacy: true });
+    const state = createMatch(map, setup, seed, { fog, diplomacy: true, freeStarts: true });
     for (const seat of this.seats) {
       this.takeBack(seat, state);
       this.sendStartArmy(seat, state);

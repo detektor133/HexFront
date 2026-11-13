@@ -614,6 +614,7 @@ export function useSandbox(
             tutorial: setup.tutorial !== null,
             botLevel: setup.botLevel,
             spawn: setup.spawn,
+            freeStarts: setup.freeStarts,
             playerName:
               setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
             playerColors: matchPlayerColors(

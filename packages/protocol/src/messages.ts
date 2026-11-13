@@ -196,6 +196,8 @@ export interface LobbyInfo {
   readonly map: LobbyMap;
   /** Места людей по порядку: ник, готовность, владелец комнаты, выбранная стартовая точка. */
   readonly seats: readonly LobbySeat[];
+  /** Столицы всех игроков комнаты (id гекса): сначала люди, затем боты; на карте их видят все. */
+  readonly starts: readonly number[];
 }
 
 export interface LobbySeat {
@@ -515,7 +517,7 @@ export function decodeClientMessage(text: string): C2S {
     case 'pick':
       if (
         source.spawn !== null &&
-        (!isInt(source.spawn) || source.spawn < 0 || source.spawn > 200)
+        (!isInt(source.spawn) || source.spawn < 0 || source.spawn > 1_000_000)
       ) {
         throw new MessageError('Поле spawn');
       }

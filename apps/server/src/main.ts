@@ -22,7 +22,7 @@ const hub = new Hub({
   maxRooms: Number(process.env.MAX_ROOMS ?? 24),
   budgetMs: Number(process.env.TICK_BUDGET_MS ?? 65),
   lateJoinSeconds: Number(process.env.LATE_JOIN_SECONDS ?? 240),
-  placeSeconds: Number(process.env.PLACE_SECONDS ?? 15),
+  placeSeconds: Number(process.env.PLACE_SECONDS ?? 0),
   log(event, data) {
     process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), event, ...data })}\n`);
   },

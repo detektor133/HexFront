@@ -10,6 +10,7 @@ import { navigate } from '../nav.ts';
 import { MapPicker } from './MapPicker.tsx';
 import { Chips } from './MenuParts.tsx';
 import { Stepper } from './Stepper.tsx';
+import { lobbyStarts } from './lobby-starts.ts';
 import styles from './lobby.module.css';
 import {
   GEN_SIZES,
@@ -278,6 +279,20 @@ export function LobbyPanel(props: {
     }
   }, [roomMap, roomSeed, roomSize, onRoomMap]);
   const mySeat = (info?.seats ?? []).find((seat) => seat.id === session?.playerId);
+  // Столицы на карте за меню: нажатие по карте выбирает свою (зрителю нельзя).
+  const lobbyStarting = info?.starts;
+  const lobbyHumans = info?.humans ?? 0;
+  const myId = session?.playerId ?? -1;
+  useEffect(() => {
+    if (lobbyStarting === undefined) return;
+    lobbyStarts.set({
+      starts: lobbyStarting,
+      me: myId,
+      humans: lobbyHumans,
+      pick: spectate ? null : (hex) => clientRef.current?.pick(hex),
+    });
+  }, [lobbyStarting, lobbyHumans, myId, spectate]);
+  useEffect(() => () => lobbyStarts.clear(), []);
 
   return (
     <div

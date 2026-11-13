@@ -54,6 +54,8 @@ export interface MenuSettings {
   readonly seed: number;
   /** Размер случайной карты (число стартовых точек). */
   readonly genSize: GenSize;
+  /** Столица, выбранная нажатием на карту за меню (id гекса); `null` — случайная. */
+  readonly start: number | null;
 }
 
 function read(key: string, fallback: string): string {
@@ -109,6 +111,7 @@ export function loadSettings(): MenuSettings {
     level: LEVELS.find((l) => l === read(LEVEL_KEY, LEVEL_DEFAULT)) ?? LEVEL_DEFAULT,
     seed: randomGenSeed(),
     genSize: GEN_SIZES.find((n) => n === Number(read(GEN_SIZE_KEY, ''))) ?? GEN_SIZE_DEFAULT,
+    start: null,
   };
 }
 
@@ -127,6 +130,13 @@ export function useMenuSettings(): readonly [MenuSettings, (patch: Partial<MenuS
   const update = useCallback((patch: Partial<MenuSettings>): void => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
+      // Другая карта — прежний выбор места на ней теряет смысл.
+      if (
+        patch.start === undefined &&
+        (patch.map !== undefined || patch.seed !== undefined || patch.genSize !== undefined)
+      ) {
+        next.start = null;
+      }
       saveSettings(next);
       return next;
     });
@@ -159,7 +169,8 @@ export function randomGenSeed(except?: number): number {
 /** Ссылка на матч против ботов по настройкам меню. */
 export function matchUrl(s: MenuSettings): string {
   const players = Math.min(s.players, maxPlayersOf(s.map, s.genSize));
-  const seed = s.map === 'gen' ? s.seed : s.map === 'europe' ? randomSeed() : 42;
+  // Зерно у всех карт общее с фоном меню: боты стоят там же, где их показал фон.
+  const { seed } = s;
   const url = new URL(
     `/match?map=${s.map}&seed=${seed}&players=${players}`,
     window.location.origin,
@@ -168,7 +179,8 @@ export function matchUrl(s: MenuSettings): string {
   if (s.nickname !== '') url.searchParams.set('name', s.nickname);
   url.searchParams.set('color', s.color);
   url.searchParams.set('difficulty', s.level);
-  // Игрок выбирает место старта на карте перед началом матча.
-  url.searchParams.set('pick', '1');
+  // Столицы на любых сухопутных гексах: место игрока — нажатием на фон меню, боты — случайно.
+  url.searchParams.set('free', '1');
+  if (s.start !== null) url.searchParams.set('spawn', String(s.start));
   return `${url.pathname}?${url.searchParams.toString()}`;
 }

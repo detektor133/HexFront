@@ -85,16 +85,18 @@ export function createLocalEngine(
   tutorial = false,
   botLevel: BotLevel = 'medium',
   spawn?: number,
+  freeStarts = false,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({
     name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
-    ...(i === HUMAN_ID && spawn !== undefined ? { spawn } : {}),
+    ...(i === HUMAN_ID && spawn !== undefined ? (freeStarts ? { start: spawn } : { spawn }) : {}),
   }));
   const state = createMatch(loaded.map, setup, seed, {
     fog,
     diplomacy,
+    ...(freeStarts ? { freeStarts: true } : {}),
     ...(tutorial ? { noVictory: true } : {}),
   });
   // Человек сам ведёт войска (меню направлений): автокомандование стартовой армии выключено, иначе

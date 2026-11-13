@@ -17,6 +17,7 @@ import { setHexOwner } from './hex-owner.ts';
 import { addCity } from './layers.ts';
 import { recomputeAllNetworks } from './network.ts';
 import { cityPopCap, hexPopCap } from './pop-cap.ts';
+import { planStarts } from './starts.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { addUnit, rebuildUnitIndex } from './unit-index.ts';
@@ -31,9 +32,13 @@ export interface PlayerSetup {
   readonly name: string;
   /** Выбранная стартовая точка: индекс в map.spawns; нет — случайная из оставшихся. */
   readonly spawn?: number;
+  /** Желаемая столица (id гекса) при `freeStarts`: сдвигается к ближайшему подходящему гексу. */
+  readonly start?: number;
 }
 
 export interface MatchOptions {
+  /** Столицы на любых сухопутных гексах (выбор игрока или случайно), а не на спавнах карты. */
+  readonly freeStarts?: boolean;
   readonly fog?: boolean;
   /** Дипломатия: по умолчанию все в мире, войну объявляют (CR-007); нет — все в войне. */
   readonly diplomacy?: boolean;
@@ -204,11 +209,24 @@ export function createMatch(
   seed: number,
   options: MatchOptions = {},
 ): MatchState {
-  if (players.length === 0 || players.length > map.spawns.length) {
+  const freeStarts = options.freeStarts === true;
+  if (players.length === 0 || (!freeStarts && players.length > map.spawns.length)) {
     throw new RangeError(`игроков ${players.length}, спавнов на карте ${map.spawns.length}`);
   }
   const state = emptyState(map, seed, options);
   seedNeutralPopulation(state);
+  if (freeStarts) {
+    const starts = planStarts(
+      map,
+      state.seed,
+      players.map((player) => player.start),
+    );
+    players.forEach((player, playerId) => {
+      const at = starts[playerId];
+      if (at) addPlayer(state, playerId, at, player.name);
+    });
+    return finishMatch(state, players, options);
+  }
   const shuffled = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
   // Выбранные точки отдаются своим игрокам (повтор — второму случайная), остальные — по жребию.
   const chosen = new Set<(typeof map.spawns)[number]>();
@@ -223,6 +241,14 @@ export function createMatch(
     const spawn = picked[playerId] ?? free.shift();
     if (spawn) addPlayer(state, playerId, spawn, player.name);
   });
+  return finishMatch(state, players, options);
+}
+
+function finishMatch(
+  state: MatchState,
+  players: readonly PlayerSetup[],
+  options: MatchOptions,
+): MatchState {
   state.cities.sort((a, b) => a.id - b.id);
   rebuildUnitIndex(state);
   recomputeAllNetworks(state);

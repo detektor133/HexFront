@@ -1,15 +1,18 @@
-/* Число с кнопками «−» и «+»: одна плотная строка. */
+/* Число с кнопками «−» и «+»: на всю строку, как ряд чипсов рядом — кнопки тянутся, число по центру. */
 .stepper {
-  display: inline-flex;
+  display: flex;
   align-items: stretch;
+  width: 100%;
+  overflow: hidden;
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-button);
   background: var(--ui-surface2);
 }
 
 .button {
-  display: inline-grid;
-  width: 36px;
+  display: grid;
+  flex: 1 1 0;
+  min-width: 36px;
   min-height: 36px;
   padding: 0;
   place-items: center;
@@ -19,13 +22,19 @@
   border: 0;
 }
 
+.button:hover:not(:disabled),
+.button:focus-visible {
+  background: var(--ui-surface);
+}
+
 .button:disabled {
   color: var(--ui-ink3);
   cursor: not-allowed;
 }
 
 .input {
-  width: 48px;
+  flex: 0 0 56px;
+  width: 56px;
   min-width: 0;
   padding: 0;
   color: var(--ui-ink);

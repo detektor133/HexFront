@@ -1,127 +1,87 @@
-// Живая карта за меню: партия шести ботов идёт в обычном темпе, камера плывёт от города к городу,
-// ни за кем конкретно не следя. Партия начинается сразу с первого тика; когда остаётся один, она заканчивается, и начинается новая.
-import { useEffect, type RefObject } from 'react';
+// Карта за меню: спокойная, без боёв. Пока открыт режим или комната, это карта, на которой будем
+// играть: нажатие по ней выбирает место старта, а метки показывают столицы людей и ботов.
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
-import { loadMap } from '@hexfront/sim';
+import { hexId, inBounds, loadMap, type MapStatic } from '@hexfront/sim';
 
-import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
-import { startLocalMatch } from '../local/local-match.ts';
+import { createStartsLayer, type StartMarker, type StartsLayer } from './starts-layer.ts';
 import { loadMapJson, type MapRequest } from '../local/map-request.ts';
-import type { FromWorker } from '../local/messages.ts';
-import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { mapBounds } from '../render/hex-geometry.ts';
 import { createMapView, type MapView } from '../render/map-view.ts';
 import { tokens } from '../theme/tokens.ts';
 
-const EMPTY_SELECTION = { hex: null, units: [], target: null } as const;
-/** Малая карта на шесть армий: стартовые земли рядом, поэтому границы сходятся и войны идут быстро. */
-const BOTS = 6;
-/** Масштаб кадра: на этом уровне уже видны отряды и границы, а в кадр попадает много земель. */
+/** Не меньше этого масштаба: на нём видны рельеф и города. */
 const WATCH_SCALE = 0.8;
-/** Пока зритель сам двигает карту, камера не уплывает: столько мс после последнего касания. */
-const USER_HOLD_MS = 25_000;
-/** Как часто камера выбирает новое место и сколько летит к нему, мс. */
-const GLIDE_EVERY_MS = 12_000;
-const GLIDE_MS = 10_000;
-/** Пауза после победителя, прежде чем начать новую партию, и длительность проявления, мс. */
-const AFTER_WIN_MS = 9000;
-const FADE_MS = 800;
+/** Сдвиг мышью дальше этого (пикселей) — это перетаскивание карты, а не выбор места. */
+const DRAG_PX = 6;
+const FADE_MS = 400;
 
-/** Запускает фоновую партию в `hostRef`. */
+/** Что нарисовать на карте и что делать с нажатием по ней. */
+export interface BackgroundStarts {
+  readonly markers: readonly StartMarker[];
+  /** Нажатие по гексу карты (id); `null` — нажатия ничего не выбирают. */
+  readonly onPick: ((hex: number) => void) | null;
+}
+
+/**
+ * Рисует карту запроса в `hostRef`.
+ * @returns загруженная карта (для расчёта стартов) или `null`, пока она строится
+ */
 export function useMenuBackground(
   hostRef: RefObject<HTMLDivElement | null>,
   request: MapRequest,
-): void {
+  starts: BackgroundStarts,
+): MapStatic | null {
   const { id, seed, size } = request;
+  const [loaded, setLoaded] = useState<MapStatic | null>(null);
+  const layerRef = useRef<StartsLayer | null>(null);
+  const startsRef = useRef(starts);
+  startsRef.current = starts;
+
+  useEffect(() => {
+    layerRef.current?.setMarkers(starts.markers);
+  }, [starts.markers]);
+
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
-    let layer: EconomyLayer | null = null;
     let stopResize: (() => void) | null = null;
     let stopInput: (() => void) | null = null;
-    let glide: ReturnType<typeof setInterval> | null = null;
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-    let match: ReturnType<typeof startLocalMatch> | null = null;
-    let deltaApplier = new ViewDeltaApplier();
-    let json: unknown = null;
-    let finished = false;
-    let bots = BOTS;
-
-    const later = (ms: number, action: () => void): void => {
-      const id = setTimeout(() => {
-        timers.delete(id);
-        action();
-      }, ms);
-      timers.add(id);
-    };
-    const show = (visible: boolean): void => {
-      const host = hostRef.current;
-      if (host === null) return;
-      host.style.transition = `opacity ${FADE_MS}ms ease`;
-      host.style.opacity = visible ? '1' : '0';
-    };
-    const launch = (): void => {
-      if (disposed || json === null) return;
-      match?.dispose();
-      deltaApplier = new ViewDeltaApplier();
-      finished = false;
-      match = startLocalMatch(
-        json,
-        1 + Math.floor(Math.random() * 1_000_000),
-        { count: bots, bots: Array.from({ length: bots }, (_, i) => i), speed: 1 },
-        (message: FromWorker): void => {
-          if (message.t === 'view') applyMessage(message);
-        },
-        { fog: false },
-      );
-      show(true);
-    };
-    function applyMessage(message: Extract<FromWorker, { t: 'view' }>): void {
-      // Без подтверждения воркер перестаёт слать виды (защита от перегруза).
-      match?.ack(message.seq);
-      const view =
-        message.kind === 'snapshot'
-          ? deltaApplier.applySnapshot(message.snapshot)
-          : deltaApplier.applyDelta(message.delta);
-      // Зритель: ни одна армия не «своя», все отряды показываются одинаково.
-      layer?.setView({ ...view, armies: [] }, EMPTY_SELECTION);
-      layer?.frame(performance.now());
-      if (!finished && message.events.some((event) => event.t === 'matchWon')) {
-        finished = true;
-        later(AFTER_WIN_MS, () => {
-          show(false);
-          later(FADE_MS, launch);
-        });
-      }
-    }
+    setLoaded(null);
 
     const start = async (): Promise<void> => {
-      json = await loadMapJson({ id, seed, size, players: BOTS });
-      const loaded = loadMap(json);
+      const json = await loadMapJson({ id, seed, size, players: 6 });
+      const result = loadMap(json);
       const host = hostRef.current;
-      if (disposed || !loaded.ok || host === null) return;
-      bots = Math.min(BOTS, loaded.map.spawns.length);
+      if (disposed || !result.ok || host === null) return;
+      const { map } = result;
+      host.style.transition = `opacity ${FADE_MS}ms ease`;
       host.style.opacity = '0';
+      let dragged = false;
       const created = await createMapView(
         host,
-        loaded.map,
+        map,
         {
           radius: tokens.map.hexRadius,
-          midLayer: (map, radius) => {
-            layer = createEconomyLayer(map, radius);
-            // Подписи государств на фоне не нужны: «Игрок 1» поверх земли только мешает.
-            layer.territoryLabels.visible = false;
+          midLayer: (m, radius) => {
+            const layer = createStartsLayer(m, radius, startsRef.current.markers);
+            layerRef.current = layer;
             return layer;
           },
         },
         () => undefined,
+        (hex) => {
+          const pick = startsRef.current.onPick;
+          if (dragged || pick === null || !inBounds(hex, map.width, map.height)) return;
+          pick(hexId(hex, map.width));
+        },
       );
       if (disposed) {
         created.destroy();
         return;
       }
       mapView = created;
-      const bounds = mapBounds(loaded.map.width, loaded.map.height, tokens.map.hexRadius);
+      const bounds = mapBounds(map.width, map.height, tokens.map.hexRadius);
       const frame = (): void => {
         const cover = Math.max(host.clientWidth / bounds.width, host.clientHeight / bounds.height);
         created.setScale(Math.max(cover, WATCH_SCALE));
@@ -131,43 +91,39 @@ export function useMenuBackground(
       observer.observe(host);
       stopResize = () => observer.disconnect();
       // Колесо и жесты пальцев карта разбирает сама; левой кнопкой мыши её тянем здесь.
-      let touchedAt = -Infinity;
+      let travelled = 0;
+      const onDown = (): void => {
+        travelled = 0;
+        dragged = false;
+      };
       const onMove = (event: PointerEvent): void => {
-        touchedAt = performance.now();
         if (event.pointerType === 'mouse' && (event.buttons & 1) === 1) {
+          travelled += Math.abs(event.movementX) + Math.abs(event.movementY);
+          if (travelled > DRAG_PX) dragged = true;
           created.pan(event.movementX, event.movementY);
         }
       };
+      host.addEventListener('pointerdown', onDown, true);
       host.addEventListener('pointermove', onMove);
-      const onWheel = (): void => {
-        touchedAt = performance.now();
-      };
-      host.addEventListener('wheel', onWheel, { passive: true });
       stopInput = () => {
+        host.removeEventListener('pointerdown', onDown, true);
         host.removeEventListener('pointermove', onMove);
-        host.removeEventListener('wheel', onWheel);
       };
-      const cities = loaded.map.cities;
-      const glideTo = (ms: number): void => {
-        const city = cities[Math.floor(Math.random() * cities.length)];
-        if (city !== undefined) created.centerOn({ q: city.q, r: city.r }, ms);
-      };
-      glideTo(0);
-      glide = setInterval(() => {
-        if (performance.now() - touchedAt > USER_HOLD_MS) glideTo(GLIDE_MS);
-      }, GLIDE_EVERY_MS);
-      launch();
+      const city = map.cities[Math.floor(map.cities.length / 2)];
+      if (city !== undefined) created.centerOn({ q: city.q, r: city.r }, 0);
+      layerRef.current?.setMarkers(startsRef.current.markers);
+      host.style.opacity = '1';
+      setLoaded(map);
     };
     void start();
     return () => {
       disposed = true;
-      if (glide !== null) clearInterval(glide);
-      for (const id of timers) clearTimeout(id);
       stopResize?.();
       stopInput?.();
-      match?.dispose();
-      layer?.destroy();
+      layerRef.current = null;
       mapView?.destroy();
     };
   }, [hostRef, id, seed, size]);
+
+  return loaded;
 }

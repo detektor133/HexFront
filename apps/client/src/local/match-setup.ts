@@ -17,8 +17,10 @@ export interface LocalMatchSetup {
   readonly tutorial: string | null;
   /** Сложность ботов (`difficulty=easy|normal|hard`); без параметра — полная сила. */
   readonly botLevel: BotLevel;
-  /** Выбранная стартовая точка игрока (`spawn=N`, индекс в карте); нет — случайная. */
+  /** Выбранная столица игрока (`spawn=N`, id гекса карты); нет — случайная. */
   readonly spawn: number | null;
+  /** Столицы на любых сухопутных гексах (`free=1`), а не на спавнах карты. */
+  readonly freeStarts: boolean;
 }
 
 /** Сложность из адреса: «hard» — полная сила бота (`medium` в sim). */
@@ -28,7 +30,7 @@ function botLevelParam(value: string | null): BotLevel {
   return 'medium';
 }
 
-/** Номер стартовой точки из адреса: целое от 0; иначе игрок садится случайно. */
+/** Гекс столицы из адреса: целое от 0; иначе игрок садится случайно. */
 function spawnParam(value: string | null): number | null {
   if (value === null || value === '') return null;
   const index = Number(value);
@@ -73,5 +75,6 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     tutorial,
     botLevel: botLevelParam(params.get('difficulty')),
     spawn: spawnParam(params.get('spawn')),
+    freeStarts: params.get('free') === '1',
   };
 }

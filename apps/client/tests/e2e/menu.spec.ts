@@ -165,7 +165,16 @@ test('@layout смена карты не двигает панель проти�
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
   const panel = page.getByRole('group', { name: /Против ботов|Versus bots/ });
-  const before = await panel.boundingBox();
+  // Окно открывается анимацией: берём размер, когда он перестал меняться.
+  let before = await panel.boundingBox();
+  await expect
+    .poll(async () => {
+      const now = await panel.boundingBox();
+      const same = now?.height === before?.height && now?.y === before?.y;
+      before = now;
+      return same && (now?.height ?? 0) > 100;
+    })
+    .toBe(true);
   await page.getByRole('button', { name: /Предыдущая карта|Previous map/ }).click();
   // Окно проявляется анимацией: ждём, пока размер и место установятся.
   await expect
@@ -319,3 +328,23 @@ for (const size of [
     await context.close();
   });
 }
+
+test('@layout против ботов: нажатие по карте за меню выбирает место старта', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('hexfront.tutorialAsked', '1');
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
+  await expect(page.getByRole('note')).toBeVisible();
+  await page.mouse.click(80, 300);
+  await page.getByRole('button', { name: /^(Играть|Play)/ }).click();
+  await expect(page.getByRole('banner')).toBeVisible();
+  const search = await page.evaluate(
+    () => (history.state as { hexfront: { search: string } }).hexfront.search,
+  );
+  const params = new URLSearchParams(search);
+  expect(params.get('free')).toBe('1');
+  expect(Number(params.get('spawn'))).toBeGreaterThanOrEqual(0);
+  expect(params.has('pick')).toBe(false);
+});

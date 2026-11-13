@@ -49,6 +49,21 @@
   box-shadow: var(--shadow-hard);
 }
 
+/* Подсказка под шапкой: по карте можно нажать и выбрать место старта. */
+.pickHint {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs) var(--space-md);
+  color: var(--ui-ink);
+  font-size: var(--font-size-caption);
+  text-align: center;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-hard);
+}
+
 /* Плашка связи слева вверху: сколько игроков в сети или что игра в офлайне. */
 .status {
   grid-column: 1;
