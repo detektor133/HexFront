@@ -27,7 +27,7 @@ export interface PingLayer {
   readonly container: Container;
   /** Новая метка; `nowMs` — время кадра (performance.now()). */
   add(hex: number, kind: MarkKind, owner: number, nowMs: number): void;
-  /** Постоянный маркер выбранного старта в меню; null — убрать. */
+  /** Постоянный маркер выбранного места старта; null — убрать. */
   setMarker(hex: number | null): void;
   /** Покадровая отрисовка; `scale` — масштаб карты, чтобы знак не менял экранный размер. */
   frame(nowMs: number, scale: number): void;

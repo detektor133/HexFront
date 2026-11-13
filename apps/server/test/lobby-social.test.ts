@@ -72,11 +72,12 @@ describe('лобби: готовность и владелец', () => {
     expect(host.of('welcome').at(-1)?.playerId).toBe(1);
   });
 
-  it('стартовая точка: занятую другим не выдают; на старте игрок получает свою', () => {
+  it('стартовая точка: занятую другим заменяют ближайшей свободной; на старте игрок получает свою', () => {
     const { hub, host, friend, code } = pair();
     host.send({ t: 'pick', spawn: 3 });
     friend.send({ t: 'pick', spawn: 3 });
-    expect(friend.of('lobby').at(-1)?.info.seats[1]?.spawn).toBeNull();
+    const friendSpawn = friend.of('lobby').at(-1)?.info.seats[1]?.spawn;
+    expect(friendSpawn).not.toBe(3);
     friend.send({ t: 'pick', spawn: 4 });
     host.send({ t: 'start' });
     hub.tickAll();
@@ -172,5 +173,49 @@ describe('случайная карта комнаты', () => {
     hub.tickAll();
     host.send({ t: 'rematch' });
     expect(host.of('welcome').at(-1)?.seed).not.toBe(5);
+  });
+});
+
+describe('выбор места старта перед матчем', () => {
+  function placingPair() {
+    let clock = 1_000_000;
+    const hub = new Hub({ now: () => clock, size: 6, makeMap: () => MAP, placeSeconds: 10 });
+    const host = new Client(hub);
+    host.hello('Хозяин', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+    const friend = new Client(hub);
+    friend.hello('Друг', { room: code });
+    return { hub, host, friend, code, advance: (ms: number) => (clock += ms) };
+  }
+
+  it('старт открывает фазу выбора, матч начинается, когда выбрали все', () => {
+    const { hub, host, friend, code } = placingPair();
+    host.send({ t: 'start' });
+    expect(hub.roomById(code)?.phase).toBe('placing');
+    expect(host.of('placing').at(-1)).toMatchObject({ endsInS: 10, spawn: null, decided: false });
+    host.send({ t: 'pick', spawn: 2 });
+    expect(hub.roomById(code)?.phase).toBe('placing');
+    friend.send({ t: 'pick', spawn: null });
+    expect(hub.roomById(code)?.phase).toBe('running');
+    expect(host.of('placing').at(-1)).toMatchObject({ spawn: 2, decided: true });
+    expect(host.of('humans').at(-1)?.ids).toEqual([0, 1]);
+  });
+
+  it('занятую точку игрок получает не пустой, а ближайшую свободную', () => {
+    const { host, friend } = placingPair();
+    host.send({ t: 'start' });
+    host.send({ t: 'pick', spawn: 2 });
+    friend.send({ t: 'pick', spawn: 2 });
+    const mine = friend.of('placing').at(-1)?.spawn;
+    expect(mine).not.toBeNull();
+    expect(mine).not.toBe(2);
+  });
+
+  it('время вышло — матч начинается с тем, что успели выбрать', () => {
+    const { hub, host, code, advance } = placingPair();
+    host.send({ t: 'start' });
+    advance(10_500);
+    hub.tickAll();
+    expect(hub.roomById(code)?.phase).toBe('running');
   });
 });

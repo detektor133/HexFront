@@ -2,7 +2,6 @@
 // в строке действий рядом с «Оборона» и «Наступать», как они: без рамки, значок и подпись.
 import {
   IconAlertTriangle,
-  IconChevronDown,
   IconHeartHandshake,
   IconMapPin,
   IconMessage,
@@ -26,10 +25,10 @@ const MARKS = [
   { kind: 'look', icon: IconAlertTriangle },
 ] as const satisfies readonly { kind: MarkKind; icon: unknown }[];
 
-/** Можно ли общаться с этим игроком: онлайн-матч и не я сам. */
+/** Можно ли общаться с этим игроком: онлайн-матч, это живой человек и не я сам. */
 function useCanTalk(other: number): boolean {
   const chat = useChat();
-  return chat.sender !== null && other !== chat.sender.me;
+  return chat.sender !== null && other !== chat.sender.me && chat.humans?.has(other) === true;
 }
 
 /** Значок «Написать» в заголовке окна: открывает чат с адресатом. */
@@ -65,33 +64,31 @@ export function MarkMenu(props: {
   if (!canTalk) return null;
   return (
     <div ref={ref} className={splitStyles.split}>
-      <button
-        type="button"
-        className={styles.ghost}
+      <IconButton
+        label={t('mark.title')}
+        className={styles.write}
         aria-expanded={open}
-        title={t('mark.title')}
         onClick={() => setOpen((now) => !now)}
       >
-        <IconMapPin size={20} aria-hidden="true" />
-        <span>{t('mark.title')}</span>
-        <IconChevronDown size={16} aria-hidden="true" />
-      </button>
+        <IconMapPin size={18} aria-hidden="true" />
+      </IconButton>
       {open && (
-        <ul className={splitStyles.list} role="listbox" aria-label={t('mark.title')}>
+        <ul className={styles.marks} role="listbox" aria-label={t('mark.title')}>
           {MARKS.map(({ kind, icon: Icon }) => (
             <li key={kind}>
               <button
                 type="button"
-                className={splitStyles.item}
+                className={styles.markItem}
                 role="option"
                 aria-selected={false}
+                title={t(`mark.${kind}`)}
+                aria-label={t(`mark.${kind}`)}
                 onClick={() => {
                   setOpen(false);
                   chatStore.sendMark(props.hex, kind);
                 }}
               >
                 <Icon size={20} aria-hidden="true" />
-                <span className={splitStyles.itemName}>{t(`mark.${kind}`)}</span>
               </button>
             </li>
           ))}

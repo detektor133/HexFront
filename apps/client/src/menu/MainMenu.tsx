@@ -11,7 +11,7 @@ import { isCoarsePointer } from '../input/touch-tap.ts';
 import { navigate } from '../nav.ts';
 import { guestNick, nickProblem, useMenuSettings, type MenuMapId } from './menu-config.ts';
 import styles from './menu-ui.module.css';
-import { useMenuBackground, type StartPicker } from './use-menu-background.ts';
+import { useMenuBackground } from './use-menu-background.ts';
 import { shortCount, useServerStatus } from './use-server-status.ts';
 import { SettingsScreen } from '../settings/SettingsScreen.tsx';
 import { fullscreenWanted, setFullscreen } from '../settings/fullscreen.ts';
@@ -36,21 +36,12 @@ export function MainMenu(props: {
   const askWindow = useTvPresence(askOpen);
   // Карта комнаты, пока открыто лобби: фон показывает её, а не выбор в меню «Против ботов».
   const [room, setRoom] = useState<{ id: MenuMapId; seed: number; size: number } | null>(null);
-  const [roomPick, setRoomPick] = useState<StartPicker | null>(null);
-  const botsPick: StartPicker | null =
-    mode === 'bots' && lobby === null
-      ? { spawn: settings.spawn, onPick: (spawn) => update({ spawn }) }
-      : null;
-  useMenuBackground(
-    hostRef,
-    {
-      id: room?.id ?? settings.map,
-      seed: room?.seed ?? settings.seed,
-      size: room?.size ?? settings.genSize,
-      players: 6,
-    },
-    lobby === null ? botsPick : roomPick,
-  );
+  useMenuBackground(hostRef, {
+    id: room?.id ?? settings.map,
+    seed: room?.seed ?? settings.seed,
+    size: room?.size ?? settings.genSize,
+    players: 6,
+  });
   const server = useServerStatus();
   const offline = server.state === 'offline';
   // Связь пропала при открытой панели «Онлайн» — панель закрывается, вернётся она сама не должна.
@@ -146,7 +137,6 @@ export function MainMenu(props: {
             nick={settings.nickname}
             onClose={() => {
               setRoom(null);
-              setRoomPick(null);
               setLobby(null);
             }}
             onRoomMap={(id, seed, size) =>
@@ -156,7 +146,6 @@ export function MainMenu(props: {
                   : { id, seed, size },
               )
             }
-            onRoomPick={setRoomPick}
             className={lobbyWindow.className}
           />
         </div>

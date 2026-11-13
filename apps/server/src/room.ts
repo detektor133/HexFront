@@ -21,6 +21,7 @@ import {
   type S2C,
 } from '@hexfront/protocol';
 import {
+  distance,
   botCommands,
   buildMask,
   type BuildMaskKind,
@@ -101,6 +102,8 @@ export interface Connection {
 export interface RoomOptions {
   /** Тиков с начала матча, пока можно подсесть на место бота; 0 — подсадка выключена. */
   readonly lateJoinTicks?: number;
+  /** Секунд на выбор места старта перед матчем; 0 или нет — матч начинается сразу. */
+  readonly placeSeconds?: number;
   readonly id: string;
   readonly mode: JoinMode;
   readonly map: MapStatic;
@@ -115,7 +118,7 @@ export interface RoomOptions {
   readonly now: () => number;
 }
 
-export type Phase = 'lobby' | 'running' | 'ended';
+export type Phase = 'lobby' | 'placing' | 'running' | 'ended';
 
 interface Seat {
   /** В лобби номер условный (по порядку входа), окончательный задаётся при старте. */
@@ -145,6 +148,8 @@ interface Seat {
   /** Готов к старту (закрытая комната) и выбранная стартовая точка (индекс в карте). */
   ready: boolean;
   spawn: number | null;
+  /** Выбрал место старта (или «случайно») в фазе выбора. */
+  placed: boolean;
   /** Времена последних сообщений чата, мс: защита от потока. */
   chatAt: number[];
 }
@@ -193,6 +198,7 @@ export class Room {
   private readonly spectators: Seat[] = [];
   private snapshotsThisTick = 0;
   private gatherEndsAt: number | null = null;
+  private placeEndsAt: number | null = null;
   private nextToken = 0;
   /** Метрики: сколько тиков и сколько мс ушло на шаги sim, виды и отправку. */
   public readonly stats = {
@@ -384,6 +390,7 @@ export class Room {
     if (player !== undefined) player.name = nick;
     this.takeBack(seat);
     this.sendWelcome(seat);
+    this.sendHumans();
     this.send(seat, { t: 'start', tick: state.tick });
     return { token, playerId };
   }
@@ -411,6 +418,7 @@ export class Room {
       windowCount: 0,
       ready: false,
       spawn: null,
+      placed: false,
       chatAt: [],
     };
   }
@@ -447,6 +455,11 @@ export class Room {
     if (this.phase === 'lobby' && !seat.spectator) {
       this.send(seat, { t: 'lobby', info: this.lobbyInfo(), host: this.seats[0] === seat });
     }
+    if (this.phase === 'placing' && !seat.spectator) {
+      this.send(seat, { t: 'start', tick: 0 });
+      this.sendPlacing(seat);
+    }
+    if (this.phase === 'running') this.sendHumans();
     return seat.playerId;
   }
 
@@ -637,13 +650,48 @@ export class Room {
   /** Стартовая точка человека: занятая другим игроком не выдаётся; `null` — случайная. */
   public pick(conn: Connection, spawn: number | null): void {
     const seat = this.seatOf(conn);
-    if (this.phase !== 'lobby' || seat === undefined || seat.spectator) return;
-    if (spawn !== null) {
-      if (spawn >= this.map.spawns.length) return;
-      if (this.seats.some((other) => other !== seat && other.spawn === spawn)) return;
+    const placing = this.phase === 'placing';
+    if ((this.phase !== 'lobby' && !placing) || seat === undefined || seat.spectator) return;
+    if (spawn !== null && (spawn < 0 || spawn >= this.map.spawns.length)) return;
+    // Занятую точку игрок получает не «никакую», а ближайшую свободную к выбранной.
+    seat.spawn = spawn === null ? null : this.nearestFreeSpawn(spawn, seat);
+    if (!placing) {
+      this.broadcastLobby();
+      return;
     }
-    seat.spawn = spawn;
-    this.broadcastLobby();
+    seat.placed = true;
+    this.sendPlacing(seat);
+    if (this.seats.every((other) => other.placed)) this.launch();
+  }
+
+  /** Ближайшая к `wanted` точка старта, не занятая другими игроками; `null`, если свободных нет. */
+  private nearestFreeSpawn(wanted: number, seat: Seat): number | null {
+    const taken = new Set(
+      this.seats.filter((o) => o !== seat && o.spawn !== null).map((o) => o.spawn),
+    );
+    const target = this.map.spawns[wanted];
+    if (target === undefined) return null;
+    let best: number | null = null;
+    let bestSteps = Infinity;
+    this.map.spawns.forEach((spawn, index) => {
+      if (taken.has(index)) return;
+      const steps = distance(spawn, target);
+      if (steps < bestSteps) {
+        best = index;
+        bestSteps = steps;
+      }
+    });
+    return best;
+  }
+
+  private sendPlacing(seat: Seat): void {
+    const left = Math.max(0, Math.ceil(((this.placeEndsAt ?? 0) - this.options.now()) / 1000));
+    this.send(seat, { t: 'placing', endsInS: left, spawn: seat.spawn, decided: seat.placed });
+  }
+
+  private sendHumans(): void {
+    const ids = this.seats.map((seat) => seat.playerId);
+    for (const seat of [...this.seats, ...this.spectators]) this.send(seat, { t: 'humans', ids });
   }
 
   /** Можно ли после матча вернуть присутствующих в лобби (закрытая комната, есть люди онлайн). */
@@ -675,6 +723,7 @@ export class Room {
         watching: null,
         ready: false,
         spawn: null,
+        placed: false,
       });
       seat.stream.reset();
     });
@@ -738,14 +787,39 @@ export class Room {
 
   /** Вызывается таймером: в открытом наборе по истечении времени запускает матч. */
   public poll(): void {
+    if (this.phase === 'placing') {
+      if (this.placeEndsAt !== null && this.options.now() >= this.placeEndsAt) this.launch();
+      return;
+    }
     if (this.phase !== 'lobby' || this.gatherEndsAt === null) return;
     if (this.options.now() >= this.gatherEndsAt) this.start();
     else this.broadcastLobby();
   }
 
-  /** Запускает матч: люди — игроки 0..n−1, остальные места занимают боты. */
+  /**
+   * Начинает матч. Если на выбор места отведено время, сначала открывается фаза выбора: люди
+   * нажимают на карту, матч идёт, когда все выбрали или время вышло.
+   */
   public start(): void {
     if (this.phase !== 'lobby' || this.seats.length === 0) return;
+    const place = this.options.placeSeconds ?? 0;
+    if (place <= 0) {
+      this.launch();
+      return;
+    }
+    this.phase = 'placing';
+    this.placeEndsAt = this.options.now() + place * 1000;
+    for (const seat of this.seats) {
+      seat.placed = false;
+      this.send(seat, { t: 'start', tick: 0 });
+      this.sendPlacing(seat);
+    }
+    this.sendHumans();
+  }
+
+  /** Запускает матч: люди — игроки 0..n−1, остальные места занимают боты. */
+  private launch(): void {
+    if ((this.phase !== 'lobby' && this.phase !== 'placing') || this.seats.length === 0) return;
     const { fog } = this.options;
     const { size } = this;
     const { map, seed } = this;
@@ -763,6 +837,7 @@ export class Room {
     }
     this.state = state;
     this.phase = 'running';
+    this.sendHumans();
     for (const seat of this.seats) {
       this.send(seat, { t: 'start', tick: state.tick });
       seat.stream.reset();

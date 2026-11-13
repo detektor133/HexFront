@@ -34,7 +34,7 @@ export type ToShard =
 export interface RoomStatus {
   readonly id: string;
   readonly mode: JoinMode;
-  readonly phase: 'lobby' | 'running' | 'ended';
+  readonly phase: 'lobby' | 'placing' | 'running' | 'ended';
   /** Людей с живым соединением. */
   readonly connected: number;
   readonly freeSeat: boolean;
@@ -82,4 +82,6 @@ export interface HostSettings {
   readonly roomEstimateMs: number;
   /** Тиков с начала матча, пока можно подсесть на место бота. */
   readonly lateJoinTicks: number;
+  /** Секунд на выбор места старта перед матчем; 0 — без выбора. */
+  readonly placeSeconds?: number;
 }

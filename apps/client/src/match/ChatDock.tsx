@@ -1,9 +1,8 @@
-// Чат онлайн-матча: кнопка в колонке инструментов и лента внизу слева. Быстрые реакции — значки,
+// Чат онлайн-матча: кнопка в колонке инструментов (MapTools) и окно слева от неё. Быстрые реакции — значки,
 // личное сообщение — кнопка «Написать» в окне соседа.
 import {
   IconAlertTriangle,
   IconHeartHandshake,
-  IconMessage,
   IconMoodSad,
   IconMoodSmile,
   IconSend,
@@ -19,7 +18,6 @@ import styles from './ChatDock.module.css';
 import { t } from '../i18n/dict.ts';
 import { chatStore, useChat, type ChatLine } from '../net/chat-store.ts';
 import { tokens } from '../theme/tokens.ts';
-import { IconButton } from '../ui/icon-button.tsx';
 
 /** Быстрые реакции: номер в сообщении — индекс здесь (значки, не эмодзи — правило стиля). */
 export const REACTIONS = [
@@ -52,31 +50,13 @@ function Line(props: { readonly line: ChatLine; readonly me: number }): React.JS
   );
 }
 
-/** Кнопка чата для колонки инструментов: точка — есть непрочитанное. */
-export function ChatToggle(): React.JSX.Element | null {
-  const chat = useChat();
-  if (chat.sender === null) return null;
-  return (
-    <IconButton
-      label={chat.open ? t('chat.close') : t('chat.open')}
-      className={chat.open ? styles.toggleOn : styles.toggle}
-      aria-pressed={chat.open}
-      onClick={chatStore.toggle}
-    >
-      <IconMessage size={22} stroke={1.75} />
-      {chat.unread > 0 && <span className={styles.badge}>{Math.min(chat.unread, 9)}</span>}
-    </IconButton>
-  );
-}
-
 /** Сколько последних сообщений видно в ленте и сколько мс висит новое при свёрнутом чате. */
 const SHOWN = 6;
 const TOAST_MS = 6000;
 
-/** Лента, ввод и быстрые реакции внизу слева, над нижней панелью. */
+/** Лента, ввод и быстрые реакции: окно слева от колонки инструментов, внутри её контейнера. */
 export function ChatPanel(props: {
   readonly players: readonly { readonly id: number; readonly name: string }[];
-  readonly bottom: number;
 }): React.JSX.Element | null {
   const chat = useChat();
   const [text, setText] = useState('');
@@ -97,7 +77,7 @@ export function ChatPanel(props: {
   const me = chat.sender.me;
   if (!chat.open) {
     return last !== undefined && toastId === last.id ? (
-      <ul className={styles.toast} style={{ bottom: props.bottom }} aria-live="polite">
+      <ul className={styles.toast} aria-live="polite">
         <Line line={last} me={me} />
       </ul>
     ) : null;
@@ -108,7 +88,7 @@ export function ChatPanel(props: {
     setText('');
   };
   return (
-    <section className={styles.panel} style={{ bottom: props.bottom }} aria-label={t('chat.title')}>
+    <section className={styles.panel} aria-label={t('chat.title')}>
       <ul className={styles.log}>
         {chat.lines.length === 0 && <li className={styles.empty}>{t('chat.empty')}</li>}
         {chat.lines.slice(-SHOWN).map((line) => (

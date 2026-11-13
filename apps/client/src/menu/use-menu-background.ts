@@ -1,8 +1,8 @@
 // Живая карта за меню: партия шести ботов идёт в обычном темпе, камера плывёт от города к городу,
 // ни за кем конкретно не следя. Партия начинается сразу с первого тика; когда остаётся один, она заканчивается, и начинается новая.
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 
-import { hexId, loadMap } from '@hexfront/sim';
+import { loadMap } from '@hexfront/sim';
 
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { startLocalMatch } from '../local/local-match.ts';
@@ -27,36 +27,12 @@ const GLIDE_MS = 10_000;
 const AFTER_WIN_MS = 9000;
 const FADE_MS = 800;
 
-/**
- * Выбор старта тапом по фону: номер точки старта на карте (индекс в `map.spawns`) или `null` —
- * случайно. Ближайшая точка находится по тапу, сами точки не показываются.
- */
-export interface StartPicker {
-  readonly spawn: number | null;
-  readonly onPick: (spawn: number | null) => void;
-}
-
-/** Расстояние между гексами в осевых координатах. */
-function hexSteps(a: { q: number; r: number }, b: { q: number; r: number }): number {
-  const dq = a.q - b.q;
-  const dr = a.r - b.r;
-  return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
-}
-
-/** Запускает фоновую партию в `hostRef`; `picker` включает выбор старта тапом по карте. */
+/** Запускает фоновую партию в `hostRef`. */
 export function useMenuBackground(
   hostRef: RefObject<HTMLDivElement | null>,
   request: MapRequest,
-  picker: StartPicker | null = null,
 ): void {
   const { id, seed, size } = request;
-  const pickerRef = useRef(picker);
-  const markerRef = useRef<() => void>(() => undefined);
-  const pickedSpawn = picker?.spawn ?? null;
-  useEffect(() => {
-    pickerRef.current = picker;
-    markerRef.current();
-  }, [picker, pickedSpawn]);
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
@@ -139,32 +115,12 @@ export function useMenuBackground(
           },
         },
         () => undefined,
-        (hex, kind) => {
-          const current = pickerRef.current;
-          if (current === null || kind !== 'select') return;
-          let best = -1;
-          let bestSteps = Infinity;
-          loaded.map.spawns.forEach((spawn, index) => {
-            const steps = hexSteps(spawn, hex);
-            if (steps < bestSteps) {
-              best = index;
-              bestSteps = steps;
-            }
-          });
-          if (best >= 0) current.onPick(current.spawn === best ? null : best);
-        },
       );
       if (disposed) {
         created.destroy();
         return;
       }
       mapView = created;
-      markerRef.current = () => {
-        const spawn = pickerRef.current?.spawn ?? null;
-        const at = spawn === null ? undefined : loaded.map.spawns[spawn];
-        layer?.setStartMarker(at === undefined ? null : hexId(at, loaded.map.width));
-      };
-      markerRef.current();
       const bounds = mapBounds(loaded.map.width, loaded.map.height, tokens.map.hexRadius);
       const frame = (): void => {
         const cover = Math.max(host.clientWidth / bounds.width, host.clientHeight / bounds.height);
@@ -210,7 +166,6 @@ export function useMenuBackground(
       stopResize?.();
       stopInput?.();
       match?.dispose();
-      markerRef.current = () => undefined;
       layer?.destroy();
       mapView?.destroy();
     };

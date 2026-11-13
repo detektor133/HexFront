@@ -238,6 +238,7 @@ export function TerritoryMenu(props: {
           1/5
         </button>
         {!neutral && <WriteButton other={other} />}
+        {!neutral && <MarkMenu other={other} hex={hex} />}
         <IconButton label={t('menu.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} aria-hidden="true" />
         </IconButton>
@@ -359,7 +360,6 @@ export function TerritoryMenu(props: {
               <IconSwords size={20} aria-hidden="true" />
               <span>{t('menu.attack')}</span>
             </button>
-            <MarkMenu other={other} hex={hex} />
           </>
         )}
       </div>

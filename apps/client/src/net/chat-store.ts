@@ -29,6 +29,8 @@ export interface ChatState {
   readonly open: boolean;
   /** Кому пишем: id игрока или `null` — всем. */
   readonly target: number | null;
+  /** Номера игроков-людей; `null` — ещё не известно (писать и ставить метки некому). */
+  readonly humans: ReadonlySet<number> | null;
 }
 
 /** Сколько последних сообщений хранится. */
@@ -43,7 +45,14 @@ export interface MarkEvent {
 }
 const markListeners = new Set<(mark: MarkEvent) => void>();
 let nextId = 1;
-let state: ChatState = { sender: null, lines: [], unread: 0, open: false, target: null };
+let state: ChatState = {
+  sender: null,
+  lines: [],
+  unread: 0,
+  open: false,
+  target: null,
+  humans: null,
+};
 
 function set(patch: Partial<ChatState>): void {
   state = { ...state, ...patch };
@@ -65,9 +74,10 @@ export const chatStore = {
   },
   /** Матч стал онлайн (или закончился): чат включается и очищается. */
   setSender: (sender: ChatSender | null): void => {
-    set({ sender, lines: [], unread: 0, open: false, target: null });
+    set({ sender, lines: [], unread: 0, open: false, target: null, humans: null });
   },
   receive: (line: Omit<ChatLine, 'id'>): void => push(line),
+  setHumans: (ids: readonly number[]): void => set({ humans: new Set(ids) }),
   /** Пришла метка: слой карты подписан и рисует её. */
   receiveMark: (mark: MarkEvent): void => {
     for (const listener of markListeners) listener(mark);

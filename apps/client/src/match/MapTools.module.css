@@ -28,6 +28,7 @@
 
 .button,
 .active {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -46,6 +47,21 @@
   color: var(--ui-button-primary-ink);
   background: var(--ui-button-primary-bg);
   border-color: var(--ui-button-primary-bg);
+}
+
+/* Непрочитанное в чате: красный счётчик в углу кнопки. */
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  padding: 0 3px;
+  color: var(--ui-button-primary-ink);
+  font-size: var(--font-size-caption);
+  line-height: 16px;
+  text-align: center;
+  background: var(--status-danger);
+  border-radius: var(--radius-button);
 }
 
 /* Кнопка постройки: значок и мелкая цена под ним; красным, когда золота не хватает. */

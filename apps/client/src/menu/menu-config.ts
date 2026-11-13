@@ -52,7 +52,6 @@ export interface MenuSettings {
   readonly level: MenuLevel;
   /** Зерно случайной карты (из готовых) и выбранная точка старта; не хранятся между сеансами. */
   readonly seed: number;
-  readonly spawn: number | null;
   /** Размер случайной карты (число стартовых точек). */
   readonly genSize: GenSize;
 }
@@ -109,7 +108,6 @@ export function loadSettings(): MenuSettings {
       : PLAYERS_DEFAULT,
     level: LEVELS.find((l) => l === read(LEVEL_KEY, LEVEL_DEFAULT)) ?? LEVEL_DEFAULT,
     seed: randomGenSeed(),
-    spawn: null,
     genSize: GEN_SIZES.find((n) => n === Number(read(GEN_SIZE_KEY, ''))) ?? GEN_SIZE_DEFAULT,
   };
 }
@@ -167,9 +165,10 @@ export function matchUrl(s: MenuSettings): string {
     window.location.origin,
   );
   if (s.map === 'gen') url.searchParams.set('size', String(s.genSize));
-  if (s.spawn !== null) url.searchParams.set('spawn', String(s.spawn));
   if (s.nickname !== '') url.searchParams.set('name', s.nickname);
   url.searchParams.set('color', s.color);
   url.searchParams.set('difficulty', s.level);
+  // Игрок выбирает место старта на карте перед началом матча.
+  url.searchParams.set('pick', '1');
   return `${url.pathname}?${url.searchParams.toString()}`;
 }

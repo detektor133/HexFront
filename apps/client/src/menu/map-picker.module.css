@@ -1,4 +1,4 @@
-/* Выбор карты: стрелки, мини-карта, подсказка. */
+/* Выбор карты: стрелки, название, кубик. */
 .picker {
   display: grid;
   gap: var(--space-xs);
@@ -12,8 +12,6 @@
 
 .title {
   display: grid;
-  align-content: center;
-  height: 36px;
   flex: 1 1 auto;
   min-width: 0;
   text-align: center;
@@ -42,115 +40,4 @@
   color: var(--ui-ink3);
   cursor: default;
   opacity: 0.5;
-}
-
-.sizes {
-  display: flex;
-  justify-content: center;
-  gap: 2px;
-}
-
-.size {
-  min-height: 16px;
-  line-height: 1;
-  padding: 0 var(--space-xs);
-  color: var(--ui-ink2);
-  font: inherit;
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-  background: transparent;
-  border-radius: var(--radius-button);
-}
-
-.sizeOn {
-  color: var(--ui-button-primary-ink);
-  background: var(--ui-button-primary-bg);
-}
-
-.hint {
-  margin: 0;
-  color: var(--ui-ink2);
-  font-size: var(--font-size-caption);
-}
-
-/* Низкий экран: мини-карта и подсказка не нужны, чтобы панель не прокручивалась. */
-@media (max-height: 560px) {
-  .sizes {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-xs);
-  }
-
-  .sizesIdle {
-    visibility: hidden;
-  }
-
-  .size {
-    min-height: 32px;
-    padding: 0 var(--space-xs);
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--font-size-caption);
-    cursor: pointer;
-    background: var(--ui-surface2);
-    border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-    border-radius: var(--radius-button);
-  }
-
-  .sizeOn {
-    color: var(--ui-button-primary-ink);
-    background: var(--ui-button-primary-bg);
-    border-color: var(--ui-ink);
-  }
-
-  .hint {
-    display: none;
-  }
-}
-
-@media (max-width: 699px) {
-  .sizes {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-xs);
-  }
-
-  .sizesIdle {
-    visibility: hidden;
-  }
-
-  .size {
-    min-height: 32px;
-    padding: 0 var(--space-xs);
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--font-size-caption);
-    cursor: pointer;
-    background: var(--ui-surface2);
-    border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
-    border-radius: var(--radius-button);
-  }
-
-  .sizeOn {
-    color: var(--ui-button-primary-ink);
-    background: var(--ui-button-primary-bg);
-    border-color: var(--ui-ink);
-  }
-
-  .hint {
-    display: none;
-  }
-}
-
-/* Тач: цель нажатия размера карты больше видимой кнопки. */
-@media (pointer: coarse) {
-  .size {
-    position: relative;
-  }
-
-  .size::after {
-    position: absolute;
-    inset: -10px -2px;
-    content: '';
-  }
 }

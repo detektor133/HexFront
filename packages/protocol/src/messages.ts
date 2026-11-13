@@ -225,6 +225,18 @@ export type S2C =
     }
   /** `host` — получатель хозяин комнаты (может начать матч раньше срока). */
   | { readonly t: 'lobby'; readonly info: LobbyInfo; readonly host: boolean }
+  /**
+   * Перед матчем игроки выбирают место старта на карте: `endsInS` секунд, `spawn` — точка, которую
+   * сервер закрепил за получателем (ближайшая свободная к выбранной), `decided` — он уже выбрал.
+   */
+  | {
+      readonly t: 'placing';
+      readonly endsInS: number;
+      readonly spawn: number | null;
+      readonly decided: boolean;
+    }
+  /** Номера игроков-людей (остальные — боты): писать и ставить метки имеет смысл только им. */
+  | { readonly t: 'humans'; readonly ids: readonly number[] }
   | { readonly t: 'start'; readonly tick: number }
   | { readonly t: 'ack'; readonly seq: number }
   | {

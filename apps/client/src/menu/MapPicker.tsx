@@ -1,9 +1,9 @@
-// Выбор карты: стрелки «‹ название ›», мини-карта и выбор своей точки старта. Для случайной карты —
-// кнопка «Другая карта». Один вид и для «Против ботов», и для лобби.
+// Выбор карты: стрелки «‹ название ›». Для случайной карты — кнопка «Сгенерировать». Один вид и для
+// «Против ботов», и для лобби; размер случайной карты — отдельные чипсы рядом (как «Сложность»).
 import { IconChevronLeft, IconChevronRight, IconDice3 } from '@tabler/icons-react';
 
 import styles from './map-picker.module.css';
-import { GEN_SIZES, MAPS, maxPlayersOf, type GenSize, type MenuMapId } from './menu-config.ts';
+import { MAPS, maxPlayersOf, type MenuMapId } from './menu-config.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 
 export interface MapPickerProps {
@@ -11,13 +11,9 @@ export interface MapPickerProps {
   /** Выбрать карту может не каждый (гость лобби только смотрит). */
   readonly editable: boolean;
   readonly onMap: (map: MenuMapId) => void;
-  readonly seed: number;
   readonly onOtherMap: () => void;
-  /** Размер случайной карты и его смена (только у того, кто выбирает карту). */
+  /** Размер случайной карты (число стартовых точек) для подзаголовка. */
   readonly genSize: number;
-  readonly onGenSize: (size: GenSize) => void;
-  /** Выбран ли старт тапом по фону (иначе — случайный). */
-  readonly spawn: number | null;
 }
 
 /** Карта рядом в списке по кругу: `step` = 1 вперёд, −1 назад. */
@@ -45,27 +41,11 @@ export function MapPicker(props: MapPickerProps): React.JSX.Element {
         </button>
         <div className={styles.title} aria-live="polite">
           <b>{name}</b>
-          {map === 'gen' && props.editable ? (
-            <div className={styles.sizes} role="group" aria-label={t('menu.genSize')}>
-              {GEN_SIZES.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  className={`${styles.size} ${size === props.genSize ? styles.sizeOn : ''}`}
-                  aria-pressed={size === props.genSize}
-                  onClick={() => props.onGenSize(size)}
-                >
-                  {t(`menu.genSize.${size}` as MessageKey)}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <small>
-              {map === 'gen'
-                ? `${t(`menu.genSize.${props.genSize}` as MessageKey)} · ${props.genSize}`
-                : `${entry?.size ?? ''} · ${maxPlayersOf(map)}`}
-            </small>
-          )}
+          <small>
+            {map === 'gen'
+              ? `${t(`menu.genSize.${props.genSize}` as MessageKey)} · ${props.genSize}`
+              : `${entry?.size ?? ''} · ${maxPlayersOf(map)}`}
+          </small>
         </div>
         {map === 'gen' && props.editable && (
           <button
@@ -88,9 +68,6 @@ export function MapPicker(props: MapPickerProps): React.JSX.Element {
           <IconChevronRight size={20} aria-hidden="true" />
         </button>
       </div>
-      <p className={styles.hint}>
-        {props.spawn === null ? t('menu.spawnHint') : t('menu.spawnChosen')}
-      </p>
     </div>
   );
 }

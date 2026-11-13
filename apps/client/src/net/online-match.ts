@@ -18,6 +18,7 @@ import {
 } from './net-client.ts';
 import type { LocalMatch } from '../local/match-api.ts';
 import type { FromWorker } from '../local/messages.ts';
+import { placement } from '../match/placement.ts';
 
 export interface OnlineMatch extends LocalMatch {
   readonly client: NetClient;
@@ -98,6 +99,15 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
         });
       },
       onChat: (message) => chatStore.receive(message),
+      onHumans: (ids) => chatStore.setHumans(ids),
+      onPlacing: (endsInS, spawn, decided) => {
+        const endsAt = performance.now() + endsInS * 1000;
+        if (placement.getState().active) placement.update({ endsAt, spawn, decided });
+        else {
+          placement.begin(endsAt, { choose: (picked) => client.pick(picked) });
+          placement.update({ spawn, decided });
+        }
+      },
       onMark: (from, hex, kind) => chatStore.receiveMark({ from, hex, kind }),
       onRematch: () => options.onRematch?.(),
       onSelection: (sel) => {

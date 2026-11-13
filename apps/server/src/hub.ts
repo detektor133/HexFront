@@ -76,6 +76,8 @@ export interface HubOptions {
   readonly fog?: boolean;
   /** Подмена карты во встроенном шарде (тесты); воркеры генерируют сами. */
   readonly makeMap?: (seed: number, size: number) => MapStatic;
+  /** Секунд на выбор места старта перед матчем (0 — без выбора). */
+  readonly placeSeconds?: number;
   readonly log?: (event: string, data?: Record<string, unknown>) => void;
   /** Жёсткий предел комнат процесса: дальше новые входы получают `busy`. */
   readonly maxRooms?: number;
@@ -225,6 +227,7 @@ export class Hub {
       budgetMs: this.budgetMs,
       roomEstimateMs: this.roomEstimateMs,
       lateJoinTicks: (options.lateJoinSeconds ?? LATE_JOIN_TICKS / 10) * 10,
+      placeSeconds: options.placeSeconds ?? 0,
     };
     const count = Math.max(1, this.workers);
     for (let index = 0; index < count; index += 1) this.shards.push(this.makeShard(index));

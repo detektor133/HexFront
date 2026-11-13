@@ -70,6 +70,10 @@ export interface NetHandlers {
   onStatus?(status: NetStatus): void;
   onSession?(session: NetSession): void;
   onLobby?(info: LobbyInfo, host: boolean): void;
+  /** Фаза выбора места старта: секунд осталось, закреплённая точка, выбрал ли игрок. */
+  onPlacing?(endsInS: number, spawn: number | null, decided: boolean): void;
+  /** Номера игроков-людей (остальные — боты). */
+  onHumans?(ids: readonly number[]): void;
   onStart?(tick: number): void;
   /** Новый вид игрока и события тика; `full` — пришёл полный снимок. */
   onView?(view: PlayerView, events: readonly GameEvent[], full: boolean): void;
@@ -454,6 +458,12 @@ export class NetClient {
       }
       case 'lobby':
         handlers?.onLobby?.(message.info, message.host);
+        return;
+      case 'placing':
+        handlers?.onPlacing?.(message.endsInS, message.spawn, message.decided);
+        return;
+      case 'humans':
+        handlers?.onHumans?.(message.ids);
         return;
       case 'start':
         handlers?.onStart?.(message.tick);

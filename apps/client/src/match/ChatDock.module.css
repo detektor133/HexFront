@@ -1,34 +1,13 @@
-/* Чат матча: кнопка-пузырь в колонке инструментов, лента и строка ввода внизу слева, над панелью. */
-.toggle,
-.toggleOn {
-  position: relative;
-}
-
-.badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  padding: 0 3px;
-  color: var(--ui-button-primary-ink);
-  font-size: var(--font-size-caption);
-  line-height: 16px;
-  text-align: center;
-  background: var(--status-danger);
-  border-radius: var(--radius-button);
-}
-
-/* Панель и всплывающая строка: тот же материал, что у панели армий и карточек. */
+/* Чат матча: окно слева от колонки инструментов и всплывающая строка нового сообщения. */
+/* Окно и всплывающая строка: тот же материал, что у панели армий и колонки инструментов. */
 .panel,
 .toast {
-  position: fixed;
-  left: var(--space-lg);
-  z-index: 25;
   box-sizing: border-box;
-  width: min(360px, calc(100vw - 2 * var(--space-lg)));
+  width: min(300px, calc(100vw - 96px));
   color: var(--ui-ink);
+  pointer-events: auto;
   background: var(--ui-panel-image) var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
   border-radius: var(--radius-card);
   corner-shape: var(--ui-corner);
   box-shadow: var(--shadow-hard);
@@ -36,12 +15,17 @@
 
 .panel {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: var(--space-xs);
+  /* Не выше экрана: от нижней кромки колонки инструментов до HUD остаётся запас. */
+  max-height: min(360px, calc(100dvh - var(--tools-bottom, 0px) - 72px));
   padding: var(--space-sm);
 }
 
 .toast {
+  margin: 0;
   padding: var(--space-xs) var(--space-sm);
+  list-style: none;
   pointer-events: none;
 }
 

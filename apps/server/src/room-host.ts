@@ -67,7 +67,7 @@ export class RoomHost {
 
   /** Создаёт комнату: id и сид выбирает шлюз, чтобы сразу знать, где она. */
   public create(roomId: string, mode: 'open' | 'private', seed: number): void {
-    const { size, fog, now, lateJoinTicks } = this.options;
+    const { size, fog, now, lateJoinTicks, placeSeconds } = this.options;
     const room = new Room({
       id: roomId,
       mode,
@@ -79,6 +79,7 @@ export class RoomHost {
       fog,
       now,
       lateJoinTicks,
+      ...(placeSeconds === undefined ? {} : { placeSeconds }),
     });
     this.rooms.set(roomId, room);
     // Первый тик через период от создания: фазы комнат разнесены по времени, а не сходятся в один миг.

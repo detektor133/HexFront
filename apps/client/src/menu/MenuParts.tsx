@@ -7,6 +7,7 @@ import { CodeRow } from './CodeRow.tsx';
 import { MapPicker } from './MapPicker.tsx';
 import { Stepper } from './Stepper.tsx';
 import {
+  GEN_SIZES,
   LEVELS,
   NICK_MAX,
   guestNick,
@@ -189,20 +190,26 @@ function BotsBody(props: {
         map={s.map}
         editable
         onMap={(map) =>
-          props.update({
-            map,
-            players: Math.min(s.players, maxPlayersOf(map, s.genSize)),
-            spawn: null,
-          })
+          props.update({ map, players: Math.min(s.players, maxPlayersOf(map, s.genSize)) })
         }
-        seed={s.seed}
-        onOtherMap={() => props.update({ seed: randomGenSeed(s.seed), spawn: null })}
+        onOtherMap={() => props.update({ seed: randomGenSeed(s.seed) })}
         genSize={s.genSize}
-        onGenSize={(genSize) =>
-          props.update({ genSize, players: Math.min(s.players, genSize), spawn: null })
-        }
-        spawn={s.spawn}
       />
+      {s.map === 'gen' && (
+        <Chips
+          dense
+          label={t('menu.genSize')}
+          options={GEN_SIZES.map((n) => ({
+            id: String(n),
+            text: t(`menu.genSize.${n}` as MessageKey),
+          }))}
+          value={String(s.genSize)}
+          onPick={(id) => {
+            const genSize = GEN_SIZES.find((n) => String(n) === id) ?? s.genSize;
+            props.update({ genSize, players: Math.min(s.players, genSize) });
+          }}
+        />
+      )}
       <div className={`${styles.group} ${styles.dense}`}>
         <div className={styles.groupLabel}>{t('menu.botsCount')}</div>
         <Stepper

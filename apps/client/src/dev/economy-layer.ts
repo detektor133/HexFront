@@ -84,7 +84,7 @@ export interface EconomyLayer {
   setQueueMarks(hexes: readonly number[]): void;
   /** Метка союзника на карте (чат): гекс, вид и игрок, поставивший её. */
   addPing(hex: number, kind: MarkKind, owner: number): void;
-  /** Выбранный старт игрока в меню: постоянный маркер на гексе; null — убрать. */
+  /** Выбранное место старта: постоянный маркер на гексе; null — убрать. */
   setStartMarker(hex: number | null): void;
   /** Подписи на гексах (цена вторжения): текст по центру гекса; пусто — убрать. */
   setHexLabels(labels: readonly { readonly hex: number; readonly text: string }[]): void;

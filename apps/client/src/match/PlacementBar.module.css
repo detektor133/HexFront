@@ -1,0 +1,67 @@
+/* Выбор места старта: панель сверху по центру, тот же материал, что у панелей игры. */
+.bar {
+  position: absolute;
+  top: var(--space-lg);
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--space-sm));
+  padding: var(--space-sm) var(--space-md);
+  color: var(--ui-ink);
+  background: var(--ui-panel-image) var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  corner-shape: var(--ui-corner);
+  box-shadow: var(--shadow-hard);
+  translate: -50% 0;
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+}
+
+.text small {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.timer {
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ghost,
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-button);
+}
+
+.ghost {
+  color: var(--ui-ink);
+  background: transparent;
+}
+
+.ghost:hover,
+.ghost:focus-visible {
+  background: var(--ui-surface2);
+}
+
+.primary {
+  color: var(--ui-button-primary-ink);
+  font-weight: 600;
+  background: var(--ui-button-primary-bg);
+}

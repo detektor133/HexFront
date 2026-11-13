@@ -43,3 +43,22 @@ for (const size of [12, 30, 60]) {
     expect(errors).toEqual([]);
   });
 }
+
+test('@layout smoke: выбор места старта на карте, затем матч начинается', async ({ page }) => {
+  await page.goto('/match?map=small&seed=7&players=3&pick=1');
+  const bar = page.getByRole('region', { name: /Выберите место старта|Pick your start/ });
+  await expect(bar).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('banner')).toHaveCount(0);
+  const box = await page.locator('canvas').boundingBox();
+  if (box === null) throw new Error('нет карты');
+  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.6);
+  await page.getByRole('button', { name: /Начать|Start/ }).click();
+  await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+  await expect(bar).toHaveCount(0);
+});
+
+test('@layout smoke: «Случайно» начинает матч без выбранной точки', async ({ page }) => {
+  await page.goto('/match?map=small&seed=7&players=3&pick=1');
+  await page.getByRole('button', { name: /Случайно|Random/ }).click({ timeout: 30_000 });
+  await expect(page.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+});

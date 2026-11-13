@@ -11,9 +11,14 @@ import { MapPicker } from './MapPicker.tsx';
 import { Chips } from './MenuParts.tsx';
 import { Stepper } from './Stepper.tsx';
 import styles from './lobby.module.css';
-import { GEN_SIZE_DEFAULT, maxPlayersOf, randomGenSeed, type MenuMapId } from './menu-config.ts';
+import {
+  GEN_SIZES,
+  GEN_SIZE_DEFAULT,
+  maxPlayersOf,
+  randomGenSeed,
+  type MenuMapId,
+} from './menu-config.ts';
 import ui from './menu-ui.module.css';
-import type { StartPicker } from './use-menu-background.ts';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
 import {
   clearOnlineSession,
@@ -184,8 +189,6 @@ export function LobbyPanel(props: {
   readonly onClose: () => void;
   /** Карта и зерно комнаты: фон меню показывает её. */
   readonly onRoomMap?: (map: MenuMapId, seed: number, size: number) => void;
-  /** Выбор старта по фону для этой комнаты (null — выбирать нельзя). */
-  readonly onRoomPick?: (picker: StartPicker | null) => void;
   readonly className: string;
 }): React.JSX.Element {
   const { mode, room } = props.request;
@@ -275,15 +278,6 @@ export function LobbyPanel(props: {
     }
   }, [roomMap, roomSeed, roomSize, onRoomMap]);
   const mySeat = (info?.seats ?? []).find((seat) => seat.id === session?.playerId);
-  const mySpawn = mySeat?.spawn ?? null;
-  // Тап по фону выбирает старт, пока открыта закрытая комната; сама точка на карте не показана.
-  const { onRoomPick } = props;
-  const privateRoom = mode === 'private';
-  useEffect(() => {
-    onRoomPick?.(
-      privateRoom ? { spawn: mySpawn, onPick: (spawn) => clientRef.current?.pick(spawn) } : null,
-    );
-  }, [privateRoom, mySpawn, onRoomPick]);
 
   return (
     <div
@@ -384,18 +378,30 @@ export function LobbyPanel(props: {
                 map={info.map}
                 editable={isHost}
                 onMap={(next) => clientRef.current?.configure({ map: next })}
-                seed={session?.seed ?? 42}
                 onOtherMap={() =>
                   clientRef.current?.configure({
                     seed: randomGenSeed(session?.seed),
                   })
                 }
                 genSize={session?.genSpawns ?? GEN_SIZE_DEFAULT}
-                onGenSize={(genSpawns) => clientRef.current?.configure({ genSpawns })}
-                spawn={mySpawn}
               />
               {isHost && (
                 <>
+                  {info.map === 'gen' && (
+                    <Chips
+                      dense
+                      label={t('menu.genSize')}
+                      options={GEN_SIZES.map((n) => ({
+                        id: String(n),
+                        text: t(`menu.genSize.${n}` as MessageKey),
+                      }))}
+                      value={String(session?.genSpawns ?? GEN_SIZE_DEFAULT)}
+                      onPick={(id) => {
+                        const genSpawns = GEN_SIZES.find((n) => String(n) === id);
+                        if (genSpawns !== undefined) clientRef.current?.configure({ genSpawns });
+                      }}
+                    />
+                  )}
                   <div className={`${ui.group} ${ui.dense}`}>
                     <div className={ui.groupLabel}>{t('menu.botsCount')}</div>
                     <Stepper

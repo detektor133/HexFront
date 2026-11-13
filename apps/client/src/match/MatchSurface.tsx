@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appSearch, navigate } from '../nav.ts';
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
-import { ChatPanel, ChatToggle } from './ChatDock.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
+import { PlacementBar } from './PlacementBar.tsx';
 import { SpectatorBar, watchOrder } from './SpectatorBar.tsx';
 import { computeMatchLayout, matchLayoutElementStyle } from './layout.ts';
 import { createPauseController } from './pause-controller.ts';
@@ -332,6 +332,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   return (
     <div className={styles.page}>
       <div ref={hostRef} className={styles.map} />
+      <PlacementBar />
       {!pauseState.menuOpen && (
         <EventFeed
           items={sb.events}
@@ -540,13 +541,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           buildingsOpen={buildingsOpen}
           drawer={phoneView && viewport.width <= viewport.height}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
-          extra={<ChatToggle />}
-        />
-      )}
-      {view && !debug && !spectating && (
-        <ChatPanel
-          players={view.players.map((p) => ({ id: p.id, name: p.name ?? String(p.id + 1) }))}
-          bottom={dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0) + 12}
+          chatPlayers={view.players.map((p) => ({ id: p.id, name: p.name ?? String(p.id + 1) }))}
         />
       )}
       {view && !debug && buildingsOpen && !spectating && (

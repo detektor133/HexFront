@@ -6,6 +6,7 @@ import {
   IconHammer,
   IconListDetails,
   IconMap2,
+  IconMessage,
   IconPackage,
   IconUsersGroup,
   IconShield,
@@ -14,10 +15,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { DEPOT_COST, FORT_COST, IMPROVEMENT_COST } from '@hexfront/sim';
 
+import { ChatPanel } from './ChatDock.tsx';
 import styles from './MapTools.module.css';
 import type { BuildTool, MapMode } from './map-modes.ts';
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { formatCompact } from '../i18n/format.ts';
+import { chatStore, useChat } from '../net/chat-store.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 const BUILD_TOOLS: readonly {
@@ -60,8 +63,8 @@ interface Props {
   readonly onToggleBuildings: () => void;
   /** Колонка кнопок прячется за правый край экрана, торчит только ручка (телефон в портрете). */
   readonly drawer?: boolean;
-  /** Дополнительные кнопки в конце колонки (чат онлайн-матча). */
-  readonly extra?: React.ReactNode;
+  /** Игроки для адресата чата онлайн-матча. */
+  readonly chatPlayers?: readonly { readonly id: number; readonly name: string }[];
 }
 
 /** Правый нижний угол: молоточек (режим строительства) и режимы карты — обычная и снабжение. */
@@ -77,9 +80,10 @@ export function MapTools({
   buildingsOpen,
   onToggleBuildings,
   drawer = false,
-  extra,
+  chatPlayers = [],
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
+  const chat = useChat();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   // Выдвинутая колонка прячется нажатием в любом другом месте.
@@ -101,7 +105,11 @@ export function MapTools({
         top === undefined ? '' : styles.fromTop,
         drawer ? styles.drawer : '',
       ].join(' ')}
-      style={top === undefined ? { bottom } : { top }}
+      style={
+        top === undefined
+          ? ({ bottom, '--tools-bottom': `${bottom}px` } as React.CSSProperties)
+          : { top }
+      }
       data-testid="map-tools"
     >
       {hammerOn && (
@@ -127,6 +135,7 @@ export function MapTools({
           })}
         </div>
       )}
+      <ChatPanel players={chatPlayers} />
       <div className={styles.group} data-open={!drawer || open}>
         {drawer && (
           <button
@@ -185,7 +194,17 @@ export function MapTools({
           >
             <IconUsersGroup size={22} stroke={1.75} />
           </IconButton>
-          {extra}
+          {chat.sender !== null && (
+            <IconButton
+              label={chat.open ? t('chat.close') : t('chat.open')}
+              className={chat.open ? styles.active : styles.button}
+              aria-pressed={chat.open}
+              onClick={chatStore.toggle}
+            >
+              <IconMessage size={22} stroke={1.75} />
+              {chat.unread > 0 && <span className={styles.badge}>{Math.min(chat.unread, 9)}</span>}
+            </IconButton>
+          )}
         </div>
       </div>
     </div>

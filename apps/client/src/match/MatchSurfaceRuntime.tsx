@@ -15,6 +15,7 @@ import {
 import { coastPath, isOwnCoast, ownCoast } from './coast-defense.ts';
 import { useInvasion, type Invasion } from './invasion.ts';
 import { useMapModes, type MapModes } from './map-modes.ts';
+import { nearestSpawn, placement } from './placement.ts';
 import { applyStartCamera as applyStartCameraToMap } from './start-camera.ts';
 import { orderArmy } from '../dev/army-order.ts';
 import { armyCounts, orderFields } from '../dev/direction-order.ts';
@@ -573,16 +574,24 @@ export function useSandbox(
       if (m.t === 'error') return setError(m.errors.join('; '));
       // Ответ предпросмотра пути обрабатывает клиент маршрута (T17dg).
       if (m.t === 'pathPreview') return;
+      // Пока игрок выбирает место старта, матч не показывается: на карте нет чужих государств.
+      if (m.t === 'view' && placement.getState().active) {
+        if (online === null) return;
+        placement.end();
+      }
       if (m.t === 'mapMask') return mapModesRef.current.handleReply(m);
       scheduleMessage(m);
     };
     // Сетевой матч (`online=1`): вид и расчёты приходят с сервера по токену места из лобби.
-    const online =
-      new URLSearchParams(appSearch()).get('online') === '1' ? loadOnlineSession() : null;
+    const params0 = new URLSearchParams(appSearch());
+    const online = params0.get('online') === '1' ? loadOnlineSession() : null;
     if (new URLSearchParams(appSearch()).get('online') === '1' && online === null) {
       setError(t('online.refused.badHello'));
       return;
     }
+    // Игра с ботами из меню (`pick=1`): сначала игрок выбирает место старта на карте.
+    const pickStart =
+      online === null && !debug && setup.tutorial === null && params0.get('pick') === '1';
     const match: LocalMatch = online
       ? startOnlineMatch({
           connect: webSocketTransport(online.server),
@@ -594,22 +603,46 @@ export function useSandbox(
           ...(online.friends === true ? { friends: true } : {}),
           onRematch: () => navigate('/online?resume=1'),
         })
-      : startLocalMatch(json, mapRequest.seed, readLocalMatchSetup(appSearch()), onWorkerMessage, {
-          telemetry: debug,
-          initialGold: setup.initialGold,
-          tutorial: setup.tutorial !== null,
-          botLevel: setup.botLevel,
-          spawn: setup.spawn,
-          playerName:
-            setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
-          playerColors: matchPlayerColors(
-            setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
-          ),
-        });
+      : startLocalMatch(
+          json,
+          mapRequest.seed,
+          { ...setup, speed: pickStart ? 0 : setup.speed },
+          onWorkerMessage,
+          {
+            telemetry: debug,
+            initialGold: setup.initialGold,
+            tutorial: setup.tutorial !== null,
+            botLevel: setup.botLevel,
+            spawn: setup.spawn,
+            playerName:
+              setup.playerName ?? localStorage.getItem(NICKNAME_KEY) ?? `${t('observer.player')} 1`,
+            playerColors: matchPlayerColors(
+              setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal',
+            ),
+          },
+        );
     setPlayerPalette(
       matchPlayerColors(setup.playerColor ?? localStorage.getItem(COLOR_KEY) ?? 'teal'),
     );
     matchRef.current = match;
+    if (pickStart) {
+      placement.begin(null, {
+        choose: () => undefined,
+        confirm: () => {
+          const next = new URLSearchParams(appSearch());
+          next.delete('pick');
+          const spawn = placement.getState().spawn;
+          if (spawn !== null) next.set('spawn', String(spawn));
+          next.set('run', String(Date.now()));
+          navigate(`/match?${next.toString()}`);
+        },
+      });
+    }
+    const stopMarker = placement.subscribe(() => {
+      const spawn = placement.getState().spawn;
+      const at = spawn === null ? undefined : map.spawns[spawn];
+      layerRef.current?.setStartMarker(at === undefined ? null : hexId(at, map.width));
+    });
     const pingTimer = online
       ? window.setInterval(() => {
           const rtt = (match as OnlineMatch).client.rtt;
@@ -649,6 +682,10 @@ export function useSandbox(
       shift?: boolean,
       screen?: Point,
     ): void => {
+      if (placement.getState().active) {
+        if (inBounds(h, map.width, map.height)) placement.tap(nearestSpawn(map.spawns, h));
+        return;
+      }
       const current = viewRef.current;
       setMenu(null);
       // «Держать» без приказа: следующий тап по чужой стране ставит армии фронт на её границе.
@@ -877,6 +914,8 @@ export function useSandbox(
       if (frameRequest !== 0) cancelAnimationFrame(frameRequest);
       window.removeEventListener('keydown', onKey);
       if (pingTimer !== 0) window.clearInterval(pingTimer);
+      stopMarker();
+      placement.end();
       match.dispose();
       view?.destroy();
       matchRef.current = null;

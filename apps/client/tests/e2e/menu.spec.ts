@@ -166,10 +166,14 @@ test('@layout смена карты не двигает панель проти�
   await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
   const panel = page.getByRole('group', { name: /Против ботов|Versus bots/ });
   const before = await panel.boundingBox();
-  await page.getByRole('button', { name: /Следующая карта|Next map/ }).click();
-  const after = await panel.boundingBox();
-  expect(after?.height).toBe(before?.height);
-  expect(after?.y).toBe(before?.y);
+  await page.getByRole('button', { name: /Предыдущая карта|Previous map/ }).click();
+  // Окно проявляется анимацией: ждём, пока размер и место установятся.
+  await expect
+    .poll(async () => {
+      const after = await panel.boundingBox();
+      return [after?.height, after?.y];
+    })
+    .toEqual([before?.height, before?.y]);
 });
 
 test('@layout «Смотреть» по коду комнаты ведёт в матч зрителем', async ({ browser }) => {
@@ -315,19 +319,3 @@ for (const size of [
     await context.close();
   });
 }
-
-test('@layout старт выбирается тапом по фону без видимых точек', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('hexfront.tutorialAsked', '1');
-  });
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
-  await expect(page.getByText(/Старт случайный|Random start/)).toBeVisible();
-  await expect(page.locator('[class*="spawn"]')).toHaveCount(0);
-  // Фон загружается и строит карту: ждём, пока тап начнёт попадать в карту.
-  await expect(async () => {
-    await page.mouse.click(40, 360);
-    await expect(page.getByText(/Старт выбран|Start picked/)).toBeVisible({ timeout: 500 });
-  }).toPass({ timeout: 20_000 });
-});

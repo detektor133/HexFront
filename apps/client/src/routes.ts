@@ -7,6 +7,7 @@ export function quickMatchUrl(): string {
     map: 'gen',
     seed: String(seed),
     players: String(QUICK_MATCH_PLAYERS),
+    pick: '1',
   });
   return `/match?${params.toString()}`;
 }
