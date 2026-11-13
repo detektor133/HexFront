@@ -42,6 +42,8 @@ export type ToWorker =
       readonly spawn?: number;
       /** Столицы на любых сухопутных гексах, а не на спавнах карты. */
       readonly freeStarts?: boolean;
+      /** Свой список названий городов человека. */
+      readonly cityNames?: readonly string[];
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }

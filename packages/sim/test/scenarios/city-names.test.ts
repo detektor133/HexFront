@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
-import { pickCityName } from '../../src/map/city-names.ts';
+import { botName, cleanCityPool, pickCityName } from '../../src/map/city-names.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
 const MAP = `
@@ -44,5 +44,38 @@ describe('названия городов', () => {
     expect(pickCityName(5, 11, s.state.cities)).toBe(first);
     const taken = s.state.cities.map((c) => ({ ...c, name: first }));
     expect(pickCityName(5, 11, taken)).not.toBe(first);
+  });
+});
+
+describe('слоговые названия и свой список', () => {
+  it('названия латиницей, одинаковы для всех, боты подчёркнуты', () => {
+    const a = botName(11, 3);
+    expect(botName(11, 3)).toBe(a);
+    expect(a).toContain('\u0332');
+    expect(a.replace(/\u0332/gu, '')).toMatch(/^[A-Za-z]+$/u);
+    for (let id = 0; id < 40; id += 1) {
+      expect(pickCityName(9, id, [], id % 7)).toMatch(/^[A-Za-z ]+$/u);
+    }
+  });
+
+  it('названия бота не повторяются, если передать занятые', () => {
+    const names: string[] = [];
+    for (let id = 0; id < 20; id += 1) names.push(botName(5, id, names));
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('свой список идёт первым и по порядку, потом слоговые', () => {
+    const pool = ['Aldoria', 'Brenn'];
+    const first = pickCityName(1, 1, [], 0, pool);
+    expect(first).toBe('Aldoria');
+    const taken = [{ name: 'Aldoria' }] as never;
+    expect(pickCityName(1, 2, taken, 0, pool)).toBe('Brenn');
+    const both = [{ name: 'Aldoria' }, { name: 'Brenn' }] as never;
+    expect(pickCityName(1, 3, both, 0, pool)).not.toMatch(/^(Aldoria|Brenn)$/u);
+  });
+
+  it('список игрока очищается: пробелы, повторы, предел', () => {
+    expect(cleanCityPool(['  A  ', 'A', '', 'B  c'])).toEqual(['A', 'B c']);
+    expect(cleanCityPool(Array.from({ length: 50 }, (_, i) => `n${i}`))).toHaveLength(30);
   });
 });

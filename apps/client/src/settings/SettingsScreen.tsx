@@ -1,6 +1,7 @@
 import { IconArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { CityNamesField } from './CityNamesField.tsx';
 import { SettingsPanel } from './SettingsPanel.tsx';
 import styles from './SettingsScreen.module.css';
 import {
@@ -148,6 +149,7 @@ function GameTab(): React.JSX.Element {
         on={ping}
         onChange={setPing}
       />
+      <CityNamesField />
     </>
   );
 }

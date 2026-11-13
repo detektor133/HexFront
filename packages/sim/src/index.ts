@@ -56,12 +56,12 @@ export { atSea, portCapacity, sailCost } from './commands/sail.ts';
 export {
   botName,
   CITY_NAME_MAX,
-  GEN_PREFIX_COUNT,
-  GEN_SUFFIX_COUNT,
-  NATION_CITY_COUNT,
-  NATION_COUNT,
-  nationOf,
+  CITY_POOL_MAX,
+  CULTURE_COUNT,
+  cleanCityPool,
+  cultureOf,
   pickCityName,
+  underlined,
 } from './map/city-names.ts';
 export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';
 export { isSupportedByArtillery } from './queries/battle-math.ts';

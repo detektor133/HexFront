@@ -3,6 +3,7 @@ import type { BotLevel } from '@hexfront/sim';
 
 import type { LocalMatch } from './match-api.ts';
 import type { FromWorker, ToWorker } from './messages.ts';
+import { readCityNames } from '../settings/city-names-pref.ts';
 
 export type { LocalMatch };
 
@@ -44,6 +45,7 @@ export function startLocalMatch(
     ...(options.botLevel ? { botLevel: options.botLevel } : {}),
     ...(options.spawn !== undefined && options.spawn !== null ? { spawn: options.spawn } : {}),
     ...(options.freeStarts ? { freeStarts: true } : {}),
+    ...(readCityNames().length > 0 ? { cityNames: readCityNames() } : {}),
     ...(options.initialGold !== undefined && options.initialGold !== null
       ? { initialGold: options.initialGold }
       : {}),

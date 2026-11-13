@@ -123,7 +123,7 @@ describe('вход и набор', () => {
       'Борис',
       room?.state?.players[2]?.name,
     ]);
-    expect(room?.state?.players[2]?.name).toMatch(/^~b:\d+:0$/);
+    expect(room?.state?.players[2]?.name).toContain('̲');
     expect(room?.state?.players).toHaveLength(SIZE);
   });
 

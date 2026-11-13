@@ -2,7 +2,6 @@ import { Graphics, Text, type Container } from 'pixi.js';
 
 import { hexFromId, type PlayerView, type TreatyKind } from '@hexfront/sim';
 
-import { territoryName } from '../i18n/names.ts';
 import { hexCenter } from '../render/hex-geometry.ts';
 import { playerLine } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
@@ -73,7 +72,7 @@ export function buildTerritoryLabels(
   const sums = ownerSums(view.hexes.owner, mapWidth, hexRadius);
   return view.players.flatMap((player) => {
     const sum = sums.get(player.id);
-    const name = territoryName(player.name ?? '');
+    const name = player.name ?? '';
     if (!sum || name.trim() === '') return [];
     const fontSize = Math.min(
       tokens.font.size.display,

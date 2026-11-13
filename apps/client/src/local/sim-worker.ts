@@ -74,6 +74,7 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     msg.botLevel ?? 'medium',
     msg.spawn,
     msg.freeStarts === true,
+    msg.cityNames ?? [],
   );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });

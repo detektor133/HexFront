@@ -34,6 +34,7 @@ import {
   isAllied,
   planStarts,
   botName,
+  cleanCityPool,
   playerView,
   previewPath,
   selectionFor,
@@ -147,6 +148,8 @@ interface Seat {
   watching: number | null;
   windowStart: number;
   windowCount: number;
+  /** Свой список названий городов игрока (проверен `cleanCityPool`). */
+  cityNames: string[];
   /** Готов к старту (закрытая комната) и выбранная стартовая точка (индекс в карте). */
   ready: boolean;
   spawn: number | null;
@@ -421,6 +424,7 @@ export class Room {
       windowCount: 0,
       ready: false,
       spawn: null,
+      cityNames: [],
       placed: false,
       chatAt: [],
     };
@@ -669,6 +673,15 @@ export class Room {
     if (this.seats.every((other) => other.placed)) this.launch();
   }
 
+  /** Свой список названий городов человека: берётся при старте матча и для городов, основанных позже. */
+  public setCityNames(conn: Connection, names: readonly string[]): void {
+    const seat = this.seatOf(conn);
+    if (seat === undefined || seat.spectator) return;
+    seat.cityNames = cleanCityPool(names);
+    const player = this.state?.players[seat.playerId];
+    if (player !== undefined) player.cityPool = seat.cityNames.length > 0 ? seat.cityNames : [];
+  }
+
   /** Столицы всех мест комнаты: желания людей сдвинуты к подходящим гексам, остальные случайны. */
   private plannedStarts(): number[] {
     const wanted = Array.from({ length: this.size }, (_, i) => this.seats[i]?.spawn ?? null);
@@ -714,6 +727,7 @@ export class Room {
         watching: null,
         ready: false,
         spawn: null,
+        cityNames: [],
         placed: false,
       });
       seat.stream.reset();
@@ -814,11 +828,15 @@ export class Room {
     const { fog } = this.options;
     const { size } = this;
     const { map, seed } = this;
+    const names: string[] = [];
     const setup = Array.from({ length: size }, (_, i) => {
       const seat = this.seats[i];
+      const name = seat?.nick ?? botName(seed, i, names);
+      names.push(name);
       return {
-        name: seat?.nick ?? botName(seed, i),
+        name,
         ...(seat?.spawn === null || seat === undefined ? {} : { start: seat.spawn }),
+        ...(seat === undefined || seat.cityNames.length === 0 ? {} : { cityNames: seat.cityNames }),
       };
     });
     const state = createMatch(map, setup, seed, { fog, diplomacy: true, freeStarts: true });

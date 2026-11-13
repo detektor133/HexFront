@@ -87,11 +87,18 @@ export function createLocalEngine(
   botLevel: BotLevel = 'medium',
   spawn?: number,
   freeStarts = false,
+  cityNames: readonly string[] = [],
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
+  const names: string[] = [];
   const setup = Array.from({ length: players }, (_, i) => ({
-    name: i === HUMAN_ID ? playerName || 'Игрок 1' : botName(seed, i),
+    name: ((): string => {
+      const name = i === HUMAN_ID ? playerName || 'Игрок 1' : botName(seed, i, names);
+      names.push(name);
+      return name;
+    })(),
+    ...(i === HUMAN_ID && cityNames.length > 0 ? { cityNames } : {}),
     ...(i === HUMAN_ID && spawn !== undefined ? (freeStarts ? { start: spawn } : { spawn }) : {}),
   }));
   const state = createMatch(loaded.map, setup, seed, {

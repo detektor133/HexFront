@@ -33,6 +33,7 @@ import type { Command, GameEvent, PathPreview, PlayerView, Selection } from '@he
 import { probed } from './probe-hook.ts';
 import { tabId } from './tab-id.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
+import { readCityNames } from '../settings/city-names-pref.ts';
 
 /** Сокет, каким его видит клиент: тонкая обёртка над WebSocket. */
 export interface NetSocket {
@@ -314,6 +315,11 @@ export class NetClient {
     this.send({ t: 'transfer', to });
   }
 
+  /** Свой список названий городов: сервер берёт их для новых городов игрока по порядку. */
+  public cityNames(names: readonly string[]): void {
+    this.send({ t: 'cityNames', names });
+  }
+
   /** Выбор стартовой точки; `null` — случайная. */
   public pick(spawn: number | null): void {
     this.send({ t: 'pick', spawn });
@@ -451,6 +457,9 @@ export class NetClient {
         this.lostAt = null;
         this.setStatus('online');
         handlers?.onSession?.(this.session);
+        // Свой список названий городов уходит серверу при каждом входе: он хранится на месте игрока.
+        const names = readCityNames();
+        if (!this.session.spectator && names.length > 0) this.cityNames(names);
         // Всё, что сервер не успел подтвердить, уходит заново в том же порядке, порциями.
         this.ackedAt = this.clock.now();
         this.restartFlush(0);

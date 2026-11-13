@@ -291,6 +291,10 @@ const ru = {
   'settings.eventSeconds': 'Время показа событий в ленте',
   'settings.eventSecondsHint': 'Сколько секунд запись висит в ленте, пока её не вытеснят новые.',
   'settings.ping': 'Всегда показывать пинг',
+  'settings.cityNames': 'Свои названия городов',
+  'settings.cityNamesHint':
+    'По одному в строке, до 30. Новые города берут их по порядку, потом названия собираются из слогов.',
+  'settings.cityNamesPlaceholder': 'Например: Aldoria',
   'settings.pingHint': 'В сетевом матче: по умолчанию пинг виден, только когда связь плохая.',
   'settings.zoomSpeed': 'Скорость зума колесом',
   'settings.zoomSpeedHint': 'Как быстро карта приближается и отдаляется от колеса мыши.',
@@ -1042,6 +1046,10 @@ const en: Record<MessageKey, string> = {
   'settings.eventSecondsHint':
     'How many seconds an entry stays in the feed unless newer ones push it out.',
   'settings.ping': 'Always show ping',
+  'settings.cityNames': 'Your city names',
+  'settings.cityNamesHint':
+    'One per line, up to 30. New cities take them in order, then names are built from syllables.',
+  'settings.cityNamesPlaceholder': 'For example: Aldoria',
   'settings.pingHint':
     'In online matches: by default ping is shown only when the connection is poor.',
   'settings.zoomSpeed': 'Wheel zoom speed',

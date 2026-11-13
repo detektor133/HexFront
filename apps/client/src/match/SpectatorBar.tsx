@@ -4,7 +4,6 @@ import type { PlayerView } from '@hexfront/sim';
 
 import styles from './SpectatorBar.module.css';
 import { t } from '../i18n/dict.ts';
-import { localName } from '../i18n/names.ts';
 
 export interface SpectatorBarProps {
   readonly view: PlayerView;
@@ -35,9 +34,7 @@ export function neighbour(order: readonly number[], current: number, step: 1 | -
 export function SpectatorBar(props: SpectatorBarProps): React.JSX.Element {
   const { view } = props;
   const order = watchOrder(view);
-  const name = localName(
-    view.players[view.playerId]?.name ?? `${t('observer.player')} ${view.playerId + 1}`,
-  );
+  const name = view.players[view.playerId]?.name ?? `${t('observer.player')} ${view.playerId + 1}`;
   const go = (step: 1 | -1): void => {
     const next = neighbour(order, view.playerId, step);
     if (next !== null && next !== view.playerId) props.onWatch(next);

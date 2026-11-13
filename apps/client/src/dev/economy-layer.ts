@@ -36,7 +36,6 @@ import {
   territoryLabelsKey,
 } from './territory-labels.ts';
 import { createUnitLayer, type UnitLayer } from './unit-layer.ts';
-import { localName } from '../i18n/names.ts';
 import type { DetailLevel } from '../render/camera.ts';
 import { hexCenter, hexPolygon, type Point } from '../render/hex-geometry.ts';
 import { createMaskGpu, type MaskKind } from '../render/mask-gpu.ts';
@@ -455,7 +454,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     const nextLabelsKey = cityLabelsKey(
       v.cities.map((c) => ({
         at: center(c.hex),
-        name: localName(c.name),
+        name: c.name,
         level: c.level,
         isCapital: c.isCapital,
       })),
@@ -468,7 +467,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
         labels,
         v.cities.map((c) => ({
           at: center(c.hex),
-          name: localName(c.name),
+          name: c.name,
           level: c.level,
           isCapital: c.isCapital,
         })),

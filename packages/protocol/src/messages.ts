@@ -152,6 +152,8 @@ export type C2S =
   | { readonly t: 'transfer'; readonly to: number }
   /** Стартовая точка человека (индекс в карте);  — случайная. Только в лобби. */
   | { readonly t: 'pick'; readonly spawn: number | null }
+  /** Свой список названий городов игрока (до 30, каждое до 24 символов): новые города берут их по порядку. */
+  | { readonly t: 'cityNames'; readonly names: readonly string[] }
   /** После матча хозяин возвращает всех присутствующих в лобби той же комнаты. */
   | { readonly t: 'rematch' }
   /**
@@ -522,6 +524,17 @@ export function decodeClientMessage(text: string): C2S {
         throw new MessageError('Поле spawn');
       }
       return { t: 'pick', spawn: source.spawn };
+    case 'cityNames': {
+      const { names } = source;
+      if (
+        !Array.isArray(names) ||
+        names.length > 30 ||
+        names.some((n) => typeof n !== 'string' || n.length > 64)
+      ) {
+        throw new MessageError('Поле names');
+      }
+      return { t: 'cityNames', names: names as string[] };
+    }
     case 'rematch':
       return { t: 'rematch' };
     case 'chat': {

@@ -17,7 +17,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import styles from './ChatDock.module.css';
 import { t } from '../i18n/dict.ts';
-import { localName } from '../i18n/names.ts';
 import { chatStore, useChat, type ChatLine } from '../net/chat-store.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -250,7 +249,7 @@ export function ChatPanel(props: {
               title={t('chat.all')}
               onClick={() => chatStore.setTarget(null)}
             >
-              <span>{localName(target.name)}</span>
+              <span>{target.name}</span>
               <IconX size={16} aria-hidden="true" />
             </button>
           )}

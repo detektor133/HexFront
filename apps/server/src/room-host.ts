@@ -170,6 +170,9 @@ export class RoomHost {
       case 'pick':
         room.pick(connection, message.spawn);
         break;
+      case 'cityNames':
+        room.setCityNames(connection, message.names);
+        break;
       case 'rematch':
         room.rematch(connection);
         break;

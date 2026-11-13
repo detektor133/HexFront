@@ -21,7 +21,7 @@ import { planStarts } from './starts.ts';
 import { fork, RNG_STREAM, shuffle } from '../rng.ts';
 import { NEUTRAL, type City, type MatchState } from './types.ts';
 import { addUnit, rebuildUnitIndex } from './unit-index.ts';
-import { pickCityName } from '../map/city-names.ts';
+import { cleanCityPool, pickCityName } from '../map/city-names.ts';
 import { TERRAIN, type MapStatic } from '../map/types.ts';
 import { hexId, inBounds, neighbors, type Hex, type HexId } from '../math/hex.ts';
 import { FP, fpMul, type Fp } from '../math/int.ts';
@@ -34,6 +34,8 @@ export interface PlayerSetup {
   readonly spawn?: number;
   /** Желаемая столица (id гекса) при `freeStarts`: сдвигается к ближайшему подходящему гексу. */
   readonly start?: number;
+  /** Свой список названий городов игрока (до CITY_POOL_MAX); лишнее отбрасывается. */
+  readonly cityNames?: readonly string[];
 }
 
 export interface MatchOptions {
@@ -126,7 +128,14 @@ export function pickStartNeighbors(state: MatchState, capital: Hex): HexId[] {
   return candidates.slice(0, START_HEXES - 1).map((c) => c.id);
 }
 
-function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string): void {
+function addPlayer(
+  state: MatchState,
+  playerId: number,
+  spawn: Hex,
+  name: string,
+  cityNames: readonly string[] = [],
+): void {
+  const pool = cleanCityPool(cityNames);
   const capital = hexId(spawn, state.map.width);
   const cityId = state.nextId;
   state.nextId += 1;
@@ -135,7 +144,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
     hex: capital,
     owner: playerId,
     level: 1,
-    name: pickCityName(state.seed, cityId, state.cities, playerId),
+    name: pickCityName(state.seed, cityId, state.cities, playerId, pool),
     defenders: MILITIA_PER_LEVEL,
     defenseOrg: ORG_MAX,
     inBattle: false,
@@ -163,6 +172,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
     chaosTicks: 0,
     noCityTicks: 0,
     eliminatedTick: -1,
+    ...(pool.length > 0 ? { cityPool: pool } : {}),
   });
   // Стартовые отряды — в «1-й армии» (08-match.md, «Старт»).
   const armyId = state.nextId;
@@ -225,7 +235,7 @@ export function createMatch(
     );
     players.forEach((player, playerId) => {
       const at = starts[playerId];
-      if (at) addPlayer(state, playerId, at, player.name);
+      if (at) addPlayer(state, playerId, at, player.name, player.cityNames);
     });
     return finishMatch(state, players, options);
   }
@@ -241,7 +251,7 @@ export function createMatch(
   const free = shuffled.filter((spawn) => !chosen.has(spawn));
   players.forEach((player, playerId) => {
     const spawn = picked[playerId] ?? free.shift();
-    if (spawn) addPlayer(state, playerId, spawn, player.name);
+    if (spawn) addPlayer(state, playerId, spawn, player.name, player.cityNames);
   });
   return finishMatch(state, players, options);
 }
