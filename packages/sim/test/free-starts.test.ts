@@ -39,6 +39,26 @@ describe('свободные стартовые точки', () => {
     expect(a && b && distance(a, b)).toBeGreaterThanOrEqual(START_GAP);
   });
 
+  it('выбор человека — ровно нажатый гекс, а боты вне его зоны не двигаются', () => {
+    const map = load();
+    const base = planStarts(map, 3, [null, null, null]);
+    const free = (id: number): boolean => {
+      const terrain = map.terrain[id];
+      return terrain !== TERRAIN.water && terrain !== TERRAIN.mountains;
+    };
+    const target = Array.from({ length: map.width * map.height }, (_, id) => id).find(
+      (id) =>
+        free(id) &&
+        !map.cities.some((c) => hexId(c, map.width) === id) &&
+        base.every((b) => distance(b, hexFromId(id, map.width)) >= START_GAP),
+    );
+    expect(target).toBeDefined();
+    const plan = planStarts(map, 3, [target, null, null]);
+    expect(plan[0]).toEqual(hexFromId(target ?? 0, map.width));
+    expect(plan[1]).toEqual(base[1]);
+    expect(plan[2]).toEqual(base[2]);
+  });
+
   it('матч с freeStarts ставит столицу игрока там, где показывал план', () => {
     const map = load();
     const want = hexId({ q: 14, r: 9 }, map.width);

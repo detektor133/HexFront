@@ -504,6 +504,31 @@
   }
 }
 
+/* Портрет: все ячейки разделены одинаково, а кнопка паузы стоит отдельным столбцом справа. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .hud {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .hud > :where(.slot, .taxWrap) {
+    align-self: stretch;
+    padding: var(--space-xs) 0;
+  }
+
+  .hud > .taxWrap .taxButton {
+    inline-size: 100%;
+    height: 100%;
+  }
+
+  .hud > .settingsButton {
+    align-self: center;
+    border-left: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+    border-radius: 0;
+    height: 100%;
+  }
+}
+
 /* Телефон в ландшафте: высоты мало, ширины много. Полоса по содержимому, без растянутых колонок
    и больших полей: значок, значение и прирост в одну строку, высота 36 px. */
 @media (orientation: landscape) and (max-height: 500px) {

@@ -64,6 +64,33 @@
   box-shadow: var(--shadow-hard);
 }
 
+/* Кнопка под подсказкой: прячет панели снизу, чтобы они не закрывали карту при выборе места. */
+.collapseBtn {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  justify-self: center;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 36px;
+  margin: var(--space-xs) 0 0;
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-hard);
+}
+
+.collapsed .panelSlot,
+.collapsed .nickSlot {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Плашка связи слева вверху: сколько игроков в сети или что игра в офлайне. */
 .status {
   grid-column: 1;

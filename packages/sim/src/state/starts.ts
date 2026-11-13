@@ -61,19 +61,34 @@ export function planStarts(
     return hex;
   });
   const reach = Math.max(width, height);
-  wanted.forEach((want, index) => {
-    if (want === null || want === undefined || want < 0 || want >= total) return;
-    taken = result.filter((_, other) => other !== index);
-    const center = hexFromId(want, width);
+  /** Ближайший к `center` гекс, подходящий при текущем `taken`; сам `center`, если он подходит. */
+  const nearest = (center: Hex): Hex | undefined => {
     for (let radius = 0; radius <= reach; radius += 1) {
       const hit = (radius === 0 ? [center] : ring(center, radius)).find((h) =>
         usable(h, START_GAP),
       );
-      if (hit !== undefined) {
-        result[index] = hit;
-        return;
-      }
+      if (hit !== undefined) return hit;
     }
+    return undefined;
+  };
+  // Выбор человека — ровно тот гекс, куда он нажал; двигается только когда рядом уже стоит выбор
+  // другого человека (или гекс — вода, гора, город). Случайные места занятые рядом уступают ему.
+  const fixed: number[] = [];
+  wanted.forEach((want, index) => {
+    if (want === null || want === undefined || want < 0 || want >= total) return;
+    taken = fixed.map((other) => result[other]).filter((h): h is Hex => h !== undefined);
+    const hit = nearest(hexFromId(want, width));
+    if (hit !== undefined) result[index] = hit;
+    fixed.push(index);
   });
+  if (fixed.length > 0) {
+    result.forEach((own, index) => {
+      if (fixed.includes(index)) return;
+      taken = result.filter((_, other) => other !== index);
+      if (usable(own, START_GAP)) return;
+      const hit = nearest(own);
+      if (hit !== undefined) result[index] = hit;
+    });
+  }
   return result;
 }

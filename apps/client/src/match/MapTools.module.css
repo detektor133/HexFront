@@ -134,8 +134,14 @@
   transition: transform 160ms ease-out;
 }
 
-.drawer .group[data-open='false'] {
-  transform: translateX(calc(100% - 22px));
+/* Закрытая колонка уходит за край отрицательным полем: ширина группы сжимается до ручки, и ряд
+   инструментов стройки остаётся прижатым к ней, а не повисает посреди экрана. */
+.column {
+  transition: margin-right 160ms ease-out;
+}
+
+.drawer .group[data-open='false'] .column {
+  margin-right: calc(-1 * (44px + 2 * var(--space-xs) + 2 * var(--ui-border-width)));
 }
 
 .handle {
@@ -157,7 +163,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .group {
+  .group,
+  .column {
     transition: none;
   }
 }

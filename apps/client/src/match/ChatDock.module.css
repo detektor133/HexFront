@@ -23,10 +23,40 @@
   }
 }
 
+/* Окно чата: положение и размер задаёт пользователь (тянуть за заголовок и за уголок). */
+.floating {
+  position: fixed;
+  z-index: 21;
+  display: flex;
+  pointer-events: none;
+}
+
+.floating > .panel {
+  flex: 1 1 auto;
+  width: auto;
+  max-height: none;
+}
+
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--ui-ink2);
+  cursor: nwse-resize;
+  touch-action: none;
 }
 
 .title {
@@ -66,11 +96,13 @@
 }
 
 .panel {
+  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: var(--space-xs);
-  /* Не выше экрана: от нижней кромки колонки инструментов до HUD остаётся запас. */
-  max-height: min(360px, calc(100dvh - var(--chat-bottom, 16px) - 72px));
+  min-width: 0;
+  min-height: 0;
   padding: var(--space-sm);
 }
 
@@ -85,7 +117,7 @@
   display: grid;
   align-content: end;
   gap: 2px;
-  max-height: 132px;
+  min-height: 0;
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -112,6 +144,7 @@
 
 .reactions {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
 }
 
@@ -151,6 +184,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  /* Справа место под уголок изменения размера. */
+  padding-right: 20px;
 }
 
 .input {

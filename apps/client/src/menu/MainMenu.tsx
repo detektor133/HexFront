@@ -1,6 +1,6 @@
 // Главное меню: фоном карта (в комнате — та, на которой будем играть, с выбором места старта), внизу док режимов, над ним ник и цвет. Настройки игры и
 // вопрос про обучение — окна с анимацией «телевизора».
-import { IconSettings } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconSettings } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { hexId, planStarts, type MapStatic } from '@hexfront/sim';
@@ -55,6 +55,12 @@ export function MainMenu(props: {
   const lobbyState = useLobbyStarts();
   const pickable = inLobby ? lobbyState.pick !== null : mode === 'bots';
   const [background, setBackground] = useState<MapStatic | null>(null);
+  // Панели снизу можно спрятать, чтобы выбрать место на всей карте; закрытие режима возвращает их.
+  const [collapsedRaw, setCollapsed] = useState(false);
+  const collapsed = collapsedRaw && pickable;
+  useEffect(() => {
+    if (!pickable) setCollapsed(false);
+  }, [pickable]);
   const markers = useMemo<readonly StartMarker[]>(() => {
     const palette = tokens.players.palette;
     if (inLobby) {
@@ -145,7 +151,7 @@ export function MainMenu(props: {
   };
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${collapsed ? styles.collapsed : ''}`}>
       <div ref={hostRef} className={styles.background} aria-hidden="true" />
       <div className={styles.top}>
         <p
@@ -174,6 +180,21 @@ export function MainMenu(props: {
           <p className={styles.pickHint} role="note">
             {t(inLobby ? 'menu.pickHintLobby' : 'menu.pickHint')}
           </p>
+        )}
+        {pickable && (
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            aria-pressed={collapsed}
+            onClick={() => setCollapsed((now) => !now)}
+          >
+            {collapsed ? (
+              <IconChevronUp size={18} aria-hidden="true" />
+            ) : (
+              <IconChevronDown size={18} aria-hidden="true" />
+            )}
+            {t(collapsed ? 'menu.showPanels' : 'menu.hidePanels')}
+          </button>
         )}
       </div>
       <div className={styles.nickSlot}>

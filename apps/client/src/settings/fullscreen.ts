@@ -80,8 +80,9 @@ export function useFullscreen(): boolean {
 export function enterFullscreenOnFirstTap(): () => void {
   if (!fullscreenSupported() || isStandalone() || !fullscreenWanted()) return () => undefined;
   if (!(window.matchMedia?.('(pointer: coarse)').matches ?? false)) return () => undefined;
+  // Слушатель живёт, пока открыт экран: система может вывести из полного экрана (жест «назад»,
+  // уведомление), и следующее же нажатие возвращает его, а не только первое после загрузки.
   const handler = (): void => {
-    document.removeEventListener('pointerup', handler);
     if (!isFullscreen() && fullscreenWanted()) void setFullscreen(true);
   };
   document.addEventListener('pointerup', handler);

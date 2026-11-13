@@ -302,6 +302,12 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
       style.left = 0;
       style.maxWidth = '100%';
     }
+    // Телефон в портрете: полоса во всю ширину экрана, без полей из раскладки (иначе сбоку остаются щели).
+    if (id === 'hud' && viewport.width <= 600 && viewport.width <= viewport.height) {
+      delete style.width;
+      style.left = 0;
+      style.right = 0;
+    }
     if (id === 'popup-menu') {
       delete style.width;
       delete style.height;
