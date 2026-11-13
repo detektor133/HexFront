@@ -1,5 +1,6 @@
 import {
   IconCheck,
+  IconDots,
   IconHeartHandshake,
   IconLink,
   IconLinkOff,
@@ -9,6 +10,7 @@ import {
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
+import { useState } from 'react';
 
 import type { Command, PlayerView, Relation, TreatyKind } from '@hexfront/sim';
 
@@ -226,130 +228,276 @@ function IconsVariant(props: { readonly model: Model }): React.JSX.Element {
   );
 }
 
-/** Вариант 2: главное действие по смыслу и подписанные договоры. */
-function CardVariant(props: { readonly model: Model }): React.JSX.Element {
-  const { relation, outgoing, other, send, allies } = props.model;
-  const treaty = (kind: Treaty): React.JSX.Element | null =>
-    RANK[kind] > RANK[relation] ? (
-      <button
-        key={kind}
-        type="button"
-        className={styles.text}
-        disabled={outgoing}
-        title={t(`diplomacy.${kind}` as MessageKey)}
-        onClick={() => send({ t: 'proposeTreaty', target: other, kind })}
-      >
-        {t(`diplomacy.s.${kind}` as MessageKey)}
-      </button>
-    ) : null;
+/** Одно действие с соседом: общий список для всех видов окна, вид решает только компоновку. */
+interface Act {
+  readonly id: string;
+  readonly cmd: Command;
+  readonly label: string;
+  readonly hint: string;
+  readonly Icon: typeof IconSwords;
+  /** `calm` — главное мирное действие, `danger` — война, остальное — обычные. */
+  readonly tone: 'calm' | 'danger' | 'plain';
+  readonly disabled: boolean;
+}
+
+const TREATY_ICONS = {
+  pact: IconHeartHandshake,
+  defense: IconShield,
+  alliance: IconLink,
+} as const;
+
+/** Что можно сделать с соседом сейчас; в войне — только мир (договоры недоступны). */
+function actionsOf(model: Model): Act[] {
+  const { relation, outgoing, other, allies } = model;
+  const label = (key: string): string => t(`diplomacy.s.${key}` as MessageKey);
+  const hint = (key: string): string => t(`diplomacy.h.${key}` as MessageKey);
+  if (relation === 'war') {
+    return [
+      {
+        id: 'peace',
+        cmd: { t: 'proposeTreaty', target: other, kind: 'peace' },
+        label: outgoing ? label('pending') : label('peace'),
+        hint: hint('peace'),
+        Icon: IconPeace,
+        tone: 'calm',
+        disabled: outgoing,
+      },
+    ];
+  }
+  const out: Act[] = [];
+  for (const kind of TREATIES) {
+    if (RANK[kind] <= RANK[relation]) continue;
+    out.push({
+      id: kind,
+      cmd: { t: 'proposeTreaty', target: other, kind },
+      label: label(kind),
+      hint: hint(kind),
+      Icon: TREATY_ICONS[kind],
+      tone: out.length === 0 ? 'calm' : 'plain',
+      disabled: outgoing,
+    });
+  }
+  if (relation === 'alliance' && allies >= 2) {
+    out.push({
+      id: 'expel',
+      cmd: { t: 'proposeExpel', target: other },
+      label: label('expel'),
+      hint: hint('expel'),
+      Icon: IconUserMinus,
+      tone: 'plain',
+      disabled: false,
+    });
+  }
+  if (bound(relation)) {
+    out.push({
+      id: 'break',
+      cmd: { t: 'breakTreaty', target: other },
+      label: label('break'),
+      hint: hint('break'),
+      Icon: IconLinkOff,
+      tone: 'plain',
+      disabled: false,
+    });
+  }
+  out.push({
+    id: 'war',
+    cmd: { t: 'declareWar', target: other },
+    label: label('war'),
+    hint: hint('war'),
+    Icon: IconSwords,
+    tone: 'danger',
+    disabled: false,
+  });
+  return out;
+}
+
+/** Мирные действия (без войны) и война отдельно: у войны свой цвет и своё место. */
+function split(acts: readonly Act[]): { readonly calm: Act[]; readonly war: Act | undefined } {
+  return {
+    calm: acts.filter((a) => a.tone !== 'danger'),
+    war: acts.find((a) => a.tone === 'danger'),
+  };
+}
+
+/** Кнопка действия: общая основа видов «фокус» и «вкладки». */
+function ActButton(props: {
+  readonly act: Act;
+  readonly model: Model;
+  readonly className: string | undefined;
+  readonly children?: React.ReactNode;
+}): React.JSX.Element {
+  const { act, model } = props;
+  return (
+    <button
+      type="button"
+      data-tutorial={act.id === 'war' ? 'declare-war' : undefined}
+      data-tone={act.tone}
+      className={props.className}
+      disabled={act.disabled}
+      title={act.hint}
+      onClick={() => model.send(act.cmd)}
+    >
+      <act.Icon size={18} aria-hidden="true" />
+      {props.children ?? act.label}
+    </button>
+  );
+}
+
+/** Вид «список»: строки с названием и пояснением последствия, война — отдельно внизу. */
+function ListVariant(props: { readonly model: Model }): React.JSX.Element {
+  const { calm, war } = split(actionsOf(props.model));
+  const row = (act: Act): React.JSX.Element => (
+    <button
+      key={act.id}
+      type="button"
+      data-tutorial={act.id === 'war' ? 'declare-war' : undefined}
+      data-tone={act.tone}
+      className={styles.listRow}
+      disabled={act.disabled}
+      onClick={() => props.model.send(act.cmd)}
+    >
+      <act.Icon size={20} aria-hidden="true" />
+      <span className={styles.listText}>
+        <b>{act.label}</b>
+        <small>{act.hint}</small>
+      </span>
+    </button>
+  );
   return (
     <>
       <OfferRow model={props.model} />
-      {relation === 'war' ? (
-        <button
-          type="button"
-          className={`${styles.main} ${styles.calm}`}
-          disabled={outgoing}
-          onClick={() => send({ t: 'proposeTreaty', target: other, kind: 'peace' })}
-        >
-          <IconPeace size={18} aria-hidden="true" />
-          {outgoing ? t('diplomacy.s.pending') : t('diplomacy.s.peace')}
-        </button>
-      ) : (
-        <>
+      <div className={styles.list}>{calm.map(row)}</div>
+      {war && <div className={`${styles.list} ${styles.listWar}`}>{row(war)}</div>}
+    </>
+  );
+}
+
+/** Вид «фокус»: одно главное действие, война рядом значком, остальное — под «Ещё». */
+function FocusVariant(props: { readonly model: Model }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const { calm, war } = split(actionsOf(props.model));
+  const primary = calm.find((a) => a.tone === 'calm');
+  const rest = calm.filter((a) => a !== primary);
+  return (
+    <>
+      <OfferRow model={props.model} />
+      <div className={styles.focusBar}>
+        {primary && <ActButton act={primary} model={props.model} className={styles.focusMain} />}
+        {war && (
+          <ActButton act={war} model={props.model} className={styles.focusWar}>
+            {primary ? null : war.label}
+          </ActButton>
+        )}
+        {rest.length > 0 && primary && (
           <button
             type="button"
-            data-tutorial="declare-war"
-            className={`${styles.main} ${styles.danger}`}
-            onClick={() => send({ t: 'declareWar', target: other })}
+            className={styles.focusMore}
+            aria-expanded={open}
+            title={t('diplomacy.s.more')}
+            aria-label={t('diplomacy.s.more')}
+            onClick={() => setOpen((value) => !value)}
           >
-            <IconSwords size={18} aria-hidden="true" />
-            {t('diplomacy.s.war')}
+            <IconDots size={18} aria-hidden="true" />
           </button>
-          {bound(relation) && <small className={styles.note}>{t('diplomacy.s.breach')}</small>}
-          <div className={styles.group}>
-            <span className={styles.groupLabel}>{t('diplomacy.s.treaties')}</span>
-            <div className={styles.texts}>
-              {TREATIES.map(treaty)}
-              {relation === 'alliance' && allies >= 2 && (
-                <button
-                  type="button"
-                  className={styles.text}
-                  onClick={() => send({ t: 'proposeExpel', target: other })}
-                >
-                  {t('diplomacy.s.expel')}
-                </button>
-              )}
-              {bound(relation) && (
-                <button
-                  type="button"
-                  className={styles.text}
-                  onClick={() => send({ t: 'breakTreaty', target: other })}
-                >
-                  {t('diplomacy.s.break')}
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+        )}
+      </div>
+      {(open || !primary) && rest.length > 0 && (
+        <div className={styles.texts}>
+          {rest.map((act) => (
+            <ActButton key={act.id} act={act} model={props.model} className={styles.text} />
+          ))}
+        </div>
+      )}
+      {bound(props.model.relation) && (
+        <small className={styles.note}>{t('diplomacy.s.breach')}</small>
       )}
     </>
   );
 }
 
-const STEPS: readonly Relation[] = ['war', 'peace', 'pact', 'defense', 'alliance'];
-
-// Команда нажатия на ступень лестницы или null, если ступень недоступна.
-export function stepCommand(relation: Relation, step: Relation, other: number): Command | null {
-  if (step === relation) return null;
-  if (step === 'war') return { t: 'declareWar', target: other };
-  if (relation === 'war') {
-    return step === 'peace' ? { t: 'proposeTreaty', target: other, kind: 'peace' } : null;
-  }
-  if (RANK[step] > RANK[relation]) {
-    return step === 'peace' ? null : { t: 'proposeTreaty', target: other, kind: step };
-  }
-  // Ниже договора — только разрыв (мир); из «альянса» на «пакт» не спускаются.
-  return step === 'peace' && bound(relation) ? { t: 'breakTreaty', target: other } : null;
-}
-
-function stepLabel(step: Relation, cmd: Command | null): string {
-  if (cmd?.t === 'declareWar') return t('diplomacy.war');
-  if (cmd?.t === 'breakTreaty') return t('diplomacy.break');
-  if (cmd?.t === 'proposeTreaty') return t(`diplomacy.${cmd.kind}` as MessageKey);
-  return t(`diplomacy.rel.${step}` as MessageKey);
-}
-
-/** Вариант 3: лестница отношений — ступень выше предлагается, ниже — разрыв или война. */
-function LadderVariant(props: { readonly model: Model }): React.JSX.Element {
-  const { relation, outgoing, other, send } = props.model;
+/** Вид «плитки»: сетка с подписями под значками, война — широкой плиткой снизу. */
+function TilesVariant(props: { readonly model: Model }): React.JSX.Element {
+  const { calm, war } = split(actionsOf(props.model));
+  const tile = (act: Act): React.JSX.Element => (
+    <button
+      key={act.id}
+      type="button"
+      data-tutorial={act.id === 'war' ? 'declare-war' : undefined}
+      data-tone={act.tone}
+      className={styles.tile}
+      disabled={act.disabled}
+      title={act.hint}
+      onClick={() => props.model.send(act.cmd)}
+    >
+      <act.Icon size={22} aria-hidden="true" />
+      <span>{act.label}</span>
+    </button>
+  );
   return (
     <>
       <OfferRow model={props.model} />
-      <div className={styles.ladder} role="group" aria-label={t('diplomacy.title')}>
-        {STEPS.map((step) => {
-          const cmd = stepCommand(relation, step, other);
-          const upward = cmd?.t === 'proposeTreaty';
-          const label = stepLabel(step, cmd);
-          return (
-            <button
-              key={step}
-              type="button"
-              data-tutorial={step === 'war' ? 'declare-war' : undefined}
-              data-step={step}
-              aria-current={step === relation ? 'step' : undefined}
-              className={`${styles.step} ${step === relation ? styles.here : ''}`}
-              disabled={cmd === null || (upward && outgoing)}
-              title={label}
-              aria-label={label}
-              onClick={() => cmd && send(cmd)}
-            >
-              {t(`diplomacy.s.${step}` as MessageKey)}
-            </button>
-          );
-        })}
+      <div className={styles.tiles}>{calm.map(tile)}</div>
+      {war && <div className={styles.tilesWar}>{tile(war)}</div>}
+    </>
+  );
+}
+
+/** Вид «вкладки»: «Договоры» и «Война» — показано только то, что сейчас нужно. */
+function TabsVariant(props: { readonly model: Model }): React.JSX.Element {
+  const [picked, setPicked] = useState<'treaties' | 'war' | null>(null);
+  const { calm, war } = split(actionsOf(props.model));
+  // В войне открыта вкладка «Война» (там мир), в мире — «Договоры»: выбор игрока важнее.
+  const tab = picked ?? (props.model.relation === 'war' ? 'war' : 'treaties');
+  const tabButton = (id: 'treaties' | 'war', text: string): React.JSX.Element => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={tab === id}
+      className={`${styles.tab} ${tab === id ? styles.tabOn : ''}`}
+      onClick={() => setPicked(id)}
+    >
+      {text}
+    </button>
+  );
+  const peace = props.model.relation === 'war' ? calm : [];
+  return (
+    <>
+      <OfferRow model={props.model} />
+      <div className={styles.tabBar} role="tablist">
+        {tabButton('treaties', t('diplomacy.s.tabTreaties'))}
+        {tabButton('war', t('diplomacy.s.tabWar'))}
       </div>
-      {bound(relation) && <small className={styles.note}>{t('diplomacy.s.breach')}</small>}
+      {tab === 'treaties' ? (
+        <div className={styles.texts}>
+          {props.model.relation === 'war' && (
+            <small className={styles.note}>{t('diplomacy.s.atWar')}</small>
+          )}
+          {(props.model.relation === 'war' ? [] : calm).map((act) => (
+            <ActButton key={act.id} act={act} model={props.model} className={styles.text} />
+          ))}
+        </div>
+      ) : (
+        <div className={styles.group}>
+          {peace.map((act) => (
+            <ActButton
+              key={act.id}
+              act={act}
+              model={props.model}
+              className={`${styles.main} ${styles.calm}`}
+            />
+          ))}
+          {war && (
+            <ActButton
+              act={war}
+              model={props.model}
+              className={`${styles.main} ${styles.danger}`}
+            />
+          )}
+          {bound(props.model.relation) && (
+            <small className={styles.note}>{t('diplomacy.s.breach')}</small>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -357,7 +505,7 @@ function LadderVariant(props: { readonly model: Model }): React.JSX.Element {
 /**
  * Дипломатия с владельцем выбранной территории или столицы (CR-007): отношение, нарушения
  * договоров, ответ на предложение и действия. Вид окна выбирается в настройках и переключателем
- * в шапке: значки, карточка или лестница отношений.
+ * в шапке: значки, список, фокус, плитки или вкладки.
  */
 export function DiplomacyBlock(props: {
   view: PlayerView;
@@ -381,8 +529,10 @@ export function DiplomacyBlock(props: {
     <div className={styles.block} aria-label={t('diplomacy.title')} data-variant={variant}>
       <Head model={model} variant={variant} onVariant={setVariant} />
       {variant === 'icons' && <IconsVariant model={model} />}
-      {variant === 'card' && <CardVariant model={model} />}
-      {variant === 'ladder' && <LadderVariant model={model} />}
+      {variant === 'list' && <ListVariant model={model} />}
+      {variant === 'focus' && <FocusVariant model={model} />}
+      {variant === 'tiles' && <TilesVariant model={model} />}
+      {variant === 'tabs' && <TabsVariant model={model} />}
     </div>
   );
 }

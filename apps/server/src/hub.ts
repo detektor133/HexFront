@@ -389,6 +389,9 @@ export class Hub {
         return;
       }
     }
+    // Комната с этим местом закрыта (матч окончен): тихо начинать новую игру нельзя — выбывший
+    // у экрана итогов не должен оказаться в свежем матче.
+    if (message.token !== undefined) return this.refuse(session, 'noRoom');
     // Дренаж: вернуться в свою игру можно, начать новую или подсесть — нет.
     if (this.draining) return this.refuse(session, 'busy');
     if (message.spectate === true && message.room === undefined) {

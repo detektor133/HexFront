@@ -39,6 +39,9 @@
 | `BOT_PEACE_LOCK_TICKS`       | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_PACT_MIN_TICKS`         | 1800 (3 мин) `[ТЮНИНГ]` |
 | `BOT_SPLIT_MIN_SOLDIERS`     | 600 `[ТЮНИНГ]`          |
+| `BOT_BLOC_SHARE_DIVISOR`     | 3: блок альянса ботов ≤ ⌈живые / 3⌉, не меньше 2 `[ТЮНИНГ]` |
+| `BOT_RESTLESS_START_TICKS`   | 3000 (5 мин покоя) `[ТЮНИНГ]` |
+| `BOT_RESTLESS_RAMP_TICKS`    | 3000 (рост нетерпения до полного) `[ТЮНИНГ]` |
 
 Профили сложности `BOT_PROFILES` `[ТЮНИНГ]` (09-bots.md, «Правки 2026-11-12»):
 
@@ -54,6 +57,7 @@
 | `opportunist`  | нет  | нет    | да               |
 | `grudge`       | 0    | 150    | 250              |
 | `maxArmies`    | 2    | 3      | 4                |
+| `restless`     | 0    | 0,25   | 0,45             |
 
 ## Отношения игроков
 
@@ -136,7 +140,7 @@
 | `CAPTURE_POP_LOSS_CITY`                            | 0,30                   |
 | `TAX_MIN` / `TAX_MAX` / `TAX_STEP` / `TAX_DEFAULT` | 0 / 0,40 / 0,05 / 0,20 |
 | `TAX_SLEW_PER_S`                                   | 0,02                   |
-| `TAX_GROWTH_AT_0` / `_AT_20` / `_AT_40`            | 1,4 / 1,0 / 0,5        |
+| `TAX_GROWTH_AT_0` / `_AT_20` / `_AT_40`            | 1,4 / 1,0 / 0,1        |
 | `GOLD_PER_POP_TAX`                                 | 0,01                   |
 | `ISOLATED_INCOME_MULT`                             | 0,5                    |
 | `ISOLATED_SUPPLY_MULT`                             | 0,5                    |

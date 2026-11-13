@@ -1,11 +1,11 @@
-// Вид окна соседа (дипломатия в меню страны), хранится в браузере: пока выбираем лучший из трёх.
+// Вид окна соседа (дипломатия в меню страны), хранится в браузере: пока выбираем лучший из пяти.
 import { useEffect, useState } from 'react';
 
-export const NEIGHBOR_VIEWS = ['icons', 'card', 'ladder'] as const;
+export const NEIGHBOR_VIEWS = ['icons', 'list', 'focus', 'tiles', 'tabs'] as const;
 export type NeighborView = (typeof NEIGHBOR_VIEWS)[number];
 
 const KEY = 'hexfront.neighborView';
-export const DEFAULT_NEIGHBOR_VIEW: NeighborView = 'card';
+export const DEFAULT_NEIGHBOR_VIEW: NeighborView = 'focus';
 const listeners = new Set<() => void>();
 let memory: NeighborView | null = null;
 

@@ -146,6 +146,53 @@ describe('вход и набор', () => {
     missing.hello('Некто', { room: 'нет' });
     expect(missing.of('refused')[0]?.reason).toBe('noRoom');
   });
+
+  it('хозяин правит сложность и карту до старта, остальные не могут', () => {
+    const { hub, tick } = setup();
+    const host = new Client(hub);
+    host.hello('Хозяин', { mode: 'private' });
+    const code = host.of('welcome')[0]?.room ?? '';
+    const friend = new Client(hub);
+    friend.hello('Друг', { room: code });
+    const seed = host.of('welcome')[0]?.seed ?? 0;
+    const other = seed === 42 ? 43 : 42;
+
+    friend.send({ t: 'configure', level: 'easy', seed: other });
+    expect(friend.of('lobby').at(-1)?.info.level).toBe('hard');
+
+    host.send({ t: 'configure', level: 'easy', seed: other });
+    expect(host.of('lobby').at(-1)?.info).toMatchObject({ level: 'easy', seed: other });
+    // Новое приветствие несёт новую карту: клиент собирает матч по ней.
+    expect(host.of('welcome').at(-1)?.seed).toBe(other);
+    expect(friend.of('welcome').at(-1)?.seed).toBe(other);
+    host.send({ t: 'start' });
+    tick();
+    expect(host.of('start')).toHaveLength(1);
+  });
+
+  it('место закрытой комнаты по токену не сажает в новую игру: матч окончен — «нет комнаты»', () => {
+    const { hub } = setup();
+    const a = new Client(hub);
+    a.hello('Аня');
+    const token = a.of('welcome')[0]?.token ?? '';
+    const b = new Client(hub);
+    b.hello('Аня', { token: token.replace(/^[^-]+/, 'zzzz') });
+    expect(b.of('refused')[0]?.reason).toBe('noRoom');
+    expect(b.of('welcome')).toHaveLength(0);
+  });
+
+  it('стартовые отряды человека сразу получают приказ занимать ничью землю', () => {
+    const { hub, tick } = setup();
+    const host = new Client(hub);
+    host.hello('Хозяин', { mode: 'private' });
+    host.send({ t: 'start' });
+    tick();
+    tick();
+    const state = hub.roomById(host.of('welcome')[0]?.room ?? '')?.state;
+    const mine = state?.armies.filter((a) => a.owner === 0) ?? [];
+    expect(mine.length).toBeGreaterThan(0);
+    expect(state?.units.some((u) => u.owner === 0 && u.order === 'move')).toBe(true);
+  });
 });
 
 describe('матч: снимок, дельты и туман', () => {

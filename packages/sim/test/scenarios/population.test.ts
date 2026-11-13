@@ -76,7 +76,7 @@ describe('рост населения', () => {
   it.each([
     [0, 1.4],
     [20, 1.0],
-    [40, 0.5],
+    [40, 0.1],
   ])('налог %i %% даёт множитель роста %f', (tax, mult) => {
     const s = scenario(RINGS, { legend });
     s.cmd('A', setTax(tax));

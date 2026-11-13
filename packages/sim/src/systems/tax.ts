@@ -17,7 +17,7 @@ const SLEW_PER_TICK = intDiv(TAX_SLEW_PER_S, TICKS_PER_S);
 
 /**
  * Множитель роста населения от налога:
- * taxGrowthMult(t) = t ≤ 20 ? 1,4 − 0,02 × t : 1,0 − 0,025 × (t − 20), t — в процентах.
+ * taxGrowthMult(t) = t ≤ 20 ? 1,4 − 0,02 × t : 1,0 − 0,045 × (t − 20), t — в процентах.
  * Реализован как кусочно-линейная интерполяция по TAX_GROWTH_AT_0/_20/_40.
  * @param tax доля налога в fixed-point (200 = 20 %)
  * @returns множитель в fixed-point (1000 = ×1,0)

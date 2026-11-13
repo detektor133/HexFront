@@ -109,7 +109,20 @@ export interface BotProfile {
   /** Доля танков и артиллерии в заказе армии, процентов (состав карточки армии). */
   readonly armorPercent: number;
   readonly artilleryPercent: number;
+  /**
+   * Насколько падает нужный перевес над целью, если бот долго не воюет (тиков покоя сверх
+   * BOT_RESTLESS_START_TICKS, линейно за BOT_RESTLESS_RAMP_TICKS): застоявшиеся боты начинают бить
+   * соседей, а не сидеть в равных границах. Мирный сосед не вечно «слишком силён».
+   */
+  readonly restless: Fp;
 }
+
+/** Блок альянса ботов не больше ⌈живые / это число⌉ игроков (но не меньше двух). */
+export const BOT_BLOC_SHARE_DIVISOR = 3;
+/** Сколько тиков покоя (нет войн, мир не менялся) бот терпит, прежде чем его тянет воевать. */
+export const BOT_RESTLESS_START_TICKS = 3000;
+/** За сколько тиков нетерпение вырастает до полного значения профиля. */
+export const BOT_RESTLESS_RAMP_TICKS = 3000;
 
 /** Профили по уровням: лёгкий осторожен и пассивен, сложный — инициативен, строит коалиции и рвёт их. */
 export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProfile>> = {
@@ -127,6 +140,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     armyCapPercent: 30,
     armorPercent: 0,
     artilleryPercent: 0,
+    restless: fp(0),
   },
   normal: {
     attackRatio: fp(1.2),
@@ -142,6 +156,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     armyCapPercent: 40,
     armorPercent: 10,
     artilleryPercent: 10,
+    restless: fp(0.25),
   },
   medium: {
     attackRatio: fp(1),
@@ -157,6 +172,7 @@ export const BOT_PROFILES: Readonly<Record<'easy' | 'normal' | 'medium', BotProf
     armyCapPercent: 50,
     armorPercent: 15,
     artilleryPercent: 15,
+    restless: fp(0.45),
   },
 };
 
@@ -237,7 +253,7 @@ export const TAX_DEFAULT: Fp = fp(0.2);
 export const TAX_SLEW_PER_S: Fp = fp(0.02);
 export const TAX_GROWTH_AT_0: Fp = fp(1.4);
 export const TAX_GROWTH_AT_20: Fp = fp(1.0);
-export const TAX_GROWTH_AT_40: Fp = fp(0.5);
+export const TAX_GROWTH_AT_40: Fp = fp(0.1);
 export const GOLD_PER_POP_TAX: Fp = fp(0.01);
 export const ISOLATED_INCOME_MULT: Fp = fp(0.5);
 export const ISOLATED_SUPPLY_MULT: Fp = fp(0.5);

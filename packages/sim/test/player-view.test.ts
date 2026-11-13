@@ -169,7 +169,7 @@ describe('playerView', () => {
     // Доход: 100 чел. × 20 % × 0,01 = 0,2 + 2 города × 0,5 = 1,2; при 40 % — 1,4.
     expect(me.incomePerS).toBe(1200);
     expect(me.incomeAtTargetPerS).toBe(1400);
-    expect(me.growthMultAtTarget).toBe(500);
+    expect(me.growthMultAtTarget).toBe(100);
     expect(me.popGrowthPerS).toBeGreaterThan(0);
     // Очки (08-match.md): 2 города × 10 + 27 своих гексов, отрядов нет.
     expect(me.score).toBe(2 * 10 + 27);

@@ -205,52 +205,190 @@
   border-color: transparent;
 }
 
-/* Вариант «ступени»: пять ступеней в ряд, текущая закрашена. */
-.ladder {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+/* Вид «список»: строки действий с пояснением; война отдельно, красная. */
+.list {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
 }
 
-.step {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0 2px;
-  overflow: hidden;
+.listWar {
+  padding-top: var(--space-xs);
+  border-top: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 4px var(--space-sm);
   color: var(--ui-ink);
   font: inherit;
-  font-size: 11px;
-  text-overflow: ellipsis;
+  text-align: left;
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.listRow[data-tone='calm'] {
+  border-color: var(--ui-border-strong);
+}
+
+.listRow[data-tone='danger'] {
+  color: var(--status-danger);
+}
+
+.listText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.listText small {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.listRow:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.listRow:not(:disabled):hover {
+  border-color: var(--selection-color);
+}
+
+/* Вид «фокус»: главное действие во всю ширину, война и «Ещё» — квадратными кнопками рядом. */
+.focusBar {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.focusMain {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 40px;
+  padding: 0 var(--space-md);
+  color: var(--ui-button-primary-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--ui-button-primary-bg);
+  border: 0;
+  border-radius: var(--radius-button);
+}
+
+.focusMain:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.focusWar,
+.focusMore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.focusWar {
+  color: var(--status-danger);
+}
+
+.focusWar:not(:disabled):hover,
+.focusMore:hover {
+  border-color: var(--selection-color);
+}
+
+/* Вид «плитки»: сетка, значок над подписью; война — широкая плитка внизу. */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--space-xs);
+}
+
+.tilesWar {
+  display: grid;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-xs);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  text-align: center;
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.tile[data-tone='calm'] {
+  color: var(--ui-button-primary-ink);
+  background: var(--ui-button-primary-bg);
+  border-color: transparent;
+}
+
+.tile[data-tone='danger'] {
+  color: var(--status-danger);
+}
+
+.tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tile:not(:disabled):hover {
+  border-color: var(--selection-color);
+}
+
+/* Вид «вкладки»: две вкладки; показано только то, что нужно сейчас. */
+.tabBar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.tab {
+  min-height: 32px;
+  color: var(--ui-ink2);
+  font: inherit;
+  font-size: var(--font-size-caption);
   cursor: pointer;
   background: var(--ui-surface);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
 }
 
-.step[data-step='war'] {
+.tab:first-child {
   border-radius: var(--radius-button) 0 0 var(--radius-button);
 }
 
-.step[data-step='alliance'] {
+.tab:last-child {
   border-radius: 0 var(--radius-button) var(--radius-button) 0;
 }
 
-.step.here {
-  color: var(--ui-button-primary-ink);
-  font-weight: 600;
-  background: var(--ui-button-primary-bg);
-  border-color: transparent;
-}
-
-.step[data-step='war'].here {
+.tabOn {
   color: var(--ui-ink);
-  background: var(--status-danger-bg);
-}
-
-.step:disabled:not(.here) {
-  color: var(--ui-ink3);
-  cursor: not-allowed;
-}
-
-.step:not(:disabled):hover {
-  border-color: var(--selection-color);
+  font-weight: 600;
+  background: var(--ui-surface2);
+  border-color: var(--ui-border-strong);
 }

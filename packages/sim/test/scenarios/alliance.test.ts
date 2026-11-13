@@ -86,6 +86,15 @@ describe('оборонительный пакт', () => {
 });
 
 describe('альянс', () => {
+  it('альянс посреди войны: союзник вступает в неё против врага воюющего', () => {
+    const s = game();
+    cmd(s, 0, { t: 'declareWar', target: 3 });
+    expect(atWar(s.state, 1, 3)).toBe(false);
+    treaty(s, 0, 1, 'alliance');
+    expect(rel(s, 0, 1)).toBe('alliance');
+    expect(atWar(s.state, 1, 3)).toBe(true);
+  });
+
   it('война одному члену — война всем членам', () => {
     const s = game();
     treaty(s, 0, 1, 'alliance');

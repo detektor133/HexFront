@@ -19,8 +19,6 @@ export function MenuDock(props: {
   readonly go: (url: string) => void;
   readonly mode: ModeId | null;
   readonly onMode: (mode: ModeId | null) => void;
-  /** Открыть окно «Войти по коду». */
-  readonly onCode: () => void;
   /** Сервер недоступен: «Онлайн» заблокирован, а «Быстрый бой» открывает игру против ботов. */
   readonly offline: boolean;
 }): React.JSX.Element {
@@ -71,7 +69,6 @@ export function MenuDock(props: {
             settings={props.settings}
             update={props.update}
             go={props.go}
-            onCode={props.onCode}
             onBack={() => props.onMode(null)}
             className={presence.className}
           />

@@ -17,6 +17,7 @@ import {
   type C2S,
   type DeltaMessage,
   type JoinMode,
+  type LobbyLevel,
   type MapMaskMode,
   type Query,
   type SnapshotMessage,
@@ -150,6 +151,8 @@ export class NetClient {
   private tickHandle: unknown = null;
   private retryHandle: unknown = null;
   private stopped = false;
+  /** Сервер сообщил об окончании матча: закрытие связи после этого — не обрыв, повторов нет. */
+  private ended = false;
   private fullPending = true;
   /** Тик последнего применённого и подтверждённого вида: база для `have` при реконнекте. */
   private appliedTick: number | null = null;
@@ -265,6 +268,11 @@ export class NetClient {
       sent += 1;
     }
     if (this.outbox.some((item) => item.seq > this.sentSeq)) this.scheduleFlush(RESEND_GAP_MS);
+  }
+
+  /** Хозяин закрытой комнаты меняет сложность ботов и карту до старта. */
+  public configure(patch: { level?: LobbyLevel; seed?: number }): void {
+    this.send({ t: 'configure', ...patch });
   }
 
   /** Хозяин закрытой комнаты запускает матч. */
@@ -421,6 +429,7 @@ export class NetClient {
         handlers?.onMask?.(message.id, message.mode, message.rle);
         return;
       case 'end':
+        this.ended = true;
         handlers?.onEnd?.(message.winner, message.tick);
         return;
       case 'pong': {
@@ -462,6 +471,10 @@ export class NetClient {
 
   private lost(): void {
     if (this.stopped) return;
+    if (this.ended) {
+      this.stop();
+      return;
+    }
     if (this.tickHandle !== null) this.clock.clearTimeout(this.tickHandle);
     this.tickHandle = null;
     this.lostAt ??= this.clock.now();

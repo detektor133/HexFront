@@ -1,0 +1,54 @@
+/* Вход по коду в панели «Онлайн»: поле и кнопка в одной строке, высота как у кнопок панели. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-sm);
+}
+
+.code {
+  min-width: 0;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}
+
+.code::placeholder {
+  color: var(--ui-ink2);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.code:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
+.go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  color: var(--ui-button-primary-ink);
+  cursor: pointer;
+  background: var(--ui-button-primary-bg);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-button-primary-bg);
+  border-radius: var(--radius-button);
+}
+
+.go:disabled {
+  color: var(--ui-ink2);
+  cursor: default;
+  background: var(--ui-surface2);
+  border-color: var(--ui-border-strong);
+  opacity: 0.6;
+}

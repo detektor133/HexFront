@@ -96,7 +96,6 @@
   border-left: 0;
   border-right: 4px solid var(--ui-ink);
   border-radius: 0 var(--radius-card) var(--radius-card) 0;
-  box-shadow: var(--shadow-hard);
   transition: max-width 180ms ease-out;
 }
 

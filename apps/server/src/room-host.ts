@@ -73,6 +73,7 @@ export class RoomHost {
       mode,
       map: this.options.makeMap(seed, size),
       mapName: 'gen',
+      makeMap: this.options.makeMap,
       seed,
       size,
       fog,
@@ -149,6 +150,12 @@ export class RoomHost {
         break;
       case 'start':
         room.startEarly(connection);
+        break;
+      case 'configure':
+        room.configure(connection, {
+          ...(message.level === undefined ? {} : { level: message.level }),
+          ...(message.seed === undefined ? {} : { seed: message.seed }),
+        });
         break;
       case 'watch':
         room.watch(connection, message.player);

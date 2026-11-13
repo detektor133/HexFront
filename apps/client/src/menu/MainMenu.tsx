@@ -3,7 +3,6 @@
 import { IconSettings } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { JoinWindow } from './JoinWindow.tsx';
 import { LobbyPanel, lobbyFromUrl, type LobbyRequest } from './LobbyPanel.tsx';
 import { MenuDock } from './MenuDock.tsx';
 import { NickPlate, tutorialLink, type ModeId } from './MenuParts.tsx';
@@ -33,8 +32,6 @@ export function MainMenu(props: {
   const lobbyWindow = useTvPresence(lobby !== null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
-  const [joinOpen, setJoinOpen] = useState(false);
-  const joinWindow = useTvPresence(joinOpen);
   const settingsWindow = useTvPresence(settingsOpen);
   const askWindow = useTvPresence(askOpen);
   useMenuBackground(hostRef);
@@ -68,17 +65,16 @@ export function MainMenu(props: {
   );
 
   useEffect(() => {
-    if (!settingsOpen && !joinOpen && mode === null && lobby === null) return;
+    if (!settingsOpen && mode === null && lobby === null) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
       if (settingsOpen) setSettingsOpen(false);
-      else if (joinOpen) setJoinOpen(false);
       else if (lobby !== null) setLobby(null);
       else setMode(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [settingsOpen, joinOpen, mode, lobby]);
+  }, [settingsOpen, mode, lobby]);
 
   const closeAsk = (): void => {
     markAsked();
@@ -121,7 +117,6 @@ export function MainMenu(props: {
         go={go}
         mode={mode}
         onMode={setMode}
-        onCode={() => setJoinOpen(true)}
         offline={offline}
       />
       {lobbyWindow.mounted && lastLobby.current !== null && (
@@ -133,16 +128,6 @@ export function MainMenu(props: {
             className={lobbyWindow.className}
           />
         </div>
-      )}
-      {joinWindow.mounted && (
-        <JoinWindow
-          className={joinWindow.className}
-          onClose={() => setJoinOpen(false)}
-          onJoin={(room, spectate) => {
-            setJoinOpen(false);
-            go(`/online?room=${encodeURIComponent(room)}${spectate ? '&spectate=1' : ''}`);
-          }}
-        />
       )}
       {askWindow.mounted && (
         <div className={styles.backdrop}>

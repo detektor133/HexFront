@@ -14,6 +14,7 @@ import {
   slowLayerReuse,
   type JoinMode,
   type LobbyInfo,
+  type LobbyLevel,
   type S2C,
 } from '@hexfront/protocol';
 import {
@@ -24,6 +25,8 @@ import {
   createBotTickContext,
   createMatch,
   createPlayerViewContext,
+  FP,
+  intDiv,
   playerView,
   previewPath,
   selectionFor,
@@ -54,7 +57,12 @@ export const MAX_SPECTATORS = 20;
 const SPECTATOR_KEEP_SECONDS = 120;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
 const ACK_STALE_TICKS = 100;
-const BOT_LEVEL: BotLevel = 'medium';
+/** Сложность комнаты (меню) → профиль ботов sim: `hard` — профиль `medium`. */
+const BOT_LEVELS: Readonly<Record<LobbyLevel, BotLevel>> = {
+  easy: 'easy',
+  normal: 'normal',
+  hard: 'medium',
+};
 /** Команд в очереди на тик от одного игрока; больше — отклоняются как `rateLimit`. */
 const MAX_PENDING = 64;
 /**
@@ -86,6 +94,8 @@ export interface RoomOptions {
   /** Имя карты для клиента: он собирает такую же карту у себя (`gen` — генерация по сиду). */
   readonly mapName: string;
   readonly seed: number;
+  /** Карта по сиду для `configure`; нет — карту сменить нельзя. */
+  readonly makeMap?: (seed: number, size: number) => MapStatic;
   /** Всего игроков в матче; людей не больше этого числа, остальные — боты. */
   readonly size: number;
   readonly fog: boolean;
@@ -153,6 +163,10 @@ export class Room {
   public phase: Phase = 'lobby';
   public state: MatchState | null = null;
   private readonly options: RoomOptions;
+  /** Карта, сид и сложность ботов: хозяин закрытой комнаты меняет их до старта (`configure`). */
+  private map: MapStatic;
+  private seed: number;
+  private level: LobbyLevel = 'hard';
   private readonly seats: Seat[] = [];
   private readonly spectators: Seat[] = [];
   private snapshotsThisTick = 0;
@@ -171,6 +185,8 @@ export class Room {
 
   public constructor(options: RoomOptions) {
     this.options = options;
+    this.map = options.map;
+    this.seed = options.seed;
     this.id = options.id;
     this.mode = options.mode;
   }
@@ -210,7 +226,24 @@ export class Room {
       max: this.options.size,
       startsInS: left,
       open: this.mode === 'open',
+      level: this.level,
+      seed: this.seed,
     };
+  }
+
+  /**
+   * Хозяин закрытой комнаты меняет сложность ботов и карту до старта. Клиентам уходит новое
+   * приветствие (карта и сид в нём) и табло лобби.
+   */
+  public configure(conn: Connection, patch: { level?: LobbyLevel; seed?: number }): void {
+    if (this.phase !== 'lobby' || this.mode !== 'private' || this.seats[0]?.conn !== conn) return;
+    if (patch.level !== undefined) this.level = patch.level;
+    if (patch.seed !== undefined && patch.seed !== this.seed) {
+      this.seed = patch.seed;
+      this.map = this.options.makeMap?.(patch.seed, this.options.size) ?? this.map;
+    }
+    for (const seat of this.seats) if (seat.conn !== null) this.sendWelcome(seat);
+    this.broadcastLobby();
   }
 
   /**
@@ -516,12 +549,16 @@ export class Room {
   /** Запускает матч: люди — игроки 0..n−1, остальные места занимают боты. */
   public start(): void {
     if (this.phase !== 'lobby' || this.seats.length === 0) return;
-    const { size, map, seed, fog } = this.options;
+    const { size, fog } = this.options;
+    const { map, seed } = this;
     const setup = Array.from({ length: size }, (_, i) => ({
       name: this.seats[i]?.nick ?? `Бот ${i - this.seats.length + 1}`,
     }));
     const state = createMatch(map, setup, seed, { fog, diplomacy: true });
-    for (const seat of this.seats) this.takeBack(seat, state);
+    for (const seat of this.seats) {
+      this.takeBack(seat, state);
+      this.sendStartArmy(seat, state);
+    }
     this.state = state;
     this.phase = 'running';
     for (const seat of this.seats) {
@@ -537,7 +574,7 @@ export class Room {
     const started = performance.now();
     const botIds = this.botIds();
     const context = createBotTickContext(state);
-    const levels = state.players.map(() => BOT_LEVEL);
+    const levels = state.players.map(() => BOT_LEVELS[this.level]);
     const commands: PlayerCommand[] = [];
     for (const seat of this.seats) {
       if (seat.botControlled) continue;
@@ -577,6 +614,21 @@ export class Room {
     const ids: number[] = [];
     for (let id = 0; id < this.options.size; id += 1) if (!humans.has(id)) ids.push(id);
     return ids;
+  }
+
+  /**
+   * Стартовые отряды человека сразу занимают ничью землю — как в локальном матче: армия не стоит без
+   * дела, пока игрок не откроет меню, и сразу видна в окне занятия.
+   */
+  private sendStartArmy(seat: Seat, state: MatchState): void {
+    let soldiers = 0;
+    for (const unit of state.units) if (unit.owner === seat.playerId) soldiers += unit.soldiers;
+    if (soldiers <= 0) return;
+    seat.pending.push({
+      t: 'launchOffensive',
+      target: -1,
+      soldiers: intDiv(soldiers + FP - 1, FP),
+    });
   }
 
   /** Люди ведут армии сами: автокомандование выключено, как в локальной игре. */
@@ -672,7 +724,7 @@ export class Room {
       room: this.id,
       tickMs: TICK_MS,
       map: this.options.mapName,
-      seed: this.options.seed,
+      seed: this.seed,
       players: this.options.size,
       fog: this.options.fog,
       ...(seat.spectator ? { spectator: true } : {}),

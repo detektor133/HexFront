@@ -9,7 +9,10 @@ import {
   ATTITUDE_MAX,
   BOT_EASY_THINK_TICKS,
   BOT_PACT_MIN_TICKS,
+  BOT_BLOC_SHARE_DIVISOR,
   BOT_PEACE_LOCK_TICKS,
+  BOT_RESTLESS_RAMP_TICKS,
+  BOT_RESTLESS_START_TICKS,
   BOT_VOTE_DELAY_TICKS,
   BOT_WAR_GRACE_TICKS,
   BOT_WAR_MIN_TICKS,
@@ -48,6 +51,16 @@ function worstThreat(s: Situation, except: number): number {
   );
 }
 
+/**
+ * Альянс ботов не растёт в один блок на всех: объединённая группа не больше доли живых игроков
+ * (BOT_BLOC_SHARE_DIVISOR), но не меньше двух. Иначе все боты в союзе и друг с другом не воюют.
+ */
+function blocFull(state: MatchState, a: number, b: number): boolean {
+  const alive = state.players.filter((p) => p.status === 'alive').length;
+  const cap = Math.max(2, intDiv(alive + BOT_BLOC_SHARE_DIVISOR - 1, BOT_BLOC_SHARE_DIVISOR));
+  return new Set([...groupOf(state, a), ...groupOf(state, b)]).size > cap;
+}
+
 // Лёгкий бот берёт договор по старому правилу: сильный сосед рядом опаснее выгоды напасть на него.
 function acceptSimple(s: Situation, peer: Peer): boolean {
   const danger = Math.max(worstThreat(s, peer.id), peer.threat);
@@ -55,7 +68,8 @@ function acceptSimple(s: Situation, peer: Peer): boolean {
 }
 
 /** Принимает ли бот предложенный договор: теплота, общая угроза, выгода напасть самому. */
-function accepts(s: Situation, offer: TreatyOffer, peer: Peer): boolean {
+function accepts(state: MatchState, s: Situation, offer: TreatyOffer, peer: Peer): boolean {
+  if (offer.kind === 'alliance' && blocFull(state, s.me, peer.id)) return false;
   // Свежая война не кончается миром, если бот не проигрывает: иначе агрессор мирился бы сразу.
   if (offer.kind === 'peace' && peer.age < BOT_WAR_MIN_TICKS && peer.threat < LOSING_THREAT) {
     return false;
@@ -84,10 +98,11 @@ function accepts(s: Situation, offer: TreatyOffer, peer: Peer): boolean {
 
 // Голос бота в альянсе: за вход — если инициатор и новичок ему не враги; за мир — если не добивает;
 // за исключение — если исключаемый враг, нарушитель или общая угроза.
-function voteOf(s: Situation, vote: AllianceVote): boolean {
+function voteOf(state: MatchState, s: Situation, vote: AllianceVote): boolean {
   const peer = (id: number): Peer | undefined => s.peers.find((p) => p.id === id);
   const a = peer(vote.a);
   const b = peer(vote.b);
+  if (vote.kind === 'join' && blocFull(state, vote.a, vote.b)) return false;
   if (!s.profile.coalitions) {
     const trusted = (a?.violations ?? 0) <= s.myViolations + 1;
     if (vote.kind === 'peace') return true;
@@ -120,7 +135,7 @@ function replies(state: MatchState, s: Situation): Command[] {
     out.push({
       t: 'answerTreaty',
       from: o.from,
-      accept: peer !== undefined && accepts(s, o, peer),
+      accept: peer !== undefined && accepts(state, s, o, peer),
     });
   }
   // Запрос помощи: вступаем, если агрессор не сильнее нас, или это общий враг, или жертва нам друг.
@@ -143,7 +158,7 @@ function replies(state: MatchState, s: Situation): Command[] {
       ![...v.yes, ...v.no].includes(s.me) &&
       state.tick - v.tick >= thinkTicks,
   )) {
-    out.push({ t: 'castVote', voteId: vote.id, yes: voteOf(s, vote) });
+    out.push({ t: 'castVote', voteId: vote.id, yes: voteOf(state, s, vote) });
   }
   return out;
 }
@@ -159,6 +174,23 @@ function backers(state: MatchState, s: Situation, target: number): number {
 }
 
 /**
+ * Нетерпение бота: растёт, пока у него нет войн и мир с соседями не менялся, и снижает перевес,
+ * нужный для нападения. Без него равные соседи сидели бы в границах до конца матча.
+ * @returns снижение нужного перевеса, fixed-point (0 — нет)
+ */
+function restlessness(s: Situation): number {
+  let quiet = Infinity;
+  for (const p of s.peers) {
+    if (p.contact === 0) continue;
+    if (p.relation === 'war') return 0;
+    if (p.relation === 'peace') quiet = Math.min(quiet, p.age);
+  }
+  if (quiet === Infinity) return 0;
+  const over = Math.min(BOT_RESTLESS_RAMP_TICKS, Math.max(0, quiet - BOT_RESTLESS_START_TICKS));
+  return intDiv(s.profile.restless * over, BOT_RESTLESS_RAMP_TICKS);
+}
+
+/**
  * Цель новой войны: сосед (или заморский соперник), которого бот сильнее с запасом профиля; при
  * поддержке союзников и против лидера запас меньше. Выбирается цель с наибольшей выгодой:
  * перевес и обида, умноженные на длину общей границы.
@@ -169,6 +201,7 @@ function warTarget(state: MatchState, s: Situation): number | null {
   const start = BOT_WAR_GRACE_TICKS + ((s.me * 97) % 600);
   if (wars >= s.profile.maxWars || state.tick < start) return null;
   let best: { id: number; value: number } | null = null;
+  const itch = restlessness(s);
   for (const p of s.peers) {
     if (p.relation === 'war' || p.contact === 0) continue;
     const hegemon = s.hegemon?.id === p.id;
@@ -180,7 +213,7 @@ function warTarget(state: MatchState, s: Situation): number | null {
     // оппортунисту хватает меньшего. Лёгкий бот договоров не рвёт.
     if (bound(p) && !s.profile.coalitions) continue;
     const breach = intDiv(FP * (1 + s.myViolations) * (s.profile.opportunist ? 6 : 10), 10);
-    let need = s.profile.warEdge + (bound(p) ? breach : 0);
+    let need = s.profile.warEdge - itch + (bound(p) ? breach : 0);
     if (hegemon) need -= backed ? 500 : 300;
     else if (backed) need -= 200;
     need = Math.max(500, need);
@@ -205,7 +238,7 @@ function nextKind(peer: Peer): TreatyKind | null {
 }
 
 // Предложения периода: мир проигрываемой войне или ради общей беды, коалиция против лидера, пакты.
-function proposals(s: Situation, offered: ReadonlySet<number>): Command[] {
+function proposals(state: MatchState, s: Situation, offered: ReadonlySet<number>): Command[] {
   const out: Command[] = [];
   const room = (): boolean => out.length < PROPOSALS_PER_WINDOW;
   const fresh = (p: Peer): boolean => !offered.has(p.id) && p.attitude > -ATTITUDE_MAX + 200;
@@ -235,7 +268,7 @@ function proposals(s: Situation, offered: ReadonlySet<number>): Command[] {
       const need =
         kind === 'pact' ? COURT_PACT : kind === 'defense' ? COURT_DEFENSE : COURT_ALLIANCE;
       if (kind === null || !room() || warmth(s, p) < need) continue;
-      if (kind === 'alliance' && p.attitude < 100) continue;
+      if (kind === 'alliance' && (p.attitude < 100 || blocFull(state, s.me, p.id))) continue;
       out.push({ t: 'proposeTreaty', target: p.id, kind });
     }
   }
@@ -290,6 +323,6 @@ export function diplomacyCommands(
   // Предложения: раз в период профиля, в окне, смещённом по игроку, чтобы не все боты разом.
   if ((state.tick + me * 7) % s.profile.proposeEvery >= PROPOSE_WINDOW) return out;
   const offered = new Set(d.offers.filter((o) => o.from === me).map((o) => o.to));
-  out.push(...proposals(s, offered));
+  out.push(...proposals(state, s, offered));
   return out;
 }

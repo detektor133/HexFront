@@ -2,7 +2,15 @@
 // предупреждения), предложение и принятие договора, разрыв договора, ответ на запрос помощи
 // оборонительного пакта и голос в альянсе. Договоры — не гарантия: их можно нарушить, цена —
 // счётчик нарушений игрока, который видят все.
-import { annulAid, joinAid, joinWars, openVote, requestAid, settle } from './alliance.ts';
+import {
+  annulAid,
+  joinAid,
+  joinAllianceWars,
+  joinWars,
+  openVote,
+  requestAid,
+  settle,
+} from './alliance.ts';
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { AID_TTL_TICKS } from '../balance.ts';
 import {
@@ -185,6 +193,7 @@ function conclude(state: MatchState, from: number, to: number, kind: TreatyKind)
   recordTreaty(state, from, to, kind);
   cancelAttacks(state, from, to);
   state.events.push({ t: 'treatyMade', playerId: to, targetId: from, kind });
+  if (kind === 'alliance') joinAllianceWars(state, [from, to]);
 }
 
 // Выход из альянса целиком: мир со всеми членами, нарушение +1.

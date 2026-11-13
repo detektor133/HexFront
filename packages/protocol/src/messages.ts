@@ -47,6 +47,10 @@ const LINES_MAX = 16;
 /** Режим входа в матч (docs/stages/stage-09-analysis.md, «Играть онлайн» и «Пригласить друзей»). */
 export type JoinMode = 'open' | 'private';
 
+/** Сложность ботов комнаты (как в меню «Против ботов»): `hard` — самый сильный профиль. */
+export type LobbyLevel = 'easy' | 'normal' | 'hard';
+export const LOBBY_LEVELS: readonly LobbyLevel[] = ['easy', 'normal', 'hard'];
+
 export type C2S =
   | {
       readonly t: 'hello';
@@ -83,6 +87,11 @@ export type C2S =
   /** Хозяин закрытой комнаты запускает матч раньше срока (остальные места займут боты). */
   | { readonly t: 'start' }
   /**
+   * Хозяин закрытой комнаты правит игру до старта: сложность ботов и карта (сид из
+   * `QUICK_MATCH_SEEDS`, у клиента для него есть готовый файл). Остальным сервер не отвечает.
+   */
+  | { readonly t: 'configure'; readonly level?: LobbyLevel; readonly seed?: number }
+  /**
    * Выбывший игрок смотрит матч глазами другого игрока (вид, карточки, прогнозы — его), но не
    * командует. Живому игроку сервер отказывает молча: иначе можно подсматривать чужой туман.
    */
@@ -107,6 +116,9 @@ export interface LobbyInfo {
   /** Секунд до старта сбора; `null` — ждём хозяина. */
   readonly startsInS: number | null;
   readonly open: boolean;
+  /** Сложность ботов и сид карты комнаты: хозяин закрытой комнаты их меняет. */
+  readonly level: LobbyLevel;
+  readonly seed: number;
 }
 
 export type S2C =
@@ -355,6 +367,17 @@ export function decodeClientMessage(text: string): C2S {
       return { t: 'ping', at: source.at };
     case 'start':
       return { t: 'start' };
+    case 'configure': {
+      const level = LOBBY_LEVELS.find((l) => l === source.level);
+      if (source.level !== undefined && level === undefined) throw new MessageError('Поле level');
+      const seed = QUICK_MATCH_SEEDS.find((s) => s === source.seed);
+      if (source.seed !== undefined && seed === undefined) throw new MessageError('Поле seed');
+      return {
+        t: 'configure',
+        ...(level === undefined ? {} : { level }),
+        ...(seed === undefined ? {} : { seed }),
+      };
+    }
     case 'resync':
       return { t: 'resync' };
     case 'watch':

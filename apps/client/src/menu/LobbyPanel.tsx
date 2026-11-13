@@ -1,12 +1,18 @@
 // Лобби онлайн-матча внутри главного меню: поверх живой карты, окном-«телевизором». Набор людей
 // (30 с) или приглашение друзей по ссылке, затем переход в матч.
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft, IconDice } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
-import type { LobbyInfo, RefuseReason } from '@hexfront/protocol';
+import {
+  LOBBY_LEVELS,
+  QUICK_MATCH_SEEDS,
+  type LobbyInfo,
+  type RefuseReason,
+} from '@hexfront/protocol';
 
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { navigate } from '../nav.ts';
+import { Chips } from './MenuParts.tsx';
 import styles from './lobby.module.css';
 import ui from './menu-ui.module.css';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
@@ -34,6 +40,12 @@ export function lobbyFromUrl(url: string): LobbyRequest | null {
     room: target.searchParams.get('room'),
     ...(target.searchParams.get('spectate') === '1' ? { spectate: true } : {}),
   };
+}
+
+/** Следующая готовая карта по кругу: у клиента для каждого сида есть файл карты. */
+function nextSeed(current: number): number {
+  const at = QUICK_MATCH_SEEDS.findIndex((seed) => seed === current);
+  return QUICK_MATCH_SEEDS[(at + 1) % QUICK_MATCH_SEEDS.length] ?? QUICK_MATCH_SEEDS[0];
 }
 
 function refusalText(reason: RefuseReason): string {
@@ -250,6 +262,33 @@ export function LobbyPanel(props: {
                 {copied ? t('online.copied') : t('online.copyLink')}
               </button>
             </div>
+          )}
+          {isHost && mode === 'private' && (
+            <>
+              <Chips
+                label={t('menu.difficulty')}
+                options={LOBBY_LEVELS.map((l) => ({
+                  id: l,
+                  text: t(`menu.difficulty.${l}` as MessageKey),
+                }))}
+                value={info.level}
+                onPick={(level) => clientRef.current?.configure({ level })}
+              />
+              <div className={ui.group}>
+                <div className={ui.groupLabel}>
+                  {t('lobby.map')}
+                  <span>{`${QUICK_MATCH_SEEDS.indexOf(info.seed as never) + 1} / ${QUICK_MATCH_SEEDS.length}`}</span>
+                </div>
+                <button
+                  type="button"
+                  className={ui.action}
+                  onClick={() => clientRef.current?.configure({ seed: nextSeed(info.seed) })}
+                >
+                  <IconDice size={20} aria-hidden="true" />
+                  {t('lobby.nextMap')}
+                </button>
+              </div>
+            </>
           )}
           {isHost && mode === 'private' && (
             <button

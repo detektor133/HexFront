@@ -1,10 +1,10 @@
-// Окно соседа: вид сохраняется в браузере, лестница отношений ведёт ступень выше предложением,
-// ступень ниже — разрывом или войной.
+// Окно соседа: вид сохраняется в браузере; значения вне списка (старые «карточка» и «ступени»)
+// заменяются видом по умолчанию.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { stepCommand } from '../src/dev/DiplomacyBlock.tsx';
 import {
   DEFAULT_NEIGHBOR_VIEW,
+  NEIGHBOR_VIEWS,
   readNeighborView,
   writeNeighborView,
 } from '../src/settings/neighbor-view.ts';
@@ -20,41 +20,19 @@ describe('вид окна соседа', () => {
     writeNeighborView(DEFAULT_NEIGHBOR_VIEW);
   });
 
-  it('по умолчанию — карточка; выбор запоминается', () => {
-    expect(readNeighborView()).toBe('card');
-    writeNeighborView('ladder');
-    expect(readNeighborView()).toBe('ladder');
-    expect(store.get('hexfront.neighborView')).toBe('ladder');
-  });
-});
-
-describe('лестница отношений', () => {
-  it('из войны можно только предложить мир', () => {
-    expect(stepCommand('war', 'peace', 3)).toEqual({
-      t: 'proposeTreaty',
-      target: 3,
-      kind: 'peace',
-    });
-    expect(stepCommand('war', 'pact', 3)).toBeNull();
-    expect(stepCommand('war', 'war', 3)).toBeNull();
+  it('значки — прежний вид, ещё четыре новых; по умолчанию — «фокус»', () => {
+    expect(NEIGHBOR_VIEWS).toEqual(['icons', 'list', 'focus', 'tiles', 'tabs']);
+    expect(readNeighborView()).toBe('focus');
   });
 
-  it('из мира вверх — предложение любого договора, вниз — война', () => {
-    expect(stepCommand('peace', 'alliance', 3)).toEqual({
-      t: 'proposeTreaty',
-      target: 3,
-      kind: 'alliance',
-    });
-    expect(stepCommand('peace', 'war', 3)).toEqual({ t: 'declareWar', target: 3 });
+  it('выбор запоминается', () => {
+    writeNeighborView('tiles');
+    expect(readNeighborView()).toBe('tiles');
+    expect(store.get('hexfront.neighborView')).toBe('tiles');
   });
 
-  it('из договора вниз — разрыв в мир, на соседнюю ступень вниз не спускаются', () => {
-    expect(stepCommand('alliance', 'peace', 3)).toEqual({ t: 'breakTreaty', target: 3 });
-    expect(stepCommand('alliance', 'pact', 3)).toBeNull();
-    expect(stepCommand('pact', 'defense', 3)).toEqual({
-      t: 'proposeTreaty',
-      target: 3,
-      kind: 'defense',
-    });
+  it('снятый вид из старого хранилища заменяется видом по умолчанию', () => {
+    store.set('hexfront.neighborView', 'ladder');
+    expect(readNeighborView()).toBe(DEFAULT_NEIGHBOR_VIEW);
   });
 });

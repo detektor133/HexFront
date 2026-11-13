@@ -3,6 +3,7 @@
 import { IconArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { CodeRow } from './CodeRow.tsx';
 import {
   LEVELS,
   MAPS,
@@ -90,7 +91,7 @@ export function NickPlate(props: {
   );
 }
 
-function Chips<T extends string>(props: {
+export function Chips<T extends string>(props: {
   readonly label: string;
   readonly options: readonly { readonly id: T; readonly text: string }[];
   readonly value: T;
@@ -137,10 +138,7 @@ function Action(props: {
   );
 }
 
-function OnlineBody(props: {
-  readonly go: (url: string) => void;
-  readonly onCode: () => void;
-}): React.JSX.Element {
+function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.Element {
   return (
     <>
       <Action
@@ -154,7 +152,14 @@ function OnlineBody(props: {
         hint={t('menu.lobbyHint')}
         onPress={() => props.go('/online?mode=private')}
       />
-      <Action label={t('menu.joinCode')} hint={t('menu.codeHint')} onPress={props.onCode} />
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>{t('menu.joinCode')}</div>
+        <CodeRow
+          onJoin={(room, spectate) =>
+            props.go(`/online?room=${encodeURIComponent(room)}${spectate ? '&spectate=1' : ''}`)
+          }
+        />
+      </div>
     </>
   );
 }
@@ -212,7 +217,6 @@ export function ModePanel(props: {
   readonly settings: MenuSettings;
   readonly update: (patch: Partial<MenuSettings>) => void;
   readonly go: (url: string) => void;
-  readonly onCode: () => void;
   readonly onBack: () => void;
   readonly className: string;
 }): React.JSX.Element {
@@ -234,7 +238,7 @@ export function ModePanel(props: {
         <h2 className={styles.panelTitle}>{modeName(props.mode)}</h2>
       </div>
       {props.mode === 'online' ? (
-        <OnlineBody go={props.go} onCode={props.onCode} />
+        <OnlineBody go={props.go} />
       ) : (
         <BotsBody settings={props.settings} update={props.update} go={props.go} />
       )}

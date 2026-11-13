@@ -40,6 +40,19 @@ export function joinWars(state: MatchState, p: number, target: number): void {
   }
 }
 
+/**
+ * Альянс, заключённый посреди войны: союзники вступают в неё против врагов воюющего — как при
+ * объявлении войны альянсу (долг альянса), иначе союз «на бумаге» не помогал бы воюющему.
+ */
+export function joinAllianceWars(state: MatchState, members: readonly number[]): void {
+  for (const x of members) {
+    for (const z of state.players) {
+      if (members.includes(z.id) || relationOf(state, x, z.id) !== 'war') continue;
+      joinWars(state, x, z.id);
+    }
+  }
+}
+
 /** Оборонительные партнёры атакованного получают запрос помощи. */
 export function requestAid(state: MatchState, aggressor: number, victim: number): void {
   const d = state.diplomacy;
@@ -110,6 +123,7 @@ function applyVote(state: MatchState, vote: AllianceVote): void {
       }
     }
     state.events.push({ t: 'treatyMade', playerId: vote.b, targetId: vote.a, kind: 'alliance' });
+    joinAllianceWars(state, all);
     return;
   }
   for (const x of sideA) {
