@@ -11,6 +11,31 @@
   pointer-events: none;
 }
 
+/* Док уезжает вниз, пока на карте выбирают место: панель режима занимает его место. */
+.dock {
+  transition:
+    translate 320ms var(--motion-easing),
+    opacity 240ms var(--motion-easing),
+    visibility 0s;
+}
+
+.dock.hidden {
+  translate: 0 160%;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    translate 320ms var(--motion-easing),
+    opacity 240ms var(--motion-easing),
+    visibility 0s 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock,
+  .dock.hidden {
+    transition: none;
+  }
+}
+
 .bar {
   position: relative;
   display: flex;

@@ -64,33 +64,6 @@
   box-shadow: var(--shadow-hard);
 }
 
-/* Кнопка под подсказкой: прячет панели снизу, чтобы они не закрывали карту при выборе места. */
-.collapseBtn {
-  display: inline-flex;
-  grid-column: 1 / -1;
-  justify-self: center;
-  align-items: center;
-  gap: var(--space-xs);
-  min-height: 36px;
-  margin: var(--space-xs) 0 0;
-  padding: 0 var(--space-md);
-  color: var(--ui-ink);
-  font: inherit;
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-  background: var(--ui-surface);
-  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
-  border-radius: var(--radius-button);
-  box-shadow: var(--shadow-hard);
-}
-
-.collapsed .panelSlot,
-.collapsed .nickSlot {
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Плашка связи слева вверху: сколько игроков в сети или что игра в офлайне. */
 .status {
   grid-column: 1;
@@ -181,6 +154,46 @@
 
 .panelSlot > * {
   pointer-events: auto;
+}
+
+/* Выбор места на карте: нижний док уезжает вниз, панель режима или лобби садится на его место, ник прячется. */
+.panelSlot {
+  transition: bottom 320ms var(--motion-easing);
+}
+
+.nickSlot {
+  transition:
+    opacity 240ms var(--motion-easing),
+    translate 320ms var(--motion-easing);
+}
+
+.picking .nickSlot {
+  opacity: 0;
+  translate: 0 40px;
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 240ms var(--motion-easing),
+    translate 320ms var(--motion-easing),
+    visibility 0s 320ms;
+}
+
+.picking .panelSlot {
+  bottom: max(var(--space-sm), env(safe-area-inset-bottom));
+  padding: 0 var(--space-sm);
+}
+
+/* Низкая панель: над ней остаётся большая часть карты, остальное прокручивается внутри. */
+.picking .panelSlot > * {
+  max-height: min(46dvh, 420px);
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panelSlot,
+  .nickSlot {
+    transition: none;
+  }
 }
 
 .nickWrap {
@@ -529,6 +542,19 @@
   }
 
   .panel {
+    max-height: calc(100dvh - 2 * var(--space-sm));
+  }
+
+  /* Телефон в ландшафте при выборе места: панель сбоку на всю высоту, карта слева целиком. */
+  .picking .panelSlot {
+    top: 0;
+    bottom: 0;
+    justify-content: flex-end;
+    padding: var(--space-sm);
+  }
+
+  .picking .panelSlot > * {
+    width: min(100%, 340px);
     max-height: calc(100dvh - 2 * var(--space-sm));
   }
 }

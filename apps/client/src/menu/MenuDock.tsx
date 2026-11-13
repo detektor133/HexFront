@@ -21,6 +21,8 @@ export function MenuDock(props: {
   readonly onMode: (mode: ModeId | null) => void;
   /** Сервер недоступен: «Онлайн» заблокирован, а «Быстрый бой» открывает игру против ботов. */
   readonly offline: boolean;
+  /** На карте выбирают место старта: док уезжает вниз, панель режима садится на его место. */
+  readonly hidden?: boolean;
 }): React.JSX.Element {
   const presence = useTvPresence(props.mode !== null);
   // Кнопка боя: мечи делают один удар, и сразу после него открывается поиск матча.
@@ -74,7 +76,7 @@ export function MenuDock(props: {
           />
         </div>
       )}
-      <div className={styles.dock}>
+      <div className={`${styles.dock} ${props.hidden === true ? styles.hidden : ''}`}>
         <div className={styles.bar}>
           {tab('online', <GlobeIcon />)}
           <button

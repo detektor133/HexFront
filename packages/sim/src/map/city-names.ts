@@ -9,12 +9,12 @@ import type { City } from '../state/types.ts';
 export const CITY_NAME_MAX = 24;
 
 /** Государств в таблице; у каждого свой список городов. Должно совпадать с таблицей клиента. */
-export const NATION_COUNT = 12;
+export const NATION_COUNT = 30;
 /** Городов в списке одного государства: сначала столица, дальше основанные города по порядку. */
-export const NATION_CITY_COUNT = 10;
+export const NATION_CITY_COUNT = 12;
 /** Размеры таблиц составных названий (начало слова + окончание): «Бело» + «горск». */
-export const GEN_PREFIX_COUNT = 24;
-export const GEN_SUFFIX_COUNT = 16;
+export const GEN_PREFIX_COUNT = 32;
+export const GEN_SUFFIX_COUNT = 24;
 
 /** Целочисленный хэш трёх чисел (без Math.random): одинаков на сервере и в браузере. */
 function hash32(a: number, b: number, c: number): number {

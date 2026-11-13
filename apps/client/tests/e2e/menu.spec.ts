@@ -153,6 +153,8 @@ test('@layout без сервера онлайн заблокирован, а б
   // Связь появилась: онлайн разблокируется сам, без перезагрузки.
   alive = true;
   await expect(page.getByRole('status')).toContainText('842', { timeout: 15_000 });
+  // Пока на карте выбирают место, док уехал вниз: сначала закрываем панель, он возвращается.
+  await page.getByRole('button', { name: /Назад|Back/ }).click();
   await expect(online).toBeEnabled();
   await context.close();
 });
