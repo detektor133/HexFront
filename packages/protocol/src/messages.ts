@@ -51,6 +51,10 @@ export type JoinMode = 'open' | 'private';
 export type LobbyLevel = 'easy' | 'normal' | 'hard';
 export const LOBBY_LEVELS: readonly LobbyLevel[] = ['easy', 'normal', 'hard'];
 
+/** Карты закрытой комнаты, как в меню «Против ботов»; число игроков выбирается только на `europe`. */
+export type LobbyMap = 'gen' | 'europe' | 'small' | 'tiny';
+export const LOBBY_MAPS: readonly LobbyMap[] = ['europe', 'gen', 'small', 'tiny'];
+
 export type C2S =
   | {
       readonly t: 'hello';
@@ -87,10 +91,15 @@ export type C2S =
   /** Хозяин закрытой комнаты запускает матч раньше срока (остальные места займут боты). */
   | { readonly t: 'start' }
   /**
-   * Хозяин закрытой комнаты правит игру до старта: сложность ботов и карта (сид из
-   * `QUICK_MATCH_SEEDS`, у клиента для него есть готовый файл). Остальным сервер не отвечает.
+   * Хозяин закрытой комнаты правит игру до старта: сложность ботов, карту и (на `europe`) число
+   * игроков. Остальным сервер не отвечает.
    */
-  | { readonly t: 'configure'; readonly level?: LobbyLevel; readonly seed?: number }
+  | {
+      readonly t: 'configure';
+      readonly level?: LobbyLevel;
+      readonly map?: LobbyMap;
+      readonly players?: number;
+    }
   /**
    * Выбывший игрок смотрит матч глазами другого игрока (вид, карточки, прогнозы — его), но не
    * командует. Живому игроку сервер отказывает молча: иначе можно подсматривать чужой туман.
@@ -116,9 +125,9 @@ export interface LobbyInfo {
   /** Секунд до старта сбора; `null` — ждём хозяина. */
   readonly startsInS: number | null;
   readonly open: boolean;
-  /** Сложность ботов и сид карты комнаты: хозяин закрытой комнаты их меняет. */
+  /** Сложность ботов и карта комнаты: хозяин закрытой комнаты их меняет. */
   readonly level: LobbyLevel;
-  readonly seed: number;
+  readonly map: LobbyMap;
 }
 
 export type S2C =
@@ -370,12 +379,17 @@ export function decodeClientMessage(text: string): C2S {
     case 'configure': {
       const level = LOBBY_LEVELS.find((l) => l === source.level);
       if (source.level !== undefined && level === undefined) throw new MessageError('Поле level');
-      const seed = QUICK_MATCH_SEEDS.find((s) => s === source.seed);
-      if (source.seed !== undefined && seed === undefined) throw new MessageError('Поле seed');
+      const map = LOBBY_MAPS.find((m) => m === source.map);
+      if (source.map !== undefined && map === undefined) throw new MessageError('Поле map');
+      const players = source.players;
+      if (players !== undefined && (!isInt(players) || players < 2 || players > 30)) {
+        throw new MessageError('Поле players');
+      }
       return {
         t: 'configure',
         ...(level === undefined ? {} : { level }),
-        ...(seed === undefined ? {} : { seed }),
+        ...(map === undefined ? {} : { map }),
+        ...(players === undefined ? {} : { players }),
       };
     }
     case 'resync':

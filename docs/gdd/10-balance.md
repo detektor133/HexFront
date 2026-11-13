@@ -39,7 +39,6 @@
 | `BOT_PEACE_LOCK_TICKS`       | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_PACT_MIN_TICKS`         | 1800 (3 мин) `[ТЮНИНГ]` |
 | `BOT_SPLIT_MIN_SOLDIERS`     | 600 `[ТЮНИНГ]`          |
-| `BOT_BLOC_SHARE_DIVISOR`     | 3: блок альянса ботов ≤ ⌈живые / 3⌉, не меньше 2 `[ТЮНИНГ]` |
 | `BOT_RESTLESS_START_TICKS`   | 3000 (5 мин покоя) `[ТЮНИНГ]` |
 | `BOT_RESTLESS_RAMP_TICKS`    | 3000 (рост нетерпения до полного) `[ТЮНИНГ]` |
 

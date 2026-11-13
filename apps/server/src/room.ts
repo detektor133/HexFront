@@ -15,6 +15,7 @@ import {
   type JoinMode,
   type LobbyInfo,
   type LobbyLevel,
+  type LobbyMap,
   type S2C,
 } from '@hexfront/protocol';
 import {
@@ -41,6 +42,8 @@ import {
   type PlayerCommand,
 } from '@hexfront/sim';
 
+import { staticMap } from './maps.ts';
+
 /** Сколько секунд комната ждёт людей в открытом наборе, потом боты занимают свободные места. */
 export const GATHER_SECONDS = 30;
 /**
@@ -57,6 +60,8 @@ export const MAX_SPECTATORS = 20;
 const SPECTATOR_KEEP_SECONDS = 120;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
 const ACK_STALE_TICKS = 100;
+/** Игроков на «Европе» по умолчанию (как в меню «Против ботов»). */
+const EUROPE_DEFAULT = 12;
 /** Сложность комнаты (меню) → профиль ботов sim: `hard` — профиль `medium`. */
 const BOT_LEVELS: Readonly<Record<LobbyLevel, BotLevel>> = {
   easy: 'easy',
@@ -166,6 +171,8 @@ export class Room {
   /** Карта, сид и сложность ботов: хозяин закрытой комнаты меняет их до старта (`configure`). */
   private map: MapStatic;
   private seed: number;
+  private mapName: LobbyMap;
+  private size: number;
   private level: LobbyLevel = 'hard';
   private readonly seats: Seat[] = [];
   private readonly spectators: Seat[] = [];
@@ -187,6 +194,8 @@ export class Room {
     this.options = options;
     this.map = options.map;
     this.seed = options.seed;
+    this.mapName = 'gen';
+    this.size = options.size;
     this.id = options.id;
     this.mode = options.mode;
   }
@@ -211,7 +220,7 @@ export class Room {
 
   /** Есть ли свободное место для нового человека. */
   public get hasFreeSeat(): boolean {
-    return this.phase === 'lobby' && this.seats.length < this.options.size;
+    return this.phase === 'lobby' && this.seats.length < this.size;
   }
 
   /** Состояние набора для табло лобби. */
@@ -223,24 +232,37 @@ export class Room {
     return {
       room: this.id,
       humans: this.seats.length,
-      max: this.options.size,
+      max: this.size,
       startsInS: left,
       open: this.mode === 'open',
       level: this.level,
-      seed: this.seed,
+      map: this.mapName,
     };
   }
 
   /**
-   * Хозяин закрытой комнаты меняет сложность ботов и карту до старта. Клиентам уходит новое
-   * приветствие (карта и сид в нём) и табло лобби.
+   * Хозяин закрытой комнаты меняет сложность ботов, карту и число игроков до старта (как в меню
+   * «Против ботов»). Клиентам уходит новое приветствие (карта и число игроков в нём) и табло.
    */
-  public configure(conn: Connection, patch: { level?: LobbyLevel; seed?: number }): void {
+  public configure(
+    conn: Connection,
+    patch: { level?: LobbyLevel; map?: LobbyMap; players?: number },
+  ): void {
     if (this.phase !== 'lobby' || this.mode !== 'private' || this.seats[0]?.conn !== conn) return;
     if (patch.level !== undefined) this.level = patch.level;
-    if (patch.seed !== undefined && patch.seed !== this.seed) {
-      this.seed = patch.seed;
-      this.map = this.options.makeMap?.(patch.seed, this.options.size) ?? this.map;
+    const mapName = patch.map ?? this.mapName;
+    let size = this.size;
+    if (patch.map !== undefined && patch.map !== this.mapName) {
+      size = mapName === 'gen' ? this.options.size : mapName === 'europe' ? EUROPE_DEFAULT : 2;
+    }
+    if (patch.players !== undefined && mapName === 'europe') size = patch.players;
+    size = Math.max(size, this.seats.length);
+    if (mapName !== this.mapName || size !== this.size) {
+      const next = mapName === 'gen' ? this.options.makeMap?.(this.seed, size) : staticMap(mapName);
+      if (next === undefined) return;
+      this.map = next;
+      this.mapName = mapName;
+      this.size = size;
     }
     for (const seat of this.seats) if (seat.conn !== null) this.sendWelcome(seat);
     this.broadcastLobby();
@@ -260,7 +282,7 @@ export class Room {
       this.gatherEndsAt = this.options.now() + GATHER_SECONDS * 1000;
     }
     this.sendWelcome(this.seats[playerId] as Seat);
-    if (this.seats.length >= this.options.size) this.start();
+    if (this.seats.length >= this.size) this.start();
     else this.broadcastLobby();
     return { token, playerId };
   }
@@ -549,7 +571,8 @@ export class Room {
   /** Запускает матч: люди — игроки 0..n−1, остальные места занимают боты. */
   public start(): void {
     if (this.phase !== 'lobby' || this.seats.length === 0) return;
-    const { size, fog } = this.options;
+    const { fog } = this.options;
+    const { size } = this;
     const { map, seed } = this;
     const setup = Array.from({ length: size }, (_, i) => ({
       name: this.seats[i]?.nick ?? `Бот ${i - this.seats.length + 1}`,
@@ -612,7 +635,7 @@ export class Room {
   private botIds(): number[] {
     const humans = new Set(this.seats.filter((s) => !s.botControlled).map((s) => s.playerId));
     const ids: number[] = [];
-    for (let id = 0; id < this.options.size; id += 1) if (!humans.has(id)) ids.push(id);
+    for (let id = 0; id < this.size; id += 1) if (!humans.has(id)) ids.push(id);
     return ids;
   }
 
@@ -723,9 +746,9 @@ export class Room {
       token: seat.token,
       room: this.id,
       tickMs: TICK_MS,
-      map: this.options.mapName,
+      map: this.mapName,
       seed: this.seed,
-      players: this.options.size,
+      players: this.size,
       fog: this.options.fog,
       ...(seat.spectator ? { spectator: true } : {}),
     });

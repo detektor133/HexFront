@@ -1,4 +1,6 @@
 // Карты быстрого матча: генерация, кэш процесса и прогрев между тиками.
+import { readFileSync } from 'node:fs';
+
 import { generateMap, QUICK_MATCH_MAP_SIZE } from '@hexfront/mapgen';
 import { QUICK_MATCH_SEEDS } from '@hexfront/protocol';
 import { loadMap, type MapStatic } from '@hexfront/sim';
@@ -37,4 +39,19 @@ export function warmMaps(size: number, seeds: readonly number[] = QUICK_MATCH_SE
     setTimeout(next, 50);
   };
   setTimeout(next, 1000);
+}
+
+/** Готовые карты меню (Европа, малая, крошечная): те же файлы, что у клиента. */
+const staticMaps = new Map<string, MapStatic>();
+
+export function staticMap(name: 'europe' | 'small' | 'tiny'): MapStatic {
+  let map = staticMaps.get(name);
+  if (map === undefined) {
+    const file = new URL(`../../../packages/mapgen/maps/${name}.json`, import.meta.url);
+    const loaded = loadMap(JSON.parse(readFileSync(file, 'utf8')) as unknown);
+    if (!loaded.ok) throw new Error(loaded.errors.join('; '));
+    map = loaded.map;
+    staticMaps.set(name, map);
+  }
+  return map;
 }

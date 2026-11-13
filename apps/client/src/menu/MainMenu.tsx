@@ -116,7 +116,11 @@ export function MainMenu(props: {
         update={update}
         go={go}
         mode={mode}
-        onMode={setMode}
+        onMode={(next) => {
+          // Выбор режима закрывает открытое лобби: иначе оно висит поверх и режим не переключить.
+          setLobby(null);
+          setMode(next);
+        }}
         offline={offline}
       />
       {lobbyWindow.mounted && lastLobby.current !== null && (

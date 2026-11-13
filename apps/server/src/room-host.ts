@@ -154,7 +154,8 @@ export class RoomHost {
       case 'configure':
         room.configure(connection, {
           ...(message.level === undefined ? {} : { level: message.level }),
-          ...(message.seed === undefined ? {} : { seed: message.seed }),
+          ...(message.map === undefined ? {} : { map: message.map }),
+          ...(message.players === undefined ? {} : { players: message.players }),
         });
         break;
       case 'watch':

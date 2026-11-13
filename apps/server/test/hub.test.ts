@@ -154,17 +154,19 @@ describe('вход и набор', () => {
     const code = host.of('welcome')[0]?.room ?? '';
     const friend = new Client(hub);
     friend.hello('Друг', { room: code });
-    const seed = host.of('welcome')[0]?.seed ?? 0;
-    const other = seed === 42 ? 43 : 42;
 
-    friend.send({ t: 'configure', level: 'easy', seed: other });
+    friend.send({ t: 'configure', level: 'easy', map: 'europe', players: 10 });
     expect(friend.of('lobby').at(-1)?.info.level).toBe('hard');
 
-    host.send({ t: 'configure', level: 'easy', seed: other });
-    expect(host.of('lobby').at(-1)?.info).toMatchObject({ level: 'easy', seed: other });
-    // Новое приветствие несёт новую карту: клиент собирает матч по ней.
-    expect(host.of('welcome').at(-1)?.seed).toBe(other);
-    expect(friend.of('welcome').at(-1)?.seed).toBe(other);
+    host.send({ t: 'configure', level: 'easy', map: 'europe', players: 10 });
+    expect(host.of('lobby').at(-1)?.info).toMatchObject({
+      level: 'easy',
+      map: 'europe',
+      max: 10,
+    });
+    // Новое приветствие несёт карту и число игроков: клиент собирает матч по ним.
+    expect(host.of('welcome').at(-1)).toMatchObject({ map: 'europe', players: 10 });
+    expect(friend.of('welcome').at(-1)).toMatchObject({ map: 'europe', players: 10 });
     host.send({ t: 'start' });
     tick();
     expect(host.of('start')).toHaveLength(1);

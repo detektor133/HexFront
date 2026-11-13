@@ -18,6 +18,7 @@ import {
   type DeltaMessage,
   type JoinMode,
   type LobbyLevel,
+  type LobbyMap,
   type MapMaskMode,
   type Query,
   type SnapshotMessage,
@@ -271,7 +272,7 @@ export class NetClient {
   }
 
   /** Хозяин закрытой комнаты меняет сложность ботов и карту до старта. */
-  public configure(patch: { level?: LobbyLevel; seed?: number }): void {
+  public configure(patch: { level?: LobbyLevel; map?: LobbyMap; players?: number }): void {
     this.send({ t: 'configure', ...patch });
   }
 

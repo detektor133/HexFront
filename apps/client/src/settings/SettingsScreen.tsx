@@ -4,9 +4,8 @@ import { useState } from 'react';
 import { SettingsPanel } from './SettingsPanel.tsx';
 import styles from './SettingsScreen.module.css';
 import { useArmyStep } from './army-step.ts';
-import { NEIGHBOR_VIEWS, useNeighborView } from './neighbor-view.ts';
 import { STEP_CHOICES } from '../dev/army-limit.ts';
-import { t, type MessageKey } from '../i18n/dict.ts';
+import { t } from '../i18n/dict.ts';
 
 type Tab = 'screen' | 'game';
 const TABS: readonly Tab[] = ['screen', 'game'];
@@ -51,7 +50,6 @@ export function SettingsScreen(props: { readonly onBack: () => void }): React.JS
 
 function GameTab(): React.JSX.Element {
   const [step, setStep] = useArmyStep();
-  const [neighbor, setNeighbor] = useNeighborView();
   return (
     <>
       <div className={styles.group}>
@@ -71,24 +69,6 @@ function GameTab(): React.JSX.Element {
           ))}
         </div>
         <p className={styles.hint}>{t('settings.armyStepHint')}</p>
-      </div>
-      <div className={styles.group}>
-        <span className={styles.groupLabel}>{t('settings.neighbor')}</span>
-        <div className={styles.segmented} role="radiogroup" aria-label={t('settings.neighbor')}>
-          {NEIGHBOR_VIEWS.map((view) => (
-            <button
-              key={view}
-              type="button"
-              role="radio"
-              aria-checked={view === neighbor}
-              className={`${styles.segment} ${view === neighbor ? styles.segmentOn : ''}`}
-              onClick={() => setNeighbor(view)}
-            >
-              {t(`settings.neighbor.${view}` as MessageKey)}
-            </button>
-          ))}
-        </div>
-        <p className={styles.hint}>{t('settings.neighborHint')}</p>
       </div>
     </>
   );

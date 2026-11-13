@@ -1,19 +1,15 @@
 // Лобби онлайн-матча внутри главного меню: поверх живой карты, окном-«телевизором». Набор людей
 // (30 с) или приглашение друзей по ссылке, затем переход в матч.
-import { IconArrowLeft, IconDice } from '@tabler/icons-react';
+import { IconArrowLeft } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
-import {
-  LOBBY_LEVELS,
-  QUICK_MATCH_SEEDS,
-  type LobbyInfo,
-  type RefuseReason,
-} from '@hexfront/protocol';
+import { LOBBY_LEVELS, type LobbyInfo, type RefuseReason } from '@hexfront/protocol';
 
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { navigate } from '../nav.ts';
 import { Chips } from './MenuParts.tsx';
 import styles from './lobby.module.css';
+import { MAPS, PLAYERS_MAX, PLAYERS_MIN, PLAYERS_STEP } from './menu-config.ts';
 import ui from './menu-ui.module.css';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
 import { saveOnlineSession, serverUrl } from '../net/online-session.ts';
@@ -40,12 +36,6 @@ export function lobbyFromUrl(url: string): LobbyRequest | null {
     room: target.searchParams.get('room'),
     ...(target.searchParams.get('spectate') === '1' ? { spectate: true } : {}),
   };
-}
-
-/** Следующая готовая карта по кругу: у клиента для каждого сида есть файл карты. */
-function nextSeed(current: number): number {
-  const at = QUICK_MATCH_SEEDS.findIndex((seed) => seed === current);
-  return QUICK_MATCH_SEEDS[(at + 1) % QUICK_MATCH_SEEDS.length] ?? QUICK_MATCH_SEEDS[0];
 }
 
 function refusalText(reason: RefuseReason): string {
@@ -274,20 +264,32 @@ export function LobbyPanel(props: {
                 value={info.level}
                 onPick={(level) => clientRef.current?.configure({ level })}
               />
-              <div className={ui.group}>
-                <div className={ui.groupLabel}>
-                  {t('lobby.map')}
-                  <span>{`${QUICK_MATCH_SEEDS.indexOf(info.seed as never) + 1} / ${QUICK_MATCH_SEEDS.length}`}</span>
+              <Chips
+                label={t('menu.map')}
+                options={MAPS.map((m) => ({ id: m.id, text: t(`menu.map.${m.id}` as MessageKey) }))}
+                value={info.map}
+                onPick={(map) => clientRef.current?.configure({ map })}
+              />
+              {info.map === 'europe' && (
+                <div className={ui.group}>
+                  <div className={ui.groupLabel}>
+                    {t('menu.players')}
+                    <span>{info.max}</span>
+                  </div>
+                  <input
+                    type="range"
+                    className={ui.range}
+                    min={PLAYERS_MIN}
+                    max={PLAYERS_MAX}
+                    step={PLAYERS_STEP}
+                    value={info.max}
+                    aria-label={t('menu.players')}
+                    onChange={(event) =>
+                      clientRef.current?.configure({ players: Number(event.target.value) })
+                    }
+                  />
                 </div>
-                <button
-                  type="button"
-                  className={ui.action}
-                  onClick={() => clientRef.current?.configure({ seed: nextSeed(info.seed) })}
-                >
-                  <IconDice size={20} aria-hidden="true" />
-                  {t('lobby.nextMap')}
-                </button>
-              </div>
+              )}
             </>
           )}
           {isHost && mode === 'private' && (
