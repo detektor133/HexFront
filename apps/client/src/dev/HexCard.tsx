@@ -26,6 +26,7 @@ import { measureCardHeight } from './card-measurement.ts';
 import { visibleActions, type HexAction } from './hex-actions.ts';
 import { reasonText, t, type MessageKey } from '../i18n/dict.ts';
 import { formatFp, formatRate } from '../i18n/format.ts';
+import { localName } from '../i18n/names.ts';
 import type { Selection } from '../local/messages.ts';
 import { GoldIcon } from '../ui/gold-icon.tsx';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -254,7 +255,8 @@ export function HexCard(props: {
   const kind = c
     ? `${c.isCapital ? t('card.capital') : t('card.city')} · ${t('card.level')} ${c.level}`
     : t(`terrain.${terrain}` as MessageKey);
-  const title = c && c.name !== '' ? c.name : kind;
+  const cityLabel = c ? localName(c.name) : '';
+  const title = c && c.name !== '' ? cityLabel : kind;
   const job = visible
     ? view.constructions.find((x) => x.hex === s.hex && x.kind !== 'road')
     : undefined;
@@ -280,7 +282,7 @@ export function HexCard(props: {
               <CityName
                 key={c.id}
                 cityId={c.id}
-                name={c.name}
+                name={cityLabel}
                 editable={mine}
                 fallback={kind}
                 send={send}

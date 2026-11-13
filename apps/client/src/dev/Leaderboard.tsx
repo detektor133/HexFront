@@ -11,6 +11,7 @@ import {
   type LeaderboardRow,
 } from './leaderboard.ts';
 import { t } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { tokens } from '../theme/tokens.ts';
 
 interface LeaderboardProps {
@@ -117,8 +118,9 @@ export function Leaderboard({
         aria-label={`${t('leaderboard.place')} / ${t('leaderboard.player')} / ${t('leaderboard.score')}`}
       >
         {shown.map(({ row, place }) => {
-          const name =
-            view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`;
+          const name = localName(
+            view.players[row.playerId]?.name ?? `${t('observer.player')} ${row.playerId + 1}`,
+          );
           const hex = countryHex(view, row.playerId);
           const color = tokens.players.palette[row.playerId]?.line ?? tokens.ui.ink;
           const eliminated = view.players[row.playerId]?.status === 'eliminated';

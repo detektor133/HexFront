@@ -1,6 +1,7 @@
 import { IconX } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { localName } from '../i18n/names.ts';
 import { appSearch, navigate } from '../nav.ts';
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
@@ -351,7 +352,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           capitulating={capitulating}
           aidCalls={view?.diplomacy?.aidCalls ?? []}
           votes={view?.diplomacy?.votes ?? []}
-          nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+          nameOf={(id) => localName(view?.players[id]?.name ?? String(id + 1))}
           send={sb.send}
           graceLeftS={view?.me.graceLeftS}
           {...(view ? { localPlayerId: view.playerId } : {})}
@@ -549,7 +550,10 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           buildingsOpen={buildingsOpen}
           drawer={phoneView && viewport.width <= viewport.height}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
-          chatPlayers={view.players.map((p) => ({ id: p.id, name: p.name ?? String(p.id + 1) }))}
+          chatPlayers={view.players.map((p) => ({
+            id: p.id,
+            name: localName(p.name ?? String(p.id + 1)),
+          }))}
         />
       )}
       {view && !debug && buildingsOpen && !spectating && (

@@ -53,7 +53,16 @@ export { ARMY_NAME_MAX } from './commands/army.ts';
 export { isPortHex, isPortOf, portLevel, waterNeighbors, type PortGround } from './state/port.ts';
 export { planSeaRoute, seaTargets } from './queries/sea-route.ts';
 export { atSea, portCapacity, sailCost } from './commands/sail.ts';
-export { CITY_NAME_MAX } from './map/city-names.ts';
+export {
+  botName,
+  CITY_NAME_MAX,
+  GEN_PREFIX_COUNT,
+  GEN_SUFFIX_COUNT,
+  NATION_CITY_COUNT,
+  NATION_COUNT,
+  nationOf,
+  pickCityName,
+} from './map/city-names.ts';
 export { battlePowers, flankMultiplier, supplyCombatMult } from './systems/combat.ts';
 export { isSupportedByArtillery } from './queries/battle-math.ts';
 export { fireTargetOf } from './systems/artillery.ts';

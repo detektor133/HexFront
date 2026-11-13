@@ -1,77 +1,74 @@
-// Названия городов, которые игрок основывает сам, и столиц (интерфейс показывает их подписью над
-// городом). Выбор детерминирован: от зерна матча и id города, занятые имена пропускаются.
+// Названия городов и ботов. Симуляция не знает языка, поэтому в состоянии лежит не готовое слово, а
+// короткий код (`~n:<государство>:<номер>`), а клиент подставляет слово на языке игрока. Таблицы слов —
+// в клиенте (`apps/client/src/i18n/names.ts`); здесь только их размеры и детерминированный выбор.
+// Название, которое игрок ввёл сам (команда renameCity), хранится как обычный текст.
+import { intDiv } from '../math/int.ts';
 import type { City } from '../state/types.ts';
 
-/** Предел длины названия города, символов. */
+/** Предел длины названия города, символов (для названий, которые вводит игрок). */
 export const CITY_NAME_MAX = 24;
 
-const CITY_NAMES: readonly string[] = [
-  'Новоград',
-  'Ветрогорск',
-  'Светлоярск',
-  'Заречье',
-  'Каменск',
-  'Озёрный',
-  'Белоярск',
-  'Дубрава',
-  'Медвежьи Горы',
-  'Соколов',
-  'Северная Гавань',
-  'Золотая Нива',
-  'Ольховка',
-  'Липки',
-  'Звонкий Ключ',
-  'Речной Брод',
-  'Ясная Поляна',
-  'Остров Ветров',
-  'Малиновка',
-  'Грозовой Перевал',
-  'Туманный Мыс',
-  'Рябиновка',
-  'Железный Холм',
-  'Вересковая',
-  'Серебряный Бор',
-  'Лисий Нос',
-  'Орлиное Гнездо',
-  'Сосновый Бор',
-  'Янтарный',
-  'Тихая Заводь',
-  'Кедровый',
-  'Журавли',
-  'Радужный',
-  'Берёзов',
-  'Стальной',
-  'Крутояр',
-  'Лазурный Берег',
-  'Мирный',
-  'Полярный',
-  'Степной',
-  'Лесогорск',
-  'Горностай',
-  'Зелёный Яр',
-  'Каменный Мост',
-  'Соловьи',
-  'Холмогоры',
-  'Приморск',
-  'Заря',
-  'Волчий Лог',
-  'Алые Паруса',
-];
+/** Государств в таблице; у каждого свой список городов. Должно совпадать с таблицей клиента. */
+export const NATION_COUNT = 12;
+/** Городов в списке одного государства: сначала столица, дальше основанные города по порядку. */
+export const NATION_CITY_COUNT = 10;
+/** Размеры таблиц составных названий (начало слова + окончание): «Бело» + «горск». */
+export const GEN_PREFIX_COUNT = 24;
+export const GEN_SUFFIX_COUNT = 16;
+
+/** Целочисленный хэш трёх чисел (без Math.random): одинаков на сервере и в браузере. */
+function hash32(a: number, b: number, c: number): number {
+  let h = (a | 0) ^ Math.imul(b | 0, 0x9e3779b1) ^ Math.imul(c | 0, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
+  return (h ^ (h >>> 16)) >>> 0;
+}
 
 /**
- * Свободное название города: с места, заданного зерном матча и id, первое, которого ещё нет ни у
- * одного города. Если все заняты — к названию добавляется номер круга.
- * @returns название длиной не больше CITY_NAME_MAX
+ * Государство игрока в матче: перестановка государств от зерна, игрок `i` берёт `i`-е. Когда игроков
+ * больше, чем государств, они повторяются со следующим «кругом» (II, III… в названии).
+ * @returns номер государства и круг (0 — первый)
  */
-export function pickCityName(seed: number, cityId: number, cities: readonly City[]): string {
+export function nationOf(seed: number, playerId: number): { nation: number; lap: number } {
+  const order = Array.from({ length: NATION_COUNT }, (_, i) => i).sort(
+    (a, b) => hash32(seed, a, 77) - hash32(seed, b, 77) || a - b,
+  );
+  return {
+    nation: order[playerId % NATION_COUNT] ?? 0,
+    lap: intDiv(playerId, NATION_COUNT),
+  };
+}
+
+/** Название бота: код государства, клиент покажет «Российская империя» и пометит бота подчёркиванием. */
+export function botName(seed: number, playerId: number): string {
+  const { nation, lap } = nationOf(seed, playerId);
+  return `~b:${nation}:${lap}`;
+}
+
+/**
+ * Свободное название города. Город игрока берёт следующее по порядку из списка его государства,
+ * ничей город и переполнение списка — составное слово по хэшу зерна и id. Уже занятые пропускаются.
+ * @param owner игрок-владелец; `null` — ничей город
+ * @returns код названия
+ */
+export function pickCityName(
+  seed: number,
+  cityId: number,
+  cities: readonly City[],
+  owner: number | null = null,
+): string {
   const used = new Set(cities.map((c) => c.name));
-  const start = (seed + cityId * 7) % CITY_NAMES.length;
-  for (let lap = 0; lap < 100; lap += 1) {
-    for (let k = 0; k < CITY_NAMES.length; k += 1) {
-      const base = CITY_NAMES[(start + k) % CITY_NAMES.length] as string;
-      const name = lap === 0 ? base : `${base} ${lap + 1}`;
-      if (!used.has(name)) return name.slice(0, CITY_NAME_MAX);
+  if (owner !== null && owner >= 0) {
+    const { nation } = nationOf(seed, owner);
+    for (let index = 0; index < NATION_CITY_COUNT; index += 1) {
+      const code = `~n:${nation}:${index}`;
+      if (!used.has(code)) return code;
     }
   }
-  return `Город ${cityId}`;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const h = hash32(seed, cityId, attempt);
+    const code = `~g:${h % GEN_PREFIX_COUNT}:${intDiv(h, GEN_PREFIX_COUNT) % GEN_SUFFIX_COUNT}`;
+    if (!used.has(code)) return code;
+  }
+  return `~g:0:${cityId % GEN_SUFFIX_COUNT}`;
 }

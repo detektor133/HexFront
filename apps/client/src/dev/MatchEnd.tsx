@@ -1,6 +1,7 @@
 import type { PlayerView, WinReason } from '@hexfront/sim';
 
 import { matchStatistics } from './match-end.ts';
+import { localName } from '../i18n/names.ts';
 import { MatchEndScreen } from '../match/MatchEndScreen.tsx';
 
 export function MatchEnd(props: {
@@ -19,7 +20,9 @@ export function MatchEnd(props: {
   const player = props.view.players[props.view.playerId];
   const eliminated = props.spectating !== true && player?.status !== 'alive';
   if (props.view.winner < 0 && !eliminated) return null;
-  const names = new Map(props.view.players.map((p) => [p.id, p.name]));
+  const names = new Map(
+    props.view.players.map((p) => [p.id, p.name === undefined ? p.name : localName(p.name)]),
+  );
   const nameOf = (id: number): string => names.get(id) ?? '#' + String(id + 1);
   const rows = [...(props.view.ranking ?? [])]
     .sort((a, b) => a.place - b.place || a.id - b.id)

@@ -11,6 +11,7 @@ import {
   FP,
   hexPopCap,
   botCommands,
+  botName,
   commanderCommands,
   createMatch,
   createBotTickContext,
@@ -90,7 +91,7 @@ export function createLocalEngine(
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({
-    name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
+    name: i === HUMAN_ID ? playerName || 'Игрок 1' : botName(seed, i),
     ...(i === HUMAN_ID && spawn !== undefined ? (freeStarts ? { start: spawn } : { spawn }) : {}),
   }));
   const state = createMatch(loaded.map, setup, seed, {

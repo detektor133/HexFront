@@ -28,6 +28,7 @@ import {
   strengthVs,
 } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -89,7 +90,7 @@ export function TerritoryMenu(props: {
   const atWar = !neutral && (view.diplomacy?.relations[other] ?? 'war') === 'war';
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
   const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - height - EDGE));
-  const name = neutral ? t('menu.neutral') : (player?.name ?? '');
+  const name = neutral ? t('menu.neutral') : localName(player?.name ?? '');
   const go = (command: Command): void => {
     send(command);
     onClose();

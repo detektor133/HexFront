@@ -118,7 +118,12 @@ describe('вход и набор', () => {
     expect(a.of('start')).toHaveLength(1);
     expect(b.count('snapshot')).toBe(1);
     const room = hub.roomById(a.of('welcome')[0]?.room ?? '');
-    expect(room?.state?.players.map((p) => p.name).slice(0, 3)).toEqual(['Аня', 'Борис', 'Бот 1']);
+    expect(room?.state?.players.map((p) => p.name).slice(0, 3)).toEqual([
+      'Аня',
+      'Борис',
+      room?.state?.players[2]?.name,
+    ]);
+    expect(room?.state?.players[2]?.name).toMatch(/^~b:\d+:0$/);
     expect(room?.state?.players).toHaveLength(SIZE);
   });
 

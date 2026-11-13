@@ -45,6 +45,7 @@ import {
 } from './telemetry.ts';
 import { createPickedState, createSandboxPicker, tapUnit } from './unit-selection.ts';
 import { reasonText, t } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { ControlGroups } from '../input/control-groups.ts';
 import { createHotkeyHandler } from '../input/hotkeys.ts';
 import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
@@ -559,7 +560,7 @@ export function SandboxSurface({ debug = false }: { debug?: boolean } = {}): Rea
       <EventFeed
         items={sb.events}
         offers={view?.diplomacy?.incoming ?? []}
-        nameOf={(id) => view?.players[id]?.name ?? String(id + 1)}
+        nameOf={(id) => localName(view?.players[id]?.name ?? String(id + 1))}
         send={sb.send}
         graceLeftS={view?.me.graceLeftS}
         {...(view ? { localPlayerId: view.playerId } : {})}

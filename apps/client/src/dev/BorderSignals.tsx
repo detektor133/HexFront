@@ -8,6 +8,7 @@ import { OrderSplit } from './OrderSplit.tsx';
 import { autoArmy, autoOrder, contacts, orderArmy } from './army-order.ts';
 import type { EventFeedItem } from './event-feed.ts';
 import { t } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
@@ -165,7 +166,7 @@ export function BorderSignals(props: {
     <>
       {open.map(({ other, hex, war, held }) => {
         const color = tokens.players.palette[other]?.line ?? tokens.ui.ink;
-        const name = view.players[other]?.name ?? String(other + 1);
+        const name = localName(view.players[other]?.name ?? String(other + 1));
         return (
           <div
             key={other}

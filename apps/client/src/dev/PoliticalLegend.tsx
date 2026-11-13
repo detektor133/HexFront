@@ -2,6 +2,7 @@ import type { PlayerView } from '@hexfront/sim';
 
 import styles from './PoliticalLegend.module.css';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { politicalKind, politicalLine, type PoliticalKind } from '../render/political.ts';
 
 interface Group {
@@ -20,7 +21,7 @@ function groups(view: PlayerView): Group[] {
     const kind = politicalKind(view, p.id);
     const bloc = d?.blocs[p.id] ?? p.id;
     const key = kind === 'bloc' ? `bloc:${bloc}` : kind;
-    const name = p.id === view.playerId ? t('vote.you') : (p.name ?? String(p.id + 1));
+    const name = p.id === view.playerId ? t('vote.you') : localName(p.name ?? String(p.id + 1));
     const group = out.get(key) ?? { kind, color: politicalLine(view, p.id), members: [] };
     group.members.push(name);
     out.set(key, group);

@@ -33,6 +33,7 @@ import {
   intDiv,
   isAllied,
   planStarts,
+  botName,
   playerView,
   previewPath,
   selectionFor,
@@ -816,7 +817,7 @@ export class Room {
     const setup = Array.from({ length: size }, (_, i) => {
       const seat = this.seats[i];
       return {
-        name: seat?.nick ?? `Бот ${i - this.seats.length + 1}`,
+        name: seat?.nick ?? botName(seed, i),
         ...(seat?.spawn === null || seat === undefined ? {} : { start: seat.spawn }),
       };
     });

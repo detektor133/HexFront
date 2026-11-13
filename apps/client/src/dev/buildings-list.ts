@@ -10,6 +10,8 @@ import {
   type PlayerView,
 } from '@hexfront/sim';
 
+import { localName } from '../i18n/names.ts';
+
 export interface CityRow {
   readonly id: number;
   readonly hex: number;
@@ -56,7 +58,7 @@ export function buildingsList(view: PlayerView): BuildingsList {
     .map((c): CityRow => ({
       id: c.id,
       hex: c.hex,
-      name: c.name,
+      name: localName(c.name),
       level: c.level,
       isCapital: c.isCapital,
       isolated: c.isolated,

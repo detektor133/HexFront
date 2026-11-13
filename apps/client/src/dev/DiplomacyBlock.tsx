@@ -14,6 +14,7 @@ import type { Command, PlayerView, Relation, TreatyKind } from '@hexfront/sim';
 
 import styles from './DiplomacyBlock.module.css';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { localName } from '../i18n/names.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
 /** Подпись входящего предложения по виду договора. */
@@ -52,7 +53,7 @@ export function DiplomacyBlock(props: {
   const violations = d.violations[other] ?? 0;
   const incoming = d.incoming.find((o) => o.from === other);
   const outgoing = d.outgoing.some((o) => o.to === other);
-  const name = view.players[other]?.name ?? `${t('observer.player')} ${other + 1}`;
+  const name = localName(view.players[other]?.name ?? `${t('observer.player')} ${other + 1}`);
   const relationText = t(`diplomacy.rel.${relation}` as MessageKey);
   return (
     <div className={styles.block} aria-label={t('diplomacy.title')}>

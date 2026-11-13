@@ -21,7 +21,7 @@ function complete(state: MatchState, c: Construction): void {
         hex: c.hex,
         owner: c.owner,
         level: 1,
-        name: pickCityName(state.seed, state.nextId, state.cities),
+        name: pickCityName(state.seed, state.nextId, state.cities, c.owner),
         // Новый город получает полное ополчение (03-cities-buildings.md, «Захват города»).
         defenders: MILITIA_PER_LEVEL,
         defenseOrg: ORG_MAX,

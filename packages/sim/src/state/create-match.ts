@@ -53,13 +53,15 @@ function emptyState(map: MapStatic, seed: number, options: MatchOptions): MatchS
     hex: hexId(c, map.width),
     owner: NEUTRAL,
     level: c.level,
-    name: c.name,
+    // Имя из файла карты одинаково на всех картах; настоящее — код, который клиент покажет на языке игрока.
+    name: '',
     // Ничьи города без гарнизона: ценность города в уровне и экономике, а не в обороне (решение владельца).
     defenders: 0 as Fp,
     defenseOrg: ORG_MAX,
     inBattle: false,
     captureTicks: 0,
   }));
+  for (const city of cities) city.name = pickCityName(seed >>> 0, city.id, cities);
   const state: MatchState = {
     tick: 0,
     seed: seed >>> 0,
@@ -133,7 +135,7 @@ function addPlayer(state: MatchState, playerId: number, spawn: Hex, name: string
     hex: capital,
     owner: playerId,
     level: 1,
-    name: pickCityName(state.seed, cityId, state.cities),
+    name: pickCityName(state.seed, cityId, state.cities, playerId),
     defenders: MILITIA_PER_LEVEL,
     defenseOrg: ORG_MAX,
     inBattle: false,
