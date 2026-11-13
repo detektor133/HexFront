@@ -233,22 +233,25 @@ export function LobbyPanel(props: {
         </div>
       ) : (
         <>
-          <Clock seconds={info.startsInS} />
-          <p className={styles.status}>
-            {info.startsInS === null ? t('online.waitHost') : t('online.lookingFor')}
-          </p>
-          <Seats humans={info.humans} max={max} />
-          <p className={styles.count}>
-            <b>{`${info.humans} ${t('online.people')}`}</b>
-            <span>{` · ${Math.max(0, max - info.humans)} ${t('online.botsFill')}`}</span>
-          </p>
+          <div className={styles.top}>
+            <Clock seconds={info.startsInS} />
+            <div className={styles.topText}>
+              <p className={styles.status}>
+                {info.startsInS === null ? t('online.waitHost') : t('online.lookingFor')}
+              </p>
+              <p className={styles.count}>
+                <b>{`${info.humans} ${t('online.people')}`}</b>
+                <span>{` · ${Math.max(0, max - info.humans)} ${t('online.botsFill')}`}</span>
+              </p>
+              <Seats humans={info.humans} max={max} />
+            </div>
+          </div>
           {invite !== null && session !== null && (
             <div className={styles.invite}>
-              <span className={styles.inviteLabel}>{t('online.roomCode')}</span>
               <b className={styles.inviteCode} aria-label={t('online.roomCode')}>
                 {session.room.toUpperCase()}
               </b>
-              <button type="button" className={`${ui.action} ${styles.inviteCopy}`} onClick={copy}>
+              <button type="button" className={styles.inviteCopy} onClick={copy}>
                 {copied ? t('online.copied') : t('online.copyLink')}
               </button>
             </div>
@@ -256,6 +259,7 @@ export function LobbyPanel(props: {
           {isHost && mode === 'private' && (
             <>
               <Chips
+                dense
                 label={t('menu.difficulty')}
                 options={LOBBY_LEVELS.map((l) => ({
                   id: l,
@@ -265,13 +269,14 @@ export function LobbyPanel(props: {
                 onPick={(level) => clientRef.current?.configure({ level })}
               />
               <Chips
+                dense
                 label={t('menu.map')}
                 options={MAPS.map((m) => ({ id: m.id, text: t(`menu.map.${m.id}` as MessageKey) }))}
                 value={info.map}
                 onPick={(map) => clientRef.current?.configure({ map })}
               />
               {info.map === 'europe' && (
-                <div className={ui.group}>
+                <div className={`${ui.group} ${ui.dense}`}>
                   <div className={ui.groupLabel}>
                     {t('menu.players')}
                     <span>{info.max}</span>

@@ -190,3 +190,19 @@
 .holderArrow:focus-visible {
   background: var(--ui-surface);
 }
+
+/* Обёртка пробных форм меню: сама ничего не рисует, нужна для проверки «клик внутри». */
+.variantHost {
+  display: contents;
+}
+
+.styleSwitch {
+  padding: 0 var(--space-xs);
+  color: var(--ui-ink3);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  background: none;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}

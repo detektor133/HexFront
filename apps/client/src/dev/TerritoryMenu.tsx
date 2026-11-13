@@ -17,6 +17,14 @@ import { DiplomacyBlock } from './DiplomacyBlock.tsx';
 import splitStyles from './OrderSplit.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
 import styles from './TerritoryMenu.module.css';
+import {
+  DrawerMenu,
+  PillMenu,
+  RadialMenu,
+  TilesMenu,
+  type TerritoryAct,
+  type TerritoryCtx,
+} from './TerritoryVariants.tsx';
 import { armyName } from './army-name.ts';
 import {
   autoArmy,
@@ -27,6 +35,7 @@ import {
   strengthVs,
 } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
+import { nextMenuStyle, useMenuStyle } from '../settings/menu-style.ts';
 import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
@@ -71,6 +80,7 @@ export function TerritoryMenu(props: {
       if (event.key === 'Escape') onClose();
     };
     const onDown = (event: PointerEvent): void => {
+      // Другие формы меню (не окно) закрываются Esc и крестиком; клик мимо закрывает только окно.
       if (ref.current && !ref.current.contains(event.target as Node)) onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -81,6 +91,7 @@ export function TerritoryMenu(props: {
     };
   }, [onClose]);
   const [swapOpen, setSwapOpen] = useState<number | null>(null);
+  const [style, setStyle] = useMenuStyle();
   const neutral = other < 0;
   const player = neutral ? null : view.players[other];
   if (!neutral && (!player || player.status !== 'alive')) return null;
@@ -110,6 +121,88 @@ export function TerritoryMenu(props: {
   const strength = neutral ? null : strengthVs(view, other);
   const StrengthIcon =
     strength === 'stronger' ? IconChevronsUp : strength === 'weaker' ? IconChevronsDown : IconEqual;
+  const strengthNode = strength ? (
+    <span
+      className={`${styles.strength} ${styles[strength]}`}
+      title={t(`menu.strength.${strength}`)}
+    >
+      <StrengthIcon size={18} aria-hidden="true" />
+    </span>
+  ) : null;
+  if (style !== 'menu') {
+    const acts: TerritoryAct[] = [];
+    if (neutral) {
+      acts.push({
+        id: 'occupy',
+        label: t('menu.occupy'),
+        icon: <IconFlag size={22} aria-hidden="true" />,
+        run: () => free && go(orderArmy(view, free, -1, 'attack', hex)),
+        disabled: !free,
+        title: free ? t('menu.occupy') : t('order.noFree'),
+        tutorial: 'occupy',
+      });
+    } else {
+      const defend = holder?.dir?.mode === 'attack';
+      acts.push({
+        id: 'hold',
+        label:
+          holder === undefined
+            ? t('menu.holdShort')
+            : defend
+              ? t('menu.defend')
+              : t('menu.unfront'),
+        icon:
+          holder !== undefined && !defend ? (
+            <IconShieldOff size={22} aria-hidden="true" />
+          ) : (
+            <IconShield size={22} aria-hidden="true" />
+          ),
+        run: () =>
+          holder === undefined
+            ? go(autoOrder(view, map, other, 'hold', hex))
+            : defend
+              ? go(orderArmy(view, holder, other, 'hold'))
+              : go({ t: 'holdBorder', target: other, soldiers: 0 }),
+        disabled: false,
+        title: t('menu.holdShort'),
+        tutorial: 'hold',
+      });
+      acts.push({
+        id: 'attack',
+        label: t('menu.attack'),
+        icon: <IconSwords size={22} aria-hidden="true" />,
+        run: () => go(autoOrder(view, map, other, 'attack', hex)),
+        disabled: !atWar,
+        title: atWar ? t('menu.attack') : t('army.attackNeedWar'),
+        pressed: holder?.dir?.mode === 'attack',
+        tutorial: 'attack',
+      });
+    }
+    const ctx: TerritoryCtx = {
+      name,
+      color: neutral ? tokens.neutral.line : (tokens.players.palette[other]?.line ?? tokens.ui.ink),
+      strength: strengthNode,
+      acts,
+      diplomacy: neutral ? null : <DiplomacyBlock view={view} other={other} send={send} />,
+      at,
+      style,
+      onStyle: () => setStyle(nextMenuStyle(style)),
+      onClose,
+    };
+    const Form =
+      style === 'pill'
+        ? PillMenu
+        : style === 'radial'
+          ? RadialMenu
+          : style === 'tiles'
+            ? TilesMenu
+            : DrawerMenu;
+    return (
+      <div ref={ref} className={styles.variantHost}>
+        <Form ctx={ctx} />
+      </div>
+    );
+  }
   return (
     <div
       ref={ref}
@@ -128,14 +221,16 @@ export function TerritoryMenu(props: {
           }}
         />
         <span className={styles.name}>{name}</span>
-        {strength && (
-          <span
-            className={`${styles.strength} ${styles[strength]}`}
-            title={t(`menu.strength.${strength}`)}
-          >
-            <StrengthIcon size={18} aria-hidden="true" />
-          </span>
-        )}
+        {strengthNode}
+        <button
+          type="button"
+          className={styles.styleSwitch}
+          title={t('menu.styleSwitch')}
+          aria-label={t('menu.styleSwitch')}
+          onClick={() => setStyle(nextMenuStyle(style))}
+        >
+          1/5
+        </button>
         <IconButton label={t('menu.close')} className={styles.close} onClick={onClose}>
           <IconX size={18} aria-hidden="true" />
         </IconButton>

@@ -286,6 +286,28 @@
   gap: var(--space-sm);
 }
 
+/* Тесная строка настройки: подпись слева, кнопки справа, ниже обычных. */
+.dense {
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.dense .chips {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.dense .chip {
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 6px;
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reserved {
   visibility: hidden;
 }
@@ -456,5 +478,11 @@
 
   .panel {
     max-height: calc(100dvh - 2 * var(--space-sm));
+  }
+}
+
+@media (max-height: 520px) {
+  .dense .chip {
+    min-height: 30px;
   }
 }

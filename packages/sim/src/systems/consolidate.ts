@@ -107,6 +107,9 @@ export function consolidate(state: MatchState): void {
     const total = soldiersOf.get(units[0]?.owner ?? -1) ?? 0;
     const cap = unitCap(total);
     const below = Math.max(MERGE_SMALL_BELOW, intDiv(cap, 2));
+    // Армия на линии не бегает за слиянием через всю линию: её мелочь сливается рядом (в своём гексе
+    // и соседнем), иначе отряд бросал бы своё место, а остальные перестраивались бы на его замену.
+    const radius = isPlanned ? 1 : MERGE_SMALL_RADIUS;
     const crowded = surplus && (crowd.get(units[0]?.owner ?? -1) ?? 0) > CONSOLIDATE_CROWD;
     const calm = (u: Unit): boolean => crowded && !nearFoe(u);
     const small = units.filter(
@@ -129,7 +132,7 @@ export function consolidate(state: MatchState): void {
         if (a.soldiers + b.soldiers + (incoming.get(b.id) ?? 0) > cap) continue;
         if (recentlyLeft(state, a, b.hex)) continue;
         const d = distance(at, hexFromId(b.hex, width));
-        if (d <= MERGE_SMALL_RADIUS && d < bestD) {
+        if (d <= radius && d < bestD) {
           best = b;
           bestD = d;
         }

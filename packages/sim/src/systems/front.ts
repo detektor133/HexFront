@@ -5,6 +5,7 @@
 import { consolidate } from './consolidate.ts';
 import { maintainDirections } from './direction.ts';
 import {
+  DETACH_REJOIN_TICKS,
   FRONT_ALLOC_TICKS,
   FRONT_HOLD_DENOM,
   FRONT_ROUTES_PER_TICK,
@@ -16,7 +17,7 @@ import { mergeUnits, splitUnit } from '../commands/unit.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { findPath } from '../queries/unit-path.ts';
-import { allocate, planControls } from '../state/allocate.ts';
+import { SLOT_DETACHED, allocate, planControls } from '../state/allocate.ts';
 import { planHexes } from '../state/front.ts';
 import { atWar } from '../state/relations.ts';
 import { recentlyLeft } from '../state/return-lock.ts';
@@ -175,11 +176,23 @@ function autoMerge(state: MatchState, plan: ArmyPlan): void {
   }
 }
 
+// Отряд, снятый с плана ручным приказом, простоял без шага и боя DETACH_REJOIN_TICKS — план берёт
+// его обратно (иначе после своей атаки он навсегда оставался бы на месте приказа).
+function rejoinIdle(state: MatchState, armyId: number): void {
+  for (const u of allUnits(state)) {
+    if (u.armyId !== armyId || u.slot !== SLOT_DETACHED) continue;
+    if (u.order !== 'idle' || u.inBattle || u.sea) continue;
+    if (u.cameTick !== undefined && state.tick - u.cameTick < DETACH_REJOIN_TICKS) continue;
+    u.slot = -1;
+  }
+}
+
 function runPlan(state: MatchState, armyId: number): void {
   const plan = state.plans.find((p) => p.armyId === armyId);
   if (!plan) return;
   const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
   if (owner === undefined) return;
+  rejoinIdle(state, armyId);
   autoMerge(state, plan);
   coverLine(state, armyId, owner);
   const next = allocate(state, plan, owner);

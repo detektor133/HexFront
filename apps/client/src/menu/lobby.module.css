@@ -1,6 +1,23 @@
 /* Лобби внутри меню: кольцо отсчёта, места-точки, подключение. Остальное — из menu-ui. */
+/* Лобби компактнее обычной панели: шире и теснее, чтобы помещаться без прокрутки. */
 .lobby {
   justify-items: stretch;
+  gap: var(--space-sm);
+  width: min(100%, 420px);
+  padding: var(--space-md);
+}
+
+/* Верх: кольцо отсчёта слева, состояние набора справа. */
+.top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.topText {
+  display: grid;
+  gap: var(--space-xs);
 }
 
 .connecting {
@@ -32,9 +49,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 148px;
-  height: 148px;
-  margin: 0 auto;
+  width: 84px;
+  height: 84px;
 }
 
 .ring {
@@ -75,7 +91,7 @@
 
 .number {
   font-family: var(--font-display-family);
-  font-size: 48px;
+  font-size: 28px;
   font-weight: var(--font-display-weight);
   animation: tick 400ms var(--motion-easing);
 }
@@ -89,20 +105,18 @@
 
 .status {
   margin: 0;
-  text-align: center;
   color: var(--ui-ink2);
 }
 
 .seats {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .seat {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   box-sizing: border-box;
   border: 2px dashed var(--ui-border-strong);
   border-radius: 50%;
@@ -121,39 +135,43 @@
 
 .count {
   margin: 0;
-  text-align: center;
 }
 
 .count span {
   color: var(--ui-ink2);
 }
 
+/* Код комнаты и «Скопировать» в одну строку. */
 .invite {
   display: grid;
-  justify-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-md);
   background: var(--ui-surface2);
   border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
   border-radius: var(--radius-button);
 }
 
-.inviteLabel {
-  color: var(--ui-ink2);
-  font-size: var(--font-size-caption);
-}
-
 .inviteCode {
   font-family: var(--font-display-family);
-  font-size: 32px;
+  font-size: 24px;
   font-weight: var(--font-display-weight);
   letter-spacing: 0.16em;
   user-select: all;
 }
 
 .inviteCopy {
-  justify-content: center;
-  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  color: var(--ui-ink);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
 }
 
 .error {
@@ -170,5 +188,26 @@
   .number,
   .seat.taken {
     animation: none;
+  }
+}
+
+/* Низкий экран (телефон в ландшафте): точки мест и крупные отступы лишние. */
+@media (max-height: 520px) {
+  .seats {
+    display: none;
+  }
+
+  .clock {
+    width: 64px;
+    height: 64px;
+  }
+
+  .number {
+    font-size: 22px;
+  }
+
+  .lobby {
+    gap: 6px;
+    padding: var(--space-sm) var(--space-md);
   }
 }

@@ -38,6 +38,7 @@
 | `BOT_WAR_WEARY_TICKS`        | 6000 (10 мин) `[ТЮНИНГ]` |
 | `BOT_PEACE_LOCK_TICKS`       | 3000 (5 мин) `[ТЮНИНГ]` |
 | `BOT_PACT_MIN_TICKS`         | 1800 (3 мин) `[ТЮНИНГ]` |
+| `DETACH_REJOIN_TICKS`        | 200 (20 с) `[ТЮНИНГ]`   |
 | `BOT_SPLIT_MIN_SOLDIERS`     | 600 `[ТЮНИНГ]`          |
 | `BOT_RESTLESS_START_TICKS`   | 3000 (5 мин покоя) `[ТЮНИНГ]` |
 | `BOT_RESTLESS_RAMP_TICKS`    | 3000 (рост нетерпения до полного) `[ТЮНИНГ]` |

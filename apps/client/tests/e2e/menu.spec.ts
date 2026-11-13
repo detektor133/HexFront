@@ -245,3 +245,72 @@ test('@layout «Смотреть» по коду комнаты ведёт в м
   expect(hellos[0]).toMatchObject({ room: 'k7qf', spectate: true });
   await context.close();
 });
+
+for (const size of [
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+  { width: 844, height: 390 },
+]) {
+  test(`@layout лобби хозяина (Европа) ${size.width}×${size.height}: без вертикальной прокрутки`, async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const context = await browser.newContext({ viewport: size });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      localStorage.setItem('hexfront.tutorialAsked', '1');
+      localStorage.setItem('hexfront.nickname', 'Danil');
+    });
+    await page.routeWebSocket('ws://127.0.0.1:9996/**', (ws) => {
+      ws.onMessage(() => {
+        ws.send(
+          JSON.stringify({
+            t: 'welcome',
+            playerId: 0,
+            token: 'abc',
+            room: 'K7QF',
+            tickMs: 100,
+            map: 'europe',
+            seed: 42,
+            players: 12,
+            fog: true,
+          }),
+        );
+        ws.send(
+          JSON.stringify({
+            t: 'lobby',
+            info: {
+              room: 'K7QF',
+              humans: 1,
+              max: 12,
+              startsInS: null,
+              open: false,
+              level: 'hard',
+              map: 'europe',
+            },
+            host: true,
+          }),
+        );
+      });
+    });
+    await page.route('http://127.0.0.1:9996/healthz*', (route) =>
+      route.fulfill({
+        json: { ok: true, humans: 3 },
+        headers: { 'access-control-allow-origin': '*' },
+      }),
+    );
+    await page.goto('/?server=ws://127.0.0.1:9996', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /Онлайн|Online/ }).click();
+    await page.getByRole('button', { name: /Создать лобби|Create lobby/ }).click();
+    await expect(page.getByRole('button', { name: /Начать сейчас|Start now/ })).toBeVisible({
+      timeout: 10_000,
+    });
+    const lobby = page.locator('[class*="lobby"]').first();
+    const metrics = await lobby.evaluate((el) => ({
+      scroll: el.scrollHeight,
+      client: el.clientHeight,
+    }));
+    expect(metrics.scroll).toBeLessThanOrEqual(metrics.client);
+    await context.close();
+  });
+}

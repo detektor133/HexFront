@@ -96,9 +96,11 @@ export function Chips<T extends string>(props: {
   readonly options: readonly { readonly id: T; readonly text: string }[];
   readonly value: T;
   readonly onPick: (id: T) => void;
+  /** Тесная строка: подпись слева, кнопки справа (лобби). */
+  readonly dense?: boolean;
 }): React.JSX.Element {
   return (
-    <div className={styles.group}>
+    <div className={`${styles.group} ${props.dense === true ? styles.dense : ''}`}>
       <div className={styles.groupLabel}>{props.label}</div>
       <div className={styles.chips} role="radiogroup" aria-label={props.label}>
         {props.options.map((o) => (
