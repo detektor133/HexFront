@@ -1,10 +1,8 @@
-import {
-  FP,
-  TICKS_PER_S,
-  VICTORY_CITY_SHARE,
-  type WinReason,
-} from '../../../packages/sim/src/index.ts';
+import { FP, TICKS_PER_S, type WinReason } from '../../../packages/sim/src/index.ts';
 import { intDiv } from '../../../packages/sim/src/math/int.ts';
+
+/** Доля городов, по которой считается прогресс особи в фитнесе (не правило победы). */
+export const CITY_PROGRESS_SHARE = 700;
 
 export interface AcceptanceTick {
   readonly gold: readonly number[];
@@ -75,7 +73,7 @@ export function calculateBotAcceptance(
 export function calculateFitness(metrics: FitnessMetrics): number {
   const goldPenalty = calculatePenalty(metrics.maxGoldOver5000S, 120);
   const unitPenalty = calculatePenalty(metrics.maxUnitUnder10S, 30);
-  const neededCities = Math.ceil((VICTORY_CITY_SHARE * metrics.totalCities) / FP);
+  const neededCities = Math.ceil((CITY_PROGRESS_SHARE * metrics.totalCities) / FP);
   const progress =
     neededCities > 0 ? intDiv(3000 * Math.min(metrics.cities, neededCities), neededCities) : 0;
   return (

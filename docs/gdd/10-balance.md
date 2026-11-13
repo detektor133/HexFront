@@ -294,7 +294,7 @@
 | Константа                                             | Значение   |
 | ----------------------------------------------------- | ---------- |
 | `VISION_TERRITORY` / `_UNIT` / `_CITY`                | 2 / 3 / 3  |
-| `VICTORY_CITY_SHARE`                                  | 0,70       |
+| `VICTORY_LAND_SHARE`                                  | 0,80       |
 | `VICTORY_HOLD_S`                                      | 60         |
 | `SCORE_CITY` / `SCORE_HEX` / `SCORE_PER_100_SOLDIERS` | 10 / 1 / 1 |
 | `DISCONNECT_BOT_TAKEOVER_S`                           | 30         |

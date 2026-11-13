@@ -46,7 +46,7 @@ describe('07/T17at: фильтр ленты событий', () => {
       { t: 'recruitCancelled', playerId: 0, cityId: 9, type: 'infantry' },
       { t: 'playerEliminated', playerId: 0 },
       { t: 'offensiveDone', playerId: 0, armyId: 10 },
-      { t: 'matchWon', playerId: 0, reason: 'cities' },
+      { t: 'matchWon', playerId: 0, reason: 'land' },
       { t: 'constructionDone', playerId: 0, kind: 'depot', hex: 11 },
       { t: 'constructionCancelled', playerId: 0, kind: 'depot', hex: 12 },
     ] as GameEvent[];

@@ -149,32 +149,32 @@ describe('выбывание', () => {
 });
 
 describe('победа', () => {
-  it('≥ 70 % городов 60 с подряд', () => {
+  it('≥ 80 % суши 60 с подряд', () => {
     const s = scenario(
       `
-      A1 r  A2 r  A3 ~  B1 b
+      A1 r  A2 r  A3 a  a  a  B1 b
     `,
       { legend },
     );
-    // У A 3 города из 4 — 75 %.
+    // У A 8 гексов суши из 10 — 80 %; города не считаются.
     s.runSeconds(59);
     expect(s.state.winner).toBe(-1);
     s.runSeconds(2);
     expect(s.state.winner).toBe(0);
-    expect(s.lastEvent('matchWon')).toMatchObject({ playerId: 0, reason: 'cities' });
+    expect(s.lastEvent('matchWon')).toMatchObject({ playerId: 0, reason: 'land' });
   });
 
-  it('потеря доли городов сбрасывает отсчёт', () => {
+  it('потеря доли суши сбрасывает отсчёт', () => {
     const s = scenario(
       `
-      A1 r  A2 r  A3 ~  B1 b
+      A1 r  A2 r  A3 a  a  a  B1 b
     `,
       { legend },
     );
     s.runSeconds(40);
-    s.setOwner(at(4, 0), 'B');
+    s.setOwner(at(7, 0), 'B');
     s.runTicks(1);
-    s.setOwner(at(4, 0), 'A');
+    s.setOwner(at(7, 0), 'A');
     s.runSeconds(40);
     expect(s.state.winner).toBe(-1);
   });
@@ -204,18 +204,17 @@ describe('победа', () => {
     expect(s.state.winner).toBe(-1);
   });
 
-  it('все города карты у одного игрока — победа сразу, без отсчёта 60 с', () => {
+  it('города победу не дают: захват всех при малой доле суши не завершает матч', () => {
     const s = scenario(
       `
-      A1 r  A2 ~  B1 b
+      A1 r  A2 ~  B1 b  b  b  b  b  b  b  b
     `,
       { legend },
     );
     s.unit('B', 'infantry', 50, at(4, 0));
     s.setOwner(at(4, 0), 'A');
-    s.runTicks(2);
-    expect(s.state.winner).toBe(0);
-    expect(s.lastEvent('matchWon')).toMatchObject({ playerId: 0, reason: 'allCities' });
+    s.runSeconds(30);
+    expect(s.state.winner).toBe(-1);
   });
 
   it('коалиция: все живые — союзники, побеждают вместе', () => {

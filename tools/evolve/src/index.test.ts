@@ -171,7 +171,7 @@ describe('эволюция весов бота', () => {
     }));
     const acceptance = calculateBotAcceptance(ticks, {
       winner: 0,
-      winReason: 'cities',
+      winReason: 'land',
       endTick: ticks.length,
     });
 

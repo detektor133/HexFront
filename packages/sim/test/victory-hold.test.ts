@@ -3,18 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { playerView } from '../src/queries/player-view.ts';
 import type { MatchState } from '../src/state/types.ts';
 import { step } from '../src/step.ts';
-import { city, scenario } from './scenario/dsl.ts';
+import { city, own, scenario } from './scenario/dsl.ts';
 
 function stateWithCities(): MatchState {
   const s = scenario(
     `
-      A1  A2  A3  B1  .  .  .
+      A1  A2  A3  a  a  a  a  a  a  a  B1
     `,
     {
       legend: {
         A1: city('A', 1, { capital: true }),
         A2: city('A', 1),
         A3: city('A', 1),
+        a: own('A'),
         B1: city('B', 1, { capital: true }),
       },
     },
@@ -23,7 +24,7 @@ function stateWithCities(): MatchState {
 }
 
 describe('victoryHold в playerView', () => {
-  it('критерий: игрок, держащий ≥ 70 % городов, попадает в victoryHold', () => {
+  it('критерий: игрок, держащий ≥ 80 % суши, попадает в victoryHold', () => {
     const state = stateWithCities();
     step(state, []);
     const view = playerView(state, 0) as typeof playerView extends (...args: never[]) => infer R
@@ -33,7 +34,7 @@ describe('victoryHold в playerView', () => {
     expect(view.victoryHold).toEqual({ player: 0, seconds: 59 });
   });
 
-  it('критерий: при отсутствии игрока, держащего ≥ 70 % городов, victoryHold равен null', () => {
+  it('критерий: при отсутствии игрока, держащего ≥ 80 % суши, victoryHold равен null', () => {
     const state = scenario(
       `
         A1  B1  .  .

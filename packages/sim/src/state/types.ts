@@ -347,7 +347,7 @@ export type GameEvent =
     };
 
 /** Как выиграна партия (08-match.md, «Победа»). */
-export type WinReason = 'cities' | 'allCities' | 'lastStanding' | 'coalition';
+export type WinReason = 'land' | 'lastStanding' | 'coalition';
 
 /** Отношение пары игроков (дипломатия, CR-007). */
 export type Relation = 'peace' | 'war' | 'pact' | 'defense' | 'alliance';
@@ -468,7 +468,7 @@ export interface MatchState {
   winner: number;
   /** Матч-урок: победа не фиксируется. */
   noVictory?: boolean;
-  /** Игрок, держащий ≥ VICTORY_CITY_SHARE городов, и оставшиеся тики; -1 — никто. */
+  /** Игрок, держащий ≥ VICTORY_LAND_SHARE суши, и оставшиеся тики; -1 — никто. */
   holdPlayer: number;
   holdTicks: number;
 }

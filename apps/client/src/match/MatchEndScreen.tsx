@@ -50,8 +50,7 @@ export interface MatchEndScreenProps {
 }
 
 function victoryReason(reason: WinReason | undefined): string {
-  if (reason === 'cities') return t('match.reason.cities');
-  if (reason === 'allCities') return t('match.reason.allCities');
+  if (reason === 'land') return t('match.reason.land');
   if (reason === 'coalition') return t('match.reason.coalition');
   return t('match.reason.lastStanding');
 }

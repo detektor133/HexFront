@@ -13,12 +13,12 @@ import {
   playerPlaces,
   playerScores,
   step,
-  VICTORY_CITY_SHARE,
   type MatchState,
   type WinReason,
 } from '../../../packages/sim/src/index.ts';
 import type { MapStatic } from '../../../packages/sim/src/map/types.ts';
 import {
+  CITY_PROGRESS_SHARE,
   calculateBotAcceptance,
   calculateExamFitness,
   calculateFitness,
@@ -173,7 +173,7 @@ export function evaluateMatch(
       unitUnder10S: acceptance.unitUnder10SByPlayer[actualCandidateSlot] ?? 0,
       won:
         state.winner === actualCandidateSlot &&
-        (winReason === 'cities' || winReason === 'lastStanding'),
+        (winReason === 'land' || winReason === 'lastStanding'),
       cities: state.cities.filter((city) => city.owner === actualCandidateSlot).length,
       totalCities: state.cities.length,
     }),
@@ -184,7 +184,7 @@ export function evaluateMatch(
     cities: state.cities.filter((city) => city.owner === actualCandidateSlot).length,
     won:
       state.winner === actualCandidateSlot &&
-      (winReason === 'cities' || winReason === 'lastStanding'),
+      (winReason === 'land' || winReason === 'lastStanding'),
   };
 }
 
@@ -209,8 +209,8 @@ export function evaluateExamMatch(
     ),
     0,
   );
-  const neededCities = Math.ceil((VICTORY_CITY_SHARE * state.cities.length) / FP);
-  const won = state.winner >= 0 && (winReason === 'cities' || winReason === 'lastStanding');
+  const neededCities = Math.ceil((CITY_PROGRESS_SHARE * state.cities.length) / FP);
+  const won = state.winner >= 0 && (winReason === 'land' || winReason === 'lastStanding');
   return {
     fitness: calculateExamFitness({
       won,
