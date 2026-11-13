@@ -20,6 +20,7 @@ import {
   type LobbyLevel,
   type LobbyMap,
   type MapMaskMode,
+  type MarkKind,
   type Query,
   type SnapshotMessage,
   type LobbyInfo,
@@ -78,6 +79,20 @@ export interface NetHandlers {
   onRejected?(seq: number, reason: string): void;
   onRefused?(reason: RefuseReason): void;
   onEnd?(winner: number, tick: number): void;
+  /** Сообщение чата (общее или личное). */
+  onChat?(message: ChatMessage): void;
+  /** Метка союзника или своя на карте. */
+  onMark?(from: number, hex: number, kind: MarkKind): void;
+  /** Хозяин вернул всех в лобби после матча. */
+  onRematch?(): void;
+}
+
+export interface ChatMessage {
+  readonly from: number;
+  readonly nick: string;
+  readonly text?: string;
+  readonly emoji?: number;
+  readonly to?: number;
 }
 
 export interface NetOptions {
@@ -272,8 +287,43 @@ export class NetClient {
   }
 
   /** Хозяин закрытой комнаты меняет сложность ботов и карту до старта. */
-  public configure(patch: { level?: LobbyLevel; map?: LobbyMap; players?: number }): void {
+  public configure(patch: {
+    level?: LobbyLevel;
+    map?: LobbyMap;
+    players?: number;
+    seed?: number;
+  }): void {
     this.send({ t: 'configure', ...patch });
+  }
+
+  /** Готовность к старту. */
+  public setReady(ready: boolean): void {
+    this.send({ t: 'ready', ready });
+  }
+
+  /** Хозяин передаёт комнату игроку `to`. */
+  public transfer(to: number): void {
+    this.send({ t: 'transfer', to });
+  }
+
+  /** Выбор стартовой точки; `null` — случайная. */
+  public pick(spawn: number | null): void {
+    this.send({ t: 'pick', spawn });
+  }
+
+  /** Хозяин возвращает всех в лобби после матча. */
+  public rematch(): void {
+    this.send({ t: 'rematch' });
+  }
+
+  /** Чат: текст или эмодзи, всем или игроку `to`. */
+  public chat(message: { text?: string; emoji?: number; to?: number }): void {
+    this.send({ t: 'chat', ...message });
+  }
+
+  /** Метка на карте для союзников. */
+  public mark(hex: number, kind: MarkKind): void {
+    this.send({ t: 'mark', hex, kind });
   }
 
   /** Хозяин закрытой комнаты запускает матч. */
@@ -432,6 +482,16 @@ export class NetClient {
       case 'end':
         this.ended = true;
         handlers?.onEnd?.(message.winner, message.tick);
+        return;
+      case 'chat':
+        handlers?.onChat?.(message);
+        return;
+      case 'mark':
+        handlers?.onMark?.(message.from, message.hex, message.kind);
+        return;
+      case 'rematch':
+        this.ended = false;
+        handlers?.onRematch?.();
         return;
       case 'pong': {
         const sample = this.clock.now() - message.at;

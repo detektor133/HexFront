@@ -4,24 +4,27 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import { CodeRow } from './CodeRow.tsx';
+import { MapPicker } from './MapPicker.tsx';
+import { Stepper } from './Stepper.tsx';
 import {
   LEVELS,
-  MAPS,
   NICK_MAX,
   guestNick,
-  PLAYERS_MAX,
-  PLAYERS_MIN,
-  PLAYERS_STEP,
   matchUrl,
+  maxPlayersOf,
+  randomGenSeed,
   nickProblem,
   type MenuSettings,
 } from './menu-config.ts';
 import styles from './menu-ui.module.css';
 import { t, type MessageKey } from '../i18n/dict.ts';
+import { loadOnlineSession } from '../net/online-session.ts';
 import { tokens } from '../theme/tokens.ts';
 import { tutorialUrl } from '../tutorial/links.ts';
 
 export type ModeId = 'online' | 'bots';
+
+const NO_TAKEN: ReadonlyMap<number, string> = new Map();
 
 export function modeName(mode: ModeId): string {
   return t(mode === 'online' ? 'menu.online' : 'menu.bots');
@@ -143,8 +146,15 @@ function Action(props: {
 function OnlineBody(props: { readonly go: (url: string) => void }): React.JSX.Element {
   return (
     <>
+      {loadOnlineSession() !== null && (
+        <Action
+          primary
+          label={t('lobby.backToMatch')}
+          onPress={() => props.go('/online?resume=1')}
+        />
+      )}
       <Action
-        primary
+        primary={loadOnlineSession() === null}
         label={t('menu.quick')}
         hint={t('menu.subOnline')}
         onPress={() => props.go('/online')}
@@ -172,43 +182,41 @@ function BotsBody(props: {
   readonly go: (url: string) => void;
 }): React.JSX.Element {
   const s = props.settings;
-  const chooser = MAPS.find((m) => m.id === s.map);
+  const max = maxPlayersOf(s.map);
+  const players = Math.min(s.players, max);
   return (
     <>
       <Action primary label={t('menu.play')} onPress={() => props.go(matchUrl(s))} />
-      <Chips
-        label={t('menu.map')}
-        options={MAPS.map((m) => ({ id: m.id, text: t(`menu.map.${m.id}` as MessageKey) }))}
-        value={s.map}
-        onPick={(map) => props.update({ map })}
+      <MapPicker
+        map={s.map}
+        editable
+        onMap={(map) =>
+          props.update({ map, players: Math.min(s.players, maxPlayersOf(map)), spawn: null })
+        }
+        seed={s.seed}
+        onOtherMap={() => props.update({ seed: randomGenSeed(s.seed), spawn: null })}
+        players={players}
+        spawn={s.spawn}
+        taken={NO_TAKEN}
+        onSpawn={(spawn) => props.update({ spawn })}
       />
+      <div className={`${styles.group} ${styles.dense}`}>
+        <div className={styles.groupLabel}>{t('menu.botsCount')}</div>
+        <Stepper
+          label={t('menu.botsCount')}
+          min={1}
+          max={max - 1}
+          value={players - 1}
+          onChange={(bots) => props.update({ players: bots + 1 })}
+        />
+      </div>
       <Chips
+        dense
         label={t('menu.difficulty')}
         options={LEVELS.map((l) => ({ id: l, text: t(`menu.difficulty.${l}` as MessageKey) }))}
         value={s.level}
         onPick={(level) => props.update({ level })}
       />
-      {/* Место под число игроков занято всегда: смена карты не должна двигать панель. */}
-      <div
-        className={`${styles.group} ${chooser?.choosePlayers === true ? '' : styles.reserved}`}
-        aria-hidden={chooser?.choosePlayers === true ? undefined : true}
-        inert={chooser?.choosePlayers === true ? undefined : true}
-      >
-        <div className={styles.groupLabel}>
-          {t('menu.players')}
-          <span>{s.players}</span>
-        </div>
-        <input
-          type="range"
-          className={styles.range}
-          min={PLAYERS_MIN}
-          max={PLAYERS_MAX}
-          step={PLAYERS_STEP}
-          value={s.players}
-          aria-label={t('menu.players')}
-          onChange={(event) => props.update({ players: Number(event.target.value) })}
-        />
-      </div>
     </>
   );
 }

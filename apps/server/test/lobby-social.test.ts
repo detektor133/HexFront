@@ -114,11 +114,12 @@ describe('«ещё раз»', () => {
     host.send({ t: 'start' });
     hub.tickAll();
     const room = hub.roomById(code);
+    const outsider = new Client(hub);
     if (room?.state) room.state.winner = 0;
     hub.tickAll();
     hub.tickAll();
     expect(hub.roomById(code)).toBeDefined();
-    friend.send({ t: 'rematch' });
+    outsider.send({ t: 'rematch' });
     expect(friend.of('rematch')).toHaveLength(0);
     host.send({ t: 'rematch' });
     expect(friend.of('rematch')).toHaveLength(1);

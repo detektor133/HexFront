@@ -60,6 +60,8 @@ interface Props {
   readonly onToggleBuildings: () => void;
   /** Колонка кнопок прячется за правый край экрана, торчит только ручка (телефон в портрете). */
   readonly drawer?: boolean;
+  /** Дополнительные кнопки в конце колонки (чат онлайн-матча). */
+  readonly extra?: React.ReactNode;
 }
 
 /** Правый нижний угол: молоточек (режим строительства) и режимы карты — обычная и снабжение. */
@@ -75,6 +77,7 @@ export function MapTools({
   buildingsOpen,
   onToggleBuildings,
   drawer = false,
+  extra,
 }: Props): React.JSX.Element {
   const hammerOn = build !== null;
   const [open, setOpen] = useState(false);
@@ -182,6 +185,7 @@ export function MapTools({
           >
             <IconUsersGroup size={22} stroke={1.75} />
           </IconButton>
+          {extra}
         </div>
       </div>
     </div>

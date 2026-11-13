@@ -1,18 +1,25 @@
 // Лобби онлайн-матча внутри главного меню: поверх живой карты, окном-«телевизором». Набор людей
 // (30 с) или приглашение друзей по ссылке, затем переход в матч.
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowLeft, IconCrown } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { LOBBY_LEVELS, type LobbyInfo, type RefuseReason } from '@hexfront/protocol';
 
 import { t, type MessageKey } from '../i18n/dict.ts';
 import { navigate } from '../nav.ts';
+import { MapPicker } from './MapPicker.tsx';
 import { Chips } from './MenuParts.tsx';
+import { Stepper } from './Stepper.tsx';
 import styles from './lobby.module.css';
-import { MAPS, PLAYERS_MAX, PLAYERS_MIN, PLAYERS_STEP } from './menu-config.ts';
+import { maxPlayersOf, randomGenSeed, type MenuMapId } from './menu-config.ts';
 import ui from './menu-ui.module.css';
 import { NetClient, realClock, webSocketTransport, type NetSession } from '../net/net-client.ts';
-import { saveOnlineSession, serverUrl } from '../net/online-session.ts';
+import {
+  clearOnlineSession,
+  loadOnlineSession,
+  saveOnlineSession,
+  serverUrl,
+} from '../net/online-session.ts';
 import { tokens } from '../theme/tokens.ts';
 
 /** Сколько секунд длится сбор: кольцо отсчёта пустеет за это время. */
@@ -25,6 +32,8 @@ export interface LobbyRequest {
   readonly room: string | null;
   /** Смотреть идущий матч этой комнаты, не занимая места. */
   readonly spectate?: boolean;
+  /** Вернуться на своё место по токену вкладки: в идущий матч или в лобби после «Ещё раз». */
+  readonly resume?: boolean;
 }
 
 /** Разбирает адрес вида `/online?mode=private` или `/online?room=КОД`. */
@@ -35,6 +44,7 @@ export function lobbyFromUrl(url: string): LobbyRequest | null {
     mode: target.searchParams.get('mode') === 'private' ? 'private' : 'open',
     room: target.searchParams.get('room'),
     ...(target.searchParams.get('spectate') === '1' ? { spectate: true } : {}),
+    ...(target.searchParams.get('resume') === '1' ? { resume: true } : {}),
   };
 }
 
@@ -122,14 +132,61 @@ function Seats(props: { readonly humans: number; readonly max: number }): React.
   );
 }
 
+/** Список людей в комнате: цвет, ник, хозяин, готовность; хозяин может передать комнату. */
+function Roster(props: {
+  readonly seats: LobbyInfo['seats'];
+  readonly me: number;
+  readonly isHost: boolean;
+  readonly onTransfer: (id: number) => void;
+}): React.JSX.Element {
+  const palette = tokens.players.palette;
+  return (
+    <ul className={styles.roster}>
+      {props.seats.map((seat) => (
+        <li key={seat.id} className={styles.person}>
+          <span
+            className={styles.dot}
+            style={{ backgroundColor: palette[seat.id % palette.length]?.line }}
+          />
+          <span className={styles.nick}>
+            {seat.nick}
+            {seat.id === props.me && <small>{' · ' + t('vote.you')}</small>}
+          </span>
+          {seat.host ? (
+            <span className={styles.tag}>{t('lobby.host')}</span>
+          ) : (
+            <span className={`${styles.tag} ${seat.ready ? styles.ready : ''}`}>
+              {seat.ready ? t('lobby.ready') : t('lobby.notReady')}
+            </span>
+          )}
+          {props.isHost && !seat.host && (
+            <button
+              type="button"
+              className={styles.crown}
+              title={t('lobby.makeHost')}
+              aria-label={`${t('lobby.makeHost')}: ${seat.nick}`}
+              onClick={() => props.onTransfer(seat.id)}
+            >
+              <IconCrown size={18} aria-hidden="true" />
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function LobbyPanel(props: {
   readonly request: LobbyRequest;
   readonly nick: string;
   readonly onClose: () => void;
+  /** Карта и зерно комнаты: фон меню показывает её. */
+  readonly onRoomMap?: (map: MenuMapId, seed: number) => void;
   readonly className: string;
 }): React.JSX.Element {
   const { mode, room } = props.request;
   const spectate = props.request.spectate === true;
+  const resume = props.request.resume === true;
   const [info, setInfo] = useState<LobbyInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<NetSession | null>(null);
@@ -149,6 +206,7 @@ export function LobbyPanel(props: {
       return;
     }
     let handedOver = false;
+    const saved = resume ? loadOnlineSession() : null;
     const client = new NetClient({
       connect: webSocketTransport(url),
       clock: realClock,
@@ -156,18 +214,27 @@ export function LobbyPanel(props: {
       mode,
       ...(room === null ? {} : { room }),
       ...(spectate ? { spectate: true } : {}),
+      ...(resume && saved !== null ? { token: saved.token } : {}),
       handlers: {
         onSession: setSession,
         onLobby: (lobby, host) => {
           setInfo(lobby);
           setIsHost(host);
         },
-        onRefused: (reason) => setError(refusalText(reason)),
+        onRefused: (reason) => {
+          if (reason === 'noRoom') clearOnlineSession();
+          setError(refusalText(reason));
+        },
         onStart: () => {
           const current = client.session;
           if (current === null) return;
           handedOver = true;
-          saveOnlineSession({ token: current.token, server: url, nick });
+          saveOnlineSession({
+            token: current.token,
+            server: url,
+            nick,
+            ...(mode === 'private' || room !== null ? { friends: true } : {}),
+          });
           client.stop();
           navigate(matchLink(current));
         },
@@ -179,7 +246,7 @@ export function LobbyPanel(props: {
       // Закрыли окно, не дождавшись матча: освобождаем место.
       if (!handedOver) client.stop();
     };
-  }, [mode, room, spectate, nick, attempt]);
+  }, [mode, room, spectate, resume, nick, attempt]);
 
   const invite =
     session !== null && mode === 'private'
@@ -194,6 +261,22 @@ export function LobbyPanel(props: {
     spectate ? 'online.spectateTitle' : friends ? 'online.privateTitle' : 'online.searching',
   );
   const max = info?.max ?? SEATS_FALLBACK;
+  const { onRoomMap } = props;
+  const roomMap = info?.map;
+  const roomSeed = session?.seed;
+  useEffect(() => {
+    if (roomMap !== undefined && roomSeed !== undefined) onRoomMap?.(roomMap, roomSeed);
+  }, [roomMap, roomSeed, onRoomMap]);
+  const mySeat = (info?.seats ?? []).find((seat) => seat.id === session?.playerId);
+  const mySpawn = mySeat?.spawn ?? null;
+  const takenSpawns = new Map<number, string>();
+  for (const seat of info?.seats ?? []) {
+    if (seat.id === session?.playerId || seat.spawn === null) continue;
+    takenSpawns.set(
+      seat.spawn,
+      tokens.players.palette[seat.id % tokens.players.palette.length]?.line ?? tokens.ui.ink,
+    );
+  }
 
   return (
     <div
@@ -232,81 +315,108 @@ export function LobbyPanel(props: {
           <span>{t('online.connecting')}</span>
         </div>
       ) : (
-        <>
-          <div className={styles.top}>
-            <Clock seconds={info.startsInS} />
-            <div className={styles.topText}>
-              <p className={styles.status}>
-                {info.startsInS === null ? t('online.waitHost') : t('online.lookingFor')}
-              </p>
-              <p className={styles.count}>
-                <b>{`${info.humans} ${t('online.people')}`}</b>
-                <span>{` · ${Math.max(0, max - info.humans)} ${t('online.botsFill')}`}</span>
-              </p>
-              <Seats humans={info.humans} max={max} />
+        <div className={styles.cols}>
+          <div className={styles.col}>
+            <div className={styles.top}>
+              <Clock seconds={info.startsInS} />
+              <div className={styles.topText}>
+                <p className={styles.status}>
+                  {info.startsInS === null ? t('online.waitHost') : t('online.lookingFor')}
+                </p>
+                <p className={styles.count}>
+                  <b>{`${info.humans} ${t('online.people')}`}</b>
+                  <span>{` · ${Math.max(0, max - info.humans)} ${t('online.botsFill')}`}</span>
+                </p>
+                <Seats humans={info.humans} max={max} />
+              </div>
             </div>
+            {invite !== null && session !== null && (
+              <div className={styles.invite}>
+                <b className={styles.inviteCode} aria-label={t('online.roomCode')}>
+                  {session.room.toUpperCase()}
+                </b>
+                <button type="button" className={styles.inviteCopy} onClick={copy}>
+                  {copied ? t('online.copied') : t('online.copyLink')}
+                </button>
+              </div>
+            )}
+            {mode === 'private' && session !== null && (
+              <Roster
+                seats={info.seats}
+                me={session.playerId}
+                isHost={isHost}
+                onTransfer={(id) => clientRef.current?.transfer(id)}
+              />
+            )}
+            {mode === 'private' && (
+              <>
+                {isHost ? (
+                  <button
+                    type="button"
+                    className={`${ui.action} ${ui.primary}`}
+                    onClick={() => clientRef.current?.startMatch()}
+                  >
+                    {`${t('online.start')} · ${info.seats.filter((s) => s.ready || s.host).length}/${info.humans} ${t('lobby.readyCount')}`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`${ui.action} ${mySeat?.ready === true ? '' : ui.primary}`}
+                    aria-pressed={mySeat?.ready === true}
+                    onClick={() => clientRef.current?.setReady(mySeat?.ready !== true)}
+                  >
+                    {mySeat?.ready === true ? t('lobby.notReady') : t('lobby.ready')}
+                  </button>
+                )}
+              </>
+            )}
           </div>
-          {invite !== null && session !== null && (
-            <div className={styles.invite}>
-              <b className={styles.inviteCode} aria-label={t('online.roomCode')}>
-                {session.room.toUpperCase()}
-              </b>
-              <button type="button" className={styles.inviteCopy} onClick={copy}>
-                {copied ? t('online.copied') : t('online.copyLink')}
-              </button>
+          {mode === 'private' && (
+            <div className={styles.col}>
+              <MapPicker
+                map={info.map}
+                editable={isHost}
+                onMap={(next) => clientRef.current?.configure({ map: next })}
+                seed={session?.seed ?? 42}
+                onOtherMap={() =>
+                  clientRef.current?.configure({
+                    seed: randomGenSeed(session?.seed),
+                  })
+                }
+                players={info.max}
+                spawn={mySpawn}
+                taken={takenSpawns}
+                onSpawn={(spawn) => clientRef.current?.pick(spawn)}
+              />
+              {isHost && (
+                <>
+                  <div className={`${ui.group} ${ui.dense}`}>
+                    <div className={ui.groupLabel}>{t('menu.botsCount')}</div>
+                    <Stepper
+                      label={t('menu.botsCount')}
+                      min={0}
+                      max={Math.max(0, maxPlayersOf(info.map) - info.humans)}
+                      value={Math.max(0, info.max - info.humans)}
+                      onChange={(bots) =>
+                        clientRef.current?.configure({ players: info.humans + bots })
+                      }
+                    />
+                  </div>
+                  <Chips
+                    dense
+                    label={t('menu.difficulty')}
+                    options={LOBBY_LEVELS.map((l) => ({
+                      id: l,
+                      text: t(`menu.difficulty.${l}` as MessageKey),
+                    }))}
+                    value={info.level}
+                    onPick={(level) => clientRef.current?.configure({ level })}
+                  />
+                </>
+              )}
             </div>
           )}
-          {isHost && mode === 'private' && (
-            <>
-              <Chips
-                dense
-                label={t('menu.difficulty')}
-                options={LOBBY_LEVELS.map((l) => ({
-                  id: l,
-                  text: t(`menu.difficulty.${l}` as MessageKey),
-                }))}
-                value={info.level}
-                onPick={(level) => clientRef.current?.configure({ level })}
-              />
-              <Chips
-                dense
-                label={t('menu.map')}
-                options={MAPS.map((m) => ({ id: m.id, text: t(`menu.map.${m.id}` as MessageKey) }))}
-                value={info.map}
-                onPick={(map) => clientRef.current?.configure({ map })}
-              />
-              {info.map === 'europe' && (
-                <div className={`${ui.group} ${ui.dense}`}>
-                  <div className={ui.groupLabel}>
-                    {t('menu.players')}
-                    <span>{info.max}</span>
-                  </div>
-                  <input
-                    type="range"
-                    className={ui.range}
-                    min={PLAYERS_MIN}
-                    max={PLAYERS_MAX}
-                    step={PLAYERS_STEP}
-                    value={info.max}
-                    aria-label={t('menu.players')}
-                    onChange={(event) =>
-                      clientRef.current?.configure({ players: Number(event.target.value) })
-                    }
-                  />
-                </div>
-              )}
-            </>
-          )}
-          {isHost && mode === 'private' && (
-            <button
-              type="button"
-              className={`${ui.action} ${ui.primary}`}
-              onClick={() => clientRef.current?.startMatch()}
-            >
-              {t('online.start')}
-            </button>
-          )}
-        </>
+        </div>
       )}
     </div>
   );

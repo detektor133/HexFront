@@ -166,7 +166,7 @@ test('@layout смена карты не двигает панель проти�
   await page.getByRole('button', { name: /Против ботов|Versus bots/ }).click();
   const panel = page.getByRole('group', { name: /Против ботов|Versus bots/ });
   const before = await panel.boundingBox();
-  await page.getByRole('radio', { name: /Малая|Small/ }).click();
+  await page.getByRole('button', { name: /Следующая карта|Next map/ }).click();
   const after = await panel.boundingBox();
   expect(after?.height).toBe(before?.height);
   expect(after?.y).toBe(before?.y);
@@ -287,6 +287,7 @@ for (const size of [
               open: false,
               level: 'hard',
               map: 'europe',
+              seats: [{ id: 0, nick: 'Danil', ready: false, host: true, spawn: null }],
             },
             host: true,
           }),

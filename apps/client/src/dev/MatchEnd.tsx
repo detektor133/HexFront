@@ -10,6 +10,7 @@ export function MatchEnd(props: {
   readonly spectating?: boolean;
   readonly onWatch?: (message: { readonly type: 'setFog'; readonly enabled: boolean }) => void;
   readonly onMenu?: (path: string) => void;
+  readonly onRematch?: (() => void) | undefined;
   readonly replay?: readonly PlayerView[];
   readonly reason?: WinReason;
   /** Победившая коалиция: победа засчитывается и союзникам. */
@@ -40,6 +41,7 @@ export function MatchEnd(props: {
     eliminated,
     fog: props.fog ?? true,
     ...(props.spectating ? { spectating: true } : {}),
+    onRematch: props.onRematch,
     ...(props.reason ? { reason: props.reason } : {}),
     ...(props.allies ? { allies: props.allies } : {}),
     victoryHold: props.view.victoryHold ?? null,

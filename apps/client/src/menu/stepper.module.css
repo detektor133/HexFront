@@ -1,0 +1,38 @@
+/* Число с кнопками «−» и «+»: одна плотная строка. */
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface2);
+}
+
+.button {
+  display: inline-grid;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.button:disabled {
+  color: var(--ui-ink3);
+  cursor: not-allowed;
+}
+
+.input {
+  width: 48px;
+  min-width: 0;
+  padding: 0;
+  color: var(--ui-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  background: var(--ui-surface);
+  border: 0;
+  border-inline: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appSearch, navigate } from '../nav.ts';
 import { BuildFeedbackMark } from './BuildFeedbackMark.tsx';
 import { BuildingsPanel } from './BuildingsPanel.tsx';
+import { ChatPanel, ChatToggle } from './ChatDock.tsx';
 import { MapTools } from './MapTools.tsx';
 import { useMapJson, useSandbox } from './MatchSurfaceRuntime.tsx';
 import { PauseMenu } from './PauseMenu.tsx';
@@ -28,6 +29,7 @@ import { NOTHING_PICKED, armySelection } from '../dev/sandbox-selection.ts';
 import { useTelemetry } from '../dev/telemetry-client.ts';
 import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
+import { chatStore } from '../net/chat-store.ts';
 import { enterFullscreenOnFirstTap } from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
@@ -76,6 +78,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   useEffect(() => enterFullscreenOnFirstTap(), []);
   const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
+  const chat = { sender: chatStore.getState().sender };
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const lastPauseStyle = useRef<React.CSSProperties | undefined>(undefined);
   const pausePresence = useTvPresence(!debug && pauseState.menuOpen);
@@ -448,6 +451,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
             else sb.setFog(message.enabled);
           }}
           onMenu={pauseController.goToMenu}
+          onRematch={chat.sender?.rematch}
           {...(() => {
             const won = sb.msg?.events.find((event) => event.t === 'matchWon');
             if (won?.t !== 'matchWon') return {};
@@ -536,6 +540,13 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           buildingsOpen={buildingsOpen}
           drawer={phoneView && viewport.width <= viewport.height}
           onToggleBuildings={() => setBuildingsOpen((open) => !open)}
+          extra={<ChatToggle />}
+        />
+      )}
+      {view && !debug && !spectating && (
+        <ChatPanel
+          players={view.players.map((p) => ({ id: p.id, name: p.name ?? String(p.id + 1) }))}
+          bottom={dockH + (toolsShown ? Math.max(toolsH, ARMY_TOOLS_H) : 0) + 12}
         />
       )}
       {view && !debug && buildingsOpen && !spectating && (

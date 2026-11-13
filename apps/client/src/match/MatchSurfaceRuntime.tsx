@@ -51,7 +51,7 @@ import { startLocalMatch, type LocalMatch } from '../local/local-match.ts';
 import { readLocalMatchSetup } from '../local/match-setup.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
-import { appSearch } from '../nav.ts';
+import { appSearch, navigate } from '../nav.ts';
 import { webSocketTransport, type NetStatus } from '../net/net-client.ts';
 import { startOnlineMatch, type OnlineMatch } from '../net/online-match.ts';
 import { loadOnlineSession } from '../net/online-session.ts';
@@ -586,6 +586,8 @@ export function useSandbox(
           mapSize: map.width * map.height,
           onMessage: onWorkerMessage,
           onStatus: setNetStatus,
+          ...(online.friends === true ? { friends: true } : {}),
+          onRematch: () => navigate('/online?resume=1'),
         })
       : startLocalMatch(json, mapRequest.seed, readLocalMatchSetup(appSearch()), onWorkerMessage, {
           telemetry: debug,

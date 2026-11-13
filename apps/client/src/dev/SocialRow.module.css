@@ -1,0 +1,30 @@
+/* Строка «написать» и метки в окне соседа. */
+.row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.write,
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 36px;
+  color: var(--ui-ink);
+  font: inherit;
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.write {
+  flex: 1 1 auto;
+  padding: 0 var(--space-sm);
+}
+
+.mark {
+  width: 36px;
+  padding: 0;
+}

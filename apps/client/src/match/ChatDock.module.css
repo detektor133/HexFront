@@ -1,0 +1,122 @@
+/* Чат матча: кнопка в колонке инструментов и панель слева от неё. */
+.toggle,
+.toggleOn {
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  padding: 0 3px;
+  color: var(--ui-button-primary-ink);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  background: var(--status-danger);
+  border-radius: 8px;
+}
+
+.panel {
+  position: fixed;
+  right: 72px;
+  z-index: 25;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-xs);
+  box-sizing: border-box;
+  width: min(300px, calc(100vw - 88px));
+  height: min(320px, 50vh);
+  padding: var(--space-sm);
+  color: var(--ui-ink);
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-hard);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.head b {
+  flex: 1 1 auto;
+}
+
+.to {
+  max-width: 120px;
+  min-height: 32px;
+  color: var(--ui-ink);
+  font: inherit;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.close,
+.send,
+.reaction {
+  display: inline-grid;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  place-items: center;
+  color: var(--ui-ink);
+  cursor: pointer;
+  background: var(--ui-surface2);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+.log {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.line small {
+  color: var(--ui-ink2);
+}
+
+.body {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.body em {
+  font-style: normal;
+  font-weight: 600;
+}
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.form {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  color: var(--ui-ink);
+  font: inherit;
+  background: var(--ui-surface);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border-strong);
+  border-radius: var(--radius-button);
+}

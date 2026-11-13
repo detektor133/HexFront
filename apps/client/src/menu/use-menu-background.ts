@@ -6,6 +6,7 @@ import { loadMap } from '@hexfront/sim';
 
 import { createEconomyLayer, type EconomyLayer } from '../dev/economy-layer.ts';
 import { startLocalMatch } from '../local/local-match.ts';
+import { mapUrl, type MapRequest } from '../local/map-request.ts';
 import type { FromWorker } from '../local/messages.ts';
 import { ViewDeltaApplier } from '../local/view-delta.ts';
 import { mapBounds } from '../render/hex-geometry.ts';
@@ -27,7 +28,11 @@ const AFTER_WIN_MS = 9000;
 const FADE_MS = 800;
 
 /** Запускает фоновую партию в `hostRef`. */
-export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): void {
+export function useMenuBackground(
+  hostRef: RefObject<HTMLDivElement | null>,
+  request: MapRequest,
+): void {
+  const { id, seed } = request;
   useEffect(() => {
     let disposed = false;
     let mapView: MapView | null = null;
@@ -40,6 +45,7 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
     let deltaApplier = new ViewDeltaApplier();
     let json: unknown = null;
     let finished = false;
+    let bots = BOTS;
 
     const later = (ms: number, action: () => void): void => {
       const id = setTimeout(() => {
@@ -62,7 +68,7 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
       match = startLocalMatch(
         json,
         1 + Math.floor(Math.random() * 1_000_000),
-        { count: BOTS, bots: Array.from({ length: BOTS }, (_, i) => i), speed: 1 },
+        { count: bots, bots: Array.from({ length: bots }, (_, i) => i), speed: 1 },
         (message: FromWorker): void => {
           if (message.t === 'view') applyMessage(message);
         },
@@ -90,11 +96,12 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
     }
 
     const start = async (): Promise<void> => {
-      const response = await fetch('/maps/small.json');
+      const response = await fetch(mapUrl({ id, seed, players: BOTS }));
       json = (await response.json()) as unknown;
       const loaded = loadMap(json);
       const host = hostRef.current;
       if (disposed || !loaded.ok || host === null) return;
+      bots = Math.min(BOTS, loaded.map.spawns.length);
       host.style.opacity = '0';
       const created = await createMapView(
         host,
@@ -163,5 +170,5 @@ export function useMenuBackground(hostRef: RefObject<HTMLDivElement | null>): vo
       layer?.destroy();
       mapView?.destroy();
     };
-  }, [hostRef]);
+  }, [hostRef, id, seed]);
 }

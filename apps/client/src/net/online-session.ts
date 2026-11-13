@@ -5,6 +5,8 @@ export interface OnlineSessionInfo {
   readonly token: string;
   readonly server: string;
   readonly nick: string;
+  /** Закрытая комната друзей: после матча доступно «Ещё раз». */
+  readonly friends?: boolean;
 }
 
 /** Параметр `server` в ссылке принимается только для локального сервера (проверки и разработка). */
@@ -32,6 +34,15 @@ export function saveOnlineSession(info: OnlineSessionInfo): void {
   }
 }
 
+/** Забывает сессию: место потеряно (комната закрыта), возвращаться некуда. */
+export function clearOnlineSession(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Хранилище закрыто: забывать нечего.
+  }
+}
+
 export function loadOnlineSession(): OnlineSessionInfo | null {
   try {
     const raw = sessionStorage.getItem(KEY);
@@ -42,7 +53,12 @@ export function loadOnlineSession(): OnlineSessionInfo | null {
       typeof value.server === 'string' &&
       typeof value.nick === 'string'
     ) {
-      return { token: value.token, server: value.server, nick: value.nick };
+      return {
+        token: value.token,
+        server: value.server,
+        nick: value.nick,
+        ...(value.friends === true ? { friends: true } : {}),
+      };
     }
   } catch {
     // Повреждённая запись равна отсутствию сессии.

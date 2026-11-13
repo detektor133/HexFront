@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { t } from '../i18n/dict.ts';
-import { quickMatchUrl } from '../routes.ts';
+import { QUICK_MATCH_SEEDS } from '../routes.ts';
 import { COLOR_KEY, NICKNAME_KEY } from './storage-keys.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -11,12 +11,19 @@ const MAP_KEY = 'hexfront.map';
 const PLAYERS_KEY = 'hexfront.players';
 const LEVEL_KEY = 'hexfront.botLevel';
 
-/** Карты меню: id, размер в гексах и можно ли выбирать число игроков. */
+/** Карты меню: id, размер в гексах и предел числа игроков (точек старта на карте). */
 export const MAPS = [
-  { id: 'europe', size: '76×64', choosePlayers: true },
-  { id: 'gen', size: '80×60', choosePlayers: false },
-  { id: 'small', size: '40×30', choosePlayers: false },
-  { id: 'tiny', size: '20×15', choosePlayers: false },
+  { id: 'europe', size: '115×92', choosePlayers: true, maxPlayers: 30 },
+  { id: 'gen', size: '80×60', choosePlayers: false, maxPlayers: 30 },
+  { id: 'small', size: '40×30', choosePlayers: false, maxPlayers: 6 },
+  { id: 'tiny', size: '20×15', choosePlayers: false, maxPlayers: 2 },
+  { id: 'mediterranean', size: '144×56', choosePlayers: true, maxPlayers: 16 },
+  { id: 'north', size: '107×75', choosePlayers: true, maxPlayers: 14 },
+  { id: 'namerica', size: '120×75', choosePlayers: true, maxPlayers: 16 },
+  { id: 'japan', size: '71×64', choosePlayers: true, maxPlayers: 8 },
+  { id: 'mideast', size: '119×68', choosePlayers: true, maxPlayers: 14 },
+  { id: 'continent', size: '110×80', choosePlayers: true, maxPlayers: 24 },
+  { id: 'archipelago', size: '100×70', choosePlayers: true, maxPlayers: 18 },
 ] as const;
 export type MenuMapId = (typeof MAPS)[number]['id'];
 
@@ -25,7 +32,6 @@ export type MenuLevel = (typeof LEVELS)[number];
 
 export const PLAYERS_MIN = 2;
 export const PLAYERS_MAX = 30;
-export const PLAYERS_STEP = 2;
 const PLAYERS_DEFAULT = 12;
 const LEVEL_DEFAULT: MenuLevel = 'normal';
 
@@ -39,6 +45,9 @@ export interface MenuSettings {
   readonly map: MenuMapId;
   readonly players: number;
   readonly level: MenuLevel;
+  /** Зерно случайной карты (из готовых) и выбранная точка старта; не хранятся между сеансами. */
+  readonly seed: number;
+  readonly spawn: number | null;
 }
 
 function read(key: string, fallback: string): string {
@@ -92,6 +101,8 @@ export function loadSettings(): MenuSettings {
       ? Math.min(PLAYERS_MAX, Math.max(PLAYERS_MIN, players))
       : PLAYERS_DEFAULT,
     level: LEVELS.find((l) => l === read(LEVEL_KEY, LEVEL_DEFAULT)) ?? LEVEL_DEFAULT,
+    seed: randomGenSeed(),
+    spawn: null,
   };
 }
 
@@ -126,13 +137,26 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
+/** Предел игроков карты меню. */
+export function maxPlayersOf(map: MenuMapId): number {
+  return MAPS.find((m) => m.id === map)?.maxPlayers ?? PLAYERS_MAX;
+}
+
+/** Другое зерно случайной карты из готовых (кнопка «Сгенерировать»). */
+export function randomGenSeed(except?: number): number {
+  const pool = QUICK_MATCH_SEEDS.filter((seed) => seed !== except);
+  return pool[Math.floor(Math.random() * pool.length)] ?? QUICK_MATCH_SEEDS[0];
+}
+
 /** Ссылка на матч против ботов по настройкам меню. */
 export function matchUrl(s: MenuSettings): string {
-  const start =
-    s.map === 'gen'
-      ? quickMatchUrl()
-      : `/match?map=${s.map}&seed=${s.map === 'europe' ? randomSeed() : 42}&players=${s.map === 'europe' ? s.players : 2}`;
-  const url = new URL(start, window.location.origin);
+  const players = Math.min(s.players, maxPlayersOf(s.map));
+  const seed = s.map === 'gen' ? s.seed : s.map === 'europe' ? randomSeed() : 42;
+  const url = new URL(
+    `/match?map=${s.map}&seed=${seed}&players=${players}`,
+    window.location.origin,
+  );
+  if (s.spawn !== null) url.searchParams.set('spawn', String(s.spawn));
   if (s.nickname !== '') url.searchParams.set('name', s.nickname);
   url.searchParams.set('color', s.color);
   url.searchParams.set('difficulty', s.level);

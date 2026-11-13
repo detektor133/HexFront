@@ -10,6 +10,8 @@ import {
   ConfirmedViewDeltaStream,
   MAX_COMMANDS_PER_SECOND,
   MAX_QUERIES_PER_SECOND,
+  QUICK_MATCH_SEEDS,
+  LOBBY_PLAYER_MAPS,
   type Query,
   slowLayerReuse,
   type JoinMode,
@@ -271,16 +273,24 @@ export class Room {
     const mapName = patch.map ?? this.mapName;
     let size = this.size;
     if (patch.map !== undefined && patch.map !== this.mapName) {
-      size = mapName === 'gen' ? this.options.size : mapName === 'europe' ? EUROPE_DEFAULT : 2;
+      size =
+        mapName === 'gen'
+          ? this.options.size
+          : LOBBY_PLAYER_MAPS.includes(mapName)
+            ? EUROPE_DEFAULT
+            : 2;
     }
     if (patch.players !== undefined) size = patch.players;
-    const seed = mapName === 'gen' && patch.seed !== undefined ? patch.seed : this.seed;
+    const wanted =
+      patch.seed !== undefined && QUICK_MATCH_SEEDS.some((known) => known === patch.seed);
+    const seed = mapName === 'gen' && wanted ? (patch.seed as number) : this.seed;
     if (mapName === 'gen' && seed !== this.seed) this.seed = seed;
     const known = mapName === 'gen' ? undefined : staticMap(mapName);
     const cap = known === undefined ? SIZE_MAX : known.spawns.length;
     size = Math.min(cap, Math.max(size, this.seats.length, 2));
-    if (mapName !== this.mapName || size !== this.size || patch.seed !== undefined) {
-      const next = mapName === 'gen' ? this.options.makeMap?.(this.seed, size) : staticMap(mapName);
+    if (mapName !== this.mapName || size !== this.size || (wanted && mapName === 'gen')) {
+      const next =
+        mapName === 'gen' ? this.options.makeMap?.(this.seed, SIZE_MAX) : staticMap(mapName);
       if (next === undefined) return;
       this.map = next;
       if (mapName !== this.mapName) for (const seat of this.seats) seat.spawn = null;
@@ -629,13 +639,12 @@ export class Room {
   }
 
   /**
-   * «Ещё раз»: хозяин возвращает всех присутствующих в лобби этой комнаты. Ушедшие и зрители
+   * «Ещё раз»: любой присутствующий возвращает всех присутствующих в лобби этой комнаты. Ушедшие и зрители
    * отпадают, зерно случайной карты меняется, готовность и выбор точек сбрасываются.
    */
   public rematch(conn: Connection): void {
     if (!this.rematchable) return;
-    const host = this.seats.find((seat) => seat.conn !== null);
-    if (host === undefined || host.conn !== conn) return;
+    if (!this.seats.some((seat) => seat.conn === conn)) return;
     for (const spectator of this.spectators.splice(0)) spectator.conn?.close();
     const kept = this.seats.filter((seat) => seat.conn !== null);
     this.seats.splice(0, this.seats.length, ...kept);
@@ -658,8 +667,11 @@ export class Room {
     });
     this.state = null;
     this.phase = 'lobby';
-    this.seed = (Math.imul(this.seed, 1103515245) + 12345) >>> 1;
-    if (this.mapName === 'gen') this.map = this.options.makeMap?.(this.seed, this.size) ?? this.map;
+    // Случайная карта идёт по кругу готовых сидов (клиент берёт файл карты по сиду).
+    const at = QUICK_MATCH_SEEDS.findIndex((known) => known === this.seed);
+    if (this.mapName === 'gen')
+      this.seed = QUICK_MATCH_SEEDS[(at + 1) % QUICK_MATCH_SEEDS.length] ?? this.seed;
+    if (this.mapName === 'gen') this.map = this.options.makeMap?.(this.seed, SIZE_MAX) ?? this.map;
     for (const seat of this.seats) {
       this.send(seat, { t: 'rematch' });
       this.sendWelcome(seat);

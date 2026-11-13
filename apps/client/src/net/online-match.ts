@@ -8,6 +8,7 @@ import {
 } from '@hexfront/protocol';
 import type { Selection } from '@hexfront/sim';
 
+import { chatStore } from './chat-store.ts';
 import {
   NetClient,
   realClock,
@@ -30,6 +31,10 @@ export interface OnlineOptions {
   readonly mapSize: number;
   readonly onMessage: (message: FromWorker) => void;
   readonly onStatus?: (status: NetStatus) => void;
+  /** Закрытая комната: после матча доступно «Ещё раз». */
+  readonly friends?: boolean;
+  /** Хозяин вернул всех в лобби: экран матча уходит в лобби. */
+  readonly onRematch?: () => void;
   readonly clock?: NetClock;
 }
 
@@ -82,6 +87,19 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
           events: message.d.events,
         });
       },
+      onSession: (session) => {
+        const current = chatStore.getState().sender;
+        if (current?.me === session.playerId || session.spectator) return;
+        chatStore.setSender({
+          me: session.playerId,
+          chat: (message) => client.chat(message),
+          mark: (hex, kind) => client.mark(hex, kind),
+          ...(options.friends === true ? { rematch: () => client.rematch() } : {}),
+        });
+      },
+      onChat: (message) => chatStore.receive(message),
+      onMark: (from, hex, kind) => chatStore.receive({ from, nick: '', mark: { hex, kind } }),
+      onRematch: () => options.onRematch?.(),
       onSelection: (sel) => {
         selection = sel;
       },
@@ -148,6 +166,7 @@ export function startOnlineMatch(options: OnlineOptions): OnlineMatch {
       client.resync();
     },
     dispose: () => {
+      chatStore.setSender(null);
       client.stop();
     },
   };

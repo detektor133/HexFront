@@ -47,6 +47,8 @@ export interface MatchEndScreenProps {
   readonly stats?: EndStats;
   readonly onWatch: (message: { readonly type: 'setFog'; readonly enabled: boolean }) => void;
   readonly onMenu: (path: string) => void;
+  /** Онлайн-комната друзей: вернуть всех в лобби для нового матча. */
+  readonly onRematch?: (() => void) | undefined;
 }
 
 function victoryReason(reason: WinReason | undefined): string {
@@ -152,6 +154,18 @@ export function MatchEndScreen(props: MatchEndScreenProps): React.JSX.Element | 
                 }}
               >
                 {t('match.observe')}
+              </button>,
+            ]
+          : []),
+        ...(ended && props.onRematch !== undefined
+          ? [
+              <button
+                key="rematch"
+                type="button"
+                className={styles.primary}
+                onClick={props.onRematch}
+              >
+                {t('lobby.rematch')}
               </button>,
             ]
           : []),

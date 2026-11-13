@@ -211,3 +211,94 @@
     padding: var(--space-sm) var(--space-md);
   }
 }
+
+/* Список людей комнаты: компактные строки, длинный список прокручивается внутри. */
+.roster {
+  display: grid;
+  gap: 2px;
+  max-height: 112px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 32px;
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.nick {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nick small {
+  color: var(--ui-ink2);
+}
+
+.tag {
+  color: var(--ui-ink2);
+  font-size: var(--font-size-caption);
+}
+
+.ready {
+  color: var(--status-ok, var(--ui-ink));
+  font-weight: 600;
+}
+
+.crown {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  color: var(--ui-ink2);
+  cursor: pointer;
+  background: none;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+}
+
+/* Две колонки на широком окне: люди и действие слева, карта и настройки справа. */
+.cols {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.col {
+  display: grid;
+  align-content: start;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+@media (min-width: 700px) {
+  .lobby:has(.cols > .col:nth-child(2)) {
+    width: min(100%, 760px);
+  }
+
+  .cols:has(> .col:nth-child(2)) {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--space-md);
+  }
+}
+
+/* Низкий экран: мини-карта ниже, список людей короче. */
+@media (max-height: 560px) {
+  .roster {
+    max-height: 64px;
+  }
+}

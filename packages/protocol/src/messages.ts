@@ -51,9 +51,43 @@ export type JoinMode = 'open' | 'private';
 export type LobbyLevel = 'easy' | 'normal' | 'hard';
 export const LOBBY_LEVELS: readonly LobbyLevel[] = ['easy', 'normal', 'hard'];
 
-/** Карты закрытой комнаты, как в меню «Против ботов»; число игроков выбирается только на `europe`. */
-export type LobbyMap = 'gen' | 'europe' | 'small' | 'tiny';
-export const LOBBY_MAPS: readonly LobbyMap[] = ['europe', 'gen', 'small', 'tiny'];
+/** Карты закрытой комнаты, как в меню «Против ботов»; число игроков выбирается на картах из LOBBY_PLAYER_MAPS. */
+export type LobbyMap =
+  | 'gen'
+  | 'europe'
+  | 'small'
+  | 'tiny'
+  | 'mediterranean'
+  | 'north'
+  | 'namerica'
+  | 'japan'
+  | 'mideast'
+  | 'continent'
+  | 'archipelago';
+export const LOBBY_MAPS: readonly LobbyMap[] = [
+  'europe',
+  'gen',
+  'small',
+  'tiny',
+  'mediterranean',
+  'north',
+  'namerica',
+  'japan',
+  'mideast',
+  'continent',
+  'archipelago',
+];
+/** Готовые карты с выбором числа игроков (до числа спавнов карты). */
+export const LOBBY_PLAYER_MAPS: readonly LobbyMap[] = [
+  'europe',
+  'mediterranean',
+  'north',
+  'namerica',
+  'japan',
+  'mideast',
+  'continent',
+  'archipelago',
+];
 
 /** Предельная длина сообщения чата. */
 export const CHAT_MAX = 140;

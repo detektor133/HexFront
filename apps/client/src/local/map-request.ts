@@ -1,7 +1,19 @@
 import { QUICK_MATCH_SEEDS } from '../routes.ts';
 
-/** Карты матча: готовые (Европа, малая, крошечная) и сгенерированная по зерну. */
-export const MAP_IDS = ['europe', 'gen', 'small', 'tiny'] as const;
+/** Карты матча: готовые (Европа, регионы мира, процедурные, малая, крошечная) и сгенерированная по зерну. */
+export const MAP_IDS = [
+  'europe',
+  'gen',
+  'small',
+  'tiny',
+  'mediterranean',
+  'north',
+  'namerica',
+  'japan',
+  'mideast',
+  'continent',
+  'archipelago',
+] as const;
 export type MapId = (typeof MAP_IDS)[number];
 
 export interface MapRequest {
@@ -38,15 +50,13 @@ export function readMapRequest(search: string): MapRequest {
 /** Возвращает URL карты, которую отдаёт dev-сервер или production-сборка. */
 export function mapUrl(request: MapRequest): string {
   if (request.id !== 'gen') return `/maps/${request.id}.json`;
-  if (
-    request.players === 30 &&
-    QUICK_MATCH_SEEDS.includes(request.seed as (typeof QUICK_MATCH_SEEDS)[number])
-  ) {
+  // Готовая карта на 30 мест; игроков в матче может быть меньше — лишние места пустуют.
+  if (QUICK_MATCH_SEEDS.includes(request.seed as (typeof QUICK_MATCH_SEEDS)[number])) {
     return `/maps/gen-${request.seed}-30.json`;
   }
   const params = new URLSearchParams({
     seed: String(request.seed),
-    players: String(request.players),
+    players: '30',
   });
   return `/maps/gen.json?${params.toString()}`;
 }

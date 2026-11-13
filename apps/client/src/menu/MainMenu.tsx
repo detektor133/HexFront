@@ -9,7 +9,7 @@ import { NickPlate, tutorialLink, type ModeId } from './MenuParts.tsx';
 import { t } from '../i18n/dict.ts';
 import { isCoarsePointer } from '../input/touch-tap.ts';
 import { navigate } from '../nav.ts';
-import { guestNick, nickProblem, useMenuSettings } from './menu-config.ts';
+import { guestNick, nickProblem, useMenuSettings, type MenuMapId } from './menu-config.ts';
 import styles from './menu-ui.module.css';
 import { useMenuBackground } from './use-menu-background.ts';
 import { shortCount, useServerStatus } from './use-server-status.ts';
@@ -34,7 +34,13 @@ export function MainMenu(props: {
   const [askOpen, setAskOpen] = useState<boolean>(() => !wasAsked());
   const settingsWindow = useTvPresence(settingsOpen);
   const askWindow = useTvPresence(askOpen);
-  useMenuBackground(hostRef);
+  // Карта комнаты, пока открыто лобби: фон показывает её, а не выбор в меню «Против ботов».
+  const [room, setRoom] = useState<{ id: MenuMapId; seed: number } | null>(null);
+  useMenuBackground(hostRef, {
+    id: room?.id ?? settings.map,
+    seed: room?.seed ?? settings.seed,
+    players: 6,
+  });
   const server = useServerStatus();
   const offline = server.state === 'offline';
   // Связь пропала при открытой панели «Онлайн» — панель закрывается, вернётся она сама не должна.
@@ -128,7 +134,13 @@ export function MainMenu(props: {
           <LobbyPanel
             request={lastLobby.current}
             nick={settings.nickname}
-            onClose={() => setLobby(null)}
+            onClose={() => {
+              setRoom(null);
+              setLobby(null);
+            }}
+            onRoomMap={(id, seed) =>
+              setRoom((prev) => (prev?.id === id && prev.seed === seed ? prev : { id, seed }))
+            }
             className={lobbyWindow.className}
           />
         </div>
