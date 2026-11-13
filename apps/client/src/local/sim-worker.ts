@@ -72,6 +72,7 @@ function startEngine(msg: Extract<ToWorker, { t: 'start' }>, map: unknown): void
     true,
     msg.tutorial === true,
     msg.botLevel ?? 'medium',
+    msg.spawn,
   );
   if ('errors' in created) {
     post({ t: 'error', errors: created.errors });

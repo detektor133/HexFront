@@ -29,6 +29,8 @@ import { createVisionState } from '../systems/vision.ts';
 /** Участник матча; id игрока — индекс в массиве. */
 export interface PlayerSetup {
   readonly name: string;
+  /** Выбранная стартовая точка: индекс в map.spawns; нет — случайная из оставшихся. */
+  readonly spawn?: number;
 }
 
 export interface MatchOptions {
@@ -207,9 +209,18 @@ export function createMatch(
   }
   const state = emptyState(map, seed, options);
   seedNeutralPopulation(state);
-  const spawns = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
+  const shuffled = shuffle(fork(state.seed, RNG_STREAM.spawns), [...map.spawns]);
+  // Выбранные точки отдаются своим игрокам (повтор — второму случайная), остальные — по жребию.
+  const chosen = new Set<(typeof map.spawns)[number]>();
+  const picked = players.map((player) => {
+    const spawn = player.spawn === undefined ? undefined : map.spawns[player.spawn];
+    if (spawn === undefined || chosen.has(spawn)) return undefined;
+    chosen.add(spawn);
+    return spawn;
+  });
+  const free = shuffled.filter((spawn) => !chosen.has(spawn));
   players.forEach((player, playerId) => {
-    const spawn = spawns[playerId];
+    const spawn = picked[playerId] ?? free.shift();
     if (spawn) addPlayer(state, playerId, spawn, player.name);
   });
   state.cities.sort((a, b) => a.id - b.id);

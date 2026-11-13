@@ -84,11 +84,13 @@ export function createLocalEngine(
   diplomacy = false,
   tutorial = false,
   botLevel: BotLevel = 'medium',
+  spawn?: number,
 ): LocalEngine | { readonly errors: readonly string[] } {
   const loaded = loadMap(mapJson);
   if (!loaded.ok) return { errors: loaded.errors };
   const setup = Array.from({ length: players }, (_, i) => ({
     name: i === HUMAN_ID ? playerName || 'Игрок 1' : `P${i}`,
+    ...(i === HUMAN_ID && spawn !== undefined ? { spawn } : {}),
   }));
   const state = createMatch(loaded.map, setup, seed, {
     fog,

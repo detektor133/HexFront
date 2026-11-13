@@ -156,7 +156,30 @@ export class RoomHost {
           ...(message.level === undefined ? {} : { level: message.level }),
           ...(message.map === undefined ? {} : { map: message.map }),
           ...(message.players === undefined ? {} : { players: message.players }),
+          ...(message.seed === undefined ? {} : { seed: message.seed }),
         });
+        break;
+      case 'ready':
+        room.setReady(connection, message.ready);
+        break;
+      case 'transfer':
+        room.transfer(connection, message.to);
+        break;
+      case 'pick':
+        room.pick(connection, message.spawn);
+        break;
+      case 'rematch':
+        room.rematch(connection);
+        break;
+      case 'chat':
+        room.chat(connection, {
+          ...(message.text === undefined ? {} : { text: message.text }),
+          ...(message.emoji === undefined ? {} : { emoji: message.emoji }),
+          ...(message.to === undefined ? {} : { to: message.to }),
+        });
+        break;
+      case 'mark':
+        room.mark(connection, message.hex, message.kind);
         break;
       case 'watch':
         room.watch(connection, message.player);
@@ -241,7 +264,7 @@ export class RoomHost {
     const now = this.options.now();
     room.poll();
     room.tick();
-    if (room.phase === 'ended') {
+    if (room.phase === 'ended' && !room.rematchable) {
       room.close();
       this.rooms.delete(id);
       this.dueAt.delete(id);

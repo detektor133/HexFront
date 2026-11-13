@@ -16,6 +16,7 @@ import {
   type LobbyInfo,
   type LobbyLevel,
   type LobbyMap,
+  type MarkKind,
   type S2C,
 } from '@hexfront/protocol';
 import {
@@ -28,6 +29,7 @@ import {
   createPlayerViewContext,
   FP,
   intDiv,
+  isAllied,
   playerView,
   previewPath,
   selectionFor,
@@ -56,6 +58,10 @@ export const LATE_JOIN_TICKS = 2400;
 export const RECONNECT_SECONDS = 30;
 /** Зрителей в одной комнате; больше — отказ `roomFull`. */
 export const MAX_SPECTATORS = 20;
+/** Чат: не больше CHAT_BURST сообщений и меток за CHAT_WINDOW_MS; верхний предел игроков в комнате. */
+const CHAT_WINDOW_MS = 4000;
+const CHAT_BURST = 4;
+const SIZE_MAX = 30;
 /** Сколько секунд зритель без связи держит место, потом оно освобождается. */
 const SPECTATOR_KEEP_SECONDS = 120;
 /** Тиков без `viewAck`, после которых клиенту снова шлётся полный снимок. */
@@ -134,6 +140,11 @@ interface Seat {
   watching: number | null;
   windowStart: number;
   windowCount: number;
+  /** Готов к старту (закрытая комната) и выбранная стартовая точка (индекс в карте). */
+  ready: boolean;
+  spawn: number | null;
+  /** Времена последних сообщений чата, мс: защита от потока. */
+  chatAt: number[];
 }
 
 /** События, видимые игроку: свои, политические и касающиеся его; чужие внутренние — нет. */
@@ -237,6 +248,13 @@ export class Room {
       open: this.mode === 'open',
       level: this.level,
       map: this.mapName,
+      seats: this.seats.map((seat, index) => ({
+        id: seat.playerId,
+        nick: seat.nick,
+        ready: seat.ready,
+        host: index === 0,
+        spawn: seat.spawn,
+      })),
     };
   }
 
@@ -246,7 +264,7 @@ export class Room {
    */
   public configure(
     conn: Connection,
-    patch: { level?: LobbyLevel; map?: LobbyMap; players?: number },
+    patch: { level?: LobbyLevel; map?: LobbyMap; players?: number; seed?: number },
   ): void {
     if (this.phase !== 'lobby' || this.mode !== 'private' || this.seats[0]?.conn !== conn) return;
     if (patch.level !== undefined) this.level = patch.level;
@@ -255,12 +273,17 @@ export class Room {
     if (patch.map !== undefined && patch.map !== this.mapName) {
       size = mapName === 'gen' ? this.options.size : mapName === 'europe' ? EUROPE_DEFAULT : 2;
     }
-    if (patch.players !== undefined && mapName === 'europe') size = patch.players;
-    size = Math.max(size, this.seats.length);
-    if (mapName !== this.mapName || size !== this.size) {
+    if (patch.players !== undefined) size = patch.players;
+    const seed = mapName === 'gen' && patch.seed !== undefined ? patch.seed : this.seed;
+    if (mapName === 'gen' && seed !== this.seed) this.seed = seed;
+    const known = mapName === 'gen' ? undefined : staticMap(mapName);
+    const cap = known === undefined ? SIZE_MAX : known.spawns.length;
+    size = Math.min(cap, Math.max(size, this.seats.length, 2));
+    if (mapName !== this.mapName || size !== this.size || patch.seed !== undefined) {
       const next = mapName === 'gen' ? this.options.makeMap?.(this.seed, size) : staticMap(mapName);
       if (next === undefined) return;
       this.map = next;
+      if (mapName !== this.mapName) for (const seat of this.seats) seat.spawn = null;
       this.mapName = mapName;
       this.size = size;
     }
@@ -363,6 +386,9 @@ export class Room {
       watching: null,
       windowStart: 0,
       windowCount: 0,
+      ready: false,
+      spawn: null,
+      chatAt: [],
     };
   }
 
@@ -391,6 +417,10 @@ export class Room {
     }
     if (seat.botControlled) this.takeBack(seat);
     this.sendWelcome(seat);
+    // Возврат из меню в идущий матч: лобби-клиент по «start» переходит на экран игры.
+    if (this.phase === 'running' && this.state !== null) {
+      this.send(seat, { t: 'start', tick: this.state.tick });
+    }
     if (this.phase === 'lobby' && !seat.spectator) {
       this.send(seat, { t: 'lobby', info: this.lobbyInfo(), host: this.seats[0] === seat });
     }
@@ -556,6 +586,126 @@ export class Room {
     seat.waitingTicks = 0;
   }
 
+  /** Готовность к старту: видна всем в списке мест. */
+  public setReady(conn: Connection, ready: boolean): void {
+    const seat = this.seatOf(conn);
+    if (this.phase !== 'lobby' || seat === undefined || seat.spectator) return;
+    seat.ready = ready;
+    this.broadcastLobby();
+  }
+
+  /**
+   * Хозяин передаёт комнату: выбранный человек встаёт на первое место (хозяин — всегда первое), места
+   * перенумеровываются, все получают новое приветствие и табло.
+   */
+  public transfer(conn: Connection, to: number): void {
+    if (this.phase !== 'lobby' || this.mode !== 'private' || this.seats[0]?.conn !== conn) return;
+    const target = this.seats.find((seat) => seat.playerId === to);
+    if (target === undefined || target === this.seats[0]) return;
+    this.seats.splice(this.seats.indexOf(target), 1);
+    this.seats.unshift(target);
+    this.seats.forEach((seat, index) => {
+      seat.playerId = index;
+    });
+    for (const seat of this.seats) if (seat.conn !== null) this.sendWelcome(seat);
+    this.broadcastLobby();
+  }
+
+  /** Стартовая точка человека: занятая другим игроком не выдаётся; `null` — случайная. */
+  public pick(conn: Connection, spawn: number | null): void {
+    const seat = this.seatOf(conn);
+    if (this.phase !== 'lobby' || seat === undefined || seat.spectator) return;
+    if (spawn !== null) {
+      if (spawn >= this.map.spawns.length) return;
+      if (this.seats.some((other) => other !== seat && other.spawn === spawn)) return;
+    }
+    seat.spawn = spawn;
+    this.broadcastLobby();
+  }
+
+  /** Можно ли после матча вернуть присутствующих в лобби (закрытая комната, есть люди онлайн). */
+  public get rematchable(): boolean {
+    return this.phase === 'ended' && this.mode === 'private' && this.hasConnected();
+  }
+
+  /**
+   * «Ещё раз»: хозяин возвращает всех присутствующих в лобби этой комнаты. Ушедшие и зрители
+   * отпадают, зерно случайной карты меняется, готовность и выбор точек сбрасываются.
+   */
+  public rematch(conn: Connection): void {
+    if (!this.rematchable) return;
+    const host = this.seats.find((seat) => seat.conn !== null);
+    if (host === undefined || host.conn !== conn) return;
+    for (const spectator of this.spectators.splice(0)) spectator.conn?.close();
+    const kept = this.seats.filter((seat) => seat.conn !== null);
+    this.seats.splice(0, this.seats.length, ...kept);
+    this.seats.forEach((seat, index) => {
+      Object.assign(seat, {
+        playerId: index,
+        pending: [],
+        events: [],
+        selected: null,
+        lastSel: null,
+        lastSeq: 0,
+        waitingTicks: 0,
+        droppedAt: null,
+        botControlled: false,
+        watching: null,
+        ready: false,
+        spawn: null,
+      });
+      seat.stream.reset();
+    });
+    this.state = null;
+    this.phase = 'lobby';
+    this.seed = (Math.imul(this.seed, 1103515245) + 12345) >>> 1;
+    if (this.mapName === 'gen') this.map = this.options.makeMap?.(this.seed, this.size) ?? this.map;
+    for (const seat of this.seats) {
+      this.send(seat, { t: 'rematch' });
+      this.sendWelcome(seat);
+    }
+    this.broadcastLobby();
+  }
+
+  /** Сообщение чата: всем в комнате или личное; не чаще четырёх за четыре секунды. */
+  public chat(conn: Connection, message: { text?: string; emoji?: number; to?: number }): void {
+    const from = this.seats.find((seat) => seat.conn === conn);
+    if (from === undefined) return;
+    const now = this.options.now();
+    from.chatAt = from.chatAt.filter((at) => now - at < CHAT_WINDOW_MS);
+    if (from.chatAt.length >= CHAT_BURST) return;
+    from.chatAt.push(now);
+    const out: S2C = {
+      t: 'chat',
+      from: from.playerId,
+      nick: from.nick,
+      ...(message.text === undefined ? {} : { text: message.text }),
+      ...(message.emoji === undefined ? {} : { emoji: message.emoji }),
+      ...(message.to === undefined ? {} : { to: message.to }),
+    };
+    const targets =
+      message.to === undefined
+        ? this.seats
+        : this.seats.filter((seat) => seat === from || seat.playerId === message.to);
+    for (const seat of targets) this.send(seat, out);
+  }
+
+  /** Метка на карте: видят сам игрок и его союзники (дипломатия матча). */
+  public mark(conn: Connection, hex: number, kind: MarkKind): void {
+    const state = this.state;
+    const from = this.seats.find((seat) => seat.conn === conn);
+    if (this.phase !== 'running' || state === null || from === undefined) return;
+    if (hex >= state.hexes.owner.length) return;
+    const now = this.options.now();
+    from.chatAt = from.chatAt.filter((at) => now - at < CHAT_WINDOW_MS);
+    if (from.chatAt.length >= CHAT_BURST) return;
+    from.chatAt.push(now);
+    for (const seat of this.seats) {
+      if (seat !== from && !isAllied(state, from.playerId, seat.playerId)) continue;
+      this.send(seat, { t: 'mark', from: from.playerId, hex, kind });
+    }
+  }
+
   /** Хозяин (первое место) запускает матч раньше срока. */
   public startEarly(conn: Connection): void {
     if (this.phase === 'lobby' && this.seats[0]?.conn === conn) this.start();
@@ -574,9 +724,13 @@ export class Room {
     const { fog } = this.options;
     const { size } = this;
     const { map, seed } = this;
-    const setup = Array.from({ length: size }, (_, i) => ({
-      name: this.seats[i]?.nick ?? `Бот ${i - this.seats.length + 1}`,
-    }));
+    const setup = Array.from({ length: size }, (_, i) => {
+      const seat = this.seats[i];
+      return {
+        name: seat?.nick ?? `Бот ${i - this.seats.length + 1}`,
+        ...(seat?.spawn === null || seat === undefined ? {} : { spawn: seat.spawn }),
+      };
+    });
     const state = createMatch(map, setup, seed, { fog, diplomacy: true });
     for (const seat of this.seats) {
       this.takeBack(seat, state);

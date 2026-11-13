@@ -38,6 +38,8 @@ export type ToWorker =
       readonly tutorial?: boolean;
       /** Сложность ботов матча; нет поля — полная сила. */
       readonly botLevel?: BotLevel;
+      /** Стартовая точка человека (индекс в карте); нет поля — случайная. */
+      readonly spawn?: number;
     }
   | { readonly t: 'command'; readonly cmd: Command }
   | { readonly t: 'fog'; readonly on: boolean }

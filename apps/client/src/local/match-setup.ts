@@ -17,6 +17,8 @@ export interface LocalMatchSetup {
   readonly tutorial: string | null;
   /** Сложность ботов (`difficulty=easy|normal|hard`); без параметра — полная сила. */
   readonly botLevel: BotLevel;
+  /** Выбранная стартовая точка игрока (`spawn=N`, индекс в карте); нет — случайная. */
+  readonly spawn: number | null;
 }
 
 /** Сложность из адреса: «hard» — полная сила бота (`medium` в sim). */
@@ -24,6 +26,13 @@ function botLevelParam(value: string | null): BotLevel {
   if (value === 'easy') return 'easy';
   if (value === 'normal') return 'normal';
   return 'medium';
+}
+
+/** Номер стартовой точки из адреса: целое от 0; иначе игрок садится случайно. */
+function spawnParam(value: string | null): number | null {
+  if (value === null || value === '') return null;
+  const index = Number(value);
+  return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
 /** Состав локального матча: игрок 0 — человек, остальные участники — боты. */
@@ -63,5 +72,6 @@ export function readLocalMatchSetup(search: string): LocalMatchSetup {
     initialGold: goldParam(params.get('initialGold')),
     tutorial,
     botLevel: botLevelParam(params.get('difficulty')),
+    spawn: spawnParam(params.get('spawn')),
   };
 }

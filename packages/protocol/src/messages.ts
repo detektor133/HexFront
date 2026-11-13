@@ -55,6 +55,15 @@ export const LOBBY_LEVELS: readonly LobbyLevel[] = ['easy', 'normal', 'hard'];
 export type LobbyMap = 'gen' | 'europe' | 'small' | 'tiny';
 export const LOBBY_MAPS: readonly LobbyMap[] = ['europe', 'gen', 'small', 'tiny'];
 
+/** Предельная длина сообщения чата. */
+export const CHAT_MAX = 140;
+/** Номеров быстрых эмодзи в наборе клиента. */
+export const EMOJI_COUNT = 8;
+
+/** Вид метки на карте: атака, защита, помощь, внимание. */
+export type MarkKind = 'attack' | 'defend' | 'help' | 'look';
+export const MARK_KINDS: readonly MarkKind[] = ['attack', 'defend', 'help', 'look'];
+
 export type C2S =
   | {
       readonly t: 'hello';
@@ -99,7 +108,29 @@ export type C2S =
       readonly level?: LobbyLevel;
       readonly map?: LobbyMap;
       readonly players?: number;
+      /** Новое зерно случайной карты (кнопка «Сгенерировать»). */
+      readonly seed?: number;
     }
+  /** Готовность к старту (закрытая комната): видна всем в списке мест. */
+  | { readonly t: 'ready'; readonly ready: boolean }
+  /** Хозяин передаёт комнату другому человеку из лобби (по номеру места `to`). */
+  | { readonly t: 'transfer'; readonly to: number }
+  /** Стартовая точка человека (индекс в карте);  — случайная. Только в лобби. */
+  | { readonly t: 'pick'; readonly spawn: number | null }
+  /** После матча хозяин возвращает всех присутствующих в лобби той же комнаты. */
+  | { readonly t: 'rematch' }
+  /**
+   * Сообщение игрокам: текст или быстрый эмодзи (`emoji` — номер в наборе клиента). `to` — id
+   * получателя (личное), нет поля — всем в комнате.
+   */
+  | {
+      readonly t: 'chat';
+      readonly text?: string;
+      readonly emoji?: number;
+      readonly to?: number;
+    }
+  /** Метка на карте для союзников (и себя): гекс и вид. */
+  | { readonly t: 'mark'; readonly hex: number; readonly kind: MarkKind }
   /**
    * Выбывший игрок смотрит матч глазами другого игрока (вид, карточки, прогнозы — его), но не
    * командует. Живому игроку сервер отказывает молча: иначе можно подсматривать чужой туман.
@@ -128,6 +159,16 @@ export interface LobbyInfo {
   /** Сложность ботов и карта комнаты: хозяин закрытой комнаты их меняет. */
   readonly level: LobbyLevel;
   readonly map: LobbyMap;
+  /** Места людей по порядку: ник, готовность, владелец комнаты, выбранная стартовая точка. */
+  readonly seats: readonly LobbySeat[];
+}
+
+export interface LobbySeat {
+  readonly id: number;
+  readonly nick: string;
+  readonly ready: boolean;
+  readonly host: boolean;
+  readonly spawn: number | null;
 }
 
 export type S2C =
@@ -161,6 +202,18 @@ export type S2C =
   | { readonly t: 'refused'; readonly reason: RefuseReason }
   | { readonly t: 'end'; readonly winner: number; readonly tick: number }
   | { readonly t: 'pong'; readonly at: number }
+  /** Сообщение чата: `from` — id отправителя, `to` есть у личных. */
+  | {
+      readonly t: 'chat';
+      readonly from: number;
+      readonly nick: string;
+      readonly text?: string;
+      readonly emoji?: number;
+      readonly to?: number;
+    }
+  | { readonly t: 'mark'; readonly from: number; readonly hex: number; readonly kind: MarkKind }
+  /** Матч закончился, хозяин вернул всех в лобби: клиент уходит с экрана матча в лобби. */
+  | { readonly t: 'rematch' }
   /** Карточка выбранного гекса: приходит сразу при выборе и затем при каждом изменении. */
   | { readonly t: 'selection'; readonly sel: Selection | null }
   | { readonly t: 'pathPreview'; readonly id: number; readonly preview: PathPreview | null }
@@ -381,6 +434,10 @@ export function decodeClientMessage(text: string): C2S {
       if (source.level !== undefined && level === undefined) throw new MessageError('Поле level');
       const map = LOBBY_MAPS.find((m) => m === source.map);
       if (source.map !== undefined && map === undefined) throw new MessageError('Поле map');
+      const seed = source.seed;
+      if (seed !== undefined && (!isInt(seed) || seed < 0 || seed > 2_000_000_000)) {
+        throw new MessageError('Поле seed');
+      }
       const players = source.players;
       if (players !== undefined && (!isInt(players) || players < 2 || players > 30)) {
         throw new MessageError('Поле players');
@@ -390,7 +447,51 @@ export function decodeClientMessage(text: string): C2S {
         ...(level === undefined ? {} : { level }),
         ...(map === undefined ? {} : { map }),
         ...(players === undefined ? {} : { players }),
+        ...(seed === undefined ? {} : { seed }),
       };
+    }
+    case 'ready':
+      if (typeof source.ready !== 'boolean') throw new MessageError('Поле ready');
+      return { t: 'ready', ready: source.ready };
+    case 'transfer':
+      if (!isInt(source.to) || source.to < 0 || source.to > 1000) {
+        throw new MessageError('Поле to');
+      }
+      return { t: 'transfer', to: source.to };
+    case 'pick':
+      if (
+        source.spawn !== null &&
+        (!isInt(source.spawn) || source.spawn < 0 || source.spawn > 200)
+      ) {
+        throw new MessageError('Поле spawn');
+      }
+      return { t: 'pick', spawn: source.spawn };
+    case 'rematch':
+      return { t: 'rematch' };
+    case 'chat': {
+      const text = optionalString(source.text, CHAT_MAX, 'text');
+      const { emoji, to } = source;
+      if (emoji !== undefined && (!isInt(emoji) || emoji < 0 || emoji >= EMOJI_COUNT)) {
+        throw new MessageError('Поле emoji');
+      }
+      if (to !== undefined && (!isInt(to) || to < 0 || to > 1000))
+        throw new MessageError('Поле to');
+      if ((text === undefined || text.trim() === '') && emoji === undefined) {
+        throw new MessageError('Пустое сообщение');
+      }
+      return {
+        t: 'chat',
+        ...(text === undefined || text.trim() === '' ? {} : { text: text.trim() }),
+        ...(emoji === undefined ? {} : { emoji }),
+        ...(to === undefined ? {} : { to }),
+      };
+    }
+    case 'mark': {
+      const kind = MARK_KINDS.find((k) => k === source.kind);
+      if (!isInt(source.hex) || source.hex < 0 || kind === undefined) {
+        throw new MessageError('Некорректная метка');
+      }
+      return { t: 'mark', hex: source.hex, kind };
     }
     case 'resync':
       return { t: 'resync' };

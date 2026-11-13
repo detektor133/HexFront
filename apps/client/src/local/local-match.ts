@@ -21,6 +21,7 @@ export function startLocalMatch(
     readonly initialGold?: number | null;
     readonly tutorial?: boolean;
     readonly botLevel?: BotLevel;
+    readonly spawn?: number | null;
   } = {},
 ): LocalMatch {
   const worker = new Worker(new URL('./sim-worker.ts', import.meta.url), { type: 'module' });
@@ -40,6 +41,7 @@ export function startLocalMatch(
     ...(options.playerColors ? { playerColors: options.playerColors } : {}),
     ...(options.tutorial ? { tutorial: true } : {}),
     ...(options.botLevel ? { botLevel: options.botLevel } : {}),
+    ...(options.spawn !== undefined && options.spawn !== null ? { spawn: options.spawn } : {}),
     ...(options.initialGold !== undefined && options.initialGold !== null
       ? { initialGold: options.initialGold }
       : {}),
