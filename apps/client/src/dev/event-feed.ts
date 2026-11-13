@@ -1,5 +1,7 @@
 import type { GameEvent, PlayerView } from '@hexfront/sim';
 
+import { PREF_EVENT_SECONDS, readNumberPref } from '../settings/bool-pref.ts';
+
 export interface EventFeedItem {
   readonly id: string;
   readonly event: GameEvent;
@@ -94,7 +96,7 @@ export function appendEvents(
       event,
       hex: eventHex(event, view),
       important: isImportantEvent(event),
-      expiresAt: now + EVENT_TTL_MS,
+      expiresAt: now + readNumberPref(PREF_EVENT_SECONDS, EVENT_TTL_MS / 1000) * 1000,
     }));
   return [...items, ...fresh].filter((item) => item.expiresAt > now).slice(-EVENTS_KEPT);
 }

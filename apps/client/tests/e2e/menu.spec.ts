@@ -348,3 +348,108 @@ test('@layout против ботов: нажатие по карте за ме�
   expect(Number(params.get('spawn'))).toBeGreaterThanOrEqual(0);
   expect(params.has('pick')).toBe(false);
 });
+
+for (const size of [
+  { width: 1280, height: 720, name: 'desktop' },
+  { width: 390, height: 844, name: 'phone' },
+]) {
+  test(`@layout вошёл в лобби по коду: кнопка «Готов» видна и нажимается ${size.name}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: size });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      localStorage.setItem('hexfront.tutorialAsked', '1');
+      localStorage.setItem('hexfront.nickname', 'Гость');
+    });
+    const sent: Record<string, unknown>[] = [];
+    await page.routeWebSocket('ws://127.0.0.1:9995/**', (ws) => {
+      let ready = false;
+      const lobby = (): string =>
+        JSON.stringify({
+          t: 'lobby',
+          info: {
+            room: 'K7QF',
+            humans: 2,
+            max: 12,
+            startsInS: null,
+            open: false,
+            level: 'hard',
+            map: 'small',
+            seats: [
+              { id: 0, nick: 'Хозяин', ready: false, host: true, spawn: null },
+              { id: 1, nick: 'Гость', ready, host: false, spawn: null },
+            ],
+            starts: [],
+          },
+          host: false,
+        });
+      ws.onMessage((text) => {
+        const message = JSON.parse(String(text)) as Record<string, unknown>;
+        sent.push(message);
+        if (message.t === 'hello') {
+          ws.send(
+            JSON.stringify({
+              t: 'welcome',
+              playerId: 1,
+              token: 'g',
+              room: 'K7QF',
+              tickMs: 100,
+              map: 'small',
+              seed: 42,
+              players: 12,
+              fog: true,
+            }),
+          );
+          ws.send(lobby());
+        }
+        if (message.t === 'ready') {
+          ready = message.ready === true;
+          ws.send(lobby());
+        }
+      });
+    });
+    await page.route('http://127.0.0.1:9995/healthz*', (route) =>
+      route.fulfill({
+        json: { ok: true, humans: 3 },
+        headers: { 'access-control-allow-origin': '*' },
+      }),
+    );
+    await page.goto('/?server=ws://127.0.0.1:9995', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /Онлайн|Online/ }).click();
+    const panel = page.getByRole('group', { name: /Онлайн|Online/ });
+    const field = panel.getByRole('textbox', { name: /Войти по коду|Join by code/ });
+    await field.fill('K7QF');
+    await field.press('Enter');
+    const ready = page.getByRole('button', { name: /^(Готов|Ready)$/ }).last();
+    await expect(ready).toBeVisible({ timeout: 10_000 });
+    const box = await ready.boundingBox();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(size.height);
+    const shot = process.env.LOBBY_SHOT;
+    if (shot) await page.screenshot({ path: `${shot}-${size.name}-before.png` });
+    await ready.click();
+    await expect.poll(() => sent.some((m) => m.t === 'ready' && m.ready === true)).toBe(true);
+    if (shot) await page.screenshot({ path: `${shot}-${size.name}-after.png` });
+    await context.close();
+  });
+}
+
+test('@layout настройки: вкладка «Управление» меняет и запоминает значения', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('hexfront.tutorialAsked', '1');
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Настройки|Settings/ }).click();
+  await page.getByRole('tab', { name: /Управление|Controls/ }).click();
+  await page.getByRole('radio', { name: /Быстро|Fast/ }).click();
+  await page.getByRole('checkbox', { name: /Инерция карты|Map inertia/ }).uncheck();
+  const saved = await page.evaluate(() => [
+    localStorage.getItem('hexfront.zoomSpeed'),
+    localStorage.getItem('hexfront.inertia'),
+  ]);
+  expect(saved).toEqual(['1.5', 'off']);
+  const tab = page.getByRole('tabpanel');
+  const box = await tab.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+});

@@ -43,3 +43,19 @@
   color: var(--ui-ink2);
   font-size: var(--font-size-caption);
 }
+
+.langRow {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.langOn {
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  color: var(--ui-button-primary-ink);
+  font: inherit;
+  cursor: default;
+  background: var(--ui-button-primary-bg);
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-button-primary-bg);
+  border-radius: var(--radius-button);
+}

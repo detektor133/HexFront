@@ -267,15 +267,14 @@ export function LobbyPanel(props: {
     };
   }, [mode, room, spectate, resume, nick, attempt]);
 
+  // Комната друзей — и у хозяина, и у тех, кто вошёл по коду: у вторых режим в адресе не указан.
+  const friends = mode === 'private' || room !== null;
   const invite =
-    session !== null && mode === 'private'
-      ? `${window.location.origin}/online?room=${session.room}`
-      : null;
+    session !== null && friends ? `${window.location.origin}/online?room=${session.room}` : null;
   const copy = (): void => {
     if (invite === null) return;
     void navigator.clipboard.writeText(invite).then(() => setCopied(true));
   };
-  const friends = mode === 'private' || room !== null;
   const title = t(
     spectate ? 'online.spectateTitle' : friends ? 'online.privateTitle' : 'online.searching',
   );
@@ -367,7 +366,7 @@ export function LobbyPanel(props: {
                 </button>
               </div>
             )}
-            {mode === 'private' && session !== null && (
+            {friends && session !== null && (
               <Roster
                 seats={info.seats}
                 me={session.playerId}
@@ -376,7 +375,7 @@ export function LobbyPanel(props: {
                 onReady={(ready) => clientRef.current?.setReady(ready)}
               />
             )}
-            {mode === 'private' && (
+            {friends && (
               <>
                 {isHost ? (
                   <button
@@ -399,7 +398,7 @@ export function LobbyPanel(props: {
               </>
             )}
           </div>
-          {mode === 'private' && (
+          {friends && (
             <div className={styles.col}>
               <MapPicker
                 map={info.map}

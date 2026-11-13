@@ -286,6 +286,20 @@ const ru = {
   'settings.back': 'Назад',
   'settings.tab.screen': 'Экран',
   'settings.tab.game': 'Игра',
+  'settings.tab.controls': 'Управление',
+  'settings.sec': 'с',
+  'settings.eventSeconds': 'Время показа событий в ленте',
+  'settings.eventSecondsHint': 'Сколько секунд запись висит в ленте, пока её не вытеснят новые.',
+  'settings.ping': 'Всегда показывать пинг',
+  'settings.pingHint': 'В сетевом матче: по умолчанию пинг виден, только когда связь плохая.',
+  'settings.zoomSpeed': 'Скорость зума колесом',
+  'settings.zoomSpeedHint': 'Как быстро карта приближается и отдаляется от колеса мыши.',
+  'settings.slow': 'Медленно',
+  'settings.normal': 'Обычно',
+  'settings.fast': 'Быстро',
+  'settings.inertia': 'Инерция карты',
+  'settings.inertiaHint': 'После быстрого броска карта ещё немного скользит. Выключи, если мешает.',
+  'settings.language': 'Язык',
   'settings.labels': 'Названия государств на карте',
   'settings.labelsHint':
     'Подписи над территориями игроков. Выключи, если они мешают смотреть на карту.',
@@ -1020,6 +1034,23 @@ const en: Record<MessageKey, string> = {
   'settings.back': 'Back',
   'settings.tab.screen': 'Screen',
   'settings.tab.game': 'Game',
+  'settings.tab.controls': 'Controls',
+  'settings.sec': 's',
+  'settings.eventSeconds': 'Event feed time',
+  'settings.eventSecondsHint':
+    'How many seconds an entry stays in the feed unless newer ones push it out.',
+  'settings.ping': 'Always show ping',
+  'settings.pingHint':
+    'In online matches: by default ping is shown only when the connection is poor.',
+  'settings.zoomSpeed': 'Wheel zoom speed',
+  'settings.zoomSpeedHint': 'How fast the map zooms with the mouse wheel.',
+  'settings.slow': 'Slow',
+  'settings.normal': 'Normal',
+  'settings.fast': 'Fast',
+  'settings.inertia': 'Map inertia',
+  'settings.inertiaHint':
+    'After a quick swipe the map keeps gliding. Turn off if it gets in the way.',
+  'settings.language': 'Language',
   'settings.labels': 'Country names on the map',
   'settings.labelsHint': 'Labels above player territories. Turn off if they get in the way.',
   'match.end': 'Match over',
@@ -1201,8 +1232,18 @@ const en: Record<MessageKey, string> = {
   'recruit.amount': 'Soldier count',
 };
 
-export const lang =
-  typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
+/** Язык интерфейса: выбранный в настройках или по языку браузера. */
+function pickLang(): 'ru' | 'en' {
+  try {
+    const saved = localStorage.getItem('hexfront.lang');
+    if (saved === 'ru' || saved === 'en') return saved;
+  } catch {
+    // Хранилище закрыто: язык берётся из браузера.
+  }
+  return typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
+}
+
+export const lang = pickLang();
 const dict: Record<MessageKey, string> = lang === 'ru' ? ru : en;
 
 /** Текст причины отказа команды; неизвестная причина — ключ как есть, чтобы её было видно. */

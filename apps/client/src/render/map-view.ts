@@ -22,6 +22,12 @@ import { createGesture, type Gesture, type StrokePhase, type TapKind } from './g
 import { graphicsTelemetry, type GraphicsTelemetry } from './graphics-telemetry.ts';
 import { hexCenter, mapBounds, pixelToHex, type Point, type Rect } from './hex-geometry.ts';
 import { createTerrainLayer, type TerrainLayer } from './terrain-layer.ts';
+import {
+  PREF_INERTIA,
+  PREF_ZOOM_SPEED,
+  readBoolPref,
+  readNumberPref,
+} from '../settings/bool-pref.ts';
 import { currentBrightness, onBrightness } from '../settings/brightness.ts';
 import { tokens } from '../theme/tokens.ts';
 
@@ -302,6 +308,7 @@ export async function createMapView(
       };
       if (progress >= 1) centerAnimation = null;
     }
+    if (velocity && !readBoolPref(PREF_INERTIA, true)) velocity = null;
     if (velocity && pressed === 0) {
       const v = velocity;
       cam = panBy(
@@ -582,7 +589,7 @@ export function attachInput(canvas: HTMLCanvasElement, g: Gesture, h: InputHandl
   };
   const wheel = (e: WheelEvent): void => {
     e.preventDefault();
-    h.zoom(wheelFactor(e.deltaY), local(e));
+    h.zoom(wheelFactor(e.deltaY, readNumberPref(PREF_ZOOM_SPEED, 1)), local(e));
   };
 
   canvas.style.touchAction = 'none';

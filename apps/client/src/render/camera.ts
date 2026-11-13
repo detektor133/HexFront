@@ -135,8 +135,8 @@ export function zoomAt(
 }
 
 /** Множитель масштаба для события колеса. */
-export function wheelFactor(deltaY: number): number {
-  return WHEEL_ZOOM_PER_100 ** (-deltaY / 100);
+export function wheelFactor(deltaY: number, speed = 1): number {
+  return WHEEL_ZOOM_PER_100 ** ((-deltaY / 100) * speed);
 }
 
 /** Сдвиг камеры на экранный вектор. */

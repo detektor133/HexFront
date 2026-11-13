@@ -30,6 +30,7 @@ import { useTelemetry } from '../dev/telemetry-client.ts';
 import { useLingering } from '../dev/use-lingering.ts';
 import { t } from '../i18n/dict.ts';
 import { chatStore } from '../net/chat-store.ts';
+import { PREF_SHOW_PING, useBoolPref } from '../settings/bool-pref.ts';
 import { enterFullscreenOnFirstTap } from '../settings/fullscreen.ts';
 import { tokens } from '../theme/tokens.ts';
 import { TutorialOverlay } from '../tutorial/TutorialOverlay.tsx';
@@ -78,6 +79,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
   useEffect(() => enterFullscreenOnFirstTap(), []);
   const [offscreen, setOffscreen] = useState<readonly { other: number; hex: number }[]>([]);
   const sb = useSandbox(hostRef, loaded, mapRequest, debug);
+  const [showPing] = useBoolPref(PREF_SHOW_PING, false);
   const chat = { sender: chatStore.getState().sender };
   const [pauseState, setPauseState] = useState({ paused: false, menuOpen: false });
   const lastPauseStyle = useRef<React.CSSProperties | undefined>(undefined);
@@ -564,7 +566,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
         </p>
       ) : (
         sb.pingMs !== null &&
-        sb.pingMs > 200 && (
+        (sb.pingMs > 200 || showPing) && (
           <p className={styles.error} role="status">
             {`${sb.pingMs} ${t('net.ping')}`}
           </p>
