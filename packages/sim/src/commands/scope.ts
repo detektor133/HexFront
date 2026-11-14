@@ -2,7 +2,8 @@
 // раздел»). Охват — одна страна или весь блок врагов (страна цели и её союзники, с которыми идёт
 // война); он выбирается при приказе и дальше не меняется, когда враги объединяются или распадаются.
 // Несколько армий одного охвата делят его границу на участки сами.
-import { distance, hexFromId, type HexId } from '../math/hex.ts';
+import { TERRAIN } from '../map/types.ts';
+import { distance, hexFromId, hexId, inBounds, neighbors, type HexId } from '../math/hex.ts';
 import { intDiv } from '../math/int.ts';
 import { borderEdges, borderSegmentEdges, edgeHex, type EdgeId } from '../state/edges.ts';
 import { atWar, isAllied } from '../state/relations.ts';
@@ -58,12 +59,47 @@ export function wantsBloc(
   );
 }
 
+/** Охват приказа (блок, плацдарм), который переходит в каждое новое состояние направления. */
+export function keepScope(dir: NonNullable<Army['dir']>): {
+  bloc?: true;
+  pocket?: number;
+} {
+  return {
+    ...(dir.bloc === true ? { bloc: true as const } : {}),
+    ...(dir.pocket === undefined ? {} : { pocket: dir.pocket }),
+  };
+}
+
+/**
+ * Своя суша, связная с гексом hex (для плацдарма десанта).
+ * @returns гексы или null, если hex не наш
+ */
+export function pocketHexes(state: MatchState, owner: number, hex: HexId): Set<HexId> | null {
+  const { width, height } = state.map;
+  const own = (h: HexId): boolean =>
+    state.hexes.owner[h] === owner && state.map.terrain[h] !== TERRAIN.water;
+  if (!own(hex)) return null;
+  const land = new Set<HexId>([hex]);
+  const queue = [hex];
+  for (let i = 0; i < queue.length; i += 1) {
+    for (const n of neighbors(hexFromId(queue[i] as HexId, width))) {
+      if (!inBounds(n, width, height)) continue;
+      const id = hexId(n, width);
+      if (land.has(id) || !own(id)) continue;
+      land.add(id);
+      queue.push(id);
+    }
+  }
+  return land;
+}
+
 /** Куски своей границы с охватом, каждый — упорядоченная цепочка граней. */
 export function borderPieces(
   state: MatchState,
   playerId: number,
   target: number,
   bloc = false,
+  pocket?: number,
 ): EdgeId[][] {
   const isEnemy = blocOf(state, playerId, target, bloc);
   const pieces: EdgeId[][] = [];
@@ -74,7 +110,9 @@ export function borderPieces(
     for (const x of piece) seen.add(x);
     if (piece.length > 0) pieces.push(piece);
   }
-  return pieces;
+  if (pocket === undefined) return pieces;
+  const land = pocketHexes(state, playerId, pocket);
+  return land ? pieces.filter((p) => land.has(edgeHex(p[0] as EdgeId))) : [];
 }
 
 /** Армии с тем же охватом, что у `army`, по возрастанию id (сама армия входит). */
@@ -86,7 +124,11 @@ export function scopeMates(state: MatchState, army: Army): Army[] {
     .filter((a) => {
       if (a.owner !== army.owner || !a.dir || a.dir.mode === 'idle') return false;
       if (a.id === army.id) return true;
-      return (dir.bloc === true) === (a.dir.bloc === true) && same(a.dir.target);
+      return (
+        (dir.bloc === true) === (a.dir.bloc === true) &&
+        dir.pocket === a.dir.pocket &&
+        same(a.dir.target)
+      );
     })
     .sort((a, b) => a.id - b.id);
 }
@@ -195,7 +237,7 @@ export function shareBorder(
 export function armyPieces(state: MatchState, army: Army): EdgeId[][] {
   const dir = army.dir;
   if (!dir || dir.target < 0) return [];
-  const all = borderPieces(state, army.owner, dir.target, dir.bloc === true);
+  const all = borderPieces(state, army.owner, dir.target, dir.bloc === true, dir.pocket);
   const mates = scopeMates(state, army);
   if (mates.length <= 1 || all.length === 0) return all;
   return shareBorder(state, all, mates).get(army.id) ?? [];

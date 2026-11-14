@@ -12,9 +12,10 @@ import {
   releaseDirection,
 } from '../commands/launch.ts';
 import { placeFront } from '../commands/plan.ts';
-import { armyPieces } from '../commands/scope.ts';
+import { armyPieces, keepScope, pocketHexes } from '../commands/scope.ts';
 import { onSeaMission } from '../queries/unit-view.ts';
-import type { MatchState } from '../state/types.ts';
+import { atWar } from '../state/relations.ts';
+import type { Army, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
 // Фронт направления — не «едущая» линия, а сама граница с целью: любая смена владельца гекса
@@ -36,6 +37,21 @@ function syncFronts(state: MatchState): void {
   });
 }
 
+// Десант высадился: армия встаёт на плацдарм — наступает на хозяина берега (фронт и линия по
+// его границе у плацдарма) или занимает ничью землю. Прежнее направление к этому моменту снято.
+function landed(state: MatchState, army: Army): void {
+  const landing = army.landing;
+  delete army.landing;
+  if (!landing) return;
+  const target = landing.target;
+  if (target < 0) {
+    army.dir = { target: -1, mode: 'attack', hex: landing.hex };
+    return;
+  }
+  if (state.players[target]?.status !== 'alive' || !atWar(state, army.owner, target)) return;
+  army.dir = { target, mode: 'attack', pocket: landing.hex };
+}
+
 /** Обновляет фронты (каждый тик), удары и занятие направлений (раз в секунду). */
 export function maintainDirections(state: MatchState): void {
   syncFronts(state);
@@ -46,6 +62,18 @@ export function maintainDirections(state: MatchState): void {
     if (army.invading !== true) continue;
     if (!allUnits(state).some((u) => u.armyId === army.id && onSeaMission(state, u))) {
       delete army.invading;
+      landed(state, army);
+    }
+  }
+  // Плацдарм слился с основной землёй — армия держит границу как обычная.
+  for (const army of state.armies) {
+    const dir = army.dir;
+    if (dir?.pocket === undefined) continue;
+    const capital = state.cities.find((c) => c.id === state.players[army.owner]?.capitalCityId);
+    const land = pocketHexes(state, army.owner, dir.pocket);
+    if (!land) releaseDirection(state, army);
+    else if (capital && land.has(capital.hex)) {
+      army.dir = { target: dir.target, mode: dir.mode, ...(dir.bloc ? { bloc: true } : {}) };
     }
   }
   for (const army of [...state.armies]) {
@@ -61,7 +89,7 @@ export function maintainDirections(state: MatchState): void {
     }
     // Временная оборона после застоя: время пришло — снова наступаем.
     if (dir.mode === 'hold' && dir.resume !== undefined && state.tick >= dir.resume) {
-      army.dir = { target: dir.target, mode: 'attack', ...(dir.bloc ? { bloc: true } : {}) };
+      army.dir = { ...keepScope(dir), target: dir.target, mode: 'attack' };
       continueStrike(state, army);
       continue;
     }

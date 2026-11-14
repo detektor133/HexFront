@@ -92,6 +92,8 @@ export function executeInvade(state: MatchState, playerId: number, cmd: InvadeCo
   removePlan(state, army.id);
   army.auto = false;
   army.invading = true;
+  // По высадке армия сама встанет на плацдарм: фронт у границы с хозяином берега и наступление.
+  army.landing = { hex: cmd.to, target: state.hexes.owner[cmd.to] ?? -1 };
   for (const { unit, path } of sailors) {
     unit.slot = SLOT_DETACHED;
     unit.gather = -1;

@@ -6,7 +6,7 @@ import { dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
 import { pickAxes, type Force, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
-import { armyPieces, blocOf, borderPieces, scopeMates, wantsBloc } from './scope.ts';
+import { armyPieces, blocOf, borderPieces, keepScope, scopeMates, wantsBloc } from './scope.ts';
 import { OK, rejected, type Validation } from './types.ts';
 import { AXIS_DONE_PERCENT, AXIS_MAX, AXIS_SOLDIERS, OFFENSIVE_RETRY_TICKS } from '../balance.ts';
 import { commanderLine } from '../bots/commander-line.ts';
@@ -438,10 +438,10 @@ export function continueStrike(state: MatchState, army: Army): void {
   if (strike.edges.length > 0 && startStrike(state, army, dir.target, strike)) return;
   // Бить пока нечем: временная оборона, через OFFENSIVE_RETRY_TICKS армия попробует снова.
   army.dir = {
+    ...keepScope(dir),
     target: dir.target,
     mode: 'hold',
     resume: state.tick + OFFENSIVE_RETRY_TICKS,
-    ...(dir.bloc ? { bloc: true } : {}),
   };
 }
 
@@ -468,10 +468,10 @@ export function reshuffleStrike(state: MatchState, army: Army): void {
   }
   executePlanCommand(state, army.owner, { t: 'clearOffensive', armyId: army.id });
   army.dir = {
+    ...keepScope(dir),
     target: dir.target,
     mode: 'hold',
     resume: state.tick + OFFENSIVE_RETRY_TICKS,
-    ...(dir.bloc ? { bloc: true } : {}),
   };
 }
 

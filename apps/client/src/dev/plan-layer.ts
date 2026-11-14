@@ -137,6 +137,39 @@ export function isPointNearPath(
 }
 
 /** Создаёт слой; center — центр гекса в мировых координатах. */
+/** Сколько слоёв линий фронта на одном участке рисуется отдельно (дальше — в последнем слое). */
+const LAYER_MAX = 2;
+/** Сдвиг каждого следующего слоя вглубь своей земли, долей радиуса гекса. */
+const LAYER_STEP = 0.3;
+
+/**
+ * Сдвигает линию внутрь своей земли: каждая точка идёт к ближайшему центру своего гекса у фронта.
+ * @param amount сдвиг в мировых единицах
+ */
+export function shiftInward(
+  runs: readonly Point[][],
+  centers: readonly Point[],
+  amount: number,
+): Point[][] {
+  if (centers.length === 0 || amount <= 0) return runs.map((r) => [...r]);
+  return runs.map((run) =>
+    run.map((pt) => {
+      let best = centers[0] as Point;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (const c of centers) {
+        const d = Math.hypot(c.x - pt.x, c.y - pt.y);
+        if (d < bestDist) {
+          best = c;
+          bestDist = d;
+        }
+      }
+      if (bestDist === 0) return pt;
+      const t = Math.min(1, amount / bestDist);
+      return { x: pt.x + (best.x - pt.x) * t, y: pt.y + (best.y - pt.y) * t };
+    }),
+  );
+}
+
 export function createPlanLayer(
   map: MapStatic,
   radius: number,
@@ -341,6 +374,17 @@ export function createPlanLayer(
         const army = v.armies.find((a) => a.id === armyId);
         return army ? armyColor(army.number) : null;
       };
+      // Слои: армии на одном участке границы не рисуются друг поверх друга — каждая следующая
+      // линия сдвинута вглубь своей земли (армия на весь блок и усиление одной страны).
+      const taken = new Map<number, number>();
+      const layerOf = new Map<number, number>();
+      for (const p of v.plans) {
+        if (p.kind !== 'front') continue;
+        let layer = 0;
+        for (const e of p.edges) layer = Math.max(layer, taken.get(e) ?? 0);
+        for (const e of p.edges) taken.set(e, Math.max(taken.get(e) ?? 0, layer + 1));
+        layerOf.set(p.armyId, Math.min(layer, LAYER_MAX));
+      }
       for (const p of v.plans) {
         const color = colorOf(p.armyId);
         if (!color) continue;
@@ -348,7 +392,12 @@ export function createPlanLayer(
           drawDefense(v, p.hexes, color);
           continue;
         }
-        const front = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
+        const layer = layerOf.get(p.armyId) ?? 0;
+        const tweened = tweens.runs(p.armyId, p.edges.join(','), runsOf(p.edges), now);
+        const front =
+          layer === 0
+            ? tweened
+            : shiftInward(tweened, p.hexes.map(center), layer * LAYER_STEP * radius);
         drawOffensive(p);
         const appearance = frontAppearance(selectedArmy, p.armyId, level - 1);
         drawFront(front, color, appearance.alpha, appearance.detailShift);

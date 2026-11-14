@@ -70,6 +70,7 @@ export interface ArmyView {
     readonly target: number;
     readonly mode: 'hold' | 'attack' | 'idle';
     readonly bloc?: true;
+    readonly pocket?: number;
   };
   /** Армия в морском десанте: отряд на воде или его путь ведёт через воду (значок якоря). */
   readonly sea?: boolean;

@@ -120,6 +120,7 @@ function hashEntities(s: Hasher, state: MatchState): void {
       int(s, a.dir.mode === 'hold' ? 0 : a.dir.mode === 'attack' ? 1 : 2);
       if (a.dir.hex !== undefined) int(s, a.dir.hex);
       if (a.dir.bloc === true) int(s, 7);
+      if (a.dir.pocket !== undefined) int(s, a.dir.pocket + 11);
     }
   }
   int(s, state.plans.length);

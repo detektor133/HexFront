@@ -204,9 +204,9 @@ describe('порты и морские переправы', () => {
     expect(armyViews(s.state, 0).find((a) => a.id === army)?.sea).toBe(true);
     s.runSeconds(117);
     expect(armyViews(s.state, 0).find((a) => a.id === army)?.sea).toBeUndefined();
-    const here = [unit, walker].map((id) => s.unitById(id)?.hex);
-    expect(here.every((h) => h === shore || h === undefined)).toBe(true);
+    // Высадились и дальше не стоят: армия наступает на хозяина берега (см. landing.test.ts).
     expect(s.state.hexes.owner[shore]).toBe(0);
+    expect(s.state.armies.find((a) => a.id === army)?.dir?.target).toBe(1);
   });
 });
 

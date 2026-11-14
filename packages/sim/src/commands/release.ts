@@ -1,6 +1,7 @@
 // Снятие направления (07-controls.md, «Меню страны»): фронт и заказ набора убраны, армия остаётся
 // со своими отрядами и лимитом, но стоит без дела — «пустая» она исчезает только по приказу игрока.
 import { removePlan } from './plan.ts';
+import { keepScope } from './scope.ts';
 import type { Army, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -16,5 +17,5 @@ export function releaseDirection(state: MatchState, army: Army): void {
   const rest = state.recruits.filter((r) => r.armyId !== army.id);
   state.recruits.splice(0, state.recruits.length, ...rest);
   if (army.dir !== undefined)
-    army.dir = { target: army.dir.target, mode: 'idle', ...(army.dir.bloc ? { bloc: true } : {}) };
+    army.dir = { ...keepScope(army.dir), target: army.dir.target, mode: 'idle' };
 }
