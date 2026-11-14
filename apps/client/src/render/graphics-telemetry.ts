@@ -2,6 +2,7 @@ import type { Graphics } from 'pixi.js';
 
 export interface GraphicsTelemetry {
   readonly id: number;
+  readonly label: string;
   readonly instructions: number;
   readonly vertices: number;
   readonly rebuildsPerSecond: number;
@@ -50,6 +51,7 @@ export function graphicsTelemetry(graphics: Graphics, nowMs: number): GraphicsTe
   counter.sampledAt = nowMs;
   return {
     id: context.uid,
+    label: graphics.label,
     instructions: graphics.context.instructions.length,
     vertices: graphicsVertexCount(graphics),
     rebuildsPerSecond,

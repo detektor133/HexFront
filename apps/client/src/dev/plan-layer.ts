@@ -176,8 +176,8 @@ export function createPlanLayer(
   center: (hex: number) => Point,
 ): PlanLayer {
   const container = new Container();
-  const arrows = new Graphics();
-  const g = new Graphics();
+  const arrows = new Graphics({ label: 'planArrows' });
+  const g = new Graphics({ label: 'plan' });
   const labels = new Container();
   // Стрелки — поверх линий планов: белая подложка фронта не режет наконечник на части.
   container.addChild(g, arrows, labels);

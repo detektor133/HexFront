@@ -164,7 +164,7 @@ export function createUnitLayer(
   // Фишки рисует GPU одним вызовом; без него (тесты в Node, ?chips=legacy) — по объекту на фишку.
   const gpu = createChipGpu();
   const container = new Container();
-  const ground = new Graphics();
+  const ground = new Graphics({ label: 'ground' });
   const battles = new Container();
   const chipsLayer = new Container();
   chipsLayer.addChild(ground);

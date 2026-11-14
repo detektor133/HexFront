@@ -45,6 +45,10 @@ import { tokens } from '../theme/tokens.ts';
 
 /** Толщина выделения гекса и дуги стройки, экранные px (токена нет — отладочный вид). */
 const MARK_WIDTH_PX = 2.5;
+/** На сколько может уйти масштаб от нарисованного, пока дороги на зуме не пересобираются (12%). */
+const ROADS_ZOOM_TOLERANCE = 0.12;
+/** Сторона плитки дорог в гексах. */
+const ROAD_TILE_HEXES = 12;
 /** Плашка прогноза над центром целевого гекса — выше его фишки, px экрана. */
 const PLATE_LIFT_PX = 30;
 /** Радиус дуги стройки — доля радиуса гекса. */
@@ -63,7 +67,7 @@ export interface EconomyLayer {
   readonly container: Container;
   readonly top: Container;
   readonly territoryLabels: Container;
-  update(scale: number, level: DetailLevel): void;
+  update(scale: number, level: DetailLevel, settled?: boolean): void;
   setView(view: PlayerView, selected: SandboxSelection): void;
   /** Политическая карта: страны красятся по отношению к игроку. */
   setPolitical(on: boolean): void;
@@ -200,11 +204,11 @@ export function roadEdgeOwner(view: PlayerView, a: number, b: number): number | 
 export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer {
   const territory = createTerritoryGpu(map, radius);
   const maskGpu = createMaskGpu(map, radius);
-  const constructionEffects = new Graphics();
-  const cityEffects = new Graphics();
-  const roads = new Graphics();
-  const roadPreview = new Graphics();
-  const marks = new Graphics();
+  const constructionEffects = new Graphics({ label: 'constructionEffects' });
+  const cityEffects = new Graphics({ label: 'cityEffects' });
+  const roads = new Container({ label: 'roads' });
+  const roadPreview = new Graphics({ label: 'roadPreview' });
+  const marks = new Graphics({ label: 'marks' });
   marks.context.batchMode = 'batch';
   const labels = new Container();
   const mapIcons = createMapIconLayer();
@@ -245,12 +249,13 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
   let battlePanel: MarkerAnchor | null = null;
   let scale = 1;
   let level: DetailLevel = 2;
+  let roadsScale = 1;
+  let roadsLevel: DetailLevel = 2;
   const reducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let frameMs = 0;
   let previousOwners: Int16Array | null = null;
   let previousRoad: Uint8Array | null = null;
-  let previousLink: Uint8Array | null = null;
   let previousCityHexes = '';
   // Дерево рёбер дорог пересобирается только при смене дорог; толщина и пунктир — при каждом зуме.
   let roadEdges: [number, number][] | null = null;
@@ -354,20 +359,58 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     }
   }
 
-  function drawRoads(v: PlayerView): void {
-    roads.clear();
+  // Дороги лежат плитками ROAD_TILE_HEXES×ROAD_TILE_HEXES гексов: смена цвета одного ребра на
+  // тике перестраивает только свою плитку, а не все ~120 тыс. вершин сети.
+  const roadTiles = new Map<number, Graphics>();
+  let edgeTiles: number[] = [];
+  let dirtyTiles: Set<number> | null = null; // null — перестроить все
+  const tileOf = (hex: number): number => {
+    const row = Math.floor(hex / map.width);
+    const col = hex - row * map.width;
+    return Math.floor(row / ROAD_TILE_HEXES) * 1000 + Math.floor(col / ROAD_TILE_HEXES);
+  };
+
+  function drawRoads(v: PlayerView, all = true): void {
+    const wanted = all ? null : dirtyTiles;
+    dirtyTiles = new Set();
+    if (all) {
+      roadsScale = scale;
+      roadsLevel = level;
+    }
     const width = (tokens.road.width[level - 1] ?? tokens.road.width[1]) / scale;
     const [dash, gap] = tokens.road.dash;
     roadEdges ??= roadTree(map, v);
-    for (const [a, b] of roadEdges) {
-      const owner = roadEdgeOwner(v, a, b);
-      dashed(roads, center(a), center(b), dash / scale, gap / scale);
-      roads.stroke({
-        color: owner === null ? tokens.neutral.road : playerLine(owner),
-        alpha: owner === null ? tokens.road.isolatedAlpha : 1,
-        width,
-        cap: 'round',
-      });
+    // Один stroke на владельца, а не на ребро: на каждый stroke Pixi строит отдельный буфер.
+    const byTile = new Map<number, Map<number | null, [number, number][]>>();
+    roadEdges.forEach((edge, i) => {
+      const tile = edgeTiles[i] ?? 0;
+      if (wanted && !wanted.has(tile)) return;
+      const owner = roadEdgeOwner(v, edge[0], edge[1]);
+      const owners = byTile.get(tile) ?? new Map<number | null, [number, number][]>();
+      byTile.set(tile, owners);
+      const list = owners.get(owner);
+      if (list) list.push(edge);
+      else owners.set(owner, [edge]);
+    });
+    for (const tile of wanted ?? roadTiles.keys())
+      if (!byTile.has(tile)) roadTiles.get(tile)?.clear();
+    for (const [tile, owners] of byTile) {
+      let g = roadTiles.get(tile);
+      if (!g) {
+        g = new Graphics({ label: 'roads' });
+        roadTiles.set(tile, g);
+        roads.addChild(g);
+      }
+      g.clear();
+      for (const [owner, edges] of owners) {
+        for (const [a, b] of edges) dashed(g, center(a), center(b), dash / scale, gap / scale);
+        g.stroke({
+          color: owner === null ? tokens.neutral.road : playerLine(owner),
+          alpha: owner === null ? tokens.road.isolatedAlpha : 1,
+          width,
+          cap: 'round',
+        });
+      }
     }
   }
 
@@ -514,20 +557,34 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     return true;
   };
 
-  // Дороги пересобираются только при смене дорог, связей, владельцев или городов.
+  // Дерево рёбер зависит только от дорог и городов; геометрия дорог перестраивается, когда оно
+  // или цвет хотя бы одного ребра изменились. Захват гекса без дороги (почти каждый тик войны)
+  // дороги не трогает: раньше он пересобирал ~120 тыс. вершин 10 раз в секунду.
+  let previousEdgeColors: Int16Array | null = null;
   const roadsChanged = (v: PlayerView): boolean => {
     const cityHexes = v.cities.map((city) => `${city.id}:${city.hex}`).join(',');
-    const changed =
-      !sameArray(previousRoad, v.hexes.road) ||
-      !sameArray(previousLink, v.hexes.link) ||
-      !sameArray(previousOwners, v.hexes.owner) ||
-      cityHexes !== previousCityHexes;
-    if (changed) {
+    if (!sameArray(previousRoad, v.hexes.road) || cityHexes !== previousCityHexes) {
       previousRoad = v.hexes.road.slice();
-      previousLink = v.hexes.link.slice();
       previousCityHexes = cityHexes;
       roadEdges = null;
+      previousEdgeColors = null;
     }
+    if (roadEdges === null) {
+      roadEdges = roadTree(map, v);
+      edgeTiles = roadEdges.map((edge) => tileOf(edge[0]));
+      dirtyTiles = null;
+    }
+    const colors = new Int16Array(roadEdges.length);
+    let changed = previousEdgeColors === null;
+    for (let i = 0; i < roadEdges.length; i += 1) {
+      const edge = roadEdges[i] as [number, number];
+      colors[i] = roadEdgeOwner(v, edge[0], edge[1]) ?? -2;
+      if (previousEdgeColors !== null && previousEdgeColors[i] !== colors[i]) {
+        changed = true;
+        dirtyTiles?.add(edgeTiles[i] ?? 0);
+      }
+    }
+    previousEdgeColors = colors;
     return changed;
   };
 
@@ -545,14 +602,17 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
     container,
     top,
     territoryLabels,
-    update(s, l) {
+    update(s, l, settled = true) {
       scale = s;
       level = l;
       unitLayer.setScale(s);
       territory.setScale(s);
       maskGpu.setScale(s);
       redraw();
-      if (view) drawRoads(view);
+      // Толщина и пунктир дорог зависят от масштаба, а их геометрия — самая тяжёлая (~120 тыс.
+      // вершин в большой войне). Пока зум идёт, малый сдвиг масштаба гасит сам контейнер.
+      const drift = Math.abs(s / roadsScale - 1);
+      if (view && (settled || l !== roadsLevel || drift > ROADS_ZOOM_TOLERANCE)) drawRoads(view);
     },
     setView(v, sel) {
       const roads = roadsChanged(v);
@@ -561,7 +621,7 @@ export function createEconomyLayer(map: MapStatic, radius: number): EconomyLayer
       selected = sel;
       territory.setView(v);
       redraw();
-      if (roads) drawRoads(v);
+      if (roads) drawRoads(v, dirtyTiles === null);
       if (typeof document !== 'undefined') unitLayer.setView(v, sel, performance.now());
     },
     setPolitical(on) {

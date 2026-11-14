@@ -51,7 +51,8 @@ export interface PixiSceneStats {
 export interface MidLayer {
   readonly container: Container;
   readonly top?: Container;
-  update(scale: number, level: DetailLevel): void;
+  /** settled — масштаб остановился; без него слой вправе отложить дорогую перестройку. */
+  update(scale: number, level: DetailLevel, settled?: boolean): void;
   /** Покадровая анимация (движение фишек, бегущие штрихи); время — performance.now(), мс. */
   frame?(nowMs: number): void;
   destroy(): void;
@@ -144,6 +145,8 @@ let cullerAdded = false;
 
 /** Как часто пересчитываются слои карты, пока меняется масштаб, мс. */
 const MID_THROTTLE_MS = 100;
+/** Пауза без смены масштаба, после которой зум считается законченным (точная перерисовка). */
+const SETTLE_MS = 150;
 
 /** Создаёт карту в host и сообщает масштаб, детализацию и fps через onState. */
 export async function createMapView(
@@ -252,6 +255,8 @@ export async function createMapView(
   const cameraListeners = new Set<() => void>();
   let lastMidMs = 0;
   let lastLayerScale = 0;
+  let settledScale = 0;
+  let lastScaleChangeMs = 0;
   const apply = (): void => {
     world.position.set(Math.round(cam.x), Math.round(cam.y));
     world.scale.set(cam.scale);
@@ -264,10 +269,19 @@ export async function createMapView(
     const moving = cam.scale !== lastLayerScale;
     lastLayerScale = cam.scale;
     const due = !moving || now - lastMidMs >= MID_THROTTLE_MS;
-    if (due) layer.update(cam.scale, level);
-    if (cam.scale !== drawnScale && due) {
-      mid?.update(cam.scale, level);
+    // Слои зависят только от масштаба (уровень детализации — его функция), а сдвиг камеры
+    // делает контейнер: без смены масштаба перестраивать дороги, метки и планы незачем.
+    // После остановки жеста слой получает ещё один вызов с settled — точная перерисовка тяжёлых
+    // частей (дороги), которые на лету пропускались при малых сдвигах масштаба.
+    // Колесо шлёт события с паузами в несколько кадров, поэтому «остановился» — это
+    // SETTLE_MS без смены масштаба, а не один кадр без неё.
+    if (moving) lastScaleChangeMs = now;
+    const settled = !moving && now - lastScaleChangeMs >= SETTLE_MS;
+    if ((cam.scale !== drawnScale && due) || (settled && settledScale !== cam.scale)) {
+      layer.update(cam.scale, level);
+      mid?.update(cam.scale, level, settled);
       drawnScale = cam.scale;
+      if (settled) settledScale = cam.scale;
       lastMidMs = now;
     }
     onState({ scale: cam.scale, level, fps: app.ticker.FPS });
