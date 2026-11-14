@@ -1,0 +1,56 @@
+/* Фишки армий, которые держат страну: одна строка в окне соседа. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: var(--radius-button);
+  background: var(--ui-surface2);
+  color: var(--ui-ink);
+}
+
+.pick,
+.drop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 var(--space-xs);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pick {
+  padding-left: var(--space-sm);
+  border-radius: var(--radius-button) 0 0 var(--radius-button);
+}
+
+.drop {
+  min-width: 32px;
+  justify-content: center;
+  border-left: var(--ui-border-width) var(--ui-border-style) var(--ui-border);
+  border-radius: 0 var(--radius-button) var(--radius-button) 0;
+  color: var(--ui-ink2);
+}
+
+.pick:hover,
+.pick:focus-visible,
+.drop:hover,
+.drop:focus-visible {
+  background: var(--ui-surface);
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}

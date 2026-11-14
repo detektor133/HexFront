@@ -424,6 +424,7 @@ export const MatchSurface: React.FC<MatchSurfaceProps> = ({
           at={sb.menu}
           send={sb.send}
           onClose={sb.closeMenu}
+          insets={{ top: hudH, bottom: dockH }}
           onSelectArmy={(armyId) => {
             sb.setArmy(armyId);
             sb.pick({

@@ -4,6 +4,7 @@ import {
   IconEqual,
   IconFlag,
   IconShield,
+  IconShieldPlus,
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
@@ -12,7 +13,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
-import { HoldSplit } from './HoldSplit.tsx';
+import { HoldChips } from './HoldChips.tsx';
 import { OrderSplit } from './OrderSplit.tsx';
 import { MarkMenu, WriteButton } from './SocialRow.tsx';
 import styles from './TerritoryMenu.module.css';
@@ -23,6 +24,7 @@ import {
   isFree,
   nearestFreeArmy,
   orderArmy,
+  orderNewArmy,
   strengthVs,
 } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
@@ -51,8 +53,10 @@ export function TerritoryMenu(props: {
   readonly onClose: () => void;
   /** Выбрать армию на карте (клик по подписи армии, которая держит эту страну). */
   readonly onSelectArmy?: (armyId: number) => void;
+  /** Занятое панелями место сверху и снизу: окно не заходит под них. */
+  readonly insets?: { readonly top: number; readonly bottom: number };
 }): React.JSX.Element | null {
-  const { view, map, other, hex, at, send, onClose, onSelectArmy } = props;
+  const { view, map, other, hex, at, send, onClose, onSelectArmy, insets } = props;
   const ref = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(120);
   useLayoutEffect(() => {
@@ -84,7 +88,9 @@ export function TerritoryMenu(props: {
   if (!neutral && (!player || player.status !== 'alive')) return null;
   const atWar = !neutral && (view.diplomacy?.relations[other] ?? 'war') === 'war';
   const left = Math.max(EDGE, Math.min(at.x, window.innerWidth - MENU_WIDTH - EDGE));
-  const top = Math.max(EDGE, Math.min(at.y, window.innerHeight - height - EDGE));
+  const minTop = EDGE + (insets?.top ?? 0);
+  const maxTop = window.innerHeight - (insets?.bottom ?? 0) - height - EDGE;
+  const top = Math.max(minTop, Math.min(at.y, maxTop));
   const name = neutral ? t('menu.neutral') : (player?.name ?? '');
   const go = (command: Command): void => {
     send(command);
@@ -137,6 +143,16 @@ export function TerritoryMenu(props: {
         </IconButton>
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
+      {!neutral && holders.length > 0 && (
+        <HoldChips
+          holders={holders}
+          onSelect={(id) => {
+            onSelectArmy?.(id);
+            onClose();
+          }}
+          onRelease={(id) => go({ t: 'holdBorder', target: other, soldiers: 0, armyId: id })}
+        />
+      )}
       <div className={styles.actions}>
         {neutral ? (
           <OrderSplit
@@ -165,22 +181,24 @@ export function TerritoryMenu(props: {
                 onPick={orderBy('hold')}
               />
             ) : (
-              <HoldSplit
-                view={view}
-                map={map}
-                other={other}
-                hex={hex}
-                holders={holders}
-                send={go}
-                onSelectArmy={
-                  onSelectArmy
-                    ? (id) => {
-                        onSelectArmy(id);
-                        onClose();
-                      }
-                    : undefined
-                }
-              />
+              <button
+                type="button"
+                className={styles.ghostButton}
+                data-tutorial="hold"
+                title={t('order.reinforce')}
+                onClick={() => {
+                  // Усиление: ближайшая свободная армия, иначе новая; прежние армии остаются.
+                  const spare = nearestFreeArmy(view, map, hex);
+                  go(
+                    spare
+                      ? orderArmy(view, spare, other, 'hold')
+                      : orderNewArmy(view, map, other, 'hold'),
+                  );
+                }}
+              >
+                <IconShieldPlus size={20} aria-hidden="true" />
+                <span>{t('menu.reinforce')}</span>
+              </button>
             )}
             <button
               type="button"
