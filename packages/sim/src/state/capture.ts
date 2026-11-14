@@ -5,6 +5,7 @@ import { CAPTURE_RAMP_TICKS } from './city-output.ts';
 import { setHexOwner } from './hex-owner.ts';
 import { setCityOwner } from './layers.ts';
 import { NEUTRAL, type MatchState } from './types.ts';
+import { TERRAIN } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { fpMul, type Fp } from '../math/int.ts';
 
@@ -14,6 +15,8 @@ import { fpMul, type Fp } from '../math/int.ts';
  */
 export function captureHex(state: MatchState, hex: HexId, owner: number): void {
   const { hexes } = state;
+  // Вода не принадлежит никому: бой кораблей у берега или в проливе гекс не захватывает.
+  if (state.map.terrain[hex] === TERRAIN.water) return;
   const previous = hexes.owner[hex] ?? NEUTRAL;
   if (previous === owner) return;
   setHexOwner(state, hex, owner);
