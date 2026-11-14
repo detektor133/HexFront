@@ -24,7 +24,7 @@ function listTextFiles(directory: string): string[] {
     }
     if (
       entry.isDirectory() &&
-      !['.git', '.ai-logs', 'coverage', 'dist', 'node_modules'].includes(entry.name)
+      !['.git', '.ai-logs', '.claude', 'coverage', 'dist', 'node_modules'].includes(entry.name)
     ) {
       files.push(...listTextFiles(path));
     } else if (entry.isFile()) {
