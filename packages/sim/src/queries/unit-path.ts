@@ -89,8 +89,18 @@ function inEnemyZoc(state: MatchState, owner: number, hex: HexId): boolean {
     const { width, height } = state.map;
     const table = neighborTable(state.map);
     mask = new Uint8Array(width * height);
+    // Война с владельцем отряда — одно число на игрока, а не вопрос к дипломатии на каждый отряд.
+    const war = new Uint8Array(state.players.length);
+    for (let other = 0; other < war.length; other += 1) {
+      war[other] = atWar(state, owner, other) ? 1 : 0;
+    }
     for (const unit of state.units) {
-      if (!atWar(state, owner, unit.owner)) continue;
+      if (
+        unit.owner < 0 || unit.owner >= war.length
+          ? !atWar(state, owner, unit.owner)
+          : war[unit.owner] === 0
+      )
+        continue;
       for (let d = 0; d < SIDES; d += 1) {
         const n = table[unit.hex * SIDES + d] as number;
         if (n >= 0) mask[n] = 1;

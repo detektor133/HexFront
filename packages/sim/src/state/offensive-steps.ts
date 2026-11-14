@@ -8,7 +8,7 @@ import type { LineGround } from './ground.ts';
 import { OFFENSIVE_FACING_RANGE } from '../balance.ts';
 import { neighborTable as sharedNeighborTable, SIDES } from '../map/neighbor-table.ts';
 import { TERRAIN } from '../map/types.ts';
-import { distance, hexFromId, type Hex, type HexId } from '../math/hex.ts';
+import { hexDistanceById, type HexId } from '../math/hex.ts';
 
 const neighborTable = (g: LineGround): Int32Array => sharedNeighborTable(g.map);
 
@@ -114,26 +114,26 @@ function nearLine(
   const hexes = [...new Set(edges.map(edgeHex))].filter((h) => (dist[h] ?? -1) >= 0);
   if (hexes.length === 0) return () => true;
   const width = g.map.width;
-  const front = hexes.map((h) => hexFromId(h, width));
-  const anchors: Hex[] = [];
-  const scratch = new Int32Array(front.length);
-  // Простой цикл: `forEach` по всей карте с замыканием здесь был одной из самых дорогих строк тика.
+  const anchors: HexId[] = [];
+  const scratch = new Int32Array(hexes.length);
+  // Простой цикл по id без выделений: `forEach` и Hex-объекты на гекс были одной из самых дорогих строк тика.
   for (let l = 0; l < dist.length; l += 1) {
     if (dist[l] !== 0) continue;
-    const at = hexFromId(l, width);
     let min = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < front.length; i += 1) {
-      const d = distance(front[i] as Hex, at);
+    for (let i = 0; i < hexes.length; i += 1) {
+      const d = hexDistanceById(hexes[i] as HexId, l, width);
       scratch[i] = d;
       if (d < min) min = d;
     }
-    for (let i = 0; i < front.length; i += 1) {
-      if (scratch[i] === min) anchors.push(front[i] as Hex);
+    for (let i = 0; i < hexes.length; i += 1) {
+      if (scratch[i] === min) anchors.push(hexes[i] as HexId);
     }
   }
   return (h) => {
-    const p = hexFromId(h, width);
-    return anchors.some((a) => distance(a, p) <= OFFENSIVE_FACING_RANGE);
+    for (let i = 0; i < anchors.length; i += 1) {
+      if (hexDistanceById(anchors[i] as HexId, h, width) <= OFFENSIVE_FACING_RANGE) return true;
+    }
+    return false;
   };
 }
 

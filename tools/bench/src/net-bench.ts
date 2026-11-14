@@ -15,11 +15,13 @@ import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 
 import { createLocalEngine } from '../../../apps/client/src/local/engine.ts';
+import { ViewDeltaApplier } from '../../../apps/client/src/local/view-delta.ts';
 import { ConfirmedViewDeltaStream } from '../../../apps/client/src/local/view-delta.ts';
 import { generateMap } from '../../../packages/mapgen/src/index.ts';
 import {
   buildViewDelta,
   canBuildViewDelta,
+  decodeDelta,
   encodeDelta,
   paceView,
   slowLayerReuse,
@@ -92,8 +94,9 @@ function memory(): string {
 
 function report(minute: number, window: Window, state: MatchState, hexes: number): void {
   const per = (value: number): number => value / TICKS_PER_MINUTE;
+  const server = Object.entries(window.stages).filter(([name]) => !name.startsWith('кл:'));
   const parts = Object.entries(window.stages).map(([name, ms]) => `${name} ${per(ms).toFixed(1)}`);
-  const total = Object.values(window.stages).reduce((sum, ms) => sum + per(ms), 0);
+  const total = server.reduce((sum, [, ms]) => sum + per(ms), 0);
   const bytes = Math.round(window.bytes / Math.max(1, window.messages));
   const deflated = Math.round(window.deflated / Math.max(1, window.messages));
   const alive = state.players.filter((p) => p.status === 'alive').length;
@@ -163,6 +166,7 @@ function runRoom(): void {
   const humans = Math.min(HUMANS, players);
   const confirmed: (PlayerView | null)[] = Array(humans).fill(null);
   const syncedAt: number[] = Array(humans).fill(0);
+  const client = new ViewDeltaApplier();
   let window = empty();
   for (let tick = 0; tick < MINUTES * TICKS_PER_MINUTE; tick += 1) {
     if (ARMIES > 0 && tick === ARMIES_AT * TICKS_PER_MINUTE) injectArmies(state, ARMIES, SOLDIERS);
@@ -194,6 +198,7 @@ function runRoom(): void {
       const base = confirmed[id] ?? null;
       if (base === null || !canBuildViewDelta(base, view)) {
         confirmed[id] = view;
+        if (id === 0) client.applySnapshot({ t: 'snapshot', tick: view.tick, view } as never);
         continue;
       }
       const sync = syncs[id] as boolean;
@@ -207,6 +212,14 @@ function runRoom(): void {
       window.messages += 1;
       if (id % DEFLATE_EVERY === 0) window.deflated += deflateRawSync(text).length * DEFLATE_EVERY;
       confirmed[id] = sent;
+      if (id === 0) {
+        // Клиентская сторона первого человека: разбор JSON и применение дельты (главный поток браузера).
+        const parsed = decodeDelta(text);
+        add(window, 'кл:разбор', at);
+        at = performance.now();
+        client.applyDelta(parsed);
+        add(window, 'кл:применение', at);
+      }
     }
     if ((tick + 1) % TICKS_PER_MINUTE === 0) {
       report((tick + 1) / TICKS_PER_MINUTE, window, state, state.hexes.owner.length);
