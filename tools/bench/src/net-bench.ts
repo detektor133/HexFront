@@ -7,7 +7,9 @@
 //   --level=easy|medium|hard уровень ботов; по умолчанию medium
 //   --humans=N               людей в комнате сервера (виды, дельты, JSON на каждого); по умолчанию 30
 //   --minutes=M              длина матча в минутах игры (ускоренно, без реального времени); по умолчанию 6
-//   --solo                   одиночная игра на реальном движке клиента (один человек, как в воркере)
+//   --armies=N               на минуте --armies-at каждому игроку добавляется N отрядов (нагрузка «большие армии»)
+//   --soldiers=S             солдат в добавленном отряде; по умолчанию 25
+//   --solo                одиночная игра на реальном движке клиента (один человек, как в воркере)
 // Печатает по минуте матча: мс на тик по стадиям, байты дельты, память (после GC), отряды.
 import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
@@ -23,6 +25,7 @@ import {
   slowLayerReuse,
   SLOW_PERIOD_TICKS,
 } from '../../../packages/protocol/src/index.ts';
+import { ORG_MAX } from '../../../packages/sim/src/balance.ts';
 import {
   botCommands,
   commanderCommands,
@@ -36,7 +39,9 @@ import {
   type MatchState,
   type PlayerView,
 } from '../../../packages/sim/src/index.ts';
-import { allUnits } from '../../../packages/sim/src/state/unit-index.ts';
+import { FP, type Fp } from '../../../packages/sim/src/math/int.ts';
+import type { Unit } from '../../../packages/sim/src/state/types.ts';
+import { addUnit, allUnits } from '../../../packages/sim/src/state/unit-index.ts';
 
 const SEED = 43;
 const TICKS_PER_MINUTE = 600;
@@ -51,6 +56,9 @@ const MAP = option('map', 'gen');
 const LEVEL = option('level', 'medium') as BotLevel;
 const HUMANS = Number(option('humans', '30'));
 const MINUTES = Number(option('minutes', '6'));
+const ARMIES = Number(option('armies', '0'));
+const ARMIES_AT = Number(option('armies-at', '2'));
+const SOLDIERS = Number(option('soldiers', '25'));
 const SOLO = process.argv.includes('--solo');
 
 /** Карта формата: JSON готовой карты или сгенерированная; игроков в матче всегда 30 (как в меню). */
@@ -97,6 +105,48 @@ function report(minute: number, window: Window, state: MatchState, hexes: number
   );
 }
 
+/** Добавляет каждому живому игроку `count` отрядов по `soldiers` солдат на его гексах (стек допустим). */
+function injectArmies(state: MatchState, count: number, soldiers: number): void {
+  const owned: number[][] = state.players.map(() => []);
+  for (let id = 0; id < state.hexes.owner.length; id += 1) {
+    const owner = state.hexes.owner[id] ?? -1;
+    if (owner >= 0) owned[owner]?.push(id);
+  }
+  for (const player of state.players) {
+    const hexes = owned[player.id] ?? [];
+    if (player.status !== 'alive' || hexes.length === 0) continue;
+    for (let i = 0; i < count; i += 1) {
+      const unit: Unit = {
+        id: state.nextId,
+        owner: player.id,
+        type: i % 5 === 4 ? 'artillery' : 'infantry',
+        soldiers: (soldiers * FP) as Fp,
+        org: ORG_MAX,
+        hex: hexes[(i * 7) % hexes.length] as number,
+        order: 'idle',
+        supplyLevel: FP as Fp,
+        path: [],
+        moveTicks: 0,
+        moveTotal: 0,
+        armyId: null,
+        lowSupplyTicks: 0,
+        encircled: false,
+        sea: false,
+        seaFrom: -1,
+        target: -1,
+        inBattle: false,
+        focus: -1,
+        fireTarget: -1,
+        slot: -1,
+        gather: -1,
+      };
+      state.nextId += 1;
+      addUnit(state, unit);
+    }
+  }
+  state.units.sort((a, b) => a.id - b.id);
+}
+
 /** Комната сервера: боты, step, виды и дельты для `HUMANS` людей. */
 function runRoom(): void {
   const loaded = loadMap(mapJson());
@@ -115,6 +165,7 @@ function runRoom(): void {
   const syncedAt: number[] = Array(humans).fill(0);
   let window = empty();
   for (let tick = 0; tick < MINUTES * TICKS_PER_MINUTE; tick += 1) {
+    if (ARMIES > 0 && tick === ARMIES_AT * TICKS_PER_MINUTE) injectArmies(state, ARMIES, SOLDIERS);
     let at = performance.now();
     const context = createBotTickContext(state);
     const commands = [

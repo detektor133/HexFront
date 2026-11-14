@@ -135,11 +135,19 @@ export function procure(state: MatchState): void {
   if (state.tick % TICKS_PER_S !== 0) return;
   // Справедливо: сначала армия с наименьшей долей заказа — иначе первая по id забирает резерв и
   // очередь единственного города, а остальные направления стоят пустыми.
+  // Сила армий — одним проходом по отрядам: компаратору нельзя считать её на каждое сравнение.
+  const power = new Map<number, number>();
+  for (const u of allUnits(state)) {
+    if (u.armyId !== null) power.set(u.armyId, (power.get(u.armyId) ?? 0) + u.soldiers);
+  }
+  for (const r of state.recruits) {
+    if (r.armyId !== undefined) power.set(r.armyId, (power.get(r.armyId) ?? 0) + r.soldiers);
+  }
   const wanting = state.armies
     .filter((a) => a.wanted !== undefined)
     .sort((a, b) => {
-      const left = strength(state, a) * (b.wanted ?? 1);
-      const right = strength(state, b) * (a.wanted ?? 1);
+      const left = (power.get(a.id) ?? 0) * (b.wanted ?? 1);
+      const right = (power.get(b.id) ?? 0) * (a.wanted ?? 1);
       return left - right || a.id - b.id;
     });
   for (const army of wanting) {

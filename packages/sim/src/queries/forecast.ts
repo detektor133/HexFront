@@ -6,6 +6,7 @@ import {
   defensePower,
   orgLossPerS,
   type Fighter,
+  type Supporter,
   type Ground,
 } from './battle-math.ts';
 import type { UnitView } from './unit-view.ts';
@@ -13,7 +14,7 @@ import type { MapStatic } from '../map/types.ts';
 import type { HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import type { MatchState, Unit } from '../state/types.ts';
-import { allUnits } from '../state/unit-index.ts';
+import { unitIndex } from '../state/unit-index.ts';
 
 export type ForecastOutcome = 'victory' | 'defeat' | 'stalemate';
 
@@ -94,7 +95,7 @@ interface ForecastInput {
   readonly attackers: readonly Combatant[];
   readonly defenders: readonly Combatant[];
   readonly city: { readonly defenders: Fp; readonly defenseOrg: Fp } | null;
-  readonly all: readonly Fighter[];
+  readonly all: readonly Supporter[];
   readonly target: HexId;
 }
 
@@ -137,6 +138,8 @@ export function forecastBattle(
   target: HexId,
 ): Forecast {
   const me = view.playerId;
+  // Множество вместо includes: сотня отрядов в приказе не должна давать O(отряды × приказ).
+  const ids = new Set(unitIds);
   const city = view.cities.find(
     (c) => c.hex === target && c.owner !== me && c.defenders > 0 && c.defenseOrg > 0,
   );
@@ -146,10 +149,10 @@ export function forecastBattle(
       building: view.hexes.building,
       hasCity: (hex) => view.cities.some((c) => c.hex === hex),
     },
-    attackers: view.units.filter((u) => unitIds.includes(u.id) && u.owner === me).map(fighter),
+    attackers: view.units.filter((u) => ids.has(u.id) && u.owner === me).map(fighter),
     defenders: view.units.filter((u) => u.hex === target && u.owner !== me).map(fighter),
     city: city ?? null,
-    all: view.units.map(fighter),
+    all: view.units,
     target,
   });
 }
@@ -174,7 +177,7 @@ export function forecastInState(
       hasCity: (hex) => state.cities.some((c) => c.hex === hex),
     },
     attackers,
-    defenders: allUnits(state).filter((u) => u.hex === target && u.owner !== owner),
+    defenders: (unitIndex(state).unitsByHex[target] ?? []).filter((u) => u.owner !== owner),
     city: city ?? null,
     all: state.units,
     target,

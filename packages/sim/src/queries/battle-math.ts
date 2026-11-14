@@ -20,7 +20,7 @@ import {
   type UnitType,
 } from '../balance.ts';
 import { TERRAIN_NAMES, type MapStatic } from '../map/types.ts';
-import { distance, hexFromId, neighbors, type HexId } from '../math/hex.ts';
+import { hexDistanceById, hexFromId, neighbors, type HexId } from '../math/hex.ts';
 import { FP, fpDiv, fpMul, intDiv, type Fp } from '../math/int.ts';
 import { fortLevel } from '../state/fort.ts';
 import type { UnitOrder } from '../state/types.ts';
@@ -42,6 +42,9 @@ export interface Fighter {
   /** Звёзды опыта армии 0..3; нет поля — ноль. */
   readonly stars?: number | undefined;
 }
+
+/** Минимум полей отряда для проверки поддержки артиллерией (подходит и отряду снимка). */
+export type Supporter = Pick<Fighter, 'owner' | 'type' | 'soldiers' | 'hex' | 'order'>;
 
 /** Местность боя: карта, постройки гексов и признак города на гексе. */
 export interface Ground {
@@ -72,18 +75,17 @@ export function hexDirection(map: MapStatic, from: HexId, to: HexId): number {
 // Своя артиллерия (≥ ARTY_SUPPORT_MIN_SOLDIERS, не отступает) в радиусе ARTY_RANGE от цели.
 export function isSupportedByArtillery(
   map: MapStatic,
-  all: readonly Fighter[],
+  all: readonly Supporter[],
   owner: number,
   hex: HexId,
 ): boolean {
-  const target = hexFromId(hex, map.width);
   return all.some(
     (a) =>
       a.owner === owner &&
       a.type === 'artillery' &&
       a.order !== 'retreat' &&
       a.soldiers >= ARTY_SUPPORT_MIN_SOLDIERS &&
-      distance(hexFromId(a.hex, map.width), target) <= ARTY_RANGE,
+      hexDistanceById(a.hex, hex, map.width) <= ARTY_RANGE,
   );
 }
 
@@ -96,7 +98,7 @@ export function attackContribution(
   map: MapStatic,
   f: Fighter,
   hex: HexId,
-  all: readonly Fighter[],
+  all: readonly Supporter[],
 ): number {
   return contribution(map, f, hex, () => isSupportedByArtillery(map, all, f.owner, hex));
 }
@@ -121,7 +123,7 @@ export function attackPower(
   map: MapStatic,
   attackers: readonly Fighter[],
   hex: HexId,
-  all: readonly Fighter[],
+  all: readonly Supporter[],
 ): number {
   const support = new Map<number, boolean>();
   const supportOf = (owner: number): boolean => {

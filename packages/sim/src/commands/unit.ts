@@ -49,8 +49,17 @@ export function routePath(
   start: HexId = unit.hex,
 ): HexId[] | null {
   // Слабый враг (победа по прогнозу) не преграда: отряд дойдёт и атакует его сам (meetEnemy).
-  const weakEnemy = (hex: HexId): boolean =>
-    unit.type !== 'artillery' && forecastInState(state, [unit], hex).outcome === 'victory';
+  // Прогноз зависит только от гекса: поиск пути спрашивает про один и тот же гекс много раз.
+  const verdicts = new Map<HexId, boolean>();
+  const weakEnemy = (hex: HexId): boolean => {
+    if (unit.type === 'artillery') return false;
+    let weak = verdicts.get(hex);
+    if (weak === undefined) {
+      weak = forecastInState(state, [unit], hex).outcome === 'victory';
+      verdicts.set(hex, weak);
+    }
+    return weak;
+  };
   const path: HexId[] = [];
   let from = start;
   for (const point of [...via, to]) {

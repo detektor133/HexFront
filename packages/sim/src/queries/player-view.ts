@@ -51,6 +51,8 @@ export interface PlayerViewContext {
   readonly links: Uint8Array;
   readonly scores: Int32Array;
   readonly places: Int32Array;
+  /** Полные (без тумана) отряды владельца для оценки боёв чужих атак; общие на всех игроков тика. */
+  readonly omniUnits: Map<number, UnitView[]>;
 }
 
 export interface PlayerRanking {
@@ -252,6 +254,7 @@ export function createPlayerViewContext(state: MatchState): PlayerViewContext {
     links: links(state),
     scores,
     places: playerPlaces(state, scores),
+    omniUnits: new Map(),
   };
 }
 
@@ -423,41 +426,78 @@ export function playerView(
         totalTicks: r.totalTicks,
       })),
   };
+  const attackOf = attackStates(state, view, viewContext);
   return {
     ...view,
-    units: view.units.map((unit) => ({
-      ...unit,
-      attackState: attackState(state, view, unit),
-    })),
+    units: view.units.map((unit) => ({ ...unit, attackState: attackOf(unit) })),
   };
 }
 
-function attackState(state: MatchState, view: PlayerView, unit: UnitView): AttackState | null {
-  if (unit.order !== 'attack' || unit.target < 0) return null;
-  const localDefender =
-    view.units.some(
-      (candidate) => candidate.owner === view.playerId && candidate.hex === unit.target,
-    ) ||
-    view.cities.some(
-      (candidate) =>
-        candidate.owner === view.playerId &&
-        candidate.hex === unit.target &&
-        candidate.defenders > 0 &&
-        candidate.defenseOrg > 0,
+/**
+ * Оценка боя для отряда: зависит только от (владелец, цель), поэтому сотня отрядов на один гекс
+ * считает прогноз один раз, а не каждый по полному обходу всех отрядов матча.
+ */
+function attackStates(
+  state: MatchState,
+  view: PlayerView,
+  context: PlayerViewContext,
+): (unit: UnitView) => AttackState | null {
+  const myHexes = new Set<number>();
+  for (const candidate of view.units)
+    if (candidate.owner === view.playerId) myHexes.add(candidate.hex);
+  for (const city of view.cities) {
+    if (city.owner === view.playerId && city.defenders > 0 && city.defenseOrg > 0) {
+      myHexes.add(city.hex);
+    }
+  }
+  let attackers: Map<number, number[]> | null = null;
+  const results = new Map<number, AttackState | null>();
+  return (unit) => {
+    if (unit.order !== 'attack' || unit.target < 0) return null;
+    const localDefender = myHexes.has(unit.target);
+    if (unit.owner !== view.playerId && !localDefender) return null;
+    const key = unit.owner * 1_000_000 + unit.target;
+    if (results.has(key)) return results.get(key) ?? null;
+    if (attackers === null) {
+      attackers = new Map();
+      for (const candidate of allUnits(state)) {
+        if (candidate.order !== 'attack' || candidate.target < 0) continue;
+        const k = candidate.owner * 1_000_000 + candidate.target;
+        const list = attackers.get(k);
+        if (list) list.push(candidate.id);
+        else attackers.set(k, [candidate.id]);
+      }
+    }
+    const result = attackStateFor(
+      state,
+      view,
+      context,
+      unit,
+      localDefender,
+      attackers.get(key) ?? [],
     );
-  if (unit.owner !== view.playerId && !localDefender) return null;
-  const perspective =
-    unit.owner === view.playerId
-      ? view
-      : { ...view, playerId: unit.owner, units: unitViews(state, unit.owner) };
-  const attackerIds = allUnits(state)
-    .filter(
-      (candidate) =>
-        candidate.owner === unit.owner &&
-        candidate.order === 'attack' &&
-        candidate.target === unit.target,
-    )
-    .map((candidate) => candidate.id);
+    results.set(key, result);
+    return result;
+  };
+}
+
+function attackStateFor(
+  state: MatchState,
+  view: PlayerView,
+  context: PlayerViewContext,
+  unit: UnitView,
+  localDefender: boolean,
+  attackerIds: readonly number[],
+): AttackState {
+  let perspective = view;
+  if (unit.owner !== view.playerId) {
+    let omni = context.omniUnits.get(unit.owner);
+    if (omni === undefined) {
+      omni = unitViews(state, unit.owner);
+      context.omniUnits.set(unit.owner, omni);
+    }
+    perspective = { ...view, playerId: unit.owner, units: omni };
+  }
   const forecast = forecastBattle(state.map, perspective, attackerIds, unit.target);
   const attackerTime = forecast.attackerTimeS ?? 0;
   const defenderTime = forecast.defenderTimeS ?? 0;
