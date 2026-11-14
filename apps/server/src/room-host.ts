@@ -4,6 +4,7 @@
 import type { C2S } from '@hexfront/protocol';
 import { TICK_MS, type MapStatic } from '@hexfront/sim';
 
+import { cachedMap, pickQuickMap } from './maps.ts';
 import { Room, type Connection } from './room.ts';
 import type { HostSettings, RoomStatus, ShardStatus, TickStats } from './shard-protocol.ts';
 
@@ -67,12 +68,18 @@ export class RoomHost {
 
   /** Создаёт комнату: id и сид выбирает шлюз, чтобы сразу знать, где она. */
   public create(roomId: string, mode: 'open' | 'private', seed: number): void {
-    const { size, fog, now, lateJoinTicks, placeSeconds } = this.options;
+    const { fog, now, lateJoinTicks, placeSeconds } = this.options;
+    // Открытые комнаты берут карту из пула (только с кэшем карт процесса: у тестов своя карта).
+    const quick =
+      mode === 'open' && this.options.makeMap === cachedMap
+        ? pickQuickMap(seed, this.options.size)
+        : null;
+    const size = quick?.size ?? this.options.size;
     const room = new Room({
       id: roomId,
       mode,
-      map: this.options.makeMap(seed, size),
-      mapName: 'gen',
+      map: quick?.map ?? this.options.makeMap(seed, size),
+      mapName: quick?.name ?? 'gen',
       makeMap: this.options.makeMap,
       seed,
       size,

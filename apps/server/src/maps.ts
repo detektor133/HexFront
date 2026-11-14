@@ -42,3 +42,35 @@ export function staticMap(name: Exclude<LobbyMap, 'gen'>): MapStatic {
   }
   return map;
 }
+
+/**
+ * Пул карт быстрого боя: случайная по зерну и готовые карты меню. Крошечная не входит (на двоих
+ * комната не набирается), малая — на шестерых; число игроков не превышает числа стартов карты.
+ */
+const QUICK_POOL: readonly LobbyMap[] = [
+  'gen',
+  'gen',
+  'europe',
+  'mediterranean',
+  'north',
+  'namerica',
+  'japan',
+  'mideast',
+  'continent',
+  'archipelago',
+  'small',
+];
+
+export interface QuickPick {
+  readonly name: LobbyMap;
+  readonly map: MapStatic;
+  readonly size: number;
+}
+
+/** Карта и число игроков открытой комнаты: по зерну берётся из пула, зерно у всех клиентов одно. */
+export function pickQuickMap(seed: number, size: number): QuickPick {
+  const name = QUICK_POOL[(seed >>> 0) % QUICK_POOL.length] ?? 'gen';
+  if (name === 'gen') return { name, map: cachedMap(seed, size), size };
+  const map = staticMap(name);
+  return { name, map, size: Math.max(2, Math.min(size, map.spawns.length)) };
+}

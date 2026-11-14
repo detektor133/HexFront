@@ -220,7 +220,7 @@ export class Room {
     this.options = options;
     this.map = options.map;
     this.seed = options.seed;
-    this.mapName = 'gen';
+    this.mapName = (options.mapName as LobbyMap | undefined) ?? 'gen';
     this.size = options.size;
     this.genSpawns = options.size;
     this.id = options.id;
