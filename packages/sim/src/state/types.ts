@@ -388,6 +388,16 @@ export interface Diplomacy {
   results?: VoteResult[];
   /** Номер следующего голосования. */
   nextVote?: number;
+  /** Паузы после отказа в голосовании: то же предложение не открывается снова до `until`. */
+  locks?: VoteLock[];
+}
+
+/** Пауза после отклонённого голосования: `a` — инициатор, `b` — цель (для исключения — исключаемый). */
+export interface VoteLock {
+  readonly kind: AllianceVote['kind'];
+  readonly a: number;
+  readonly b: number;
+  readonly until: number;
 }
 
 /** Итог голосования: кто как ответил и принято ли; живёт RESULT_TTL_TICKS. */

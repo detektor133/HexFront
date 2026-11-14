@@ -196,6 +196,9 @@ function hashDiplomacy(s: Hasher, state: MatchState): void {
   }
   for (const w of d.aid ?? [])
     for (const v of [w.ally, w.victim, w.aggressor, w.ending ?? -1]) int(s, v);
+  for (const l of d.locks ?? [])
+    for (const x of [l.kind === 'join' ? 0 : l.kind === 'peace' ? 1 : 2, l.a, l.b, l.until])
+      int(s, x);
   for (const v of d.votes ?? []) {
     for (const x of [v.id, v.kind === 'join' ? 0 : v.kind === 'peace' ? 1 : 2, v.a, v.b, v.tick])
       int(s, x);

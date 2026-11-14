@@ -1,6 +1,7 @@
 // Альянс и оборонительный пакт (gdd/08-match.md, «Оборонительный пакт и альянс»): голосования
 // большинством, запросы помощи, автоматическое вступление в войну, возврат отрядов домой.
 import { executeUnitCommand } from './unit.ts';
+import { KICK_LOCK_TICKS, VOTE_LOCK_TICKS } from '../balance.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import {
   allianceOf,
@@ -136,6 +137,41 @@ function applyVote(state: MatchState, vote: AllianceVote): void {
   state.events.push({ t: 'treatyMade', playerId: vote.b, targetId: vote.a, kind: 'peace' });
 }
 
+/** Хватает ли голосов «за»: большинство, а для исключения — две трети. */
+function enough(yes: number, total: number, strict: boolean): boolean {
+  return strict ? yes * 3 >= total * 2 : yes * 2 > total;
+}
+
+/** Отказ в голосовании ставит паузу: тот же вопрос не открывается снова сразу (против спама). */
+function lockVote(state: MatchState, d: Diplomacy, vote: AllianceVote): void {
+  const ticks = vote.kind === 'kick' ? KICK_LOCK_TICKS : VOTE_LOCK_TICKS;
+  d.locks ??= [];
+  d.locks.push({ kind: vote.kind, a: vote.a, b: vote.b, until: state.tick + ticks });
+}
+
+/**
+ * Закрыт ли вопрос паузой или уже идущим голосованием. Исключение: нельзя трогать того же игрока и
+ * нельзя инициатору, чей запрос только что отклонён; вход и мир — по той же паре игроков.
+ */
+export function voteBlocked(
+  state: MatchState,
+  kind: AllianceVote['kind'],
+  a: number,
+  b: number,
+): boolean {
+  const d = state.diplomacy;
+  if (!d) return false;
+  const same = (l: { kind: string; a: number; b: number }): boolean =>
+    l.kind === kind &&
+    (kind === 'kick'
+      ? l.b === b || l.a === a
+      : (l.a === a && l.b === b) || (l.a === b && l.b === a));
+  return (
+    (d.locks ?? []).some((l) => l.until > state.tick && same(l)) ||
+    (d.votes ?? []).some((v) => same(v))
+  );
+}
+
 /**
  * Решает голосование, если исход ясен: большинство «за» — принято, «за» уже не набрать — отказ.
  * По истечении срока (`expired`) решает набранное: нет большинства — отказ.
@@ -156,11 +192,13 @@ export function settle(
     if (voters.length === 0) continue;
     const yes = vote.yes.filter((v) => voters.includes(v)).length;
     const no = vote.no.filter((v) => voters.includes(v)).length;
-    if (yes * 2 <= voters.length) passed = false;
-    if ((voters.length - no) * 2 <= voters.length) lost = true;
+    // Исключение — тяжёлый шаг: нужны две трети голосующих, молчание считается отказом.
+    if (!enough(yes, voters.length, vote.kind === 'kick')) passed = false;
+    if (!enough(voters.length - no, voters.length, vote.kind === 'kick')) lost = true;
   }
   if (!passed && !lost && !expired) return;
   d.votes = (d.votes ?? []).filter((v) => v !== vote);
+  if (!passed) lockVote(state, d, vote);
   // Итог остаётся на виду: ответы ботов приходят быстро, и без него исход голосования не увидеть.
   d.results ??= [];
   d.results.push({

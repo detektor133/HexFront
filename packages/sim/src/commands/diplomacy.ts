@@ -10,6 +10,7 @@ import {
   openVote,
   requestAid,
   settle,
+  voteBlocked,
 } from './alliance.ts';
 import { OK, rejected, type Command, type Validation } from './types.ts';
 import { AID_TTL_TICKS } from '../balance.ts';
@@ -69,7 +70,7 @@ export function validateDiplomacy(
   if (cmd.t === 'proposeExpel') {
     // Исключать можно члена своего альянса, если в нём не меньше троих: иначе это просто выход.
     const group = groupOf(state, playerId);
-    const open = state.diplomacy.votes?.some((v) => v.kind === 'kick' && v.b === cmd.target);
+    const open = voteBlocked(state, 'kick', playerId, cmd.target);
     if (!Number.isInteger(cmd.target) || cmd.target === playerId || !alive(state, cmd.target)) {
       return rejected('badPlayer');
     }
@@ -91,8 +92,14 @@ export function validateDiplomacy(
       return now === 'war' ? rejected('sameRelation') : OK;
     case 'proposeTreaty':
       // Из войны — только мир; из мира и договоров — только более тесный договор.
-      if (now === 'war') return cmd.kind === 'peace' ? OK : rejected('sameRelation');
+      if (now === 'war') {
+        if (cmd.kind !== 'peace') return rejected('sameRelation');
+        return voteBlocked(state, 'peace', playerId, other) ? rejected('sameRelation') : OK;
+      }
       if (cmd.kind === 'peace') return rejected('sameRelation');
+      if (cmd.kind === 'alliance' && voteBlocked(state, 'join', playerId, other)) {
+        return rejected('sameRelation');
+      }
       return RANK[cmd.kind] > RANK[now] ? OK : rejected('sameRelation');
     case 'answerTreaty':
       return liveOffer(state, cmd.from, playerId) ? OK : rejected('noOffer');

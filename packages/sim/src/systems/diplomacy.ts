@@ -31,6 +31,9 @@ export function diplomacySystem(state: MatchState): void {
   for (const vote of [...(d.votes ?? [])]) {
     settle(state, d, vote, state.tick - vote.tick >= VOTE_TTL_TICKS);
   }
+  if (d.locks?.some((l) => l.until <= state.tick)) {
+    d.locks = d.locks.filter((l) => l.until > state.tick);
+  }
   if (d.results?.some((r) => state.tick - r.tick >= RESULT_TTL_TICKS)) {
     d.results = d.results.filter((r) => state.tick - r.tick < RESULT_TTL_TICKS);
   }

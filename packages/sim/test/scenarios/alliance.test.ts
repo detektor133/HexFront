@@ -226,6 +226,47 @@ describe('альянс', () => {
     expect(diplomacyView(s.state, 0)?.votes).toEqual([]);
   });
 
+  it('отклонённое исключение и вход не повторяются сразу: пауза против спама', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    cmd(s, 0, { t: 'proposeTreaty', target: 2, kind: 'alliance' });
+    cmd(s, 2, { t: 'answerTreaty', from: 0, accept: true });
+    cmd(s, 1, { t: 'castVote', voteId: s.state.diplomacy?.votes?.[0]?.id ?? -1, yes: true });
+    cmd(s, 0, { t: 'proposeExpel', target: 2 });
+    cmd(s, 1, { t: 'castVote', voteId: s.state.diplomacy?.votes?.[0]?.id ?? -1, yes: false });
+    expect(rel(s, 1, 2)).toBe('alliance');
+    // Тот же игрок и тот же инициатор: пауза.
+    expect(validate(s.state, 0, { t: 'proposeExpel', target: 2 }).ok).toBe(false);
+    expect(validate(s.state, 1, { t: 'proposeExpel', target: 2 }).ok).toBe(false);
+    expect(validate(s.state, 0, { t: 'proposeExpel', target: 1 }).ok).toBe(false);
+    s.runTicks(3001);
+    expect(validate(s.state, 0, { t: 'proposeExpel', target: 2 }).ok).toBe(true);
+  });
+
+  it('исключение требует две трети: один голос из трёх не хватает', () => {
+    const s = game();
+    treaty(s, 0, 1, 'alliance');
+    for (const [from, to] of [
+      [0, 2],
+      [0, 3],
+    ] as const) {
+      cmd(s, from, { t: 'proposeTreaty', target: to, kind: 'alliance' });
+      cmd(s, to, { t: 'answerTreaty', from, accept: true });
+      for (const v of [1, 2]) {
+        const open = s.state.diplomacy?.votes?.[0];
+        if (open && open.voters.includes(v))
+          cmd(s, v, { t: 'castVote', voteId: open.id, yes: true });
+      }
+    }
+    expect(rel(s, 2, 3)).toBe('alliance');
+    cmd(s, 0, { t: 'proposeExpel', target: 3 });
+    const vote = s.state.diplomacy?.votes?.[0];
+    expect(vote?.voters).toEqual([0, 1, 2]);
+    cmd(s, 1, { t: 'castVote', voteId: vote?.id ?? -1, yes: false });
+    cmd(s, 2, { t: 'castVote', voteId: vote?.id ?? -1, yes: false });
+    expect(rel(s, 0, 3)).toBe('alliance');
+  });
+
   it('исключать нельзя, если в альянсе двое; итог отказа тоже виден', () => {
     const s = game();
     treaty(s, 0, 1, 'alliance');
