@@ -335,6 +335,16 @@ export function createTerritoryGpu(map: MapStatic, radius: number): TerritoryGpu
     },
     setPolitical(on) {
       political = on;
+      // Политическая карта читается целиком: туман войны её не затемняет.
+      for (const shader of [fillShader, overShader]) {
+        const group = shader.resources.params as { uniforms: Record<string, unknown> };
+        group.uniforms.uFogColor = [
+          fog[0] / 255,
+          fog[1] / 255,
+          fog[2] / 255,
+          on ? 0 : tokens.fog.darkAlpha,
+        ];
+      }
       if (lastView) writePalette();
     },
     setView(view) {

@@ -25,7 +25,14 @@ function groups(view: PlayerView): Group[] {
     group.members.push(name);
     out.set(key, group);
   }
-  const order: Record<PoliticalKind, number> = { own: 0, war: 1, bloc: 2, solo: 3 };
+  const order: Record<PoliticalKind, number> = {
+    own: 0,
+    defense: 1,
+    pact: 2,
+    war: 3,
+    bloc: 4,
+    solo: 5,
+  };
   return [...out.entries()]
     .map(([key, g]) => ({ key, ...g }))
     .sort((a, b) => order[a.kind] - order[b.kind] || a.key.localeCompare(b.key));
