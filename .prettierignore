@@ -8,3 +8,4 @@ docs/
 apps/client/src/theme/tokens.*
 apps/client/src/theme/themes.*
 apps/client/public/manifest.webmanifest
+.claude/worktrees/

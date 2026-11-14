@@ -116,6 +116,8 @@ export default tseslint.config(
       '**/dist/**',
       'coverage/**',
       'docs/**',
+      // Рабочие каталоги параллельных сессий: у них свой линт.
+      '.claude/worktrees/**',
       // Фикстура нарочно нарушает правила; её проверяет sim-guards.test.ts.
       'packages/sim/test/fixtures/**',
     ],
