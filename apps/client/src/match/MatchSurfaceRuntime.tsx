@@ -784,6 +784,7 @@ export function useSandbox(
             (cmd) => match.send(cmd),
             screen,
             (h) => current.cities.find((c) => c.hex === h)?.id,
+            { width: map.width, height: map.height },
           )
         )
           return;

@@ -3,7 +3,7 @@
 // пока режим включён, и сразу после стройки.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Command } from '@hexfront/sim';
+import { hexFromId, hexId, inBounds, spiral, type Command } from '@hexfront/sim';
 
 import type { EconomyLayer } from '../dev/economy-layer.ts';
 import type { LocalMatch } from '../local/local-match.ts';
@@ -12,6 +12,8 @@ import type { MapMaskMode, MapMaskReply } from '../local/messages.ts';
 export type MapMode = 'normal' | 'supply' | 'political';
 export type BuildTool = 'city' | 'fort' | 'depot' | 'improve';
 
+/** Радиус области «благоустройство»: клик берёт всё доступное вокруг (гексы, что нельзя или не по карману, пропускаются). */
+const IMPROVE_AREA_RADIUS = 2;
 /** Как часто обновляется маска, мс: стройка и захват гексов меняют её не чаще секунды. */
 const REFRESH_MS = 1000;
 /** Пауза после команды стройки: команда применяется на ближайшем тике (100 мс). */
@@ -62,6 +64,8 @@ export interface MapModes {
     at?: { readonly x: number; readonly y: number },
     /** Город на гексе (id) — инструмент «город» улучшает его, а не основывает новый. */
     cityAt?: (hex: number) => number | undefined,
+    /** Размер карты: нужен, чтобы благоустройство шло областью вокруг клика. */
+    size?: { readonly width: number; readonly height: number },
   ): boolean;
 }
 
@@ -138,9 +142,28 @@ export function useMapModes(
       send: (cmd: Command) => void,
       at?: { readonly x: number; readonly y: number },
       cityAt?: (hex: number) => number | undefined,
+      size?: { readonly width: number; readonly height: number },
     ): boolean => {
       const tool = buildRef.current;
       if (tool === null) return false;
+      if (tool === 'improve' && size) {
+        const mask = maskRef.current;
+        const area = spiral(hexFromId(hex, size.width), IMPROVE_AREA_RADIUS)
+          .filter((h) => inBounds(h, size.width, size.height))
+          .map((h) => hexId(h, size.width))
+          .filter((id) => mask[id] === 1);
+        if (at) {
+          feedbackId.current += 1;
+          const kind = area.length > 0 ? 'ok' : mask[hex] === 2 ? 'gold' : 'blocked';
+          setFeedback({ id: feedbackId.current, kind, x: at.x, y: at.y });
+        }
+        for (const id of area) send({ t: 'improve', hex: id });
+        if (area.length > 0) {
+          if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+          refreshTimer.current = window.setTimeout(request, AFTER_COMMAND_MS);
+        }
+        return true;
+      }
       // 1 — можно построить; 2 — не хватает золота, 0 — нельзя: клик объясняет отказ.
       const mask = maskRef.current[hex];
       if (at) {
