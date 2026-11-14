@@ -4,6 +4,7 @@
 // счётчик нарушений игрока, который видят все.
 import {
   annulAid,
+  endAid,
   joinAid,
   joinAllianceWars,
   joinWars,
@@ -201,6 +202,10 @@ function conclude(state: MatchState, from: number, to: number, kind: TreatyKind)
   cancelAttacks(state, from, to);
   state.events.push({ t: 'treatyMade', playerId: to, targetId: from, kind });
   if (kind === 'alliance') joinAllianceWars(state, [from, to]);
+  if (kind === 'peace') {
+    endAid(state, [from], [to]);
+    endAid(state, [to], [from]);
+  }
 }
 
 // Выход из альянса целиком: мир со всеми членами, нарушение +1.

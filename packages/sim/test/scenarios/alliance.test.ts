@@ -51,6 +51,23 @@ describe('оборонительный пакт', () => {
     expect(s.state.diplomacy?.violations[0]).toBe(0);
   });
 
+  it('сепаратный мир помощника: пакт с пострадавшим рвётся сам, без нарушения', () => {
+    const s = game();
+    treaty(s, 0, 1, 'defense');
+    cmd(s, 2, { t: 'declareWar', target: 1 });
+    cmd(s, 0, { t: 'answerAid', aggressor: 2, join: true });
+    expect(atWar(s.state, 0, 2)).toBe(true);
+    cmd(s, 0, { t: 'proposeTreaty', target: 2, kind: 'peace' });
+    cmd(s, 2, { t: 'answerTreaty', from: 0, accept: true });
+    expect(rel(s, 0, 2)).toBe('peace');
+    // Пострадавший воюет дальше один; наш пакт с ним распался в мир, нарушения нет.
+    expect(rel(s, 1, 2)).toBe('war');
+    expect(rel(s, 0, 1)).toBe('peace');
+    expect(s.state.diplomacy?.violations[0]).toBe(0);
+    s.runTicks(2);
+    expect(s.state.diplomacy?.aid).toEqual([]);
+  });
+
   it('отказ и молчание аннулируют пакт без нарушения', () => {
     const s = game();
     treaty(s, 0, 1, 'defense');

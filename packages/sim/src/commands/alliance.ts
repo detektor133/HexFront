@@ -105,6 +105,29 @@ export function joinAid(state: MatchState, call: AidCall): void {
   joinWars(state, call.ally, call.aggressor);
 }
 
+/**
+ * Мир с агрессором заканчивает помощь по оборонительному пакту: сепаратный мир разрешён, и пакт с
+ * пострадавшим рвётся в мир без нарушения (помощь больше нечем держать).
+ */
+export function endAid(
+  state: MatchState,
+  allies: readonly number[],
+  aggressors: readonly number[],
+): void {
+  for (const war of state.diplomacy?.aid ?? []) {
+    if (!allies.includes(war.ally) || !aggressors.includes(war.aggressor)) continue;
+    if (relationOf(state, war.ally, war.aggressor) === 'war') continue;
+    if (relationOf(state, war.ally, war.victim) !== 'defense') continue;
+    setRelation(state, war.ally, war.victim, 'peace');
+    state.events.push({
+      t: 'treatyBroken',
+      playerId: war.ally,
+      targetId: war.victim,
+      kind: 'defense',
+    });
+  }
+}
+
 function applyVote(state: MatchState, vote: AllianceVote): void {
   const sideA = groupOf(state, vote.a);
   const sideB = groupOf(state, vote.b);
@@ -134,6 +157,8 @@ function applyVote(state: MatchState, vote: AllianceVote): void {
       recordTreaty(state, x, y, 'peace');
     }
   }
+  endAid(state, sideA, sideB);
+  endAid(state, sideB, sideA);
   state.events.push({ t: 'treatyMade', playerId: vote.b, targetId: vote.a, kind: 'peace' });
 }
 
