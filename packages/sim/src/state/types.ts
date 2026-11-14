@@ -281,6 +281,8 @@ export interface Army {
   dir?: {
     readonly target: number;
     readonly mode: 'hold' | 'attack' | 'idle';
+    /** Охват — весь блок врагов цели (её союзники на войне с нами); нет поля — только сама страна. */
+    readonly bloc?: true;
     /** Гекс клика наступления: удар повторяется, пока он не взят. */
     readonly hex?: number;
     /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { applyCommands } from '../../src/commands/apply.ts';
-import { borderPieces } from '../../src/commands/launch.ts';
+import { borderPieces } from '../../src/commands/scope.ts';
 import { createDiplomacy, setRelation } from '../../src/state/relations.ts';
 import { at, city, own, scenario } from '../scenario/dsl.ts';
 
@@ -65,5 +65,41 @@ describe('фронты держатся за участки границы, а �
       expect(edges.length).toBeGreaterThan(0);
       expect([...edges].sort()).toEqual([...own].sort());
     }
+  });
+
+  it('приказ на члена альянса охватывает весь блок, а две армии делят границу без наложения', () => {
+    const s = game();
+    for (const id of [1, 2, 3]) {
+      applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: id } }]);
+    }
+    for (const [x, y] of [
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ] as const) {
+      setRelation(s.state, x, y, 'alliance');
+    }
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 100 } }]);
+    const first = s.state.armies.find((a) => a.owner === 0 && a.dir);
+    expect(first?.dir?.bloc).toBe(true);
+    const whole = [...borderPieces(s.state, 0, 1, true).flat()].sort((a, b) => a - b);
+    const planOf = (id: number | undefined) => {
+      const plan = s.state.plans.find((p) => p.armyId === id);
+      return plan?.kind === 'front' ? plan.edges : [];
+    };
+    expect([...planOf(first?.id)].sort((a, b) => a - b)).toEqual(whole);
+
+    // Вторая армия на тот же блок (через другого его члена): граница делится.
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'holdBorder', target: 2, soldiers: 100, armyId: -1 } },
+    ]);
+    s.runTicks(5);
+    const armies = s.state.armies.filter((a) => a.owner === 0 && a.dir?.mode === 'hold');
+    expect(armies.length).toBe(2);
+    const [a, b] = armies.map((x) => planOf(x.id));
+    expect(a?.length).toBeGreaterThan(0);
+    expect(b?.length).toBeGreaterThan(0);
+    expect(a?.some((e) => b?.includes(e))).toBe(false);
+    expect([...(a ?? []), ...(b ?? [])].sort((x, y) => x - y)).toEqual(whole);
   });
 });

@@ -6,19 +6,14 @@ import { dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
 import { pickAxes, type Force, type Strike } from './axis.ts';
 import { executePlanCommand, placeFront, removePlan, validatePlanCommand } from './plan.ts';
 import { releaseDirection } from './release.ts';
+import { armyPieces, blocOf, borderPieces, scopeMates, wantsBloc } from './scope.ts';
 import { OK, rejected, type Validation } from './types.ts';
 import { AXIS_DONE_PERCENT, AXIS_MAX, AXIS_SOLDIERS, OFFENSIVE_RETRY_TICKS } from '../balance.ts';
 import { commanderLine } from '../bots/commander-line.ts';
 import { distance, hexFromId, type HexId } from '../math/hex.ts';
 import { FP, intDiv } from '../math/int.ts';
 import { SLOT_DETACHED } from '../state/allocate.ts';
-import {
-  borderEdges,
-  borderSegmentEdges,
-  edgeHex,
-  edgeOther,
-  type EdgeId,
-} from '../state/edges.ts';
+import { edgeHex, edgeOther, type EdgeId } from '../state/edges.ts';
 import { mixNeed } from '../state/mix.ts';
 import { atWar } from '../state/relations.ts';
 import type { Army, ArmyMix, MatchState, Unit } from '../state/types.ts';
@@ -48,33 +43,11 @@ export interface DirectionCommand {
   readonly mix?: ArmyMix;
 }
 
-/**
- * Цель направления: сам игрок (или ничья земля). Союзники цели в блок не входят: объединение врагов
- * в альянс не двигает фронты — каждая армия держит свой участок границы, у кого бы он ни был
- * (07-controls.md, «Фронт — участок границы»).
- * @param _playerId владелец армии (оставлен для единого вида вызова)
- * @returns признак «гекс этого владельца — враг направления»
- */
-export function blocOf(
-  _state: MatchState,
-  _playerId: number,
-  target: number,
-): (who: number) => boolean {
-  return (who) => who === target;
-}
-
-/** Куски своей границы с блоком цели, каждый — упорядоченная цепочка граней. */
-export function borderPieces(state: MatchState, playerId: number, target: number): EdgeId[][] {
-  const isEnemy = blocOf(state, playerId, target);
-  const pieces: EdgeId[][] = [];
-  const seen = new Set<EdgeId>();
-  for (const e of borderEdges(state, playerId)) {
-    if (seen.has(e)) continue;
-    const piece = borderSegmentEdges(state, playerId, isEnemy, e);
-    for (const x of piece) seen.add(x);
-    if (piece.length > 0) pieces.push(piece);
-  }
-  return pieces;
+// Фронт армии пересчитается на ближайшем тике (границу делят заново).
+function resync(state: MatchState, armyId: number): void {
+  const i = state.plans.findIndex((p) => p.armyId === armyId);
+  const plan = state.plans[i];
+  if (plan?.kind === 'front' && plan.derived !== undefined) state.plans[i] = { ...plan, rev: -1 };
 }
 
 // Участок удара выбирает ИИ: клик игрока в выборе оси не участвует.
@@ -89,8 +62,8 @@ function strikeFront(
   return pickAxes(
     state,
     playerId,
-    blocOf(state, playerId, cmd.target),
-    borderPieces(state, playerId, cmd.target),
+    blocOf(state, playerId, cmd.target, army?.dir?.bloc === true),
+    army?.dir ? armyPieces(state, army) : borderPieces(state, playerId, cmd.target),
     cmd.soldiers,
     skip,
     want,
@@ -112,8 +85,8 @@ function forcesOf(state: MatchState, playerId: number, army?: Army): Force[] {
 }
 
 // Фронт направления: у игрока — вся граница с блоком цели (нигде нет дыр и ничего лишнего).
-function frontOf(state: MatchState, playerId: number, target: number): EdgeId[] {
-  return borderPieces(state, playerId, target).flat();
+function frontOf(state: MatchState, army: Army): EdgeId[] {
+  return armyPieces(state, army).flat();
 }
 
 function validateDirection(
@@ -152,7 +125,10 @@ function validateDirection(
   if (badHex) return rejected('badHex');
   // Снять направление можно и без границы; остальное требует контакта с целью.
   if (cmd.soldiers === 0) return OK;
-  return borderPieces(state, playerId, cmd.target).length > 0 ? OK : rejected('noFront');
+  return borderPieces(state, playerId, cmd.target, wantsBloc(state, playerId, cmd.target)).length >
+    0
+    ? OK
+    : rejected('noFront');
 }
 
 /**
@@ -188,7 +164,13 @@ export function directionArmy(
 ): Army | undefined {
   // Снятое направление остаётся у армии как idle: действующая армия на цель важнее такой тени,
   // иначе «снять с фронта» и повторный приказ доставались бы не той армии.
-  const mine = state.armies.filter((a) => a.owner === playerId && a.dir?.target === target);
+  const mine = state.armies.filter(
+    (a) =>
+      a.owner === playerId &&
+      a.dir !== undefined &&
+      (a.dir.target === target ||
+        (a.dir.bloc === true && blocOf(state, playerId, a.dir.target, true)(target))),
+  );
   return mine.find((a) => a.dir?.mode !== 'idle') ?? mine[0];
 }
 
@@ -233,7 +215,7 @@ function candidates(
     );
 }
 
-export { releaseDirection };
+export { releaseDirection, blocOf, borderPieces };
 
 // Армия направления: создаётся при первом запуске, затем переиспользуется; фронт стоит на границе
 // с целью, отряды добраны под заказ, чего не хватает — закупит ИИ. Автокомандование выключено:
@@ -279,13 +261,16 @@ function prepare(
     target: cmd.target,
     mode,
     // Клик нужен только занятию ничьей земли — как приоритет; ось удара по игроку выбирает ИИ.
+    ...(wantsBloc(state, playerId, cmd.target) ? { bloc: true as const } : {}),
     ...(mode === 'attack' && cmd.target === NEUTRAL_TARGET && cmd.hex !== undefined
       ? { hex: cmd.hex }
       : {}),
   };
+  // Армии того же охвата делят границу заново.
+  for (const mate of scopeMates(state, army)) resync(state, mate.id);
   // Фронт — вся граница с блоком цели, чтобы нигде на ней не было дыр и не было лишнего.
   const neutral = cmd.target === NEUTRAL_TARGET;
-  const front = neutral ? [] : frontOf(state, playerId, cmd.target);
+  const front = neutral ? [] : frontOf(state, army);
   const strike: Strike = neutral
     ? { edges: [], windows: [], axes: 0, depth: 0 }
     : strikeFront(state, playerId, cmd, [], undefined, army);
@@ -345,7 +330,7 @@ function prepare(
 
 // Линии наступления: у каждой оси свой участок границы и своя линия впереди него.
 function strikeLines(state: MatchState, army: Army, target: number, strike: Strike): EdgeId[][] {
-  const enemy = blocOf(state, army.owner, target);
+  const enemy = blocOf(state, army.owner, target, army.dir?.bloc === true);
   return strike.windows
     .map((w) =>
       commanderLine(
@@ -452,7 +437,12 @@ export function continueStrike(state: MatchState, army: Army): void {
   );
   if (strike.edges.length > 0 && startStrike(state, army, dir.target, strike)) return;
   // Бить пока нечем: временная оборона, через OFFENSIVE_RETRY_TICKS армия попробует снова.
-  army.dir = { target: dir.target, mode: 'hold', resume: state.tick + OFFENSIVE_RETRY_TICKS };
+  army.dir = {
+    target: dir.target,
+    mode: 'hold',
+    resume: state.tick + OFFENSIVE_RETRY_TICKS,
+    ...(dir.bloc ? { bloc: true } : {}),
+  };
 }
 
 /**
@@ -477,7 +467,12 @@ export function reshuffleStrike(state: MatchState, army: Army): void {
     return;
   }
   executePlanCommand(state, army.owner, { t: 'clearOffensive', armyId: army.id });
-  army.dir = { target: dir.target, mode: 'hold', resume: state.tick + OFFENSIVE_RETRY_TICKS };
+  army.dir = {
+    target: dir.target,
+    mode: 'hold',
+    resume: state.tick + OFFENSIVE_RETRY_TICKS,
+    ...(dir.bloc ? { bloc: true } : {}),
+  };
 }
 
 /** Применяет команду holdBorder. Вызывается только после успешной проверки. */

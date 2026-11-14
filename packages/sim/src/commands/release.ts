@@ -15,5 +15,6 @@ export function releaseDirection(state: MatchState, army: Army): void {
   }
   const rest = state.recruits.filter((r) => r.armyId !== army.id);
   state.recruits.splice(0, state.recruits.length, ...rest);
-  if (army.dir !== undefined) army.dir = { target: army.dir.target, mode: 'idle' };
+  if (army.dir !== undefined)
+    army.dir = { target: army.dir.target, mode: 'idle', ...(army.dir.bloc ? { bloc: true } : {}) };
 }

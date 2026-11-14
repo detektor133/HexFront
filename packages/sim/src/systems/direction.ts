@@ -6,13 +6,13 @@ import { commandAssaults } from './assault.ts';
 import { expandNeutral } from './expand.ts';
 import { AXIS_REFRESH_S, OFFENSIVE_STALL_TICKS, TICKS_PER_S } from '../balance.ts';
 import {
-  borderPieces,
   continueStrike,
   refreshStrike,
   reshuffleStrike,
   releaseDirection,
 } from '../commands/launch.ts';
 import { placeFront } from '../commands/plan.ts';
+import { armyPieces } from '../commands/scope.ts';
 import { onSeaMission } from '../queries/unit-view.ts';
 import type { MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
@@ -25,7 +25,8 @@ function syncFronts(state: MatchState): void {
     if (plan.rev === state.supplyRevision) return;
     const owner = state.armies.find((a) => a.id === plan.armyId)?.owner;
     if (owner === undefined) return;
-    const edges = borderPieces(state, owner, plan.derived).flat();
+    const army = state.armies.find((a) => a.id === plan.armyId);
+    const edges = army?.dir ? armyPieces(state, army).flat() : [];
     const same = edges.length === plan.edges.length && edges.every((e, k) => e === plan.edges[k]);
     state.plans[i] = {
       ...plan,
@@ -60,7 +61,7 @@ export function maintainDirections(state: MatchState): void {
     }
     // Временная оборона после застоя: время пришло — снова наступаем.
     if (dir.mode === 'hold' && dir.resume !== undefined && state.tick >= dir.resume) {
-      army.dir = { target: dir.target, mode: 'attack' };
+      army.dir = { target: dir.target, mode: 'attack', ...(dir.bloc ? { bloc: true } : {}) };
       continueStrike(state, army);
       continue;
     }
@@ -91,7 +92,7 @@ export function maintainDirections(state: MatchState): void {
     }
     // Фронта нет (его сняли руками) — ставим по границе с блоком цели.
     if (state.plans.some((p) => p.armyId === army.id && p.kind === 'front')) continue;
-    const edges = borderPieces(state, army.owner, dir.target).flat();
+    const edges = armyPieces(state, army).flat();
     if (edges.length > 0) placeFront(state, army.id, edges, dir.target);
   }
 }

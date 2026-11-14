@@ -121,7 +121,15 @@ export function BorderSignals(props: {
     }
     const held = (other: number): boolean =>
       fronted.has(other) ||
-      view.armies.some((a) => a.dir?.target === other && a.dir.mode !== 'idle');
+      view.armies.some(
+        (a) =>
+          a.dir !== undefined &&
+          a.dir.mode !== 'idle' &&
+          (a.dir.target === other ||
+            (a.dir.bloc === true &&
+              view.diplomacy?.blocs[other] !== undefined &&
+              view.diplomacy.blocs[other] === view.diplomacy.blocs[a.dir.target])),
+      );
     const list: { other: number; hex: number; war: string | null; held: boolean }[] = [];
     for (const [other, hex] of neighbours) {
       const war = wars.get(other) ?? null;

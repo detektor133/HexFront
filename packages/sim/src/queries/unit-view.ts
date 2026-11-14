@@ -66,7 +66,11 @@ export interface ArmyView {
   /** Состав заказа: танки и артиллерия (остальное — пехота); нет поля — тип не важен. */
   readonly mix?: { readonly armor: number; readonly artillery: number };
   /** Направление армии: цель (id игрока или -1 — ничья земля) и режим. */
-  readonly dir?: { readonly target: number; readonly mode: 'hold' | 'attack' | 'idle' };
+  readonly dir?: {
+    readonly target: number;
+    readonly mode: 'hold' | 'attack' | 'idle';
+    readonly bloc?: true;
+  };
   /** Армия в морском десанте: отряд на воде или его путь ведёт через воду (значок якоря). */
   readonly sea?: boolean;
 }

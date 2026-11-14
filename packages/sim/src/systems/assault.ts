@@ -11,7 +11,7 @@ import {
   TICKS_PER_S,
   ASSAULT_PERIOD_S,
 } from '../balance.ts';
-import { blocOf } from '../commands/launch.ts';
+import { blocOf } from '../commands/scope.ts';
 import { executeUnitCommand, validateUnitCommand } from '../commands/unit.ts';
 import { TERRAIN } from '../map/types.ts';
 import { distance, hexFromId } from '../math/hex.ts';
@@ -57,7 +57,7 @@ function nearOwn(state: MatchState, hex: number, owner: number): boolean {
 function assault(state: MatchState, army: Army): void {
   const dir = army.dir;
   if (!dir || dir.mode !== 'attack' || dir.target < 0) return;
-  const enemy = blocOf(state, army.owner, dir.target);
+  const enemy = blocOf(state, army.owner, dir.target, dir.bloc === true);
   const { width } = state.map;
   const at = (hex: number) => hexFromId(hex, width);
   const mine = allUnits(state).filter((u) => u.armyId === army.id);
