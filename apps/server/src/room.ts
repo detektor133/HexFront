@@ -896,9 +896,11 @@ export class Room {
   }
 
   private botIds(): number[] {
-    const humans = new Set(this.seats.filter((s) => !s.botControlled).map((s) => s.playerId));
+    // Место человека — не бот, даже если он отключился: его армиями командует только commander
+    // (GDD 08-match), а новых армий, договоров и войн без игрока никто не заводит.
+    const seated = new Set(this.seats.map((s) => s.playerId));
     const ids: number[] = [];
-    for (let id = 0; id < this.size; id += 1) if (!humans.has(id)) ids.push(id);
+    for (let id = 0; id < this.size; id += 1) if (!seated.has(id)) ids.push(id);
     return ids;
   }
 

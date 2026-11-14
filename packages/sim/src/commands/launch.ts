@@ -1,6 +1,5 @@
 // Направление одной командой (07-controls.md, «Меню страны»): армия направления набирает отряды
-// под заданное число солдат и ставит фронт на границу с целью (соседом, его союзниками при войне
-// с ними, или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
+// под заданное число солдат и ставит фронт на границу с целью (соседом или ничьей землёй). Наступление (`launchOffensive`): ось удара выбирает сам ИИ по
 // обстановке (`pickAxis`), клик задаёт только цель; удержание (`holdBorder`) держит всю границу
 // с целью, пока она жива, и 0 солдат снимает направление. Дальше всё ведёт обычный движок фронта.
 import { dropEmptyArmies, executeArmyCommand, validMix } from './army.ts';
@@ -21,7 +20,7 @@ import {
   type EdgeId,
 } from '../state/edges.ts';
 import { mixNeed } from '../state/mix.ts';
-import { atWar, isAllied } from '../state/relations.ts';
+import { atWar } from '../state/relations.ts';
 import type { Army, ArmyMix, MatchState, Unit } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 import { expandNeutral } from '../systems/expand.ts';
@@ -50,23 +49,18 @@ export interface DirectionCommand {
 }
 
 /**
- * Блок цели: она сама и её союзники, с которыми мы воюем, — для ИИ это общее полотно врагов.
- * Ничья земля — отдельная цель без союзников.
+ * Цель направления: сам игрок (или ничья земля). Союзники цели в блок не входят: объединение врагов
+ * в альянс не двигает фронты — каждая армия держит свой участок границы, у кого бы он ни был
+ * (07-controls.md, «Фронт — участок границы»).
+ * @param _playerId владелец армии (оставлен для единого вида вызова)
  * @returns признак «гекс этого владельца — враг направления»
  */
 export function blocOf(
-  state: MatchState,
-  playerId: number,
+  _state: MatchState,
+  _playerId: number,
   target: number,
 ): (who: number) => boolean {
-  if (target === NEUTRAL_TARGET) return (who) => who === NEUTRAL_TARGET;
-  const bloc = new Set<number>([target]);
-  for (const p of state.players) {
-    if (p.id !== playerId && isAllied(state, target, p.id) && atWar(state, playerId, p.id)) {
-      bloc.add(p.id);
-    }
-  }
-  return (who) => bloc.has(who);
+  return (who) => who === target;
 }
 
 /** Куски своей границы с блоком цели, каждый — упорядоченная цепочка граней. */

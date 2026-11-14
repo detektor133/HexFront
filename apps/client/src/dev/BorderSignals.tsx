@@ -1,7 +1,15 @@
 import { IconShield, IconSwords, IconX } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Command, MapStatic, PlayerView } from '@hexfront/sim';
+import {
+  hexFromId,
+  hexId,
+  inBounds,
+  neighbors,
+  type Command,
+  type MapStatic,
+  type PlayerView,
+} from '@hexfront/sim';
 
 import styles from './BorderSignals.module.css';
 import { OrderSplit } from './OrderSplit.tsx';
@@ -98,7 +106,21 @@ export function BorderSignals(props: {
     return found;
   }, [view, map]);
   const open = useMemo(() => {
+    // Страну держит армия с направлением на неё или любая армия, чей фронт (в том числе нарисованный
+    // руками, у десанта) стоит на границе с ней: сигнал нужен только там, где фронта нет.
+    const fronted = new Set<number>();
+    for (const plan of view.plans) {
+      if (plan.kind !== 'front') continue;
+      for (const hex of plan.hexes) {
+        for (const n of neighbors(hexFromId(hex, map.width))) {
+          if (!inBounds(n, map.width, map.height)) continue;
+          const owner = view.hexes.owner[hexId(n, map.width)] ?? -1;
+          if (owner >= 0 && owner !== view.playerId) fronted.add(owner);
+        }
+      }
+    }
     const held = (other: number): boolean =>
+      fronted.has(other) ||
       view.armies.some((a) => a.dir?.target === other && a.dir.mode !== 'idle');
     const list: { other: number; hex: number; war: string | null; held: boolean }[] = [];
     for (const [other, hex] of neighbours) {
@@ -114,7 +136,7 @@ export function BorderSignals(props: {
       if (capital) list.push({ other, hex: capital.hex, war, held: held(other) });
     }
     return list.sort((a, b) => a.other - b.other);
-  }, [neighbours, closed, wars, view.armies, view.cities]);
+  }, [neighbours, closed, wars, view.armies, view.cities, view.plans, view.hexes, map]);
   const nodes = useRef(new Map<number, HTMLElement>());
   const reported = useRef('');
   const place = useMemo(
