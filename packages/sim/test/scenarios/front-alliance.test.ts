@@ -120,4 +120,29 @@ describe('фронты держатся за участки границы, а �
     expect(s.state.armies.find((x) => x.id === gone?.id)?.dir?.mode).toBe('idle');
     expect(s.state.armies.find((x) => x.id === mates[1]?.id)?.dir?.mode).toBe('hold');
   });
+
+  it('член блока капитулировал — армия на весь блок остаётся на фронте с живыми', () => {
+    const s = game();
+    for (const id of [1, 2, 3]) {
+      applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: id } }]);
+    }
+    for (const [x, y] of [
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ] as const) {
+      setRelation(s.state, x, y, 'alliance');
+    }
+    applyCommands(s.state, [{ playerId: 0, cmd: { t: 'holdBorder', target: 1, soldiers: 100 } }]);
+    const army = s.state.armies.find((a) => a.owner === 0 && a.dir);
+    expect(army?.dir?.target).toBe(1);
+    const dead = s.state.players[1];
+    if (dead) dead.status = 'eliminated';
+    s.runSeconds(2);
+    const after = s.state.armies.find((a) => a.id === army?.id);
+    expect(after?.dir?.mode).toBe('hold');
+    expect([2, 3]).toContain(after?.dir?.target);
+    expect(after?.dir?.bloc).toBe(true);
+    expect(s.state.plans.some((p) => p.armyId === army?.id)).toBe(true);
+  });
 });

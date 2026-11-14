@@ -14,7 +14,7 @@ import {
 import { placeFront } from '../commands/plan.ts';
 import { armyPieces, keepScope, pocketHexes } from '../commands/scope.ts';
 import { onSeaMission } from '../queries/unit-view.ts';
-import { atWar } from '../state/relations.ts';
+import { atWar, isAllied } from '../state/relations.ts';
 import type { Army, MatchState } from '../state/types.ts';
 import { allUnits } from '../state/unit-index.ts';
 
@@ -84,7 +84,19 @@ export function maintainDirections(state: MatchState): void {
       continue;
     }
     if (state.players[dir.target]?.status !== 'alive') {
-      releaseDirection(state, army);
+      // Армия на весь блок переживает капитуляцию члена: цель переходит к живому союзнику выбывшего,
+      // фронт остаётся (иначе он сбрасывался бы, пока блок ещё воюет).
+      const heir = dir.bloc
+        ? state.players.find(
+            (q) =>
+              q.status === 'alive' &&
+              q.id !== army.owner &&
+              atWar(state, army.owner, q.id) &&
+              isAllied(state, dir.target, q.id),
+          )
+        : undefined;
+      if (heir) army.dir = { ...dir, target: heir.id };
+      else releaseDirection(state, army);
       continue;
     }
     // Временная оборона после застоя: время пришло — снова наступаем.

@@ -21,6 +21,8 @@ import {
   autoArmy,
   autoOrder,
   covers,
+  newArmyCost,
+  type AutoArmy,
   isFree,
   nearestFreeArmy,
   orderArmy,
@@ -105,6 +107,11 @@ export function TerritoryMenu(props: {
   // Снятое с фронта направление остаётся у армии в режиме idle: оно уже ничего не держит.
   const onFront = (a: ArmyView): boolean => covers(view, a, other);
   const holders = neutral ? [] : view.armies.filter(onFront);
+  // Кого возьмёт «Усилить»: ближайшая свободная армия, иначе новая с золотом на набор.
+  const spare = neutral ? undefined : nearestFreeArmy(view, map, hex);
+  const reinforceAuto: AutoArmy = spare
+    ? { kind: 'army', army: spare }
+    : { kind: 'new', cost: neutral ? 0 : newArmyCost(view, map, other) };
   const attacking = holders.filter((a) => a.dir?.mode === 'attack');
   const strength = neutral ? null : strengthVs(view, other);
   const StrengthIcon =
@@ -150,7 +157,7 @@ export function TerritoryMenu(props: {
             onSelectArmy?.(id);
             onClose();
           }}
-          onRelease={(id) => go({ t: 'holdBorder', target: other, soldiers: 0, armyId: id })}
+          onRelease={(id) => send({ t: 'holdBorder', target: other, soldiers: 0, armyId: id })}
         />
       )}
       <div className={styles.actions}>
@@ -181,24 +188,23 @@ export function TerritoryMenu(props: {
                 onPick={orderBy('hold')}
               />
             ) : (
-              <button
-                type="button"
-                className={styles.ghostButton}
-                data-tutorial="hold"
-                title={t('order.reinforce')}
-                onClick={() => {
-                  // Усиление: ближайшая свободная армия, иначе новая; прежние армии остаются.
-                  const spare = nearestFreeArmy(view, map, hex);
+              <OrderSplit
+                tone="ghost"
+                icon={<IconShieldPlus size={20} aria-hidden="true" />}
+                label="menu.reinforce"
+                tutorial="hold"
+                auto={reinforceAuto}
+                disabled={null}
+                armies={view.armies.filter((a) => !holders.some((h) => h.id === a.id))}
+                onAuto={() =>
                   go(
-                    spare
-                      ? orderArmy(view, spare, other, 'hold')
+                    reinforceAuto.kind === 'army'
+                      ? orderArmy(view, reinforceAuto.army, other, 'hold')
                       : orderNewArmy(view, map, other, 'hold'),
-                  );
-                }}
-              >
-                <IconShieldPlus size={20} aria-hidden="true" />
-                <span>{t('menu.reinforce')}</span>
-              </button>
+                  )
+                }
+                onPick={orderBy('hold')}
+              />
             )}
             <button
               type="button"
