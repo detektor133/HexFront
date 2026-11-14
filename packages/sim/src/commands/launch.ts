@@ -261,7 +261,7 @@ function prepare(
     target: cmd.target,
     mode,
     // Клик нужен только занятию ничьей земли — как приоритет; ось удара по игроку выбирает ИИ.
-    ...(wantsBloc(state, playerId, cmd.target) ? { bloc: true as const } : {}),
+    ...(wantsBloc(state, playerId, cmd.target, army.id) ? { bloc: true as const } : {}),
     ...(mode === 'attack' && cmd.target === NEUTRAL_TARGET && cmd.hex !== undefined
       ? { hex: cmd.hex }
       : {}),
@@ -478,7 +478,10 @@ export function reshuffleStrike(state: MatchState, army: Army): void {
 /** Применяет команду holdBorder. Вызывается только после успешной проверки. */
 export function executeHold(state: MatchState, playerId: number, cmd: DirectionCommand): void {
   if (cmd.soldiers === 0) {
-    const army = directionArmy(state, playerId, cmd.target);
+    const army =
+      cmd.armyId !== undefined && cmd.armyId >= 0
+        ? state.armies.find((a) => a.id === cmd.armyId && a.owner === playerId)
+        : directionArmy(state, playerId, cmd.target);
     if (army) releaseDirection(state, army);
     return;
   }

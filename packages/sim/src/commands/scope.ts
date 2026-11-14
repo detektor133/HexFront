@@ -32,9 +32,27 @@ export function blocOf(
   return (who) => members.has(who);
 }
 
-/** Охват нового приказа: блок, если у цели есть союзники на войне с нами, иначе одна страна. */
-export function wantsBloc(state: MatchState, playerId: number, target: number): boolean {
+/**
+ * Охват нового приказа: блок, если у цели есть союзники на войне с нами, иначе одна страна. Если
+ * границу цели уже держит другая армия на весь блок, новая армия усиливает только эту страну.
+ * @param except армия, которой отдаётся приказ (её прежний охват в счёт не идёт)
+ */
+export function wantsBloc(
+  state: MatchState,
+  playerId: number,
+  target: number,
+  except = -1,
+): boolean {
   if (target < 0) return false;
+  const covered = state.armies.some(
+    (a) =>
+      a.id !== except &&
+      a.owner === playerId &&
+      a.dir?.bloc === true &&
+      a.dir.mode !== 'idle' &&
+      blocOf(state, playerId, a.dir.target, true)(target),
+  );
+  if (covered) return false;
   return state.players.some(
     (p) => p.id !== target && blocOf(state, playerId, target, true)(p.id) && p.status === 'alive',
   );

@@ -67,7 +67,7 @@ describe('фронты держатся за участки границы, а �
     }
   });
 
-  it('приказ на члена альянса охватывает весь блок, а две армии делят границу без наложения', () => {
+  it('приказ на члена альянса охватывает весь блок; усиление и раздел границы страны', () => {
     const s = game();
     for (const id of [1, 2, 3]) {
       applyCommands(s.state, [{ playerId: 0, cmd: { t: 'declareWar', target: id } }]);
@@ -89,17 +89,35 @@ describe('фронты держатся за участки границы, а �
     };
     expect([...planOf(first?.id)].sort((a, b) => a - b)).toEqual(whole);
 
-    // Вторая армия на тот же блок (через другого его члена): граница делится.
+    // Усиление: армия на блок уже держит границу — новая армия берёт только эту страну.
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'holdBorder', target: 2, soldiers: 100, armyId: -1 } },
+    ]);
+    const second = s.state.armies.find((a) => a.owner === 0 && a.dir && a.id !== first?.id);
+    expect(second?.dir?.bloc).toBeUndefined();
+    const country = [...borderPieces(s.state, 0, 2).flat()].sort((a, b) => a - b);
+    expect([...planOf(second?.id)].sort((a, b) => a - b)).toEqual(country);
+    expect([...planOf(first?.id)].sort((a, b) => a - b)).toEqual(whole);
+
+    // Ещё одна армия на ту же страну: две армии страны делят её границу без наложения.
     applyCommands(s.state, [
       { playerId: 0, cmd: { t: 'holdBorder', target: 2, soldiers: 100, armyId: -1 } },
     ]);
     s.runTicks(5);
-    const armies = s.state.armies.filter((a) => a.owner === 0 && a.dir?.mode === 'hold');
-    expect(armies.length).toBe(2);
-    const [a, b] = armies.map((x) => planOf(x.id));
+    const mates = s.state.armies.filter((a) => a.owner === 0 && a.dir && !a.dir.bloc);
+    expect(mates.length).toBe(2);
+    const [a, b] = mates.map((x) => planOf(x.id));
     expect(a?.length).toBeGreaterThan(0);
     expect(b?.length).toBeGreaterThan(0);
     expect(a?.some((e) => b?.includes(e))).toBe(false);
-    expect([...(a ?? []), ...(b ?? [])].sort((x, y) => x - y)).toEqual(whole);
+    expect([...(a ?? []), ...(b ?? [])].sort((x, y) => x - y)).toEqual(country);
+
+    // Снять с фронта одну армию: приказ по номеру армии, вторая остаётся.
+    const gone = mates[0];
+    applyCommands(s.state, [
+      { playerId: 0, cmd: { t: 'holdBorder', target: 2, soldiers: 0, armyId: gone?.id ?? -1 } },
+    ]);
+    expect(s.state.armies.find((x) => x.id === gone?.id)?.dir?.mode).toBe('idle');
+    expect(s.state.armies.find((x) => x.id === mates[1]?.id)?.dir?.mode).toBe('hold');
   });
 });

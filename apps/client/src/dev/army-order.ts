@@ -209,6 +209,15 @@ export function autoOrder(
   return army ? orderArmy(view, army, target, mode) : orderNewArmy(view, map, target, mode);
 }
 
+/** Армия держит или атакует эту страну: приказ на неё саму или на весь блок врагов, куда она входит. */
+export function covers(view: PlayerView, army: ArmyView, other: number): boolean {
+  const dir = army.dir;
+  if (dir === undefined || dir.mode === 'idle') return false;
+  if (dir.target === other) return true;
+  const blocs = view.diplomacy?.blocs;
+  return dir.bloc === true && blocs !== undefined && blocs[dir.target] === blocs[other];
+}
+
 /** Во сколько раз счёт соседа должен отличаться от нашего, чтобы считать его сильнее или слабее. */
 const STRENGTH_GAP = 1.4;
 

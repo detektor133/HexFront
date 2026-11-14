@@ -1,11 +1,9 @@
 import {
-  IconChevronDown,
   IconChevronsDown,
   IconChevronsUp,
   IconEqual,
   IconFlag,
   IconShield,
-  IconShieldOff,
   IconSwords,
   IconX,
 } from '@tabler/icons-react';
@@ -14,21 +12,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ArmyView, Command, MapStatic, PlayerView } from '@hexfront/sim';
 
 import { DiplomacyBlock } from './DiplomacyBlock.tsx';
-import splitStyles from './OrderSplit.module.css';
+import { HoldSplit } from './HoldSplit.tsx';
 import { OrderSplit } from './OrderSplit.tsx';
 import { MarkMenu, WriteButton } from './SocialRow.tsx';
 import styles from './TerritoryMenu.module.css';
-import { armyName } from './army-name.ts';
 import {
   autoArmy,
   autoOrder,
+  covers,
   isFree,
   nearestFreeArmy,
   orderArmy,
   strengthVs,
 } from './army-order.ts';
 import { t } from '../i18n/dict.ts';
-import { armyColor } from '../theme/colors.ts';
 import { tokens } from '../theme/tokens.ts';
 import { IconButton } from '../ui/icon-button.tsx';
 
@@ -82,7 +79,6 @@ export function TerritoryMenu(props: {
       window.removeEventListener('pointerdown', onDown);
     };
   }, [onClose]);
-  const [swapOpen, setSwapOpen] = useState<number | null>(null);
   const neutral = other < 0;
   const player = neutral ? null : view.players[other];
   if (!neutral && (!player || player.status !== 'alive')) return null;
@@ -99,16 +95,11 @@ export function TerritoryMenu(props: {
     (army: ArmyView): void =>
       go(orderArmy(view, army, other, mode, neutral ? hex : undefined));
   const free = nearestFreeArmy(view, map, hex);
-  // Смена армии на фронте: прежняя снимается, новая встаёт в том же режиме (держит или наступает).
-  const swapHolder = (from: ArmyView, to: ArmyView): void => {
-    send({ t: 'holdBorder', target: other, soldiers: 0 });
-    go(orderArmy(view, to, other, from.dir?.mode === 'attack' ? 'attack' : 'hold'));
-  };
   // Армия, уже стоящая на эту страну: от неё зависят кнопки «Оборона» и «Снять с фронта».
   // Снятое с фронта направление остаётся у армии в режиме idle: оно уже ничего не держит.
-  const onFront = (a: ArmyView): boolean => a.dir?.target === other && a.dir.mode !== 'idle';
-  const holder = neutral ? undefined : view.armies.find(onFront);
+  const onFront = (a: ArmyView): boolean => covers(view, a, other);
   const holders = neutral ? [] : view.armies.filter(onFront);
+  const attacking = holders.filter((a) => a.dir?.mode === 'attack');
   const strength = neutral ? null : strengthVs(view, other);
   const StrengthIcon =
     strength === 'stronger' ? IconChevronsUp : strength === 'weaker' ? IconChevronsDown : IconEqual;
@@ -146,62 +137,6 @@ export function TerritoryMenu(props: {
         </IconButton>
       </div>
       {!neutral && <DiplomacyBlock view={view} other={other} send={send} />}
-      {!neutral && onSelectArmy && holders.length > 0 && (
-        <div className={styles.holders}>
-          {holders.map((army) => (
-            <div key={army.id} className={styles.holderRow}>
-              <button
-                type="button"
-                className={styles.holder}
-                title={t('order.holder')}
-                onClick={() => {
-                  onSelectArmy(army.id);
-                  onClose();
-                }}
-              >
-                <span className={styles.holderDot} style={{ background: armyColor(army.number) }} />
-                <span className={styles.holderName}>{armyName(army)}</span>
-              </button>
-              <button
-                type="button"
-                className={styles.holderArrow}
-                aria-label={t('order.swapHolder')}
-                aria-expanded={swapOpen === army.id}
-                title={t('order.swapHolder')}
-                onClick={() => setSwapOpen((now) => (now === army.id ? null : army.id))}
-              >
-                <IconChevronDown size={16} aria-hidden="true" />
-              </button>
-              {swapOpen === army.id && (
-                <ul className={splitStyles.list} role="listbox" aria-label={t('order.swapHolder')}>
-                  {view.armies
-                    .filter((a) => a.id !== army.id)
-                    .map((candidate) => (
-                      <li key={candidate.id}>
-                        <button
-                          type="button"
-                          className={splitStyles.item}
-                          role="option"
-                          aria-selected={false}
-                          onClick={() => swapHolder(army, candidate)}
-                        >
-                          <span
-                            className={splitStyles.swatch}
-                            style={{ background: armyColor(candidate.number) }}
-                          />
-                          <span className={splitStyles.itemName}>{armyName(candidate)}</span>
-                          {!isFree(candidate) && (
-                            <span className={splitStyles.busy} title={t('order.busy')} />
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
       <div className={styles.actions}>
         {neutral ? (
           <OrderSplit
@@ -217,7 +152,7 @@ export function TerritoryMenu(props: {
           />
         ) : (
           <>
-            {holder === undefined ? (
+            {holders.length === 0 ? (
               <OrderSplit
                 tone="ghost"
                 icon={<IconShield size={20} aria-hidden="true" />}
@@ -229,38 +164,48 @@ export function TerritoryMenu(props: {
                 onAuto={() => go(autoOrder(view, map, other, 'hold', hex))}
                 onPick={orderBy('hold')}
               />
-            ) : holder.dir?.mode === 'attack' ? (
-              <button
-                type="button"
-                className={styles.ghostButton}
-                data-tutorial="hold"
-                onClick={() => go(orderArmy(view, holder, other, 'hold'))}
-              >
-                <IconShield size={20} aria-hidden="true" />
-                <span>{t('menu.defend')}</span>
-              </button>
             ) : (
-              <button
-                type="button"
-                className={styles.ghostButton}
-                data-tutorial="hold"
-                onClick={() => go({ t: 'holdBorder', target: other, soldiers: 0 })}
-              >
-                <IconShieldOff size={20} aria-hidden="true" />
-                <span>{t('menu.unfront')}</span>
-              </button>
+              <HoldSplit
+                view={view}
+                map={map}
+                other={other}
+                hex={hex}
+                holders={holders}
+                send={go}
+                onSelectArmy={
+                  onSelectArmy
+                    ? (id) => {
+                        onSelectArmy(id);
+                        onClose();
+                      }
+                    : undefined
+                }
+              />
             )}
             <button
               type="button"
               className={styles.attackButton}
               data-tutorial="attack"
               disabled={!atWar}
-              aria-pressed={holder?.dir?.mode === 'attack'}
-              title={atWar ? t('menu.attack') : t('army.attackNeedWar')}
-              onClick={() => go(autoOrder(view, map, other, 'attack', hex))}
+              aria-pressed={attacking.length > 0}
+              title={
+                atWar
+                  ? t(attacking.length > 0 ? 'menu.defend' : 'menu.attack')
+                  : t('army.attackNeedWar')
+              }
+              onClick={() => {
+                // Идёт наступление — кнопка переводит держащие армии в оборону; иначе все они наступают.
+                if (attacking.length > 0) {
+                  for (const army of attacking) send(orderArmy(view, army, other, 'hold'));
+                  onClose();
+                } else if (holders.length > 0) {
+                  for (const army of holders) send(orderArmy(view, army, other, 'attack'));
+                  onClose();
+                } else go(autoOrder(view, map, other, 'attack', hex));
+              }}
             >
               <IconSwords size={20} aria-hidden="true" />
-              <span>{t('menu.attack')}</span>
+              <span>{t(attacking.length > 0 ? 'menu.defend' : 'menu.attack')}</span>
             </button>
           </>
         )}
